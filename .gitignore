@@ -6,3 +6,7 @@ __pycache__/
 .envrc.local
 .ipynb_checkpoints/
 .DS_Store
+.mypy_cache/
+Data/
+Models/
+
