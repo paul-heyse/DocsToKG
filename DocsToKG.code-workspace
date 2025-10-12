@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"terminal.integrated.profiles.linux": {
+			"Micromamba (project)": {
+				"path": "/bin/bash",
+				"args": [
+					"-lc",
+					"eval \"$(micromamba shell hook -s bash)\" && micromamba activate -p \"${workspaceFolder}/.venv\" && exec bash -l"
+				],
+				"overrideName": true
+			}
+		},
+		"terminal.integrated.defaultProfile.linux": "Micromamba (project)"
+	}
+}

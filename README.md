@@ -1,4 +1,4 @@
-# Project Title (replace via scripts/init.sh)
+# DocsToKG (replace via scripts/init.sh)
 
 Baseline template for Python projects in Cursor on Ubuntu.
 

@@ -1,0 +1,1185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!doctype html>
+<html >
+<html lang="en">
+
+	<head>
+        <script type="text/javascript">
+			
+            ;window.NREUM||(NREUM={});NREUM.init={privacy:{cookies_enabled:true}};
+            window.NREUM||(NREUM={}),__nr_require=function(t,e,n){function r(n){if(!e[n]){var o=e[n]={exports:{}};t[n][0].call(o.exports,function(e){var o=t[n][1][e];return r(o||e)},o,o.exports)}return e[n].exports}if("function"==typeof __nr_require)return __nr_require;for(var o=0;o<n.length;o++)r(n[o]);return r}({1:[function(t,e,n){function r(t){try{c.console&&console.log(t)}catch(e){}}var o,i=t("ee"),a=t(27),c={};try{o=localStorage.getItem("__nr_flags").split(","),console&&"function"==typeof console.log&&(c.console=!0,o.indexOf("dev")!==-1&&(c.dev=!0),o.indexOf("nr_dev")!==-1&&(c.nrDev=!0))}catch(s){}c.nrDev&&i.on("internal-error",function(t){r(t.stack)}),c.dev&&i.on("fn-err",function(t,e,n){r(n.stack)}),c.dev&&(r("NR AGENT IN DEVELOPMENT MODE"),r("flags: "+a(c,function(t,e){return t}).join(", ")))},{}],2:[function(t,e,n){function r(t,e,n,r,c){try{l?l-=1:o(c||new UncaughtException(t,e,n),!0)}catch(f){try{i("ierr",[f,s.now(),!0])}catch(d){}}return"function"==typeof u&&u.apply(this,a(arguments))}function UncaughtException(t,e,n){this.message=t||"Uncaught error with no additional information",this.sourceURL=e,this.line=n}function o(t,e){var n=e?null:s.now();i("err",[t,n])}var i=t("handle"),a=t(28),c=t("ee"),s=t("loader"),f=t("gos"),u=window.onerror,d=!1,p="nr@seenError",l=0;s.features.err=!0,t(1),window.onerror=r;try{throw new Error}catch(h){"stack"in h&&(t(13),t(12),"addEventListener"in window&&t(6),s.xhrWrappable&&t(14),d=!0)}c.on("fn-start",function(t,e,n){d&&(l+=1)}),c.on("fn-err",function(t,e,n){d&&!n[p]&&(f(n,p,function(){return!0}),this.thrown=!0,o(n))}),c.on("fn-end",function(){d&&!this.thrown&&l>0&&(l-=1)}),c.on("internal-error",function(t){i("ierr",[t,s.now(),!0])})},{}],3:[function(t,e,n){t("loader").features.ins=!0},{}],4:[function(t,e,n){function r(){_++,T=g.hash,this[u]=y.now()}function o(){_--,g.hash!==T&&i(0,!0);var t=y.now();this[h]=~~this[h]+t-this[u],this[d]=t}function i(t,e){E.emit("newURL",[""+g,e])}function a(t,e){t.on(e,function(){this[e]=y.now()})}var c="-start",s="-end",f="-body",u="fn"+c,d="fn"+s,p="cb"+c,l="cb"+s,h="jsTime",m="fetch",v="addEventListener",w=window,g=w.location,y=t("loader");if(w[v]&&y.xhrWrappable){var x=t(10),b=t(11),E=t(8),R=t(6),O=t(13),N=t(7),M=t(14),P=t(9),S=t("ee"),C=S.get("tracer");t(16),y.features.spa=!0;var T,_=0;S.on(u,r),S.on(p,r),S.on(d,o),S.on(l,o),S.buffer([u,d,"xhr-done","xhr-resolved"]),R.buffer([u]),O.buffer(["setTimeout"+s,"clearTimeout"+c,u]),M.buffer([u,"new-xhr","send-xhr"+c]),N.buffer([m+c,m+"-done",m+f+c,m+f+s]),E.buffer(["newURL"]),x.buffer([u]),b.buffer(["propagate",p,l,"executor-err","resolve"+c]),C.buffer([u,"no-"+u]),P.buffer(["new-jsonp","cb-start","jsonp-error","jsonp-end"]),a(M,"send-xhr"+c),a(S,"xhr-resolved"),a(S,"xhr-done"),a(N,m+c),a(N,m+"-done"),a(P,"new-jsonp"),a(P,"jsonp-end"),a(P,"cb-start"),E.on("pushState-end",i),E.on("replaceState-end",i),w[v]("hashchange",i,!0),w[v]("load",i,!0),w[v]("popstate",function(){i(0,_>1)},!0)}},{}],5:[function(t,e,n){function r(t){}if(window.performance&&window.performance.timing&&window.performance.getEntriesByType){var o=t("ee"),i=t("handle"),a=t(13),c=t(12),s="learResourceTimings",f="addEventListener",u="resourcetimingbufferfull",d="bstResource",p="resource",l="-start",h="-end",m="fn"+l,v="fn"+h,w="bstTimer",g="pushState",y=t("loader");y.features.stn=!0,t(8),"addEventListener"in window&&t(6);var x=NREUM.o.EV;o.on(m,function(t,e){var n=t[0];n instanceof x&&(this.bstStart=y.now())}),o.on(v,function(t,e){var n=t[0];n instanceof x&&i("bst",[n,e,this.bstStart,y.now()])}),a.on(m,function(t,e,n){this.bstStart=y.now(),this.bstType=n}),a.on(v,function(t,e){i(w,[e,this.bstStart,y.now(),this.bstType])}),c.on(m,function(){this.bstStart=y.now()}),c.on(v,function(t,e){i(w,[e,this.bstStart,y.now(),"requestAnimationFrame"])}),o.on(g+l,function(t){this.time=y.now(),this.startPath=location.pathname+location.hash}),o.on(g+h,function(t){i("bstHist",[location.pathname+location.hash,this.startPath,this.time])}),f in window.performance&&(window.performance["c"+s]?window.performance[f](u,function(t){i(d,[window.performance.getEntriesByType(p)]),window.performance["c"+s]()},!1):window.performance[f]("webkit"+u,function(t){i(d,[window.performance.getEntriesByType(p)]),window.performance["webkitC"+s]()},!1)),document[f]("scroll",r,{passive:!0}),document[f]("keypress",r,!1),document[f]("click",r,!1)}},{}],6:[function(t,e,n){function r(t){for(var e=t;e&&!e.hasOwnProperty(u);)e=Object.getPrototypeOf(e);e&&o(e)}function o(t){c.inPlace(t,[u,d],"-",i)}function i(t,e){return t[1]}var a=t("ee").get("events"),c=t("wrap-function")(a,!0),s=t("gos"),f=XMLHttpRequest,u="addEventListener",d="removeEventListener";e.exports=a,"getPrototypeOf"in Object?(r(document),r(window),r(f.prototype)):f.prototype.hasOwnProperty(u)&&(o(window),o(f.prototype)),a.on(u+"-start",function(t,e){var n=t[1],r=s(n,"nr@wrapped",function(){function t(){if("function"==typeof n.handleEvent)return n.handleEvent.apply(n,arguments)}var e={object:t,"function":n}[typeof n];return e?c(e,"fn-",null,e.name||"anonymous"):n});this.wrapped=t[1]=r}),a.on(d+"-start",function(t){t[1]=this.wrapped||t[1]})},{}],7:[function(t,e,n){function r(t,e,n){var r=t[e];"function"==typeof r&&(t[e]=function(){var t=i(arguments),e={};o.emit(n+"before-start",[t],e);var a;e[m]&&e[m].dt&&(a=e[m].dt);var c=r.apply(this,t);return o.emit(n+"start",[t,a],c),c.then(function(t){return o.emit(n+"end",[null,t],c),t},function(t){throw o.emit(n+"end",[t],c),t})})}var o=t("ee").get("fetch"),i=t(28),a=t(27);e.exports=o;var c=window,s="fetch-",f=s+"body-",u=["arrayBuffer","blob","json","text","formData"],d=c.Request,p=c.Response,l=c.fetch,h="prototype",m="nr@context";d&&p&&l&&(a(u,function(t,e){r(d[h],e,f),r(p[h],e,f)}),r(c,"fetch",s),o.on(s+"end",function(t,e){var n=this;if(e){var r=e.headers.get("content-length");null!==r&&(n.rxSize=r),o.emit(s+"done",[null,e],n)}else o.emit(s+"done",[t],n)}))},{}],8:[function(t,e,n){var r=t("ee").get("history"),o=t("wrap-function")(r);e.exports=r;var i=window.history&&window.history.constructor&&window.history.constructor.prototype,a=window.history;i&&i.pushState&&i.replaceState&&(a=i),o.inPlace(a,["pushState","replaceState"],"-")},{}],9:[function(t,e,n){function r(t){function e(){s.emit("jsonp-end",[],p),t.removeEventListener("load",e,!1),t.removeEventListener("error",n,!1)}function n(){s.emit("jsonp-error",[],p),s.emit("jsonp-end",[],p),t.removeEventListener("load",e,!1),t.removeEventListener("error",n,!1)}var r=t&&"string"==typeof t.nodeName&&"script"===t.nodeName.toLowerCase();if(r){var o="function"==typeof t.addEventListener;if(o){var a=i(t.src);if(a){var u=c(a),d="function"==typeof u.parent[u.key];if(d){var p={};f.inPlace(u.parent,[u.key],"cb-",p),t.addEventListener("load",e,!1),t.addEventListener("error",n,!1),s.emit("new-jsonp",[t.src],p)}}}}}function o(){return"addEventListener"in window}function i(t){var e=t.match(u);return e?e[1]:null}function a(t,e){var n=t.match(p),r=n[1],o=n[3];return o?a(o,e[r]):e[r]}function c(t){var e=t.match(d);return e&&e.length>=3?{key:e[2],parent:a(e[1],window)}:{key:t,parent:window}}var s=t("ee").get("jsonp"),f=t("wrap-function")(s);if(e.exports=s,o()){var u=/[?&](?:callback|cb)=([^&#]+)/,d=/(.*)\.([^.]+)/,p=/^(\w+)(\.|$)(.*)$/,l=["appendChild","insertBefore","replaceChild"];Node&&Node.prototype&&Node.prototype.appendChild?f.inPlace(Node.prototype,l,"dom-"):(f.inPlace(HTMLElement.prototype,l,"dom-"),f.inPlace(HTMLHeadElement.prototype,l,"dom-"),f.inPlace(HTMLBodyElement.prototype,l,"dom-")),s.on("dom-start",function(t){r(t[0])})}},{}],10:[function(t,e,n){var r=t("ee").get("mutation"),o=t("wrap-function")(r),i=NREUM.o.MO;e.exports=r,i&&(window.MutationObserver=function(t){return this instanceof i?new i(o(t,"fn-")):i.apply(this,arguments)},MutationObserver.prototype=i.prototype)},{}],11:[function(t,e,n){function r(t){var e=a.context(),n=c(t,"executor-",e),r=new f(n);return a.context(r).getCtx=function(){return e},a.emit("new-promise",[r,e],e),r}function o(t,e){return e}var i=t("wrap-function"),a=t("ee").get("promise"),c=i(a),s=t(27),f=NREUM.o.PR;e.exports=a,f&&(window.Promise=r,["all","race"].forEach(function(t){var e=f[t];f[t]=function(n){function r(t){return function(){a.emit("propagate",[null,!o],i),o=o||!t}}var o=!1;s(n,function(e,n){Promise.resolve(n).then(r("all"===t),r(!1))});var i=e.apply(f,arguments),c=f.resolve(i);return c}}),["resolve","reject"].forEach(function(t){var e=f[t];f[t]=function(t){var n=e.apply(f,arguments);return t!==n&&a.emit("propagate",[t,!0],n),n}}),f.prototype["catch"]=function(t){return this.then(null,t)},f.prototype=Object.create(f.prototype,{constructor:{value:r}}),s(Object.getOwnPropertyNames(f),function(t,e){try{r[e]=f[e]}catch(n){}}),a.on("executor-start",function(t){t[0]=c(t[0],"resolve-",this),t[1]=c(t[1],"resolve-",this)}),a.on("executor-err",function(t,e,n){t[1](n)}),c.inPlace(f.prototype,["then"],"then-",o),a.on("then-start",function(t,e){this.promise=e,t[0]=c(t[0],"cb-",this),t[1]=c(t[1],"cb-",this)}),a.on("then-end",function(t,e,n){this.nextPromise=n;var r=this.promise;a.emit("propagate",[r,!0],n)}),a.on("cb-end",function(t,e,n){a.emit("propagate",[n,!0],this.nextPromise)}),a.on("propagate",function(t,e,n){this.getCtx&&!e||(this.getCtx=function(){if(t instanceof Promise)var e=a.context(t);return e&&e.getCtx?e.getCtx():this})}),r.toString=function(){return""+f})},{}],12:[function(t,e,n){var r=t("ee").get("raf"),o=t("wrap-function")(r),i="equestAnimationFrame";e.exports=r,o.inPlace(window,["r"+i,"mozR"+i,"webkitR"+i,"msR"+i],"raf-"),r.on("raf-start",function(t){t[0]=o(t[0],"fn-")})},{}],13:[function(t,e,n){function r(t,e,n){t[0]=a(t[0],"fn-",null,n)}function o(t,e,n){this.method=n,this.timerDuration=isNaN(t[1])?0:+t[1],t[0]=a(t[0],"fn-",this,n)}var i=t("ee").get("timer"),a=t("wrap-function")(i),c="setTimeout",s="setInterval",f="clearTimeout",u="-start",d="-";e.exports=i,a.inPlace(window,[c,"setImmediate"],c+d),a.inPlace(window,[s],s+d),a.inPlace(window,[f,"clearImmediate"],f+d),i.on(s+u,r),i.on(c+u,o)},{}],14:[function(t,e,n){function r(t,e){d.inPlace(e,["onreadystatechange"],"fn-",c)}function o(){var t=this,e=u.context(t);t.readyState>3&&!e.resolved&&(e.resolved=!0,u.emit("xhr-resolved",[],t)),d.inPlace(t,g,"fn-",c)}function i(t){y.push(t),h&&(b?b.then(a):v?v(a):(E=-E,R.data=E))}function a(){for(var t=0;t<y.length;t++)r([],y[t]);y.length&&(y=[])}function c(t,e){return e}function s(t,e){for(var n in t)e[n]=t[n];return e}t(6);var f=t("ee"),u=f.get("xhr"),d=t("wrap-function")(u),p=NREUM.o,l=p.XHR,h=p.MO,m=p.PR,v=p.SI,w="readystatechange",g=["onload","onerror","onabort","onloadstart","onloadend","onprogress","ontimeout"],y=[];e.exports=u;var x=window.XMLHttpRequest=function(t){var e=new l(t);try{u.emit("new-xhr",[e],e),e.addEventListener(w,o,!1)}catch(n){try{u.emit("internal-error",[n])}catch(r){}}return e};if(s(l,x),x.prototype=l.prototype,d.inPlace(x.prototype,["open","send"],"-xhr-",c),u.on("send-xhr-start",function(t,e){r(t,e),i(e)}),u.on("open-xhr-start",r),h){var b=m&&m.resolve();if(!v&&!m){var E=1,R=document.createTextNode(E);new h(a).observe(R,{characterData:!0})}}else f.on("fn-end",function(t){t[0]&&t[0].type===w||a()})},{}],15:[function(t,e,n){function r(t){if(!c(t))return null;var e=window.NREUM;if(!e.loader_config)return null;var n=(e.loader_config.accountID||"").toString()||null,r=(e.loader_config.agentID||"").toString()||null,f=(e.loader_config.trustKey||"").toString()||null;if(!n||!r)return null;var h=l.generateSpanId(),m=l.generateTraceId(),v=Date.now(),w={spanId:h,traceId:m,timestamp:v};return(t.sameOrigin||s(t)&&p())&&(w.traceContextParentHeader=o(h,m),w.traceContextStateHeader=i(h,v,n,r,f)),(t.sameOrigin&&!u()||!t.sameOrigin&&s(t)&&d())&&(w.newrelicHeader=a(h,m,v,n,r,f)),w}function o(t,e){return"00-"+e+"-"+t+"-01"}function i(t,e,n,r,o){var i=0,a="",c=1,s="",f="";return o+"@nr="+i+"-"+c+"-"+n+"-"+r+"-"+t+"-"+a+"-"+s+"-"+f+"-"+e}function a(t,e,n,r,o,i){var a="btoa"in window&&"function"==typeof window.btoa;if(!a)return null;var c={v:[0,1],d:{ty:"Browser",ac:r,ap:o,id:t,tr:e,ti:n}};return i&&r!==i&&(c.d.tk=i),btoa(JSON.stringify(c))}function c(t){return f()&&s(t)}function s(t){var e=!1,n={};if("init"in NREUM&&"distributed_tracing"in NREUM.init&&(n=NREUM.init.distributed_tracing),t.sameOrigin)e=!0;else if(n.allowed_origins instanceof Array)for(var r=0;r<n.allowed_origins.length;r++){var o=h(n.allowed_origins[r]);if(t.hostname===o.hostname&&t.protocol===o.protocol&&t.port===o.port){e=!0;break}}return e}function f(){return"init"in NREUM&&"distributed_tracing"in NREUM.init&&!!NREUM.init.distributed_tracing.enabled}function u(){return"init"in NREUM&&"distributed_tracing"in NREUM.init&&!!NREUM.init.distributed_tracing.exclude_newrelic_header}function d(){return"init"in NREUM&&"distributed_tracing"in NREUM.init&&NREUM.init.distributed_tracing.cors_use_newrelic_header!==!1}function p(){return"init"in NREUM&&"distributed_tracing"in NREUM.init&&!!NREUM.init.distributed_tracing.cors_use_tracecontext_headers}var l=t(24),h=t(17);e.exports={generateTracePayload:r,shouldGenerateTrace:c}},{}],16:[function(t,e,n){function r(t){var e=this.params,n=this.metrics;if(!this.ended){this.ended=!0;for(var r=0;r<p;r++)t.removeEventListener(d[r],this.listener,!1);e.aborted||(n.duration=a.now()-this.startTime,this.loadCaptureCalled||4!==t.readyState?null==e.status&&(e.status=0):i(this,t),n.cbTime=this.cbTime,u.emit("xhr-done",[t],t),c("xhr",[e,n,this.startTime]))}}function o(t,e){var n=s(e),r=t.params;r.host=n.hostname+":"+n.port,r.pathname=n.pathname,t.parsedOrigin=s(e),t.sameOrigin=t.parsedOrigin.sameOrigin}function i(t,e){t.params.status=e.status;var n=v(e,t.lastSize);if(n&&(t.metrics.rxSize=n),t.sameOrigin){var r=e.getResponseHeader("X-NewRelic-App-Data");r&&(t.params.cat=r.split(", ").pop())}t.loadCaptureCalled=!0}var a=t("loader");if(a.xhrWrappable){var c=t("handle"),s=t(17),f=t(15).generateTracePayload,u=t("ee"),d=["load","error","abort","timeout"],p=d.length,l=t("id"),h=t(21),m=t(20),v=t(18),w=window.XMLHttpRequest;a.features.xhr=!0,t(14),t(7),u.on("new-xhr",function(t){var e=this;e.totalCbs=0,e.called=0,e.cbTime=0,e.end=r,e.ended=!1,e.xhrGuids={},e.lastSize=null,e.loadCaptureCalled=!1,t.addEventListener("load",function(n){i(e,t)},!1),h&&(h>34||h<10)||window.opera||t.addEventListener("progress",function(t){e.lastSize=t.loaded},!1)}),u.on("open-xhr-start",function(t){this.params={method:t[0]},o(this,t[1]),this.metrics={}}),u.on("open-xhr-end",function(t,e){"loader_config"in NREUM&&"xpid"in NREUM.loader_config&&this.sameOrigin&&e.setRequestHeader("X-NewRelic-ID",NREUM.loader_config.xpid);var n=f(this.parsedOrigin);if(n){var r=!1;n.newrelicHeader&&(e.setRequestHeader("newrelic",n.newrelicHeader),r=!0),n.traceContextParentHeader&&(e.setRequestHeader("traceparent",n.traceContextParentHeader),n.traceContextStateHeader&&e.setRequestHeader("tracestate",n.traceContextStateHeader),r=!0),r&&(this.dt=n)}}),u.on("send-xhr-start",function(t,e){var n=this.metrics,r=t[0],o=this;if(n&&r){var i=m(r);i&&(n.txSize=i)}this.startTime=a.now(),this.listener=function(t){try{"abort"!==t.type||o.loadCaptureCalled||(o.params.aborted=!0),("load"!==t.type||o.called===o.totalCbs&&(o.onloadCalled||"function"!=typeof e.onload))&&o.end(e)}catch(n){try{u.emit("internal-error",[n])}catch(r){}}};for(var c=0;c<p;c++)e.addEventListener(d[c],this.listener,!1)}),u.on("xhr-cb-time",function(t,e,n){this.cbTime+=t,e?this.onloadCalled=!0:this.called+=1,this.called!==this.totalCbs||!this.onloadCalled&&"function"==typeof n.onload||this.end(n)}),u.on("xhr-load-added",function(t,e){var n=""+l(t)+!!e;this.xhrGuids&&!this.xhrGuids[n]&&(this.xhrGuids[n]=!0,this.totalCbs+=1)}),u.on("xhr-load-removed",function(t,e){var n=""+l(t)+!!e;this.xhrGuids&&this.xhrGuids[n]&&(delete this.xhrGuids[n],this.totalCbs-=1)}),u.on("addEventListener-end",function(t,e){e instanceof w&&"load"===t[0]&&u.emit("xhr-load-added",[t[1],t[2]],e)}),u.on("removeEventListener-end",function(t,e){e instanceof w&&"load"===t[0]&&u.emit("xhr-load-removed",[t[1],t[2]],e)}),u.on("fn-start",function(t,e,n){e instanceof w&&("onload"===n&&(this.onload=!0),("load"===(t[0]&&t[0].type)||this.onload)&&(this.xhrCbStart=a.now()))}),u.on("fn-end",function(t,e){this.xhrCbStart&&u.emit("xhr-cb-time",[a.now()-this.xhrCbStart,this.onload,e],e)}),u.on("fetch-before-start",function(t){function e(t,e){var n=!1;return e.newrelicHeader&&(t.set("newrelic",e.newrelicHeader),n=!0),e.traceContextParentHeader&&(t.set("traceparent",e.traceContextParentHeader),e.traceContextStateHeader&&t.set("tracestate",e.traceContextStateHeader),n=!0),n}var n,r=t[1]||{};"string"==typeof t[0]?n=t[0]:t[0]&&t[0].url&&(n=t[0].url),n&&(this.parsedOrigin=s(n),this.sameOrigin=this.parsedOrigin.sameOrigin);var o=f(this.parsedOrigin);if(o&&(o.newrelicHeader||o.traceContextParentHeader))if("string"==typeof t[0]){var i={};for(var a in r)i[a]=r[a];i.headers=new Headers(r.headers||{}),e(i.headers,o)&&(this.dt=o),t.length>1?t[1]=i:t.push(i)}else t[0]&&t[0].headers&&e(t[0].headers,o)&&(this.dt=o)})}},{}],17:[function(t,e,n){var r={};e.exports=function(t){if(t in r)return r[t];var e=document.createElement("a"),n=window.location,o={};e.href=t,o.port=e.port;var i=e.href.split("://");!o.port&&i[1]&&(o.port=i[1].split("/")[0].split("@").pop().split(":")[1]),o.port&&"0"!==o.port||(o.port="https"===i[0]?"443":"80"),o.hostname=e.hostname||n.hostname,o.pathname=e.pathname,o.protocol=i[0],"/"!==o.pathname.charAt(0)&&(o.pathname="/"+o.pathname);var a=!e.protocol||":"===e.protocol||e.protocol===n.protocol,c=e.hostname===document.domain&&e.port===n.port;return o.sameOrigin=a&&(!e.hostname||c),"/"===o.pathname&&(r[t]=o),o}},{}],18:[function(t,e,n){function r(t,e){var n=t.responseType;return"json"===n&&null!==e?e:"arraybuffer"===n||"blob"===n||"json"===n?o(t.response):"text"===n||""===n||void 0===n?o(t.responseText):void 0}var o=t(20);e.exports=r},{}],19:[function(t,e,n){function r(){}function o(t,e,n){return function(){return i(t,[f.now()].concat(c(arguments)),e?null:this,n),e?void 0:this}}var i=t("handle"),a=t(27),c=t(28),s=t("ee").get("tracer"),f=t("loader"),u=NREUM;"undefined"==typeof window.newrelic&&(newrelic=u);var d=["setPageViewName","setCustomAttribute","setErrorHandler","finished","addToTrace","inlineHit","addRelease"],p="api-",l=p+"ixn-";a(d,function(t,e){u[e]=o(p+e,!0,"api")}),u.addPageAction=o(p+"addPageAction",!0),u.setCurrentRouteName=o(p+"routeName",!0),e.exports=newrelic,u.interaction=function(){return(new r).get()};var h=r.prototype={createTracer:function(t,e){var n={},r=this,o="function"==typeof e;return i(l+"tracer",[f.now(),t,n],r),function(){if(s.emit((o?"":"no-")+"fn-start",[f.now(),r,o],n),o)try{return e.apply(this,arguments)}catch(t){throw s.emit("fn-err",[arguments,this,t],n),t}finally{s.emit("fn-end",[f.now()],n)}}}};a("actionText,setName,setAttribute,save,ignore,onEnd,getContext,end,get".split(","),function(t,e){h[e]=o(l+e)}),newrelic.noticeError=function(t,e){"string"==typeof t&&(t=new Error(t)),i("err",[t,f.now(),!1,e])}},{}],20:[function(t,e,n){e.exports=function(t){if("string"==typeof t&&t.length)return t.length;if("object"==typeof t){if("undefined"!=typeof ArrayBuffer&&t instanceof ArrayBuffer&&t.byteLength)return t.byteLength;if("undefined"!=typeof Blob&&t instanceof Blob&&t.size)return t.size;if(!("undefined"!=typeof FormData&&t instanceof FormData))try{return JSON.stringify(t).length}catch(e){return}}}},{}],21:[function(t,e,n){var r=0,o=navigator.userAgent.match(/Firefox[\/\s](\d+\.\d+)/);o&&(r=+o[1]),e.exports=r},{}],22:[function(t,e,n){function r(){return c.exists&&performance.now?Math.round(performance.now()):(i=Math.max((new Date).getTime(),i))-a}function o(){return i}var i=(new Date).getTime(),a=i,c=t(29);e.exports=r,e.exports.offset=a,e.exports.getLastTimestamp=o},{}],23:[function(t,e,n){function r(t,e){var n=t.getEntries();n.forEach(function(t){"first-paint"===t.name?d("timing",["fp",Math.floor(t.startTime)]):"first-contentful-paint"===t.name&&d("timing",["fcp",Math.floor(t.startTime)])})}function o(t,e){var n=t.getEntries();n.length>0&&d("lcp",[n[n.length-1]])}function i(t){t.getEntries().forEach(function(t){t.hadRecentInput||d("cls",[t])})}function a(t){if(t instanceof h&&!v){var e=Math.round(t.timeStamp),n={type:t.type};e<=p.now()?n.fid=p.now()-e:e>p.offset&&e<=Date.now()?(e-=p.offset,n.fid=p.now()-e):e=p.now(),v=!0,d("timing",["fi",e,n])}}function c(t){d("pageHide",[p.now(),t])}if(!("init"in NREUM&&"page_view_timing"in NREUM.init&&"enabled"in NREUM.init.page_view_timing&&NREUM.init.page_view_timing.enabled===!1)){var s,f,u,d=t("handle"),p=t("loader"),l=t(26),h=NREUM.o.EV;if("PerformanceObserver"in window&&"function"==typeof window.PerformanceObserver){s=new PerformanceObserver(r);try{s.observe({entryTypes:["paint"]})}catch(m){}f=new PerformanceObserver(o);try{f.observe({entryTypes:["largest-contentful-paint"]})}catch(m){}u=new PerformanceObserver(i);try{u.observe({type:"layout-shift",buffered:!0})}catch(m){}}if("addEventListener"in document){var v=!1,w=["click","keydown","mousedown","pointerdown","touchstart"];w.forEach(function(t){document.addEventListener(t,a,!1)})}l(c)}},{}],24:[function(t,e,n){function r(){function t(){return e?15&e[n++]:16*Math.random()|0}var e=null,n=0,r=window.crypto||window.msCrypto;r&&r.getRandomValues&&(e=r.getRandomValues(new Uint8Array(31)));for(var o,i="xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx",a="",c=0;c<i.length;c++)o=i[c],"x"===o?a+=t().toString(16):"y"===o?(o=3&t()|8,a+=o.toString(16)):a+=o;return a}function o(){return a(16)}function i(){return a(32)}function a(t){function e(){return n?15&n[r++]:16*Math.random()|0}var n=null,r=0,o=window.crypto||window.msCrypto;o&&o.getRandomValues&&Uint8Array&&(n=o.getRandomValues(new Uint8Array(31)));for(var i=[],a=0;a<t;a++)i.push(e().toString(16));return i.join("")}e.exports={generateUuid:r,generateSpanId:o,generateTraceId:i}},{}],25:[function(t,e,n){function r(t,e){if(!o)return!1;if(t!==o)return!1;if(!e)return!0;if(!i)return!1;for(var n=i.split("."),r=e.split("."),a=0;a<r.length;a++)if(r[a]!==n[a])return!1;return!0}var o=null,i=null,a=/Version\/(\S+)\s+Safari/;if(navigator.userAgent){var c=navigator.userAgent,s=c.match(a);s&&c.indexOf("Chrome")===-1&&c.indexOf("Chromium")===-1&&(o="Safari",i=s[1])}e.exports={agent:o,version:i,match:r}},{}],26:[function(t,e,n){function r(t){function e(){t(a&&document[a]?document[a]:document[o]?"hidden":"visible")}"addEventListener"in document&&i&&document.addEventListener(i,e,!1)}e.exports=r;var o,i,a;"undefined"!=typeof document.hidden?(o="hidden",i="visibilitychange",a="visibilityState"):"undefined"!=typeof document.msHidden?(o="msHidden",i="msvisibilitychange"):"undefined"!=typeof document.webkitHidden&&(o="webkitHidden",i="webkitvisibilitychange",a="webkitVisibilityState")},{}],27:[function(t,e,n){function r(t,e){var n=[],r="",i=0;for(r in t)o.call(t,r)&&(n[i]=e(r,t[r]),i+=1);return n}var o=Object.prototype.hasOwnProperty;e.exports=r},{}],28:[function(t,e,n){function r(t,e,n){e||(e=0),"undefined"==typeof n&&(n=t?t.length:0);for(var r=-1,o=n-e||0,i=Array(o<0?0:o);++r<o;)i[r]=t[e+r];return i}e.exports=r},{}],29:[function(t,e,n){e.exports={exists:"undefined"!=typeof window.performance&&window.performance.timing&&"undefined"!=typeof window.performance.timing.navigationStart}},{}],ee:[function(t,e,n){function r(){}function o(t){function e(t){return t&&t instanceof r?t:t?s(t,c,i):i()}function n(n,r,o,i){if(!p.aborted||i){t&&t(n,r,o);for(var a=e(o),c=m(n),s=c.length,f=0;f<s;f++)c[f].apply(a,r);var d=u[y[n]];return d&&d.push([x,n,r,a]),a}}function l(t,e){g[t]=m(t).concat(e)}function h(t,e){var n=g[t];if(n)for(var r=0;r<n.length;r++)n[r]===e&&n.splice(r,1)}function m(t){return g[t]||[]}function v(t){return d[t]=d[t]||o(n)}function w(t,e){f(t,function(t,n){e=e||"feature",y[n]=e,e in u||(u[e]=[])})}var g={},y={},x={on:l,addEventListener:l,removeEventListener:h,emit:n,get:v,listeners:m,context:e,buffer:w,abort:a,aborted:!1};return x}function i(){return new r}function a(){(u.api||u.feature)&&(p.aborted=!0,u=p.backlog={})}var c="nr@context",s=t("gos"),f=t(27),u={},d={},p=e.exports=o();p.backlog=u},{}],gos:[function(t,e,n){function r(t,e,n){if(o.call(t,e))return t[e];var r=n();if(Object.defineProperty&&Object.keys)try{return Object.defineProperty(t,e,{value:r,writable:!0,enumerable:!1}),r}catch(i){}return t[e]=r,r}var o=Object.prototype.hasOwnProperty;e.exports=r},{}],handle:[function(t,e,n){function r(t,e,n,r){o.buffer([t],r),o.emit(t,e,n)}var o=t("ee").get("handle");e.exports=r,r.ee=o},{}],id:[function(t,e,n){function r(t){var e=typeof t;return!t||"object"!==e&&"function"!==e?-1:t===window?0:a(t,i,function(){return o++})}var o=1,i="nr@id",a=t("gos");e.exports=r},{}],loader:[function(t,e,n){function r(){if(!b++){var t=x.info=NREUM.info,e=p.getElementsByTagName("script")[0];if(setTimeout(f.abort,3e4),!(t&&t.licenseKey&&t.applicationID&&e))return f.abort();s(g,function(e,n){t[e]||(t[e]=n)});var n=a();c("mark",["onload",n+x.offset],null,"api"),c("timing",["load",n]);var r=p.createElement("script");r.src="https://"+t.agent,e.parentNode.insertBefore(r,e)}}function o(){"complete"===p.readyState&&i()}function i(){c("mark",["domContent",a()+x.offset],null,"api")}var a=t(22),c=t("handle"),s=t(27),f=t("ee"),u=t(25),d=window,p=d.document,l="addEventListener",h="attachEvent",m=d.XMLHttpRequest,v=m&&m.prototype;NREUM.o={ST:setTimeout,SI:d.setImmediate,CT:clearTimeout,XHR:m,REQ:d.Request,EV:d.Event,PR:d.Promise,MO:d.MutationObserver};var w=""+location,g={beacon:"bam.nr-data.net",errorBeacon:"bam.nr-data.net",agent:"js-agent.newrelic.com/nr-spa-1184.min.js"},y=m&&v&&v[l]&&!/CriOS/.test(navigator.userAgent),x=e.exports={offset:a.getLastTimestamp(),now:a,origin:w,features:{},xhrWrappable:y,userAgent:u};t(19),t(23),p[l]?(p[l]("DOMContentLoaded",i,!1),d[l]("load",r,!1)):(p[h]("onreadystatechange",o),d[h]("onload",r)),c("mark",["firstbyte",a.getLastTimestamp()],null,"api");var b=0},{}],"wrap-function":[function(t,e,n){function r(t){return!(t&&t instanceof Function&&t.apply&&!t[a])}var o=t("ee"),i=t(28),a="nr@original",c=Object.prototype.hasOwnProperty,s=!1;e.exports=function(t,e){function n(t,e,n,o){function nrWrapper(){var r,a,c,s;try{a=this,r=i(arguments),c="function"==typeof n?n(r,a):n||{}}catch(f){p([f,"",[r,a,o],c])}u(e+"start",[r,a,o],c);try{return s=t.apply(a,r)}catch(d){throw u(e+"err",[r,a,d],c),d}finally{u(e+"end",[r,a,s],c)}}return r(t)?t:(e||(e=""),nrWrapper[a]=t,d(t,nrWrapper),nrWrapper)}function f(t,e,o,i){o||(o="");var a,c,s,f="-"===o.charAt(0);for(s=0;s<e.length;s++)c=e[s],a=t[c],r(a)||(t[c]=n(a,f?c+o:o,i,c))}function u(n,r,o){if(!s||e){var i=s;s=!0;try{t.emit(n,r,o,e)}catch(a){p([a,n,r,o])}s=i}}function d(t,e){if(Object.defineProperty&&Object.keys)try{var n=Object.keys(t);return n.forEach(function(n){Object.defineProperty(e,n,{get:function(){return t[n]},set:function(e){return t[n]=e,e}})}),e}catch(r){p([r])}for(var o in t)c.call(t,o)&&(e[o]=t[o]);return e}function p(e){try{t.emit("internal-error",e)}catch(n){}}return t||(t=o),n.inPlace=f,n.flag=a,n}},{}]},{},["loader",2,16,5,3,4]);
+            ;NREUM.loader_config={accountID:"3006682",trustKey:"3006682",agentID:"812536340",licenseKey:"NRJS-fd3a0ae5ff39b6ace59",applicationID:"812536340"}
+            ;NREUM.info={beacon:"bam.nr-data.net",errorBeacon:"bam.nr-data.net",licenseKey:"NRJS-fd3a0ae5ff39b6ace59",applicationID:"812536340",sa:1}
+			
+        </script>
+		<script src="https://app.enzuzo.com/scripts/cookiebar/57f51128-b339-11ef-b95e-ffac20097658"></script>
+
+		<!-- Google Analytics Content Experiment code -->
+		<script>
+		
+			function utmx_section(){}function utmx(){}(function(){var
+			k='192168-0',d=document,l=d.location,c=d.cookie;
+			if(l.search.indexOf('utm_expid='+k)>0)return;
+			function f(n){if(c){var i=c.indexOf(n+'=');if(i>-1){var j=c.
+			indexOf(';',i);return escape(c.substring(i+n.length+1,j<0?c.
+			length:j))}}}var x=f('__utmx'),xx=f('__utmxx'),h=l.hash;d.write(
+			'<sc'+'ript src="'+'http'+(l.protocol=='https:'?'s://ssl':
+			'://www')+'.google-analytics.com/ga_exp.js?'+'utmxkey='+k+
+			'&utmx='+(x?x:'')+'&utmxx='+(xx?xx:'')+'&utmxtime='+new Date().
+			valueOf()+(h?'&utmxhash='+escape(h.substr(1)):'')+
+			'" type="text/javascript" charset="utf-8"><\/sc'+'ript>')})();
+		
+		</script>
+
+		<script>utmx('url','A/B');</script>
+		<!-- End of Google Analytics Content Experiment code -->
+
+		<!-- Google Analytics code -->
+					<!-- Global site tag (gtag.js) - Google Analytics -->
+			<script async src="https://www.googletagmanager.com/gtag/js?id=UA-186918-20"></script>
+
+			<script>
+			
+				window.dataLayer = window.dataLayer || [];
+				function gtag(){dataLayer.push(arguments);}
+				gtag('js', new Date());
+				
+				gtag('config', 'UA-186918-20');
+				gtag( 'config', 'AW-1071448537');
+			</script>
+		
+		<meta charset="utf-8"><script type="text/javascript">(window.NREUM||(NREUM={})).init={privacy:{cookies_enabled:true},ajax:{deny_list:["bam.nr-data.net"]},distributed_tracing:{enabled:true}};(window.NREUM||(NREUM={})).loader_config={agentID:"525620855",accountID:"3094409",trustKey:"3094409",xpid:"VwYOVVJTARAFVlRUBQEAUVc=",licenseKey:"NRJS-fd3a0ae5ff39b6ace59",applicationID:"525620773"};;/*! For license information please see nr-loader-spa-1.299.0.min.js.LICENSE.txt */
+(()=>{var e,t,r={8122:(e,t,r)=>{"use strict";r.d(t,{a:()=>i});var n=r(944);function i(e,t){try{if(!e||"object"!=typeof e)return(0,n.R)(3);if(!t||"object"!=typeof t)return(0,n.R)(4);const r=Object.create(Object.getPrototypeOf(t),Object.getOwnPropertyDescriptors(t)),o=0===Object.keys(r).length?e:r;for(let a in o)if(void 0!==e[a])try{if(null===e[a]){r[a]=null;continue}Array.isArray(e[a])&&Array.isArray(t[a])?r[a]=Array.from(new Set([...e[a],...t[a]])):"object"==typeof e[a]&&"object"==typeof t[a]?r[a]=i(e[a],t[a]):r[a]=e[a]}catch(e){r[a]||(0,n.R)(1,e)}return r}catch(e){(0,n.R)(2,e)}}},2555:(e,t,r)=>{"use strict";r.d(t,{D:()=>s,f:()=>a});var n=r(384),i=r(8122);const o={beacon:n.NT.beacon,errorBeacon:n.NT.errorBeacon,licenseKey:void 0,applicationID:void 0,sa:void 0,queueTime:void 0,applicationTime:void 0,ttGuid:void 0,user:void 0,account:void 0,product:void 0,extra:void 0,jsAttributes:{},userAttributes:void 0,atts:void 0,transactionName:void 0,tNamePlain:void 0};function a(e){try{return!!e.licenseKey&&!!e.errorBeacon&&!!e.applicationID}catch(e){return!1}}const s=e=>(0,i.a)(e,o)},7699:(e,t,r)=>{"use strict";r.d(t,{It:()=>i,No:()=>n,qh:()=>a,uh:()=>o});const n=16e3,i=1e6,o="NR_CONTAINER_AGENT",a="SESSION_ERROR"},9324:(e,t,r)=>{"use strict";r.d(t,{F3:()=>i,Xs:()=>o,Yq:()=>a,xv:()=>n});const n="1.299.0",i="PROD",o="CDN",a="^2.0.0-alpha.18"},6154:(e,t,r)=>{"use strict";r.d(t,{A4:()=>s,OF:()=>d,RI:()=>i,WN:()=>h,bv:()=>o,gm:()=>a,lR:()=>f,m:()=>u,mw:()=>c,sb:()=>l});var n=r(1863);const i="undefined"!=typeof window&&!!window.document,o="undefined"!=typeof WorkerGlobalScope&&("undefined"!=typeof self&&self instanceof WorkerGlobalScope&&self.navigator instanceof WorkerNavigator||"undefined"!=typeof globalThis&&globalThis instanceof WorkerGlobalScope&&globalThis.navigator instanceof WorkerNavigator),a=i?window:"undefined"!=typeof WorkerGlobalScope&&("undefined"!=typeof self&&self instanceof WorkerGlobalScope&&self||"undefined"!=typeof globalThis&&globalThis instanceof WorkerGlobalScope&&globalThis),s="complete"===a?.document?.readyState,c=Boolean("hidden"===a?.document?.visibilityState),u=""+a?.location,d=/iPad|iPhone|iPod/.test(a.navigator?.userAgent),l=d&&"undefined"==typeof SharedWorker,f=(()=>{const e=a.navigator?.userAgent?.match(/Firefox[/\s](\d+\.\d+)/);return Array.isArray(e)&&e.length>=2?+e[1]:0})(),h=Date.now()-(0,n.t)()},7295:(e,t,r)=>{"use strict";r.d(t,{Xv:()=>a,gX:()=>i,iW:()=>o});var n=[];function i(e){if(!e||o(e))return!1;if(0===n.length)return!0;for(var t=0;t<n.length;t++){var r=n[t];if("*"===r.hostname)return!1;if(s(r.hostname,e.hostname)&&c(r.pathname,e.pathname))return!1}return!0}function o(e){return void 0===e.hostname}function a(e){if(n=[],e&&e.length)for(var t=0;t<e.length;t++){let r=e[t];if(!r)continue;0===r.indexOf("http://")?r=r.substring(7):0===r.indexOf("https://")&&(r=r.substring(8));const i=r.indexOf("/");let o,a;i>0?(o=r.substring(0,i),a=r.substring(i)):(o=r,a="");let[s]=o.split(":");n.push({hostname:s,pathname:a})}}function s(e,t){return!(e.length>t.length)&&t.indexOf(e)===t.length-e.length}function c(e,t){return 0===e.indexOf("/")&&(e=e.substring(1)),0===t.indexOf("/")&&(t=t.substring(1)),""===e||e===t}},3241:(e,t,r)=>{"use strict";r.d(t,{W:()=>o});var n=r(6154);const i="newrelic";function o(e={}){try{n.gm.dispatchEvent(new CustomEvent(i,{detail:e}))}catch(e){}}},1687:(e,t,r)=>{"use strict";r.d(t,{Ak:()=>u,Ze:()=>f,x3:()=>d});var n=r(3241),i=r(7836),o=r(3606),a=r(860),s=r(2646);const c={};function u(e,t){const r={staged:!1,priority:a.P3[t]||0};l(e),c[e].get(t)||c[e].set(t,r)}function d(e,t){e&&c[e]&&(c[e].get(t)&&c[e].delete(t),p(e,t,!1),c[e].size&&h(e))}function l(e){if(!e)throw new Error("agentIdentifier required");c[e]||(c[e]=new Map)}function f(e="",t="feature",r=!1){if(l(e),!e||!c[e].get(t)||r)return p(e,t);c[e].get(t).staged=!0,h(e)}function h(e){const t=Array.from(c[e]);t.every((([e,t])=>t.staged))&&(t.sort(((e,t)=>e[1].priority-t[1].priority)),t.forEach((([t])=>{c[e].delete(t),p(e,t)})))}function p(e,t,r=!0){const a=e?i.ee.get(e):i.ee,c=o.i.handlers;if(!a.aborted&&a.backlog&&c){if((0,n.W)({agentIdentifier:e,type:"lifecycle",name:"drain",feature:t}),r){const e=a.backlog[t],r=c[t];if(r){for(let t=0;e&&t<e.length;++t)g(e[t],r);Object.entries(r).forEach((([e,t])=>{Object.values(t||{}).forEach((t=>{t[0]?.on&&t[0]?.context()instanceof s.y&&t[0].on(e,t[1])}))}))}}a.isolatedBacklog||delete c[t],a.backlog[t]=null,a.emit("drain-"+t,[])}}function g(e,t){var r=e[1];Object.values(t[r]||{}).forEach((t=>{var r=e[0];if(t[0]===r){var n=t[1],i=e[3],o=e[2];n.apply(i,o)}}))}},7836:(e,t,r)=>{"use strict";r.d(t,{P:()=>s,ee:()=>c});var n=r(384),i=r(8990),o=r(2646),a=r(5607);const s="nr@context:".concat(a.W),c=function e(t,r){var n={},a={},d={},l=!1;try{l=16===r.length&&u.initializedAgents?.[r]?.runtime.isolatedBacklog}catch(e){}var f={on:p,addEventListener:p,removeEventListener:function(e,t){var r=n[e];if(!r)return;for(var i=0;i<r.length;i++)r[i]===t&&r.splice(i,1)},emit:function(e,r,n,i,o){!1!==o&&(o=!0);if(c.aborted&&!i)return;t&&o&&t.emit(e,r,n);var s=h(n);g(e).forEach((e=>{e.apply(s,r)}));var u=v()[a[e]];u&&u.push([f,e,r,s]);return s},get:m,listeners:g,context:h,buffer:function(e,t){const r=v();if(t=t||"feature",f.aborted)return;Object.entries(e||{}).forEach((([e,n])=>{a[n]=t,t in r||(r[t]=[])}))},abort:function(){f._aborted=!0,Object.keys(f.backlog).forEach((e=>{delete f.backlog[e]}))},isBuffering:function(e){return!!v()[a[e]]},debugId:r,backlog:l?{}:t&&"object"==typeof t.backlog?t.backlog:{},isolatedBacklog:l};return Object.defineProperty(f,"aborted",{get:()=>{let e=f._aborted||!1;return e||(t&&(e=t.aborted),e)}}),f;function h(e){return e&&e instanceof o.y?e:e?(0,i.I)(e,s,(()=>new o.y(s))):new o.y(s)}function p(e,t){n[e]=g(e).concat(t)}function g(e){return n[e]||[]}function m(t){return d[t]=d[t]||e(f,t)}function v(){return f.backlog}}(void 0,"globalEE"),u=(0,n.Zm)();u.ee||(u.ee=c)},2646:(e,t,r)=>{"use strict";r.d(t,{y:()=>n});class n{constructor(e){this.contextId=e}}},9908:(e,t,r)=>{"use strict";r.d(t,{d:()=>n,p:()=>i});var n=r(7836).ee.get("handle");function i(e,t,r,i,o){o?(o.buffer([e],i),o.emit(e,t,r)):(n.buffer([e],i),n.emit(e,t,r))}},3606:(e,t,r)=>{"use strict";r.d(t,{i:()=>o});var n=r(9908);o.on=a;var i=o.handlers={};function o(e,t,r,o){a(o||n.d,i,e,t,r)}function a(e,t,r,i,o){o||(o="feature"),e||(e=n.d);var a=t[o]=t[o]||{};(a[r]=a[r]||[]).push([e,i])}},3878:(e,t,r)=>{"use strict";function n(e,t){return{capture:e,passive:!1,signal:t}}function i(e,t,r=!1,i){window.addEventListener(e,t,n(r,i))}function o(e,t,r=!1,i){document.addEventListener(e,t,n(r,i))}r.d(t,{DD:()=>o,jT:()=>n,sp:()=>i})},5607:(e,t,r)=>{"use strict";r.d(t,{W:()=>n});const n=(0,r(9566).bz)()},9566:(e,t,r)=>{"use strict";r.d(t,{LA:()=>s,ZF:()=>c,bz:()=>a,el:()=>u});var n=r(6154);const i="xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";function o(e,t){return e?15&e[t]:16*Math.random()|0}function a(){const e=n.gm?.crypto||n.gm?.msCrypto;let t,r=0;return e&&e.getRandomValues&&(t=e.getRandomValues(new Uint8Array(30))),i.split("").map((e=>"x"===e?o(t,r++).toString(16):"y"===e?(3&o()|8).toString(16):e)).join("")}function s(e){const t=n.gm?.crypto||n.gm?.msCrypto;let r,i=0;t&&t.getRandomValues&&(r=t.getRandomValues(new Uint8Array(e)));const a=[];for(var s=0;s<e;s++)a.push(o(r,i++).toString(16));return a.join("")}function c(){return s(16)}function u(){return s(32)}},2614:(e,t,r)=>{"use strict";r.d(t,{BB:()=>a,H3:()=>n,g:()=>u,iL:()=>c,tS:()=>s,uh:()=>i,wk:()=>o});const n="NRBA",i="SESSION",o=144e5,a=18e5,s={STARTED:"session-started",PAUSE:"session-pause",RESET:"session-reset",RESUME:"session-resume",UPDATE:"session-update"},c={SAME_TAB:"same-tab",CROSS_TAB:"cross-tab"},u={OFF:0,FULL:1,ERROR:2}},1863:(e,t,r)=>{"use strict";function n(){return Math.floor(performance.now())}r.d(t,{t:()=>n})},7485:(e,t,r)=>{"use strict";r.d(t,{D:()=>i});var n=r(6154);function i(e){if(0===(e||"").indexOf("data:"))return{protocol:"data"};try{const t=new URL(e,location.href),r={port:t.port,hostname:t.hostname,pathname:t.pathname,search:t.search,protocol:t.protocol.slice(0,t.protocol.indexOf(":")),sameOrigin:t.protocol===n.gm?.location?.protocol&&t.host===n.gm?.location?.host};return r.port&&""!==r.port||("http:"===t.protocol&&(r.port="80"),"https:"===t.protocol&&(r.port="443")),r.pathname&&""!==r.pathname?r.pathname.startsWith("/")||(r.pathname="/".concat(r.pathname)):r.pathname="/",r}catch(e){return{}}}},944:(e,t,r)=>{"use strict";r.d(t,{R:()=>i});var n=r(3241);function i(e,t){"function"==typeof console.debug&&(console.debug("New Relic Warning: https://github.com/newrelic/newrelic-browser-agent/blob/main/docs/warning-codes.md#".concat(e),t),(0,n.W)({agentIdentifier:null,drained:null,type:"data",name:"warn",feature:"warn",data:{code:e,secondary:t}}))}},5701:(e,t,r)=>{"use strict";r.d(t,{B:()=>o,t:()=>a});var n=r(3241);const i=new Set,o={};function a(e,t){const r=t.agentIdentifier;o[r]??={},e&&"object"==typeof e&&(i.has(r)||(t.ee.emit("rumresp",[e]),o[r]=e,i.add(r),(0,n.W)({agentIdentifier:r,loaded:!0,drained:!0,type:"lifecycle",name:"load",feature:void 0,data:e})))}},8990:(e,t,r)=>{"use strict";r.d(t,{I:()=>i});var n=Object.prototype.hasOwnProperty;function i(e,t,r){if(n.call(e,t))return e[t];var i=r();if(Object.defineProperty&&Object.keys)try{return Object.defineProperty(e,t,{value:i,writable:!0,enumerable:!1}),i}catch(e){}return e[t]=i,i}},6389:(e,t,r)=>{"use strict";function n(e,t=500,r={}){const n=r?.leading||!1;let i;return(...r)=>{n&&void 0===i&&(e.apply(this,r),i=setTimeout((()=>{i=clearTimeout(i)}),t)),n||(clearTimeout(i),i=setTimeout((()=>{e.apply(this,r)}),t))}}function i(e){let t=!1;return(...r)=>{t||(t=!0,e.apply(this,r))}}r.d(t,{J:()=>i,s:()=>n})},1910:(e,t,r)=>{"use strict";r.d(t,{i:()=>o});var n=r(944);const i=new Map;function o(...e){return e.every((e=>{if(i.has(e))return i.get(e);const t="function"==typeof e&&e.toString().includes("[native code]");return t||(0,n.R)(64,e?.name||e?.toString()),i.set(e,t),t}))}},3304:(e,t,r)=>{"use strict";r.d(t,{A:()=>o});var n=r(7836);const i=()=>{const e=new WeakSet;return(t,r)=>{if("object"==typeof r&&null!==r){if(e.has(r))return;e.add(r)}return r}};function o(e){try{return JSON.stringify(e,i())??""}catch(e){try{n.ee.emit("internal-error",[e])}catch(e){}return""}}},3496:(e,t,r)=>{"use strict";function n(e){return!e||!(!e.licenseKey||!e.applicationID)}function i(e,t){return!e||e.licenseKey===t.info.licenseKey&&e.applicationID===t.info.applicationID}r.d(t,{A:()=>i,I:()=>n})},5289:(e,t,r)=>{"use strict";r.d(t,{GG:()=>o,Qr:()=>s,sB:()=>a});var n=r(3878);function i(){return"undefined"==typeof document||"complete"===document.readyState}function o(e,t){if(i())return e();(0,n.sp)("load",e,t)}function a(e){if(i())return e();(0,n.DD)("DOMContentLoaded",e)}function s(e){if(i())return e();(0,n.sp)("popstate",e)}},384:(e,t,r)=>{"use strict";r.d(t,{NT:()=>a,US:()=>d,Zm:()=>s,bQ:()=>u,dV:()=>c,pV:()=>l});var n=r(6154),i=r(1863),o=r(1910);const a={beacon:"bam.nr-data.net",errorBeacon:"bam.nr-data.net"};function s(){return n.gm.NREUM||(n.gm.NREUM={}),void 0===n.gm.newrelic&&(n.gm.newrelic=n.gm.NREUM),n.gm.NREUM}function c(){let e=s();return e.o||(e.o={ST:n.gm.setTimeout,SI:n.gm.setImmediate||n.gm.setInterval,CT:n.gm.clearTimeout,XHR:n.gm.XMLHttpRequest,REQ:n.gm.Request,EV:n.gm.Event,PR:n.gm.Promise,MO:n.gm.MutationObserver,FETCH:n.gm.fetch,WS:n.gm.WebSocket},(0,o.i)(...Object.values(e.o))),e}function u(e,t){let r=s();r.initializedAgents??={},t.initializedAt={ms:(0,i.t)(),date:new Date},r.initializedAgents[e]=t}function d(e,t){s()[e]=t}function l(){return function(){let e=s();const t=e.info||{};e.info={beacon:a.beacon,errorBeacon:a.errorBeacon,...t}}(),function(){let e=s();const t=e.init||{};e.init={...t}}(),c(),function(){let e=s();const t=e.loader_config||{};e.loader_config={...t}}(),s()}},2843:(e,t,r)=>{"use strict";r.d(t,{u:()=>i});var n=r(3878);function i(e,t=!1,r,i){(0,n.DD)("visibilitychange",(function(){if(t)return void("hidden"===document.visibilityState&&e());e(document.visibilityState)}),r,i)}},8139:(e,t,r)=>{"use strict";r.d(t,{u:()=>f});var n=r(7836),i=r(3434),o=r(8990),a=r(6154);const s={},c=a.gm.XMLHttpRequest,u="addEventListener",d="removeEventListener",l="nr@wrapped:".concat(n.P);function f(e){var t=function(e){return(e||n.ee).get("events")}(e);if(s[t.debugId]++)return t;s[t.debugId]=1;var r=(0,i.YM)(t,!0);function f(e){r.inPlace(e,[u,d],"-",p)}function p(e,t){return e[1]}return"getPrototypeOf"in Object&&(a.RI&&h(document,f),c&&h(c.prototype,f),h(a.gm,f)),t.on(u+"-start",(function(e,t){var n=e[1];if(null!==n&&("function"==typeof n||"object"==typeof n)&&"newrelic"!==e[0]){var i=(0,o.I)(n,l,(function(){var e={object:function(){if("function"!=typeof n.handleEvent)return;return n.handleEvent.apply(n,arguments)},function:n}[typeof n];return e?r(e,"fn-",null,e.name||"anonymous"):n}));this.wrapped=e[1]=i}})),t.on(d+"-start",(function(e){e[1]=this.wrapped||e[1]})),t}function h(e,t,...r){let n=e;for(;"object"==typeof n&&!Object.prototype.hasOwnProperty.call(n,u);)n=Object.getPrototypeOf(n);n&&t(n,...r)}},3434:(e,t,r)=>{"use strict";r.d(t,{Jt:()=>o,YM:()=>u});var n=r(7836),i=r(5607);const o="nr@original:".concat(i.W),a=50;var s=Object.prototype.hasOwnProperty,c=!1;function u(e,t){return e||(e=n.ee),r.inPlace=function(e,t,n,i,o){n||(n="");const a="-"===n.charAt(0);for(let s=0;s<t.length;s++){const c=t[s],u=e[c];l(u)||(e[c]=r(u,a?c+n:n,i,c,o))}},r.flag=o,r;function r(t,r,n,c,u){return l(t)?t:(r||(r=""),nrWrapper[o]=t,function(e,t,r){if(Object.defineProperty&&Object.keys)try{return Object.keys(e).forEach((function(r){Object.defineProperty(t,r,{get:function(){return e[r]},set:function(t){return e[r]=t,t}})})),t}catch(e){d([e],r)}for(var n in e)s.call(e,n)&&(t[n]=e[n])}(t,nrWrapper,e),nrWrapper);function nrWrapper(){var o,s,l,f;let h;try{s=this,o=[...arguments],l="function"==typeof n?n(o,s):n||{}}catch(t){d([t,"",[o,s,c],l],e)}i(r+"start",[o,s,c],l,u);const p=performance.now();let g;try{return f=t.apply(s,o),g=performance.now(),f}catch(e){throw g=performance.now(),i(r+"err",[o,s,e],l,u),h=e,h}finally{const e=g-p,t={start:p,end:g,duration:e,isLongTask:e>=a,methodName:c,thrownError:h};t.isLongTask&&i("long-task",[t,s],l,u),i(r+"end",[o,s,f],l,u)}}}function i(r,n,i,o){if(!c||t){var a=c;c=!0;try{e.emit(r,n,i,t,o)}catch(t){d([t,r,n,i],e)}c=a}}}function d(e,t){t||(t=n.ee);try{t.emit("internal-error",e)}catch(e){}}function l(e){return!(e&&"function"==typeof e&&e.apply&&!e[o])}},9300:(e,t,r)=>{"use strict";r.d(t,{T:()=>n});const n=r(860).K7.ajax},3333:(e,t,r)=>{"use strict";r.d(t,{$v:()=>d,TZ:()=>n,Xh:()=>c,Zp:()=>i,kd:()=>u,mq:()=>s,nf:()=>a,qN:()=>o});const n=r(860).K7.genericEvents,i=["auxclick","click","copy","keydown","paste","scrollend"],o=["focus","blur"],a=4,s=1e3,c=2e3,u=["PageAction","UserAction","BrowserPerformance"],d={MARKS:"experimental.marks",MEASURES:"experimental.measures",RESOURCES:"experimental.resources"}},6774:(e,t,r)=>{"use strict";r.d(t,{T:()=>n});const n=r(860).K7.jserrors},993:(e,t,r)=>{"use strict";r.d(t,{A$:()=>o,ET:()=>a,TZ:()=>s,p_:()=>i});var n=r(860);const i={ERROR:"ERROR",WARN:"WARN",INFO:"INFO",DEBUG:"DEBUG",TRACE:"TRACE"},o={OFF:0,ERROR:1,WARN:2,INFO:3,DEBUG:4,TRACE:5},a="log",s=n.K7.logging},3785:(e,t,r)=>{"use strict";r.d(t,{R:()=>c,b:()=>u});var n=r(9908),i=r(1863),o=r(860),a=r(8154),s=r(993);function c(e,t,r={},c=s.p_.INFO,u,d=(0,i.t)()){(0,n.p)(a.xV,["API/logging/".concat(c.toLowerCase(),"/called")],void 0,o.K7.metrics,e),(0,n.p)(s.ET,[d,t,r,c,u],void 0,o.K7.logging,e)}function u(e){return"string"==typeof e&&Object.values(s.p_).some((t=>t===e.toUpperCase().trim()))}},8154:(e,t,r)=>{"use strict";r.d(t,{z_:()=>o,XG:()=>s,TZ:()=>n,rs:()=>i,xV:()=>a});r(6154),r(9566),r(384);const n=r(860).K7.metrics,i="sm",o="cm",a="storeSupportabilityMetrics",s="storeEventMetrics"},6630:(e,t,r)=>{"use strict";r.d(t,{T:()=>n});const n=r(860).K7.pageViewEvent},782:(e,t,r)=>{"use strict";r.d(t,{T:()=>n});const n=r(860).K7.pageViewTiming},6344:(e,t,r)=>{"use strict";r.d(t,{BB:()=>d,G4:()=>o,Qb:()=>l,TZ:()=>i,Ug:()=>a,_s:()=>s,bc:()=>u,yP:()=>c});var n=r(2614);const i=r(860).K7.sessionReplay,o={RECORD:"recordReplay",PAUSE:"pauseReplay",ERROR_DURING_REPLAY:"errorDuringReplay"},a=.12,s={DomContentLoaded:0,Load:1,FullSnapshot:2,IncrementalSnapshot:3,Meta:4,Custom:5},c={[n.g.ERROR]:15e3,[n.g.FULL]:3e5,[n.g.OFF]:0},u={RESET:{message:"Session was reset",sm:"Reset"},IMPORT:{message:"Recorder failed to import",sm:"Import"},TOO_MANY:{message:"429: Too Many Requests",sm:"Too-Many"},TOO_BIG:{message:"Payload was too large",sm:"Too-Big"},CROSS_TAB:{message:"Session Entity was set to OFF on another tab",sm:"Cross-Tab"},ENTITLEMENTS:{message:"Session Replay is not allowed and will not be started",sm:"Entitlement"}},d=5e3,l={API:"api",RESUME:"resume",SWITCH_TO_FULL:"switchToFull",INITIALIZE:"initialize",PRELOAD:"preload"}},5270:(e,t,r)=>{"use strict";r.d(t,{Aw:()=>a,SR:()=>o,rF:()=>s});var n=r(384),i=r(7767);function o(e){return!!(0,n.dV)().o.MO&&(0,i.V)(e)&&!0===e?.session_trace.enabled}function a(e){return!0===e?.session_replay.preload&&o(e)}function s(e,t){try{if("string"==typeof t?.type){if("password"===t.type.toLowerCase())return"*".repeat(e?.length||0);if(void 0!==t?.dataset?.nrUnmask||t?.classList?.contains("nr-unmask"))return e}}catch(e){}return"string"==typeof e?e.replace(/[\S]/g,"*"):"*".repeat(e?.length||0)}},3738:(e,t,r)=>{"use strict";r.d(t,{He:()=>i,Kp:()=>s,Lc:()=>u,Rz:()=>d,TZ:()=>n,bD:()=>o,d3:()=>a,jx:()=>l,sl:()=>f,uP:()=>c});const n=r(860).K7.sessionTrace,i="bstResource",o="resource",a="-start",s="-end",c="fn"+a,u="fn"+s,d="pushState",l=1e3,f=3e4},3962:(e,t,r)=>{"use strict";r.d(t,{AM:()=>a,O2:()=>l,OV:()=>o,Qu:()=>f,TZ:()=>c,ih:()=>h,pP:()=>s,t1:()=>d,tC:()=>i,wD:()=>u});var n=r(860);const i=["click","keydown","submit"],o="popstate",a="api",s="initialPageLoad",c=n.K7.softNav,u=5e3,d=500,l={INITIAL_PAGE_LOAD:"",ROUTE_CHANGE:1,UNSPECIFIED:2},f={INTERACTION:1,AJAX:2,CUSTOM_END:3,CUSTOM_TRACER:4},h={IP:"in progress",PF:"pending finish",FIN:"finished",CAN:"cancelled"}},7378:(e,t,r)=>{"use strict";r.d(t,{$p:()=>x,BR:()=>b,Kp:()=>R,L3:()=>y,Lc:()=>c,NC:()=>o,SG:()=>d,TZ:()=>i,U6:()=>p,UT:()=>m,d3:()=>w,dT:()=>f,e5:()=>E,gx:()=>v,l9:()=>l,oW:()=>h,op:()=>g,rw:()=>u,tH:()=>A,uP:()=>s,wW:()=>T,xq:()=>a});var n=r(384);const i=r(860).K7.spa,o=["click","submit","keypress","keydown","keyup","change"],a=999,s="fn-start",c="fn-end",u="cb-start",d="api-ixn-",l="remaining",f="interaction",h="spaNode",p="jsonpNode",g="fetch-start",m="fetch-done",v="fetch-body-",b="jsonp-end",y=(0,n.dV)().o.ST,w="-start",R="-end",x="-body",T="cb"+R,E="jsTime",A="fetch"},4234:(e,t,r)=>{"use strict";r.d(t,{W:()=>o});var n=r(7836),i=r(1687);class o{constructor(e,t){this.agentIdentifier=e,this.ee=n.ee.get(e),this.featureName=t,this.blocked=!1}deregisterDrain(){(0,i.x3)(this.agentIdentifier,this.featureName)}}},7767:(e,t,r)=>{"use strict";r.d(t,{V:()=>i});var n=r(6154);const i=e=>n.RI&&!0===e?.privacy.cookies_enabled},1741:(e,t,r)=>{"use strict";r.d(t,{W:()=>o});var n=r(944),i=r(4261);class o{#e(e,...t){if(this[e]!==o.prototype[e])return this[e](...t);(0,n.R)(35,e)}addPageAction(e,t){return this.#e(i.hG,e,t)}register(e){return this.#e(i.eY,e)}recordCustomEvent(e,t){return this.#e(i.fF,e,t)}setPageViewName(e,t){return this.#e(i.Fw,e,t)}setCustomAttribute(e,t,r){return this.#e(i.cD,e,t,r)}noticeError(e,t){return this.#e(i.o5,e,t)}setUserId(e){return this.#e(i.Dl,e)}setApplicationVersion(e){return this.#e(i.nb,e)}setErrorHandler(e){return this.#e(i.bt,e)}addRelease(e,t){return this.#e(i.k6,e,t)}log(e,t){return this.#e(i.$9,e,t)}start(){return this.#e(i.d3)}finished(e){return this.#e(i.BL,e)}recordReplay(){return this.#e(i.CH)}pauseReplay(){return this.#e(i.Tb)}addToTrace(e){return this.#e(i.U2,e)}setCurrentRouteName(e){return this.#e(i.PA,e)}interaction(){return this.#e(i.dT)}wrapLogger(e,t,r){return this.#e(i.Wb,e,t,r)}measure(e,t){return this.#e(i.V1,e,t)}}},4261:(e,t,r)=>{"use strict";r.d(t,{$9:()=>d,BL:()=>c,CH:()=>p,Dl:()=>R,Fw:()=>w,PA:()=>v,Pl:()=>n,Tb:()=>f,U2:()=>a,V1:()=>E,Wb:()=>T,bt:()=>y,cD:()=>b,d3:()=>x,dT:()=>u,eY:()=>g,fF:()=>h,hG:()=>o,hw:()=>i,k6:()=>s,nb:()=>m,o5:()=>l});const n="api-",i=n+"ixn-",o="addPageAction",a="addToTrace",s="addRelease",c="finished",u="interaction",d="log",l="noticeError",f="pauseReplay",h="recordCustomEvent",p="recordReplay",g="register",m="setApplicationVersion",v="setCurrentRouteName",b="setCustomAttribute",y="setErrorHandler",w="setPageViewName",R="setUserId",x="start",T="wrapLogger",E="measure"},5205:(e,t,r)=>{"use strict";r.d(t,{j:()=>S});var n=r(384),i=r(1741);var o=r(2555),a=r(3333);const s=e=>{if(!e||"string"!=typeof e)return!1;try{document.createDocumentFragment().querySelector(e)}catch{return!1}return!0};var c=r(2614),u=r(944),d=r(8122);const l="[data-nr-mask]",f=e=>(0,d.a)(e,(()=>{const e={feature_flags:[],experimental:{marks:!1,measures:!1,resources:!1},mask_selector:"*",block_selector:"[data-nr-block]",mask_input_options:{color:!1,date:!1,"datetime-local":!1,email:!1,month:!1,number:!1,range:!1,search:!1,tel:!1,text:!1,time:!1,url:!1,week:!1,textarea:!1,select:!1,password:!0}};return{ajax:{deny_list:void 0,block_internal:!0,enabled:!0,autoStart:!0},api:{allow_registered_children:!0,duplicate_registered_data:!1},distributed_tracing:{enabled:void 0,exclude_newrelic_header:void 0,cors_use_newrelic_header:void 0,cors_use_tracecontext_headers:void 0,allowed_origins:void 0},get feature_flags(){return e.feature_flags},set feature_flags(t){e.feature_flags=t},generic_events:{enabled:!0,autoStart:!0},harvest:{interval:30},jserrors:{enabled:!0,autoStart:!0},logging:{enabled:!0,autoStart:!0},metrics:{enabled:!0,autoStart:!0},obfuscate:void 0,page_action:{enabled:!0},page_view_event:{enabled:!0,autoStart:!0},page_view_timing:{enabled:!0,autoStart:!0},performance:{get capture_marks(){return e.feature_flags.includes(a.$v.MARKS)||e.experimental.marks},set capture_marks(t){e.experimental.marks=t},get capture_measures(){return e.feature_flags.includes(a.$v.MEASURES)||e.experimental.measures},set capture_measures(t){e.experimental.measures=t},capture_detail:!0,resources:{get enabled(){return e.feature_flags.includes(a.$v.RESOURCES)||e.experimental.resources},set enabled(t){e.experimental.resources=t},asset_types:[],first_party_domains:[],ignore_newrelic:!0}},privacy:{cookies_enabled:!0},proxy:{assets:void 0,beacon:void 0},session:{expiresMs:c.wk,inactiveMs:c.BB},session_replay:{autoStart:!0,enabled:!1,preload:!1,sampling_rate:10,error_sampling_rate:100,collect_fonts:!1,inline_images:!1,fix_stylesheets:!0,mask_all_inputs:!0,get mask_text_selector(){return e.mask_selector},set mask_text_selector(t){s(t)?e.mask_selector="".concat(t,",").concat(l):""===t||null===t?e.mask_selector=l:(0,u.R)(5,t)},get block_class(){return"nr-block"},get ignore_class(){return"nr-ignore"},get mask_text_class(){return"nr-mask"},get block_selector(){return e.block_selector},set block_selector(t){s(t)?e.block_selector+=",".concat(t):""!==t&&(0,u.R)(6,t)},get mask_input_options(){return e.mask_input_options},set mask_input_options(t){t&&"object"==typeof t?e.mask_input_options={...t,password:!0}:(0,u.R)(7,t)}},session_trace:{enabled:!0,autoStart:!0},soft_navigations:{enabled:!0,autoStart:!0},spa:{enabled:!0,autoStart:!0},ssl:void 0,user_actions:{enabled:!0,elementAttributes:["id","className","tagName","type"]}}})());var h=r(6154),p=r(9324);let g=0;const m={buildEnv:p.F3,distMethod:p.Xs,version:p.xv,originTime:h.WN},v={appMetadata:{},customTransaction:void 0,denyList:void 0,disabled:!1,entityManager:void 0,harvester:void 0,isolatedBacklog:!1,isRecording:!1,loaderType:void 0,maxBytes:3e4,obfuscator:void 0,onerror:void 0,ptid:void 0,releaseIds:{},session:void 0,timeKeeper:void 0,jsAttributesMetadata:{bytes:0},get harvestCount(){return++g}},b=e=>{const t=(0,d.a)(e,v),r=Object.keys(m).reduce(((e,t)=>(e[t]={value:m[t],writable:!1,configurable:!0,enumerable:!0},e)),{});return Object.defineProperties(t,r)};var y=r(5701);const w=e=>{const t=e.startsWith("http");e+="/",r.p=t?e:"https://"+e};var R=r(7836),x=r(3241);const T={accountID:void 0,trustKey:void 0,agentID:void 0,licenseKey:void 0,applicationID:void 0,xpid:void 0},E=e=>(0,d.a)(e,T),A=new Set;function S(e,t={},r,a){let{init:s,info:c,loader_config:u,runtime:d={},exposed:l=!0}=t;if(!c){const e=(0,n.pV)();s=e.init,c=e.info,u=e.loader_config}e.init=f(s||{}),e.loader_config=E(u||{}),c.jsAttributes??={},h.bv&&(c.jsAttributes.isWorker=!0),e.info=(0,o.D)(c);const p=e.init,g=[c.beacon,c.errorBeacon];A.has(e.agentIdentifier)||(p.proxy.assets&&(w(p.proxy.assets),g.push(p.proxy.assets)),p.proxy.beacon&&g.push(p.proxy.beacon),e.beacons=[...g],function(e){const t=(0,n.pV)();Object.getOwnPropertyNames(i.W.prototype).forEach((r=>{const n=i.W.prototype[r];if("function"!=typeof n||"constructor"===n)return;let o=t[r];e[r]&&!1!==e.exposed&&"micro-agent"!==e.runtime?.loaderType&&(t[r]=(...t)=>{const n=e[r](...t);return o?o(...t):n})}))}(e),(0,n.US)("activatedFeatures",y.B),e.runSoftNavOverSpa&&=!0===p.soft_navigations.enabled&&p.feature_flags.includes("soft_nav")),d.denyList=[...p.ajax.deny_list||[],...p.ajax.block_internal?g:[]],d.ptid=e.agentIdentifier,d.loaderType=r,e.runtime=b(d),A.has(e.agentIdentifier)||(e.ee=R.ee.get(e.agentIdentifier),e.exposed=l,(0,x.W)({agentIdentifier:e.agentIdentifier,drained:!!y.B?.[e.agentIdentifier],type:"lifecycle",name:"initialize",feature:void 0,data:e.config})),A.add(e.agentIdentifier)}},8374:(e,t,r)=>{r.nc=(()=>{try{return document?.currentScript?.nonce}catch(e){}return""})()},860:(e,t,r)=>{"use strict";r.d(t,{$J:()=>d,K7:()=>c,P3:()=>u,XX:()=>i,Yy:()=>s,df:()=>o,qY:()=>n,v4:()=>a});const n="events",i="jserrors",o="browser/blobs",a="rum",s="browser/logs",c={ajax:"ajax",genericEvents:"generic_events",jserrors:i,logging:"logging",metrics:"metrics",pageAction:"page_action",pageViewEvent:"page_view_event",pageViewTiming:"page_view_timing",sessionReplay:"session_replay",sessionTrace:"session_trace",softNav:"soft_navigations",spa:"spa"},u={[c.pageViewEvent]:1,[c.pageViewTiming]:2,[c.metrics]:3,[c.jserrors]:4,[c.spa]:5,[c.ajax]:6,[c.sessionTrace]:7,[c.softNav]:8,[c.sessionReplay]:9,[c.logging]:10,[c.genericEvents]:11},d={[c.pageViewEvent]:a,[c.pageViewTiming]:n,[c.ajax]:n,[c.spa]:n,[c.softNav]:n,[c.metrics]:i,[c.jserrors]:i,[c.sessionTrace]:o,[c.sessionReplay]:o,[c.logging]:s,[c.genericEvents]:"ins"}}},n={};function i(e){var t=n[e];if(void 0!==t)return t.exports;var o=n[e]={exports:{}};return r[e](o,o.exports,i),o.exports}i.m=r,i.d=(e,t)=>{for(var r in t)i.o(t,r)&&!i.o(e,r)&&Object.defineProperty(e,r,{enumerable:!0,get:t[r]})},i.f={},i.e=e=>Promise.all(Object.keys(i.f).reduce(((t,r)=>(i.f[r](e,t),t)),[])),i.u=e=>({212:"nr-spa-compressor",249:"nr-spa-recorder",478:"nr-spa"}[e]+"-1.299.0.min.js"),i.o=(e,t)=>Object.prototype.hasOwnProperty.call(e,t),e={},t="NRBA-1.299.0.PROD:",i.l=(r,n,o,a)=>{if(e[r])e[r].push(n);else{var s,c;if(void 0!==o)for(var u=document.getElementsByTagName("script"),d=0;d<u.length;d++){var l=u[d];if(l.getAttribute("src")==r||l.getAttribute("data-webpack")==t+o){s=l;break}}if(!s){c=!0;var f={478:"sha512-yFJXofnEnG8GVm9Qz5bow499gEH4SUOHqCjdkgsEOCxDOsZoo6GAo0XOXkpDWCr8r/qh/17K3wtEjY+UStuwyw==",249:"sha512-3rG4bEt0s/aK1DXD9BmVuktPkzvPXiB21q2yBNlhxwh6FzcavxvecMtedf3aoJl9CNoyGK6ELRA9yaR0cXbgrQ==",212:"sha512-vjMr4Qq4Ot5S5x5z8QHtNerncpBJSI4ZG0LtBk34EJW4Qtauz9/kg4PFIxMbgq9NSWQyPfCLMnjuTBIHagA1aQ=="};(s=document.createElement("script")).charset="utf-8",s.timeout=120,i.nc&&s.setAttribute("nonce",i.nc),s.setAttribute("data-webpack",t+o),s.src=r,0!==s.src.indexOf(window.location.origin+"/")&&(s.crossOrigin="anonymous"),f[a]&&(s.integrity=f[a])}e[r]=[n];var h=(t,n)=>{s.onerror=s.onload=null,clearTimeout(p);var i=e[r];if(delete e[r],s.parentNode&&s.parentNode.removeChild(s),i&&i.forEach((e=>e(n))),t)return t(n)},p=setTimeout(h.bind(null,void 0,{type:"timeout",target:s}),12e4);s.onerror=h.bind(null,s.onerror),s.onload=h.bind(null,s.onload),c&&document.head.appendChild(s)}},i.r=e=>{"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(e,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(e,"__esModule",{value:!0})},i.p="https://js-agent.newrelic.com/",(()=>{var e={38:0,788:0};i.f.j=(t,r)=>{var n=i.o(e,t)?e[t]:void 0;if(0!==n)if(n)r.push(n[2]);else{var o=new Promise(((r,i)=>n=e[t]=[r,i]));r.push(n[2]=o);var a=i.p+i.u(t),s=new Error;i.l(a,(r=>{if(i.o(e,t)&&(0!==(n=e[t])&&(e[t]=void 0),n)){var o=r&&("load"===r.type?"missing":r.type),a=r&&r.target&&r.target.src;s.message="Loading chunk "+t+" failed.\n("+o+": "+a+")",s.name="ChunkLoadError",s.type=o,s.request=a,n[1](s)}}),"chunk-"+t,t)}};var t=(t,r)=>{var n,o,[a,s,c]=r,u=0;if(a.some((t=>0!==e[t]))){for(n in s)i.o(s,n)&&(i.m[n]=s[n]);if(c)c(i)}for(t&&t(r);u<a.length;u++)o=a[u],i.o(e,o)&&e[o]&&e[o][0](),e[o]=0},r=self["webpackChunk:NRBA-1.299.0.PROD"]=self["webpackChunk:NRBA-1.299.0.PROD"]||[];r.forEach(t.bind(null,0)),r.push=t.bind(null,r.push.bind(r))})(),(()=>{"use strict";i(8374);var e=i(9566),t=i(1741);class r extends t.W{agentIdentifier=(0,e.LA)(16)}var n=i(860);const o=Object.values(n.K7);var a=i(5205);var s=i(9908),c=i(1863),u=i(4261),d=i(3241),l=i(944),f=i(5701),h=i(8154);function p(e,t,i,o){const a=o||i;!a||a[e]&&a[e]!==r.prototype[e]||(a[e]=function(){(0,s.p)(h.xV,["API/"+e+"/called"],void 0,n.K7.metrics,i.ee),(0,d.W)({agentIdentifier:i.agentIdentifier,drained:!!f.B?.[i.agentIdentifier],type:"data",name:"api",feature:u.Pl+e,data:{}});try{return t.apply(this,arguments)}catch(e){(0,l.R)(23,e)}})}function g(e,t,r,n,i){const o=e.info;null===r?delete o.jsAttributes[t]:o.jsAttributes[t]=r,(i||null===r)&&(0,s.p)(u.Pl+n,[(0,c.t)(),t,r],void 0,"session",e.ee)}var m=i(1687),v=i(4234),b=i(5289),y=i(6154),w=i(5270),R=i(7767),x=i(6389),T=i(7699);class E extends v.W{constructor(e,t){super(e.agentIdentifier,t),this.agentRef=e,this.abortHandler=void 0,this.featAggregate=void 0,this.onAggregateImported=void 0,this.deferred=Promise.resolve(),!1===e.init[this.featureName].autoStart?this.deferred=new Promise(((t,r)=>{this.ee.on("manual-start-all",(0,x.J)((()=>{(0,m.Ak)(e.agentIdentifier,this.featureName),t()})))})):(0,m.Ak)(e.agentIdentifier,t)}importAggregator(e,t,r={}){if(this.featAggregate)return;let n;this.onAggregateImported=new Promise((e=>{n=e}));const o=async()=>{let o;await this.deferred;try{if((0,R.V)(e.init)){const{setupAgentSession:t}=await i.e(478).then(i.bind(i,8766));o=t(e)}}catch(e){(0,l.R)(20,e),this.ee.emit("internal-error",[e]),(0,s.p)(T.qh,[e],void 0,this.featureName,this.ee)}try{if(!this.#t(this.featureName,o,e.init))return(0,m.Ze)(this.agentIdentifier,this.featureName),void n(!1);const{Aggregate:i}=await t();this.featAggregate=new i(e,r),e.runtime.harvester.initializedAggregates.push(this.featAggregate),n(!0)}catch(e){(0,l.R)(34,e),this.abortHandler?.(),(0,m.Ze)(this.agentIdentifier,this.featureName,!0),n(!1),this.ee&&this.ee.abort()}};y.RI?(0,b.GG)((()=>o()),!0):o()}#t(e,t,r){if(this.blocked)return!1;switch(e){case n.K7.sessionReplay:return(0,w.SR)(r)&&!!t;case n.K7.sessionTrace:return!!t;default:return!0}}}var A=i(6630),S=i(2614);class O extends E{static featureName=A.T;constructor(e){var t;super(e,A.T),this.setupInspectionEvents(e.agentIdentifier),t=e,p(u.Fw,(function(e,r){"string"==typeof e&&("/"!==e.charAt(0)&&(e="/"+e),t.runtime.customTransaction=(r||"http://custom.transaction")+e,(0,s.p)(u.Pl+u.Fw,[(0,c.t)()],void 0,void 0,t.ee))}),t),this.ee.on("api-send-rum",((e,t)=>(0,s.p)("send-rum",[e,t],void 0,this.featureName,this.ee))),this.importAggregator(e,(()=>i.e(478).then(i.bind(i,1983))))}setupInspectionEvents(e){const t=(t,r)=>{t&&(0,d.W)({agentIdentifier:e,timeStamp:t.timeStamp,loaded:"complete"===t.target.readyState,type:"window",name:r,data:t.target.location+""})};(0,b.sB)((e=>{t(e,"DOMContentLoaded")})),(0,b.GG)((e=>{t(e,"load")})),(0,b.Qr)((e=>{t(e,"navigate")})),this.ee.on(S.tS.UPDATE,((t,r)=>{(0,d.W)({agentIdentifier:e,type:"lifecycle",name:"session",data:r})}))}}var _=i(384);var N=i(2843),I=i(3878),P=i(782);class j extends E{static featureName=P.T;constructor(e){super(e,P.T),y.RI&&((0,N.u)((()=>(0,s.p)("docHidden",[(0,c.t)()],void 0,P.T,this.ee)),!0),(0,I.sp)("pagehide",(()=>(0,s.p)("winPagehide",[(0,c.t)()],void 0,P.T,this.ee))),this.importAggregator(e,(()=>i.e(478).then(i.bind(i,9917)))))}}class k extends E{static featureName=h.TZ;constructor(e){super(e,h.TZ),y.RI&&document.addEventListener("securitypolicyviolation",(e=>{(0,s.p)(h.xV,["Generic/CSPViolation/Detected"],void 0,this.featureName,this.ee)})),this.importAggregator(e,(()=>i.e(478).then(i.bind(i,6555))))}}var C=i(6774),L=i(3304);class M{constructor(e,t,r,n,i){this.name="UncaughtError",this.message="string"==typeof e?e:(0,L.A)(e),this.sourceURL=t,this.line=r,this.column=n,this.__newrelic=i}}function H(e){return U(e)?e:new M(void 0!==e?.message?e.message:e,e?.filename||e?.sourceURL,e?.lineno||e?.line,e?.colno||e?.col,e?.__newrelic,e?.cause)}function D(e){const t="Unhandled Promise Rejection: ";if(!e?.reason)return;if(U(e.reason)){try{e.reason.message.startsWith(t)||(e.reason.message=t+e.reason.message)}catch(e){}return H(e.reason)}const r=H(e.reason);return(r.message||"").startsWith(t)||(r.message=t+r.message),r}function K(e){if(e.error instanceof SyntaxError&&!/:\d+$/.test(e.error.stack?.trim())){const t=new M(e.message,e.filename,e.lineno,e.colno,e.error.__newrelic,e.cause);return t.name=SyntaxError.name,t}return U(e.error)?e.error:H(e)}function U(e){return e instanceof Error&&!!e.stack}function F(e,t,r,i,o=(0,c.t)()){"string"==typeof e&&(e=new Error(e)),(0,s.p)("err",[e,o,!1,t,r.runtime.isRecording,void 0,i],void 0,n.K7.jserrors,r.ee),(0,s.p)("uaErr",[],void 0,n.K7.genericEvents,r.ee)}var W=i(3496),B=i(993),G=i(3785);function V(e,{customAttributes:t={},level:r=B.p_.INFO}={},n,i,o=(0,c.t)()){(0,G.R)(n.ee,e,t,r,i,o)}function z(e,t,r,i,o=(0,c.t)()){(0,s.p)(u.Pl+u.hG,[o,e,t,i],void 0,n.K7.genericEvents,r.ee)}function Z(e){p(u.eY,(function(t){return function(e,t){const r={};let i,o;(0,l.R)(54,"newrelic.register"),e.init.api.allow_registered_children||(i=()=>(0,l.R)(55));t&&(0,W.I)(t)||(i=()=>(0,l.R)(48,t));const a={addPageAction:(n,i={})=>{u(z,[n,{...r,...i},e],t)},log:(n,i={})=>{u(V,[n,{...i,customAttributes:{...r,...i.customAttributes||{}}},e],t)},noticeError:(n,i={})=>{u(F,[n,{...r,...i},e],t)},setApplicationVersion:e=>{r["application.version"]=e},setCustomAttribute:(e,t)=>{r[e]=t},setUserId:e=>{r["enduser.id"]=e},metadata:{customAttributes:r,target:t,get connected(){return o||Promise.reject(new Error("Failed to connect"))}}};i?i():o=new Promise(((n,i)=>{try{const o=e.runtime?.entityManager;let s=!!o?.get().entityGuid,c=o?.getEntityGuidFor(t.licenseKey,t.applicationID),u=!!c;if(s&&u)t.entityGuid=c,n(a);else{const d=setTimeout((()=>i(new Error("Failed to connect - Timeout"))),15e3);function l(r){(0,W.A)(r,e)?s||=!0:t.licenseKey===r.licenseKey&&t.applicationID===r.applicationID&&(u=!0,t.entityGuid=r.entityGuid),s&&u&&(clearTimeout(d),e.ee.removeEventListener("entity-added",l),n(a))}e.ee.emit("api-send-rum",[r,t]),e.ee.on("entity-added",l)}}catch(f){i(f)}}));const u=async(t,r,a)=>{if(i)return i();const u=(0,c.t)();(0,s.p)(h.xV,["API/register/".concat(t.name,"/called")],void 0,n.K7.metrics,e.ee);try{await o;const n=e.init.api.duplicate_registered_data;(!0===n||Array.isArray(n)&&n.includes(a.entityGuid))&&t(...r,void 0,u),t(...r,a.entityGuid,u)}catch(e){(0,l.R)(50,e)}};return a}(e,t)}),e)}class q extends E{static featureName=C.T;constructor(e){var t;super(e,C.T),t=e,p(u.o5,((e,r)=>F(e,r,t)),t),function(e){p(u.bt,(function(t){e.runtime.onerror=t}),e)}(e),function(e){let t=0;p(u.k6,(function(e,r){++t>10||(this.runtime.releaseIds[e.slice(-200)]=(""+r).slice(-200))}),e)}(e),Z(e);try{this.removeOnAbort=new AbortController}catch(e){}this.ee.on("internal-error",((t,r)=>{this.abortHandler&&(0,s.p)("ierr",[H(t),(0,c.t)(),!0,{},e.runtime.isRecording,r],void 0,this.featureName,this.ee)})),y.gm.addEventListener("unhandledrejection",(t=>{this.abortHandler&&(0,s.p)("err",[D(t),(0,c.t)(),!1,{unhandledPromiseRejection:1},e.runtime.isRecording],void 0,this.featureName,this.ee)}),(0,I.jT)(!1,this.removeOnAbort?.signal)),y.gm.addEventListener("error",(t=>{this.abortHandler&&(0,s.p)("err",[K(t),(0,c.t)(),!1,{},e.runtime.isRecording],void 0,this.featureName,this.ee)}),(0,I.jT)(!1,this.removeOnAbort?.signal)),this.abortHandler=this.#r,this.importAggregator(e,(()=>i.e(478).then(i.bind(i,2176))))}#r(){this.removeOnAbort?.abort(),this.abortHandler=void 0}}var X=i(8990);let Y=1;function Q(e){const t=typeof e;return!e||"object"!==t&&"function"!==t?-1:e===y.gm?0:(0,X.I)(e,"nr@id",(function(){return Y++}))}function J(e){if("string"==typeof e&&e.length)return e.length;if("object"==typeof e){if("undefined"!=typeof ArrayBuffer&&e instanceof ArrayBuffer&&e.byteLength)return e.byteLength;if("undefined"!=typeof Blob&&e instanceof Blob&&e.size)return e.size;if(!("undefined"!=typeof FormData&&e instanceof FormData))try{return(0,L.A)(e).length}catch(e){return}}}var ee=i(8139),te=i(7836),re=i(3434);const ne={},ie=["open","send"];function oe(e){var t=e||te.ee;const r=function(e){return(e||te.ee).get("xhr")}(t);if(void 0===y.gm.XMLHttpRequest)return r;if(ne[r.debugId]++)return r;ne[r.debugId]=1,(0,ee.u)(t);var n=(0,re.YM)(r),i=y.gm.XMLHttpRequest,o=y.gm.MutationObserver,a=y.gm.Promise,s=y.gm.setInterval,c="readystatechange",u=["onload","onerror","onabort","onloadstart","onloadend","onprogress","ontimeout"],d=[],f=y.gm.XMLHttpRequest=function(e){const t=new i(e),o=r.context(t);try{r.emit("new-xhr",[t],o),t.addEventListener(c,(a=o,function(){var e=this;e.readyState>3&&!a.resolved&&(a.resolved=!0,r.emit("xhr-resolved",[],e)),n.inPlace(e,u,"fn-",b)}),(0,I.jT)(!1))}catch(e){(0,l.R)(15,e);try{r.emit("internal-error",[e])}catch(e){}}var a;return t};function h(e,t){n.inPlace(t,["onreadystatechange"],"fn-",b)}if(function(e,t){for(var r in e)t[r]=e[r]}(i,f),f.prototype=i.prototype,n.inPlace(f.prototype,ie,"-xhr-",b),r.on("send-xhr-start",(function(e,t){h(e,t),function(e){d.push(e),o&&(p?p.then(v):s?s(v):(g=-g,m.data=g))}(t)})),r.on("open-xhr-start",h),o){var p=a&&a.resolve();if(!s&&!a){var g=1,m=document.createTextNode(g);new o(v).observe(m,{characterData:!0})}}else t.on("fn-end",(function(e){e[0]&&e[0].type===c||v()}));function v(){for(var e=0;e<d.length;e++)h(0,d[e]);d.length&&(d=[])}function b(e,t){return t}return r}var ae="fetch-",se=ae+"body-",ce=["arrayBuffer","blob","json","text","formData"],ue=y.gm.Request,de=y.gm.Response,le="prototype";const fe={};function he(e){const t=function(e){return(e||te.ee).get("fetch")}(e);if(!(ue&&de&&y.gm.fetch))return t;if(fe[t.debugId]++)return t;function r(e,r,n){var i=e[r];"function"==typeof i&&(e[r]=function(){var e,r=[...arguments],o={};t.emit(n+"before-start",[r],o),o[te.P]&&o[te.P].dt&&(e=o[te.P].dt);var a=i.apply(this,r);return t.emit(n+"start",[r,e],a),a.then((function(e){return t.emit(n+"end",[null,e],a),e}),(function(e){throw t.emit(n+"end",[e],a),e}))})}return fe[t.debugId]=1,ce.forEach((e=>{r(ue[le],e,se),r(de[le],e,se)})),r(y.gm,"fetch",ae),t.on(ae+"end",(function(e,r){var n=this;if(r){var i=r.headers.get("content-length");null!==i&&(n.rxSize=i),t.emit(ae+"done",[null,r],n)}else t.emit(ae+"done",[e],n)})),t}var pe=i(7485);class ge{constructor(e){this.agentRef=e}generateTracePayload(t){const r=this.agentRef.loader_config;if(!this.shouldGenerateTrace(t)||!r)return null;var n=(r.accountID||"").toString()||null,i=(r.agentID||"").toString()||null,o=(r.trustKey||"").toString()||null;if(!n||!i)return null;var a=(0,e.ZF)(),s=(0,e.el)(),c=Date.now(),u={spanId:a,traceId:s,timestamp:c};return(t.sameOrigin||this.isAllowedOrigin(t)&&this.useTraceContextHeadersForCors())&&(u.traceContextParentHeader=this.generateTraceContextParentHeader(a,s),u.traceContextStateHeader=this.generateTraceContextStateHeader(a,c,n,i,o)),(t.sameOrigin&&!this.excludeNewrelicHeader()||!t.sameOrigin&&this.isAllowedOrigin(t)&&this.useNewrelicHeaderForCors())&&(u.newrelicHeader=this.generateTraceHeader(a,s,c,n,i,o)),u}generateTraceContextParentHeader(e,t){return"00-"+t+"-"+e+"-01"}generateTraceContextStateHeader(e,t,r,n,i){return i+"@nr=0-1-"+r+"-"+n+"-"+e+"----"+t}generateTraceHeader(e,t,r,n,i,o){if(!("function"==typeof y.gm?.btoa))return null;var a={v:[0,1],d:{ty:"Browser",ac:n,ap:i,id:e,tr:t,ti:r}};return o&&n!==o&&(a.d.tk=o),btoa((0,L.A)(a))}shouldGenerateTrace(e){return this.agentRef.init?.distributed_tracing?.enabled&&this.isAllowedOrigin(e)}isAllowedOrigin(e){var t=!1;const r=this.agentRef.init?.distributed_tracing;if(e.sameOrigin)t=!0;else if(r?.allowed_origins instanceof Array)for(var n=0;n<r.allowed_origins.length;n++){var i=(0,pe.D)(r.allowed_origins[n]);if(e.hostname===i.hostname&&e.protocol===i.protocol&&e.port===i.port){t=!0;break}}return t}excludeNewrelicHeader(){var e=this.agentRef.init?.distributed_tracing;return!!e&&!!e.exclude_newrelic_header}useNewrelicHeaderForCors(){var e=this.agentRef.init?.distributed_tracing;return!!e&&!1!==e.cors_use_newrelic_header}useTraceContextHeadersForCors(){var e=this.agentRef.init?.distributed_tracing;return!!e&&!!e.cors_use_tracecontext_headers}}var me=i(9300),ve=i(7295);function be(e){return"string"==typeof e?e:e instanceof(0,_.dV)().o.REQ?e.url:y.gm?.URL&&e instanceof URL?e.href:void 0}var ye=["load","error","abort","timeout"],we=ye.length,Re=(0,_.dV)().o.REQ,xe=(0,_.dV)().o.XHR;const Te="X-NewRelic-App-Data";class Ee extends E{static featureName=me.T;constructor(e){super(e,me.T),this.dt=new ge(e),this.handler=(e,t,r,n)=>(0,s.p)(e,t,r,n,this.ee);try{const e={xmlhttprequest:"xhr",fetch:"fetch",beacon:"beacon"};y.gm?.performance?.getEntriesByType("resource").forEach((t=>{if(t.initiatorType in e&&0!==t.responseStatus){const r={status:t.responseStatus},i={rxSize:t.transferSize,duration:Math.floor(t.duration),cbTime:0};Ae(r,t.name),this.handler("xhr",[r,i,t.startTime,t.responseEnd,e[t.initiatorType]],void 0,n.K7.ajax)}}))}catch(e){}he(this.ee),oe(this.ee),function(e,t,r,i){function o(e){var t=this;t.totalCbs=0,t.called=0,t.cbTime=0,t.end=E,t.ended=!1,t.xhrGuids={},t.lastSize=null,t.loadCaptureCalled=!1,t.params=this.params||{},t.metrics=this.metrics||{},t.latestLongtaskEnd=0,e.addEventListener("load",(function(r){A(t,e)}),(0,I.jT)(!1)),y.lR||e.addEventListener("progress",(function(e){t.lastSize=e.loaded}),(0,I.jT)(!1))}function a(e){this.params={method:e[0]},Ae(this,e[1]),this.metrics={}}function u(t,r){e.loader_config.xpid&&this.sameOrigin&&r.setRequestHeader("X-NewRelic-ID",e.loader_config.xpid);var n=i.generateTracePayload(this.parsedOrigin);if(n){var o=!1;n.newrelicHeader&&(r.setRequestHeader("newrelic",n.newrelicHeader),o=!0),n.traceContextParentHeader&&(r.setRequestHeader("traceparent",n.traceContextParentHeader),n.traceContextStateHeader&&r.setRequestHeader("tracestate",n.traceContextStateHeader),o=!0),o&&(this.dt=n)}}function d(e,r){var n=this.metrics,i=e[0],o=this;if(n&&i){var a=J(i);a&&(n.txSize=a)}this.startTime=(0,c.t)(),this.body=i,this.listener=function(e){try{"abort"!==e.type||o.loadCaptureCalled||(o.params.aborted=!0),("load"!==e.type||o.called===o.totalCbs&&(o.onloadCalled||"function"!=typeof r.onload)&&"function"==typeof o.end)&&o.end(r)}catch(e){try{t.emit("internal-error",[e])}catch(e){}}};for(var s=0;s<we;s++)r.addEventListener(ye[s],this.listener,(0,I.jT)(!1))}function l(e,t,r){this.cbTime+=e,t?this.onloadCalled=!0:this.called+=1,this.called!==this.totalCbs||!this.onloadCalled&&"function"==typeof r.onload||"function"!=typeof this.end||this.end(r)}function f(e,t){var r=""+Q(e)+!!t;this.xhrGuids&&!this.xhrGuids[r]&&(this.xhrGuids[r]=!0,this.totalCbs+=1)}function p(e,t){var r=""+Q(e)+!!t;this.xhrGuids&&this.xhrGuids[r]&&(delete this.xhrGuids[r],this.totalCbs-=1)}function g(){this.endTime=(0,c.t)()}function m(e,r){r instanceof xe&&"load"===e[0]&&t.emit("xhr-load-added",[e[1],e[2]],r)}function v(e,r){r instanceof xe&&"load"===e[0]&&t.emit("xhr-load-removed",[e[1],e[2]],r)}function b(e,t,r){t instanceof xe&&("onload"===r&&(this.onload=!0),("load"===(e[0]&&e[0].type)||this.onload)&&(this.xhrCbStart=(0,c.t)()))}function w(e,r){this.xhrCbStart&&t.emit("xhr-cb-time",[(0,c.t)()-this.xhrCbStart,this.onload,r],r)}function R(e){var t,r=e[1]||{};if("string"==typeof e[0]?0===(t=e[0]).length&&y.RI&&(t=""+y.gm.location.href):e[0]&&e[0].url?t=e[0].url:y.gm?.URL&&e[0]&&e[0]instanceof URL?t=e[0].href:"function"==typeof e[0].toString&&(t=e[0].toString()),"string"==typeof t&&0!==t.length){t&&(this.parsedOrigin=(0,pe.D)(t),this.sameOrigin=this.parsedOrigin.sameOrigin);var n=i.generateTracePayload(this.parsedOrigin);if(n&&(n.newrelicHeader||n.traceContextParentHeader))if(e[0]&&e[0].headers)s(e[0].headers,n)&&(this.dt=n);else{var o={};for(var a in r)o[a]=r[a];o.headers=new Headers(r.headers||{}),s(o.headers,n)&&(this.dt=n),e.length>1?e[1]=o:e.push(o)}}function s(e,t){var r=!1;return t.newrelicHeader&&(e.set("newrelic",t.newrelicHeader),r=!0),t.traceContextParentHeader&&(e.set("traceparent",t.traceContextParentHeader),t.traceContextStateHeader&&e.set("tracestate",t.traceContextStateHeader),r=!0),r}}function x(e,t){this.params={},this.metrics={},this.startTime=(0,c.t)(),this.dt=t,e.length>=1&&(this.target=e[0]),e.length>=2&&(this.opts=e[1]);var r=this.opts||{},n=this.target;Ae(this,be(n));var i=(""+(n&&n instanceof Re&&n.method||r.method||"GET")).toUpperCase();this.params.method=i,this.body=r.body,this.txSize=J(r.body)||0}function T(e,t){if(this.endTime=(0,c.t)(),this.params||(this.params={}),(0,ve.iW)(this.params))return;let i;this.params.status=t?t.status:0,"string"==typeof this.rxSize&&this.rxSize.length>0&&(i=+this.rxSize);const o={txSize:this.txSize,rxSize:i,duration:(0,c.t)()-this.startTime};r("xhr",[this.params,o,this.startTime,this.endTime,"fetch"],this,n.K7.ajax)}function E(e){const t=this.params,i=this.metrics;if(!this.ended){this.ended=!0;for(let t=0;t<we;t++)e.removeEventListener(ye[t],this.listener,!1);t.aborted||(0,ve.iW)(t)||(i.duration=(0,c.t)()-this.startTime,this.loadCaptureCalled||4!==e.readyState?null==t.status&&(t.status=0):A(this,e),i.cbTime=this.cbTime,r("xhr",[t,i,this.startTime,this.endTime,"xhr"],this,n.K7.ajax))}}function A(e,r){e.params.status=r.status;var i=function(e,t){var r=e.responseType;return"json"===r&&null!==t?t:"arraybuffer"===r||"blob"===r||"json"===r?J(e.response):"text"===r||""===r||void 0===r?J(e.responseText):void 0}(r,e.lastSize);if(i&&(e.metrics.rxSize=i),e.sameOrigin&&r.getAllResponseHeaders().indexOf(Te)>=0){var o=r.getResponseHeader(Te);o&&((0,s.p)(h.rs,["Ajax/CrossApplicationTracing/Header/Seen"],void 0,n.K7.metrics,t),e.params.cat=o.split(", ").pop())}e.loadCaptureCalled=!0}t.on("new-xhr",o),t.on("open-xhr-start",a),t.on("open-xhr-end",u),t.on("send-xhr-start",d),t.on("xhr-cb-time",l),t.on("xhr-load-added",f),t.on("xhr-load-removed",p),t.on("xhr-resolved",g),t.on("addEventListener-end",m),t.on("removeEventListener-end",v),t.on("fn-end",w),t.on("fetch-before-start",R),t.on("fetch-start",x),t.on("fn-start",b),t.on("fetch-done",T)}(e,this.ee,this.handler,this.dt),this.importAggregator(e,(()=>i.e(478).then(i.bind(i,3845))))}}function Ae(e,t){var r=(0,pe.D)(t),n=e.params||e;n.hostname=r.hostname,n.port=r.port,n.protocol=r.protocol,n.host=r.hostname+":"+r.port,n.pathname=r.pathname,e.parsedOrigin=r,e.sameOrigin=r.sameOrigin}const Se={},Oe=["pushState","replaceState"];function _e(e){const t=function(e){return(e||te.ee).get("history")}(e);return!y.RI||Se[t.debugId]++||(Se[t.debugId]=1,(0,re.YM)(t).inPlace(window.history,Oe,"-")),t}var Ne=i(3738);function Ie(e){p(u.BL,(function(t=Date.now()){const r=t-y.WN;r<0&&(0,l.R)(62,t),(0,s.p)(h.XG,[u.BL,{time:r}],void 0,n.K7.metrics,e.ee),e.addToTrace({name:u.BL,start:t,origin:"nr"}),(0,s.p)(u.Pl+u.hG,[r,u.BL],void 0,n.K7.genericEvents,e.ee)}),e)}const{He:Pe,bD:je,d3:ke,Kp:Ce,TZ:Le,Lc:Me,uP:He,Rz:De}=Ne;class Ke extends E{static featureName=Le;constructor(e){var t;super(e,Le),t=e,p(u.U2,(function(e){if(!(e&&"object"==typeof e&&e.name&&e.start))return;const r={n:e.name,s:e.start-y.WN,e:(e.end||e.start)-y.WN,o:e.origin||"",t:"api"};r.s<0||r.e<0||r.e<r.s?(0,l.R)(61,{start:r.s,end:r.e}):(0,s.p)("bstApi",[r],void 0,n.K7.sessionTrace,t.ee)}),t),Ie(e);if(!(0,R.V)(e.init))return void this.deregisterDrain();const r=this.ee;let o;_e(r),this.eventsEE=(0,ee.u)(r),this.eventsEE.on(He,(function(e,t){this.bstStart=(0,c.t)()})),this.eventsEE.on(Me,(function(e,t){(0,s.p)("bst",[e[0],t,this.bstStart,(0,c.t)()],void 0,n.K7.sessionTrace,r)})),r.on(De+ke,(function(e){this.time=(0,c.t)(),this.startPath=location.pathname+location.hash})),r.on(De+Ce,(function(e){(0,s.p)("bstHist",[location.pathname+location.hash,this.startPath,this.time],void 0,n.K7.sessionTrace,r)}));try{o=new PerformanceObserver((e=>{const t=e.getEntries();(0,s.p)(Pe,[t],void 0,n.K7.sessionTrace,r)})),o.observe({type:je,buffered:!0})}catch(e){}this.importAggregator(e,(()=>i.e(478).then(i.bind(i,6974))),{resourceObserver:o})}}var Ue=i(6344);class Fe extends E{static featureName=Ue.TZ;#n;recorder;constructor(e){var t;let r;super(e,Ue.TZ),t=e,p(u.CH,(function(){(0,s.p)(u.CH,[],void 0,n.K7.sessionReplay,t.ee)}),t),function(e){p(u.Tb,(function(){(0,s.p)(u.Tb,[],void 0,n.K7.sessionReplay,e.ee)}),e)}(e);try{r=JSON.parse(localStorage.getItem("".concat(S.H3,"_").concat(S.uh)))}catch(e){}(0,w.SR)(e.init)&&this.ee.on(Ue.G4.RECORD,(()=>this.#i())),this.#o(r)&&this.importRecorder().then((e=>{e.startRecording(Ue.Qb.PRELOAD,r?.sessionReplayMode)})),this.importAggregator(this.agentRef,(()=>i.e(478).then(i.bind(i,6167))),this),this.ee.on("err",(e=>{this.blocked||this.agentRef.runtime.isRecording&&(this.errorNoticed=!0,(0,s.p)(Ue.G4.ERROR_DURING_REPLAY,[e],void 0,this.featureName,this.ee))}))}#o(e){return e&&(e.sessionReplayMode===S.g.FULL||e.sessionReplayMode===S.g.ERROR)||(0,w.Aw)(this.agentRef.init)}importRecorder(){return this.recorder?Promise.resolve(this.recorder):(this.#n??=Promise.all([i.e(478),i.e(249)]).then(i.bind(i,8589)).then((({Recorder:e})=>(this.recorder=new e(this),this.recorder))).catch((e=>{throw this.ee.emit("internal-error",[e]),this.blocked=!0,e})),this.#n)}#i(){this.blocked||(this.featAggregate?this.featAggregate.mode!==S.g.FULL&&this.featAggregate.initializeRecording(S.g.FULL,!0,Ue.Qb.API):this.importRecorder().then((()=>{this.recorder.startRecording(Ue.Qb.API,S.g.FULL)})))}}var We=i(3962);function Be(e){const t=e.ee.get("tracer");function r(){}p(u.dT,(function(e){return(new r).get("object"==typeof e?e:{})}),e);const i=r.prototype={createTracer:function(r,i){var o={},a=this,d="function"==typeof i;return(0,s.p)(h.xV,["API/createTracer/called"],void 0,n.K7.metrics,e.ee),e.runSoftNavOverSpa||(0,s.p)(u.hw+"tracer",[(0,c.t)(),r,o],a,n.K7.spa,e.ee),function(){if(t.emit((d?"":"no-")+"fn-start",[(0,c.t)(),a,d],o),d)try{return i.apply(this,arguments)}catch(e){const r="string"==typeof e?new Error(e):e;throw t.emit("fn-err",[arguments,this,r],o),r}finally{t.emit("fn-end",[(0,c.t)()],o)}}}};["actionText","setName","setAttribute","save","ignore","onEnd","getContext","end","get"].forEach((t=>{p.apply(this,[t,function(){return(0,s.p)(u.hw+t,[(0,c.t)(),...arguments],this,e.runSoftNavOverSpa?n.K7.softNav:n.K7.spa,e.ee),this},e,i])})),p(u.PA,(function(){e.runSoftNavOverSpa?(0,s.p)(u.hw+"routeName",[performance.now(),...arguments],void 0,n.K7.softNav,e.ee):(0,s.p)(u.Pl+"routeName",[(0,c.t)(),...arguments],this,n.K7.spa,e.ee)}),e)}class Ge extends E{static featureName=We.TZ;constructor(e){if(super(e,We.TZ),Be(e),!y.RI||!(0,_.dV)().o.MO)return;const t=_e(this.ee);try{this.removeOnAbort=new AbortController}catch(e){}We.tC.forEach((e=>{(0,I.sp)(e,(e=>{a(e)}),!0,this.removeOnAbort?.signal)}));const r=()=>(0,s.p)("newURL",[(0,c.t)(),""+window.location],void 0,this.featureName,this.ee);t.on("pushState-end",r),t.on("replaceState-end",r),(0,I.sp)(We.OV,(e=>{a(e),(0,s.p)("newURL",[e.timeStamp,""+window.location],void 0,this.featureName,this.ee)}),!0,this.removeOnAbort?.signal);let n=!1;const o=new((0,_.dV)().o.MO)(((e,t)=>{n||(n=!0,requestAnimationFrame((()=>{(0,s.p)("newDom",[(0,c.t)()],void 0,this.featureName,this.ee),n=!1})))})),a=(0,x.s)((e=>{(0,s.p)("newUIEvent",[e],void 0,this.featureName,this.ee),o.observe(document.body,{attributes:!0,childList:!0,subtree:!0,characterData:!0})}),100,{leading:!0});this.abortHandler=function(){this.removeOnAbort?.abort(),o.disconnect(),this.abortHandler=void 0},this.importAggregator(e,(()=>i.e(478).then(i.bind(i,4393))),{domObserver:o})}}var Ve=i(7378);const ze={},Ze=["appendChild","insertBefore","replaceChild"];function qe(e){const t=function(e){return(e||te.ee).get("jsonp")}(e);if(!y.RI||ze[t.debugId])return t;ze[t.debugId]=!0;var r=(0,re.YM)(t),n=/[?&](?:callback|cb)=([^&#]+)/,i=/(.*)\.([^.]+)/,o=/^(\w+)(\.|$)(.*)$/;function a(e,t){if(!e)return t;const r=e.match(o),n=r[1];return a(r[3],t[n])}return r.inPlace(Node.prototype,Ze,"dom-"),t.on("dom-start",(function(e){!function(e){if(!e||"string"!=typeof e.nodeName||"script"!==e.nodeName.toLowerCase())return;if("function"!=typeof e.addEventListener)return;var o=(s=e.src,c=s.match(n),c?c[1]:null);var s,c;if(!o)return;var u=function(e){var t=e.match(i);if(t&&t.length>=3)return{key:t[2],parent:a(t[1],window)};return{key:e,parent:window}}(o);if("function"!=typeof u.parent[u.key])return;var d={};function l(){t.emit("jsonp-end",[],d),e.removeEventListener("load",l,(0,I.jT)(!1)),e.removeEventListener("error",f,(0,I.jT)(!1))}function f(){t.emit("jsonp-error",[],d),t.emit("jsonp-end",[],d),e.removeEventListener("load",l,(0,I.jT)(!1)),e.removeEventListener("error",f,(0,I.jT)(!1))}r.inPlace(u.parent,[u.key],"cb-",d),e.addEventListener("load",l,(0,I.jT)(!1)),e.addEventListener("error",f,(0,I.jT)(!1)),t.emit("new-jsonp",[e.src],d)}(e[0])})),t}const Xe={};function Ye(e){const t=function(e){return(e||te.ee).get("promise")}(e);if(Xe[t.debugId])return t;Xe[t.debugId]=!0;var r=t.context,n=(0,re.YM)(t),i=y.gm.Promise;return i&&function(){function e(r){var o=t.context(),a=n(r,"executor-",o,null,!1);const s=Reflect.construct(i,[a],e);return t.context(s).getCtx=function(){return o},s}y.gm.Promise=e,Object.defineProperty(e,"name",{value:"Promise"}),e.toString=function(){return i.toString()},Object.setPrototypeOf(e,i),["all","race"].forEach((function(r){const n=i[r];e[r]=function(e){let i=!1;[...e||[]].forEach((e=>{this.resolve(e).then(a("all"===r),a(!1))}));const o=n.apply(this,arguments);return o;function a(e){return function(){t.emit("propagate",[null,!i],o,!1,!1),i=i||!e}}}})),["resolve","reject"].forEach((function(r){const n=i[r];e[r]=function(e){const r=n.apply(this,arguments);return e!==r&&t.emit("propagate",[e,!0],r,!1,!1),r}})),e.prototype=i.prototype;const o=i.prototype.then;i.prototype.then=function(...e){var i=this,a=r(i);a.promise=i,e[0]=n(e[0],"cb-",a,null,!1),e[1]=n(e[1],"cb-",a,null,!1);const s=o.apply(this,e);return a.nextPromise=s,t.emit("propagate",[i,!0],s,!1,!1),s},i.prototype.then[re.Jt]=o,t.on("executor-start",(function(e){e[0]=n(e[0],"resolve-",this,null,!1),e[1]=n(e[1],"resolve-",this,null,!1)})),t.on("executor-err",(function(e,t,r){e[1](r)})),t.on("cb-end",(function(e,r,n){t.emit("propagate",[n,!0],this.nextPromise,!1,!1)})),t.on("propagate",(function(e,r,n){this.getCtx&&!r||(this.getCtx=function(){if(e instanceof Promise)var r=t.context(e);return r&&r.getCtx?r.getCtx():this})}))}(),t}const $e={},Qe="setTimeout",Je="setInterval",et="clearTimeout",tt="-start",rt=[Qe,"setImmediate",Je,et,"clearImmediate"];function nt(e){const t=function(e){return(e||te.ee).get("timer")}(e);if($e[t.debugId]++)return t;$e[t.debugId]=1;var r=(0,re.YM)(t);return r.inPlace(y.gm,rt.slice(0,2),Qe+"-"),r.inPlace(y.gm,rt.slice(2,3),Je+"-"),r.inPlace(y.gm,rt.slice(3),et+"-"),t.on(Je+tt,(function(e,t,n){e[0]=r(e[0],"fn-",null,n)})),t.on(Qe+tt,(function(e,t,n){this.method=n,this.timerDuration=isNaN(e[1])?0:+e[1],e[0]=r(e[0],"fn-",this,n)})),t}const it={};function ot(e){const t=function(e){return(e||te.ee).get("mutation")}(e);if(!y.RI||it[t.debugId])return t;it[t.debugId]=!0;var r=(0,re.YM)(t),n=y.gm.MutationObserver;return n&&(window.MutationObserver=function(e){return this instanceof n?new n(r(e,"fn-")):n.apply(this,arguments)},MutationObserver.prototype=n.prototype),t}const{TZ:at,d3:st,Kp:ct,$p:ut,wW:dt,e5:lt,tH:ft,uP:ht,rw:pt,Lc:gt}=Ve;class mt extends E{static featureName=at;constructor(e){if(super(e,at),Be(e),!y.RI)return;try{this.removeOnAbort=new AbortController}catch(e){}let t,r=0;const n=this.ee.get("tracer"),o=qe(this.ee),a=Ye(this.ee),u=nt(this.ee),d=oe(this.ee),l=this.ee.get("events"),f=he(this.ee),h=_e(this.ee),p=ot(this.ee);function g(e,t){h.emit("newURL",[""+window.location,t])}function m(){r++,t=window.location.hash,this[ht]=(0,c.t)()}function v(){r--,window.location.hash!==t&&g(0,!0);var e=(0,c.t)();this[lt]=~~this[lt]+e-this[ht],this[gt]=e}function b(e,t){e.on(t,(function(){this[t]=(0,c.t)()}))}this.ee.on(ht,m),a.on(pt,m),o.on(pt,m),this.ee.on(gt,v),a.on(dt,v),o.on(dt,v),this.ee.on("fn-err",((...t)=>{t[2]?.__newrelic?.[e.agentIdentifier]||(0,s.p)("function-err",[...t],void 0,this.featureName,this.ee)})),this.ee.buffer([ht,gt,"xhr-resolved"],this.featureName),l.buffer([ht],this.featureName),u.buffer(["setTimeout"+ct,"clearTimeout"+st,ht],this.featureName),d.buffer([ht,"new-xhr","send-xhr"+st],this.featureName),f.buffer([ft+st,ft+"-done",ft+ut+st,ft+ut+ct],this.featureName),h.buffer(["newURL"],this.featureName),p.buffer([ht],this.featureName),a.buffer(["propagate",pt,dt,"executor-err","resolve"+st],this.featureName),n.buffer([ht,"no-"+ht],this.featureName),o.buffer(["new-jsonp","cb-start","jsonp-error","jsonp-end"],this.featureName),b(f,ft+st),b(f,ft+"-done"),b(o,"new-jsonp"),b(o,"jsonp-end"),b(o,"cb-start"),h.on("pushState-end",g),h.on("replaceState-end",g),window.addEventListener("hashchange",g,(0,I.jT)(!0,this.removeOnAbort?.signal)),window.addEventListener("load",g,(0,I.jT)(!0,this.removeOnAbort?.signal)),window.addEventListener("popstate",(function(){g(0,r>1)}),(0,I.jT)(!0,this.removeOnAbort?.signal)),this.abortHandler=this.#r,this.importAggregator(e,(()=>i.e(478).then(i.bind(i,5592))))}#r(){this.removeOnAbort?.abort(),this.abortHandler=void 0}}var vt=i(3333);class bt extends E{static featureName=vt.TZ;constructor(e){super(e,vt.TZ);const t=[e.init.page_action.enabled,e.init.performance.capture_marks,e.init.performance.capture_measures,e.init.user_actions.enabled,e.init.performance.resources.enabled];var r;if(r=e,p(u.hG,((e,t)=>z(e,t,r)),r),function(e){p(u.fF,(function(){(0,s.p)(u.Pl+u.fF,[(0,c.t)(),...arguments],void 0,n.K7.genericEvents,e.ee)}),e)}(e),Ie(e),Z(e),function(e){p(u.V1,(function(t,r){const i=(0,c.t)(),{start:o,end:a,customAttributes:d}=r||{},f={customAttributes:d||{}};if("object"!=typeof f.customAttributes||"string"!=typeof t||0===t.length)return void(0,l.R)(57);const h=(e,t)=>null==e?t:"number"==typeof e?e:e instanceof PerformanceMark?e.startTime:Number.NaN;if(f.start=h(o,0),f.end=h(a,i),Number.isNaN(f.start)||Number.isNaN(f.end))(0,l.R)(57);else{if(f.duration=f.end-f.start,!(f.duration<0))return(0,s.p)(u.Pl+u.V1,[f,t],void 0,n.K7.genericEvents,e.ee),f;(0,l.R)(58)}}),e)}(e),y.RI){if(e.init.user_actions.enabled&&(vt.Zp.forEach((e=>(0,I.sp)(e,(e=>(0,s.p)("ua",[e],void 0,this.featureName,this.ee)),!0))),vt.qN.forEach((e=>{const t=(0,x.s)((e=>{(0,s.p)("ua",[e],void 0,this.featureName,this.ee)}),500,{leading:!0});(0,I.sp)(e,t)}))),e.init.performance.resources.enabled&&y.gm.PerformanceObserver?.supportedEntryTypes.includes("resource")){new PerformanceObserver((e=>{e.getEntries().forEach((e=>{(0,s.p)("browserPerformance.resource",[e],void 0,this.featureName,this.ee)}))})).observe({type:"resource",buffered:!0})}const a=_e(this.ee);function d(){a.emit("navChange")}a.on("pushState-end",d),a.on("replaceState-end",d),window.addEventListener("hashchange",d,(0,I.jT)(!0,this.removeOnAbort?.signal)),window.addEventListener("popstate",d,(0,I.jT)(!0,this.removeOnAbort?.signal))}try{this.removeOnAbort=new AbortController}catch(f){}function o(t){const r=(0,pe.D)(t);return e.beacons.includes(r.hostname+":"+r.port)}this.abortHandler=()=>{this.removeOnAbort?.abort(),this.abortHandler=void 0},y.gm.addEventListener("error",(()=>{(0,s.p)("uaErr",[],void 0,n.K7.genericEvents,this.ee)}),(0,I.jT)(!1,this.removeOnAbort?.signal)),he(this.ee),oe(this.ee),this.ee.on("open-xhr-start",((e,t)=>{o(e[1])||t.addEventListener("readystatechange",(()=>{2===t.readyState&&(0,s.p)("uaXhr",[],void 0,n.K7.genericEvents,this.ee)}))})),this.ee.on("fetch-start",(e=>{e.length>=1&&!o(be(e[0]))&&(0,s.p)("uaXhr",[],void 0,n.K7.genericEvents,this.ee)})),t.some((e=>e))?this.importAggregator(e,(()=>i.e(478).then(i.bind(i,8019)))):this.deregisterDrain()}}var yt=i(2646);const wt=new Map;function Rt(e,t,r,n){if("object"!=typeof t||!t||"string"!=typeof r||!r||"function"!=typeof t[r])return(0,l.R)(29);const i=function(e){return(e||te.ee).get("logger")}(e),o=(0,re.YM)(i),a=new yt.y(te.P);a.level=n.level,a.customAttributes=n.customAttributes;const s=t[r]?.[re.Jt]||t[r];return wt.set(s,a),o.inPlace(t,[r],"wrap-logger-",(()=>wt.get(s))),i}var xt=i(1910);class Tt extends E{static featureName=B.TZ;constructor(e){var t;super(e,B.TZ),t=e,p(u.$9,((e,r)=>V(e,r,t)),t),function(e){p(u.Wb,((t,r,{customAttributes:n={},level:i=B.p_.INFO}={})=>{Rt(e.ee,t,r,{customAttributes:n,level:i})}),e)}(e),Z(e);const r=this.ee;["log","error","warn","info","debug","trace"].forEach((e=>{(0,xt.i)(y.gm.console[e]),Rt(r,y.gm.console,e,{level:"log"===e?"info":e})})),this.ee.on("wrap-logger-end",(function([e]){const{level:t,customAttributes:n}=this;(0,G.R)(r,e,n,t)})),this.importAggregator(e,(()=>i.e(478).then(i.bind(i,5288))))}}new class extends r{constructor(e){var t;(super(),y.gm)?(this.features={},(0,_.bQ)(this.agentIdentifier,this),this.desiredFeatures=new Set(e.features||[]),this.desiredFeatures.add(O),this.runSoftNavOverSpa=[...this.desiredFeatures].some((e=>e.featureName===n.K7.softNav)),(0,a.j)(this,e,e.loaderType||"agent"),t=this,p(u.cD,(function(e,r,n=!1){if("string"==typeof e){if(["string","number","boolean"].includes(typeof r)||null===r)return g(t,e,r,u.cD,n);(0,l.R)(40,typeof r)}else(0,l.R)(39,typeof e)}),t),function(e){p(u.Dl,(function(t){if("string"==typeof t||null===t)return g(e,"enduser.id",t,u.Dl,!0);(0,l.R)(41,typeof t)}),e)}(this),function(e){p(u.nb,(function(t){if("string"==typeof t||null===t)return g(e,"application.version",t,u.nb,!1);(0,l.R)(42,typeof t)}),e)}(this),function(e){p(u.d3,(function(){e.ee.emit("manual-start-all")}),e)}(this),this.run()):(0,l.R)(21)}get config(){return{info:this.info,init:this.init,loader_config:this.loader_config,runtime:this.runtime}}get api(){return this}run(){try{const e=function(e){const t={};return o.forEach((r=>{t[r]=!!e[r]?.enabled})),t}(this.init),t=[...this.desiredFeatures];t.sort(((e,t)=>n.P3[e.featureName]-n.P3[t.featureName])),t.forEach((t=>{if(!e[t.featureName]&&t.featureName!==n.K7.pageViewEvent)return;if(this.runSoftNavOverSpa&&t.featureName===n.K7.spa)return;if(!this.runSoftNavOverSpa&&t.featureName===n.K7.softNav)return;const r=function(e){switch(e){case n.K7.ajax:return[n.K7.jserrors];case n.K7.sessionTrace:return[n.K7.ajax,n.K7.pageViewEvent];case n.K7.sessionReplay:return[n.K7.sessionTrace];case n.K7.pageViewTiming:return[n.K7.pageViewEvent];default:return[]}}(t.featureName).filter((e=>!(e in this.features)));r.length>0&&(0,l.R)(36,{targetFeature:t.featureName,missingDependencies:r}),this.features[t.featureName]=new t(this)}))}catch(e){(0,l.R)(22,e);for(const e in this.features)this.features[e].abortHandler?.();const t=(0,_.Zm)();delete t.initializedAgents[this.agentIdentifier]?.features,delete this.sharedAggregator;return t.ee.get(this.agentIdentifier).abort(),!1}}}({features:[Ee,O,j,Ke,Fe,k,q,bt,Tt,Ge,mt],loaderType:"spa"})})()})();</script>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<meta name="google-site-verification" content="3oNMhivFw3_Q7QYQWJC7K099knwu7H9XS5gKK_9DIxY" />
+
+		
+		<!-- Remove Sky Ad on Small Screens -->
+		
+			<style type="text/css">
+				@media screen and (max-width: 768px) {
+					.ad--sky {
+						display:none;
+					}
+				}
+			</style>
+		
+			<!-- prevent iOS from making phone number look-a-likes callable -->
+			<meta name="format-detection" content="telephone=no" />
+
+			<!-- for Google -->
+			<meta name="description" content="Journal of Medical Internet Research - International Scientific Journal for Medical Research, Information and Communication on the Internet" />
+			<meta name="keywords" content="Peer-review, Medical, Medicine, Internet, Research, Journal, ehealth, JMIR,open access publishing, medical research" />
+		
+		
+		
+<link rel="alternate" type="application/atom+xml" href="https://preprints.jmir.org/feed/atom" />
+<link rel="alternate" type="application/rdf+xml" href="https://preprints.jmir.org/feed/rss" />
+<link rel="alternate" type="application/rss+xml" href="https://preprints.jmir.org/feed/rss2" />
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+					<meta name="description" content="#Preprint #PeerReviewMe: Warning: This is a unreviewed preprint. Readers are warned that the document has not been peer-reviewed by expert/patient reviewers or an academic editor, may contain misleading claims, and is likely to undergo changes before final publication, if accepted, or may have been rejected/withdrawn. Readers with interest and expertise are encouraged to sign up as peer-reviewer, if the paper is within an open peer-review period. Please cite this preprint only for review purposes or for grant applications and CVs (if you are the author).
+			 Background: Mild Cognitive Impairment (MCI), characterized by cognitive decline exceeding age-related norms without significant functional impairment, represents a critical prodromal stage for dementia. Given the limited efficacy of pharmacological interventions and the escalating global burden of aging populations, effective non-pharmacological strategies are urgently needed. Virtual Reality (VR), offering immersive and interactive environments, shows promise for cognitive rehabilitation in MCI, but evidence regarding its efficacy remains inconsistent due to heterogeneity in intervention types (training vs. gaming) and technical parameters, particularly immersion level. Objective: This systematic review and meta-analysis synthesized evidence from randomized controlled trials (RCTs) to evaluate the efficacy of VR-based cognitive training and gaming interventions on cognitive function in older adults with MCI and to investigate the moderating role of immersion level. Methods: We systematically searched four electronic databases (PubMed, Web of Science, Embase, Scopus) from inception to July 20, 2025, for RCTs investigating VR interventions (cognitive training or games) in individuals aged &ge; 55 years diagnosed with MCI. Two independent reviewers performed study selection, data extraction (including intervention characteristics, implementation details, and behavior change techniques), and risk-of-bias assessment using the Cochrane Risk of Bias tool (RevMan 5.4.1). Standardized mean differences ((Hedges&rsquo;s g) with 95% confidence intervals (CI) were pooled using random-effects models in Stata 18.0. Heterogeneity was quantified using I&sup2;. Publication bias was assessed via funnel plots and Egger&rsquo;s test. Pre-specified meta-regression explored immersion level as a potential moderator. Results: Of the 1,411 articles retrieved in total, 11 studies were included in the analysis. VR demonstrated a statistically significant improvement in the efficacy of cognitive rehabilitation among patients with MCI (Hedges&rsquo;s g = 0.6, 95% CI: 0.29 to 0.90, p &lt; 0.05). Specifically, VR-based games (Hedges&rsquo;s g = 0.68, 95% CI: 0.12 to 1.24, p = 0.02) showed greater advantages in improving cognitive impairments compared to VR-based cognitive training (Hedges&rsquo;s g = 0.52, 95% CI: 0.15 to 0.89, p = 0.05). The immersive level of VR interventions emerged as a significant moderator of heterogeneity across the included studies. Conclusions: VR-based interventions, including cognitive training and games, effectively improve cognitive function in MCI patients, with VR games showing a trend toward greater efficacy. Critical to these outcomes is VR immersion level, highlighting the need to optimize sensory integration (e.g., multi-modal feedback) while balancing individual tolerance. Moderate heterogeneity across studies underscores the importance of standardized protocols for intervention design and immersion assessment. These findings support VR as a valuable non-pharmacological tool for MCI cognitive rehabilitation, with future research needed to refine personalized approaches and enhance generalizability.  " />
+
+			<meta name="title" content="JMIR Preprints #82876: Effectiveness of VR-based cognitive training and games on cognitive rehabilitation in patients with MCI：A Systematic Review and Meta-Analysis">
+								<!-- for Facebook -->
+	<meta property="og:title" content="Effectiveness of VR-based cognitive training and games on cognitive rehabilitation in patients with MCI：A Systematic Review and Meta-Analysis" />
+	<meta property="og:type" content="article" />
+
+	<meta property="og:url" content="https://preprints.jmir.org/preprint/82876" />
+
+    		<meta property="og:image" content="https://preprints.jmir.org/ojs/images/pre-logo.png" />
+	
+	<meta property="og:site_name" content="JMIR Preprints" />
+	<meta property="fb:admins" content="872305111" />
+
+	<!-- for Twitter -->
+			<meta name="twitter:card" content="summary" />
+		<meta name="twitter:site" content="@jmirpub" />
+	<meta name="twitter:title" content="Effectiveness of VR-based cognitive training and games on cognitive rehabilitation in patients with MCI：A Systematic Review and Meta-Analysis" />
+	<meta name="twitter:description" content="Background: Mild Cognitive Impairment (MCI), characterized by cognitive decline exceeding age-related norms without significant functional impairment, represents a critical prodromal stage for..." />
+			<meta name="twitter:image" content="https://preprints.jmir.org/ojs/images/pre-logo.png" />
+	
+							<title>JMIR Preprints #82876: Effectiveness of VR-based cognitive training and games on cognitive rehabilitation in patients with MCI：A Systematic Review and Meta-Analysis</title>
+					
+				<!--[if (gt IE 8)|!(IE)]><!-->
+			<link rel="stylesheet" media="screen" href="https://asset.jmir.pub/assets/preprints_stylesheet.css" />
+			<link rel="stylesheet" href="/ojs/css/20th.css">
+			<link rel="stylesheet" media="print" href="https://asset.jmir.pub/assets/static/styles/print.css?v=127.1.1.1" />
+					<!--<![endif]-->
+
+		<link rel="stylesheet" href="https://asset.jmir.pub/assets/static/css/third-party-header.min.css?v=127.1.1.1" />
+		<link rel="canonical" href="https://preprints.jmir.org/preprint/82876"/>
+        <link rel="stylesheet" href="https://asset.jmir.pub/assets/static/css/balloon.css">
+		<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.3.1/css/all.css" integrity="sha384-mzrmE5qonljUremFsqc01SB46JvROS7bZs3IO2EmfFsd15uHvIt+Y8vEf7N7fWAU" crossorigin="anonymous">
+
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/v5-font-face.min.css" integrity="sha512-hodJLDkf8nP/2zZwY2qYj8sIQOLvS/L9ZyUoIWBIgKJcyXHgQ/8m7VieJuaYpRqVVU5jUXZNfVQmX0GGjVvKQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+		<!--AngularJS-->
+		<!-- A little favicon just so it's not blank on a web browser. -->
+		<link rel="apple-touch-icon" sizes="57x57" href="https://asset.jmir.pub/assets/static/images/apple-touch-icon-57x57.png">
+		<link rel="apple-touch-icon" sizes="114x114" href="https://asset.jmir.pub/assets/static/images/apple-touch-icon-114x114.png">
+		<link rel="apple-touch-icon" sizes="72x72" href="https://asset.jmir.pub/assets/static/images/apple-touch-icon-72x72.png">
+		<link rel="apple-touch-icon" sizes="144x144" href="https://asset.jmir.pub/assets/static/images/apple-touch-icon-144x144.png">
+		<link rel="apple-touch-icon" sizes="60x60" href="https://asset.jmir.pub/assets/static/images/apple-touch-icon-60x60.png">
+		<link rel="apple-touch-icon" sizes="120x120" href="https://asset.jmir.pub/assets/static/images/apple-touch-icon-120x120.png">
+		<link rel="apple-touch-icon" sizes="76x76" href="https://asset.jmir.pub/assets/static/images/apple-touch-icon-76x76.png">
+		<link rel="apple-touch-icon" sizes="152x152" href="https://asset.jmir.pub/assets/static/images/apple-touch-icon-152x152.png">
+		<link rel="icon" type="image/png" href="https://asset.jmir.pub/assets/static/images/favicon-196x196.png" sizes="196x196">
+		<link rel="icon" type="image/png" href="https://asset.jmir.pub/assets/static/images/favicon-160x160.png" sizes="160x160">
+		<link rel="icon" type="image/png" href="https://asset.jmir.pub/assets/static/images/favicon-96x96.png" sizes="96x96">
+		<link rel="icon" type="image/png" href="https://asset.jmir.pub/assets/static/images/favicon-16x16.png" sizes="16x16">
+		<link rel="icon" type="image/png" href="https://asset.jmir.pub/assets/static/images/favicon-32x32.png" sizes="32x32">
+		<meta name="msapplication-TileColor" content="#247CB3">
+		<meta name="msapplication-TileImage" content="https://asset.jmir.pub/assets/static/images/mstile-144x144.png">
+		<!-- JSON cross-broswer compatibility -->
+
+		<script type="text/javascript" src="https://asset.jmir.pub/assets/static/js/scripts.external.min.js?v=127.1.1.1"></script>
+		<script type="text/javascript" src="https://asset.jmir.pub/assets/static/js/scripts.third-party.min.js?v=127.1.1.1"></script>
+
+		<script type="text/javascript" src="https://asset.jmir.pub/assets/static/js/custom.js?v=127.1.1.1"></script>
+		<script type="text/javascript" src="https://asset.jmir.pub/assets/static/js/controller.js?v=127.1.1.1"></script>
+
+        <script src="https://badge.dimensions.ai/badge.js" charset="utf-8"></script>
+
+	    <script type="text/javascript" src="https://platform.linkedin.com/in.js">
+		    api_key: 77jej2tj08s872
+		    authorize: true
+		    onLoad: onLinkedInLoad
+		</script>
+
+        <script type="text/javascript" src="https://badge.dimensions.ai/badge.js"></script>
+
+        
+            <script type="text/javascript">
+                window.zESettings = {
+                    webWidget: {
+                        offset: {
+                            mobile: {
+                                vertical: '50px'
+                            }
+                        }
+                    }
+                };
+            </script>
+        
+
+        <!-- Zendesk Widget -->
+        <!-- Start of jmir Zendesk Widget script -->
+        
+            <script>
+                /*<![CDATA[*/window.zEmbed||function(e,t){var n,o,d,i,s,a=[],r=document.createElement("iframe");window.zEmbed=function(){a.push(arguments)},window.zE=window.zE||window.zEmbed,r.src="javascript:false",r.title="",r.role="presentation",(r.frameElement||r).style.cssText="display: none",d=document.getElementsByTagName("script"),d=d[d.length-1],d.parentNode.insertBefore(r,d),i=r.contentWindow,s=i.document;try{o=s}catch(c){n=document.domain,r.src='javascript:var d=document.open();d.domain="'+n+'";void(0);',o=s}o.open()._l=function(){var o=this.createElement("script");n&&(this.domain=n),o.id="js-iframe-async",o.src=e,this.t=+new Date,this.zendeskHost=t,this.zEQueue=a,this.body.appendChild(o)},o.write('<body onload="document._l();">'),o.close()}("https://assets.zendesk.com/embeddable_framework/main.js","jmir.zendesk.com");/*]]>*/
+            </script>
+        
+        <!-- End of jmir Zendesk Widget script -->
+
+		<!-- Style to hide Zendesk help button (for now) on article template as it's nav conflicts with help button -->
+		
+			<style type="text/css">
+				.support-tooltip {
+				background:#545454;
+				color:#ffffff;
+				display:inline-block;
+				padding:0.75rem;
+				font-family:'Roboto',sans-serif;
+				font-weight:50;
+				font-size:12px;
+				position:fixed; right: 0px; bottom: 70px;
+				}
+
+				.support-tooltip:after {
+					content: "";
+					position: absolute;
+					bottom: -10px;
+					left: calc(50% - 5px);
+					border-width: 10px 10px 0;
+					border-style: solid;
+					border-color: #545454 transparent;
+					display: block;
+					width: 0;
+				}
+
+			@media screen and (max-width: 699px){
+				.support-tooltip {
+					display: none !important;
+				}
+			}
+			@media only screen and (device-width: 768px) {
+				.support-tooltip {
+					display: none !important;
+				}
+			}
+			@media only screen and (min-device-width : 1024px) and (max-device-width : 1366px) {
+					.support-tooltip {
+						display: none !important;
+					}
+				}
+			</style>
+		
+        <script type="text/javascript">
+            window.journalId = '18';
+            window.apiServer = 'https://middleman.jmir.pub/';
+        </script>
+
+        <!-- Twitter conversion tracking base code -->
+        
+        <script>
+			!function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);
+
+			},s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',
+
+			a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
+
+			twq('config','o7i83');
+        </script>
+        
+        <!-- End Twitter conversion tracking base code -->
+	</head>
+	<!-- id on the body is for the scroll to top function -->
+	<body id="Body" class="JP body-article">
+
+	<noscript style="position:fixed;left:35%;top:30%;background: #ffa500; z-index: 99999;
+    padding: 10px 10px 10px 10px;
+    border-top: #ffa500;
+    border-bottom: #ffa500;
+    border-left: #ffa500;"><p style="color:white;">Sorry, you need to enable javascript for this page to function properly.</p></noscript>
+	  <button type="button" class="ion-clipboard btn--menu-cirular js--btn-open-toolbar"></button>
+
+		<header>
+			<div class="header-wrapper clearfix header-ads-content">
+				<div class="jmir-logo">
+					<a class="h1-link-ie" style="text-decoration:none;" href="//jmirpublications.com/"><h1>JMIR Publications</h1></a>
+				</div>
+
+				<nav class="">
+    <button type="button" class="btn-menu-mobile"><i class="icon-menu">&nbsp;</i>Menu</button>
+   <!--  <button type="button" class="btn-menu-mobile-close"><i class="icon-menu-close">&nbsp;</i>Close Menu</button> -->
+    <button type="button" id="btnMobileSearch" class="btn-menu-mobile-search"><i class="icon-search-mobile">&nbsp;</i>Search</button>
+    <button type="button" id="btn-user" class="btn-menu-mobile-user"><i class="icon-user">&nbsp;</i>User</button>
+    <div id="btnMobileSignInOptions" class="mobile-sign-in-options-closed">
+                <button class="btn-mobile-sign-in" type="button"><a class="" href="https://accounts.jmir.pub">Sign In</a>
+        </button>
+        <button class="btn-mobile-sign-up" type="button">Sign Up</button>
+            </div>
+    <button type="button" id="" class="btn-mobile-twitter-follow">
+        <a href="https://twitter.com/intent/follow?screen_name=jmirpub"><img src="https://asset.jmir.pub/assets/static/images/icon-twitter-follow.png" />
+        </a>Follow Us on Twitter</button>
+    <div id="navMobile" class="nav-mobile nav-mobile-closed clearfix">
+        <ul>
+            <li class=""><a href="https://preprints.jmir.org">Home</a></li>
+            <li id="btn-browse-journal">Browse Journal<span class="typcn typcn-plus"></span></li>
+
+            <li class="browse-journal-li browse-journal-li-closed">
+                <ul class="clearfix sub-ul">
+                    <li class=""><a href="/issue/current">Current Issue</a>
+                    </li>
+                    <li class=""><a href="/issue/upcoming">Upcoming Issue</a>
+                    </li>
+                    <li id="btn-browse-year" class="">Browse By Year<span class="typcn typcn-plus"></span>
+                    </li>
+                    <li class="browse-year browse-year-closed">
+                        <form>
+                            <label>Browse by Year:
+                                <select id="yearSelect">
+                                    <option value="">Select...</option>
+                                                                        <option value="/issue/year/2015">2015</option>
+                                                                    </select>
+                                <button type="button" onclick="browseYear()" class="btn-jmir-submit">Submit</button>
+                            </label>
+                        </form>
+                    </li>
+                    <li class=""><a href="/issue/archive">Browse by Issue</a>
+                    </li>
+                    <li class=""><a href="/search/authors">Browse by Author</a>
+                    </li>
+                    <li class=""><a href="/themes">Browse by Theme</a>
+                    </li>
+                </ul>
+            </li>
+
+            <li id="btn-other-journals" class="">Other Journals<span class="typcn typcn-plus"></span></li>
+
+            <li class="other-journals-li other-journals-li-closed">
+                <ul class="clearfix sub-ul">
+
+                                                                        <li ><a href="https://www.jmir.org">Journal of Medical Internet Research</a></li>
+                                                                                                <li ><a href="https://www.researchprotocols.org">JMIR Research Protocols</a></li>
+                                                                                                <li ><a href="https://formative.jmir.org">JMIR Formative Research</a></li>
+                                                                                                <li ><a href="https://mhealth.jmir.org">JMIR mHealth and uHealth</a></li>
+                                                                                                <li ><a href="https://publichealth.jmir.org">JMIR Public Health and Surveillance</a></li>
+                                                                                                <li ><a href="https://ojphi.jmir.org">Online Journal of Public Health Informatics</a></li>
+                                                                                                <li ><a href="https://medinform.jmir.org">JMIR Medical Informatics</a></li>
+                                                                                                <li ><a href="https://mental.jmir.org">JMIR Mental Health</a></li>
+                                                                                                <li ><a href="https://humanfactors.jmir.org">JMIR Human Factors</a></li>
+                                                                                                <li ><a href="https://games.jmir.org">JMIR Serious Games</a></li>
+                                                                                                <li ><a href="https://mededu.jmir.org">JMIR Medical Education</a></li>
+                                                                                                <li ><a href="https://aging.jmir.org">JMIR Aging</a></li>
+                                                                                                <li ><a href="https://xmed.jmir.org">JMIRx Med</a></li>
+                                                                                                <li ><a href="https://cancer.jmir.org">JMIR Cancer</a></li>
+                                                                                                <li ><a href="https://www.iproc.org">iProceedings</a></li>
+                                                                                                <li ><a href="https://www.i-jmr.org">Interactive Journal of Medical Research</a></li>
+                                                                                                <li ><a href="https://pediatrics.jmir.org">JMIR Pediatrics and Parenting</a></li>
+                                                                                                <li ><a href="https://derma.jmir.org">JMIR Dermatology</a></li>
+                                                                                                <li ><a href="https://rehab.jmir.org">JMIR Rehabilitation and Assistive Technologies</a></li>
+                                                                                                <li ><a href="https://diabetes.jmir.org">JMIR Diabetes</a></li>
+                                                                                                <li ><a href="https://cardio.jmir.org">JMIR Cardio</a></li>
+                                                                                                <li ><a href="https://infodemiology.jmir.org">JMIR Infodemiology</a></li>
+                                                                                                <li ><a href="https://ai.jmir.org">JMIR AI</a></li>
+                                                                                                <li ><a href="https://nursing.jmir.org">JMIR Nursing</a></li>
+                                                                                                <li ><a href="https://jopm.jmir.org">Journal of Participatory Medicine</a></li>
+                                                                                                <li ><a href="https://periop.jmir.org">JMIR Perioperative Medicine</a></li>
+                                                                                                <li ><a href="https://biomedeng.jmir.org">JMIR Biomedical Engineering</a></li>
+                                                                                                <li ><a href="https://bioinform.jmir.org">JMIR Bioinformatics and Biotechnology</a></li>
+                                                                                                <li ><a href="https://apinj.jmir.org">Asian/Pacific Island Nursing Journal</a></li>
+                                                                                                <li ><a href="https://xbio.jmir.org">JMIRx Bio</a></li>
+                                                                                                <li ><a href="https://neuro.jmir.org">JMIR Neurotechnology</a></li>
+                                                                                                <li ><a href="https://xr.jmir.org">JMIR XR and Spatial Computing (JMXR)</a></li>
+                                                                                                <li ><a href="https://www.medicine20.com">Medicine 2.0</a></li>
+                                                                                                <li ><a href="https://data.jmir.org">JMIR Data</a></li>
+                                                                                                <li ><a href="https://challenges.jmir.org">JMIR Challenges</a></li>
+                                                                                                                                            <li ><a href="https://manuscripts.jmir.org">Transfer Hub (manuscript eXchange)</a></li>
+                                            
+
+                </ul>
+            </li>
+
+                            <li><a href="https://accounts.jmir.pub/register?redirectTo=https%3A%2F%2Fpreprints.jmir.org/user">Sign Up</li>
+                <li><a href="https://accounts.jmir.pub/login?redirectTo=https%3A%2F%2Fpreprints.jmir.org/user">Sign In</a></li>
+            
+            <li><a href="https://www.jmir.org/fees/membership-types">Membership</a></li>
+            <li><a href="/stats/overview">Top Articles</a></li>
+            <li><a href="/search">Search</a></li>
+        </ul>
+    </div>
+    <ul class="nav-desktop">
+        <li class="" data-balloon="Want to publish? Submit today!" data-balloon-pos="left"><a class='btn-hero-submit' href="/author">SUBMIT</a></li>
+        <li class=""><a href="https://www.jmir.org/fees/membership-types">MEMBERSHIP</a></li>
+
+        <li class="nav-desktop-twitter-follow">
+            <a href="https://twitter.com/jmirpub" class="twitter-follow-button" data-show-count="false" data-size="large" data-show-screen-name="false">Follow @jmirpub</a>
+        </li>
+
+        
+            <script>
+                ! function(d, s, id) {
+                    var js, fjs = d.getElementsByTagName(s)[0],
+                        p = /^http:/.test(d.location) ? 'http' : 'https';
+                    if (!d.getElementById(id)) {
+                        js = d.createElement(s);
+                        js.id = id;
+                        js.src = p + '://platform.twitter.com/widgets.js';
+                        fjs.parentNode.insertBefore(js, fjs);
+                    }
+                }(document, 'script', 'twitter-wjs');
+            </script>
+        
+        <li class="search-bar clearfix">
+            <form id="nav-search" class="search-basic clearfix" action="/search/searchResult" method="get">
+                <input name="field[]" value="text" type='hidden' />
+                <input id="basic-search" class="basic-input" type="text" placeholder="Search all Journals and Conferences" name="criteria[]">
+                <a href="/search">
+                    <button type="button" class="btn-show-advanced-search" onclick="ga('send', 'event', 'input', 'click', 'advanced-search',{'page': '/search'});">Advanced Search<i class="icon-arrow">&nbsp;</i>
+                    </button>
+                </a>
+                <input type="submit" value="" class="icon-search" name="clicked" onclick="ga('send', 'event', 'input', 'click', 'header-search');">
+            </form>
+        </li>
+                <li class="">
+            <a class="btn-sign-in" href="https://accounts.jmir.pub/login?redirectTo=https%3A%2F%2Fpreprints.jmir.org/user">SIGN IN</a>
+        </li>
+        <li class="btn-sign-up show">
+            <a class='' href="https://accounts.jmir.pub/register?redirectTo=https%3A%2F%2Fpreprints.jmir.org/user">SIGN UP</a>
+        </li>
+            </ul>
+</nav>
+
+<style>
+    header .header-wrapper nav .nav-mobile ul .browse-year label select {
+        display: inline;
+        margin: -40px 0px auto;
+        width: 75%;
+        height: 30px;
+        border-radius: 0px;
+    }
+
+    .btn-jmir-submit {
+        background: #629f36;
+        padding: 5px 12px;
+        margin-left: 6px;
+        color: #fff;
+    }
+    .nav-desktop-twitter-follow {
+        padding-top: 9px;
+    }
+</style>
+
+<script>
+    function browseYear() {
+        var year = $('#yearSelect').val();
+        window.location.href = year;
+    }
+</script>
+			</div>
+
+			<div id="journal-nav" class="journal-specific-nav-wrapper clearfix">
+    <section class="inner-nav-container clearfix">
+        <div class="journal-title-h2">
+            <ul class="journals-drop-down-container">
+                <li id="journals-list" class="btn-journals"><a href=https://preprints.jmir.org onclick="ga('send', 'event', 'button', 'click', 'icon-home');"><span class="typcn typcn-home icon-home" style="margin-right:5px; font-size:20px; position:static; border-left:none;"></span>JMIR Preprints</a><span class="btn-journal-expand typcn typcn-arrow-down-thick" data-balloon="Visit our sister journals!" data-balloon-pos="up" style="font-family:typicons;padding-top:2px;">&#57352;</span>
+                    <ul class="journals-ul clearfix" style="height: 340px;">
+                                                                                    <li class="jmir-li"><a href="https://www.jmir.org">Journal of Medical Internet Research</a></li>
+                                                                                                                <li class="resprot-li"><a href="https://www.researchprotocols.org">JMIR Research Protocols</a></li>
+                                                                                                                <li class="formative-li"><a href="https://formative.jmir.org">JMIR Formative Research</a></li>
+                                                                                                                <li class="mhealth-li"><a href="https://mhealth.jmir.org">JMIR mHealth and uHealth</a></li>
+                                                                                                                <li class="publichealth-li"><a href="https://publichealth.jmir.org">JMIR Public Health and Surveillance</a></li>
+                                                                                                                <li class="ojphi-li"><a href="https://ojphi.jmir.org">Online Journal of Public Health Informatics</a></li>
+                                                                                                                <li class="medinform-li"><a href="https://medinform.jmir.org">JMIR Medical Informatics</a></li>
+                                                                                                                <li class="mental-li"><a href="https://mental.jmir.org">JMIR Mental Health</a></li>
+                                                                                                                <li class="humanfactors-li"><a href="https://humanfactors.jmir.org">JMIR Human Factors</a></li>
+                                                                                                                <li class="games-li"><a href="https://games.jmir.org">JMIR Serious Games</a></li>
+                                                                                                                <li class="mededu-li"><a href="https://mededu.jmir.org">JMIR Medical Education</a></li>
+                                                                                                                <li class="aging-li"><a href="https://aging.jmir.org">JMIR Aging</a></li>
+                                                                                                                <li class="xmed-li"><a href="https://xmed.jmir.org">JMIRx Med</a></li>
+                                                                                                                <li class="cancer-li"><a href="https://cancer.jmir.org">JMIR Cancer</a></li>
+                                                                                                                <li class="iproc-li"><a href="https://www.iproc.org">iProceedings</a></li>
+                                                                                                                <li class="ijmr-li"><a href="https://www.i-jmr.org">Interactive Journal of Medical Research</a></li>
+                                                                                                                <li class="pediatrics-li"><a href="https://pediatrics.jmir.org">JMIR Pediatrics and Parenting</a></li>
+                                                                                                                <li class="derma-li"><a href="https://derma.jmir.org">JMIR Dermatology</a></li>
+                                                                                                                <li class="rehab-li"><a href="https://rehab.jmir.org">JMIR Rehabilitation and Assistive Technologies</a></li>
+                                                                                                                <li class="diabetes-li"><a href="https://diabetes.jmir.org">JMIR Diabetes</a></li>
+                                                                                                                <li class="cardio-li"><a href="https://cardio.jmir.org">JMIR Cardio</a></li>
+                                                                                                                <li class="infodemiology-li"><a href="https://infodemiology.jmir.org">JMIR Infodemiology</a></li>
+                                                                                                                <li class="ai-li"><a href="https://ai.jmir.org">JMIR AI</a></li>
+                                                                                                                <li class="nursing-li"><a href="https://nursing.jmir.org">JMIR Nursing</a></li>
+                                                                                                                <li class="jopm-li"><a href="https://jopm.jmir.org">Journal of Participatory Medicine</a></li>
+                                                                                                                <li class="periop-li"><a href="https://periop.jmir.org">JMIR Perioperative Medicine</a></li>
+                                                                                                                <li class="biomedeng-li"><a href="https://biomedeng.jmir.org">JMIR Biomedical Engineering</a></li>
+                                                                                                                <li class="bioinform-li"><a href="https://bioinform.jmir.org">JMIR Bioinformatics and Biotechnology</a></li>
+                                                                                                                <li class="apinj-li"><a href="https://apinj.jmir.org">Asian/Pacific Island Nursing Journal</a></li>
+                                                                                                                <li class="xbio-li"><a href="https://xbio.jmir.org">JMIRx Bio</a></li>
+                                                                                                                <li class="neuro-li"><a href="https://neuro.jmir.org">JMIR Neurotechnology</a></li>
+                                                                                                                <li class="xr-li"><a href="https://xr.jmir.org">JMIR XR and Spatial Computing (JMXR)</a></li>
+                                                                                                                <li class="med20-li"><a href="https://www.medicine20.com">Medicine 2.0</a></li>
+                                                                                                                <li class="data-li"><a href="https://data.jmir.org">JMIR Data</a></li>
+                                                                                                                <li class="challenges-li"><a href="https://challenges.jmir.org">JMIR Challenges</a></li>
+                                                                                                                                                                    <li class="manuscripts-li"><a href="https://manuscripts.jmir.org">Transfer Hub (manuscript eXchange)</a></li>
+                                                                        </ul>
+                </li>
+            </ul>
+                                                                                    <div class="tooltip__ui--right js--btn-journal-dropdown-tooltip show">
+                <p>Explore our sister journals here.</p>
+            </div>
+        </div>
+        <div class="journal-specific-nav clearfix">
+            <ul class="current-upcoming-ul">
+                <li><a href="/issue/current">Current Issue</a></li>
+                <li><a href="/issue/upcoming">Upcoming Issue</a></li>
+                <li><a href="/stats/overview">Top Articles</a></li>
+            </ul>
+            <ul class="browse-by-year-ul">
+                <li>
+                    <form>
+                        <label>Browse by Year:
+                            <select onchange="this.options[this.selectedIndex].value && (window.location = this.options[this.selectedIndex].value);">
+                                <option value="">Select...</option>
+                                                                    <option value="/issue/year/2015">2015</option>
+                                                            </select>
+                        </label>
+                    </form>
+                </li>
+            </ul>
+            <ul class="browse-by-issue-author-title-theme">
+                <li>Browse:</li>
+                <li><a href="/issue/archive">Issues</a></li>
+                <li><a href="/search/authors">Authors</a></li>
+                <li><a href="/themes">Themes</a></li>
+            </ul>
+        </div>
+    </section>
+</div>
+			
+				<script type="text/javascript">
+					$(document).ready(function($) {
+						$(".maintenanceClose").click(function(){
+							$(this).parent().hide();
+					        var superdomain = location.hostname.replace(/^[^.]+\./g, ".");
+					        var expiry = new Date("May 14, 2016 00:00:00");
+					        document.cookie = "maintenanceClosed=1; expires=" + expiry.toString() + ";domain=" + superdomain + ";";
+						});
+						//copied from w3school
+					function getCookie(cname) {
+					    var name = cname + "=";
+					    var ca = document.cookie.split(';');
+					    for(var i = 0; i < ca.length; i++) {
+					        var c = ca[i];
+					        while (c.charAt(0) == ' ') {
+					            c = c.substring(1);
+					        }
+					        if (c.indexOf(name) == 0) {
+					            return c.substring(name.length, c.length);
+					        }
+					    }
+					    return "";
+					}
+
+					function checkCookie() {
+					    var maintenanceClose = getCookie("maintenanceClosed");
+					    console.log(maintenanceClose);
+					    if (maintenanceClose == 1) {
+					    	$(".messageMaintenance").hide();
+					    } else {
+					    	$(".messageMaintenance").show();
+					    }
+					}
+					checkCookie();
+
+					});
+				</script>
+				<style type="text/css">
+					.messageMaintenance{
+						position:fixed;
+						background:#FFF;
+						border:5px solid #FF9900;
+						box-sizing: border-box;
+						padding:12px 12px;
+						bottom:0px;
+						left:0px;
+						right:0px;
+					}
+					.maintenanceClose{
+						position:absolute;
+						top:0px;
+						right:0px;
+						background:none;
+						font-size: 32px;
+					}
+				</style>
+			
+		</header>
+
+		
+<style>
+#maintenance {
+    display: none;
+    background: rgba(16, 100, 154, 1);
+    box-shadow: 0 0 5px #999;
+    max-width: 550px;
+    width: 100%;
+    position: fixed;
+    left: 20px;
+    bottom: 20px;
+    z-index: 100000;
+    font-size: 14px;
+    line-height: 18px;
+    box-sizing: border-box;
+    color: #ffffff !important;
+    font-family: Roboto !important;
+}
+
+#maintenance a{
+    color: orange;
+}
+#maintenance__container p.h3 {
+    padding-bottom: 5px;
+    font-size: 16px;
+    margin: 10px 0 4px 0 !important;
+    font-weight: 800;
+    color: white !important;
+}
+#maintenance__container {
+    text-align: left;
+    padding: 12px;
+}
+#maintenance__container p {
+    margin-top: 0 !important;
+}
+#maintenance__header p.h3 {
+    font-weight: 800;
+    font-size: 18px;
+    color: white !important;
+    border-bottom: 1px solid #ffffff;
+    padding: 12px 12px 11px 26px;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    line-height: 1.1 !important;
+}
+#maintenance__header .orange {
+    padding: 20.75px 7px;
+    background-color: orange;
+    position: absolute;
+    left: 0;
+}
+#maintenance__container ul li {
+    margin-bottom: 3px;
+}
+#maintenance__icon {
+    width: 79px;
+    height: 78px;
+    margin-bottom: 20px;
+}
+#maintenance__close {
+    position: absolute;
+    top: 12px;
+    right: 20px;
+    cursor: pointer;
+}
+#maintenance__close-icon {
+    font-size: 18px;
+    color: #ffffff;
+}
+@media (max-width: 400px) {
+    #maintenance {
+        left: 0;
+    }
+}
+</style>
+<script type="text/javascript">
+    var jNoConflict;
+    if (typeof j != 'undefined') {
+        jNoConflict = j;
+    } else {
+        jNoConflict = $;
+    }
+    // uncomment to enable maintenance note, comment to disable
+    jNoConflict(document).ready(function() {
+        var today = new Date();
+        var expire = new Date(2019, 07, 2, 0, 0, 0, 0);
+
+        if (today < expire) {
+            checkCookie();
+
+            jNoConflict('body').on('click', '#maintenance__close, #maintenance__bg', function() {
+                jNoConflict('#maintenance, #maintenance__bg').hide();
+                var superdomain = location.hostname;
+
+                determineExpiryTime(function(expireTime) {
+                    var expiry = new Date(expireTime);
+                    document.cookie = "maintenanceHide=1; expires=" + expiry.toGMTString() + ";domain=" + superdomain + ";path=/";
+                })
+
+            })
+        }
+    });
+    function determineExpiryTime(callback) {
+        var sid = getCookie("OJSSID");
+        var u_ids = [104788, 14789, 104790, 104791, 106675, 113817];
+        var now = new Date();
+        var expireTime = now.getTime() + 1000 * 60 * 60 * 48;
+
+        $.ajax({
+            url: "/user/restrictUsers",
+            type: "POST",
+            data: {
+                users: u_ids
+            },
+            success: function(data) {
+                if(data > 0) {
+                    expireTime = now.getTime() * 30;
+                }
+                callback(expireTime);
+            }
+        });
+    }
+    function checkCookie() {
+        var maintenanceClose = getCookie("maintenanceHide");
+        if (maintenanceClose) {
+            jNoConflict('#maintenance, #maintenance__bg').hide();
+        } else {
+            jNoConflict('#maintenance, #maintenance__bg').show();
+        }
+    }
+    function getCookie(cname) {
+        var name = cname + "=";
+        var ca = document.cookie.split(';');
+        for(var i = 0; i < ca.length; i++) {
+            var c = ca[i];
+            while (c.charAt(0) == ' ') {
+                c = c.substring(1);
+            }
+            if (c.indexOf(name) == 0) {
+                return c.substring(name.length, c.length);
+            }
+        }
+        return "";
+    }
+</script>
+
+<div id="maintenance">
+    <div id="maintenance__header">
+        <div class="orange"></div>
+        <p class="h3 border">Maintenance Notice</p>
+        <div id="maintenance__close"><span id="maintenance__close-icon" class="fa fa-times"></span></div>
+    </div>
+    <div id="maintenance__container">
+        <p>
+            Due to necessary scheduled maintenance, the JMIR Publications website will be unavailable from <strong>Wednesday, July 01, 2020 at 8:00 PM to 10:00 PM EST</strong>. We apologize in advance for any inconvenience this may cause you.
+        </p>
+        <p class="h3">Who will be affected?</p>
+        <ul style="list-style: initial; margin-left: 20px; padding: 0">
+            <li><strong>Readers:</strong> No access to all 28 journals. We recommend accessing our articles via <a href="https://www.ncbi.nlm.nih.gov/pmc/?term=jmir">PubMed Central</a></li>
+            <li><strong>Authors:</strong> No access to the submission form or your user account.</li>
+            <li><strong>Reviewers:</strong> No access to your user account. Please download manuscripts you are reviewing for offline reading before <strong>Wednesday, July 01, 2020 at 7:00 PM</strong>.</li>
+            <li><strong>Editors:</strong> No access to your user account to assign reviewers or make decisions.</li>
+            <li><strong>Copyeditors:</strong> No access to user account. Please download manuscripts you are copyediting before <strong>Wednesday, July 01, 2020 at 7:00 PM</strong>.</li>
+        </ul>
+    </div>
+</div>
+					<div id="mobile-logo" style="margin: 60px 24px 0 24px;">
+				<a href="/" style="color:#444; text-decoration:none; margin-bottom:12px; width: 93.75%; max-width: 1280px; display: block;">
+					<h3 class="typcn typcn-home journal-title--mobile">JMIR Preprints</h3>
+				</a>
+				
+				
+				
+				
+											</div>
+		
+<script src="https://js.pusher.com/4.3/pusher.min.js"></script>
+
+<!-- Hypothesis Configuration -->
+<script type="application/json" class="js-hypothesis-config">
+    {
+        'showHighlights': false
+    }
+</script>
+
+<!-- Hypothesis Integration -->
+<script async src="https://hypothes.is/embed.js"></script>
+
+
+    <style>
+        .aside-right.sticky {
+            position: sticky !important;
+        }
+
+        .aside-left-alt-2.sticky {
+            position: sticky !important;
+        }
+        .main-article-content.sticky {
+            float: right !important;
+        }
+
+        .pdf-download-button {
+            text-decoration: none;
+            background: #247CB3;
+            padding: 10px 20px;
+            color: white;
+            font-weight: 500;
+        }
+
+        .pdf-download-button:hover {
+            opacity: 0.9;
+        }
+
+        .pdf-download-button:active {
+            background: #146495;
+        }
+        .pdf-download-viewer-wrapper {
+            overflow-y: scroll;
+        }
+        .pdf-download-viewer {
+            width: 100%;
+            height: 1000px;
+            border: 1px solid black;
+        }
+    </style>
+
+
+<main id="wrapper" class="wrapper ArticleMain clearfix">
+    <section class="inner-wrapper clearfix">
+
+            
+            <aside id='asideRight' class="aside-right">
+
+                <button type="button" class="btn-sharing-options">&#160;</button>
+
+                <section class="sharing-options-wrapper ">
+                    <button type='button' class='btn-close-sharing'><span class="typcn typcn-times"></span>Close</button>
+                    <div class="addthis_sharing_toolbox addthis-extra"></div>
+                </section>
+
+                <div class="citation-options-wrapper">
+                    <h3><i class="icon-Citations-black hide-p">&nbsp;</i>Citation</h3>
+                    <p class="hide-p">Please cite as:</p>
+
+                        <p style="font-weight:normal !important;" class="citation-authorstring hide-p">Yuan P, Peng D, Chen J, Liu B, Lu C</p>
+    <p style="font-weight:normal !important;" class="citation-article-title hide-p">Effectiveness of VR-based cognitive training and games on cognitive rehabilitation in patients with MCI：A Systematic Review and Meta-Analysis</p>
+
+                                        <p style="font-weight:normal !important;" class="citation-article-doi hide-p">JMIR Preprints. 28/08/2025:82876</p>
+                        
+                <p style="font-weight:normal !important;" class="citation-article-doi hide-p">DOI: <a href="https://doi.org/10.2196/preprints.82876">10.2196/preprints.82876</a></p>
+        <p style="font-weight:normal !important;" class="citation-article-doi hide-p">URL: <a href="https://preprints.jmir.org/preprint/82876">https://preprints.jmir.org/preprint/82876</a></p>
+
+
+                    </div>
+
+                <button type="button" class="btn-download-options"><span class="typcn typcn-download"></span></button>
+                <section class="preprint-options-wrapper" style="margin-top: 25px;">
+                    <h1 style="font-size: 16px;"><i class="fas fa-cog" style="font-style: normal !important; padding-right: 5px;"></i>Current Preprint Settings</h1>
+                    <div class="options" style="font-size: 12px; padding-left: 22px !important; color:black;">
+                        <small style="color: gray;">(as selected by the authors)<a title="JMIR Preprint Settings" style="margin-left: 5px; font-size: 15px;" href="https://support.jmir.org/hc/en-us/articles/360000555331-How-do-I-change-my-preprint-settings-or-availability-of-preprints-"><i class="fas fa-info-circle" style="color: #247CB3; font-style: normal !important"></i></a></small><br />
+
+                                                    <div style="margin-top: 15px; font-weight:bold;">
+                                1. When the manuscript is submitted, allow peer review from:
+                            </div>
+
+                            <div style="margin-left: 15px; margin-top: 5px;">
+                                                                    <i class="fas fa-check" style="color: green; margin-left: -25px; margin-right: 10px;"></i>
+                                                                (a) Anybody (open community peer review)
+                                <br/>
+
+                                                                (b) Editor-selected reviewers (closed peer review)
+                                <br/>
+                            </div>
+
+                            <div style="margin-top: 15px; font-weight:bold;">
+                                2. When the manuscript is submitted, display the preprint PDF to:
+                            </div>
+
+                            <div style="margin-left: 15px; margin-top: 5px;">
+                                                                    (a) Anybody, anytime
+                                    <br/>
+
+                                                                    <i class="fas fa-check" style="color: green; margin-left: -25px; margin-right: 10px;"></i>
+                                                                    (b) Logged-in users only
+                                    <br/>
+
+                                                                (c) Anybody, anytime (title and abstract only)
+                                <br />
+
+                                                                (d) No one
+                                <br />
+                            </div>
+
+                            <div style="margin-top: 15px; font-weight:bold;">
+                                3. When the manuscript is accepted, display the accepted manuscript PDF to:
+                             </div>
+
+                            <div style="margin-left: 15px; margin-top: 5px;">
+                                                                (a) Anybody, anytime
+                                <br />
+
+                                                                    <i class="fas fa-check" style="color: green; margin-left: -25px; margin-right: 10px;"></i>
+                                                                (b) Logged-in users only
+                                <br />
+
+                                                                (c) Anybody, anytime (title and abstract only)
+                                <br />
+
+                                                                (d) No one
+                                <br />
+
+                            </div>
+                                            </div>
+                </section>
+             </aside>
+
+            <section class="main-article-content clearfix">
+
+            <div class="open-peer-review-card-dates-wrapper" style="padding-bottom:10px;">
+                                    <h4>
+                                              Currently submitted to:
+                                            <a href="https://neuro.jmir.org" target="_blank">JMIR Neurotechnology</a>
+                                          </h4>
+                
+                <h5>Date Submitted: <span>Aug 28, 2025</span></h5>
+
+                                    <h5 class="in-review" style="display: inline-block">Open Peer Review Period: <span> Sep  4, 2025 - Oct 30, 2025 </span></h5>
+                
+                
+                                    <h5>(currently open for review)</h5>
+                
+                <div class="container" style="margin: 10px 0px">
+                                            <a class="review-link link" href="/reviewer/openReview/add/82876" style="color:#ffffff; vertical-align: bottom;">Peer-Review Me</a>
+                    
+                                            <a class="twitter-share-button" href="https://twitter.com/share" data-text="Check out and #peerreview this interesting #JMIR #Preprint: Effectiveness of VR-based cognitive training and games on cognitive rehabilitation in patients with MCI：A Systematic Review and Meta-Analysis" data-url="https://preprints.jmir.org/preprint/82876" data-hashtags="peerreview, digitalhealth" data-via="jmirpub">
+                            Tweet
+                        </a>
+                                    </div>
+            </div>
+
+            
+            
+            
+            
+                <script>
+                    $(document).ready(function() {
+                        $("#warning-content").hide();
+                        $(".arrow-up").hide();
+                        $(".warning-container").click(function() {
+                            $(this).next("#warning-content").slideToggle(200);
+                            $(this).find(".arrow-up, .arrow-down").toggle();
+                        });
+                    });
+                </script>
+            
+
+            <div class="article-view-options" id="preprint-tabs">
+                <ul class=" clearfix">
+                                                                
+                                                                        <li class="tab-active preprint-tab-active">
+                                <a style="width: 100%; height: 100%; display: block;" href="/preprint/82876/submitted">
+                                                                        Submitted Manuscript
+                                                                    </a>
+                            </li>
+                        
+                                                            </ul>
+            </div>
+                            <div style="background: #faf1c6; border: 2px solid #ea8f19; padding: 1rem; margin-top: 1rem">
+                    <p>
+                        <strong>Warning:</strong> This is an author submission that is not peer-reviewed or edited. Preprints - unless they show as "accepted" - should not be relied on to guide clinical practice or health-related behavior and should not be reported in news media as established information.
+                    </p>
+                </div>
+                                        <article class="ajax-article-content">
+                    <div class="bookmark-title-container clearfix">
+                        <div class="article-title">
+                            <h2 class="h2-article-title">Effectiveness of VR-based cognitive training and games on cognitive rehabilitation in patients with MCI：A Systematic Review and Meta-Analysis</h2>
+                        </div>
+                    </div>
+
+                    <div class="authors-container">
+                        <div class="authors clearfix">
+                            <ul class="clearfix">
+                                                                                                <li>
+                                        Peiming Yuan;&#160;                                    </li>
+                                                                    <li>
+                                        Dianhui Peng;&#160;                                    </li>
+                                                                    <li>
+                                        Jiaxi Chen;&#160;                                    </li>
+                                                                    <li>
+                                        Bin Liu;&#160;                                    </li>
+                                                                    <li>
+                                        Chunxia Lu                                    </li>
+                                                                                        </ul>
+                        </div>
+                    </div>
+
+                    <section class="article-content clearfix">
+                                                <article class="abstract">
+                            <h3 id="Abstract" name="abstract">ABSTRACT</h3>
+                                                                                                <p class="abstract-sub-heading">Background:</p>
+                                                                                                                                <p> Mild Cognitive Impairment (MCI), characterized by cognitive decline exceeding age-related norms without significant functional impairment, represents a critical prodromal stage for dementia. Given the limited efficacy of pharmacological interventions and the escalating global burden of aging populations, effective non-pharmacological strategies are urgently needed. Virtual Reality (VR), offering immersive and interactive environments, shows promise for cognitive rehabilitation in MCI, but evidence regarding its efficacy remains inconsistent due to heterogeneity in intervention types (training vs. gaming) and technical parameters, particularly immersion level. </p>
+                                                                                                                                <p class="abstract-sub-heading">Objective:</p>
+                                                                                                                                <p> This systematic review and meta-analysis synthesized evidence from randomized controlled trials (RCTs) to evaluate the efficacy of VR-based cognitive training and gaming interventions on cognitive function in older adults with MCI and to investigate the moderating role of immersion level. </p>
+                                                                                                                                <p class="abstract-sub-heading">Methods:</p>
+                                                                                                                                <p> We systematically searched four electronic databases (PubMed, Web of Science, Embase, Scopus) from inception to July 20, 2025, for RCTs investigating VR interventions (cognitive training or games) in individuals aged ≥ 55 years diagnosed with MCI. Two independent reviewers performed study selection, data extraction (including intervention characteristics, implementation details, and behavior change techniques), and risk-of-bias assessment using the Cochrane Risk of Bias tool (RevMan 5.4.1). Standardized mean differences ((Hedges’s g) with 95% confidence intervals (CI) were pooled using random-effects models in Stata 18.0. Heterogeneity was quantified using I². Publication bias was assessed via funnel plots and Egger’s test. Pre-specified meta-regression explored immersion level as a potential moderator. </p>
+                                                                                                                                <p class="abstract-sub-heading">Results:</p>
+                                                                                                                                <p> Of the 1,411 articles retrieved in total, 11 studies were included in the analysis. VR demonstrated a statistically significant improvement in the efficacy of cognitive rehabilitation among patients with MCI (Hedges’s g = 0.6, 95% CI: 0.29 to 0.90, p < 0.05). Specifically, VR-based games (Hedges’s g = 0.68, 95% CI: 0.12 to 1.24, p = 0.02) showed greater advantages in improving cognitive impairments compared to VR-based cognitive training (Hedges’s g = 0.52, 95% CI: 0.15 to 0.89, p = 0.05). The immersive level of VR interventions emerged as a significant moderator of heterogeneity across the included studies. </p>
+                                                                                                                                <p class="abstract-sub-heading">Conclusions:</p>
+                                                                                                                                <p> VR-based interventions, including cognitive training and games, effectively improve cognitive function in MCI patients, with VR games showing a trend toward greater efficacy. Critical to these outcomes is VR immersion level, highlighting the need to optimize sensory integration (e.g., multi-modal feedback) while balancing individual tolerance. Moderate heterogeneity across studies underscores the importance of standardized protocols for intervention design and immersion assessment. These findings support VR as a valuable non-pharmacological tool for MCI cognitive rehabilitation, with future research needed to refine personalized approaches and enhance generalizability. </p>
+                                                                                    </article>
+                        
+                        
+                                                <br/>
+                    </section>
+
+                                            <div class="mobile-preprint-setting">
+                            <div class="citation-note">
+                                <h3><i class="icon-Citations-black hide-p">&nbsp;</i>Citation</h3>
+                                <p class="hide-p">Please cite as:</p>
+                                    <p style="font-weight:normal !important;" class="citation-authorstring hide-p">Yuan P, Peng D, Chen J, Liu B, Lu C</p>
+    <p style="font-weight:normal !important;" class="citation-article-title hide-p">Effectiveness of VR-based cognitive training and games on cognitive rehabilitation in patients with MCI：A Systematic Review and Meta-Analysis</p>
+
+                                        <p style="font-weight:normal !important;" class="citation-article-doi hide-p">JMIR Preprints. 28/08/2025:82876</p>
+                        
+                <p style="font-weight:normal !important;" class="citation-article-doi hide-p">DOI: <a href="https://doi.org/10.2196/preprints.82876">10.2196/preprints.82876</a></p>
+        <p style="font-weight:normal !important;" class="citation-article-doi hide-p">URL: <a href="https://preprints.jmir.org/preprint/82876">https://preprints.jmir.org/preprint/82876</a></p>
+
+
+                                </div>
+                        </div>
+                    
+                                            
+                        
+                        <script>
+                            Pusher.logToConsole = false;
+
+                            var articleId = '82876';
+                            var version = 'submitted';
+
+                            var pusher = new Pusher('11ced5c559070ec35363', {
+                                cluster: 'us2',
+                                forceTLS: true
+                            });
+
+                            var channel = pusher.subscribe('preprint-' + articleId + '-' + version);
+
+                            channel.bind('created', function(data) {
+                                $('#pdf-viewer').attr("src", data).css('display', 'block');
+                                $('.pdf-download-button').attr('href', data);
+                                $('#preprint-error-msg').html("");
+                                $('#spinner').removeClass('fa fa-spinner fa-pulse fa-3x fa-fw');
+                            });
+
+                            channel.bind('error', function(data) {
+                                $('#preprint-error-msg').css('color', 'red');
+
+                                $('#preprint-error-msg').html('There was an error while generating the pdf. Please contact support.');
+                                $('#spinner').removeClass('fa fa-spinner fa-pulse fa-3x fa-fw');
+                            });
+
+                            $(document).ready(function() {
+                                $.ajax({
+                                    type: "GET",
+                                    url: "/article/getPreprintPdf/" + articleId + "/" + version,
+                                    contentType: 'application/json; charset=utf-8',
+                                    dataType: 'json',
+                                    async: true,
+                                    success: function(data) {
+                                        if (data && data['url']) {
+                                            $('#pdf-viewer').attr("src", data['url']).css('display', 'block');
+                                            $('.pdf-download-button').attr('href', data['url']);
+                                        }
+
+                                        $('#preprint-error-msg').html("");
+                                        $('#spinner').removeClass('fa fa-spinner fa-pulse fa-3x fa-fw');
+                                    },
+                                    failure: function(errorMessage) {
+                                        $('#preprint-error-msg').css('color', 'red');
+                                        $('#preprint-error-msg').html(errorMessage);
+                                        $('#spinner').removeClass('fa fa-spinner fa-pulse fa-3x fa-fw');
+                                    }
+                                });
+                            })
+
+                        </script>
+                        
+
+                                                    <a
+                                href="javascript:;"
+                                role="button"
+                                target="_blank"
+                                aria-label="Download PDF"
+                                title="Download PDF"
+                                class="pdf-download-button"
+                                style="color: white !important">
+                                <i
+                                    class="fas fa-file-download"
+                                    style="font-style: normal !important;">
+                                </i> Download PDF
+                            </a>
+
+                            <br />
+                            <br />
+                            <div class="pdf-download-viewer-wrapper">
+                                <iframe 
+                                    src="" 
+                                    id="pdf-viewer" 
+                                    class="pdf-download-viewer">
+                                </iframe>
+                            </div>
+                        
+                        <span id="spinner" class="fa fa-spinner fa-pulse fa-3x fa-fw" style="right: -40%;position: relative;"></span>
+
+                        <br>
+
+                        <span id="preprint-error-msg" style="display: content; color: green;">Request queued. Please wait while the file is being generated. It may take some time.</span>
+                    
+                                            <h4 id="Copyright" style="margin-top: 20px">Copyright</h4>
+
+                        <p class="article-copyright">
+                            <strong>&#169; The authors. All rights reserved.</strong> This is a privileged document currently under peer-review/community review (or an accepted/rejected manuscript). Authors have provided JMIR Publications with an exclusive
+                            license to publish this preprint on it's website for review and ahead-of-print citation purposes only. While the final peer-reviewed paper may be licensed under a cc-by license on publication, at this stage authors and publisher
+                            expressively prohibit redistribution of this draft paper other than for review purposes.
+                        </p>
+                                    </article>
+                    </section>
+        <aside id="tocNav" class="aside-left-alt-2">
+            <button type="button" class="btn-TOC"><i class="icon-TOC">&#160;</i>Sections</button>
+
+            <h3 class="hide-h3"><i class="icon-TOC">&#160;</i>Sections</h3>
+
+            <section class="TOC clearfix">
+                <ul>
+                    <li><a href="#Abstract">Abstract</a></li>
+                </ul>
+            </section>
+
+            <button type="button" class="btn-scroll-top"><a href="#Body"><span class="typcn typcn-arrow-up-thick"></span>Back to top</a></button>
+        </aside>
+        
+
+    </section>
+</main>
+
+		<footer>
+			<h3>JMIR Preprints
+							</h3>
+			<div class="other-links-wrapper clearfix">
+				<ul class="clearfix">
+					<li class="other-links-parent-li">
+						<h3>Journals</h3>
+						<ul class="journals-list-footer">
+
+						</ul>
+					</li>
+					<li class="other-links-parent-li">
+						<h3>Editorial Policies</h3>
+						<ul class="ul-show-more">
+														<li> <a target="_self" href="https://preprints.jmir.org/about/editorialPolicies#sectionPolicies">Section Policies</a></li>
+							<li> <a target="_self" href="https://preprints.jmir.org/about/editorialPolicies#peerReviewProcess">Peer Review Process</a></li>														<li> <a target="_self" href="https://preprints.jmir.org/about/editorialPolicies#openAccessPolicy">Open Access Policy</a></li>							
+							<!-- https://preprints.jmir.org/about/subscriptions%3FnewDesign -->
+																																												<li> <a target="_self" href="https://preprints.jmir.org/about/editorialPolicies#custom0">About JMIR Publications</a></li>															<li><a href="/about/editorialTeam">Editorial Board</a></li>								<li> <a target="_self" href="https://preprints.jmir.org/about/editorialPolicies#custom1">Editorial Board Policy</a></li>																							<li> <a target="_self" href="https://preprints.jmir.org/about/editorialPolicies#custom2">Theme Issues and Guest Editors</a></li>																							<li> <a target="_self" href="https://preprints.jmir.org/about/editorialPolicies#custom3">Instructions for Authors</a></li>																							<li> <a target="_self" href="https://preprints.jmir.org/about/editorialPolicies#custom4">Trademarks Policy</a></li>																							<li> <a target="_self" href="https://preprints.jmir.org/about/editorialPolicies#custom5">Fee Schedule</a></li>																							<li> <a target="_self" href="https://preprints.jmir.org/about/editorialPolicies#custom6">Subscriptions (Membership)</a></li>																							<li> <a target="_self" href="https://preprints.jmir.org/about/editorialPolicies#custom7">Publication Ethics and Malpractice</a></li>														
+						</ul>
+					</li>
+					<li class="other-links-parent-li">
+						<h3>Submissions</h3>
+						<ul>
+							<li><a target="_self" href="https://preprints.jmir.org/about/submissions#onlineSubmissions">Online Submissions</a></li>
+							<li><a href="https://preprints.jmir.org/about/submissions#authorGuidelines">Author Guidelines</a></li>							<li><a href="https://preprints.jmir.org/about/submissions#copyrightNotice">Copyright Notice</a></li>							<li><a href="https://jmir.zendesk.com/hc/en-us/articles/360004220332">Privacy Statement</a></li>							
+						</ul>
+					</li>
+					<li class="other-links-parent-li">
+						<h3>Other</h3>
+						<ul>
+							<li><a href="/announcement">Announcements</a></li>
+							<li><a href="https://docs.google.com/spreadsheet/viewform?formkey=dGR6eVMxTEdxblVycV8tMVRmdjRHS2c6MQ">Feedback</a></li>
+							<li><a href="https://jmir.zendesk.com/hc/en-us">Knowledge Base/Help Center/FAQs</a></li>
+							<li><a href="/about/contact">Contact Us</a></li>
+							<li><a href="/sitemap.xml">Sitemap</a></li>
+						</ul>
+					</li>
+				</ul>
+			</div>
+			<div class="social-media-wrapper">
+                <ul>
+                    <li><a href="https://twitter.com/jmirpub" target="_blank"><span class="typcn typcn-social-twitter"></span>Twitter</a></li>
+                    <li><a href="https://www.facebook.com/JMedInternetRes" target="_blank"><span class="typcn typcn-social-facebook" target="_blank" style="display: none;"></span>Facebook</a></li>
+                    <li><a href="https://www.linkedin.com/company/jmir-publications" target="_blank"><span class="typcn typcn-social-linkedin"></span>LinkedIn</a></li>
+                    <li><a href="https://google.com/+JmirOrg" target="_blank"><span class="typcn typcn-social-google-plus"></span>Google+</a></li>
+                                        <li><a href=/feed/atom target="_blank"><span class="typcn typcn-rss"></span>RSS</a></li>
+                                    </ul>
+            </div>
+						<p>Copyright &copy; 2025 JMIR Publications</p>
+			<div class="support-tooltip" style="display: none;">
+				NEW: Help Desk Now Available
+			</div>
+		</footer>
+
+		
+        <script defer src="//js.trendmd.com/trendmd-ns.min.js" data-trendmdconfig="{'element': '#trendmd-suggestions'}"></script>
+		
+
+					
+				<script type="text/javascript"> var addthis_config = addthis_config||{}; addthis_config.services_exclude = 'mendeley, citeulike';addthis_config.data_track_clickback=false;
+				</script>
+			
+						
+			<script>
+				$( document ).ready(function() {
+					setTimeout(function(){
+						$('.support-tooltip').fadeIn(500);
+					}, 5000);
+
+					$('.support-tooltip').on('click hover', function(){
+						$(this).fadeOut(400);
+					});
+				});
+			</script>
+		
+
+		<script type="text/javascript" src="https://s7.addthis.com/js/300/addthis_widget.js#pubid=ra-5407198f78be0579"></script>
+		<script type="text/javascript" src="/ojs/styles/common-backend/js/journals-drop-down.js?v=127.1.1.1"></script>
+	<script type="text/javascript">window.NREUM||(NREUM={});NREUM.info={"beacon":"bam.nr-data.net","licenseKey":"NRJS-fd3a0ae5ff39b6ace59","applicationID":"525620773","transactionName":"bwNUYkoDXhJYB0UMC1ZJdUNLFl8MFhRDABRKD1hCF0g=","queueTime":0,"applicationTime":322,"atts":"Q0RXFAIZTRw=","errorBeacon":"bam.nr-data.net","agent":""}</script></body>
+</html>
