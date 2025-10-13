@@ -199,6 +199,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Download OpenAlex PDFs for a topic and year range using pyalex."
     )
+
     parser.add_argument(
         "--topic", type=str, help="Free-text topic (search across title/abstract/fulltext)."
     )
