@@ -9,4 +9,8 @@ __pycache__/
 .mypy_cache/
 Data/
 Models/
+.docling_artifacts/
+DocsToKG.code-workspace
+faiss/
+vllm/
 
