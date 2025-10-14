@@ -5,6 +5,7 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Callable, List, Mapping, Sequence
 
+import numpy as np
 import pytest
 
 from DocsToKG.HybridSearch import (
@@ -24,12 +25,14 @@ from DocsToKG.HybridSearch import (
     should_rebuild_index,
     verify_pagination,
 )
+from DocsToKG.HybridSearch.config import DenseIndexConfig
 from DocsToKG.HybridSearch.dense import FaissIndexManager
 from DocsToKG.HybridSearch.storage import ChunkRegistry, OpenSearchSimulator
 from DocsToKG.HybridSearch.validation import load_dataset
 from DocsToKG.HybridSearch.tokenization import tokenize
 from DocsToKG.HybridSearch.ingest import IngestError
-from uuid import NAMESPACE_URL, uuid5
+from DocsToKG.HybridSearch.types import ChunkFeatures, ChunkPayload
+from uuid import NAMESPACE_URL, uuid5, uuid4
 
 
 def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
@@ -333,4 +336,34 @@ def test_ingest_missing_vector_raises(
 
     with pytest.raises(IngestError):
         ingestion.upsert_documents([doc])
+
+
+def test_faiss_index_uses_registry_bridge(tmp_path: Path) -> None:
+    pytest.importorskip("faiss")
+    config = DenseIndexConfig(index_type="flat")
+    manager = FaissIndexManager(dim=4, config=config)
+    registry = ChunkRegistry()
+    manager.set_id_resolver(registry.resolve_faiss_id)
+
+    embedding = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)
+    features = ChunkFeatures(bm25_terms={}, splade_weights={}, embedding=embedding)
+    chunk = ChunkPayload(
+        doc_id="doc-bridge",
+        chunk_id="0",
+        vector_id=str(uuid4()),
+        namespace="bridge",
+        text="example chunk",
+        metadata={},
+        features=features,
+        token_count=int(embedding.size),
+        source_chunk_idxs=(0,),
+        doc_items_refs=(),
+        char_offset=(0, len("example chunk")),
+    )
+
+    manager.add([features.embedding], [chunk.vector_id])
+    registry.upsert([chunk])
+
+    hits = manager.search(embedding, 1)
+    assert hits and hits[0].vector_id == chunk.vector_id
 

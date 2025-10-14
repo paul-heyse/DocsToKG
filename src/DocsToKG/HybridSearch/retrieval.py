@@ -260,9 +260,14 @@ class HybridSearchService:
         hits: Sequence[FaissSearchResult],
         filters: Mapping[str, object],
     ) -> List[FaissSearchResult]:
+        if not hits:
+            return []
+        chunk_map = {
+            chunk.vector_id: chunk for chunk in self._registry.bulk_get([hit.vector_id for hit in hits])
+        }
         filtered: List[FaissSearchResult] = []
         for hit in hits:
-            chunk = self._registry.get(hit.vector_id)
+            chunk = chunk_map.get(hit.vector_id)
             if chunk is None:
                 continue
             if self._matches_filters(chunk, filters):

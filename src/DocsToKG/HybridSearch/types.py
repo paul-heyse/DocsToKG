@@ -126,6 +126,20 @@ class ChunkPayload:
     source_chunk_idxs: Sequence[int]
     doc_items_refs: Sequence[str]
     char_offset: Optional[Tuple[int, int]] = None
+    """
+
+    doc_id: str
+    chunk_id: str
+    vector_id: str
+    namespace: str
+    text: str
+    metadata: MutableMapping[str, Any]
+    features: ChunkFeatures
+    token_count: int
+    source_chunk_idxs: Sequence[int]
+    doc_items_refs: Sequence[str]
+    char_offset: Optional[Tuple[int, int]] = None
+
 
 
 @dataclass(slots=True)

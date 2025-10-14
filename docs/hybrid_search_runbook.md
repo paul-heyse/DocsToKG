@@ -4,7 +4,7 @@
 Hybrid search combines BM25, SPLADE, and FAISS dense retrieval. This runbook summarizes daily operations, calibration routines, and contingency procedures for the ingestion and retrieval subsystems.
 
 ## Calibration sweeps
-1. Launch the validation harness: `python -m DocsToKG.HybridSearch.validation --dataset tests/data/hybrid_dataset.jsonl`.
+1. Launch the validation harness: `python -m DocsToKG.HybridSearch.tools.run_real_vector_ci --pytest-args "-q --real-vectors"` or invoke `python -m DocsToKG.HybridSearch.validation --dataset tests/data/hybrid_dataset.jsonl` for ad-hoc checks.
 2. Review `calibration.json` in the generated report directory. Confirm that self-hit accuracy is ≥0.95 for oversample ≥2.
 3. If accuracy drops below threshold:
    - Increase `dense.oversample` in `hybrid_config.json`.
@@ -19,7 +19,7 @@ Hybrid search combines BM25, SPLADE, and FAISS dense retrieval. This runbook sum
 
 ## Failover and rollback
 1. Serialize the FAISS index with `serialize_state` and persist the payload alongside OpenSearch snapshots.
-2. During failover, restore OpenSearch from snapshot and call `restore_state` on the FAISS manager.
+2. During failover, restore OpenSearch from snapshot and call `restore_state` on the FAISS manager. Confirm startup logs include a `faiss-index-config` event with the expected `index_type`, `nlist`, `nprobe`, and device metadata before serving traffic.
 3. Warm the cache by issuing `HybridSearchRequest` probes for top queries.
 4. Use `verify_pagination` to ensure cursor continuity after failover.
 5. If errors persist, revert to the previous config file and call `HybridSearchConfigManager.reload`.

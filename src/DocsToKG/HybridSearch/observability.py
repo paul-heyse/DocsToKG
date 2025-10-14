@@ -1,4 +1,19 @@
-"""Lightweight observability primitives for ingestion and retrieval."""
+"""
+Lightweight observability primitives for ingestion and retrieval.
+
+This module provides comprehensive observability and monitoring capabilities
+for DocsToKG's hybrid search operations, including metrics collection,
+timing utilities, and performance tracking for ingestion and retrieval
+operations.
+
+The observability system supports:
+- Counter and histogram metrics collection
+- Timing context managers for operation measurement
+- Prometheus-style metric export
+- Performance monitoring and alerting
+- Structured logging integration
+"""
+
 from __future__ import annotations
 
 import logging
@@ -11,6 +26,24 @@ from typing import Dict, Iterable, Iterator, Mapping, MutableMapping, Optional, 
 
 @dataclass
 class CounterSample:
+    """Sample from a counter metric with labels and value.
+
+    This class represents a single measurement from a counter metric,
+    including the metric name, associated labels, and current value.
+
+    Attributes:
+        name: Name of the counter metric
+        labels: Dictionary of label key-value pairs
+        value: Current counter value
+
+    Examples:
+        >>> sample = CounterSample(
+        ...     name="documents_processed",
+        ...     labels={"status": "success"},
+        ...     value=150.0
+        ... )
+    """
+
     name: str
     labels: Mapping[str, str]
     value: float
@@ -18,6 +51,30 @@ class CounterSample:
 
 @dataclass
 class HistogramSample:
+    """Sample from a histogram metric with percentile statistics.
+
+    This class represents statistical information from a histogram metric,
+    including count and percentile values for performance analysis.
+
+    Attributes:
+        name: Name of the histogram metric
+        labels: Dictionary of label key-value pairs
+        count: Total number of observations
+        p50: 50th percentile (median) value
+        p95: 95th percentile value
+        p99: 99th percentile value
+
+    Examples:
+        >>> sample = HistogramSample(
+        ...     name="search_latency",
+        ...     labels={"method": "hybrid"},
+        ...     count=1000,
+        ...     p50=45.2,
+        ...     p95=89.1,
+        ...     p99=156.7
+        ... )
+    """
+
     name: str
     labels: Mapping[str, str]
     count: int
@@ -27,11 +84,33 @@ class HistogramSample:
 
 
 class MetricsCollector:
-    """In-memory metrics collector compatible with Prometheus-style summaries."""
+    """In-memory metrics collector compatible with Prometheus-style summaries.
+
+    This class provides lightweight, in-memory metrics collection for
+    monitoring DocsToKG operations, supporting both counter and histogram
+    metrics with labeled dimensions for detailed observability.
+
+    The collector uses thread-safe operations and provides Prometheus-style
+    metric export for integration with monitoring systems.
+
+    Attributes:
+        _counters: Internal storage for counter metrics
+        _histograms: Internal storage for histogram metrics
+
+    Examples:
+        >>> collector = MetricsCollector()
+        >>> collector.increment("documents_processed", labels={"type": "pdf"})
+        >>> collector.observe("search_latency", 45.2, method="hybrid")
+        >>> counters = list(collector.export_counters())
+    """
 
     def __init__(self) -> None:
-        self._counters: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], float] = defaultdict(float)
-        self._histograms: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], list[float]] = defaultdict(list)
+        self._counters: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], float] = (
+            defaultdict(float)
+        )
+        self._histograms: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], list[float]] = (
+            defaultdict(list)
+        )
 
     def increment(self, name: str, amount: float = 1.0, **labels: str) -> None:
         key = (name, tuple(sorted(labels.items())))
@@ -54,7 +133,9 @@ class MetricsCollector:
             p50 = sorted_samples[int(0.5 * (count - 1))]
             p95 = sorted_samples[int(0.95 * (count - 1))]
             p99 = sorted_samples[int(0.99 * (count - 1))]
-            yield HistogramSample(name=name, labels=dict(labels), count=count, p50=p50, p95=p95, p99=p99)
+            yield HistogramSample(
+                name=name, labels=dict(labels), count=count, p50=p50, p95=p95, p99=p99
+            )
 
 
 class TraceRecorder:
@@ -104,4 +185,3 @@ class Observability:
         counters = [sample.__dict__ for sample in self._metrics.export_counters()]
         histograms = [sample.__dict__ for sample in self._metrics.export_histograms()]
         return {"counters": counters, "histograms": histograms}
-

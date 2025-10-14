@@ -235,9 +235,9 @@ def test_real_fixture_api_roundtrip(
 
 
 def test_remove_ids_cpu_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("faiss")
     manager = FaissIndexManager(dim=8, config=DenseIndexConfig())
     manager._use_native = True
-    manager._id_lookup = {1: "chunk-1", 2: "chunk-2"}
 
     class FailingIndex:
         def __init__(self) -> None:
@@ -261,6 +261,7 @@ def test_remove_ids_cpu_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(manager, "_index", failing_index, raising=False)
     monkeypatch.setattr(manager, "_to_cpu", lambda index: cpu_index)
     monkeypatch.setattr(manager, "_maybe_to_gpu", lambda index: index)
+    monkeypatch.setattr(manager, "_apply_search_parameters", lambda index: None)
 
     manager._remove_ids(np.array([1, 2], dtype=np.int64))
     assert manager._remove_fallbacks == 1

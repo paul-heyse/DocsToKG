@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Callable, Dict, List, Mapping, Optional, Sequence
+
+import uuid
 
 import numpy as np
 
@@ -25,20 +27,26 @@ class ChunkRegistry:
 
     def __init__(self) -> None:
         self._chunks: Dict[str, ChunkPayload] = {}
+        self._bridge: Dict[int, str] = {}
 
     def upsert(self, chunks: Sequence[ChunkPayload]) -> None:
         for chunk in chunks:
             self._chunks[chunk.vector_id] = chunk
+            self._bridge[_uuid_to_faiss_id(chunk.vector_id)] = chunk.vector_id
 
     def delete(self, vector_ids: Sequence[str]) -> None:
         for vector_id in vector_ids:
             self._chunks.pop(vector_id, None)
+            self._bridge.pop(_uuid_to_faiss_id(vector_id), None)
 
     def get(self, vector_id: str) -> Optional[ChunkPayload]:
         return self._chunks.get(vector_id)
 
     def bulk_get(self, vector_ids: Sequence[str]) -> List[ChunkPayload]:
         return [self._chunks[vid] for vid in vector_ids if vid in self._chunks]
+
+    def resolve_faiss_id(self, internal_id: int) -> Optional[str]:
+        return self._bridge.get(internal_id)
 
     def all(self) -> List[ChunkPayload]:
         return list(self._chunks.values())
@@ -48,6 +56,10 @@ class ChunkRegistry:
 
     def vector_ids(self) -> List[str]:
         return list(self._chunks.keys())
+
+
+def _uuid_to_faiss_id(value: str) -> int:
+    return uuid.UUID(value).int & ((1 << 63) - 1)
 
 
 class OpenSearchSimulator:
@@ -87,14 +99,12 @@ class OpenSearchSimulator:
         top_k: int,
         cursor: Optional[int] = None,
     ) -> tuple[List[tuple[ChunkPayload, float]], Optional[int]]:
-        candidates = self._filtered_chunks(filters)
-        scores: List[tuple[ChunkPayload, float]] = []
-        for chunk in candidates:
-            score = self._bm25_score(chunk, query_weights)
-            if score > 0.0:
-                scores.append((chunk.payload, score))
-        scores.sort(key=lambda item: item[1], reverse=True)
-        return self._paginate(scores, top_k, cursor)
+        return self._search_sparse(
+            lambda stored: self._bm25_score(stored, query_weights),
+            filters,
+            top_k,
+            cursor,
+        )
 
     def search_splade(
         self,
@@ -103,17 +113,14 @@ class OpenSearchSimulator:
         top_k: int,
         cursor: Optional[int] = None,
     ) -> tuple[List[tuple[ChunkPayload, float]], Optional[int]]:
-        candidates = self._filtered_chunks(filters)
-        scores: List[tuple[ChunkPayload, float]] = []
-        for chunk in candidates:
+        def score_chunk(stored: StoredChunk) -> float:
             score = 0.0
             for token, weight in query_weights.items():
-                if token in chunk.payload.features.splade_weights:
-                    score += weight * chunk.payload.features.splade_weights[token]
-            if score > 0.0:
-                scores.append((chunk.payload, score))
-        scores.sort(key=lambda item: item[1], reverse=True)
-        return self._paginate(scores, top_k, cursor)
+                if token in stored.payload.features.splade_weights:
+                    score += weight * stored.payload.features.splade_weights[token]
+            return float(score)
+
+        return self._search_sparse(score_chunk, filters, top_k, cursor)
 
     def highlight(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
         highlights: List[str] = []
@@ -170,6 +177,22 @@ class OpenSearchSimulator:
         page = scores[offset:end]
         next_cursor = end if end < len(scores) else None
         return page, next_cursor
+
+    def _search_sparse(
+        self,
+        scoring_fn: Callable[[StoredChunk], float],
+        filters: Mapping[str, object],
+        top_k: int,
+        cursor: Optional[int],
+    ) -> tuple[List[tuple[ChunkPayload, float]], Optional[int]]:
+        candidates = self._filtered_chunks(filters)
+        scored: List[tuple[ChunkPayload, float]] = []
+        for stored in candidates:
+            score = scoring_fn(stored)
+            if score > 0.0:
+                scored.append((stored.payload, float(score)))
+        scored.sort(key=lambda item: item[1], reverse=True)
+        return self._paginate(scored, top_k, cursor)
 
     def _recompute_avg_length(self) -> None:
         if not self._chunks:

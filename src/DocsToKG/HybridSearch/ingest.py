@@ -47,6 +47,7 @@ class ChunkIngestionPipeline:
         self._registry = registry
         self._metrics = IngestMetrics()
         self._observability = observability or Observability()
+        self._faiss.set_id_resolver(self._registry.resolve_faiss_id)
 
     @property
     def metrics(self) -> IngestMetrics:

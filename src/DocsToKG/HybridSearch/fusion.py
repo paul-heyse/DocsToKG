@@ -7,6 +7,7 @@ from typing import Dict, Iterable, List, Mapping, Sequence, Tuple
 import numpy as np
 
 from .types import FusionCandidate
+from .similarity import normalize_rows, pairwise_inner_products
 
 
 class ReciprocalRankFusion:
@@ -33,34 +34,36 @@ def apply_mmr_diversification(
 ) -> List[FusionCandidate]:
     if not 0.0 <= lambda_param <= 1.0:
         raise ValueError("lambda_param must be within [0, 1]")
-    remaining = list(fused_candidates)
-    selected: List[FusionCandidate] = []
-    while remaining and len(selected) < top_k:
-        best_candidate = None
+    if not fused_candidates:
+        return []
+
+    embeddings = np.stack(
+        [candidate.chunk.features.embedding.astype(np.float32, copy=False) for candidate in fused_candidates]
+    )
+    normalized = normalize_rows(embeddings)
+    similarity_matrix = pairwise_inner_products(normalized)
+
+    candidate_indices = list(range(len(fused_candidates)))
+    selected_indices: List[int] = []
+
+    while candidate_indices and len(selected_indices) < top_k:
+        best_idx: int | None = None
         best_score = float("-inf")
-        for candidate in remaining:
-            relevance = fused_scores[candidate.chunk.vector_id]
-            diversity_penalty = 0.0
-            if selected:
-                similarities = [
-                    _cosine_similarity(candidate.chunk.features.embedding, other.chunk.features.embedding)
-                    for other in selected
-                ]
-                diversity_penalty = max(similarities)
+        for idx in candidate_indices:
+            vector_id = fused_candidates[idx].chunk.vector_id
+            relevance = fused_scores.get(vector_id, 0.0)
+            if selected_indices:
+                diversity_penalty = float(np.max(similarity_matrix[idx, selected_indices]))
+            else:
+                diversity_penalty = 0.0
             score = lambda_param * relevance - (1 - lambda_param) * diversity_penalty
             if score > best_score:
-                best_candidate = candidate
+                best_idx = idx
                 best_score = score
-        if best_candidate is None:
+        if best_idx is None:
             break
-        selected.append(best_candidate)
-        remaining = [candidate for candidate in remaining if candidate.chunk.vector_id != best_candidate.chunk.vector_id]
-    return selected
+        selected_indices.append(best_idx)
+        candidate_indices = [idx for idx in candidate_indices if idx != best_idx]
 
-
-def _cosine_similarity(lhs: np.ndarray, rhs: np.ndarray) -> float:
-    denom = float(np.linalg.norm(lhs) * np.linalg.norm(rhs))
-    if denom == 0.0:
-        return 0.0
-    return float(np.dot(lhs, rhs) / denom)
+    return [fused_candidates[idx] for idx in selected_indices]
 

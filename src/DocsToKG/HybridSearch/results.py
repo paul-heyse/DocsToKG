@@ -7,6 +7,7 @@ from typing import Dict, Iterable, List, Mapping, Sequence
 import numpy as np
 
 from .config import FusionConfig
+from .similarity import max_inner_product, normalize_rows
 from .storage import OpenSearchSimulator
 from .tokenization import tokenize
 from .types import (
@@ -33,12 +34,14 @@ class ResultShaper:
     ) -> List[HybridSearchResult]:
         doc_buckets: Dict[str, int] = defaultdict(int)
         emitted_vectors: List[str] = []
+        emitted_embeddings: List[np.ndarray] = []
         results: List[HybridSearchResult] = []
         query_tokens = tokenize(request.query)
         for rank, chunk in enumerate(ordered_chunks, start=1):
             if not self._within_doc_limit(chunk.doc_id, doc_buckets):
                 continue
-            if self._is_near_duplicate(chunk, emitted_vectors):
+            embedding = self._normalize_embedding(chunk.features.embedding)
+            if self._is_near_duplicate(embedding, emitted_embeddings):
                 continue
             highlights = self._build_highlights(chunk, query_tokens)
             diagnostics = HybridSearchDiagnostics(
@@ -62,25 +65,23 @@ class ResultShaper:
                 )
             )
             emitted_vectors.append(chunk.vector_id)
+            emitted_embeddings.append(embedding)
         return results
 
     def _within_doc_limit(self, doc_id: str, doc_buckets: Dict[str, int]) -> bool:
         doc_buckets[doc_id] += 1
         return doc_buckets[doc_id] <= self._fusion_config.max_chunks_per_doc
 
-    def _is_near_duplicate(self, chunk: ChunkPayload, emitted_vector_ids: Sequence[str]) -> bool:
-        for vector_id in emitted_vector_ids:
-            existing = self._opensearch.fetch([vector_id])
-            if not existing:
-                continue
-            existing_chunk = existing[0]
-            similarity = self._cosine_similarity(
-                chunk.features.embedding,
-                existing_chunk.features.embedding,
-            )
-            if similarity >= self._fusion_config.cosine_dedupe_threshold:
-                return True
-        return False
+    def _is_near_duplicate(
+        self,
+        embedding: np.ndarray,
+        emitted_embeddings: Sequence[np.ndarray],
+    ) -> bool:
+        if not emitted_embeddings:
+            return False
+        corpus = np.stack(emitted_embeddings)
+        similarity = max_inner_product(embedding, corpus)
+        return similarity >= self._fusion_config.cosine_dedupe_threshold
 
     def _build_highlights(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
         highlights = self._opensearch.highlight(chunk, query_tokens)
@@ -89,9 +90,7 @@ class ResultShaper:
         snippet = chunk.text[:200]
         return [snippet] if snippet else []
 
-    def _cosine_similarity(self, lhs: np.ndarray, rhs: np.ndarray) -> float:
-        denom = float(np.linalg.norm(lhs) * np.linalg.norm(rhs))
-        if denom == 0.0:
-            return 0.0
-        return float(np.dot(lhs, rhs) / denom)
+    def _normalize_embedding(self, embedding: np.ndarray) -> np.ndarray:
+        normalized = normalize_rows(embedding.reshape(1, -1).astype(np.float32, copy=False))
+        return normalized[0]
 
