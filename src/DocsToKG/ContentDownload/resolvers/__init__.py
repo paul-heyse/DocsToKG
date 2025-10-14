@@ -15,7 +15,7 @@ import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from itertools import chain
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Protocol, Sequence
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Protocol, Sequence, Tuple
 from urllib.parse import quote, urljoin, urlparse
 
 import requests
@@ -24,6 +24,13 @@ try:  # Optional dependency; landing-page resolver guards at runtime.
     from bs4 import BeautifulSoup  # type: ignore
 except Exception:  # pragma: no cover - handled downstream
     BeautifulSoup = None
+
+from DocsToKG.ContentDownload.utils import (
+    dedupe,
+    normalize_doi,
+    normalize_pmcid,
+    strip_prefix,
+)
 
 
 DEFAULT_RESOLVER_ORDER: List[str] = [
@@ -403,35 +410,6 @@ class ResolverPipeline:
 
 
 # --- Resolver Implementations -------------------------------------------------
-
-
-def _normalize_doi(doi: Optional[str]) -> Optional[str]:
-    if not doi:
-        return None
-    doi = doi.strip()
-    if doi.lower().startswith("https://doi.org/"):
-        doi = doi[16:]
-    return doi.strip()
-
-
-def _normalize_pmcid(pmcid: Optional[str]) -> Optional[str]:
-    if not pmcid:
-        return None
-    pmcid = pmcid.strip()
-    if pmcid.lower().startswith("pmc"):
-        pmcid = pmcid[3:]
-    return f"PMC{pmcid}" if pmcid else None
-
-
-def _strip_prefix(value: Optional[str], prefix: str) -> Optional[str]:
-    if not value:
-        return None
-    value = value.strip()
-    if value.lower().startswith(prefix.lower()):
-        return value[len(prefix) :]
-    return value
-
-
 def _absolute_url(base: str, href: str) -> str:
     parsed = urlparse(href)
     if parsed.scheme and parsed.netloc:
@@ -451,7 +429,7 @@ class UnpaywallResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        doi = _normalize_doi(artifact.doi)
+        doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(
                 url=None,
@@ -496,26 +474,25 @@ class UnpaywallResolver:
             )
             return
 
-        seen = set()
+        candidates: List[Tuple[str, Dict[str, Any]]] = []
         best = (data or {}).get("best_oa_location") or {}
         url = best.get("url_for_pdf")
         if url:
-            seen.add(url)
-            yield ResolverResult(
-                url=url,
-                metadata={"source": "best_oa_location"},
-            )
+            candidates.append((url, {"source": "best_oa_location"}))
 
         for loc in (data or {}).get("oa_locations", []) or []:
             if not isinstance(loc, dict):
                 continue
             url = loc.get("url_for_pdf")
-            if url and url not in seen:
-                seen.add(url)
-                yield ResolverResult(
-                    url=url,
-                    metadata={"source": "oa_location"},
-                )
+            if url:
+                candidates.append((url, {"source": "oa_location"}))
+
+        unique_urls = dedupe([candidate_url for candidate_url, _ in candidates])
+        for unique_url in unique_urls:
+            for candidate_url, metadata in candidates:
+                if candidate_url == unique_url:
+                    yield ResolverResult(url=unique_url, metadata=metadata)
+                    break
 
 
 class CrossrefResolver:
@@ -530,7 +507,7 @@ class CrossrefResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        doi = _normalize_doi(artifact.doi)
+        doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(
                 url=None,
@@ -581,29 +558,36 @@ class CrossrefResolver:
 
         message = (data or {}).get("message") or {}
         links = message.get("link") or []
-        seen = set()
-        priority_urls: List[ResolverResult] = []
-        secondary_urls: List[ResolverResult] = []
+        priority_candidates: List[Tuple[str, Dict[str, Any]]] = []
+        secondary_candidates: List[Tuple[str, Dict[str, Any]]] = []
         for link in links:
             if not isinstance(link, dict):
                 continue
             url = link.get("URL")
-            if not url or url in seen:
+            if not url:
                 continue
-            seen.add(url)
             meta = {
                 "content_type": link.get("content-type"),
                 "content_version": link.get("content-version"),
                 "application": link.get("intended-application"),
             }
             ctype = (link.get("content-type") or "").lower()
-            result = ResolverResult(url=url, metadata=meta)
             if "application/pdf" in ctype:
-                priority_urls.append(result)
+                priority_candidates.append((url, meta))
             else:
-                secondary_urls.append(result)
+                secondary_candidates.append((url, meta))
 
-        for result in chain(priority_urls, secondary_urls):  # type: ignore[name-defined]
+        def _yield_unique(candidates: List[Tuple[str, Dict[str, Any]]]) -> Iterator[ResolverResult]:
+            for unique_url in dedupe([url for url, _ in candidates]):
+                for candidate_url, metadata in candidates:
+                    if candidate_url == unique_url:
+                        yield ResolverResult(url=unique_url, metadata=metadata)
+                        break
+
+        for result in chain(
+            _yield_unique(priority_candidates),
+            _yield_unique(secondary_candidates),
+        ):
             yield result
 
 
@@ -702,7 +686,7 @@ class ArxivResolver:
         arxiv_id = artifact.arxiv_id
         if not arxiv_id:
             return []
-        arxiv_id = _strip_prefix(arxiv_id, "arxiv:")
+        arxiv_id = strip_prefix(arxiv_id, "arxiv:")
         return [
             ResolverResult(
                 url=f"https://arxiv.org/pdf/{arxiv_id}.pdf",
@@ -748,7 +732,7 @@ class PmcResolver:
         for record in data.get("records", []) or []:
             pmcid = record.get("pmcid")
             if pmcid:
-                results.append(_normalize_pmcid(pmcid))
+                results.append(normalize_pmcid(pmcid))
         return [pmc for pmc in results if pmc]
 
     def iter_urls(
@@ -759,20 +743,16 @@ class PmcResolver:
     ) -> Iterable[ResolverResult]:
         pmcids: List[str] = []
         if artifact.pmcid:
-            pmcids.append(_normalize_pmcid(artifact.pmcid))
+            pmcids.append(normalize_pmcid(artifact.pmcid))
         identifiers = []
         if artifact.doi:
-            identifiers.append(_normalize_doi(artifact.doi))
+            identifiers.append(normalize_doi(artifact.doi))
         if artifact.pmid:
             identifiers.append(artifact.pmid)
         if not pmcids:
             pmcids.extend(self._lookup_pmcids(session, identifiers, config))
 
-        seen = set()
-        for pmcid in pmcids:
-            if not pmcid or pmcid in seen:
-                continue
-            seen.add(pmcid)
+        for pmcid in dedupe(pmcids):
             oa_url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id={pmcid}"
             try:
                 resp = _request_with_retries(
@@ -811,7 +791,7 @@ class EuropePmcResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        doi = _normalize_doi(artifact.doi)
+        doi = normalize_doi(artifact.doi)
         if not doi:
             return []
         try:
@@ -852,7 +832,7 @@ class CoreResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        doi = _normalize_doi(artifact.doi)
+        doi = normalize_doi(artifact.doi)
         if not doi:
             return []
         headers = dict(config.polite_headers)
@@ -899,7 +879,7 @@ class DoajResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        doi = _normalize_doi(artifact.doi)
+        doi = normalize_doi(artifact.doi)
         if not doi:
             return []
         headers = dict(config.polite_headers)
@@ -946,7 +926,7 @@ class SemanticScholarResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        doi = _normalize_doi(artifact.doi)
+        doi = normalize_doi(artifact.doi)
         if not doi:
             return []
         headers = dict(config.polite_headers)

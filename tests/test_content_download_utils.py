@@ -1,0 +1,47 @@
+from DocsToKG.ContentDownload.utils import (
+    dedupe,
+    normalize_doi,
+    normalize_pmcid,
+    strip_prefix,
+)
+
+
+def test_normalize_doi_with_https_prefix() -> None:
+    assert normalize_doi("https://doi.org/10.1234/abc") == "10.1234/abc"
+
+
+def test_normalize_doi_without_prefix() -> None:
+    assert normalize_doi("10.1234/abc") == "10.1234/abc"
+
+
+def test_normalize_doi_with_whitespace() -> None:
+    assert normalize_doi("  10.1234/abc  ") == "10.1234/abc"
+
+
+def test_normalize_doi_none() -> None:
+    assert normalize_doi(None) is None
+
+
+def test_normalize_pmcid_with_pmc_prefix() -> None:
+    assert normalize_pmcid("PMC123456") == "PMC123456"
+
+
+def test_normalize_pmcid_without_prefix_adds_prefix() -> None:
+    assert normalize_pmcid("123456") == "PMC123456"
+
+
+def test_normalize_pmcid_lowercase() -> None:
+    assert normalize_pmcid("pmc123456") == "PMC123456"
+
+
+def test_strip_prefix_case_insensitive() -> None:
+    assert strip_prefix("ARXIV:2301.12345", "arxiv:") == "2301.12345"
+
+
+def test_dedupe_preserves_order() -> None:
+    assert dedupe(["b", "a", "b", "c"]) == ["b", "a", "c"]
+
+
+def test_dedupe_filters_falsey_values() -> None:
+    assert dedupe(["a", "", None, "a"]) == ["a"]
+
