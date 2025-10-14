@@ -16,13 +16,13 @@ import base64
 import io
 import json
 import logging
-import uuid
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Sequence
 
 import numpy as np
 
 from .config import DenseIndexConfig
+from .ids import vector_uuid_to_faiss_int
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +197,7 @@ class FaissIndexManager:
         matrix = np.stack([self._ensure_dim(vec) for vec in vectors]).astype(np.float32)
         faiss.normalize_L2(matrix) if self._use_native else self._normalize(matrix)
         if self._use_native and self._index is not None:
-            ids = np.array([self._uuid_to_int64(vid) for vid in vector_ids], dtype=np.int64)
+            ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
             self._remove_ids(ids)
             self._index.add_with_ids(matrix, ids)
         else:
@@ -220,7 +220,7 @@ class FaissIndexManager:
         if not vector_ids:
             return
         if self._use_native and self._index is not None:
-            ids = np.array([self._uuid_to_int64(vid) for vid in vector_ids], dtype=np.int64)
+            ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
             self._remove_ids(ids)
         else:
             for vector_id in vector_ids:
@@ -458,9 +458,6 @@ class FaissIndexManager:
         if vector.shape != (self._dim,):
             raise ValueError(f"Expected embedding dimension {self._dim}, got {vector.shape}")
         return vector
-
-    def _uuid_to_int64(self, value: str) -> int:
-        return uuid.UUID(value).int & ((1 << 63) - 1)
 
     def _remove_ids(self, ids: np.ndarray) -> None:
         if not self._use_native or self._index is None or ids.size == 0:

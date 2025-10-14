@@ -64,10 +64,6 @@ FAISS index management with GPU-aware fallbacks.
 
 *No documentation available.*
 
-### `_uuid_to_int64(self, value)`
-
-*No documentation available.*
-
 ### `_remove_ids(self, ids)`
 
 *No documentation available.*

@@ -21,7 +21,13 @@ from .fusion import ReciprocalRankFusion, apply_mmr_diversification
 from .observability import Observability
 from .results import ResultShaper
 from .storage import ChunkRegistry, OpenSearchSimulator
-from .types import ChunkFeatures, FusionCandidate, HybridSearchRequest, HybridSearchResponse
+from .types import (
+    ChunkFeatures,
+    ChunkPayload,
+    FusionCandidate,
+    HybridSearchRequest,
+    HybridSearchResponse,
+)
 
 
 class RequestValidationError(ValueError):
@@ -111,6 +117,7 @@ class HybridSearchService:
         self._opensearch = opensearch
         self._registry = registry
         self._observability = observability or Observability()
+        self._faiss.set_id_resolver(self._registry.resolve_faiss_id)
 
     def search(self, request: HybridSearchRequest) -> HybridSearchResponse:
         config = self._config_manager.get()
@@ -240,13 +247,13 @@ class HybridSearchService:
         oversampled = request.page_size * config.dense.oversample
         hits = self._faiss.search(query_features.embedding, min(config.retrieval.dense_top_k, oversampled))
         timings["dense_ms"] = (time.perf_counter() - start) * 1000
-        filtered = self._filter_dense_hits(hits, filters)
+        filtered, chunk_map = self._filter_dense_hits(hits, filters)
         self._observability.metrics.increment("search_channel_requests", channel="dense")
         self._observability.metrics.observe("search_channel_candidates", len(filtered), channel="dense")
         candidates: List[FusionCandidate] = []
         scores: Dict[str, float] = {}
         for idx, hit in enumerate(filtered):
-            chunk = self._registry.get(hit.vector_id)
+            chunk = chunk_map.get(hit.vector_id)
             if chunk is None:
                 continue
             candidates.append(
@@ -259,10 +266,10 @@ class HybridSearchService:
         self,
         hits: Sequence[FaissSearchResult],
         filters: Mapping[str, object],
-    ) -> List[FaissSearchResult]:
+    ) -> tuple[List[FaissSearchResult], Dict[str, ChunkPayload]]:
         if not hits:
-            return []
-        chunk_map = {
+            return [], {}
+        chunk_map: Dict[str, ChunkPayload] = {
             chunk.vector_id: chunk for chunk in self._registry.bulk_get([hit.vector_id for hit in hits])
         }
         filtered: List[FaissSearchResult] = []
@@ -272,7 +279,7 @@ class HybridSearchService:
                 continue
             if self._matches_filters(chunk, filters):
                 filtered.append(hit)
-        return filtered
+        return filtered, chunk_map
 
     def _matches_filters(self, chunk, filters: Mapping[str, object]) -> bool:
         for key, expected in filters.items():
@@ -323,4 +330,3 @@ class HybridSearchService:
             raise RequestValidationError("page_size must be positive")
         if request.page_size > 100:
             raise RequestValidationError("page_size too large")
-

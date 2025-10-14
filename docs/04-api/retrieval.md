@@ -22,7 +22,8 @@ Hybrid search execution across sparse and dense channels.
 
 ### `_filter_dense_hits(self, hits, filters)`
 
-*No documentation available.*
+Return the dense hits that satisfy the active filters along with a pre-fetched
+chunk map for downstream processing.
 
 ### `_matches_filters(self, chunk, filters)`
 

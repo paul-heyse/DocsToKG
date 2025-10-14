@@ -4,10 +4,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Dict, List, Mapping, Optional, Sequence
 
-import uuid
-
 import numpy as np
 
+from .ids import vector_uuid_to_faiss_int
 from .tokenization import tokenize
 from .types import ChunkPayload
 
@@ -32,12 +31,12 @@ class ChunkRegistry:
     def upsert(self, chunks: Sequence[ChunkPayload]) -> None:
         for chunk in chunks:
             self._chunks[chunk.vector_id] = chunk
-            self._bridge[_uuid_to_faiss_id(chunk.vector_id)] = chunk.vector_id
+            self._bridge[vector_uuid_to_faiss_int(chunk.vector_id)] = chunk.vector_id
 
     def delete(self, vector_ids: Sequence[str]) -> None:
         for vector_id in vector_ids:
             self._chunks.pop(vector_id, None)
-            self._bridge.pop(_uuid_to_faiss_id(vector_id), None)
+            self._bridge.pop(vector_uuid_to_faiss_int(vector_id), None)
 
     def get(self, vector_id: str) -> Optional[ChunkPayload]:
         return self._chunks.get(vector_id)
@@ -56,10 +55,6 @@ class ChunkRegistry:
 
     def vector_ids(self) -> List[str]:
         return list(self._chunks.keys())
-
-
-def _uuid_to_faiss_id(value: str) -> int:
-    return uuid.UUID(value).int & ((1 << 63) - 1)
 
 
 class OpenSearchSimulator:
@@ -206,4 +201,3 @@ class OpenSearchSimulator:
             "document_count": float(len(self._chunks)),
             "avg_token_length": float(self._avg_length),
         }
-
