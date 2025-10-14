@@ -45,3 +45,4 @@ The ContentDownload module (`src/DocsToKG/ContentDownload`) successfully downloa
 - Reduced maintenance: ~15% code reduction via shared utilities and unified logging
 - Increased throughput: 2-5x with `--workers` flag (opt-in)
 - Enhanced observability: SHA-256 digests in manifests, conditional request support for idempotency
+- **Implementation Detail**: 120 tasks include complete code blocks, function signatures, exact line numbers, and test templates for unambiguous AI agent execution

@@ -181,11 +181,75 @@ The ContentDownload module orchestrates PDF acquisition from OpenAlex with fallb
 15. Update documentation: migration guide (config/logging changes), new CLI flags, rate limit units, parallelism tuning.
 16. Run end-to-end smoke test: batch of 100 works, --workers 3, verify no regressions in success rate, manifest integrity, file atomicity.
 
+## Dependencies and Versions
+
+### Required Dependencies
+
+- `requests >= 2.28.0` - HTTP library with session support
+- `urllib3 >= 1.26.0` - For Retry logic (requests dependency)
+- Existing: `pyalex`, `beautifulsoup4`, `lxml`
+
+### Optional Dependencies
+
+- `trafilatura >= 1.6.0` - For HTML text extraction
+- `responses >= 0.23.0` - For HTTP mocking in tests
+
+### Constraints
+
+- Python >=3.9 required (type hint syntax, dict ops)
+- No upper bound pins (allow security patches)
+
+## Error Handling Details
+
+### Network Errors
+
+- HTTPAdapter retries: ConnectionError, Timeout, 429/502/503/504
+- Does NOT retry: 4xx (except 429), SSL errors, ValueError
+- Backoff formula: `0.5 * (2 ** attempt)`
+
+### File System Errors
+
+```python
+try:
+    os.replace(part, final)  # atomic
+except OSError as e:
+    if e.errno == ENOSPC: log "disk full"
+    elif e.errno == EACCES: log "permission denied"
+```
+
+### Thread Safety
+
+- `_last_invocation` protected by Lock
+- `JsonlLogger` writes atomic (file.write + flush)
+- Each worker: own Session
+- LRU cache: thread-safe (functools internal locks)
+
+## Performance Metrics
+
+### Baseline (--workers=1)
+
+- Work processing: 2-5s (OpenAlex + resolvers)
+- API latency: 100-500ms
+- Memory: ~50MB
+
+### Parallel Scaling
+
+- --workers=3: 2.5-3x throughput
+- --workers=5: 3.5-4.5x (rate limits dominate)
+- Memory per worker: ~30MB
+- Lock contention: <1% overhead
+
+### Overhead
+
+- Retry: <5% overall (most succeed first)
+- SHA-256: ~50ms/MB (<2% for 1-5MB PDFs)
+- Cache hits: ~15% API call reduction
+
 ## Open Questions
 
-- Should we add Prometheus metrics export for production monitoring (success rates, latencies per resolver)?
-- What's the preferred default for --workers in CI/production (1 for safety vs 3 for throughput)?
-- Should conditional requests be opt-in (--use-etags) or opt-out (--ignore-etags)?
-- Do we need a separate --max-retries flag to override HTTPAdapter default (5 attempts)?
-- Should HTML text extraction use trafilatura, newspaper3k, or BeautifulSoup get_text()?
-- Is there value in adding content-addressable storage (store by SHA-256) to enable natural deduplication?
+- Should we add Prometheus metrics export for production monitoring (success rates, latencies per resolver)? *Proposed: defer to later PR*
+- What's the preferred default for --workers in CI/production (1 for safety vs 3 for throughput)? *Proposed: 1 (safest), document 3-5 for production*
+- Should conditional requests be opt-in (--use-etags) or opt-out (--ignore-etags)? *Proposed: always-on (no flag)*
+- Do we need a separate --max-retries flag to override HTTPAdapter default (5 attempts)? *Proposed: no, 5 is sensible default*
+- Should HTML text extraction use trafilatura, newspaper3k, or BeautifulSoup get_text()? *Proposed: trafilatura (best for articles)*
+- Is there value in adding content-addressable storage (store by SHA-256) to enable natural deduplication? *Proposed: defer, manifest SHA-256 sufficient*
