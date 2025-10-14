@@ -1,22 +1,24 @@
-"""HTTP download utilities for ontology artifacts."""
+"""Download utilities for ontology retrieval."""
 
 from __future__ import annotations
 
+import hashlib
 import ipaddress
 import logging
 import os
 import re
 import shutil
+import socket
 import threading
 import time
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from urllib.parse import urlparse, urlunparse
 
 import pooch
 import requests
-import socket
 
 from .config import ConfigError, DownloadConfiguration
 
@@ -112,13 +114,38 @@ def validate_url_security(url: str) -> str:
 
 
 def sha256_file(path: Path) -> str:
-    import hashlib
-
     hasher = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1 << 20), b""):
             hasher.update(chunk)
     return hasher.hexdigest()
+
+
+def extract_zip_safe(zip_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None) -> List[Path]:
+    """Extract a ZIP archive while preventing path traversal."""
+
+    if not zip_path.exists():
+        raise ConfigError(f"ZIP archive not found: {zip_path}")
+    destination.mkdir(parents=True, exist_ok=True)
+    extracted: List[Path] = []
+    with zipfile.ZipFile(zip_path) as archive:
+        for member in archive.infolist():
+            member_path = Path(member.filename)
+            if member_path.is_absolute() or ".." in member_path.parts:
+                raise ConfigError(f"Unsafe path detected in archive: {member.filename}")
+            target_path = destination / member_path
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            if member.is_dir():
+                continue
+            with archive.open(member, "r") as source, target_path.open("wb") as target:
+                shutil.copyfileobj(source, target)
+            extracted.append(target_path)
+    if logger:
+        logger.info(
+            "extracted zip archive",
+            extra={"stage": "extract", "archive": str(zip_path), "files": len(extracted)},
+        )
+    return extracted
 
 
 class StreamingDownloader(pooch.HTTPDownloader):
@@ -197,24 +224,34 @@ class StreamingDownloader(pooch.HTTPDownloader):
                     mode = "ab" if resume_position else "wb"
                     bytes_downloaded = resume_position
                     part_path.parent.mkdir(parents=True, exist_ok=True)
-                    with part_path.open(mode) as fh:
-                        for chunk in response.iter_content(chunk_size=1 << 20):
-                            if not chunk:
-                                continue
-                            fh.write(chunk)
-                            bytes_downloaded += len(chunk)
-                            if bytes_downloaded > self.http_config.max_download_size_gb * (1024 ** 3):
-                                self.logger.error(
-                                    "download exceeded size limit",
-                                    extra={
-                                        "stage": "download",
-                                        "size": bytes_downloaded,
-                                        "limit": self.http_config.max_download_size_gb * (1024 ** 3),
-                                    },
-                                )
-                                raise ConfigError(
-                                    "Download exceeded maximum configured size while streaming"
-                                )
+                    try:
+                        with part_path.open(mode) as fh:
+                            for chunk in response.iter_content(chunk_size=1 << 20):
+                                if not chunk:
+                                    continue
+                                fh.write(chunk)
+                                bytes_downloaded += len(chunk)
+                                if bytes_downloaded > self.http_config.max_download_size_gb * (1024 ** 3):
+                                    self.logger.error(
+                                        "download exceeded size limit",
+                                        extra={
+                                            "stage": "download",
+                                            "size": bytes_downloaded,
+                                            "limit": self.http_config.max_download_size_gb * (1024 ** 3),
+                                        },
+                                    )
+                                    raise ConfigError(
+                                        "Download exceeded maximum configured size while streaming"
+                                    )
+                    except OSError as exc:
+                        part_path.unlink(missing_ok=True)
+                        self.logger.error(
+                            "filesystem error during download",
+                            extra={"stage": "download", "error": str(exc)},
+                        )
+                        if "No space left" in str(exc):
+                            raise ConfigError("No space left on device while writing download") from exc
+                        raise ConfigError(f"Failed to write download: {exc}") from exc
                     break
             except (requests.ConnectionError, requests.Timeout, requests.HTTPError, requests.exceptions.SSLError) as exc:
                 if attempt > self.http_config.max_retries:
@@ -260,15 +297,29 @@ def download_stream(
     )
     cache_dir.mkdir(parents=True, exist_ok=True)
     safe_name = sanitize_filename(destination.name)
-    cached_path = Path(
-        pooch.retrieve(
-            secure_url,
-            path=cache_dir,
-            fname=safe_name,
-            downloader=downloader,
-            progressbar=False,
+    try:
+        cached_path = Path(
+            pooch.retrieve(
+                secure_url,
+                path=cache_dir,
+                fname=safe_name,
+                known_hash=None,
+                downloader=downloader,
+                progressbar=False,
+            )
         )
-    )
+    except (requests.ConnectionError, requests.Timeout, requests.HTTPError, requests.exceptions.SSLError) as exc:
+        logger.error(
+            "download request failed",
+            extra={"stage": "download", "url": secure_url, "error": str(exc)},
+        )
+        raise ConfigError(f"HTTP error while downloading {secure_url}: {exc}") from exc
+    except Exception as exc:  # pragma: no cover - defensive catch for pooch errors
+        logger.error(
+            "pooch download error",
+            extra={"stage": "download", "url": secure_url, "error": str(exc)},
+        )
+        raise ConfigError(f"Download failed for {secure_url}: {exc}") from exc
     if downloader.status == "cached":
         elapsed = (time.monotonic() - start_time) * 1000
         logger.info(
@@ -290,6 +341,28 @@ def download_stream(
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(cached_path, destination)
     sha256 = sha256_file(destination)
+    expected_hash = previous_manifest.get("sha256") if previous_manifest else None
+    if expected_hash and expected_hash != sha256:
+        logger.error(
+            "sha256 mismatch detected",
+            extra={
+                "stage": "download",
+                "expected": expected_hash,
+                "actual": sha256,
+                "url": secure_url,
+            },
+        )
+        destination.unlink(missing_ok=True)
+        cached_path.unlink(missing_ok=True)
+        return download_stream(
+            url=url,
+            destination=destination,
+            headers=headers,
+            previous_manifest=None,
+            http_config=http_config,
+            cache_dir=cache_dir,
+            logger=logger,
+        )
     elapsed = (time.monotonic() - start_time) * 1000
     logger.info(
         "download complete",
@@ -311,6 +384,7 @@ def download_stream(
 
 __all__ = [
     "DownloadResult",
+    "extract_zip_safe",
     "download_stream",
     "sanitize_filename",
     "sha256_file",

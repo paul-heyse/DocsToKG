@@ -1,4 +1,4 @@
-"""GPU-first FAISS index management for dense retrieval."""
+"""GPU-only FAISS index management for dense retrieval."""
 
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ class FaissIndexManager:
         self._index = self._create_index()
         self._vectors: Dict[str, np.ndarray] = {}
         self._id_resolver: Optional[Callable[[int], Optional[str]]] = None
-        self._use_native = True
+        self._use_native = True  # Backwards compat for older tests expecting this flag
         self._remove_fallbacks = 0
         self._apply_search_parameters(self._index)
 

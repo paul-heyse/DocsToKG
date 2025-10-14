@@ -6,10 +6,10 @@
   from __future__ import annotations
   import re
   from typing import List, Optional
-  
+
   def normalize_doi(doi: Optional[str]) -> Optional[str]:
       """Normalize DOI by stripping https://doi.org/ prefix and whitespace.
-      
+
       Examples:
           normalize_doi("https://doi.org/10.1234/abc") -> "10.1234/abc"
           normalize_doi("  10.1234/abc  ") -> "10.1234/abc"
@@ -21,10 +21,10 @@
       if doi.lower().startswith("https://doi.org/"):
           doi = doi[16:]
       return doi.strip()
-  
+
   def normalize_pmcid(pmcid: Optional[str]) -> Optional[str]:
       """Normalize PMCID ensuring PMC prefix.
-      
+
       Examples:
           normalize_pmcid("PMC123456") -> "PMC123456"
           normalize_pmcid("123456") -> "PMC123456"
@@ -38,10 +38,10 @@
       if match:
           return f"PMC{match.group(1)}"
       return None
-  
+
   def strip_prefix(value: Optional[str], prefix: str) -> Optional[str]:
       """Strip case-insensitive prefix from value.
-      
+
       Examples:
           strip_prefix("arxiv:2301.12345", "arxiv:") -> "2301.12345"
           strip_prefix("ARXIV:2301.12345", "arxiv:") -> "2301.12345"
@@ -53,10 +53,10 @@
       if value.lower().startswith(prefix.lower()):
           return value[len(prefix):]
       return value
-  
+
   def dedupe(items: List[str]) -> List[str]:
       """Remove duplicates while preserving first occurrence order.
-      
+
       Examples:
           dedupe(['b', 'a', 'b', 'c']) -> ['b', 'a', 'c']
           dedupe([]) -> []
@@ -73,31 +73,31 @@
   ```python
   import pytest
   from DocsToKG.ContentDownload.utils import normalize_doi, normalize_pmcid, strip_prefix, dedupe
-  
+
   def test_normalize_doi_with_https_prefix():
       assert normalize_doi("https://doi.org/10.1234/abc") == "10.1234/abc"
-  
+
   def test_normalize_doi_without_prefix():
       assert normalize_doi("10.1234/abc") == "10.1234/abc"
-  
+
   def test_normalize_doi_with_whitespace():
       assert normalize_doi("  10.1234/abc  ") == "10.1234/abc"
-  
+
   def test_normalize_doi_none():
       assert normalize_doi(None) is None
-  
+
   def test_normalize_pmcid_with_pmc_prefix():
       assert normalize_pmcid("PMC123456") == "PMC123456"
-  
+
   def test_normalize_pmcid_without_prefix():
       assert normalize_pmcid("123456") is None  # requires PMC in input
-  
+
   def test_normalize_pmcid_lowercase():
       assert normalize_pmcid("pmc123456") == "PMC123456"
-  
+
   def test_strip_prefix_case_insensitive():
       assert strip_prefix("ARXIV:2301.12345", "arxiv:") == "2301.12345"
-  
+
   def test_dedupe_preserves_order():
       assert dedupe(['b', 'a', 'b', 'c']) == ['b', 'a', 'c']
   ```
@@ -185,16 +185,225 @@
 
 ## 9. Parallel Execution with ThreadPoolExecutor
 
-- [ ] 9.1 Add CLI argument: `parser.add_argument('--workers', type=int, default=1, help='Number of parallel workers (default: 1 for sequential)')`
-- [ ] 9.2 In `main()`, extract work processing into function: `def process_one_work(work: Dict, session: requests.Session, pdf_dir: Path, html_dir: Path, pipeline: ResolverPipeline, logger: JsonlLogger, metrics: ResolverMetrics) -> Dict: ...`
-- [ ] 9.3 Refactor main loop: if `args.workers == 1`: keep existing sequential loop; else: use `with ThreadPoolExecutor(max_workers=args.workers) as executor: ...`
-- [ ] 9.4 Create session factory: `def _make_session_for_worker() -> requests.Session: return _make_session(config.polite_headers)`
-- [ ] 9.5 Submit work to executor: `futures = {executor.submit(process_one_work, work, _make_session_for_worker(), ...): work for work in batch}`
-- [ ] 9.6 Add `threading.Lock` to `ResolverPipeline._last_invocation` dict access in `_respect_rate_limit()` to make thread-safe
-- [ ] 9.7 Update `ResolverPipeline.__init__()` to initialize: `self._lock = threading.Lock()`
-- [ ] 9.8 Wrap `self._last_invocation[resolver_name] = time.monotonic()` in `with self._lock:` block
-- [ ] 9.9 Add test in `tests/test_parallel_execution.py` with --workers=3, verify rate limiting still enforced (mock time, assert minimum intervals)
-- [ ] 9.10 Document in README: "Use --workers=3-5 for production; higher values may violate rate limits"
+- [ ] 9.1 In `download_pyalex_pdfs.py` argparse section (around line 700), add: `parser.add_argument('--workers', type=int, default=1, help='Number of parallel workers for processing works (default: 1 for sequential). Recommended: 3-5 for production.')`
+- [ ] 9.2 Before `main()` function, extract work processing logic into standalone function:
+
+  ```python
+  def process_one_work(
+      work: Dict[str, Any],
+      session: requests.Session,
+      pdf_dir: Path,
+      html_dir: Path,
+      pipeline: ResolverPipeline,
+      logger: JsonlLogger,
+      metrics: ResolverMetrics,
+      sleep_sec: float,
+  ) -> Dict[str, Any]:
+      """Process single work through OpenAlex + resolver pipeline.
+
+      Returns dict with keys: work_id, status, path, classification
+      """
+      artifact = create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir)
+
+      # Check if already exists
+      existing = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
+      if existing.exists():
+          logger.log_work_summary(
+              artifact.work_id, artifact.title, artifact.publication_year,
+              "existing", None, str(existing), "exists", "already-downloaded", []
+          )
+          return {"work_id": artifact.work_id, "status": "exists", "path": str(existing)}
+
+      # Try OpenAlex candidates
+      openalex_result = attempt_openalex_candidates(session, artifact, logger, metrics)
+      if openalex_result and openalex_result[0].is_pdf:
+          outcome, url = openalex_result
+          logger.log_work_summary(
+              artifact.work_id, artifact.title, artifact.publication_year,
+              "openalex", url, outcome.path, outcome.classification, outcome.error,
+              artifact.metadata.get("openalex_html_paths", [])
+          )
+          time.sleep(sleep_sec)
+          return {"work_id": artifact.work_id, "status": "success", "path": outcome.path}
+
+      # Try resolver pipeline
+      pipeline_result = pipeline.run(session, artifact)
+      combined_html = list(pipeline_result.html_paths)
+      combined_html.extend(artifact.metadata.get("openalex_html_paths", []))
+
+      if pipeline_result.success and pipeline_result.outcome:
+          logger.log_work_summary(
+              artifact.work_id, artifact.title, artifact.publication_year,
+              pipeline_result.resolver_name, pipeline_result.url,
+              pipeline_result.outcome.path, pipeline_result.outcome.classification,
+              pipeline_result.outcome.error, combined_html
+          )
+          time.sleep(sleep_sec)
+          return {"work_id": artifact.work_id, "status": "success", "path": pipeline_result.outcome.path}
+      else:
+          logger.log(
+              AttemptRecord(
+                  work_id=artifact.work_id,
+                  resolver_name="final",
+                  resolver_order=None,
+                  url=None,
+                  status="miss",
+                  http_status=None,
+                  content_type=None,
+                  elapsed_ms=None,
+                  reason=pipeline_result.reason or "no-resolver-success",
+              )
+          )
+          time.sleep(sleep_sec)
+          return {"work_id": artifact.work_id, "status": "miss", "path": None}
+  ```
+
+- [ ] 9.3 In `main()` function, replace the `for work in iterate_openalex(...)` loop (lines 835-945) with:
+
+  ```python
+  if args.workers == 1:
+      # Sequential processing (backward compatible)
+      for work in iterate_openalex(query, per_page=args.per_page, max_results=args.max):
+          processed += 1
+          result = process_one_work(
+              work, session, pdf_dir, html_dir, pipeline, logger, metrics, args.sleep
+          )
+          if result["status"] == "success":
+              saved += 1
+          elif result["status"] == "miss":
+              html_only += 1  # Adjust logic as needed
+  else:
+      # Parallel processing with ThreadPoolExecutor
+      from concurrent.futures import ThreadPoolExecutor, as_completed
+
+      def make_worker_session():
+          """Each worker gets its own session."""
+          return _make_session(config.polite_headers)
+
+      with ThreadPoolExecutor(max_workers=args.workers) as executor:
+          # Submit all works
+          futures = {}
+          for work in iterate_openalex(query, per_page=args.per_page, max_results=args.max):
+              future = executor.submit(
+                  process_one_work,
+                  work,
+                  make_worker_session(),  # New session per worker
+                  pdf_dir,
+                  html_dir,
+                  pipeline,
+                  logger,
+                  metrics,
+                  args.sleep,
+              )
+              futures[future] = work
+              processed += 1
+
+          # Collect results
+          for future in as_completed(futures):
+              try:
+                  result = future.result()
+                  if result["status"] == "success":
+                      saved += 1
+                  elif result["status"] == "miss":
+                      html_only += 1
+              except Exception as exc:
+                  work = futures[future]
+                  work_id = work.get("id", "unknown")
+                  LOGGER.error(f"Worker failed for {work_id}: {exc}", exc_info=True)
+  ```
+
+- [ ] 9.4 Delete old task 9.4 (merged into 9.3)
+- [ ] 9.5 Delete old task 9.5 (merged into 9.3)
+- [ ] 9.6 In `resolvers/__init__.py` `ResolverPipeline.__init__()` (around line 224), add import and lock initialization:
+
+  ```python
+  import threading
+
+  def __init__(self, ...):
+      # ... existing init ...
+      self._lock = threading.Lock()  # ADD THIS
+  ```
+
+- [ ] 9.7 In `ResolverPipeline._respect_rate_limit()` (around line 232), wrap dict access in lock:
+
+  ```python
+  def _respect_rate_limit(self, resolver_name: str) -> None:
+      limit = self.config.resolver_min_interval_s.get(resolver_name)
+      if not limit:
+          return
+
+      with self._lock:  # ADD THIS
+          last = self._last_invocation[resolver_name]
+          now = time.monotonic()
+          delta = now - last
+
+      if delta < limit:
+          time.sleep(limit - delta)
+
+      with self._lock:  # ADD THIS
+          self._last_invocation[resolver_name] = time.monotonic()
+  ```
+
+- [ ] 9.8 Delete old tasks 9.7 and 9.8 (merged into 9.6 and 9.7)
+- [ ] 9.9 Create `tests/test_parallel_execution.py`:
+
+  ```python
+  import pytest
+  import time
+  from unittest.mock import Mock, patch
+  from concurrent.futures import ThreadPoolExecutor
+  from DocsToKG.ContentDownload.resolvers import ResolverPipeline, ResolverConfig
+
+  def test_rate_limiting_with_parallel_workers():
+      """Verify rate limiting enforced across parallel workers."""
+      config = ResolverConfig()
+      config.resolver_min_interval_s = {"test_resolver": 1.0}
+
+      pipeline = ResolverPipeline(
+          resolvers=[],
+          config=config,
+          download_func=Mock(),
+          logger=Mock(),
+      )
+
+      # Simulate 5 workers calling same resolver concurrently
+      def call_respect_limit():
+          pipeline._respect_rate_limit("test_resolver")
+          return time.monotonic()
+
+      with ThreadPoolExecutor(max_workers=5) as executor:
+          futures = [executor.submit(call_respect_limit) for _ in range(5)]
+          timestamps = [f.result() for f in futures]
+
+      # Verify minimum 1s intervals between calls
+      timestamps.sort()
+      for i in range(1, len(timestamps)):
+          interval = timestamps[i] - timestamps[i-1]
+          assert interval >= 0.95, f"Interval {interval}s < 1.0s (rate limit violated)"
+  ```
+
+- [ ] 9.10 Update `README.md` or `docs/` with section:
+
+  ```markdown
+  ## Parallel Execution
+
+  Use `--workers N` for bounded parallelism across works:
+
+  ```bash
+  # Sequential (default, safest)
+  python -m DocsToKG.ContentDownload.download_pyalex_pdfs --workers 1 ...
+
+  # Parallel (2-5x throughput)
+  python -m DocsToKG.ContentDownload.download_pyalex_pdfs --workers 3 ...
+  ```
+
+  **Recommendations:**
+  - Start with `--workers=3` for production
+  - Monitor rate limit compliance with resolver APIs
+  - Higher values (>5) may overwhelm resolvers despite per-resolver rate limiting
+  - Each worker creates its own HTTP session with retry logic
+
+  ```
 
 ## 10. Dry Run and Resume Modes
 

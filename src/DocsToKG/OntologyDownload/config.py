@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence
-
-import logging
 
 import yaml
 
@@ -176,11 +175,20 @@ def merge_defaults(raw_config: Mapping[str, object]) -> ResolvedConfig:
     for index, entry in enumerate(ontologies, start=1):
         if not isinstance(entry, Mapping):
             raise ConfigError(f"Ontology entry #{index} must be a mapping")
-        ontology_id = str(entry.get("id"))
-        resolver = str(entry.get("resolver", defaults.prefer_source[0]))
-        extras = dict(entry.get("extras", {}))
+        ontology_id = entry.get("id")
+        if not ontology_id:
+            raise ConfigError(f"Ontology entry #{index} is missing required field 'id'")
+        resolver_value = entry.get("resolver")
+        resolver = str(resolver_value or defaults.prefer_source[0])
+        extras_value = entry.get("extras", {})
+        if extras_value is None:
+            extras_value = {}
+        if not isinstance(extras_value, Mapping):
+            raise ConfigError(f"Ontology entry '{ontology_id}' extras must be a mapping if provided")
         target_formats = _coerce_sequence(entry.get("target_formats") or defaults.normalize_to)
-        fetch_specs.append(_make_fetch_spec(ontology_id, resolver, extras, target_formats))
+        fetch_specs.append(
+            _make_fetch_spec(str(ontology_id), resolver, extras_value, target_formats)
+        )
 
     return ResolvedConfig(defaults=defaults, specs=fetch_specs)
 
@@ -193,19 +201,74 @@ def _make_fetch_spec(
 ) -> "FetchSpec":
     from .core import FetchSpec as _FetchSpec  # Local import avoids circular dependency
 
-    return _FetchSpec(id=ontology_id, resolver=resolver, extras=dict(extras), target_formats=target_formats)
+    return _FetchSpec(id=ontology_id, resolver=resolver, extras=dict(extras), target_formats=list(target_formats))
 
 
 def validate_config(config_path: Path) -> ResolvedConfig:
     raw = load_raw_yaml(config_path)
-    return merge_defaults(raw)
+    config = merge_defaults(raw)
+    _validate_schema(raw)
+    return config
+
+
+def _validate_schema(raw: Mapping[str, object]) -> None:
+    errors: List[str] = []
+
+    defaults = raw.get("defaults")
+    if defaults is not None and not isinstance(defaults, Mapping):
+        errors.append("'defaults' section must be a mapping when provided")
+    if isinstance(defaults, Mapping):
+        for key in defaults:
+            if key not in {"accept_licenses", "normalize_to", "prefer_source", "http", "validation", "logging", "continue_on_error", "concurrent_downloads"}:
+                errors.append(f"Unknown key in defaults: {key}")
+
+        http_section = defaults.get("http") if isinstance(defaults, Mapping) else None
+        if http_section is not None and not isinstance(http_section, Mapping):
+            errors.append("'defaults.http' must be a mapping")
+
+        validation_section = defaults.get("validation") if isinstance(defaults, Mapping) else None
+        if validation_section is not None and not isinstance(validation_section, Mapping):
+            errors.append("'defaults.validation' must be a mapping")
+
+        logging_section = defaults.get("logging") if isinstance(defaults, Mapping) else None
+        if logging_section is not None and not isinstance(logging_section, Mapping):
+            errors.append("'defaults.logging' must be a mapping")
+
+    ontologies = raw.get("ontologies")
+    if ontologies is None:
+        errors.append("'ontologies' section is required")
+    elif not isinstance(ontologies, list):
+        errors.append("'ontologies' must be a list of ontology entries")
+    else:
+        for index, entry in enumerate(ontologies, start=1):
+            if not isinstance(entry, Mapping):
+                errors.append(f"Ontology entry #{index} must be a mapping")
+                continue
+            if "id" not in entry:
+                errors.append(f"Ontology entry #{index} missing required 'id'")
+            if "resolver" in entry and not isinstance(entry["resolver"], str):
+                errors.append(
+                    f"Ontology entry '{entry.get('id', index)}' field 'resolver' must be a string if provided"
+                )
+            if "extras" in entry and not isinstance(entry["extras"], Mapping):
+                errors.append(
+                    f"Ontology entry '{entry.get('id', index)}' field 'extras' must be a mapping if provided"
+                )
+            if "target_formats" in entry and not isinstance(entry["target_formats"], Iterable):
+                errors.append(
+                    f"Ontology entry '{entry.get('id', index)}' field 'target_formats' must be a list or iterable"
+                )
+
+    if errors:
+        raise ConfigError("Configuration validation failed:\n- " + "\n- ".join(errors))
 
 
 def load_raw_yaml(config_path: Path) -> MutableMapping[str, object]:
     try:
         text = config_path.read_text()
-    except FileNotFoundError as exc:  # pragma: no cover - depends on filesystem state
-        raise ConfigError(f"Configuration file not found: {config_path}") from exc
+    except FileNotFoundError:  # pragma: no cover - depends on filesystem state
+        print(f"Configuration file not found: {config_path}", file=sys.stderr)
+        raise SystemExit(2)
 
     try:
         data = yaml.safe_load(text) or {}

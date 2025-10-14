@@ -42,6 +42,12 @@ from DocsToKG.ContentDownload.utils import (
     normalize_pmcid,
     strip_prefix,
 )
+from DocsToKG.ContentDownload.utils import (
+    dedupe,
+    normalize_doi,
+    normalize_pmcid,
+    strip_prefix,
+)
 
 
 MAX_SNIFF_BYTES = 64 * 1024

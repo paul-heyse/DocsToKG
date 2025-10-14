@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from typing import Dict, Optional
 
@@ -10,6 +11,7 @@ from bioregistry import get_obo_download, get_owl_download, get_rdf_download
 from ols_client import OlsClient
 from ontoportal_client import BioPortalClient
 import pystow
+import requests
 
 from .config import ConfigError, ResolvedConfig
 
@@ -25,6 +27,28 @@ class FetchPlan:
 
 
 class BaseResolver:
+    def _execute_with_retry(self, func, *, config: ResolvedConfig, logger: logging.Logger, name: str):
+        attempts = 0
+        max_attempts = max(1, config.defaults.http.max_retries)
+        while True:
+            attempts += 1
+            try:
+                return func()
+            except requests.Timeout as exc:
+                if attempts >= max_attempts:
+                    raise ConfigError(f"{name} API timeout after {config.defaults.http.timeout_sec}s") from exc
+                sleep_time = config.defaults.http.backoff_factor * (2 ** (attempts - 1))
+                logger.warning(
+                    "resolver timeout",
+                    extra={"stage": "plan", "resolver": name, "attempt": attempts, "sleep_sec": sleep_time},
+                )
+                time.sleep(sleep_time)
+            except requests.HTTPError as exc:
+                status = exc.response.status_code if exc.response is not None else None
+                if status in {401, 403}:
+                    raise
+                raise ConfigError(f"{name} API error {status}: {exc}") from exc
+
     def _build_plan(
         self,
         *,
@@ -71,10 +95,21 @@ class OLSResolver(BaseResolver):
 
     def __init__(self) -> None:
         self.client = OlsClient()
+        self.credentials_path = pystow.join("ontology-fetcher", "configs") / "ols_api_token.txt"
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
         ontology_id = spec.id.lower()
-        record = self.client.get_ontology(ontology_id)
+        try:
+            record = self._execute_with_retry(
+                lambda: self.client.get_ontology(ontology_id), config=config, logger=logger, name="ols"
+            )
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            if status in {401, 403}:
+                raise ConfigError(
+                    f"OLS authentication failed with status {status}. Configure API key at {self.credentials_path}"
+                ) from exc
+            raise
         download_url = None
         version = None
         license_value = None
@@ -94,7 +129,12 @@ class OLSResolver(BaseResolver):
             version = getattr(record, "version", None)
             license_value = getattr(record, "license", None)
         if not download_url:
-            submissions = self.client.get_ontology_versions(ontology_id)
+            submissions = self._execute_with_retry(
+                lambda: self.client.get_ontology_versions(ontology_id),
+                config=config,
+                logger=logger,
+                name="ols",
+            )
             for submission in submissions:
                 candidate = submission.get("downloadLocation") or submission.get("links", {}).get("download")
                 if candidate:
@@ -126,12 +166,24 @@ class BioPortalResolver(BaseResolver):
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
         acronym = spec.extras.get("acronym", spec.id.upper())
-        ontology = self.client.get_ontology(acronym)
+        try:
+            ontology = self._execute_with_retry(
+                lambda: self.client.get_ontology(acronym), config=config, logger=logger, name="bioportal"
+            )
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            if status in {401, 403}:
+                raise ConfigError(
+                    f"BioPortal authentication failed with status {status}. Configure API key at {self.api_key_path}"
+                ) from exc
+            raise
         version = None
         license_value = None
         if isinstance(ontology, dict):
             license_value = ontology.get("license")
-        latest_submission = self.client.get_latest_submission(acronym)
+        latest_submission = self._execute_with_retry(
+            lambda: self.client.get_latest_submission(acronym), config=config, logger=logger, name="bioportal"
+        )
         if isinstance(latest_submission, dict):
             download_url = (
                 latest_submission.get("download")

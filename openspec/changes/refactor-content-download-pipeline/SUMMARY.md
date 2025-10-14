@@ -47,9 +47,9 @@ Current production runs show 5-8% miss rate attributable to transient HTTP error
 
 - **Requirements**: 13 ADDED, 3 MODIFIED, 0 REMOVED
 - **Scenarios**: 48 total across all requirements
-- **Tasks**: 101 tasks across 16 phases
+- **Tasks**: 120 tasks across 16 phases (enhanced with explicit implementation details)
 - **Estimated effort**: 3-4 weeks (1 week quick wins, 1 week streamlining, 1 week functionality upgrades, 1 week testing/docs)
-- **Code changes**: ~1200 lines added, ~800 lines removed (net +400 with tests)
+- **Code changes**: ~1500 lines added (including full function implementations), ~800 lines removed (net +700 with tests and scripts)
 - **Test coverage**: Target >=85% for ContentDownload modules
 
 ## Implementation Phases

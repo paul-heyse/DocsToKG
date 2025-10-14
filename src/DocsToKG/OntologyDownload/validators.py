@@ -106,6 +106,12 @@ def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> Valid
         return ValidationResult(ok=True, details=payload, output_files=output_files)
     except ValidationTimeout:
         payload = {"ok": False, "error": "rdflib parser timeout"}
+    except MemoryError as exc:
+        payload = {"ok": False, "error": "rdflib memory limit exceeded"}
+        logger.warning(
+            "rdflib memory error",
+            extra={"stage": "validate", "error": str(exc)},
+        )
     except Exception as exc:  # pylint: disable=broad-except
         payload = {"ok": False, "error": str(exc)}
     _write_validation_json(request.validation_dir / "rdflib_parse.json", payload)
@@ -141,6 +147,12 @@ def validate_pronto(request: ValidationRequest, logger: logging.Logger) -> Valid
         return ValidationResult(ok=True, details=payload, output_files=output_files)
     except ValidationTimeout:
         payload = {"ok": False, "error": "pronto parser timeout"}
+    except MemoryError as exc:
+        payload = {"ok": False, "error": "pronto memory limit exceeded"}
+        logger.warning(
+            "pronto memory error",
+            extra={"stage": "validate", "error": str(exc)},
+        )
     except Exception as exc:  # pylint: disable=broad-except
         payload = {"ok": False, "error": str(exc)}
     _write_validation_json(request.validation_dir / "pronto_parse.json", payload)
@@ -154,6 +166,17 @@ def validate_owlready2(request: ValidationRequest, logger: logging.Logger) -> Va
         payload = {"ok": True, "entities": len(list(ontology.classes()))}
         _write_validation_json(request.validation_dir / "owlready2_parse.json", payload)
         return ValidationResult(ok=True, details=payload, output_files=[])
+    except MemoryError as exc:
+        payload = {
+            "ok": False,
+            "error": f"Memory limit exceeded parsing {request.file_path.name}. Consider skipping reasoning",
+        }
+        _write_validation_json(request.validation_dir / "owlready2_parse.json", payload)
+        logger.warning(
+            "owlready2 memory error",
+            extra={"stage": "validate", "error": str(exc)},
+        )
+        return ValidationResult(ok=False, details=payload, output_files=[])
     except Exception as exc:  # pylint: disable=broad-except
         payload = {"ok": False, "error": str(exc)}
         _write_validation_json(request.validation_dir / "owlready2_parse.json", payload)
@@ -185,6 +208,14 @@ def validate_robot(request: ValidationRequest, logger: logging.Logger) -> Valida
         return ValidationResult(ok=True, details=result_payload, output_files=output_files)
     except subprocess.CalledProcessError as exc:
         result_payload = {"ok": False, "error": exc.stderr.decode("utf-8", errors="ignore")}
+    except MemoryError as exc:
+        result_payload = {"ok": False, "error": "robot memory limit exceeded"}
+        _write_validation_json(request.validation_dir / "robot_report.json", result_payload)
+        logger.warning(
+            "robot memory error",
+            extra={"stage": "validate", "error": str(exc)},
+        )
+        return ValidationResult(ok=False, details=result_payload, output_files=output_files)
     except Exception as exc:  # pylint: disable=broad-except
         result_payload = {"ok": False, "error": str(exc)}
     _write_validation_json(request.validation_dir / "robot_report.json", result_payload)
