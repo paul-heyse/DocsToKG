@@ -1,6 +1,6 @@
 ## 1. Shared Utilities Extraction
 
-- [ ] 1.1 Create `src/DocsToKG/ContentDownload/utils.py` with exact implementation:
+- [x] 1.1 Create `src/DocsToKG/ContentDownload/utils.py` with exact implementation:
   ```python
   """Shared utility functions for ContentDownload module."""
   from __future__ import annotations
@@ -69,7 +69,7 @@
               seen.add(item)
       return result
   ```
-- [ ] 1.2 Add unit tests in `tests/test_content_download_utils.py` with minimum coverage:
+- [x] 1.2 Add unit tests in `tests/test_content_download_utils.py` with minimum coverage:
   ```python
   import pytest
   from DocsToKG.ContentDownload.utils import normalize_doi, normalize_pmcid, strip_prefix, dedupe
@@ -101,86 +101,86 @@
   def test_dedupe_preserves_order():
       assert dedupe(['b', 'a', 'b', 'c']) == ['b', 'a', 'c']
   ```
-- [ ] 1.3 In `download_pyalex_pdfs.py`, delete lines 159-166 (old `_normalize_doi`) and add import at top: `from DocsToKG.ContentDownload.utils import normalize_doi, normalize_pmcid, strip_prefix, dedupe`, then replace all calls to `_normalize_doi(doi)` with `normalize_doi(doi)` (lines 287, 765, etc.)
-- [ ] 1.4 In `resolvers/__init__.py`, delete lines 408-433 (old `_normalize_doi`, `_normalize_pmcid`, `_strip_prefix`) and add import at top: `from .utils import normalize_doi, normalize_pmcid, strip_prefix, dedupe`, then replace all calls (lines 454, 534, 705, 814, 856, 902, 949)
-- [ ] 1.5 Update `_collect_location_urls` in `download_pyalex_pdfs.py` to use `utils.dedupe()` instead of inline dedupe logic
-- [ ] 1.6 Update resolver URL collection in `resolvers/__init__.py` (Unpaywall, Crossref) to use `utils.dedupe()`
+- [x] 1.3 In `download_pyalex_pdfs.py`, delete lines 159-166 (old `_normalize_doi`) and add import at top: `from DocsToKG.ContentDownload.utils import normalize_doi, normalize_pmcid, strip_prefix, dedupe`, then replace all calls to `_normalize_doi(doi)` with `normalize_doi(doi)` (lines 287, 765, etc.)
+- [x] 1.4 In `resolvers/__init__.py`, delete lines 408-433 (old `_normalize_doi`, `_normalize_pmcid`, `_strip_prefix`) and add import at top: `from .utils import normalize_doi, normalize_pmcid, strip_prefix, dedupe`, then replace all calls (lines 454, 534, 705, 814, 856, 902, 949)
+- [x] 1.5 Update `_collect_location_urls` in `download_pyalex_pdfs.py` to use `utils.dedupe()` instead of inline dedupe logic
+- [x] 1.6 Update resolver URL collection in `resolvers/__init__.py` (Unpaywall, Crossref) to use `utils.dedupe()`
 
 ## 2. HTTP Retry Infrastructure
 
-- [ ] 2.1 In `download_pyalex_pdfs.py`, create `_make_session(headers: Dict[str, str]) -> requests.Session` that constructs Session, mounts HTTPAdapter with Retry(total=5, backoff_factor=0.5, status_forcelist=[429, 502, 503, 504], respect_retry_after_header=True) on http:// and https://
-- [ ] 2.2 Replace `session = requests.Session()` in `main()` with `session = _make_session(config.polite_headers)`
-- [ ] 2.3 Add integration test in `tests/test_download_retries.py` that mocks sequence [503, 503, 200] and verifies download succeeds after retries
-- [ ] 2.4 Add test verifying Retry-After header is respected (mock 429 with Retry-After: 2, assert delay >=2s)
-- [ ] 2.5 Add test verifying 4xx errors (401, 404) do NOT retry (fail immediately)
+- [x] 2.1 In `download_pyalex_pdfs.py`, create `_make_session(headers: Dict[str, str]) -> requests.Session` that constructs Session, mounts HTTPAdapter with Retry(total=5, backoff_factor=0.5, status_forcelist=[429, 502, 503, 504], respect_retry_after_header=True) on http:// and https://
+- [x] 2.2 Replace `session = requests.Session()` in `main()` with `session = _make_session(config.polite_headers)`
+- [x] 2.3 Add integration test in `tests/test_download_retries.py` that mocks sequence [503, 503, 200] and verifies download succeeds after retries
+- [x] 2.4 Add test verifying Retry-After header is respected (mock 429 with Retry-After: 2, assert delay >=2s)
+- [x] 2.5 Add test verifying 4xx errors (401, 404) do NOT retry (fail immediately)
 
 ## 3. Atomic File Writes and Digests
 
-- [ ] 3.1 In `download_candidate()`, change file write pattern: open `dest_path.with_suffix(dest_path.suffix + '.part')` instead of `dest_path` directly
-- [ ] 3.2 After closing file handle, compute SHA-256 digest: `sha256 = hashlib.sha256(); with open(part_path, 'rb') as f: for chunk in iter(lambda: f.read(1<<20), b''): sha256.update(chunk); digest = sha256.hexdigest()`
-- [ ] 3.3 Get file size: `content_length = part_path.stat().st_size`
-- [ ] 3.4 Perform atomic rename: `os.replace(part_path, dest_path)`
-- [ ] 3.5 Add `sha256` and `content_length` fields to `DownloadOutcome` dataclass
-- [ ] 3.6 Update `DownloadOutcome` return statement to include `sha256=digest, content_length=content_length`
-- [ ] 3.7 Add test in `tests/test_atomic_writes.py` that kills download mid-stream (using signal or mock exception), verifies .part file exists and final file does NOT exist
-- [ ] 3.8 Add test verifying SHA-256 digest matches expected value for known test file
+- [x] 3.1 In `download_candidate()`, change file write pattern: open `dest_path.with_suffix(dest_path.suffix + '.part')` instead of `dest_path` directly
+- [x] 3.2 After closing file handle, compute SHA-256 digest: `sha256 = hashlib.sha256(); with open(part_path, 'rb') as f: for chunk in iter(lambda: f.read(1<<20), b''): sha256.update(chunk); digest = sha256.hexdigest()`
+- [x] 3.3 Get file size: `content_length = part_path.stat().st_size`
+- [x] 3.4 Perform atomic rename: `os.replace(part_path, dest_path)`
+- [x] 3.5 Add `sha256` and `content_length` fields to `DownloadOutcome` dataclass
+- [x] 3.6 Update `DownloadOutcome` return statement to include `sha256=digest, content_length=content_length`
+- [x] 3.7 Add test in `tests/test_atomic_writes.py` that kills download mid-stream (using signal or mock exception), verifies .part file exists and final file does NOT exist
+- [x] 3.8 Add test verifying SHA-256 digest matches expected value for known test file
 
 ## 4. Rate Limit Configuration Clarity
 
-- [ ] 4.1 In `resolvers/__init__.py` ResolverConfig dataclass, rename field: `resolver_rate_limits: Dict[str, float]` → `resolver_min_interval_s: Dict[str, float]`
-- [ ] 4.2 Update `ResolverPipeline._respect_rate_limit()` to read `config.resolver_min_interval_s.get(resolver_name)`
-- [ ] 4.3 In `load_resolver_config()` in `download_pyalex_pdfs.py`, add deprecation handling: if `resolver_rate_limits` in config_data and `resolver_min_interval_s` not in config_data, copy value and log warning "resolver_rate_limits deprecated, use resolver_min_interval_s"
-- [ ] 4.4 Update `apply_config_overrides()` to handle both field names (old and new) for backward compatibility
+ - [x] 4.1 In `resolvers/__init__.py` ResolverConfig dataclass, rename field: `resolver_rate_limits: Dict[str, float]` → `resolver_min_interval_s: Dict[str, float]`
+ - [x] 4.2 Update `ResolverPipeline._respect_rate_limit()` to read `config.resolver_min_interval_s.get(resolver_name)`
+ - [x] 4.3 In `load_resolver_config()` in `download_pyalex_pdfs.py`, add deprecation handling: if `resolver_rate_limits` in config_data and `resolver_min_interval_s` not in config_data, copy value and log warning "resolver_rate_limits deprecated, use resolver_min_interval_s"
+ - [x] 4.4 Update `apply_config_overrides()` to handle both field names (old and new) for backward compatibility
 - [ ] 4.5 Update example resolver config YAML in docs/ to use `resolver_min_interval_s` with inline comment "# seconds between calls (e.g., 1.0 = max 1 QPS)"
-- [ ] 4.6 Update comment in `load_resolver_config()` where Unpaywall default is set: `# Unpaywall recommends 1 request per second`
-- [ ] 4.7 Add test verifying deprecation warning is logged when old field name used
+ - [x] 4.6 Update comment in `load_resolver_config()` where Unpaywall default is set: `# Unpaywall recommends 1 request per second`
+- [x] 4.7 Add test verifying deprecation warning is logged when old field name used
 
 ## 5. LRU Cache for Resolver APIs
 
-- [ ] 5.1 In `resolvers/__init__.py`, add at module level: `from functools import lru_cache`
-- [ ] 5.2 Create cached helper for Unpaywall: `@lru_cache(maxsize=1000)` decorator on new function `_fetch_unpaywall_data(doi: str, email: str, timeout: float, headers: Dict) -> Optional[Dict]` that makes API call and returns JSON
-- [ ] 5.3 Update `UnpaywallResolver.iter_urls()` to call `_fetch_unpaywall_data(doi, config.unpaywall_email, config.get_timeout(self.name), ...)`
-- [ ] 5.4 Create cached helper for Crossref: `@lru_cache(maxsize=1000)` decorator on `_fetch_crossref_data(doi: str, mailto: Optional[str], timeout: float, headers: Dict) -> Optional[Dict]`
-- [ ] 5.5 Update `CrossrefResolver.iter_urls()` to call `_fetch_crossref_data(...)`
-- [ ] 5.6 Create cached helper for Semantic Scholar: `@lru_cache(maxsize=1000)` decorator on `_fetch_s2_data(doi: str, api_key: Optional[str], timeout: float, headers: Dict) -> Optional[Dict]`
-- [ ] 5.7 Update `SemanticScholarResolver.iter_urls()` to call `_fetch_s2_data(...)`
-- [ ] 5.8 Add `clear_resolver_caches()` function that calls `.cache_clear()` on all three cached functions
-- [ ] 5.9 In `main()`, call `clear_resolver_caches()` if `--resume-from` flag is set (to force fresh lookups)
-- [ ] 5.10 Add test in `tests/test_resolver_caching.py` that calls resolver twice with same DOI, verifies second call does not make HTTP request (mock session)
+- [x] 5.1 In `resolvers/__init__.py`, add at module level: `from functools import lru_cache`
+- [x] 5.2 Create cached helper for Unpaywall: `@lru_cache(maxsize=1000)` decorator on new function `_fetch_unpaywall_data(doi: str, email: str, timeout: float, headers: Dict) -> Optional[Dict]` that makes API call and returns JSON
+- [x] 5.3 Update `UnpaywallResolver.iter_urls()` to call `_fetch_unpaywall_data(doi, config.unpaywall_email, config.get_timeout(self.name), ...)`
+- [x] 5.4 Create cached helper for Crossref: `@lru_cache(maxsize=1000)` decorator on `_fetch_crossref_data(doi: str, mailto: Optional[str], timeout: float, headers: Dict) -> Optional[Dict]`
+- [x] 5.5 Update `CrossrefResolver.iter_urls()` to call `_fetch_crossref_data(...)`
+- [x] 5.6 Create cached helper for Semantic Scholar: `@lru_cache(maxsize=1000)` decorator on `_fetch_s2_data(doi: str, api_key: Optional[str], timeout: float, headers: Dict) -> Optional[Dict]`
+- [x] 5.7 Update `SemanticScholarResolver.iter_urls()` to call `_fetch_s2_data(...)`
+- [x] 5.8 Add `clear_resolver_caches()` function that calls `.cache_clear()` on all three cached functions
+- [x] 5.9 In `main()`, call `clear_resolver_caches()` if `--resume-from` flag is set (to force fresh lookups)
+- [x] 5.10 Add test in `tests/test_resolver_caching.py` that calls resolver twice with same DOI, verifies second call does not make HTTP request (mock session)
 
 ## 6. Conditional Requests Support
 
-- [ ] 6.1 In `Manifest` dataclass in `download_pyalex_pdfs.py`, add fields: `etag: Optional[str] = None`, `last_modified: Optional[str] = None`
-- [ ] 6.2 Update manifest.jsonl write to include etag and last_modified from FetchResult
-- [ ] 6.3 In `download_candidate()`, add parameter `previous_etag: Optional[str] = None`, `previous_last_modified: Optional[str] = None`
-- [ ] 6.4 Before making GET request in `download_candidate()`, add to headers dict: if `previous_etag`: `headers['If-None-Match'] = previous_etag`; if `previous_last_modified`: `headers['If-Modified-Since'] = previous_last_modified`
-- [ ] 6.5 After receiving response, if `response.status_code == 304`: return `DownloadOutcome(classification='cached', path=str(existing_path), http_status=304, ...)`
-- [ ] 6.6 In `main()`, before calling `download_candidate()`, read manifest.jsonl, lookup (work_id, url) to get previous etag/last_modified
-- [ ] 6.7 Pass etag/last_modified to `download_candidate()` call
-- [ ] 6.8 Add test in `tests/test_conditional_requests.py` that mocks 304 response, verifies cached outcome returned and no file written
-- [ ] 6.9 Add test verifying ETag/Last-Modified recorded in manifest after successful download
+- [x] 6.1 In `Manifest` dataclass in `download_pyalex_pdfs.py`, add fields: `etag: Optional[str] = None`, `last_modified: Optional[str] = None`
+- [x] 6.2 Update manifest.jsonl write to include etag and last_modified from FetchResult
+- [x] 6.3 In `download_candidate()`, add parameter `previous_etag: Optional[str] = None`, `previous_last_modified: Optional[str] = None`
+- [x] 6.4 Before making GET request in `download_candidate()`, add to headers dict: if `previous_etag`: `headers['If-None-Match'] = previous_etag`; if `previous_last_modified`: `headers['If-Modified-Since'] = previous_last_modified`
+- [x] 6.5 After receiving response, if `response.status_code == 304`: return `DownloadOutcome(classification='cached', path=str(existing_path), http_status=304, ...)`
+- [x] 6.6 In `main()`, before calling `download_candidate()`, read manifest.jsonl, lookup (work_id, url) to get previous etag/last_modified
+- [x] 6.7 Pass etag/last_modified to `download_candidate()` call
+- [x] 6.8 Add test in `tests/test_conditional_requests.py` that mocks 304 response, verifies cached outcome returned and no file written
+- [x] 6.9 Add test verifying ETag/Last-Modified recorded in manifest after successful download
 
 ## 7. Unified JSONL Logging
 
-- [ ] 7.1 Create `JsonlLogger` class in `download_pyalex_pdfs.py` with methods: `log_attempt(record: AttemptRecord)`, `log_summary(summary: Dict)`
-- [ ] 7.2 Implement `log_attempt()` to write JSON line with schema: `{"timestamp": ISO8601, "record_type": "attempt", "work_id": ..., "resolver_name": ..., ...}`
-- [ ] 7.3 Implement `log_summary()` to write JSON line with schema: `{"timestamp": ISO8601, "record_type": "summary", "total_works": ..., "success_count": ..., ...}`
-- [ ] 7.4 Replace `CsvAttemptLogger` instantiation in `main()` with `JsonlLogger(args.log_jsonl or (pdf_dir / "attempts.jsonl"))`
-- [ ] 7.5 Replace `ManifestLogger` instantiation with same `JsonlLogger` instance (unify)
-- [ ] 7.6 Update `AttemptRecord` logging calls to add `sha256` and `content_length` fields
-- [ ] 7.7 Create CSV export script `scripts/export_attempts_csv.py` that reads JSONL and writes CSV with same columns as old CsvAttemptLogger
-- [ ] 7.8 Add CLI flag `--log-format [jsonl|csv]` (default: jsonl); if csv, wrap JsonlLogger with CSV adapter
-- [ ] 7.9 Add test in `tests/test_jsonl_logging.py` verifying JSONL lines are valid JSON and contain required fields
-- [ ] 7.10 Add test verifying CSV export script produces correct columns and values
+- [x] 7.1 Create `JsonlLogger` class in `download_pyalex_pdfs.py` with methods: `log_attempt(record: AttemptRecord)`, `log_summary(summary: Dict)`
+- [x] 7.2 Implement `log_attempt()` to write JSON line with schema: `{"timestamp": ISO8601, "record_type": "attempt", "work_id": ..., "resolver_name": ..., ...}`
+- [x] 7.3 Implement `log_summary()` to write JSON line with schema: `{"timestamp": ISO8601, "record_type": "summary", "total_works": ..., "success_count": ..., ...}`
+- [x] 7.4 Replace `CsvAttemptLogger` instantiation in `main()` with `JsonlLogger(args.log_jsonl or (pdf_dir / "attempts.jsonl"))`
+- [x] 7.5 Replace `ManifestLogger` instantiation with same `JsonlLogger` instance (unify)
+- [x] 7.6 Update `AttemptRecord` logging calls to add `sha256` and `content_length` fields
+- [x] 7.7 Create CSV export script `scripts/export_attempts_csv.py` that reads JSONL and writes CSV with same columns as old CsvAttemptLogger
+- [x] 7.8 Add CLI flag `--log-format [jsonl|csv]` (default: jsonl); if csv, wrap JsonlLogger with CSV adapter
+- [x] 7.9 Add test in `tests/test_jsonl_logging.py` verifying JSONL lines are valid JSON and contain required fields
+- [x] 7.10 Add test verifying CSV export script produces correct columns and values
 
 ## 8. Refactor Download State Machine
 
-- [ ] 8.1 In `download_candidate()`, add `from enum import Enum` and define: `class DownloadState(Enum): PENDING = "pending"; WRITING = "writing"`
-- [ ] 8.2 Replace `detected: Optional[str] = None` with `state = DownloadState.PENDING; detected: Optional[str] = None`
-- [ ] 8.3 Refactor chunk iteration loop: `if state == DownloadState.PENDING: ... if detected: state = DownloadState.WRITING; elif state == DownloadState.WRITING: ...`
-- [ ] 8.4 Extract outcome building to helper function: `def _build_download_outcome(detected: Optional[str], dest_path: Optional[Path], response: requests.Response, elapsed_ms: float, flagged_unknown: bool, sha256: str, content_length: int) -> DownloadOutcome: ...`
-- [ ] 8.5 Replace multiple `return DownloadOutcome(...)` statements with calls to `_build_download_outcome(...)`
-- [ ] 8.6 Add docstring to `_build_download_outcome()` explaining classification logic and EOF check
+- [x] 8.1 In `download_candidate()`, add `from enum import Enum` and define: `class DownloadState(Enum): PENDING = "pending"; WRITING = "writing"`
+- [x] 8.2 Replace `detected: Optional[str] = None` with `state = DownloadState.PENDING; detected: Optional[str] = None`
+- [x] 8.3 Refactor chunk iteration loop: `if state == DownloadState.PENDING: ... if detected: state = DownloadState.WRITING; elif state == DownloadState.WRITING: ...`
+- [x] 8.4 Extract outcome building to helper function: `def _build_download_outcome(detected: Optional[str], dest_path: Optional[Path], response: requests.Response, elapsed_ms: float, flagged_unknown: bool, sha256: str, content_length: int) -> DownloadOutcome: ...`
+- [x] 8.5 Replace multiple `return DownloadOutcome(...)` statements with calls to `_build_download_outcome(...)`
+- [x] 8.6 Add docstring to `_build_download_outcome()` explaining classification logic and EOF check
 - [ ] 8.7 Run existing test suite (`tests/test_download_pyalex_pdfs.py`, `tests/test_resolvers.py`) to verify no regressions
 
 ## 9. Parallel Execution with ThreadPoolExecutor

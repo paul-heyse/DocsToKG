@@ -4,17 +4,24 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
+import hashlib
 import json
 import logging
 import os
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Set, Tuple
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 import pyalex
 from pyalex import Topics, Works, config as oa_config
@@ -27,6 +34,13 @@ from DocsToKG.ContentDownload.resolvers import (
     ResolverMetrics,
     ResolverPipeline,
     default_resolvers,
+    clear_resolver_caches,
+)
+from DocsToKG.ContentDownload.utils import (
+    dedupe,
+    normalize_doi,
+    normalize_pmcid,
+    strip_prefix,
 )
 
 
@@ -34,45 +48,6 @@ MAX_SNIFF_BYTES = 64 * 1024
 SUCCESS_STATUSES = {"pdf", "pdf_unknown"}
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
-_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
-_MAX_DOWNLOAD_RETRIES = 2
-_BACKOFF_BASE = 0.75
-
-
-def _sleep_with_jitter(attempt: int) -> None:
-    time.sleep(_BACKOFF_BASE * (2 ** attempt) + (0.1 * attempt))
-
-
-def request_with_retries(
-    session: requests.Session,
-    method: str,
-    url: str,
-    *,
-    max_retries: int = _MAX_DOWNLOAD_RETRIES,
-    retry_statuses: Optional[Iterable[int]] = None,
-    **kwargs: Any,
-) -> requests.Response:
-    """Perform a request with simple exponential backoff retries."""
-
-    statuses = set(retry_statuses or _TRANSIENT_STATUS_CODES)
-    last_exc: Optional[requests.RequestException] = None
-    for attempt in range(max_retries + 1):
-        try:
-            response = session.request(method=method, url=url, **kwargs)
-        except requests.RequestException as exc:
-            last_exc = exc
-            if attempt >= max_retries:
-                raise
-            _sleep_with_jitter(attempt)
-            continue
-
-        if response.status_code in statuses and attempt < max_retries:
-            _sleep_with_jitter(attempt)
-            continue
-        return response
-
-    assert last_exc is not None  # pragma: no cover
-    raise last_exc
 
 
 def _has_pdf_eof(path: Path) -> bool:
@@ -96,6 +71,265 @@ def slugify(text: str, keep: int = 80) -> str:
 
 def ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
+
+
+def _make_session(headers: Dict[str, str]) -> requests.Session:
+    """Create a retry-enabled :class:`requests.Session` with polite headers.
+
+    The session mounts an :class:`urllib3.util.retry.Retry` adapter that retries
+    transient HTTP failures (429/502/503/504) up to five times with
+    exponential backoff and `Retry-After` support. Callers should pass the
+    polite header set returned by :func:`load_resolver_config` so that each
+    worker advertises the required contact information.
+    """
+
+    session = requests.Session()
+    session.headers.update(headers)
+    retry = Retry(
+        total=5,
+        backoff_factor=0.5,
+        status_forcelist=[429, 502, 503, 504],
+        respect_retry_after_header=True,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
+def _make_session_for_worker(headers: Dict[str, str]) -> requests.Session:
+    """Factory helper for per-worker sessions."""
+
+    return _make_session(headers)
+
+
+@dataclass
+class ManifestEntry:
+    timestamp: str
+    work_id: str
+    title: str
+    publication_year: Optional[int]
+    resolver: Optional[str]
+    url: Optional[str]
+    path: Optional[str]
+    classification: str
+    content_type: Optional[str]
+    reason: Optional[str]
+    html_paths: List[str] = field(default_factory=list)
+    sha256: Optional[str] = None
+    content_length: Optional[int] = None
+    etag: Optional[str] = None
+    last_modified: Optional[str] = None
+    extracted_text_path: Optional[str] = None
+    dry_run: bool = False
+
+
+class JsonlLogger:
+    """Structured logger that emits attempt, manifest, and summary JSONL records."""
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        ensure_dir(path.parent)
+        self._file = path.open("a", encoding="utf-8")
+
+    def _write(self, payload: Dict[str, Any]) -> None:
+        payload.setdefault("timestamp", datetime.utcnow().isoformat() + "Z")
+        self._file.write(json.dumps(payload, sort_keys=True) + "\n")
+        self._file.flush()
+
+    def log_attempt(
+        self, record: AttemptRecord, *, timestamp: Optional[str] = None
+    ) -> None:
+        ts = timestamp or (datetime.utcnow().isoformat() + "Z")
+        self._write(
+            {
+                "record_type": "attempt",
+                "timestamp": ts,
+                "work_id": record.work_id,
+                "resolver_name": record.resolver_name,
+                "resolver_order": record.resolver_order,
+                "url": record.url,
+                "status": record.status,
+                "http_status": record.http_status,
+                "content_type": record.content_type,
+                "elapsed_ms": record.elapsed_ms,
+                "reason": record.reason,
+                "metadata": record.metadata,
+                "sha256": record.sha256,
+                "content_length": record.content_length,
+                "dry_run": record.dry_run,
+            }
+        )
+
+    def log(self, record: AttemptRecord) -> None:
+        self.log_attempt(record)
+
+    def log_manifest(self, entry: ManifestEntry) -> None:
+        self._write(
+            {
+                "record_type": "manifest",
+                "timestamp": entry.timestamp,
+                "work_id": entry.work_id,
+                "title": entry.title,
+                "publication_year": entry.publication_year,
+                "resolver": entry.resolver,
+                "url": entry.url,
+                "path": entry.path,
+                "classification": entry.classification,
+                "content_type": entry.content_type,
+                "reason": entry.reason,
+                "html_paths": entry.html_paths,
+                "sha256": entry.sha256,
+                "content_length": entry.content_length,
+                "etag": entry.etag,
+                "last_modified": entry.last_modified,
+                "extracted_text_path": entry.extracted_text_path,
+                "dry_run": entry.dry_run,
+            }
+        )
+
+    def log_summary(self, summary: Dict[str, Any]) -> None:
+        payload = {
+            "record_type": "summary",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }
+        payload.update(summary)
+        self._write(payload)
+
+    def close(self) -> None:
+        self._file.close()
+
+
+class CsvAttemptLoggerAdapter:
+    """Adapter that mirrors attempt records to CSV for backward compatibility."""
+
+    HEADER = [
+        "timestamp",
+        "work_id",
+        "resolver_name",
+        "resolver_order",
+        "url",
+        "status",
+        "http_status",
+        "content_type",
+        "elapsed_ms",
+        "reason",
+        "sha256",
+        "content_length",
+        "dry_run",
+        "metadata",
+    ]
+
+    def __init__(self, logger: JsonlLogger, path: Path) -> None:
+        self._logger = logger
+        ensure_dir(path.parent)
+        exists = path.exists()
+        self._file = path.open("a", newline="", encoding="utf-8")
+        self._writer = csv.DictWriter(self._file, fieldnames=self.HEADER)
+        if not exists:
+            self._writer.writeheader()
+
+    def log_attempt(self, record: AttemptRecord) -> None:
+        ts = datetime.utcnow().isoformat() + "Z"
+        self._logger.log_attempt(record, timestamp=ts)
+        self._writer.writerow(
+            {
+                "timestamp": ts,
+                "work_id": record.work_id,
+                "resolver_name": record.resolver_name,
+                "resolver_order": record.resolver_order,
+                "url": record.url,
+                "status": record.status,
+                "http_status": record.http_status,
+                "content_type": record.content_type,
+                "elapsed_ms": record.elapsed_ms,
+                "reason": record.reason,
+                "sha256": record.sha256,
+                "content_length": record.content_length,
+                "dry_run": record.dry_run,
+                "metadata": json.dumps(record.metadata, sort_keys=True)
+                if record.metadata
+                else "",
+            }
+        )
+        self._file.flush()
+
+    def log_manifest(self, entry: ManifestEntry) -> None:
+        self._logger.log_manifest(entry)
+
+    def log_summary(self, summary: Dict[str, Any]) -> None:
+        self._logger.log_summary(summary)
+
+    def log(self, record: AttemptRecord) -> None:
+        self.log_attempt(record)
+
+    def close(self) -> None:
+        self._logger.close()
+        self._file.close()
+
+
+def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
+    "Load manifest JSONL entries indexed by work identifier."
+
+    per_work: Dict[str, Dict[str, Any]] = {}
+    completed: Set[str] = set()
+    if not path or not path.exists():
+        return per_work, completed
+
+    with path.open("r", encoding="utf-8") as handle:
+        for raw in handle:
+            line = raw.strip()
+            if not line:
+                continue
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if data.get("record_type") and data.get("record_type") != "manifest":
+                continue
+            work_id = data.get("work_id")
+            url = data.get("url")
+            if not work_id or not url:
+                continue
+            per_work.setdefault(work_id, {})[url] = data
+            classification = (data.get("classification") or "").lower()
+            if classification in {"pdf", "pdf_unknown", "cached"}:
+                completed.add(work_id)
+
+    return per_work, completed
+
+
+def build_manifest_entry(
+    artifact: WorkArtifact,
+    resolver: Optional[str],
+    url: Optional[str],
+    outcome: Optional[DownloadOutcome],
+    html_paths: List[str],
+    *,
+    dry_run: bool,
+    reason: Optional[str] = None,
+) -> ManifestEntry:
+    timestamp = datetime.utcnow().isoformat() + "Z"
+    classification = outcome.classification if outcome else "miss"
+    return ManifestEntry(
+        timestamp=timestamp,
+        work_id=artifact.work_id,
+        title=artifact.title,
+        publication_year=artifact.publication_year,
+        resolver=resolver,
+        url=url,
+        path=outcome.path if outcome else None,
+        classification=classification,
+        content_type=outcome.content_type if outcome else None,
+        reason=reason or (outcome.error if outcome else None),
+        html_paths=html_paths,
+        sha256=outcome.sha256 if outcome else None,
+        content_length=outcome.content_length if outcome else None,
+        etag=outcome.etag if outcome else None,
+        last_modified=outcome.last_modified if outcome else None,
+        extracted_text_path=outcome.extracted_text_path if outcome else None,
+        dry_run=dry_run,
+    )
 
 
 def classify_payload(head_bytes: bytes, content_type: str, url: str) -> Optional[str]:
@@ -147,22 +381,72 @@ class WorkArtifact:
         self.namespaces: Dict[str, Path] = {"pdf": self.pdf_dir, "html": self.html_dir}
 
 
-def _strip_prefix(value: Optional[str], prefix: str) -> Optional[str]:
-    if not value:
-        return None
-    value = value.strip()
-    if value.lower().startswith(prefix.lower()):
-        return value[len(prefix) :]
-    return value
+class DownloadState(Enum):
+    PENDING = "pending"
+    WRITING = "writing"
 
 
-def _normalize_doi(doi: Optional[str]) -> Optional[str]:
-    if not doi:
-        return None
-    doi = doi.strip()
-    if doi.lower().startswith("https://doi.org/"):
-        doi = doi[16:]
-    return doi.strip()
+def _build_download_outcome(
+    *,
+    artifact: WorkArtifact,
+    classification: Optional[str],
+    dest_path: Optional[Path],
+    response: requests.Response,
+    elapsed_ms: float,
+    flagged_unknown: bool,
+    sha256: Optional[str],
+    content_length: Optional[int],
+    etag: Optional[str],
+    last_modified: Optional[str],
+    extracted_text_path: Optional[str],
+    dry_run: bool,
+) -> DownloadOutcome:
+    """Create a :class:`DownloadOutcome` applying PDF validation rules.
+
+    The helper normalises classification labels, performs the terminal ``%%EOF``
+    check for PDFs (skipping when running in ``--dry-run`` mode), and attaches
+    bookkeeping metadata such as digests and conditional request headers.
+    """
+
+    normalized = classification or "empty"
+    if flagged_unknown and normalized == "pdf":
+        normalized = "pdf_unknown"
+
+    path_str = str(dest_path) if dest_path else None
+
+    if (
+        normalized in {"pdf", "pdf_unknown"}
+        and not dry_run
+        and dest_path is not None
+    ):
+        if not _has_pdf_eof(dest_path):
+            with contextlib.suppress(OSError):
+                dest_path.unlink()
+            return DownloadOutcome(
+                classification="pdf_corrupt",
+                path=None,
+                http_status=response.status_code,
+                content_type=response.headers.get("Content-Type"),
+                elapsed_ms=elapsed_ms,
+                sha256=None,
+                content_length=None,
+                etag=etag,
+                last_modified=last_modified,
+                extracted_text_path=extracted_text_path,
+            )
+
+    return DownloadOutcome(
+        classification=normalized,
+        path=path_str,
+        http_status=response.status_code,
+        content_type=response.headers.get("Content-Type"),
+        elapsed_ms=elapsed_ms,
+        sha256=sha256,
+        content_length=content_length,
+        etag=etag,
+        last_modified=last_modified,
+        extracted_text_path=extracted_text_path,
+    )
 
 
 def _normalize_pmid(pmid: Optional[str]) -> Optional[str]:
@@ -173,20 +457,10 @@ def _normalize_pmid(pmid: Optional[str]) -> Optional[str]:
     return match.group(1) if match else None
 
 
-def _normalize_pmcid(pmcid: Optional[str]) -> Optional[str]:
-    if not pmcid:
-        return None
-    pmcid = pmcid.strip()
-    match = re.search(r"PMC?(\d+)", pmcid, flags=re.I)
-    if match:
-        return f"PMC{match.group(1)}"
-    return None
-
-
 def _normalize_arxiv(arxiv_id: Optional[str]) -> Optional[str]:
     if not arxiv_id:
         return None
-    arxiv_id = _strip_prefix(arxiv_id, "arxiv:") or arxiv_id
+    arxiv_id = strip_prefix(arxiv_id, "arxiv:") or arxiv_id
     arxiv_id = arxiv_id.replace("https://arxiv.org/abs/", "")
     return arxiv_id.strip()
 
@@ -217,16 +491,6 @@ def _collect_location_urls(work: Dict[str, Any]) -> Dict[str, List[str]]:
     oa_url = ((work.get("open_access") or {}).get("oa_url") or None)
     if oa_url:
         pdf_urls.append(oa_url)
-
-    # De-duplicate while preserving order
-    def dedupe(items: List[str]) -> List[str]:
-        seen = set()
-        uniq = []
-        for item in items:
-            if item and item not in seen:
-                uniq.append(item)
-                seen.add(item)
-        return uniq
 
     return {
         "landing": dedupe(landing_urls),
@@ -284,9 +548,9 @@ def create_artifact(work: Dict[str, Any], pdf_dir: Path, html_dir: Path) -> Work
     title = work.get("title") or work.get("display_name") or ""
     year = work.get("publication_year")
     ids = work.get("ids") or {}
-    doi = _normalize_doi(ids.get("doi"))
+    doi = normalize_doi(ids.get("doi"))
     pmid = _normalize_pmid(ids.get("pmid"))
-    pmcid = _normalize_pmcid(ids.get("pmcid"))
+    pmcid = normalize_pmcid(ids.get("pmcid"))
     arxiv_id = _normalize_arxiv(ids.get("arxiv"))
 
     locations = _collect_location_urls(work)
@@ -323,37 +587,46 @@ def download_candidate(
     url: str,
     referer: Optional[str],
     timeout: float,
+    context: Dict[str, Any],
 ) -> DownloadOutcome:
+    context = context or {}
     headers: Dict[str, str] = {}
     if referer:
         headers["Referer"] = referer
+
+    dry_run = bool(context.get("dry_run", False))
+    extract_html_text = bool(context.get("extract_html_text", False))
+    previous_map: Dict[str, Dict[str, Any]] = context.get("previous", {})
+    previous = previous_map.get(url, {})
+    previous_etag = previous.get("etag")
+    previous_last_modified = previous.get("last_modified")
+    existing_path = previous.get("path")
+    previous_sha = previous.get("sha256")
+    previous_length = previous.get("content_length")
+
+    if previous_etag:
+        headers["If-None-Match"] = previous_etag
+    if previous_last_modified:
+        headers["If-Modified-Since"] = previous_last_modified
+
     start = time.monotonic()
     content_type_hint = ""
-    head: Optional[requests.Response] = None
     try:
-        try:
-            head = request_with_retries(
-                session,
-                "head",
+        head_headers = dict(headers)
+        head_headers.pop("If-None-Match", None)
+        head_headers.pop("If-Modified-Since", None)
+        with contextlib.suppress(requests.RequestException):
+            head = session.head(
                 url,
                 allow_redirects=True,
                 timeout=timeout,
-                headers=headers,
+                headers=head_headers,
             )
             if head.status_code < 400:
                 content_type_hint = head.headers.get("Content-Type", "") or ""
-        except requests.RequestException:
-            pass
-        finally:
-            if head is not None:
-                try:
-                    head.close()
-                except Exception:
-                    pass
+            head.close()
 
-        with request_with_retries(
-            session,
-            "get",
+        with session.get(
             url,
             stream=True,
             allow_redirects=True,
@@ -361,6 +634,20 @@ def download_candidate(
             headers=headers,
         ) as response:
             elapsed_ms = (time.monotonic() - start) * 1000.0
+            if response.status_code == 304:
+                return DownloadOutcome(
+                    classification="cached",
+                    path=existing_path,
+                    http_status=response.status_code,
+                    content_type=response.headers.get("Content-Type")
+                    or content_type_hint,
+                    elapsed_ms=elapsed_ms,
+                    sha256=previous_sha,
+                    content_length=previous_length,
+                    etag=previous_etag,
+                    last_modified=previous_last_modified,
+                )
+
             if response.status_code != 200:
                 return DownloadOutcome(
                     classification="http_error",
@@ -375,13 +662,15 @@ def download_candidate(
             detected: Optional[str] = None
             flagged_unknown = False
             dest_path: Optional[Path] = None
+            part_path: Optional[Path] = None
             handle = None
+            state = DownloadState.PENDING
 
             try:
                 for chunk in response.iter_content(chunk_size=1 << 15):
                     if not chunk:
                         continue
-                    if detected is None:
+                    if state is DownloadState.PENDING:
                         sniff_buffer.extend(chunk)
                         detected = classify_payload(bytes(sniff_buffer), content_type, url)
                         if detected is None and len(sniff_buffer) >= MAX_SNIFF_BYTES:
@@ -389,18 +678,20 @@ def download_candidate(
                             flagged_unknown = True
 
                         if detected is not None:
+                            if dry_run:
+                                break
                             if detected == "html":
                                 dest_path = artifact.html_dir / f"{artifact.base_stem}.html"
-                                ensure_dir(dest_path.parent)
                             else:
                                 dest_path = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
-                                ensure_dir(dest_path.parent)
-                            handle = open(dest_path, "wb")
+                            ensure_dir(dest_path.parent)
+                            part_path = dest_path.with_suffix(dest_path.suffix + ".part")
+                            handle = part_path.open("wb")
                             handle.write(sniff_buffer)
                             sniff_buffer.clear()
+                            state = DownloadState.WRITING
                             continue
-                    else:
-                        assert handle is not None
+                    elif handle is not None:
                         handle.write(chunk)
 
                 if detected is None:
@@ -415,31 +706,81 @@ def download_candidate(
                 if handle is not None:
                     handle.close()
 
-            path_str = str(dest_path) if dest_path else None
-            classification = detected or "pdf"
-            if flagged_unknown and classification == "pdf":
-                classification = "pdf_unknown"
-            if classification in {"pdf", "pdf_unknown"} and path_str:
-                pdf_path = Path(path_str)
-                if not _has_pdf_eof(pdf_path):
-                    try:
-                        pdf_path.unlink()
-                    except OSError:
-                        pass
-                    return DownloadOutcome(
-                        classification="pdf_corrupt",
-                        path=None,
-                        http_status=response.status_code,
-                        content_type=content_type,
-                        elapsed_ms=elapsed_ms,
-                        error="missing-eof",
+            if dry_run:
+                return _build_download_outcome(
+                    artifact=artifact,
+                    classification=detected,
+                    dest_path=None,
+                    response=response,
+                    elapsed_ms=elapsed_ms,
+                    flagged_unknown=flagged_unknown,
+                    sha256=None,
+                    content_length=None,
+                    etag=response.headers.get("ETag") or previous_etag,
+                    last_modified=response.headers.get("Last-Modified")
+                    or previous_last_modified,
+                    extracted_text_path=None,
+                    dry_run=True,
+                )
+
+            sha256: Optional[str] = None
+            content_length: Optional[int] = None
+            if part_path and dest_path:
+                sha = hashlib.sha256()
+                try:
+                    with part_path.open("rb") as tmp:
+                        for chunk in iter(lambda: tmp.read(1 << 20), b""):
+                            if not chunk:
+                                break
+                            sha.update(chunk)
+                    sha256 = sha.hexdigest()
+                    content_length = part_path.stat().st_size
+                    os.replace(part_path, dest_path)
+                finally:
+                    with contextlib.suppress(FileNotFoundError):
+                        if part_path.exists() and dest_path.exists():
+                            part_path.unlink()
+
+            extracted_text_path: Optional[str] = None
+            if (
+                dest_path
+                and detected == "html"
+                and extract_html_text
+            ):
+                try:
+                    import trafilatura  # type: ignore
+                except ImportError:
+                    LOGGER.warning(
+                        "HTML text extraction requested but trafilatura is not installed."
                     )
-            return DownloadOutcome(
-                classification=classification,
-                path=path_str,
-                http_status=response.status_code,
-                content_type=content_type,
+                else:
+                    try:
+                        text = trafilatura.extract(
+                            dest_path.read_text(encoding="utf-8", errors="ignore")
+                        )
+                    except Exception as exc:  # pragma: no cover - third-party failure
+                        LOGGER.warning(
+                            "Failed to extract HTML text for %s: %s", dest_path, exc
+                        )
+                    else:
+                        if text:
+                            text_path = dest_path.with_suffix(dest_path.suffix + ".txt")
+                            text_path.write_text(text, encoding="utf-8")
+                            extracted_text_path = str(text_path)
+
+            return _build_download_outcome(
+                artifact=artifact,
+                classification=detected,
+                dest_path=dest_path,
+                response=response,
                 elapsed_ms=elapsed_ms,
+                flagged_unknown=flagged_unknown,
+                sha256=sha256,
+                content_length=content_length,
+                etag=response.headers.get("ETag"),
+                last_modified=response.headers.get("Last-Modified"),
+                extracted_text_path=extracted_text_path,
+                dry_run=False,
             )
     except requests.RequestException as exc:
         elapsed_ms = (time.monotonic() - start) * 1000.0
@@ -451,76 +792,6 @@ def download_candidate(
             elapsed_ms=elapsed_ms,
             error=str(exc),
         )
-
-
-class CsvAttemptLogger:
-    HEADER = [
-        "timestamp",
-        "work_id",
-        "resolver_source",
-        "resolver_order",
-        "attempt_url",
-        "status",
-        "http_status",
-        "content_type",
-        "elapsed_ms",
-        "reason",
-        "metadata",
-    ]
-
-    def __init__(self, path: Optional[Path]) -> None:
-        self._path = path
-        self._writer: Optional[csv.DictWriter] = None
-        self._file = None
-        if path:
-            ensure_dir(path.parent)
-            exists = path.exists()
-            self._file = path.open("a", newline="", encoding="utf-8")
-            self._writer = csv.DictWriter(self._file, fieldnames=self.HEADER)
-            if not exists:
-                self._writer.writeheader()
-
-    def log(self, record: AttemptRecord) -> None:
-        if not self._writer:
-            return
-        row = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "work_id": record.work_id,
-            "resolver_source": record.resolver_name,
-            "resolver_order": record.resolver_order,
-            "attempt_url": record.url,
-            "status": record.status,
-            "http_status": record.http_status,
-            "content_type": record.content_type,
-            "elapsed_ms": record.elapsed_ms,
-            "reason": record.reason,
-            "metadata": json.dumps(record.metadata, sort_keys=True) if record.metadata else "",
-        }
-        self._writer.writerow(row)
-        self._file.flush()
-
-    def close(self) -> None:
-        if self._file:
-            self._file.close()
-
-
-class ManifestLogger:
-    def __init__(self, path: Optional[Path]) -> None:
-        self._path = path
-        self._file = None
-        if path:
-            ensure_dir(path.parent)
-            self._file = path.open("a", encoding="utf-8")
-
-    def log(self, record: Dict[str, Any]) -> None:
-        if not self._file:
-            return
-        self._file.write(json.dumps(record, sort_keys=True) + "\n")
-        self._file.flush()
-
-    def close(self) -> None:
-        if self._file:
-            self._file.close()
 
 
 def read_resolver_config(path: Path) -> Dict[str, Any]:
@@ -566,14 +837,22 @@ def apply_config_overrides(
         "semantic_scholar_api_key",
         "doaj_api_key",
         "resolver_timeouts",
-        "resolver_rate_limits",
+        "resolver_min_interval_s",
         "mailto",
     ):
         if field_name in data and data[field_name] is not None:
             setattr(config, field_name, data[field_name])
 
+    if "resolver_rate_limits" in data and "resolver_min_interval_s" not in data:
+        LOGGER.warning(
+            "resolver_rate_limits deprecated, use resolver_min_interval_s",
+        )
+        legacy_limits = data.get("resolver_rate_limits") or {}
+        config.resolver_min_interval_s.update(legacy_limits)
+
     for name in resolver_names:
-        config.resolver_toggles.setdefault(name, True)
+        default_enabled = name not in {"openaire", "hal", "osf"}
+        config.resolver_toggles.setdefault(name, default_enabled)
 
 
 def load_resolver_config(
@@ -616,7 +895,8 @@ def load_resolver_config(
         config.resolver_order = ordered
 
     for name in resolver_names:
-        config.resolver_toggles.setdefault(name, True)
+        default_enabled = name not in {"openaire", "hal", "osf"}
+        config.resolver_toggles.setdefault(name, default_enabled)
 
     for disabled in args.disable_resolver or []:
         config.resolver_toggles[disabled] = False
@@ -624,14 +904,16 @@ def load_resolver_config(
     # Polite headers include mailto when available
     headers = dict(config.polite_headers)
     headers.pop("mailto", None)
-    user_agent = headers.get("User-Agent") or "DocsToKG-OpenAlexDownloader/1.0"
-    if config.mailto and "mailto:" not in user_agent:
-        user_agent = f"{user_agent} (+mailto:{config.mailto})"
+    base_agent = headers.get("User-Agent") or "DocsToKGDownloader/1.0"
+    if config.mailto:
+        user_agent = f"DocsToKGDownloader/1.0 (+{config.mailto}; mailto:{config.mailto})"
+    else:
+        user_agent = base_agent
     headers["User-Agent"] = user_agent
     config.polite_headers = headers
 
-    # Apply resolver rate defaults (Unpaywall recommended 1 QPS)
-    config.resolver_rate_limits.setdefault("unpaywall", 1.0)
+    # Apply resolver rate defaults (Unpaywall recommends 1 request per second)
+    config.resolver_min_interval_s.setdefault("unpaywall", 1.0)
 
     return config
 
@@ -650,8 +932,9 @@ def iterate_openalex(query: Works, per_page: int, max_results: Optional[int]) ->
 def attempt_openalex_candidates(
     session: requests.Session,
     artifact: WorkArtifact,
-    logger: CsvAttemptLogger,
+    logger: JsonlLogger,
     metrics: ResolverMetrics,
+    context: Dict[str, Any],
 ) -> Optional[Tuple[DownloadOutcome, str]]:
     candidates = list(artifact.pdf_urls)
     if artifact.open_access_url:
@@ -663,7 +946,14 @@ def attempt_openalex_candidates(
         if not url or url in seen:
             continue
         seen.add(url)
-        outcome = download_candidate(session, artifact, url, referer=None, timeout=30.0)
+        outcome = download_candidate(
+            session,
+            artifact,
+            url,
+            referer=None,
+            timeout=30.0,
+            context=context,
+        )
         logger.log(
             AttemptRecord(
                 work_id=artifact.work_id,
@@ -676,6 +966,9 @@ def attempt_openalex_candidates(
                 elapsed_ms=outcome.elapsed_ms,
                 reason=outcome.error,
                 metadata={"source": "openalex"},
+                sha256=outcome.sha256,
+                content_length=outcome.content_length,
+                dry_run=bool(context.get("dry_run", False)),
             )
         )
         metrics.record_attempt("openalex", outcome)
@@ -694,279 +987,451 @@ def attempt_openalex_candidates(
     return None
 
 
-def main() -> None:
-    logging.basicConfig(level=logging.INFO)
-    parser = argparse.ArgumentParser(
-        description="Download OpenAlex PDFs for a topic and year range with resolvers.",
-    )
-    parser.add_argument("--topic", type=str, help="Free-text topic search.")
-    parser.add_argument(
-        "--topic-id",
-        type=str,
-        help="OpenAlex Topic ID (e.g., https://openalex.org/T12345). Overrides --topic.",
-    )
-    parser.add_argument("--year-start", type=int, required=True, help="Start year (inclusive).")
-    parser.add_argument("--year-end", type=int, required=True, help="End year (inclusive).")
-    parser.add_argument("--out", type=Path, default=Path("./pdfs"), help="Output folder for PDFs.")
-    parser.add_argument(
-        "--html-out",
-        type=Path,
-        default=None,
-        help="Folder for HTML responses (default: sibling 'HTML').",
-    )
-    parser.add_argument("--mailto", type=str, default=None, help="Email for the OpenAlex polite pool.")
-    parser.add_argument("--per-page", type=int, default=200, help="Results per page (1-200).")
-    parser.add_argument("--max", type=int, default=None, help="Maximum works to process.")
-    parser.add_argument("--oa-only", action="store_true", help="Only consider open-access works.")
-    parser.add_argument("--sleep", type=float, default=0.05, help="Sleep seconds between works.")
+def process_one_work(
+    work: Dict[str, Any],
+    session: requests.Session,
+    pdf_dir: Path,
+    html_dir: Path,
+    pipeline: ResolverPipeline,
+    logger: JsonlLogger,
+    metrics: ResolverMetrics,
+    *,
+    dry_run: bool,
+    extract_html_text: bool,
+    previous_lookup: Dict[str, Dict[str, Any]],
+    resume_completed: Set[str],
+) -> Dict[str, Any]:
+    artifact = create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir)
 
-    # Resolver configuration
-    parser.add_argument("--resolver-config", type=str, default=None, help="Path to resolver config (YAML/JSON).")
-    parser.add_argument(
-        "--resolver-order",
-        type=str,
-        default=None,
-        help="Comma-separated resolver order override (e.g., 'unpaywall,crossref').",
-    )
-    parser.add_argument("--unpaywall-email", type=str, default=None, help="Override Unpaywall email credential.")
-    parser.add_argument("--core-api-key", type=str, default=None, help="CORE API key override.")
-    parser.add_argument(
-        "--semantic-scholar-api-key",
-        type=str,
-        default=None,
-        help="Semantic Scholar Graph API key override.",
-    )
-    parser.add_argument("--doaj-api-key", type=str, default=None, help="DOAJ API key override.")
-    parser.add_argument(
-        "--disable-resolver",
-        action="append",
-        default=[],
-        help="Disable a resolver by name (can be repeated).",
-    )
-    parser.add_argument(
-        "--max-resolver-attempts",
-        type=int,
-        default=None,
-        help="Maximum resolver attempts per work.",
-    )
-    parser.add_argument(
-        "--resolver-timeout",
-        type=float,
-        default=None,
-        help="Default timeout (seconds) for resolver HTTP requests.",
-    )
-    parser.add_argument(
-        "--log-csv",
-        type=Path,
-        default=None,
-        help="Optional CSV log file capturing resolver attempts.",
-    )
-    parser.add_argument(
-        "--manifest",
-        type=Path,
-        default=None,
-        help="Path to JSONL manifest of final outcomes (default: <out>/manifest.jsonl).",
+    result = {"work_id": artifact.work_id, "saved": False, "html_only": False, "skipped": False}
+
+    raw_previous = previous_lookup.get(artifact.work_id, {})
+    previous_map = {
+        url: {
+            "etag": entry.get("etag"),
+            "last_modified": entry.get("last_modified"),
+            "path": entry.get("path"),
+            "sha256": entry.get("sha256"),
+            "content_length": entry.get("content_length"),
+        }
+        for url, entry in raw_previous.items()
+    }
+    download_context = {
+        "dry_run": dry_run,
+        "extract_html_text": extract_html_text,
+        "previous": previous_map,
+    }
+
+    if artifact.work_id in resume_completed:
+        LOGGER.info("Skipping %s (already completed)", artifact.work_id)
+        skipped_outcome = DownloadOutcome(
+            classification="skipped",
+            path=None,
+            http_status=None,
+            content_type=None,
+            elapsed_ms=None,
+            error="resume-complete",
+        )
+        entry = build_manifest_entry(
+            artifact,
+            resolver="resume",
+            url=None,
+            outcome=skipped_outcome,
+            html_paths=[],
+            dry_run=dry_run,
+            reason="resume-complete",
+        )
+        logger.log_manifest(entry)
+        result["skipped"] = True
+        return result
+
+    existing_pdf = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
+    if not dry_run and existing_pdf.exists():
+        existing_outcome = DownloadOutcome(
+            classification="exists",
+            path=str(existing_pdf),
+            http_status=None,
+            content_type=None,
+            elapsed_ms=None,
+            error="already-downloaded",
+        )
+        entry = build_manifest_entry(
+            artifact,
+            resolver="existing",
+            url=None,
+            outcome=existing_outcome,
+            html_paths=[],
+            dry_run=dry_run,
+            reason="already-downloaded",
+        )
+        logger.log_manifest(entry)
+        result["skipped"] = True
+        return result
+
+    openalex_result = attempt_openalex_candidates(
+        session,
+        artifact,
+        logger,
+        metrics,
+        download_context,
     )
 
-    args = parser.parse_args()
+    if openalex_result and openalex_result[0].is_pdf:
+        outcome, url = openalex_result
+        html_paths = artifact.metadata.get("openalex_html_paths", [])
+        entry = build_manifest_entry(
+            artifact,
+            resolver="openalex",
+            url=url,
+            outcome=outcome,
+            html_paths=html_paths,
+            dry_run=dry_run,
+        )
+        logger.log_manifest(entry)
+        result["saved"] = True
+        return result
 
-    if not args.topic and not args.topic_id:
-        parser.error("Provide --topic or --topic-id.")
+    html_paths_total = list(artifact.metadata.get("openalex_html_paths", []))
 
-    if args.mailto:
-        oa_config.email = args.mailto
+    pipeline_result = pipeline.run(session, artifact, context=download_context)
+    html_paths_total.extend(pipeline_result.html_paths)
 
-    topic_id = args.topic_id
-    if not topic_id and args.topic:
-        topic_id = resolve_topic_id_if_needed(args.topic)
+    if pipeline_result.success and pipeline_result.outcome:
+        entry = build_manifest_entry(
+            artifact,
+            resolver=pipeline_result.resolver_name,
+            url=pipeline_result.url,
+            outcome=pipeline_result.outcome,
+            html_paths=html_paths_total,
+            dry_run=dry_run,
+        )
+        logger.log_manifest(entry)
+        if pipeline_result.outcome.is_pdf:
+            result["saved"] = True
+        elif pipeline_result.outcome.classification == "html":
+            result["html_only"] = True
+        return result
 
-    query = build_query(
-        argparse.Namespace(
-            topic=args.topic,
-            topic_id=topic_id,
-            year_start=args.year_start,
-            year_end=args.year_end,
-            oa_only=args.oa_only,
+    reason = pipeline_result.reason or (
+        pipeline_result.outcome.error if pipeline_result.outcome else "no-resolver-success"
+    )
+    outcome = pipeline_result.outcome or DownloadOutcome(
+        classification="miss",
+        path=None,
+        http_status=None,
+        content_type=None,
+        elapsed_ms=None,
+        error=reason,
+    )
+    logger.log(
+        AttemptRecord(
+            work_id=artifact.work_id,
+            resolver_name="final",
+            resolver_order=None,
+            url=pipeline_result.url,
+            status=outcome.classification,
+            http_status=outcome.http_status,
+            content_type=outcome.content_type,
+            elapsed_ms=outcome.elapsed_ms,
+            reason=reason,
+            sha256=outcome.sha256,
+            content_length=outcome.content_length,
+            dry_run=dry_run,
         )
     )
 
-    pdf_dir = args.out
-    html_dir = args.html_out or (pdf_dir.parent / "HTML")
+    if html_paths_total:
+        result["html_only"] = True
 
-    ensure_dir(pdf_dir)
-    ensure_dir(html_dir)
-
-    # Resolver setup
-    resolvers = default_resolvers()
-    resolver_names = [resolver.name for resolver in resolvers]
-    resolver_order_override: Optional[List[str]] = None
-    if args.resolver_order:
-        resolver_order_override = [name.strip() for name in args.resolver_order.split(",") if name.strip()]
-        if not resolver_order_override:
-            parser.error("--resolver-order requires at least one resolver name.")
-        unknown = [name for name in resolver_order_override if name not in resolver_names]
-        if unknown:
-            parser.error(f"Unknown resolver(s) in --resolver-order: {', '.join(unknown)}")
-        resolver_order_override = resolver_order_override + [
-            name for name in resolver_names if name not in resolver_order_override
-        ]
-
-    config = load_resolver_config(args, resolver_names, resolver_order_override)
-
-    logger = CsvAttemptLogger(args.log_csv)
-    manifest_path = args.manifest or (pdf_dir / "manifest.jsonl")
-    manifest_logger = ManifestLogger(manifest_path)
-    metrics = ResolverMetrics()
-    pipeline = ResolverPipeline(
-        resolvers=resolvers,
-        config=config,
-        download_func=download_candidate,
-        logger=logger,
-        metrics=metrics,
+    entry = build_manifest_entry(
+        artifact,
+        resolver=pipeline_result.resolver_name,
+        url=pipeline_result.url,
+        outcome=outcome,
+        html_paths=html_paths_total,
+        dry_run=dry_run,
+        reason=reason,
     )
+    logger.log_manifest(entry)
+    return result
 
-    session = requests.Session()
-    session.headers.update(config.polite_headers)
 
-    processed = 0
-    saved = 0
-    html_only = 0
-    try:
-        for work in iterate_openalex(query, per_page=args.per_page, max_results=args.max):
+
+    def main() -> None:
+        logging.basicConfig(level=logging.INFO)
+        parser = argparse.ArgumentParser(
+            description="Download OpenAlex PDFs for a topic and year range with resolvers.",
+        )
+        parser.add_argument("--topic", type=str, help="Free-text topic search.")
+        parser.add_argument(
+            "--topic-id",
+            type=str,
+            help="OpenAlex Topic ID (e.g., https://openalex.org/T12345). Overrides --topic.",
+        )
+        parser.add_argument("--year-start", type=int, required=True, help="Start year (inclusive).")
+        parser.add_argument("--year-end", type=int, required=True, help="End year (inclusive).")
+        parser.add_argument("--out", type=Path, default=Path("./pdfs"), help="Output folder for PDFs.")
+        parser.add_argument(
+            "--html-out",
+            type=Path,
+            default=None,
+            help="Folder for HTML responses (default: sibling 'HTML').",
+        )
+        parser.add_argument("--mailto", type=str, default=None, help="Email for the OpenAlex polite pool.")
+        parser.add_argument("--per-page", type=int, default=200, help="Results per page (1-200).")
+        parser.add_argument("--max", type=int, default=None, help="Maximum works to process.")
+        parser.add_argument("--oa-only", action="store_true", help="Only consider open-access works.")
+        parser.add_argument("--sleep", type=float, default=0.05, help="Sleep seconds between works (sequential mode).")
+
+        # Resolver configuration
+        parser.add_argument("--resolver-config", type=str, default=None, help="Path to resolver config (YAML/JSON).")
+        parser.add_argument(
+            "--resolver-order",
+            type=str,
+            default=None,
+            help="Comma-separated resolver order override (e.g., 'unpaywall,crossref').",
+        )
+        parser.add_argument("--unpaywall-email", type=str, default=None, help="Override Unpaywall email credential.")
+        parser.add_argument("--core-api-key", type=str, default=None, help="CORE API key override.")
+        parser.add_argument(
+            "--semantic-scholar-api-key",
+            type=str,
+            default=None,
+            help="Semantic Scholar Graph API key override.",
+        )
+        parser.add_argument("--doaj-api-key", type=str, default=None, help="DOAJ API key override.")
+        parser.add_argument(
+            "--disable-resolver",
+            action="append",
+            default=[],
+            help="Disable a resolver by name (can be repeated).",
+        )
+        parser.add_argument(
+            "--max-resolver-attempts",
+            type=int,
+            default=None,
+            help="Maximum resolver attempts per work.",
+        )
+        parser.add_argument(
+            "--resolver-timeout",
+            type=float,
+            default=None,
+            help="Default timeout (seconds) for resolver HTTP requests.",
+        )
+        parser.add_argument(
+            "--log-path",
+            dest="log_jsonl",
+            type=Path,
+            default=None,
+            help="Path to JSONL attempts log (default: <out>/attempts.jsonl).",
+        )
+        parser.add_argument(
+            "--log-format",
+            choices=["jsonl", "csv"],
+            default="jsonl",
+            help="Log format for attempts (default: jsonl).",
+        )
+        parser.add_argument(
+            "--workers",
+            type=int,
+            default=1,
+            help="Number of parallel workers (default: 1 for sequential).",
+        )
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Measure resolver coverage without writing files.",
+        )
+        parser.add_argument(
+            "--resume-from",
+            type=Path,
+            default=None,
+            help="Resume from manifest JSONL log, skipping completed works.",
+        )
+        parser.add_argument(
+            "--extract-html-text",
+            action="store_true",
+            help="Extract plaintext from HTML fallbacks (requires trafilatura).",
+        )
+
+        args = parser.parse_args()
+
+        if args.workers < 1:
+            parser.error("--workers must be >= 1")
+        if not args.topic and not args.topic_id:
+            parser.error("Provide --topic or --topic-id.")
+
+        if args.mailto:
+            oa_config.email = args.mailto
+
+        topic_id = args.topic_id
+        if not topic_id and args.topic:
+            topic_id = resolve_topic_id_if_needed(args.topic)
+
+        query = build_query(
+            argparse.Namespace(
+                topic=args.topic,
+                topic_id=topic_id,
+                year_start=args.year_start,
+                year_end=args.year_end,
+                oa_only=args.oa_only,
+            )
+        )
+
+        pdf_dir = args.out
+        html_dir = args.html_out or (pdf_dir.parent / "HTML")
+        ensure_dir(pdf_dir)
+        ensure_dir(html_dir)
+
+        resolvers = default_resolvers()
+        resolver_names = [resolver.name for resolver in resolvers]
+        resolver_order_override: Optional[List[str]] = None
+        if args.resolver_order:
+            resolver_order_override = [name.strip() for name in args.resolver_order.split(",") if name.strip()]
+            if not resolver_order_override:
+                parser.error("--resolver-order requires at least one resolver name.")
+            unknown = [name for name in resolver_order_override if name not in resolver_names]
+            if unknown:
+                parser.error(f"Unknown resolver(s) in --resolver-order: {', '.join(unknown)}")
+            resolver_order_override = resolver_order_override + [
+                name for name in resolver_names if name not in resolver_order_override
+            ]
+
+        config = load_resolver_config(args, resolver_names, resolver_order_override)
+
+        json_log_path = args.log_jsonl or (pdf_dir / "attempts.jsonl")
+        if json_log_path.suffix != ".jsonl":
+            json_log_path = json_log_path.with_suffix(".jsonl")
+        base_logger = JsonlLogger(json_log_path)
+        if args.log_format == "csv":
+            csv_path = json_log_path.with_suffix(".csv")
+            attempt_logger = CsvAttemptLoggerAdapter(base_logger, csv_path)
+        else:
+            attempt_logger = base_logger
+
+        resume_lookup, resume_completed = load_previous_manifest(args.resume_from)
+        if args.resume_from:
+            clear_resolver_caches()
+        metrics = ResolverMetrics()
+        pipeline = ResolverPipeline(
+            resolvers=resolvers,
+            config=config,
+            download_func=download_candidate,
+            logger=attempt_logger,
+            metrics=metrics,
+        )
+
+        session_factory = lambda: _make_session_for_worker(config.polite_headers)
+
+        processed = 0
+        saved = 0
+        html_only = 0
+        skipped = 0
+
+        def record_result(res: Dict[str, Any]) -> None:
+            nonlocal processed, saved, html_only, skipped
             processed += 1
-            artifact = create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir)
-
-            if (artifact.pdf_dir / f"{artifact.base_stem}.pdf").exists():
-                existing_path = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
-                manifest_logger.log(
-                    {
-                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                        "work_id": artifact.work_id,
-                        "title": artifact.title,
-                        "publication_year": artifact.publication_year,
-                        "resolver": "existing",
-                        "url": None,
-                        "path": str(existing_path),
-                        "classification": "exists",
-                        "content_type": None,
-                        "reason": "already-downloaded",
-                        "html_paths": [],
-                    }
-                )
-                print(f"[skip] {artifact.base_stem}.pdf (exists)")
-                time.sleep(args.sleep)
-                continue
-
-            openalex_result = attempt_openalex_candidates(session, artifact, logger, metrics)
-            if openalex_result and openalex_result[0].is_pdf:
-                outcome, url = openalex_result
+            if res.get("saved"):
                 saved += 1
-                print(f"[ok]   {artifact.base_stem}.pdf ← openalex")
-                manifest_logger.log(
-                    {
-                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                        "work_id": artifact.work_id,
-                        "title": artifact.title,
-                        "publication_year": artifact.publication_year,
-                        "resolver": "openalex",
-                        "url": url,
-                        "path": outcome.path,
-                        "classification": outcome.classification,
-                        "content_type": outcome.content_type,
-                        "reason": outcome.error,
-                        "html_paths": artifact.metadata.get("openalex_html_paths", []),
-                    }
-                )
-                time.sleep(args.sleep)
-                continue
+            if res.get("html_only"):
+                html_only += 1
+            if res.get("skipped"):
+                skipped += 1
 
-            pipeline_result: PipelineResult = pipeline.run(session, artifact)
-            combined_html = list(pipeline_result.html_paths)
-            combined_html.extend(artifact.metadata.get("openalex_html_paths", []))
-            if pipeline_result.success and pipeline_result.outcome:
-                saved += 1
-                print(
-                    f"[ok]   {artifact.base_stem}.pdf ← {pipeline_result.resolver_name}"
-                )
-                manifest_logger.log(
-                    {
-                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                        "work_id": artifact.work_id,
-                        "title": artifact.title,
-                        "publication_year": artifact.publication_year,
-                        "resolver": pipeline_result.resolver_name,
-                        "url": pipeline_result.url,
-                        "path": pipeline_result.outcome.path,
-                        "classification": pipeline_result.outcome.classification,
-                        "content_type": pipeline_result.outcome.content_type,
-                        "reason": pipeline_result.outcome.error,
-                        "html_paths": combined_html,
-                    }
-                )
+        try:
+            if args.workers == 1:
+                session = session_factory()
+                try:
+                    for work in iterate_openalex(query, per_page=args.per_page, max_results=args.max):
+                        result = process_one_work(
+                            work,
+                            session,
+                            pdf_dir,
+                            html_dir,
+                            pipeline,
+                            attempt_logger,
+                            metrics,
+                            dry_run=args.dry_run,
+                            extract_html_text=args.extract_html_text,
+                            previous_lookup=resume_lookup,
+                            resume_completed=resume_completed,
+                        )
+                        record_result(result)
+                        if args.sleep > 0:
+                            time.sleep(args.sleep)
+                finally:
+                    session.close()
             else:
-                if combined_html:
-                    html_only += 1
-                    last_html = Path(combined_html[-1]).name if combined_html else ""
-                    print(
-                        f"[miss] {artifact.work_id} — HTML saved ({last_html})"
-                    )
-                else:
-                    reason = pipeline_result.reason or "no-resolver-success"
-                    print(f"[miss] {artifact.work_id} — {reason}")
-                logger.log(
-                    AttemptRecord(
-                        work_id=artifact.work_id,
-                        resolver_name="final",
-                        resolver_order=None,
-                        url=None,
-                        status="miss",
-                        http_status=None,
-                        content_type=None,
-                        elapsed_ms=None,
-                        reason=pipeline_result.reason or "no-resolver-success",
-                    )
-                )
-                manifest_logger.log(
-                    {
-                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                        "work_id": artifact.work_id,
-                        "title": artifact.title,
-                        "publication_year": artifact.publication_year,
-                        "resolver": pipeline_result.resolver_name,
-                        "url": pipeline_result.url,
-                        "path": pipeline_result.outcome.path if pipeline_result.outcome else None,
-                        "classification": pipeline_result.outcome.classification if pipeline_result.outcome else "miss",
-                        "content_type": pipeline_result.outcome.content_type if pipeline_result.outcome else None,
-                        "reason": pipeline_result.reason or (pipeline_result.outcome.error if pipeline_result.outcome else None),
-                        "html_paths": combined_html,
-                    }
-                )
+                with ThreadPoolExecutor(max_workers=args.workers) as executor:
+                    futures = []
 
-            time.sleep(args.sleep)
-    finally:
-        logger.close()
-        manifest_logger.close()
+                    def submit_work(work_item: Dict[str, Any]) -> None:
+                        def runner() -> Dict[str, Any]:
+                            session = session_factory()
+                            try:
+                                return process_one_work(
+                                    work_item,
+                                    session,
+                                    pdf_dir,
+                                    html_dir,
+                                    pipeline,
+                                    attempt_logger,
+                                    metrics,
+                                    dry_run=args.dry_run,
+                                    extract_html_text=args.extract_html_text,
+                                    previous_lookup=resume_lookup,
+                                    resume_completed=resume_completed,
+                                )
+                            finally:
+                                session.close()
 
-    summary = metrics.summary()
-    print(
-        f"\nDone. Processed {processed} works, saved {saved} PDFs, HTML-only {html_only}."
-    )
-    print("Resolver summary:")
-    for key, values in summary.items():
-        print(f"  {key}: {values}")
+                        futures.append(executor.submit(runner))
 
-    LOGGER.info(
-        "resolver_run_summary %s",
-        json.dumps(
-            {
-                "processed": processed,
-                "saved": saved,
-                "html_only": html_only,
-                "summary": summary,
-            },
-            sort_keys=True,
-        ),
-    )
+                    for work in iterate_openalex(query, per_page=args.per_page, max_results=args.max):
+                        submit_work(work)
+
+                    for future in as_completed(futures):
+                        record_result(future.result())
+        except Exception:
+            attempt_logger.close()
+            raise
+        else:
+            summary = metrics.summary()
+            attempt_logger.log_summary(
+                {
+                    "total_works": processed,
+                    "saved_pdfs": saved,
+                    "html_only": html_only,
+                    "skipped": skipped,
+                    "dry_run": args.dry_run,
+                    "metrics": summary,
+                }
+            )
+            attempt_logger.close()
+
+        print(
+            f"\nDone. Processed {processed} works, saved {saved} PDFs, HTML-only {html_only}, skipped {skipped}."
+        )
+        if args.dry_run:
+            print("DRY RUN: no files written, resolver coverage only.")
+        print("Resolver summary:")
+        for key, values in summary.items():
+            print(f"  {key}: {values}")
+
+        LOGGER.info(
+            "resolver_run_summary %s",
+            json.dumps(
+                {
+                    "processed": processed,
+                    "saved": saved,
+                    "html_only": html_only,
+                    "skipped": skipped,
+                    "summary": summary,
+                },
+                sort_keys=True,
+            ),
+        )
+
 
 
 if __name__ == "__main__":
