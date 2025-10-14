@@ -24,10 +24,27 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import urlparse, urlunparse
 
+import psutil
 import pooch
 import requests
 
 from .config import ConfigError, DownloadConfiguration
+
+
+def _log_memory(logger: logging.Logger, event: str) -> None:
+    is_enabled = getattr(logger, "isEnabledFor", None)
+    if callable(is_enabled):
+        enabled = is_enabled(logging.DEBUG)
+    else:  # pragma: no cover - fallback for stub loggers
+        enabled = False
+    if not enabled:
+        return
+    process = psutil.Process()
+    memory_mb = process.memory_info().rss / (1024 ** 2)
+    logger.debug(
+        "memory usage",
+        extra={"stage": "download", "event": event, "memory_mb": round(memory_mb, 2)},
+    )
 
 
 @dataclass(slots=True)
@@ -280,20 +297,32 @@ class StreamingDownloader(pooch.HTTPDownloader):
                         self.status = "updated"
                     response.raise_for_status()
                     length_header = response.headers.get("Content-Length")
+                    total_bytes: Optional[int] = None
+                    next_progress: Optional[float] = 0.1
                     if length_header:
+                        try:
+                            total_bytes = int(length_header)
+                        except ValueError:
+                            total_bytes = None
                         max_bytes = self.http_config.max_download_size_gb * (1024 ** 3)
-                        if int(length_header) > max_bytes:
+                        if total_bytes is not None and total_bytes > max_bytes:
                             self.logger.error(
                                 "file exceeds size limit",
                                 extra={
                                     "stage": "download",
-                                    "size": int(length_header),
+                                    "size": total_bytes,
                                     "limit": max_bytes,
                                 },
                             )
                             raise ConfigError(
-                                f"File size {int(length_header)} exceeds configured limit of {self.http_config.max_download_size_gb} GB"
+                                f"File size {total_bytes} exceeds configured limit of {self.http_config.max_download_size_gb} GB"
                             )
+                        if total_bytes:
+                            completed_fraction = resume_position / total_bytes
+                            if completed_fraction >= 1:
+                                next_progress = None
+                            else:
+                                next_progress = ((int(completed_fraction * 10)) + 1) / 10
                     self.response_etag = response.headers.get("ETag")
                     self.response_last_modified = response.headers.get("Last-Modified")
                     mode = "ab" if resume_position else "wb"
@@ -306,6 +335,23 @@ class StreamingDownloader(pooch.HTTPDownloader):
                                     continue
                                 fh.write(chunk)
                                 bytes_downloaded += len(chunk)
+                                if total_bytes and next_progress:
+                                    progress = bytes_downloaded / total_bytes
+                                    while next_progress and progress >= next_progress:
+                                        self.logger.info(
+                                            "download progress",
+                                            extra={
+                                                "stage": "download",
+                                                "status": "in-progress",
+                                                "progress": {
+                                                    "percent": round(min(progress, 1.0) * 100, 1)
+                                                },
+                                            },
+                                        )
+                                        next_progress += 0.1
+                                        if next_progress > 1:
+                                            next_progress = None
+                                            break
                                 if bytes_downloaded > self.http_config.max_download_size_gb * (1024 ** 3):
                                     self.logger.error(
                                         "download exceeded size limit",
@@ -380,6 +426,7 @@ def download_stream(
     bucket.consume()
 
     start_time = time.monotonic()
+    _log_memory(logger, "before")
     downloader = StreamingDownloader(
         destination=destination,
         headers=headers,
@@ -422,6 +469,7 @@ def download_stream(
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(cached_path, destination)
         sha256 = sha256_file(destination)
+        _log_memory(logger, "after")
         return DownloadResult(
             path=destination,
             status="cached",
@@ -465,6 +513,7 @@ def download_stream(
             "sha256": sha256,
         },
     )
+    _log_memory(logger, "after")
     return DownloadResult(
         path=destination,
         status=downloader.status,
