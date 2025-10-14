@@ -1,0 +1,107 @@
+"""Lightweight observability primitives for ingestion and retrieval."""
+from __future__ import annotations
+
+import logging
+import time
+from collections import defaultdict
+from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Dict, Iterable, Iterator, Mapping, MutableMapping, Optional, Tuple
+
+
+@dataclass
+class CounterSample:
+    name: str
+    labels: Mapping[str, str]
+    value: float
+
+
+@dataclass
+class HistogramSample:
+    name: str
+    labels: Mapping[str, str]
+    count: int
+    p50: float
+    p95: float
+    p99: float
+
+
+class MetricsCollector:
+    """In-memory metrics collector compatible with Prometheus-style summaries."""
+
+    def __init__(self) -> None:
+        self._counters: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], float] = defaultdict(float)
+        self._histograms: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], list[float]] = defaultdict(list)
+
+    def increment(self, name: str, amount: float = 1.0, **labels: str) -> None:
+        key = (name, tuple(sorted(labels.items())))
+        self._counters[key] += amount
+
+    def observe(self, name: str, value: float, **labels: str) -> None:
+        key = (name, tuple(sorted(labels.items())))
+        self._histograms[key].append(value)
+
+    def export_counters(self) -> Iterable[CounterSample]:
+        for (name, labels), value in self._counters.items():
+            yield CounterSample(name=name, labels=dict(labels), value=value)
+
+    def export_histograms(self) -> Iterable[HistogramSample]:
+        for (name, labels), samples in self._histograms.items():
+            sorted_samples = sorted(samples)
+            count = len(sorted_samples)
+            if count == 0:
+                continue
+            p50 = sorted_samples[int(0.5 * (count - 1))]
+            p95 = sorted_samples[int(0.95 * (count - 1))]
+            p99 = sorted_samples[int(0.99 * (count - 1))]
+            yield HistogramSample(name=name, labels=dict(labels), count=count, p50=p50, p95=p95, p99=p99)
+
+
+class TraceRecorder:
+    """Context manager producing timing spans for tracing."""
+
+    def __init__(self, metrics: MetricsCollector, logger: logging.Logger) -> None:
+        self._metrics = metrics
+        self._logger = logger
+
+    @contextmanager
+    def span(self, name: str, **attributes: str) -> Iterator[None]:
+        start = time.perf_counter()
+        try:
+            yield
+            status = "ok"
+        except Exception:
+            status = "error"
+            raise
+        finally:
+            duration_ms = (time.perf_counter() - start) * 1000
+            self._metrics.observe(f"trace_{name}_ms", duration_ms, **attributes)
+            payload = {"span": name, "duration_ms": round(duration_ms, 3), "status": status}
+            payload.update(attributes)
+            self._logger.info("hybrid-trace", extra={"event": payload})
+
+
+class Observability:
+    """Facade for metrics, structured logging, and tracing."""
+
+    def __init__(self, *, logger: Optional[logging.Logger] = None) -> None:
+        self._metrics = MetricsCollector()
+        self._logger = logger or logging.getLogger("DocsToKG.HybridSearch")
+        self._tracer = TraceRecorder(self._metrics, self._logger)
+
+    @property
+    def metrics(self) -> MetricsCollector:
+        return self._metrics
+
+    @property
+    def logger(self) -> logging.Logger:
+        return self._logger
+
+    def trace(self, name: str, **attributes: str) -> Iterator[None]:
+        return self._tracer.span(name, **attributes)
+
+    def metrics_snapshot(self) -> Dict[str, list[Mapping[str, object]]]:
+        counters = [sample.__dict__ for sample in self._metrics.export_counters()]
+        histograms = [sample.__dict__ for sample in self._metrics.export_histograms()]
+        return {"counters": counters, "histograms": histograms}
+
