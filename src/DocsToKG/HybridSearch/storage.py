@@ -128,14 +128,15 @@ class OpenSearchSimulator:
         top_k: int,
         cursor: Optional[int] = None,
     ) -> tuple[List[tuple[ChunkPayload, float]], Optional[int]]:
-        def score_chunk(stored: StoredChunk) -> float:
-            score = 0.0
-            for token, weight in query_weights.items():
-                if token in stored.payload.features.splade_weights:
-                    score += weight * stored.payload.features.splade_weights[token]
-            return float(score)
-
-        return self._search_sparse(score_chunk, filters, top_k, cursor)
+        return self._search_sparse(
+            lambda stored: sum(
+                weight * stored.payload.features.splade_weights.get(token, 0.0)
+                for token, weight in query_weights.items()
+            ),
+            filters,
+            top_k,
+            cursor,
+        )
 
     def highlight(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
         highlights: List[str] = []
