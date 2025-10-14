@@ -1,6 +1,6 @@
 ## 1. Setup and Dependencies
 
-- [ ] 1.1 Add dependencies to requirements.txt or pyproject.toml with these EXACT version constraints:
+- [x] 1.1 Add dependencies to requirements.txt or pyproject.toml with these EXACT version constraints:
 
   ```
   bioregistry>=0.10.0
@@ -17,7 +17,7 @@
   requests>=2.28.0
   ```
 
-- [ ] 1.2 Create module structure under src/DocsToKG/OntologyDownload/ with these EXACT files:
+- [x] 1.2 Create module structure under src/DocsToKG/OntologyDownload/ with these EXACT files:
   - `__init__.py` (exports: fetch_one, fetch_all, FetchSpec, FetchResult)
   - `core.py` (dataclasses: FetchSpec, FetchPlan, FetchResult, Manifest; protocol: Resolver)
   - `resolvers.py` (classes: OBOResolver, OLSResolver, BioPortalResolver, SKOSResolver, XBRLResolver, RESOLVERS dict)
@@ -26,8 +26,8 @@
   - `config.py` (functions: load_config, validate_config, merge_defaults, get_env_overrides)
   - `logging_config.py` (functions: setup_logging, mask_sensitive_data, generate_correlation_id)
   - `cli.py` (main entry point with argparse/Click: pull, show, validate subcommands)
-- [ ] 1.3 Create pystow directory structure initialization in core.py using pystow.join('ontology-fetcher') with subdirs: configs/, cache/, logs/, ontologies/; use .mkdir(parents=True, exist_ok=True)
-- [ ] 1.4 Create example sources.yaml with COMPLETE commented examples:
+- [x] 1.3 Create pystow directory structure initialization in core.py using pystow.join('ontology-fetcher') with subdirs: configs/, cache/, logs/, ontologies/; use .mkdir(parents=True, exist_ok=True)
+- [x] 1.4 Create example sources.yaml with COMPLETE commented examples:
 
   ```yaml
   defaults:
@@ -66,55 +66,55 @@
 
 ## 2. Core Data Models
 
-- [ ] 2.1 Implement FetchSpec dataclass with fields: id, resolver, extras, target_formats
-- [ ] 2.2 Implement FetchPlan dataclass with fields: url, headers, filename_hint, version, license, media_type
-- [ ] 2.3 Implement FetchResult dataclass with fields: local_path, status, etag, last_modified, sha256
-- [ ] 2.4 Implement Manifest dataclass for provenance with fields: id, resolver, url, filename, version, license, status, sha256, etag, last_modified, downloaded_at, target_formats
-- [ ] 2.5 Define Resolver protocol interface with plan() method signature
+- [x] 2.1 Implement FetchSpec dataclass with fields: id, resolver, extras, target_formats
+- [x] 2.2 Implement FetchPlan dataclass with fields: url, headers, filename_hint, version, license, media_type
+- [x] 2.3 Implement FetchResult dataclass with fields: local_path, status, etag, last_modified, sha256
+- [x] 2.4 Implement Manifest dataclass for provenance with fields: id, resolver, url, filename, version, license, status, sha256, etag, last_modified, downloaded_at, target_formats
+- [x] 2.5 Define Resolver protocol interface with plan() method signature
 
 ## 3. Resolver Implementations
 
-- [ ] 3.1 Implement OBOResolver using Bioregistry (get_owl_download, get_obo_download, get_rdf_download) with format fallback logic
-- [ ] 3.2 Implement OLSResolver using ols-client to query OLS4 API and retrieve ontology metadata/download URLs
-- [ ] 3.3 Implement BioPortalResolver using ontoportal-client to fetch latest submission URLs with API key from pystow
-- [ ] 3.4 Implement SKOSResolver for direct URL-based SKOS thesauri
-- [ ] 3.5 Implement XBRLResolver for XBRL taxonomy ZIP packages
-- [ ] 3.6 Create resolver registry dictionary mapping resolver names to instances
+- [x] 3.1 Implement OBOResolver using Bioregistry (get_owl_download, get_obo_download, get_rdf_download) with format fallback logic
+- [x] 3.2 Implement OLSResolver using ols-client to query OLS4 API and retrieve ontology metadata/download URLs
+- [x] 3.3 Implement BioPortalResolver using ontoportal-client to fetch latest submission URLs with API key from pystow
+- [x] 3.4 Implement SKOSResolver for direct URL-based SKOS thesauri
+- [x] 3.5 Implement XBRLResolver for XBRL taxonomy ZIP packages
+- [x] 3.6 Create resolver registry dictionary mapping resolver names to instances
 - [ ] 3.7 Add unit tests for each resolver with mocked library responses
 
 ## 4. Download Manager
 
-- [ ] 4.1 Implement sha256_file() utility function for computing file hashes
-- [ ] 4.2 Implement download_stream() using pooch with stream-to-.part pattern
-- [ ] 4.3 Add ETag/Last-Modified conditional request headers from previous manifest
-- [ ] 4.4 Implement HTTP 304 cache hit detection and early return
-- [ ] 4.5 Add Range request support for partial resume on interruption
-- [ ] 4.6 Implement exponential backoff retry with configurable max_retries (default 5) and backoff_factor (default 0.5)
-- [ ] 4.7 Add per-host rate limiting using token bucket algorithm (default 4 req/sec)
-- [ ] 4.8 Add SHA-256 verification on completed downloads
-- [ ] 4.9 Add structured logging for HTTP status, elapsed time, retry count, cache hit/miss
+- [x] 4.1 Implement sha256_file() utility function for computing file hashes
+- [x] 4.2 Implement download_stream() using pooch with stream-to-.part pattern
+- [x] 4.3 Add ETag/Last-Modified conditional request headers from previous manifest
+- [x] 4.4 Implement HTTP 304 cache hit detection and early return
+- [x] 4.5 Add Range request support for partial resume on interruption
+- [x] 4.6 Implement exponential backoff retry with configurable max_retries (default 5) and backoff_factor (default 0.5)
+- [x] 4.7 Add per-host rate limiting using token bucket algorithm (default 4 req/sec)
+- [x] 4.8 Add SHA-256 verification on completed downloads
+- [x] 4.9 Add structured logging for HTTP status, elapsed time, retry count, cache hit/miss
 - [ ] 4.10 Create test fixture: local HTTP server supporting ETag, Last-Modified, Range headers for download tests
 
 ## 5. Validation Pipeline
 
-- [ ] 5.1 Implement RDFLib validator: Graph.parse() with triple count recording and error capture
-- [ ] 5.2 Add RDFLib Turtle normalization (serialize to normalized/)
-- [ ] 5.3 Implement Pronto validator: Ontology() load with term count recording and error capture
-- [ ] 5.4 Add Pronto OBO Graph JSON export (to normalized/)
-- [ ] 5.5 Implement Owlready2 validator: get_ontology().load() with error capture
-- [ ] 5.6 Add optional ROBOT integration: runtime detection via shutil.which('robot')
-- [ ] 5.7 Implement ROBOT convert subprocess call for format conversions
-- [ ] 5.8 Implement ROBOT report subprocess call for SPARQL QC checks
-- [ ] 5.9 Implement Arelle validator for XBRL taxonomy packages with JSON result export
-- [ ] 5.10 Write validation results to validation/<parser>_parse.json
+- [x] 5.1 Implement RDFLib validator: Graph.parse() with triple count recording and error capture
+- [x] 5.2 Add RDFLib Turtle normalization (serialize to normalized/)
+- [x] 5.3 Implement Pronto validator: Ontology() load with term count recording and error capture
+- [x] 5.4 Add Pronto OBO Graph JSON export (to normalized/)
+- [x] 5.5 Implement Owlready2 validator: get_ontology().load() with error capture
+- [x] 5.6 Add optional ROBOT integration: runtime detection via shutil.which('robot')
+- [x] 5.7 Implement ROBOT convert subprocess call for format conversions
+- [x] 5.8 Implement ROBOT report subprocess call for SPARQL QC checks
+- [x] 5.9 Implement Arelle validator for XBRL taxonomy packages with JSON result export
+- [x] 5.10 Write validation results to validation/<parser>_parse.json
 - [ ] 5.11 Create mini-ontology test fixtures (5-10 terms) in Turtle, OBO, OWL for parser tests
 
 ## 6. Storage and Manifests
 
-- [ ] 6.1 Implement directory creation for ontologies/<id>/<version>/{original,normalized,validation}
-- [ ] 6.2 Implement manifest.json write with comprehensive provenance fields
-- [ ] 6.3 Implement manifest.json read for cache invalidation decisions (ETag/Last-Modified)
-- [ ] 6.4 Add version resolution logic (use provided version or generate from timestamp)
+- [x] 6.1 Implement directory creation for ontologies/<id>/<version>/{original,normalized,validation}
+- [x] 6.2 Implement manifest.json write with comprehensive provenance fields
+- [x] 6.3 Implement manifest.json read for cache invalidation decisions (ETag/Last-Modified)
+- [x] 6.4 Add version resolution logic (use provided version or generate from timestamp)
 - [ ] 6.5 Implement safe ZIP extraction with path validation for XBRL taxonomies
 - [ ] 6.6 Add manifest validation and schema checks
 
@@ -202,30 +202,30 @@
 
 ## 14. Security Implementation
 
-- [ ] 14.1 In download.py, create validate_url_security(url: str) function that:
+- [x] 14.1 In download.py, create validate_url_security(url: str) function that:
   - Parses URL with urllib.parse
   - Checks scheme is https:// (warn if http://, upgrade to https://)
   - Extracts hostname, resolves to IP with socket.gethostbyname()
   - Rejects private IP ranges: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, ::1, fc00::/7
   - Returns validated URL or raises SecurityError
-- [ ] 14.2 In download.py, enable TLS certificate verification: use requests.get(url, verify=True) always; catch requests.exceptions.SSLError with clear message about invalid certificate
-- [ ] 14.3 In download.py, create sanitize_filename(filename: str) -> str that:
+- [x] 14.2 In download.py, enable TLS certificate verification: use requests.get(url, verify=True) always; catch requests.exceptions.SSLError with clear message about invalid certificate
+- [x] 14.3 In download.py, create sanitize_filename(filename: str) -> str that:
   - Removes path separators (os.sep, os.altsep, '/', '\\')
   - Removes leading dots and special chars
   - Limits length to 255 chars
   - Logs warning if sanitization occurred: "Sanitized unsafe filename: <original> -> <safe>"
-- [ ] 14.4 In logging_config.py, create mask_sensitive_data(log_record: dict) -> dict that:
+- [x] 14.4 In logging_config.py, create mask_sensitive_data(log_record: dict) -> dict that:
   - Searches for 'Authorization', 'apikey', 'api_key', 'password', 'token' keys (case-insensitive)
   - Replaces values with "***masked***"
   - Returns sanitized record
-- [ ] 14.5 In download.py, enforce max file size: check Content-Length header before download; if > config.http.max_download_size_gb * 1024³, log error "File exceeds max_download_size: <size> > <limit>", skip download
+- [x] 14.5 In download.py, enforce max file size: check Content-Length header before download; if > config.http.max_download_size_gb * 1024³, log error "File exceeds max_download_size: <size> > <limit>", skip download
 - [ ] 14.6 In validators.py for XBRL, before ZIP extraction:
   - Call zipfile.is_zipfile() to verify
   - Check compressed vs uncompressed size ratio (<10x)
   - Validate all member paths don't contain ".." or start with "/"
   - Extract to temp dir first, then move to final location
-- [ ] 14.7 Call validate_url_security() before every download in download_stream()
-- [ ] 14.8 Apply mask_sensitive_data() to all log records in logging_config.py formatter
+- [x] 14.7 Call validate_url_security() before every download in download_stream()
+- [x] 14.8 Apply mask_sensitive_data() to all log records in logging_config.py formatter
 
 ## 15. Performance and Resource Management
 
@@ -293,7 +293,7 @@
       logging: LoggingConfig = field(default_factory=LoggingConfig)
   ```
 
-- [ ] 16.2 In config.py, implement get_env_overrides() that checks for ONTOFETCH_* env vars:
+- [x] 16.2 In config.py, implement get_env_overrides() that checks for ONTOFETCH_* env vars:
   - ONTOFETCH_MAX_RETRIES -> defaults.http.max_retries
   - ONTOFETCH_TIMEOUT_SEC -> defaults.http.timeout_sec
   - ONTOFETCH_LOG_LEVEL -> defaults.logging.level
