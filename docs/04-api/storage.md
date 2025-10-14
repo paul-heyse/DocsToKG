@@ -28,6 +28,10 @@ In-memory storage simulators for OpenSearch and chunk registry.
 
 *No documentation available.*
 
+### `vector_ids(self)`
+
+*No documentation available.*
+
 ### `bulk_upsert(self, chunks)`
 
 *No documentation available.*
@@ -41,6 +45,14 @@ In-memory storage simulators for OpenSearch and chunk registry.
 *No documentation available.*
 
 ### `vector_ids(self)`
+
+*No documentation available.*
+
+### `register_template(self, template)`
+
+*No documentation available.*
+
+### `template_for(self, namespace)`
 
 *No documentation available.*
 

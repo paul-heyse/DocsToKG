@@ -252,7 +252,11 @@ class HybridSearchValidator:
 
 def main(argv: Optional[Sequence[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Hybrid search validation harness")
-    parser.add_argument("--dataset", required=True, help="Path to JSONL dataset")
+    parser.add_argument(
+        "--dataset",
+        default="tests/data/real_hybrid_dataset/dataset.jsonl",
+        help="Path to JSONL dataset (defaults to real fixture at tests/data/real_hybrid_dataset/dataset.jsonl). Use tests/data/hybrid_dataset.jsonl for the synthetic suite.",
+    )
     parser.add_argument("--config", required=True, help="Path to hybrid search config JSON")
     parser.add_argument("--output", default=None, help="Optional output directory for reports")
     args = parser.parse_args(argv)
@@ -292,4 +296,3 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entrypoint
     main()
-

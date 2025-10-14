@@ -17,7 +17,9 @@ logger = logging.getLogger(__name__)
 try:  # pragma: no cover - import tested indirectly
     import faiss  # type: ignore
 
-    _FAISS_AVAILABLE = True
+    _FAISS_AVAILABLE = all(
+        hasattr(faiss, attr) for attr in ("IndexFlatIP", "IndexIDMap2", "IDSelectorArray")
+    )
 except Exception:  # pragma: no cover - environment without GPU/FAISS deps
     faiss = None  # type: ignore
     _FAISS_AVAILABLE = False
@@ -42,6 +44,7 @@ class FaissIndexManager:
         self._index = self._create_index() if self._use_native else None
         self._id_lookup: Dict[int, str] = {}
         self._vectors: Dict[str, np.ndarray] = {}
+        self._remove_fallbacks = 0
 
     @property
     def ntotal(self) -> int:
@@ -152,6 +155,7 @@ class FaissIndexManager:
         return {
             "ntotal": float(self.ntotal),
             "index_type": self._config.index_type,
+            "gpu_remove_fallbacks": float(self._remove_fallbacks),
         }
 
     def _create_index(self) -> "faiss.Index":
@@ -226,10 +230,19 @@ class FaissIndexManager:
             selector = faiss.IDSelectorArray(id_array.size, faiss.swig_ptr(id_array))
         except AttributeError:
             selector = faiss.IDSelectorBatch(id_array)
-        self._index.remove_ids(selector)
+        try:
+            self._index.remove_ids(selector)
+        except RuntimeError as exc:
+            message = str(exc).lower()
+            if "remove_ids not implemented" not in message:
+                raise
+            logger.warning("FAISS remove_ids not implemented on GPU index, falling back to CPU")
+            self._remove_fallbacks += 1
+            cpu_index = self._to_cpu(self._index)
+            cpu_index.remove_ids(selector)
+            self._index = self._maybe_to_gpu(cpu_index)
 
     def _normalize(self, matrix: np.ndarray) -> None:
         norms = np.linalg.norm(matrix, axis=1, keepdims=True)
         norms[norms == 0.0] = 1.0
         matrix /= norms
-

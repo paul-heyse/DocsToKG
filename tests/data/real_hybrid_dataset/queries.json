@@ -1,0 +1,20 @@
+[
+  {
+    "doc_id": "2025__Effects_of_balance_physical_therapy_with_or_without_cognitive_training_in_adults__W4414700851",
+    "namespace": "real-fixture",
+    "query": "risk of bias assessment",
+    "expected_doc_id": "2025__Effects_of_balance_physical_therapy_with_or_without_cognitive_training_in_adults__W4414700851"
+  },
+  {
+    "doc_id": "2025__Physical_Activity_and_the_Myokine_Irisin_in_Non-pharmacological_Treatment_of_Alz__W4413367152",
+    "namespace": "real-fixture",
+    "query": "physical activity and the myokine irisin",
+    "expected_doc_id": "2025__Physical_Activity_and_the_Myokine_Irisin_in_Non-pharmacological_Treatment_of_Alz__W4413367152"
+  },
+  {
+    "doc_id": "2025__Relationship_between_caregiving_burden_and_alterations_in_circadian_rhythms_amon__W4413471237",
+    "namespace": "real-fixture",
+    "query": "relationship between caregiving burden and alterations",
+    "expected_doc_id": "2025__Relationship_between_caregiving_burden_and_alterations_in_circadian_rhythms_amon__W4413471237"
+  }
+]

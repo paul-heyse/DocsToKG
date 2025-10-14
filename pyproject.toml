@@ -16,3 +16,8 @@ extend-select = ["I"]
 [tool.mypy]
 python_version = "3.13"
 strict = true
+
+[tool.pytest.ini_options]
+markers = [
+    "real_vectors: tests that require the real-vector fixture (enable with --real-vectors)",
+]

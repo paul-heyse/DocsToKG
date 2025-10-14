@@ -72,6 +72,10 @@ FAISS index management with GPU-aware fallbacks.
 
 *No documentation available.*
 
+### `_normalize(self, matrix)`
+
+*No documentation available.*
+
 ## Classes
 
 ### `FaissSearchResult`
