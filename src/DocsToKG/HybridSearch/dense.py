@@ -1,6 +1,8 @@
 """FAISS index management with GPU-aware fallbacks."""
 from __future__ import annotations
 
+import io
+import json
 import logging
 import uuid
 from dataclasses import dataclass
@@ -14,8 +16,11 @@ logger = logging.getLogger(__name__)
 
 try:  # pragma: no cover - import tested indirectly
     import faiss  # type: ignore
-except ModuleNotFoundError as exc:  # pragma: no cover
-    raise RuntimeError("faiss module is required for dense retrieval") from exc
+
+    _FAISS_AVAILABLE = True
+except Exception:  # pragma: no cover - environment without GPU/FAISS deps
+    faiss = None  # type: ignore
+    _FAISS_AVAILABLE = False
 
 
 @dataclass(slots=True)
@@ -32,19 +37,25 @@ class FaissIndexManager:
     def __init__(self, dim: int, config: DenseIndexConfig) -> None:
         self._dim = dim
         self._config = config
-        self._gpu_resources = self._init_gpu_resources()
-        self._index = self._create_index()
+        self._use_native = _FAISS_AVAILABLE
+        self._gpu_resources = self._init_gpu_resources() if self._use_native else None
+        self._index = self._create_index() if self._use_native else None
         self._id_lookup: Dict[int, str] = {}
+        self._vectors: Dict[str, np.ndarray] = {}
 
     @property
     def ntotal(self) -> int:
-        return int(self._index.ntotal)
+        if self._use_native and self._index is not None:
+            return int(self._index.ntotal)
+        return len(self._vectors)
 
     @property
     def config(self) -> DenseIndexConfig:
         return self._config
 
     def train(self, vectors: Sequence[np.ndarray]) -> None:
+        if not self._use_native or self._index is None:
+            return
         if not hasattr(self._index, "is_trained"):
             return
         if getattr(self._index, "is_trained"):
@@ -56,7 +67,7 @@ class FaissIndexManager:
         self._index.train(matrix)
 
     def needs_training(self) -> bool:
-        if not hasattr(self._index, "is_trained"):
+        if not self._use_native or self._index is None:
             return False
         return not bool(getattr(self._index, "is_trained"))
 
@@ -66,42 +77,76 @@ class FaissIndexManager:
         if not vectors:
             return
         matrix = np.stack([self._ensure_dim(vec) for vec in vectors]).astype(np.float32)
-        faiss.normalize_L2(matrix)
-        ids = np.array([self._uuid_to_int64(vid) for vid in vector_ids], dtype=np.int64)
-        self._remove_ids(ids)
-        self._index.add_with_ids(matrix, ids)
-        for internal_id, vector_id in zip(ids, vector_ids):
-            self._id_lookup[int(internal_id)] = vector_id
+        faiss.normalize_L2(matrix) if self._use_native else self._normalize(matrix)
+        if self._use_native and self._index is not None:
+            ids = np.array([self._uuid_to_int64(vid) for vid in vector_ids], dtype=np.int64)
+            self._remove_ids(ids)
+            self._index.add_with_ids(matrix, ids)
+            for internal_id, vector_id in zip(ids, vector_ids):
+                self._id_lookup[int(internal_id)] = vector_id
+        else:
+            for vector, vector_id in zip(matrix, vector_ids):
+                self._vectors[vector_id] = vector.copy()
 
     def remove(self, vector_ids: Sequence[str]) -> None:
         if not vector_ids:
             return
-        ids = np.array([self._uuid_to_int64(vid) for vid in vector_ids], dtype=np.int64)
-        self._remove_ids(ids)
-        for internal_id in ids:
-            self._id_lookup.pop(int(internal_id), None)
+        if self._use_native and self._index is not None:
+            ids = np.array([self._uuid_to_int64(vid) for vid in vector_ids], dtype=np.int64)
+            self._remove_ids(ids)
+            for internal_id in ids:
+                self._id_lookup.pop(int(internal_id), None)
+        else:
+            for vector_id in vector_ids:
+                self._vectors.pop(vector_id, None)
 
     def search(self, query: np.ndarray, top_k: int) -> List[FaissSearchResult]:
         query_matrix = self._ensure_dim(query).reshape(1, -1).astype(np.float32)
-        faiss.normalize_L2(query_matrix)
-        scores, ids = self._index.search(query_matrix, top_k)
+        faiss.normalize_L2(query_matrix) if self._use_native else self._normalize(query_matrix)
+        if self._use_native and self._index is not None:
+            scores, ids = self._index.search(query_matrix, top_k)
+            results: List[FaissSearchResult] = []
+            for score, internal_id in zip(scores[0], ids[0]):
+                if internal_id == -1:
+                    continue
+                vector_id = self._id_lookup.get(int(internal_id))
+                if vector_id is None:
+                    continue
+                results.append(FaissSearchResult(vector_id=vector_id, score=float(score)))
+            return results
         results: List[FaissSearchResult] = []
-        for score, internal_id in zip(scores[0], ids[0]):
-            if internal_id == -1:
-                continue
-            vector_id = self._id_lookup.get(int(internal_id))
-            if vector_id is None:
-                continue
-            results.append(FaissSearchResult(vector_id=vector_id, score=float(score)))
+        if not self._vectors:
+            return results
+        query_vec = query_matrix[0]
+        all_items = [
+            (vector_id, float(np.dot(query_vec, stored)))
+            for vector_id, stored in self._vectors.items()
+        ]
+        all_items.sort(key=lambda item: item[1], reverse=True)
+        for vector_id, score in all_items[:top_k]:
+            results.append(FaissSearchResult(vector_id=vector_id, score=score))
         return results
 
     def serialize(self) -> bytes:
-        cpu_index = self._to_cpu(self._index)
-        return faiss.serialize_index(cpu_index)
+        if self._use_native and self._index is not None:
+            cpu_index = self._to_cpu(self._index)
+            return faiss.serialize_index(cpu_index)
+        buffer = io.BytesIO()
+        payload = {vector_id: vector.tolist() for vector_id, vector in self._vectors.items()}
+        buffer.write(json.dumps(payload).encode("utf-8"))
+        return buffer.getvalue()
 
     def restore(self, payload: bytes) -> None:
-        cpu_index = faiss.deserialize_index(payload)
-        self._index = self._maybe_to_gpu(cpu_index)
+        if self._use_native:
+            cpu_index = faiss.deserialize_index(payload)
+            self._index = self._maybe_to_gpu(cpu_index)
+            self._id_lookup = {}
+        else:
+            data = json.loads(payload.decode("utf-8"))
+            self._vectors = {
+                vector_id: np.array(values, dtype=np.float32)
+                for vector_id, values in data.items()
+            }
 
     def stats(self) -> Dict[str, float | str]:
         return {
@@ -110,6 +155,8 @@ class FaissIndexManager:
         }
 
     def _create_index(self) -> "faiss.Index":
+        if not self._use_native:
+            return None
         if self._config.index_type == "flat":
             base_index = faiss.IndexFlatIP(self._dim)
         elif self._config.index_type == "ivf_flat":
@@ -133,7 +180,7 @@ class FaissIndexManager:
         return self._maybe_to_gpu(index)
 
     def _maybe_to_gpu(self, index: "faiss.Index") -> "faiss.Index":
-        if self._gpu_resources is None:
+        if not self._use_native or self._gpu_resources is None:
             return index
         try:
             gpu_index = faiss.index_cpu_to_gpu(self._gpu_resources, 0, index)
@@ -144,6 +191,8 @@ class FaissIndexManager:
             return index
 
     def _to_cpu(self, index: "faiss.Index") -> "faiss.Index":
+        if not self._use_native:
+            return index
         if hasattr(faiss, "index_gpu_to_cpu"):
             try:
                 return faiss.index_gpu_to_cpu(index)
@@ -152,7 +201,7 @@ class FaissIndexManager:
         return index
 
     def _init_gpu_resources(self) -> "faiss.StandardGpuResources | None":
-        if not hasattr(faiss, "StandardGpuResources"):
+        if not self._use_native or not hasattr(faiss, "StandardGpuResources"):
             return None
         try:
             resources = faiss.StandardGpuResources()
@@ -170,7 +219,7 @@ class FaissIndexManager:
         return uuid.UUID(value).int & ((1 << 63) - 1)
 
     def _remove_ids(self, ids: np.ndarray) -> None:
-        if ids.size == 0:
+        if not self._use_native or self._index is None or ids.size == 0:
             return
         id_array = ids.astype(np.int64)
         try:
@@ -178,4 +227,9 @@ class FaissIndexManager:
         except AttributeError:
             selector = faiss.IDSelectorBatch(id_array)
         self._index.remove_ids(selector)
+
+    def _normalize(self, matrix: np.ndarray) -> None:
+        norms = np.linalg.norm(matrix, axis=1, keepdims=True)
+        norms[norms == 0.0] = 1.0
+        matrix /= norms
 

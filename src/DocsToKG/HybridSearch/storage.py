@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 
 from .tokenization import tokenize
 from .types import ChunkPayload
+
+if TYPE_CHECKING:  # pragma: no cover - import guard for type checking only
+    from .schema import OpenSearchIndexTemplate
 
 
 @dataclass(slots=True)
@@ -43,6 +46,9 @@ class ChunkRegistry:
     def count(self) -> int:
         return len(self._chunks)
 
+    def vector_ids(self) -> List[str]:
+        return list(self._chunks.keys())
+
 
 class OpenSearchSimulator:
     """Subset of OpenSearch capabilities required for hybrid retrieval tests."""
@@ -50,6 +56,7 @@ class OpenSearchSimulator:
     def __init__(self) -> None:
         self._chunks: Dict[str, StoredChunk] = {}
         self._avg_length: float = 0.0
+        self._templates: Dict[str, "OpenSearchIndexTemplate"] = {}
 
     def bulk_upsert(self, chunks: Sequence[ChunkPayload]) -> None:
         for chunk in chunks:
@@ -66,6 +73,12 @@ class OpenSearchSimulator:
 
     def vector_ids(self) -> List[str]:
         return list(self._chunks.keys())
+
+    def register_template(self, template: "OpenSearchIndexTemplate") -> None:
+        self._templates[template.namespace] = template
+
+    def template_for(self, namespace: str) -> Optional["OpenSearchIndexTemplate"]:
+        return self._templates.get(namespace)
 
     def search_bm25(
         self,

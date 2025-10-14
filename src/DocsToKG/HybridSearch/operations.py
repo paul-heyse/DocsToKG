@@ -29,16 +29,17 @@ def build_stats_snapshot(
 
 
 def verify_pagination(service: HybridSearchService, request: HybridSearchRequest) -> PaginationCheckResult:
-    seen: set[str] = set()
+    seen: set[tuple[str, str]] = set()
     cursor_chain: list[str] = []
     next_request = request
     duplicate = False
     while True:
         response = service.search(next_request)
         for result in response.results:
-            if result.chunk_id in seen:
+            key = (result.doc_id, result.chunk_id)
+            if key in seen:
                 duplicate = True
-            seen.add(result.chunk_id)
+            seen.add(key)
         if not response.next_cursor:
             break
         cursor_chain.append(response.next_cursor)

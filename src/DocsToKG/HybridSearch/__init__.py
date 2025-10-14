@@ -1,12 +1,14 @@
 """Hybrid retrieval module for DocsToKG."""
 from __future__ import annotations
 
+from .api import HybridSearchAPI
 from .config import HybridSearchConfig, HybridSearchConfigManager
 from .dense import FaissIndexManager
 from .features import FeatureGenerator
 from .fusion import ReciprocalRankFusion, apply_mmr_diversification
 from .ingest import ChunkIngestionPipeline
 from .observability import Observability
+from .schema import OpenSearchIndexTemplate, OpenSearchSchemaManager
 from .operations import (
     PaginationCheckResult,
     build_stats_snapshot,
@@ -27,6 +29,7 @@ from .validation import HybridSearchValidator
 
 __all__ = [
     "ChunkIngestionPipeline",
+    "HybridSearchAPI",
     "FeatureGenerator",
     "FaissIndexManager",
     "HybridSearchConfig",
@@ -36,6 +39,8 @@ __all__ = [
     "HybridSearchResult",
     "HybridSearchService",
     "HybridSearchValidator",
+    "OpenSearchSchemaManager",
+    "OpenSearchIndexTemplate",
     "ReciprocalRankFusion",
     "apply_mmr_diversification",
     "ChunkPayload",

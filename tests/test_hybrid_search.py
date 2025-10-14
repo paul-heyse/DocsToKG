@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import json
+from http import HTTPStatus
 from pathlib import Path
-from typing import Callable, Iterable, List, Mapping, Sequence
+from typing import Callable, List, Mapping, Sequence
 
 import pytest
 
 from DocsToKG.HybridSearch import (
     ChunkIngestionPipeline,
+    HybridSearchAPI,
     DocumentInput,
     FeatureGenerator,
     HybridSearchConfigManager,
@@ -15,11 +17,18 @@ from DocsToKG.HybridSearch import (
     HybridSearchService,
     HybridSearchValidator,
     Observability,
+    OpenSearchSchemaManager,
+    build_stats_snapshot,
+    restore_state,
+    serialize_state,
+    should_rebuild_index,
+    verify_pagination,
 )
 from DocsToKG.HybridSearch.dense import FaissIndexManager
 from DocsToKG.HybridSearch.storage import ChunkRegistry, OpenSearchSimulator
 from DocsToKG.HybridSearch.validation import load_dataset
 from DocsToKG.HybridSearch.tokenization import tokenize
+from DocsToKG.HybridSearch.ingest import IngestError
 from uuid import NAMESPACE_URL, uuid5
 
 
@@ -42,13 +51,21 @@ def dataset() -> Sequence[Mapping[str, object]]:
 @pytest.fixture
 def stack(
     tmp_path: Path,
-) -> Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FeatureGenerator]]:
+) -> Callable[[], tuple[
+    ChunkIngestionPipeline,
+    HybridSearchService,
+    ChunkRegistry,
+    HybridSearchValidator,
+    FeatureGenerator,
+    OpenSearchSimulator,
+]]:
     def factory() -> tuple[
         ChunkIngestionPipeline,
         HybridSearchService,
         ChunkRegistry,
         HybridSearchValidator,
         FeatureGenerator,
+        OpenSearchSimulator,
     ]:
         manager = _build_config(tmp_path)
         config = manager.get()
@@ -77,7 +94,7 @@ def stack(
             registry=registry,
             opensearch=opensearch,
         )
-        return ingestion, service, registry, validator, feature_generator
+        return ingestion, service, registry, validator, feature_generator, opensearch
 
     return factory
 
@@ -163,10 +180,10 @@ def _write_document_artifacts(
 
 
 def test_hybrid_retrieval_end_to_end(
-    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FeatureGenerator]],
+    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FeatureGenerator, OpenSearchSimulator]],
     dataset: Sequence[Mapping[str, object]],
 ) -> None:
-    ingestion, service, registry, _, _ = stack()
+    ingestion, service, registry, _, _, _ = stack()
     documents = _to_documents(dataset)
     ingestion.upsert_documents(documents)
 
@@ -185,10 +202,10 @@ def test_hybrid_retrieval_end_to_end(
 
 
 def test_reingest_updates_dense_and_sparse_channels(
-    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FeatureGenerator]],
+    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FeatureGenerator, OpenSearchSimulator]],
     tmp_path: Path,
 ) -> None:
-    ingestion, service, registry, _, feature_generator = stack()
+    ingestion, service, registry, _, feature_generator, _ = stack()
     artifacts_dir = tmp_path / "docs"
     doc = _write_document_artifacts(
         artifacts_dir,
@@ -220,11 +237,11 @@ def test_reingest_updates_dense_and_sparse_channels(
 
 
 def test_validation_harness_reports(
-    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FeatureGenerator]],
+    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FeatureGenerator, OpenSearchSimulator]],
     dataset: Sequence[Mapping[str, object]],
     tmp_path: Path,
 ) -> None:
-    ingestion, service, registry, validator, _ = stack()
+    ingestion, service, registry, validator, _, _ = stack()
     documents = _to_documents(dataset)
     ingestion.upsert_documents(documents)
 
@@ -235,4 +252,85 @@ def test_validation_harness_reports(
     assert report_dirs, "Validation reports were not written"
     summary_file = report_dirs[0] / "summary.json"
     assert summary_file.exists()
+
+
+def test_schema_manager_bootstrap_and_registration() -> None:
+    manager = OpenSearchSchemaManager()
+    template = manager.bootstrap_template("research")
+    assert template.body["mappings"]["properties"]["splade"]["type"] == "rank_features"
+    assert template.chunking.max_tokens > 0
+    simulator = OpenSearchSimulator()
+    simulator.register_template(template)
+    stored = simulator.template_for("research")
+    assert stored is template
+    metadata_props = template.body["mappings"]["properties"]["metadata"]["properties"]
+    assert "author" in metadata_props and metadata_props["tags"]["type"] == "keyword"
+
+
+def test_api_post_hybrid_search_success_and_validation(
+    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FeatureGenerator, OpenSearchSimulator]],
+    dataset: Sequence[Mapping[str, object]],
+) -> None:
+    ingestion, service, _, _, _, _ = stack()
+    documents = _to_documents(dataset)
+    ingestion.upsert_documents(documents)
+    api = HybridSearchAPI(service)
+
+    status, body = api.post_hybrid_search(
+        {
+            "query": "hybrid retrieval faiss",
+            "namespace": "research",
+            "page_size": 3,
+            "filters": {"tags": ["retrieval"]},
+        }
+    )
+    assert status == HTTPStatus.OK
+    assert body["results"] and body["results"][0]["doc_id"] == "doc-1"
+
+    error_status, error_body = api.post_hybrid_search({"query": "", "page_size": -1})
+    assert error_status == HTTPStatus.BAD_REQUEST
+    assert "error" in error_body
+
+
+def test_operations_snapshot_and_restore_roundtrip(
+    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FeatureGenerator, OpenSearchSimulator]],
+    dataset: Sequence[Mapping[str, object]],
+) -> None:
+    ingestion, service, registry, _, _, opensearch = stack()
+    documents = _to_documents(dataset)
+    ingestion.upsert_documents(documents)
+
+    stats = build_stats_snapshot(ingestion.faiss_index, opensearch, registry)
+    assert stats["faiss"]["ntotal"] >= registry.count()
+    state = serialize_state(ingestion.faiss_index, registry)
+    restore_state(ingestion.faiss_index, state)
+
+    request = HybridSearchRequest(query="faiss", namespace="research", filters={}, page_size=2)
+    pagination_result = verify_pagination(service, request)
+    assert not pagination_result.duplicate_detected
+
+    assert not should_rebuild_index(registry, deleted_since_snapshot=0, threshold=0.5)
+    assert should_rebuild_index(registry, deleted_since_snapshot=max(1, registry.count() // 2), threshold=0.25)
+
+
+def test_ingest_missing_vector_raises(
+    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FeatureGenerator, OpenSearchSimulator]],
+    tmp_path: Path,
+) -> None:
+    ingestion, _, _, _, feature_generator, _ = stack()
+    artifacts_dir = tmp_path / "docs"
+    doc = _write_document_artifacts(
+        artifacts_dir,
+        doc_id="doc-missing",
+        namespace="research",
+        text="Chunk without matching vector entry",
+        metadata={},
+        feature_generator=feature_generator,
+    )
+    vector_entries = [json.loads(line) for line in doc.vector_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    vector_entries[0]["UUID"] = "00000000-0000-0000-0000-000000000000"
+    doc.vector_path.write_text("\n".join(json.dumps(entry) for entry in vector_entries) + "\n", encoding="utf-8")
+
+    with pytest.raises(IngestError):
+        ingestion.upsert_documents([doc])
 
