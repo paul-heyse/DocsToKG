@@ -10,6 +10,26 @@ from .ids import vector_uuid_to_faiss_int
 from .tokenization import tokenize
 from .types import ChunkPayload
 
+
+def matches_filters(chunk: ChunkPayload, filters: Mapping[str, object]) -> bool:
+    for key, expected in filters.items():
+        if key == "namespace":
+            if chunk.namespace != expected:
+                return False
+            continue
+        value = chunk.metadata.get(key)
+        if isinstance(expected, list):
+            if isinstance(value, list):
+                if not any(item in value for item in expected):
+                    return False
+            else:
+                if value not in expected:
+                    return False
+        else:
+            if value != expected:
+                return False
+    return True
+
 if TYPE_CHECKING:  # pragma: no cover - import guard for type checking only
     from .schema import OpenSearchIndexTemplate
 
@@ -129,28 +149,9 @@ class OpenSearchSimulator:
     def _filtered_chunks(self, filters: Mapping[str, object]) -> List[StoredChunk]:
         results: List[StoredChunk] = []
         for stored in self._chunks.values():
-            if self._matches_filters(stored.payload, filters):
+            if matches_filters(stored.payload, filters):
                 results.append(stored)
         return results
-
-    def _matches_filters(self, chunk: ChunkPayload, filters: Mapping[str, object]) -> bool:
-        for key, expected in filters.items():
-            if key == "namespace":
-                if chunk.namespace != expected:
-                    return False
-                continue
-            value = chunk.metadata.get(key)
-            if isinstance(expected, list):
-                if isinstance(value, list):
-                    if not any(item in value for item in expected):
-                        return False
-                else:
-                    if value not in expected:
-                        return False
-            else:
-                if value != expected:
-                    return False
-        return True
 
     def _bm25_score(self, stored: StoredChunk, query_weights: Mapping[str, float]) -> float:
         score = 0.0

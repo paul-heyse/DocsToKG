@@ -4,7 +4,7 @@ import json
 from http import HTTPStatus
 import os
 from pathlib import Path
-from typing import Callable, List, Mapping, Sequence
+from typing import Callable, Dict, List, Mapping, Sequence
 
 import numpy as np
 import pytest
@@ -237,34 +237,26 @@ def test_real_fixture_api_roundtrip(
 def test_remove_ids_cpu_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     pytest.importorskip("faiss")
     manager = FaissIndexManager(dim=8, config=DenseIndexConfig())
-    manager._use_native = True
+    vector = np.ones(8, dtype=np.float32)
+    manager.add([vector], ["00000000-0000-4000-8000-000000000001"])
 
-    class FailingIndex:
-        def __init__(self) -> None:
-            self.ntotal = 2
+    rebuilds: Dict[str, int] = {"count": 0}
+    original_create_index = manager._create_index
 
-        def remove_ids(self, selector: object) -> None:  # pragma: no cover - forced failure
-            raise RuntimeError("remove_ids not implemented for this type of index")
+    def tracking_create_index() -> object:
+        rebuilds["count"] += 1
+        return original_create_index()
 
-    class CPUIndex:
-        def __init__(self) -> None:
-            self.ntotal = 2
-            self.removed = 0
+    monkeypatch.setattr(manager, "_create_index", tracking_create_index)
 
-        def remove_ids(self, selector: object) -> None:
-            self.removed += 1
-            self.ntotal = 0
+    original_remove_ids = manager._index.remove_ids
 
-    failing_index = FailingIndex()
-    cpu_index = CPUIndex()
+    def failing_remove_ids(selector: object) -> None:
+        raise RuntimeError("remove_ids not implemented for this type of index")
 
-    monkeypatch.setattr(manager, "_index", failing_index, raising=False)
-    monkeypatch.setattr(manager, "_to_cpu", lambda index: cpu_index)
-    monkeypatch.setattr(manager, "_maybe_to_gpu", lambda index: index)
-    monkeypatch.setattr(manager, "_apply_search_parameters", lambda index: None)
+    monkeypatch.setattr(manager._index, "remove_ids", failing_remove_ids, raising=False)
+    manager.remove(["00000000-0000-4000-8000-000000000001"])
 
-    manager._remove_ids(np.array([1, 2], dtype=np.int64))
     assert manager._remove_fallbacks == 1
-    assert cpu_index.removed == 1
-    assert manager._index is cpu_index
-    assert manager.ntotal == cpu_index.ntotal
+    assert rebuilds["count"] == 1
+    assert manager.ntotal == 0

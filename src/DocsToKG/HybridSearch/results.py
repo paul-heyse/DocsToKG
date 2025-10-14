@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Dict, Iterable, List, Mapping, Sequence
+from typing import Dict, List, Mapping, Sequence
 
 import numpy as np
 
 from .config import FusionConfig
-from .similarity import max_inner_product, normalize_rows
+from .similarity import normalize_rows, pairwise_inner_products
 from .storage import OpenSearchSimulator
 from .tokenization import tokenize
 from .types import (
@@ -32,16 +32,24 @@ class ResultShaper:
         request: HybridSearchRequest,
         channel_scores: Mapping[str, Dict[str, float]],
     ) -> List[HybridSearchResult]:
+        if not ordered_chunks:
+            return []
+
+        embeddings = np.stack(
+            [chunk.features.embedding.astype(np.float32, copy=False) for chunk in ordered_chunks]
+        )
+        normalized = normalize_rows(embeddings)
+        similarity_matrix = pairwise_inner_products(normalized)
+
         doc_buckets: Dict[str, int] = defaultdict(int)
-        emitted_vectors: List[str] = []
-        emitted_embeddings: List[np.ndarray] = []
+        emitted_indices: List[int] = []
         results: List[HybridSearchResult] = []
         query_tokens = tokenize(request.query)
-        for rank, chunk in enumerate(ordered_chunks, start=1):
+        for current_idx, chunk in enumerate(ordered_chunks):
+            rank = current_idx + 1
             if not self._within_doc_limit(chunk.doc_id, doc_buckets):
                 continue
-            embedding = self._normalize_embedding(chunk.features.embedding)
-            if self._is_near_duplicate(embedding, emitted_embeddings):
+            if emitted_indices and self._is_near_duplicate(current_idx, emitted_indices, similarity_matrix):
                 continue
             highlights = self._build_highlights(chunk, query_tokens)
             diagnostics = HybridSearchDiagnostics(
@@ -64,8 +72,7 @@ class ResultShaper:
                     metadata=dict(chunk.metadata),
                 )
             )
-            emitted_vectors.append(chunk.vector_id)
-            emitted_embeddings.append(embedding)
+            emitted_indices.append(current_idx)
         return results
 
     def _within_doc_limit(self, doc_id: str, doc_buckets: Dict[str, int]) -> bool:
@@ -74,14 +81,14 @@ class ResultShaper:
 
     def _is_near_duplicate(
         self,
-        embedding: np.ndarray,
-        emitted_embeddings: Sequence[np.ndarray],
+        current_idx: int,
+        emitted_indices: Sequence[int],
+        similarity_matrix: np.ndarray,
     ) -> bool:
-        if not emitted_embeddings:
+        similarities = similarity_matrix[current_idx, emitted_indices]
+        if similarities.size == 0:
             return False
-        corpus = np.stack(emitted_embeddings)
-        similarity = max_inner_product(embedding, corpus)
-        return similarity >= self._fusion_config.cosine_dedupe_threshold
+        return float(np.max(similarities)) >= self._fusion_config.cosine_dedupe_threshold
 
     def _build_highlights(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
         highlights = self._opensearch.highlight(chunk, query_tokens)
@@ -89,8 +96,3 @@ class ResultShaper:
             return highlights
         snippet = chunk.text[:200]
         return [snippet] if snippet else []
-
-    def _normalize_embedding(self, embedding: np.ndarray) -> np.ndarray:
-        normalized = normalize_rows(embedding.reshape(1, -1).astype(np.float32, copy=False))
-        return normalized[0]
-

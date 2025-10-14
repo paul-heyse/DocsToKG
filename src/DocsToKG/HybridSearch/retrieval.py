@@ -20,7 +20,7 @@ from .features import FeatureGenerator
 from .fusion import ReciprocalRankFusion, apply_mmr_diversification
 from .observability import Observability
 from .results import ResultShaper
-from .storage import ChunkRegistry, OpenSearchSimulator
+from .storage import ChunkRegistry, OpenSearchSimulator, matches_filters
 from .types import (
     ChunkFeatures,
     ChunkPayload,
@@ -247,13 +247,13 @@ class HybridSearchService:
         oversampled = request.page_size * config.dense.oversample
         hits = self._faiss.search(query_features.embedding, min(config.retrieval.dense_top_k, oversampled))
         timings["dense_ms"] = (time.perf_counter() - start) * 1000
-        filtered, chunk_map = self._filter_dense_hits(hits, filters)
+        filtered, payloads = self._filter_dense_hits(hits, filters)
         self._observability.metrics.increment("search_channel_requests", channel="dense")
         self._observability.metrics.observe("search_channel_candidates", len(filtered), channel="dense")
         candidates: List[FusionCandidate] = []
         scores: Dict[str, float] = {}
         for idx, hit in enumerate(filtered):
-            chunk = chunk_map.get(hit.vector_id)
+            chunk = payloads.get(hit.vector_id)
             if chunk is None:
                 continue
             candidates.append(
@@ -269,36 +269,17 @@ class HybridSearchService:
     ) -> tuple[List[FaissSearchResult], Dict[str, ChunkPayload]]:
         if not hits:
             return [], {}
-        chunk_map: Dict[str, ChunkPayload] = {
-            chunk.vector_id: chunk for chunk in self._registry.bulk_get([hit.vector_id for hit in hits])
+        vector_ids = [hit.vector_id for hit in hits]
+        payloads = {
+            chunk.vector_id: chunk
+            for chunk in self._registry.bulk_get(vector_ids)
         }
-        filtered: List[FaissSearchResult] = []
-        for hit in hits:
-            chunk = chunk_map.get(hit.vector_id)
-            if chunk is None:
-                continue
-            if self._matches_filters(chunk, filters):
-                filtered.append(hit)
-        return filtered, chunk_map
-
-    def _matches_filters(self, chunk, filters: Mapping[str, object]) -> bool:
-        for key, expected in filters.items():
-            if key == "namespace":
-                if chunk.namespace != expected:
-                    return False
-                continue
-            value = chunk.metadata.get(key)
-            if isinstance(expected, list):
-                if isinstance(value, list):
-                    if not any(item in value for item in expected):
-                        return False
-                else:
-                    if value not in expected:
-                        return False
-            else:
-                if value != expected:
-                    return False
-        return True
+        filtered = [
+            hit
+            for hit in hits
+            if (chunk := payloads.get(hit.vector_id)) is not None and matches_filters(chunk, filters)
+        ]
+        return filtered, payloads
 
     def _dedupe_candidates(
         self,

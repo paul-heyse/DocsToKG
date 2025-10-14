@@ -1,0 +1,11 @@
+Validation started at: 2025-10-14T20:10:07.757638+00:00
+Validation completed at: 2025-10-14T20:10:18.576084+00:00
+Overall status: PASS
+- ingest_integrity: PASS
+- dense_self_hit: PASS
+- sparse_relevance: PASS
+- namespace_filter: PASS
+- pagination_stability: PASS
+- highlight_presence: PASS
+- backup_restore: PASS
+- calibration_sweep: PASS

@@ -108,7 +108,7 @@ class ChunkIngestionPipeline:
         population = list(existing) + list(new_chunks)
         if not population:
             return [chunk.features.embedding for chunk in new_chunks]
-        sample_size = min(len(population), max(64, self._faiss.config.nlist * 2))
+        sample_size = min(len(population), max(2048, self._faiss.config.nlist * 256))
         if sample_size >= len(population):
             sample = population
         else:
@@ -189,4 +189,3 @@ class ChunkIngestionPipeline:
                 continue
             entries.append(json.loads(line))
         return entries
-

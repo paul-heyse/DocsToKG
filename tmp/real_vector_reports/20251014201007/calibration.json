@@ -1,0 +1,16 @@
+{
+  "dense": [
+    {
+      "oversample": 1,
+      "self_hit_accuracy": 0.9966101694915255
+    },
+    {
+      "oversample": 2,
+      "self_hit_accuracy": 0.9966101694915255
+    },
+    {
+      "oversample": 3,
+      "self_hit_accuracy": 0.9966101694915255
+    }
+  ]
+}
