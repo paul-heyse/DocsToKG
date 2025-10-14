@@ -12,7 +12,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import requests
 
@@ -34,6 +34,58 @@ MAX_SNIFF_BYTES = 64 * 1024
 SUCCESS_STATUSES = {"pdf", "pdf_unknown"}
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
+_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
+_MAX_DOWNLOAD_RETRIES = 2
+_BACKOFF_BASE = 0.75
+
+
+def _sleep_with_jitter(attempt: int) -> None:
+    time.sleep(_BACKOFF_BASE * (2 ** attempt) + (0.1 * attempt))
+
+
+def request_with_retries(
+    session: requests.Session,
+    method: str,
+    url: str,
+    *,
+    max_retries: int = _MAX_DOWNLOAD_RETRIES,
+    retry_statuses: Optional[Iterable[int]] = None,
+    **kwargs: Any,
+) -> requests.Response:
+    """Perform a request with simple exponential backoff retries."""
+
+    statuses = set(retry_statuses or _TRANSIENT_STATUS_CODES)
+    last_exc: Optional[requests.RequestException] = None
+    for attempt in range(max_retries + 1):
+        try:
+            response = session.request(method=method, url=url, **kwargs)
+        except requests.RequestException as exc:
+            last_exc = exc
+            if attempt >= max_retries:
+                raise
+            _sleep_with_jitter(attempt)
+            continue
+
+        if response.status_code in statuses and attempt < max_retries:
+            _sleep_with_jitter(attempt)
+            continue
+        return response
+
+    assert last_exc is not None  # pragma: no cover
+    raise last_exc
+
+
+def _has_pdf_eof(path: Path) -> bool:
+    try:
+        with path.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            size = handle.tell()
+            offset = max(size - 1024, 0)
+            handle.seek(offset)
+            tail = handle.read().decode(errors="ignore")
+            return "%%EOF" in tail
+    except OSError:
+        return False
 
 
 def slugify(text: str, keep: int = 80) -> str:
@@ -214,10 +266,17 @@ def build_query(args: argparse.Namespace) -> Works:
 def resolve_topic_id_if_needed(topic_text: Optional[str]) -> Optional[str]:
     if not topic_text:
         return None
-    hits = Topics().search(topic_text).get()
+    try:
+        hits = Topics().search(topic_text).get()
+    except requests.RequestException as exc:  # pragma: no cover - network guard
+        LOGGER.warning("Topic lookup failed for %s: %s", topic_text, exc)
+        return None
     if not hits:
         return None
-    return hits[0]["id"]
+    resolved = hits[0].get("id")
+    if resolved:
+        LOGGER.info("Resolved topic '%s' -> %s", topic_text, resolved)
+    return resolved
 
 
 def create_artifact(work: Dict[str, Any], pdf_dir: Path, html_dir: Path) -> WorkArtifact:
@@ -270,14 +329,31 @@ def download_candidate(
         headers["Referer"] = referer
     start = time.monotonic()
     content_type_hint = ""
+    head: Optional[requests.Response] = None
     try:
         try:
-            head = session.head(url, allow_redirects=True, timeout=timeout, headers=headers)
-            content_type_hint = head.headers.get("Content-Type", "")
+            head = request_with_retries(
+                session,
+                "head",
+                url,
+                allow_redirects=True,
+                timeout=timeout,
+                headers=headers,
+            )
+            if head.status_code < 400:
+                content_type_hint = head.headers.get("Content-Type", "") or ""
         except requests.RequestException:
             pass
+        finally:
+            if head is not None:
+                try:
+                    head.close()
+                except Exception:
+                    pass
 
-        with session.get(
+        with request_with_retries(
+            session,
+            "get",
             url,
             stream=True,
             allow_redirects=True,
@@ -343,6 +419,21 @@ def download_candidate(
             classification = detected or "pdf"
             if flagged_unknown and classification == "pdf":
                 classification = "pdf_unknown"
+            if classification in {"pdf", "pdf_unknown"} and path_str:
+                pdf_path = Path(path_str)
+                if not _has_pdf_eof(pdf_path):
+                    try:
+                        pdf_path.unlink()
+                    except OSError:
+                        pass
+                    return DownloadOutcome(
+                        classification="pdf_corrupt",
+                        path=None,
+                        http_status=response.status_code,
+                        content_type=content_type,
+                        elapsed_ms=elapsed_ms,
+                        error="missing-eof",
+                    )
             return DownloadOutcome(
                 classification=classification,
                 path=path_str,
@@ -413,15 +504,49 @@ class CsvAttemptLogger:
             self._file.close()
 
 
+class ManifestLogger:
+    def __init__(self, path: Optional[Path]) -> None:
+        self._path = path
+        self._file = None
+        if path:
+            ensure_dir(path.parent)
+            self._file = path.open("a", encoding="utf-8")
+
+    def log(self, record: Dict[str, Any]) -> None:
+        if not self._file:
+            return
+        self._file.write(json.dumps(record, sort_keys=True) + "\n")
+        self._file.flush()
+
+    def close(self) -> None:
+        if self._file:
+            self._file.close()
+
+
 def read_resolver_config(path: Path) -> Dict[str, Any]:
     text = path.read_text(encoding="utf-8")
-    try:
-        import yaml  # type: ignore
-    except ImportError:
+    ext = path.suffix.lower()
+    if ext in {".yaml", ".yml"}:
+        try:
+            import yaml  # type: ignore
+        except ImportError as exc:  # pragma: no cover - missing dependency
+            raise RuntimeError(
+                "Install PyYAML to load YAML resolver configs, or provide JSON."
+            ) from exc
+        return yaml.safe_load(text) or {}
+    if ext in {".json", ".jsn"}:
         return json.loads(text)
-    else:
-        data = yaml.safe_load(text)
-        return data or {}
+
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        try:
+            import yaml  # type: ignore
+        except ImportError as exc:  # pragma: no cover - missing dependency
+            raise RuntimeError(
+                "Unable to parse resolver config. Install PyYAML or supply JSON."
+            ) from exc
+        return yaml.safe_load(text) or {}
 
 
 def apply_config_overrides(
@@ -442,6 +567,7 @@ def apply_config_overrides(
         "doaj_api_key",
         "resolver_timeouts",
         "resolver_rate_limits",
+        "mailto",
     ):
         if field_name in data and data[field_name] is not None:
             setattr(config, field_name, data[field_name])
@@ -450,7 +576,11 @@ def apply_config_overrides(
         config.resolver_toggles.setdefault(name, True)
 
 
-def load_resolver_config(args: argparse.Namespace, resolver_names: Sequence[str]) -> ResolverConfig:
+def load_resolver_config(
+    args: argparse.Namespace,
+    resolver_names: Sequence[str],
+    resolver_order_override: Optional[List[str]] = None,
+) -> ResolverConfig:
     config = ResolverConfig()
     if args.resolver_config:
         config_data = read_resolver_config(Path(args.resolver_config))
@@ -468,11 +598,22 @@ def load_resolver_config(args: argparse.Namespace, resolver_names: Sequence[str]
         args.semantic_scholar_api_key or config.semantic_scholar_api_key or os.getenv("S2_API_KEY")
     )
     config.doaj_api_key = args.doaj_api_key or config.doaj_api_key or os.getenv("DOAJ_API_KEY")
+    config.mailto = args.mailto or config.mailto
 
     if args.max_resolver_attempts:
         config.max_attempts_per_work = args.max_resolver_attempts
     if args.resolver_timeout:
         config.timeout = args.resolver_timeout
+
+    if resolver_order_override:
+        ordered = []
+        for name in resolver_order_override:
+            if name not in ordered:
+                ordered.append(name)
+        for name in resolver_names:
+            if name not in ordered:
+                ordered.append(name)
+        config.resolver_order = ordered
 
     for name in resolver_names:
         config.resolver_toggles.setdefault(name, True)
@@ -482,9 +623,11 @@ def load_resolver_config(args: argparse.Namespace, resolver_names: Sequence[str]
 
     # Polite headers include mailto when available
     headers = dict(config.polite_headers)
-    if args.mailto:
-        headers.setdefault("mailto", args.mailto)
-    headers.setdefault("User-Agent", "DocsToKG-OpenAlexDownloader/1.0")
+    headers.pop("mailto", None)
+    user_agent = headers.get("User-Agent") or "DocsToKG-OpenAlexDownloader/1.0"
+    if config.mailto and "mailto:" not in user_agent:
+        user_agent = f"{user_agent} (+mailto:{config.mailto})"
+    headers["User-Agent"] = user_agent
     config.polite_headers = headers
 
     # Apply resolver rate defaults (Unpaywall recommended 1 QPS)
@@ -509,7 +652,7 @@ def attempt_openalex_candidates(
     artifact: WorkArtifact,
     logger: CsvAttemptLogger,
     metrics: ResolverMetrics,
-) -> Optional[DownloadOutcome]:
+) -> Optional[Tuple[DownloadOutcome, str]]:
     candidates = list(artifact.pdf_urls)
     if artifact.open_access_url:
         candidates.append(artifact.open_access_url)
@@ -539,11 +682,15 @@ def attempt_openalex_candidates(
         if outcome.classification == "html" and outcome.path:
             html_paths.append(outcome.path)
         if outcome.is_pdf:
-            return outcome
+            if html_paths:
+                artifact.metadata.setdefault("openalex_html_paths", []).extend(html_paths)
+            return outcome, url
         if outcome.classification not in SUCCESS_STATUSES and url:
             artifact.failed_pdf_urls.append(url)
     if not seen:
         metrics.record_skip("openalex", "no-candidates")
+    if html_paths:
+        artifact.metadata.setdefault("openalex_html_paths", []).extend(html_paths)
     return None
 
 
@@ -575,6 +722,12 @@ def main() -> None:
 
     # Resolver configuration
     parser.add_argument("--resolver-config", type=str, default=None, help="Path to resolver config (YAML/JSON).")
+    parser.add_argument(
+        "--resolver-order",
+        type=str,
+        default=None,
+        help="Comma-separated resolver order override (e.g., 'unpaywall,crossref').",
+    )
     parser.add_argument("--unpaywall-email", type=str, default=None, help="Override Unpaywall email credential.")
     parser.add_argument("--core-api-key", type=str, default=None, help="CORE API key override.")
     parser.add_argument(
@@ -608,6 +761,12 @@ def main() -> None:
         default=None,
         help="Optional CSV log file capturing resolver attempts.",
     )
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        default=None,
+        help="Path to JSONL manifest of final outcomes (default: <out>/manifest.jsonl).",
+    )
 
     args = parser.parse_args()
 
@@ -619,7 +778,7 @@ def main() -> None:
 
     topic_id = args.topic_id
     if not topic_id and args.topic:
-        topic_id = None  # placeholder for optional topic resolution
+        topic_id = resolve_topic_id_if_needed(args.topic)
 
     query = build_query(
         argparse.Namespace(
@@ -640,9 +799,23 @@ def main() -> None:
     # Resolver setup
     resolvers = default_resolvers()
     resolver_names = [resolver.name for resolver in resolvers]
-    config = load_resolver_config(args, resolver_names)
+    resolver_order_override: Optional[List[str]] = None
+    if args.resolver_order:
+        resolver_order_override = [name.strip() for name in args.resolver_order.split(",") if name.strip()]
+        if not resolver_order_override:
+            parser.error("--resolver-order requires at least one resolver name.")
+        unknown = [name for name in resolver_order_override if name not in resolver_names]
+        if unknown:
+            parser.error(f"Unknown resolver(s) in --resolver-order: {', '.join(unknown)}")
+        resolver_order_override = resolver_order_override + [
+            name for name in resolver_names if name not in resolver_order_override
+        ]
+
+    config = load_resolver_config(args, resolver_names, resolver_order_override)
 
     logger = CsvAttemptLogger(args.log_csv)
+    manifest_path = args.manifest or (pdf_dir / "manifest.jsonl")
+    manifest_logger = ManifestLogger(manifest_path)
     metrics = ResolverMetrics()
     pipeline = ResolverPipeline(
         resolvers=resolvers,
@@ -664,27 +837,78 @@ def main() -> None:
             artifact = create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir)
 
             if (artifact.pdf_dir / f"{artifact.base_stem}.pdf").exists():
+                existing_path = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
+                manifest_logger.log(
+                    {
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "work_id": artifact.work_id,
+                        "title": artifact.title,
+                        "publication_year": artifact.publication_year,
+                        "resolver": "existing",
+                        "url": None,
+                        "path": str(existing_path),
+                        "classification": "exists",
+                        "content_type": None,
+                        "reason": "already-downloaded",
+                        "html_paths": [],
+                    }
+                )
                 print(f"[skip] {artifact.base_stem}.pdf (exists)")
+                time.sleep(args.sleep)
                 continue
 
-            result = attempt_openalex_candidates(session, artifact, logger, metrics)
-            if result and result.is_pdf:
+            openalex_result = attempt_openalex_candidates(session, artifact, logger, metrics)
+            if openalex_result and openalex_result[0].is_pdf:
+                outcome, url = openalex_result
                 saved += 1
                 print(f"[ok]   {artifact.base_stem}.pdf ← openalex")
+                manifest_logger.log(
+                    {
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "work_id": artifact.work_id,
+                        "title": artifact.title,
+                        "publication_year": artifact.publication_year,
+                        "resolver": "openalex",
+                        "url": url,
+                        "path": outcome.path,
+                        "classification": outcome.classification,
+                        "content_type": outcome.content_type,
+                        "reason": outcome.error,
+                        "html_paths": artifact.metadata.get("openalex_html_paths", []),
+                    }
+                )
                 time.sleep(args.sleep)
                 continue
 
             pipeline_result: PipelineResult = pipeline.run(session, artifact)
+            combined_html = list(pipeline_result.html_paths)
+            combined_html.extend(artifact.metadata.get("openalex_html_paths", []))
             if pipeline_result.success and pipeline_result.outcome:
                 saved += 1
                 print(
                     f"[ok]   {artifact.base_stem}.pdf ← {pipeline_result.resolver_name}"
                 )
+                manifest_logger.log(
+                    {
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "work_id": artifact.work_id,
+                        "title": artifact.title,
+                        "publication_year": artifact.publication_year,
+                        "resolver": pipeline_result.resolver_name,
+                        "url": pipeline_result.url,
+                        "path": pipeline_result.outcome.path,
+                        "classification": pipeline_result.outcome.classification,
+                        "content_type": pipeline_result.outcome.content_type,
+                        "reason": pipeline_result.outcome.error,
+                        "html_paths": combined_html,
+                    }
+                )
             else:
-                if pipeline_result.html_paths:
+                if combined_html:
                     html_only += 1
+                    last_html = Path(combined_html[-1]).name if combined_html else ""
                     print(
-                        f"[miss] {artifact.work_id} — HTML saved ({Path(pipeline_result.html_paths[-1]).name})"
+                        f"[miss] {artifact.work_id} — HTML saved ({last_html})"
                     )
                 else:
                     reason = pipeline_result.reason or "no-resolver-success"
@@ -702,10 +926,26 @@ def main() -> None:
                         reason=pipeline_result.reason or "no-resolver-success",
                     )
                 )
+                manifest_logger.log(
+                    {
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "work_id": artifact.work_id,
+                        "title": artifact.title,
+                        "publication_year": artifact.publication_year,
+                        "resolver": pipeline_result.resolver_name,
+                        "url": pipeline_result.url,
+                        "path": pipeline_result.outcome.path if pipeline_result.outcome else None,
+                        "classification": pipeline_result.outcome.classification if pipeline_result.outcome else "miss",
+                        "content_type": pipeline_result.outcome.content_type if pipeline_result.outcome else None,
+                        "reason": pipeline_result.reason or (pipeline_result.outcome.error if pipeline_result.outcome else None),
+                        "html_paths": combined_html,
+                    }
+                )
 
             time.sleep(args.sleep)
     finally:
         logger.close()
+        manifest_logger.close()
 
     summary = metrics.summary()
     print(
@@ -731,4 +971,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

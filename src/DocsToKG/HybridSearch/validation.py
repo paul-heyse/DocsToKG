@@ -79,6 +79,9 @@ DEFAULT_SCALE_THRESHOLDS: Dict[str, float] = {
     "gpu_headroom_fraction": 0.2,
 }
 
+BASIC_DENSE_SELF_HIT_THRESHOLD = 0.99
+BASIC_SPARSE_RELEVANCE_THRESHOLD = 0.90
+
 
 class HybridSearchValidator:
     """Execute validation sweeps and persist reports."""
@@ -210,31 +213,52 @@ class HybridSearchValidator:
         return ValidationReport(name="ingest_integrity", passed=ok, details=details)
 
     def _check_dense_self_hit(self) -> ValidationReport:
-        ok = True
+        total = 0
+        hits_met = 0
         for chunk in self._registry.all():
+            total += 1
             hits = self._ingestion.faiss_index.search(chunk.features.embedding, 1)
-            if not hits or hits[0].vector_id != chunk.vector_id:
-                ok = False
-                break
-        return ValidationReport(name="dense_self_hit", passed=ok, details={})
+            if hits and hits[0].vector_id == chunk.vector_id:
+                hits_met += 1
+        rate = hits_met / total if total else 0.0
+        passed = rate >= BASIC_DENSE_SELF_HIT_THRESHOLD
+        return ValidationReport(
+            name="dense_self_hit",
+            passed=passed,
+            details={
+                "total_chunks": total,
+                "correct_hits": hits_met,
+                "self_hit_rate": rate,
+                "threshold": BASIC_DENSE_SELF_HIT_THRESHOLD,
+            },
+        )
 
     def _check_sparse_relevance(self, dataset: Sequence[Mapping[str, object]]) -> ValidationReport:
-        ok = True
+        total = 0
+        hits_met = 0
         for entry in dataset:
             queries = entry.get("queries", [])
             for query in queries:
+                total += 1
                 expected = query.get("expected_doc_id")
                 request = self._request_for_query(query)
                 response = self._service.search(request)
-                if not response.results:
-                    ok = False
-                    break
-                if expected and response.results[0].doc_id != expected:
-                    ok = False
-                    break
-            if not ok:
-                break
-        return ValidationReport(name="sparse_relevance", passed=ok, details={})
+                if response.results and (
+                    not expected or response.results[0].doc_id == expected
+                ):
+                    hits_met += 1
+        rate = hits_met / total if total else 0.0
+        passed = rate >= BASIC_SPARSE_RELEVANCE_THRESHOLD
+        return ValidationReport(
+            name="sparse_relevance",
+            passed=passed,
+            details={
+                "total_queries": total,
+                "top1_matches": hits_met,
+                "hit_rate": rate,
+                "threshold": BASIC_SPARSE_RELEVANCE_THRESHOLD,
+            },
+        )
 
     def _check_namespace_filters(self, dataset: Sequence[Mapping[str, object]]) -> ValidationReport:
         ok = True

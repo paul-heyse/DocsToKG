@@ -15,8 +15,8 @@
 - [x] 2.8 Update the main download loop to call the pipeline after OpenAlex candidates, pass the artifact + configuration, reuse the existing `download_pdf` streaming helper, and emit resolver provenance (resolver name, URL, status) on every attempt.
 
 ## 3. Configuration, Politeness, and Logging
-- [x] 3.1 Introduce a `ResolverConfig` loader (e.g., from `download_config.yaml` or CLI JSON) that contains per-resolver toggles, max attempts per work, global timeout, sleep jitter, and credential slots (`unpaywall_email`, `core_api_key`, `semantic_scholar_api_key`, `doaj_api_key`).
-- [x] 3.2 Extend the CLI to accept `--resolver-config` plus individual overrides (`--unpaywall-email`, `--disable-resolver=core`) while keeping backward compatibility for existing flags; document environment variable fallbacks.
+- [x] 3.1 Introduce a `ResolverConfig` loader that reads a YAML file (default `resolver_config.yaml`) via PyYAML and surfaces per-resolver toggles, max attempts per work, global timeout, sleep jitter, and credential slots (`unpaywall_email`, `core_api_key`, `semantic_scholar_api_key`, `doaj_api_key`).
+- [x] 3.2 Extend the CLI to accept `--resolver-config` (YAML path) plus individual overrides (`--unpaywall-email`, `--disable-resolver=core`) while keeping backward compatibility for existing flags; document environment variable fallbacks.
 - [x] 3.3 Add polite-pool headers (`mailto`, `User-Agent`) and per-resolver rate policies (e.g., Unpaywall 1 QPS, Crossref back-off on 429) configurable via the new config.
 - [x] 3.4 Augment the CSV log (and any JSONL output) with columns for `resolver_source`, `resolver_order`, `attempt_url`, `status`, `http_status`, `content_type`, and `elapsed_ms`, and ensure misses capture the reason (`no-doi`, `resolver-disabled`, `max-attempts-reached`).
 - [x] 3.5 Emit structured INFO logs summarizing resolver success rate per run and aggregate counts (OpenAlex hits vs. each fallback source) to help calibrate the stack.

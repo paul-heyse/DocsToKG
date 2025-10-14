@@ -39,6 +39,46 @@ DEFAULT_RESOLVER_ORDER: List[str] = [
     "wayback",
 ]
 
+_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
+_DEFAULT_MAX_RETRIES = 2
+_DEFAULT_BACKOFF = 0.75
+
+
+def _sleep_backoff(attempt: int, base: float = _DEFAULT_BACKOFF) -> None:
+    time.sleep(base * (2 ** attempt) + random.random() * 0.1)
+
+
+def _request_with_retries(
+    session: requests.Session,
+    method: str,
+    url: str,
+    *,
+    max_retries: int = _DEFAULT_MAX_RETRIES,
+    retry_statuses: Optional[Iterable[int]] = None,
+    **kwargs: Any,
+) -> requests.Response:
+    """Invoke `session.request` with exponential backoff on transient errors."""
+
+    statuses = set(retry_statuses or _TRANSIENT_STATUS_CODES)
+    last_exc: Optional[Exception] = None
+    for attempt in range(max_retries + 1):
+        try:
+            response = session.request(method=method, url=url, **kwargs)
+        except requests.RequestException as exc:  # pragma: no cover - network paths
+            last_exc = exc
+            if attempt >= max_retries:
+                raise
+            _sleep_backoff(attempt)
+            continue
+
+        if response.status_code in statuses and attempt < max_retries:
+            _sleep_backoff(attempt)
+            continue
+        return response
+
+    assert last_exc is not None  # pragma: no cover - defensive
+    raise last_exc
+
 
 @dataclass
 class ResolverResult:
@@ -74,6 +114,7 @@ class ResolverConfig:
     doaj_api_key: Optional[str] = None
     resolver_timeouts: Dict[str, float] = field(default_factory=dict)
     resolver_rate_limits: Dict[str, float] = field(default_factory=dict)
+    mailto: Optional[str] = None
 
     def get_timeout(self, resolver_name: str) -> float:
         return self.resolver_timeouts.get(resolver_name, self.timeout)
@@ -266,6 +307,7 @@ class ResolverPipeline:
                 continue
 
             self._respect_rate_limit(resolver_name)
+            self._last_invocation[resolver_name] = time.monotonic()
 
             for result in resolver.iter_urls(session, self.config, artifact):
                 if result.is_event:
@@ -317,7 +359,6 @@ class ResolverPipeline:
                     result.referer,
                     self.config.get_timeout(resolver_name),
                 )
-                self._last_invocation[resolver_name] = time.monotonic()
                 self.logger.log(
                     AttemptRecord(
                         work_id=artifact.work_id,
@@ -419,10 +460,13 @@ class UnpaywallResolver:
             )
             return
         try:
-            resp = session.get(
+            resp = _request_with_retries(
+                session,
+                "get",
                 f"https://api.unpaywall.org/v2/{quote(doi)}",
                 params={"email": config.unpaywall_email},
                 timeout=config.get_timeout(self.name),
+                headers=config.polite_headers,
             )
         except requests.RequestException as exc:  # pragma: no cover - network errors
             yield ResolverResult(
@@ -494,10 +538,18 @@ class CrossrefResolver:
                 event_reason="no-doi",
             )
             return
+        params: Dict[str, str] = {}
+        email = config.mailto or config.unpaywall_email
+        if email:
+            params["mailto"] = email
         try:
-            resp = session.get(
+            resp = _request_with_retries(
+                session,
+                "get",
                 f"https://api.crossref.org/works/{quote(doi)}",
                 timeout=config.get_timeout(self.name),
+                params=params or None,
+                headers=config.polite_headers,
             )
         except requests.RequestException as exc:  # pragma: no cover - network errors
             yield ResolverResult(
@@ -576,7 +628,9 @@ class LandingPageResolver:
             return
         for landing in artifact.landing_urls:
             try:
-                resp = session.get(
+                resp = _request_with_retries(
+                    session,
+                    "get",
                     landing,
                     headers=config.polite_headers,
                     timeout=config.get_timeout(self.name),
@@ -616,6 +670,22 @@ class LandingPageResolver:
                     yield ResolverResult(url=url, referer=landing, metadata={"pattern": "link"})
                     break
 
+            for anchor in soup.find_all("a"):
+                href = (anchor.get("href") or "").strip()
+                if not href:
+                    continue
+                text = (anchor.get_text() or "").strip().lower()
+                href_lower = href.lower()
+                if href_lower.endswith(".pdf") or "pdf" in text:
+                    candidate = _absolute_url(landing, href)
+                    if candidate.lower().endswith(".pdf"):
+                        yield ResolverResult(
+                            url=candidate,
+                            referer=landing,
+                            metadata={"pattern": "anchor"},
+                        )
+                        break
+
 
 class ArxivResolver:
     name = "arxiv"
@@ -653,7 +723,9 @@ class PmcResolver:
         if not identifiers:
             return []
         try:
-            resp = session.get(
+            resp = _request_with_retries(
+                session,
+                "get",
                 "https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/",
                 params={
                     "ids": ",".join(identifiers),
@@ -662,6 +734,7 @@ class PmcResolver:
                     "email": config.unpaywall_email or "",
                 },
                 timeout=config.get_timeout(self.name),
+                headers=config.polite_headers,
             )
         except requests.RequestException:
             return []
@@ -702,9 +775,12 @@ class PmcResolver:
             seen.add(pmcid)
             oa_url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id={pmcid}"
             try:
-                resp = session.get(
+                resp = _request_with_retries(
+                    session,
+                    "get",
                     oa_url,
                     timeout=config.get_timeout(self.name),
+                    headers=config.polite_headers,
                 )
             except requests.RequestException:
                 continue
@@ -739,10 +815,13 @@ class EuropePmcResolver:
         if not doi:
             return []
         try:
-            resp = session.get(
+            resp = _request_with_retries(
+                session,
+                "get",
                 "https://www.ebi.ac.uk/europepmc/webservices/rest/search",
                 params={"query": f'DOI:"{doi}"', "format": "json", "pageSize": 3},
                 timeout=config.get_timeout(self.name),
+                headers=config.polite_headers,
             )
         except requests.RequestException:
             return []
@@ -779,7 +858,9 @@ class CoreResolver:
         headers = dict(config.polite_headers)
         headers["Authorization"] = f"Bearer {config.core_api_key}"
         try:
-            resp = session.get(
+            resp = _request_with_retries(
+                session,
+                "get",
                 "https://api.core.ac.uk/v3/search/works",
                 params={"q": f'doi:"{doi}"', "page": 1, "pageSize": 3},
                 headers=headers,
@@ -825,7 +906,9 @@ class DoajResolver:
         if config.doaj_api_key:
             headers["X-API-KEY"] = config.doaj_api_key
         try:
-            resp = session.get(
+            resp = _request_with_retries(
+                session,
+                "get",
                 "https://doaj.org/api/v2/search/articles/",
                 params={"pageSize": 3, "q": f'doi:"{doi}"'},
                 headers=headers,
@@ -870,7 +953,9 @@ class SemanticScholarResolver:
         if config.semantic_scholar_api_key:
             headers["x-api-key"] = config.semantic_scholar_api_key
         try:
-            resp = session.get(
+            resp = _request_with_retries(
+                session,
+                "get",
                 f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(doi)}",
                 params={"fields": "title,openAccessPdf"},
                 headers=headers,
@@ -904,10 +989,13 @@ class WaybackResolver:
     ) -> Iterable[ResolverResult]:
         for original in artifact.failed_pdf_urls:
             try:
-                resp = session.get(
+                resp = _request_with_retries(
+                    session,
+                    "get",
                     "https://archive.org/wayback/available",
                     params={"url": original},
                     timeout=config.get_timeout(self.name),
+                    headers=config.polite_headers,
                 )
             except requests.RequestException:
                 continue
@@ -953,4 +1041,3 @@ __all__ = [
     "default_resolvers",
     "DEFAULT_RESOLVER_ORDER",
 ]
-
