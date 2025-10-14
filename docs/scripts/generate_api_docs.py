@@ -43,7 +43,7 @@ class APIDocGenerator:
     def extract_module_info(self, file_path: Path) -> Dict[str, Any]:
         """Extract module-level information from a Python file."""
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
             tree = ast.parse(content)
@@ -57,25 +57,29 @@ class APIDocGenerator:
 
             for node in ast.walk(tree):
                 if isinstance(node, ast.ClassDef):
-                    classes.append({
-                        'name': node.name,
-                        'lineno': node.lineno,
-                        'docstring': ast.get_docstring(node)
-                    })
-                elif isinstance(node, ast.FunctionDef) and node.name != '__init__':
-                    functions.append({
-                        'name': node.name,
-                        'lineno': node.lineno,
-                        'docstring': ast.get_docstring(node),
-                        'args': [arg.arg for arg in node.args.args]
-                    })
+                    classes.append(
+                        {
+                            "name": node.name,
+                            "lineno": node.lineno,
+                            "docstring": ast.get_docstring(node),
+                        }
+                    )
+                elif isinstance(node, ast.FunctionDef) and node.name != "__init__":
+                    functions.append(
+                        {
+                            "name": node.name,
+                            "lineno": node.lineno,
+                            "docstring": ast.get_docstring(node),
+                            "args": [arg.arg for arg in node.args.args],
+                        }
+                    )
 
             return {
-                'file_path': file_path,
-                'module_name': file_path.stem,
-                'module_docstring': module_docstring,
-                'classes': classes,
-                'functions': functions
+                "file_path": file_path,
+                "module_name": file_path.stem,
+                "module_docstring": module_docstring,
+                "classes": classes,
+                "functions": functions,
             }
 
         except Exception as e:
@@ -91,22 +95,22 @@ class APIDocGenerator:
         lines.append("")
 
         # Module description
-        if module_info.get('module_docstring'):
-            lines.append(module_info['module_docstring'])
+        if module_info.get("module_docstring"):
+            lines.append(module_info["module_docstring"])
             lines.append("")
 
         # Functions section
-        if module_info.get('functions'):
+        if module_info.get("functions"):
             lines.append("## Functions")
             lines.append("")
 
-            for func in module_info['functions']:
+            for func in module_info["functions"]:
                 lines.append(f"### `{func['name']}({', '.join(func['args'])})`")
                 lines.append("")
 
-                if func.get('docstring'):
+                if func.get("docstring"):
                     # Clean up the docstring
-                    docstring = self._clean_docstring(func['docstring'])
+                    docstring = self._clean_docstring(func["docstring"])
                     lines.append(docstring)
                 else:
                     lines.append("*No documentation available.*")
@@ -114,17 +118,17 @@ class APIDocGenerator:
                 lines.append("")
 
         # Classes section
-        if module_info.get('classes'):
+        if module_info.get("classes"):
             lines.append("## Classes")
             lines.append("")
 
-            for cls in module_info['classes']:
+            for cls in module_info["classes"]:
                 lines.append(f"### `{cls['name']}`")
                 lines.append("")
 
-                if cls.get('docstring'):
+                if cls.get("docstring"):
                     # Clean up the docstring
-                    docstring = self._clean_docstring(cls['docstring'])
+                    docstring = self._clean_docstring(cls["docstring"])
                     lines.append(docstring)
                 else:
                     lines.append("*No documentation available.*")
@@ -139,15 +143,15 @@ class APIDocGenerator:
             return ""
 
         # Remove leading/trailing whitespace
-        lines = docstring.strip().split('\n')
+        lines = docstring.strip().split("\n")
         cleaned_lines = []
 
         for line in lines:
             # Remove common leading whitespace
-            cleaned_line = re.sub(r'^\s{4,}', '', line)
+            cleaned_line = re.sub(r"^\s{4,}", "", line)
             cleaned_lines.append(cleaned_line)
 
-        return '\n'.join(cleaned_lines)
+        return "\n".join(cleaned_lines)
 
     def generate_all_docs(self):
         """Generate documentation for all modules."""
@@ -175,7 +179,7 @@ class APIDocGenerator:
 
             # Write to output file
             output_file = self.output_dir / f"{module_info['module_name']}.md"
-            with open(output_file, 'w', encoding='utf-8') as f:
+            with open(output_file, "w", encoding="utf-8") as f:
                 f.write(docs_content)
 
             generated_files.append(output_file)
@@ -204,8 +208,8 @@ def main():
     generated_files = generator.generate_all_docs()
 
     if generated_files:
-        print("
-📋 Generated Files:"        for file_path in generated_files:
+        print("\n📋 Generated Files:")
+        for file_path in generated_files:
             print(f"  - {file_path}")
     else:
         print("\n❌ No documentation files were generated")

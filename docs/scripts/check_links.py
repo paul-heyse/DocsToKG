@@ -65,9 +65,9 @@ class LinkChecker:
         links = []
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
-                lines = content.split('\n')
+                lines = content.split("\n")
         except Exception as e:
             print(f"❌ Error reading {file_path}: {e}")
             return links
@@ -75,50 +75,53 @@ class LinkChecker:
         # Patterns for different types of links
         patterns = [
             # Markdown links: [text](url)
-            (r'\[([^\]]+)\]\(([^)]+)\)', 'markdown'),
+            (r"\[([^\]]+)\]\(([^)]+)\)", "markdown"),
             # HTML links: <a href="url">text</a>
-            (r'<a[^>]+href=["\']([^"\']+)["\'][^>]*>([^<]*)</a>', 'html'),
+            (r'<a[^>]+href=["\']([^"\']+)["\'][^>]*>([^<]*)</a>', "html"),
             # Bare URLs (http/https)
-            (r'\b(https?://[^\s]+)', 'bare'),
+            (r"\b(https?://[^\s]+)", "bare"),
         ]
 
         for line_num, line in enumerate(lines, 1):
             for pattern, link_type in patterns:
                 matches = re.findall(pattern, line)
                 for match in matches:
-                    if link_type == 'markdown':
+                    if link_type == "markdown":
                         link_text, url = match
-                    elif link_type == 'html':
+                    elif link_type == "html":
                         url, link_text = match
                     else:  # bare URL
                         url = match
                         link_text = url
 
                     if url and not self._should_ignore_url(url):
-                        links.append({
-                            'url': url,
-                            'text': link_text.strip(),
-                            'line': line_num,
-                            'type': link_type,
-                            'context': line.strip()
-                        })
+                        links.append(
+                            {
+                                "url": url,
+                                "text": link_text.strip(),
+                                "line": line_num,
+                                "type": link_type,
+                                "context": line.strip(),
+                            }
+                        )
 
         return links
 
     def _should_ignore_url(self, url: str) -> bool:
         """Check if URL should be ignored (e.g., placeholders, fragments)."""
         # Ignore fragment-only links (#anchor)
-        if url.startswith('#'):
+        if url.startswith("#"):
             return True
 
         # Ignore placeholder URLs
-        if any(placeholder in url for placeholder in [
-            'yourorg', 'example.com', 'placeholder', 'TODO', 'FIXME'
-        ]):
+        if any(
+            placeholder in url
+            for placeholder in ["yourorg", "example.com", "placeholder", "TODO", "FIXME"]
+        ):
             return True
 
         # Ignore localhost URLs (unless explicitly testing)
-        if 'localhost' in url or '127.0.0.1' in url:
+        if "localhost" in url or "127.0.0.1" in url:
             return True
 
         return False
@@ -127,7 +130,7 @@ class LinkChecker:
         """Check if a URL is accessible."""
         try:
             # Handle relative URLs by making them absolute
-            if not url.startswith(('http://', 'https://')):
+            if not url.startswith(("http://", "https://")):
                 # For now, assume these are working internal links
                 # In a real implementation, you'd resolve relative to the file's location
                 return url, True, "relative"
@@ -143,7 +146,9 @@ class LinkChecker:
         except Exception as e:
             return url, False, str(e)
 
-    async def check_all_links(self, file_links: Dict[Path, List[Dict]]) -> Tuple[List[Dict], List[Dict]]:
+    async def check_all_links(
+        self, file_links: Dict[Path, List[Dict]]
+    ) -> Tuple[List[Dict], List[Dict]]:
         """Check all links for validity."""
         print("🔍 Checking link validity...")
 
@@ -151,7 +156,7 @@ class LinkChecker:
         all_urls = set()
         for file_path, links in file_links.items():
             for link in links:
-                all_urls.add(link['url'])
+                all_urls.add(link["url"])
 
         print(f"🌐 Checking {len(all_urls)} unique URLs...")
 
@@ -179,22 +184,22 @@ class LinkChecker:
 
         for file_path, links in file_links.items():
             for link in links:
-                url = link['url']
+                url = link["url"]
                 is_working, error = url_status.get(url, (False, "unknown"))
 
                 link_info = {
-                    'file': str(file_path.relative_to(self.docs_dir)),
-                    'url': url,
-                    'text': link['text'],
-                    'line': link['line'],
-                    'type': link['type'],
-                    'context': link['context']
+                    "file": str(file_path.relative_to(self.docs_dir)),
+                    "url": url,
+                    "text": link["text"],
+                    "line": link["line"],
+                    "type": link["type"],
+                    "context": link["context"],
                 }
 
                 if is_working:
                     working_links.append(link_info)
                 else:
-                    link_info['error'] = error
+                    link_info["error"] = error
                     broken_links.append(link_info)
 
         return broken_links, working_links
@@ -205,7 +210,9 @@ class LinkChecker:
 
         report.append("# 🔗 Link Check Report")
         report.append("=" * 50)
-        report.append(f"Generated: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        report.append(
+            f"Generated: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
         report.append("")
 
         # Summary
@@ -262,7 +269,7 @@ class LinkChecker:
         output_path = Path(output_file)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             f.write(report)
 
         print(f"📋 Report saved to: {output_path}")
@@ -271,32 +278,18 @@ class LinkChecker:
 def main():
     """Main entry point for link checking."""
     parser = argparse.ArgumentParser(description="Check for broken links in documentation")
+    parser.add_argument("--docs-dir", default="docs", help="Documentation directory to scan")
     parser.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Documentation directory to scan"
+        "--output", default="docs/link_check_report.md", help="Output file for the report"
     )
     parser.add_argument(
-        "--output",
-        default="docs/link_check_report.md",
-        help="Output file for the report"
+        "--timeout", type=int, default=10, help="Timeout for HTTP requests (seconds)"
     )
     parser.add_argument(
-        "--timeout",
-        type=int,
-        default=10,
-        help="Timeout for HTTP requests (seconds)"
+        "--max-concurrent", type=int, default=10, help="Maximum concurrent requests"
     )
     parser.add_argument(
-        "--max-concurrent",
-        type=int,
-        default=10,
-        help="Maximum concurrent requests"
-    )
-    parser.add_argument(
-        "--quick",
-        action="store_true",
-        help="Skip external URL checks for faster results"
+        "--quick", action="store_true", help="Skip external URL checks for faster results"
     )
 
     args = parser.parse_args()
@@ -306,9 +299,7 @@ def main():
 
     # Create link checker
     checker = LinkChecker(
-        docs_dir=args.docs_dir,
-        timeout=args.timeout,
-        max_concurrent=args.max_concurrent
+        docs_dir=args.docs_dir, timeout=args.timeout, max_concurrent=args.max_concurrent
     )
 
     # Find all links
@@ -326,13 +317,13 @@ def main():
     checker.save_report(report, args.output)
 
     # Summary
-    print("
-📊 Link Check Summary:"    print(f"  ✅ Working: {len(working_links)}")
+    print("\n📊 Link Check Summary:")
+    print(f"  ✅ Working: {len(working_links)}")
     print(f"  ❌ Broken: {len(broken_links)}")
 
     if broken_links:
-        print("
-🔧 Found broken links - check the report for details"        sys.exit(1)
+        print("\n🔧 Found broken links - check the report for details")
+        sys.exit(1)
     else:
         print("\n✅ All links are working!")
         sys.exit(0)

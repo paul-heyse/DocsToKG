@@ -35,6 +35,44 @@ main                    # Production-ready code
     └── hotfix/xyz     # Critical fixes (branch from main)
 ```
 
+### Documentation-First Development
+
+DocsToKG follows a **documentation-first development** approach:
+
+1. **Document requirements** before implementation
+2. **Write API specifications** for new endpoints
+3. **Create usage examples** alongside code
+4. **Update documentation** as features evolve
+
+### Documentation Integration
+
+#### Pre-Development Phase
+
+**Before starting implementation:**
+
+- [ ] Document requirements in appropriate section
+- [ ] Create API specifications for new endpoints
+- [ ] Define data models and relationships
+- [ ] Plan examples and use cases
+
+#### During Development
+
+**As you implement features:**
+
+- [ ] Write comprehensive docstrings for all public interfaces
+- [ ] Update documentation as functionality evolves
+- [ ] Test documentation examples to ensure they work
+- [ ] Validate changes using automated tools
+
+#### Pre-Submission Phase
+
+**Before submitting pull requests:**
+
+- [ ] Run `python docs/scripts/validate_code_annotations.py src/`
+- [ ] Run `python docs/scripts/generate_api_docs.py` to update API docs
+- [ ] Run `python docs/scripts/validate_docs.py` for content validation
+- [ ] Review changes using documentation checklist
+
 ### Commit Conventions
 
 Follow conventional commit format:
@@ -63,6 +101,8 @@ type(scope): description
 feat(api): add document upload endpoint
 fix(search): resolve vector index corruption issue
 docs: update API reference with new endpoints
+docs(api): add comprehensive search endpoint documentation
+docs(architecture): update component diagram for new service
 ```
 
 ### Pull Request Process
@@ -70,9 +110,33 @@ docs: update API reference with new endpoints
 1. **Create a branch** from `develop` with descriptive name
 2. **Make your changes** following coding standards
 3. **Write tests** for new functionality
-4. **Update documentation** if needed
-5. **Run tests locally** to ensure everything works
-6. **Submit PR** with clear description and link to related issues
+4. **Update documentation** for all user-facing changes
+5. **Validate documentation** using automated tools
+6. **Run tests locally** to ensure everything works
+7. **Submit PR** with clear description and link to related issues
+
+#### Documentation Requirements for PRs
+
+**For all code changes:**
+
+- [ ] Update docstrings for modified public interfaces
+- [ ] Add usage examples for new functionality
+- [ ] Update API documentation for endpoint changes
+- [ ] Run `python docs/scripts/validate_code_annotations.py src/`
+- [ ] Run `python docs/scripts/generate_api_docs.py`
+
+**For new features:**
+
+- [ ] Document requirements in appropriate section
+- [ ] Create API specifications for new endpoints
+- [ ] Add comprehensive usage examples
+- [ ] Update architecture documentation if needed
+
+**For bug fixes:**
+
+- [ ] Update troubleshooting documentation
+- [ ] Add test cases for the fix
+- [ ] Document workaround if applicable
 
 ### Code Review Process
 
