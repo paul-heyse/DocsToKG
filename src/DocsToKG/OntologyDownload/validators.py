@@ -1,4 +1,10 @@
-"""Validation pipeline for downloaded ontologies."""
+"""
+Ontology Validation Pipeline
+
+This module defines validators that run after ontology documents are fetched.
+Each validator parses the downloaded artifact, records structured results, and
+optionally emits normalized representations for downstream document processing.
+"""
 
 from __future__ import annotations
 
@@ -91,6 +97,15 @@ from .config import ResolvedConfig
 
 @dataclass(slots=True)
 class ValidationRequest:
+    """Parameters describing a single validation task.
+
+    Attributes:
+        name: Identifier of the validator to execute.
+        file_path: Path to the ontology document to inspect.
+        normalized_dir: Directory used to write normalized artifacts.
+        validation_dir: Directory for validator reports and logs.
+        config: Resolved configuration that supplies timeout thresholds.
+    """
     name: str
     file_path: Path
     normalized_dir: Path
@@ -100,11 +115,26 @@ class ValidationRequest:
 
 @dataclass(slots=True)
 class ValidationResult:
+    """Outcome produced by a validator.
+
+    Attributes:
+        ok: Indicates whether the validator succeeded.
+        details: Arbitrary metadata describing validator output.
+        output_files: Generated files for downstream processing.
+    """
     ok: bool
     details: Dict[str, object]
     output_files: List[str]
 
     def to_dict(self) -> Dict[str, object]:
+        """Represent the validation result as a JSON-serializable dict.
+
+        Args:
+            None
+
+        Returns:
+            Dictionary with boolean status, detail payload, and output paths.
+        """
         return {
             "ok": self.ok,
             "details": self.details,
@@ -222,6 +252,18 @@ def _prepare_xbrl_package(
 
 
 def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> ValidationResult:
+    """Parse ontologies with rdflib and optionally produce Turtle output.
+
+    Args:
+        request: Validation request describing the target ontology and output directories.
+        logger: Logger adapter used for structured validation events.
+
+    Returns:
+        ValidationResult capturing success state, metadata, and generated files.
+
+    Raises:
+        ValidationTimeout: Propagated when parsing exceeds configured timeout.
+    """
     graph = rdflib.Graph()
     payload: Dict[str, object] = {"ok": False}
     timeout = request.config.defaults.validation.parser_timeout_sec
@@ -263,6 +305,18 @@ def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> Valid
 
 
 def validate_pronto(request: ValidationRequest, logger: logging.Logger) -> ValidationResult:
+    """Execute Pronto-based validation and emit OBO Graphs when requested.
+
+    Args:
+        request: Validation request describing ontology inputs and output directories.
+        logger: Structured logger for recording warnings and failures.
+
+    Returns:
+        ValidationResult with parsed ontology statistics and generated artifacts.
+
+    Raises:
+        ValidationTimeout: Propagated when Pronto takes longer than allowed.
+    """
     def _load() -> pronto.Ontology:
         return pronto.Ontology(request.file_path.as_posix())
 
@@ -311,6 +365,15 @@ def validate_pronto(request: ValidationRequest, logger: logging.Logger) -> Valid
 
 
 def validate_owlready2(request: ValidationRequest, logger: logging.Logger) -> ValidationResult:
+    """Inspect ontologies with Owlready2 to count entities and catch parsing errors.
+
+    Args:
+        request: Validation request referencing the ontology to parse.
+        logger: Logger for reporting failures or memory warnings.
+
+    Returns:
+        ValidationResult summarizing entity counts or failure details.
+    """
     try:
         size_mb = request.file_path.stat().st_size / (1024 ** 2)
         limit = request.config.defaults.validation.skip_reasoning_if_size_mb
@@ -356,6 +419,15 @@ def validate_owlready2(request: ValidationRequest, logger: logging.Logger) -> Va
 
 
 def validate_robot(request: ValidationRequest, logger: logging.Logger) -> ValidationResult:
+    """Run ROBOT CLI validation and conversion workflows when available.
+
+    Args:
+        request: Validation request detailing ontology paths and output locations.
+        logger: Logger adapter for reporting warnings and CLI errors.
+
+    Returns:
+        ValidationResult describing generated outputs or encountered issues.
+    """
     robot_path = shutil.which("robot")
     result_payload: Dict[str, object]
     output_files: List[str] = []
@@ -403,6 +475,16 @@ def validate_robot(request: ValidationRequest, logger: logging.Logger) -> Valida
 
 
 def validate_arelle(request: ValidationRequest, logger: logging.Logger) -> ValidationResult:
+    """Validate XBRL ontologies with Arelle CLI if installed.
+
+    Args:
+        request: Validation request referencing the ontology under test.
+        logger: Logger used to communicate validation progress and failures.
+
+    Returns:
+        ValidationResult indicating whether the validation completed and
+        referencing any produced log files.
+    """
     try:
         from arelle import Cntlr  # type: ignore
 
@@ -449,6 +531,15 @@ VALIDATORS = {
 
 
 def run_validators(requests: Iterable[ValidationRequest], logger: logging.Logger) -> Dict[str, ValidationResult]:
+    """Execute registered validators and aggregate their results.
+
+    Args:
+        requests: Iterable of validation requests that specify validators to run.
+        logger: Logger adapter shared across validation executions.
+
+    Returns:
+        Mapping from validator name to the corresponding ValidationResult.
+    """
     results: Dict[str, ValidationResult] = {}
     for request in requests:
         validator = VALIDATORS.get(request.name)

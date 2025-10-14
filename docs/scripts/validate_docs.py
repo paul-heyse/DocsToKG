@@ -56,7 +56,7 @@ class DocumentationValidator:
             return [{"type": "error", "message": f"Could not read file: {e}", "file": file_name}]
 
         # Check for required sections
-        issues.extend(self._check_required_sections(content, file_name))
+        issues.extend(self._check_required_sections(content, file_path))
 
         # Check for forbidden terms
         issues.extend(self._check_forbidden_terms(content, file_name))
@@ -75,26 +75,35 @@ class DocumentationValidator:
 
         return issues
 
-    def _check_required_sections(self, content: str, file_name: str) -> List[Dict]:
+    def _check_required_sections(self, content: str, file_path: Path) -> List[Dict]:
         """Check if required sections are present."""
         issues = []
+        relative_path = file_path.relative_to(self.docs_dir)
+        path_str = str(relative_path).replace("\\", "/").lower()
+        stem = file_path.stem.lower()
 
-        # Only check certain file types for required sections
-        if file_name in ["index.md"] or "setup" in file_name or "installation" in file_name:
-            missing_sections = []
+        should_check = False
+        if path_str == "02-setup/index.md":
+            should_check = True
+        elif "setup" in stem or "installation" in stem:
+            should_check = True
 
-            for section in self.style_guide.get("required_sections", []):
-                if f"## {section}" not in content and f"# {section}" not in content:
-                    missing_sections.append(section)
+        if not should_check:
+            return issues
 
-            if missing_sections:
-                issues.append(
-                    {
-                        "type": "warning",
-                        "message": f"Missing required sections: {', '.join(missing_sections)}",
-                        "file": file_name,
-                    }
-                )
+        missing_sections = []
+        for section in self.style_guide.get("required_sections", []):
+            if f"## {section}" not in content and f"# {section}" not in content:
+                missing_sections.append(section)
+
+        if missing_sections:
+            issues.append(
+                {
+                    "type": "warning",
+                    "message": f"Missing required sections: {', '.join(missing_sections)}",
+                    "file": str(relative_path),
+                }
+            )
 
         return issues
 
@@ -103,7 +112,8 @@ class DocumentationValidator:
         issues = []
 
         for term in self.style_guide.get("forbidden_terms", []):
-            if term.lower() in content.lower():
+            pattern = re.compile(rf"\b{re.escape(term)}\b", re.IGNORECASE)
+            if pattern.search(content):
                 issues.append(
                     {
                         "type": "warning",
@@ -203,6 +213,9 @@ class DocumentationValidator:
         # Look for heading with id attribute or direct anchor
         anchor_pattern = f'id="{anchor}"'
         if anchor_pattern in content:
+            return True
+        markdown_anchor = f"{{#{anchor}}}"
+        if markdown_anchor in content:
             return True
 
         # Also check for implicit anchors from headings

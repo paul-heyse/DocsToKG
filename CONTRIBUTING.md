@@ -7,7 +7,7 @@ Welcome to the DocsToKG project! We appreciate your interest in contributing to 
 1. **Read our documentation** - Start with the [Overview](./docs/01-overview/) and [Development Guide](./docs/05-development/)
 2. **Set up your environment** - Follow the [Setup Guide](./docs/02-setup/)
 3. **Explore the codebase** - Understand our [Architecture](./docs/03-architecture/) and [API](./docs/04-api/)
-4. **Find an issue** - Look for [good first issues](https://github.com/yourorg/docstokg/labels/good%20first%20issue) or [help wanted](https://github.com/yourorg/docstokg/labels/help%20wanted)
+4. **Find an issue** - Look for [good first issues](https://github.com/paul-heyse/DocsToKG/labels/good%20first%20issue) or [help wanted](https://github.com/paul-heyse/DocsToKG/labels/help%20wanted)
 5. **Make your contribution** - Follow our development workflow and standards
 
 ## 📚 Documentation Contributions
@@ -67,10 +67,10 @@ python docs/scripts/validate_code_annotations.py src/
 
 ### Code Standards
 
-- **Python 3.8+** with type hints
+- **Python 3.12+** with type hints
 - **Black** for code formatting
 - **isort** for import sorting
-- **flake8** and **mypy** for linting
+- **ruff** and **mypy** for linting/type checks
 - **pytest** for testing
 - **Comprehensive docstrings** for all public interfaces
 
@@ -129,8 +129,8 @@ For feature requests, please provide:
 - **[Documentation](./docs/)** - Comprehensive guides and references
 - **[API Reference](./docs/04-api/)** - Complete API documentation
 - **[Development Guide](./docs/05-development/)** - Contributing guidelines
-- **[GitHub Issues](https://github.com/yourorg/docstokg/issues)** - Bug reports and feature requests
-- **[GitHub Discussions](https://github.com/yourorg/docstokg/discussions)** - Questions and community discussions
+- **[GitHub Issues](https://github.com/paul-heyse/DocsToKG/issues)** - Bug reports and feature requests
+- **[GitHub Discussions](https://github.com/paul-heyse/DocsToKG/discussions)** - Questions and community discussions
 
 ### Community Support
 

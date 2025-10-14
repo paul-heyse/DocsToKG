@@ -2,69 +2,47 @@
 
 ## What is DocsToKG?
 
-DocsToKG is a comprehensive system for transforming documents into structured knowledge graphs using vector search, machine learning, and AI technologies. It enables intelligent document processing, semantic search, and knowledge discovery across large document collections.
+DocsToKG is a Python toolkit for turning raw documents into searchable, richly annotated knowledge artefacts. It combines document acquisition, Docling-based parsing, ontology enrichment, and a FAISS-backed hybrid search engine to surface relevant context for downstream applications.
 
 ## Core Capabilities
 
-### Document Processing Pipeline
+### Content Acquisition & Parsing
 
-- **Multi-format Support**: Process PDF, DOCX, TXT, HTML, and other document types
-- **Content Extraction**: Extract text, metadata, and structural information
-- **AI-Powered Analysis**: Use modern language models for content understanding and classification
+- Download corpora and metadata from external sources (e.g., Pyalex) using the `ContentDownload` utilities.
+- Convert PDFs and HTML into DocTags, chunked Markdown, and embeddings via `DocParsing` pipelines.
+- Preserve provenance (page numbers, figure references, captions) for downstream quality checks.
 
-### Knowledge Graph Construction
+### Hybrid Search
 
-- **Entity Recognition**: Identify and extract key entities, concepts, and relationships
-- **Semantic Linking**: Create connections between related content across documents
-- **Structured Representation**: Build graph-based representations for complex querying
+- Fuse lexical (BM25), sparse (SPLADE), and dense (FAISS) retrieval signals for robust ranking.
+- Support namespace-aware search, diagnostics, and cursor-based pagination.
+- Expose programmatic APIs (`HybridSearchService`, `HybridSearchAPI`) for integration.
 
-### Intelligent Search & Discovery
+### Ontology Integration
 
-- **Vector Search**: Use Faiss for high-performance similarity search
-- **Semantic Queries**: Natural language understanding for search queries
-- **Contextual Results**: Return relevant passages with surrounding context
+- Download, validate, and catalogue ontologies through the `OntologyDownload` CLI.
+- Enrich document metadata using controlled vocabularies and reusable resolver logic.
+- Keep terminologies current with automated validation and manifests.
 
 ## Architecture Overview
 
 ```mermaid
-graph TB
-    A[Documents] --> B[Ingestion Service]
-    B --> C[Document Processor]
-    C --> D[Embedding Generator]
-    D --> E[Vector Database]
-    E --> F[Knowledge Graph]
-    F --> G[Search API]
-    G --> H[Applications]
-
-    I[External APIs] --> G
-    J[Management UI] --> B
+graph LR
+    A[Source documents] --> B[ContentDownload]
+    B --> C[DocParsing]
+    C --> D[Embeddings & chunk payloads]
+    D --> E[HybridSearch ingest]
+    E --> F[HybridSearch API & service]
+    G[OntologyDownload] --> E
 ```
 
 ## Key Components
 
-### Ingestion Service
-
-Handles document upload, validation, and initial processing pipeline orchestration.
-
-### Document Processor
-
-Extracts content, metadata, and applies preprocessing transformations.
-
-### Embedding Generator
-
-Creates vector representations using modern language models and domain-specific encoders.
-
-### Vector Database (Faiss)
-
-Stores and indexes document embeddings for fast similarity search operations.
-
-### Knowledge Graph Service
-
-Builds and maintains graph structures representing document relationships and concepts.
-
-### Search API
-
-Provides RESTful endpoints for semantic search, filtering, and result retrieval.
+- **ContentDownload** – Resolvers and utilities for fetching PDFs and metadata (e.g., Pyalex support).
+- **DocParsing** – Docling pipelines that chunk documents, extract captions, and generate embeddings.
+- **HybridSearch** – Retrieval service combining FAISS, BM25, and SPLADE with fusion, observability, and API layers.
+- **OntologyDownload** – CLI-driven ontology fetcher with validation pipelines and manifest management.
+- **Documentation Tooling** – Scripts under `docs/scripts/` to generate API docs, run validations, and build Sphinx sites.
 
 ## Use Cases
 
@@ -82,18 +60,18 @@ Provides RESTful endpoints for semantic search, filtering, and result retrieval.
 
 ### Content Management
 
-- Article and blog organization
-- Content recommendation systems
-- Automated tagging and categorization
+- Editorial workflows for large publication archives
+- Recommendation and summarisation pipelines
+- Dataset curation with ontology alignment
 
 ## Technology Stack
 
-- **Backend**: Python, FastAPI, SQLAlchemy
-- **Vector Search**: Faiss, Elasticsearch
-- **AI/ML**: Transformers, PyTorch, scikit-learn
-- **Storage**: PostgreSQL, Redis, MinIO
-- **Documentation**: Sphinx, Markdown
-- **DevOps**: Docker, Kubernetes, GitHub Actions
+- **Language & Runtime**: Python ≥3.12, type hints enforced via `mypy --strict`
+- **Parsing & NLP**: Docling, Hugging Face Transformers, vLLM for accelerated inference
+- **Retrieval**: FAISS (dense), BM25/SPLADE simulators for sparse signals
+- **Ontology & RDF**: `oaklib`, `ols-client`, `ontoportal-client`, `rdflib`, `owlready2`, `pronto`, `arelle`
+- **Tooling**: Sphinx, Vale (optional), pytest, ruff, black
+- **Automation Scripts**: `docs/scripts/` orchestration, `tests/` for quality gates
 
 ## Getting Started
 
@@ -106,9 +84,9 @@ Ready to explore DocsToKG? Here's your path:
 
 ## Project Status
 
-- **Current Version**: v1.0.0
+- **Current Version**: 0.1.0
 - **Development Phase**: Active development
-- **Documentation**: Comprehensive framework established
-- **Community**: Open to contributors and feedback
+- **Documentation**: Framework established with automated validation
+- **Community**: Contributions welcome via GitHub issues and pull requests
 
-For the latest updates, check our [GitHub repository](https://github.com/yourorg/docstokg) or [project roadmap](../05-development/roadmap.md).
+For the latest updates, check our [GitHub repository](https://github.com/paul-heyse/DocsToKG) or the [Development Guide](../05-development/index.md).

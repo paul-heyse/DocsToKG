@@ -12,11 +12,7 @@ Comprehensive guide to FAISS vector similarity search integration, including GPU
 
 Documentation for external libraries, APIs, and services used by DocsToKG.
 
-### 🛠️ [Technical Specifications](./specifications/)
-
-Detailed technical specifications, data formats, and protocol definitions.
-
-### 📖 [Glossary](./glossary/)
+### 📖 [Glossary](./glossary.md)
 
 Definitions of key terms, concepts, and domain-specific terminology used throughout the documentation.
 
@@ -26,7 +22,7 @@ Definitions of key terms, concepts, and domain-specific terminology used through
 
 How to integrate DocsToKG with external systems and services.
 
-### 🔧 [Tool Configuration](./tool-configuration/)
+### 🔧 [Tool Configuration](./tooling/)
 
 Configuration guides for development tools, testing frameworks, and deployment systems.
 

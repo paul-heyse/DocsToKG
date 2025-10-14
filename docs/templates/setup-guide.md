@@ -252,7 +252,7 @@ To remove this installation:
 
 ## Related Documentation
 
-- [Link to related setup guide](./related-setup/)
+- Add links to complementary setup guides or architecture docs
 - [Link to architecture documentation](../03-architecture/)
 - [Link to operations guide](../06-operations/)
 

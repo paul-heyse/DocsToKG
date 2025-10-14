@@ -1,6 +1,6 @@
-# API Endpoint: [ENDPOINT_PATH]
+# API Endpoint: <ENDPOINT_PATH>
 
-**Method**: [HTTP_METHOD]
+**Method**: <HTTP_METHOD>
 
 **Description**: [Brief description of what this endpoint does]
 
@@ -71,7 +71,7 @@
 ### cURL Example
 
 ```bash
-curl -X [METHOD] [FULL_URL] \
+curl -X <METHOD> <FULL_URL> \
   -H "Content-Type: application/json" \
   -d '{"key": "value"}'
 ```
@@ -81,10 +81,10 @@ curl -X [METHOD] [FULL_URL] \
 ```python
 import requests
 
-response = requests.[method](
-    '[FULL_URL]',
-    json={'key': 'value'},
-    headers={'Authorization': 'Bearer YOUR_TOKEN'}
+response = requests.METHOD(
+    "<FULL_URL>",
+    json={"key": "value"},
+    headers={"Authorization": "Bearer <TOKEN>"}
 )
 print(response.json())
 ```
@@ -92,11 +92,11 @@ print(response.json())
 ### JavaScript Example
 
 ```javascript
-const response = await fetch('[FULL_URL]', {
-  method: '[METHOD]',
+const response = await fetch("<FULL_URL>", {
+  method: "<METHOD>",
   headers: {
     'Content-Type': 'application/json',
-    'Authorization': 'Bearer YOUR_TOKEN'
+    'Authorization': 'Bearer <TOKEN>'
   },
   body: JSON.stringify({key: 'value'})
 });
@@ -107,8 +107,7 @@ console.log(data);
 
 ## Related Endpoints
 
-- [Link to related endpoint](./related-endpoint/)
-- [Link to another related endpoint](./another-endpoint/)
+- Add links to closely related endpoints here (if applicable)
 
 ## Notes
 

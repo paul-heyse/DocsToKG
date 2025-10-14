@@ -1,237 +1,117 @@
 # Setup Guide
 
-This guide will help you get DocsToKG up and running on your local development environment.
+Follow this guide to configure DocsToKG on a local workstation or development server.
+
+## Overview
+
+- Provision a Python 3.12+ environment with optional CUDA support.
+- Install project dependencies (core, GPU, documentation tooling).
+- Configure environment variables and working directories.
+- Run smoke checks to confirm the installation.
 
 ## Prerequisites
 
-Before starting the installation, ensure you have:
+- **Operating system**: Linux or macOS preferred (Windows users should use WSL2).
+- **Python**: 3.12 or newer (see `pyproject.toml`).
+- **Memory**: 16 GB RAM recommended for parsing and validation workloads.
+- **GPU (optional)**: CUDA 12.9+ for FAISS and PyTorch acceleration (required when installing `requirements.in`).
+- **Git**: 2.30 or newer.
 
-### System Requirements
+> ℹ️  Direnv is supported via `.envrc`, but optional. Install with `brew install direnv` or follow instructions at [direnv.net](https://direnv.net).
 
-- **Operating System**: Linux, macOS, or Windows (WSL2 recommended for Windows)
-- **Memory**: 8GB RAM minimum (16GB recommended for large document processing)
-- **Storage**: 10GB free disk space minimum
-- **Network**: Internet connection for downloading dependencies
-
-### Software Prerequisites
-
-#### Required Software
-
-- **Python 3.8+**: [Download from python.org](https://python.org/downloads/)
-- **Git**: For version control [Download from git-scm.com](https://git-scm.com/downloads)
-- **Docker** (optional): For containerized deployment [Download from docker.com](https://docker.com/get-started)
-
-#### Python Packages
-
-The following packages will be installed automatically:
-
-- **Faiss**: Vector similarity search library
-- **FastAPI**: Web framework for APIs
-- **SQLAlchemy**: Database ORM
-- **Transformers**: Hugging Face models
-- **PyTorch**: Deep learning framework
-
-## Quick Start Installation
+## Installation
 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourorg/docstokg.git
-cd docstokg
+git clone https://github.com/paul-heyse/DocsToKG.git
+cd DocsToKG
 ```
 
-### 2. Set Up Virtual Environment
-
-Create and activate a Python virtual environment:
+### 2. Create a Virtual Environment
 
 ```bash
-# Create virtual environment
-python -m venv venv
-
-# Activate on Linux/macOS
-source venv/bin/activate
-
-# Activate on Windows
-venv\Scripts\activate
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 ```
+
+If you use direnv, run `direnv allow` after activation so `.envrc` can automatically load the environment next time.
 
 ### 3. Install Dependencies
 
-Install all required packages:
-
 ```bash
-# Install from requirements file
-pip install -r requirements.txt
+# Core project dependencies (editable install for development)
+pip install -e .
 
-# Install development dependencies
-pip install -r requirements-dev.txt
+# Optional GPU/ML stack (requires CUDA 12.9 toolchain)
+pip install -r requirements.in
 ```
 
-### 4. Set Up Environment Variables
-
-Copy the example environment file and configure it:
+Install documentation tooling when you plan to regenerate docs:
 
 ```bash
-cp .env.example .env
+pip install -r docs/build/sphinx/requirements.txt
 ```
 
-Edit `.env` with your specific configuration:
+### 4. Configure Environment Variables
+
+Create a `.env` file in the repository root (or export variables manually):
 
 ```bash
-# Database Configuration
-DATABASE_URL=postgresql://user:password@localhost/docstokg
+cat > .env <<'EOF'
+# Storage locations
+DOCSTOKG_DATA_ROOT=./Data
+HYBRID_SEARCH_CONFIG=./config/hybrid_config.json
+ONTOLOGY_FETCHER_CONFIG=./configs/sources.yaml
 
-# API Configuration
-API_HOST=localhost
-API_PORT=8000
-DEBUG=True
-
-# Vector Search Configuration
-FAISS_INDEX_PATH=./data/faiss_index
-EMBEDDING_MODEL=all-MiniLM-L6-v2
-
-# Security
-SECRET_KEY=your-secret-key-here
+# Third-party credentials
+PA_ALEX_KEY=your-pyalex-api-key
+BIOPORTAL_API_KEY=optional-bioportal-token
+EOF
 ```
 
-### 5. Initialize Database
+Load the file with `source .env` or rely on direnv to ingest it automatically.
 
-Set up the database schema:
+### 5. Prepare Local Directories
 
 ```bash
-# Run database migrations
-python -m scripts.db_init
-
-# Verify database connection
-python -c "from app.database import engine; print('Database connected successfully')"
+mkdir -p Data/DocTagsFiles Data/ChunkedDocTagFiles Data/Embeddings artifacts logs
 ```
 
-### 6. Start the Application
+These directories store DocTags inputs, chunked outputs, embedding payloads, FAISS snapshots, and log output.
 
-Launch the DocsToKG services:
+### 6. Verify the Installation
+
+Run the automated test suite:
 
 ```bash
-# Start the API server
-python -m app.main
-
-# Or use uvicorn directly
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+pytest -q
 ```
 
-The API will be available at `http://localhost:8000`.
-
-## Verification
-
-### Test the Installation
-
-1. **Check API Health**:
-
-   ```bash
-   curl http://localhost:8000/health
-   ```
-
-   Expected response:
-
-   ```json
-   {"status": "healthy", "version": "1.0.0"}
-   ```
-
-2. **Test Document Upload** (if sample data is available):
-
-   ```bash
-   curl -X POST http://localhost:8000/api/v1/documents \
-     -H "Content-Type: application/json" \
-     -d '{"title": "Test Document", "content": "This is a test document for verification."}'
-   ```
-
-### Run Tests
-
-Execute the test suite to verify everything works:
+Generate and validate documentation:
 
 ```bash
-# Run all tests
-pytest tests/ -v
-
-# Run specific test categories
-pytest tests/test_api.py -v
-pytest tests/test_processing.py -v
+python docs/scripts/generate_api_docs.py
+python docs/scripts/validate_docs.py
 ```
 
-## Development Setup
-
-For contributors who want to modify the codebase:
-
-### Additional Development Tools
+For asynchronous link checks (optional):
 
 ```bash
-# Install development tools
-pip install black isort mypy pytest-cov pre-commit
-
-# Set up pre-commit hooks
-pre-commit install
-
-# Run code formatting
-black src/ tests/
-isort src/ tests/
+python docs/scripts/check_links.py --timeout 10
 ```
 
-### IDE Configuration
+### 7. Optional: Build Sphinx HTML Docs
 
-**VS Code**:
-
-- Install Python extension
-- Configure format on save with Black
-- Set up mypy for type checking
-
-**PyCharm**:
-
-- Enable Django support (even though we're using FastAPI)
-- Configure Black as code formatter
-- Set up pytest as test runner
-
-## Troubleshooting
-
-### Common Issues
-
-#### Import Errors
-
-**Problem**: `ModuleNotFoundError` for dependencies
-**Solution**: Ensure virtual environment is activated and dependencies installed
-
-#### Database Connection Issues
-
-**Problem**: Connection refused or authentication errors
-**Solution**:
-
-1. Verify database is running
-2. Check DATABASE_URL in `.env`
-3. Ensure database user has proper permissions
-
-#### Memory Issues
-
-**Problem**: Out of memory during document processing
-**Solution**:
-
-1. Increase system memory allocation
-2. Process documents in smaller batches
-3. Use more efficient embedding models
-
-### Getting Help
-
-If you encounter issues:
-
-1. Check the logs in `logs/` directory
-2. Review this setup guide again
-3. Search existing [GitHub issues](https://github.com/yourorg/docstokg/issues)
-4. Ask in [GitHub discussions](https://github.com/yourorg/docstokg/discussions)
+```bash
+python docs/scripts/build_docs.py --format html
+open docs/build/_build/html/index.html  # macOS
+```
 
 ## Next Steps
 
-With DocsToKG installed and running:
+- Ingest sample documents using the content downloaders (`DocsToKG.ContentDownload`).
+- Convert assets into chunked DocTags and embeddings (`DocsToKG.DocParsing`).
+- Populate a FAISS index and serve hybrid search queries (`DocsToKG.HybridSearch`).
 
-1. **Explore the API**: See [API Reference](../04-api/) for available endpoints
-2. **Process Documents**: Upload and process your first documents
-3. **Customize Configuration**: Adjust settings for your use case
-4. **Set Up Production**: Follow [Operations Guide](../06-operations/) for production deployment
-
-Happy exploring! 🚀
+Refer to the **Architecture Guide** (`docs/03-architecture/index.md`) for subsystem details and the **Operations Guide** (`docs/06-operations/index.md`) for day-two workflows.

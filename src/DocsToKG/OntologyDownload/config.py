@@ -1,4 +1,12 @@
-"""Configuration helpers for the ontology downloader."""
+"""
+Ontology Download Configuration
+
+This module centralizes configuration models, parsing helpers, and validation
+logic for the ontology downloader service. It reads YAML configuration files,
+merges default values, applies environment overrides, and ensures that the
+resulting settings are ready for downstream document processing and download
+pipelines.
+"""
 
 from __future__ import annotations
 
@@ -125,14 +133,25 @@ if TYPE_CHECKING:  # pragma: no cover - type checking only
 
 
 class ConfigError(RuntimeError):
-    """Raised when configuration files are invalid."""
+    """Raised when ontology configuration files are invalid or inconsistent."""
 
 
 PYTHON_MIN_VERSION = (3, 9)
 
 
 def ensure_python_version() -> None:
-    """Ensure the interpreter meets the minimum supported version."""
+    """Ensure the interpreter meets the minimum supported version.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        SystemExit: If Python is older than the minimum version supported by
+            the ontology downloader tooling.
+    """
 
     if sys.version_info < PYTHON_MIN_VERSION:
         print("Error: Python 3.9+ required", file=sys.stderr)
@@ -140,9 +159,14 @@ def ensure_python_version() -> None:
 
 
 @dataclass(slots=True)
-class LoggingConfig:
-    """Logging configuration for both console and file handlers."""
+class LoggingConfiguration:
+    """Structured logging options for ontology download operations.
 
+    Attributes:
+        level: Logging level name (e.g., `INFO`, `DEBUG`).
+        max_log_size_mb: Maximum individual log file size before rotation.
+        retention_days: Number of days to keep logs prior to compression.
+    """
     level: str = "INFO"
     max_log_size_mb: int = 100
     retention_days: int = 30
@@ -158,9 +182,17 @@ class ValidationConfig:
 
 
 @dataclass(slots=True)
-class HTTPConfig:
-    """HTTP and download related configuration values."""
+class DownloadConfiguration:
+    """HTTP download and retry settings for ontology sources.
 
+    Attributes:
+        max_retries: Number of retries for transient download failures.
+        timeout_sec: Timeout for request connection and read operations.
+        download_timeout_sec: Upper bound for whole file downloads.
+        backoff_factor: Backoff multiplier used between retry attempts.
+        per_host_rate_limit: Token bucket rate limit definition per host.
+        max_download_size_gb: Maximum allowed ontology archive size.
+    """
     max_retries: int = 5
     timeout_sec: int = 30
     download_timeout_sec: int = 300
@@ -170,6 +202,18 @@ class HTTPConfig:
     concurrent_downloads: int = 1
 
     def rate_limit_per_second(self) -> float:
+        """Convert the textual rate limit to a per-second float value.
+
+        Args:
+            None
+
+        Returns:
+            Number of allowed download tokens per second for each host.
+
+        Raises:
+            ConfigError: If the configured rate limit does not use a per-second
+            unit or the numeric portion cannot be parsed.
+        """
         value, _, unit = self.per_host_rate_limit.partition("/")
         try:
             tokens = float(value)
@@ -181,7 +225,19 @@ class HTTPConfig:
 
 
 @dataclass(slots=True)
-class DefaultsConfig:
+class DefaultsConfiguration:
+    """Collection of default settings applied to ontology fetch specifications.
+
+    Attributes:
+        accept_licenses: License identifiers allowed for automated downloads.
+        normalize_to: Output formats to produce after ontology normalization.
+        prefer_source: Resolver preference order when one is not specified.
+        http: Download configuration shared across ontology fetch operations.
+        validation: Validation configuration for ontologies post-download.
+        logging: Logging configuration applied to the downloader runtime.
+        continue_on_error: Whether to proceed after non-fatal download errors.
+        concurrent_downloads: Maximum concurrent download workers to run.
+    """
     accept_licenses: Sequence[str] = field(default_factory=lambda: ["CC-BY-4.0", "CC0-1.0", "OGL-UK-3.0"])
     normalize_to: Sequence[str] = field(default_factory=lambda: ["ttl"])
     prefer_source: Sequence[str] = field(default_factory=lambda: ["obo", "ols", "bioportal", "direct"])
@@ -196,7 +252,13 @@ DEFAULT_MAX_CONCURRENT_DOWNLOADS = 3
 
 @dataclass(slots=True)
 class ResolvedConfig:
-    defaults: DefaultsConfig
+    """Container for merged configuration defaults and fetch specifications.
+
+    Attributes:
+        defaults: Finalized default settings applied to fetch specs.
+        specs: Sequence of ontology fetch specifications to execute.
+    """
+    defaults: DefaultsConfiguration
     specs: Sequence["FetchSpec"]
 
     @classmethod
@@ -205,6 +267,15 @@ class ResolvedConfig:
 
 
 def _coerce_sequence(value: Optional[Iterable[str]]) -> List[str]:
+    """Normalize configuration entries into a list of strings.
+
+    Args:
+        value: Raw configuration value which may be None, a string, or an
+            iterable of string-like items.
+
+    Returns:
+        List of string values that are safe for downstream processing.
+    """
     if value is None:
         return []
     if isinstance(value, str):
@@ -213,6 +284,15 @@ def _coerce_sequence(value: Optional[Iterable[str]]) -> List[str]:
 
 
 def get_env_overrides() -> Dict[str, str]:
+    """Extract ontology downloader overrides from environment variables.
+
+    Args:
+        None
+
+    Returns:
+        Mapping of normalized environment keys (lowercase without prefix) to
+        their string values for supported overrides.
+    """
     prefix = "ONTOFETCH_"
     return {key[len(prefix) :].lower(): value for key, value in os.environ.items() if key.startswith(prefix)}
 
@@ -364,12 +444,35 @@ def _make_fetch_spec(
     extras: Mapping[str, object],
     target_formats: Sequence[str],
 ) -> "FetchSpec":
+    """Instantiate a FetchSpec from raw YAML fields.
+
+    Args:
+        ontology_id: Identifier of the ontology to retrieve.
+        resolver: Resolver backend to use when locating documents.
+        extras: Additional resolver-specific settings.
+        target_formats: Desired normalization output formats.
+
+    Returns:
+        Fetch specification ready for ontology download orchestration.
+    """
     from .core import FetchSpec as _FetchSpec  # Local import avoids circular dependency
 
     return _FetchSpec(id=ontology_id, resolver=resolver, extras=dict(extras), target_formats=list(target_formats))
 
 
 def validate_config(config_path: Path) -> ResolvedConfig:
+    """Validate a configuration file and return the resolved settings.
+
+    Args:
+        config_path: File path to a YAML config describing ontology downloads.
+
+    Returns:
+        Resolved configuration containing defaults and fetch specifications.
+
+    Raises:
+        ConfigError: If the configuration fails schema validation.
+        SystemExit: If the file does not exist.
+    """
     raw = load_raw_yaml(config_path)
     config = build_resolved_config(raw)
     _validate_schema(raw, config)
@@ -455,6 +558,18 @@ def _validate_schema(raw: Mapping[str, object], config: Optional[ResolvedConfig]
 
 
 def load_raw_yaml(config_path: Path) -> MutableMapping[str, object]:
+    """Load and parse a YAML configuration file into a mutable mapping.
+
+    Args:
+        config_path: Path to the YAML file to parse.
+
+    Returns:
+        Parsed mapping-compatible object suitable for validation.
+
+    Raises:
+        SystemExit: If the file cannot be located.
+        ConfigError: If the YAML structure is invalid.
+    """
     try:
         text = config_path.read_text()
     except FileNotFoundError:  # pragma: no cover - depends on filesystem state
@@ -475,6 +590,14 @@ def load_raw_yaml(config_path: Path) -> MutableMapping[str, object]:
 
 
 def load_config(config_path: Path) -> ResolvedConfig:
+    """Load configuration from disk without performing schema validation.
+
+    Args:
+        config_path: Path to the YAML file describing ontology downloads.
+
+    Returns:
+        Resolved configuration with defaults merged and fetch specs created.
+    """
     raw = load_raw_yaml(config_path)
     return build_resolved_config(raw)
 

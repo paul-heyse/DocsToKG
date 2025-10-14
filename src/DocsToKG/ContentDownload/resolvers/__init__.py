@@ -11,9 +11,11 @@ from __future__ import annotations
 import json
 import random
 import re
+import threading
 import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+from functools import lru_cache
 from itertools import chain
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Protocol, Sequence, Tuple
 from urllib.parse import quote, urljoin, urlparse
@@ -43,8 +45,16 @@ DEFAULT_RESOLVER_ORDER: List[str] = [
     "core",
     "doaj",
     "semantic_scholar",
+    "openaire",
+    "hal",
+    "osf",
     "wayback",
 ]
+
+_DEFAULT_RESOLVER_TOGGLES: Dict[str, bool] = {
+    name: name not in {"openaire", "hal", "osf"}
+    for name in DEFAULT_RESOLVER_ORDER
+}
 
 _TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
 _DEFAULT_MAX_RETRIES = 2
@@ -53,6 +63,83 @@ _DEFAULT_BACKOFF = 0.75
 
 def _sleep_backoff(attempt: int, base: float = _DEFAULT_BACKOFF) -> None:
     time.sleep(base * (2 ** attempt) + random.random() * 0.1)
+
+
+def _headers_cache_key(headers: Dict[str, str]) -> Tuple[Tuple[str, str], ...]:
+    return tuple(sorted((headers or {}).items()))
+
+
+@lru_cache(maxsize=1000)
+def _fetch_unpaywall_data(
+    doi: str,
+    email: str,
+    timeout: float,
+    headers_key: Tuple[Tuple[str, str], ...],
+) -> Dict[str, Any]:
+    headers = dict(headers_key)
+    response = requests.get(
+        f"https://api.unpaywall.org/v2/{quote(doi)}",
+        params={"email": email},
+        timeout=timeout,
+        headers=headers,
+    )
+    if response.status_code != 200:
+        response.raise_for_status()
+    return response.json()
+
+
+@lru_cache(maxsize=1000)
+def _fetch_crossref_data(
+    doi: str,
+    mailto: Optional[str],
+    timeout: float,
+    headers_key: Tuple[Tuple[str, str], ...],
+) -> Dict[str, Any]:
+    headers = dict(headers_key)
+    params = {"mailto": mailto} if mailto else None
+    response = requests.get(
+        f"https://api.crossref.org/works/{quote(doi)}",
+        params=params,
+        timeout=timeout,
+        headers=headers,
+    )
+    if response.status_code != 200:
+        response.raise_for_status()
+    return response.json()
+
+
+@lru_cache(maxsize=1000)
+def _fetch_semantic_scholar_data(
+    doi: str,
+    api_key: Optional[str],
+    timeout: float,
+    headers_key: Tuple[Tuple[str, str], ...],
+) -> Dict[str, Any]:
+    headers = dict(headers_key)
+    if api_key:
+        headers = dict(headers)
+        headers["x-api-key"] = api_key
+    response = requests.get(
+        f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(doi)}",
+        params={"fields": "title,openAccessPdf"},
+        timeout=timeout,
+        headers=headers,
+    )
+    if response.status_code != 200:
+        response.raise_for_status()
+    return response.json()
+
+
+def _collect_candidate_urls(node: Any, results: List[str]) -> None:
+    if isinstance(node, dict):
+        for value in node.values():
+            _collect_candidate_urls(value, results)
+    elif isinstance(node, list):
+        for item in node:
+            _collect_candidate_urls(item, results)
+    elif isinstance(node, str):
+        if node.lower().startswith("http"):
+            results.append(node)
 
 
 def _request_with_retries(
@@ -109,7 +196,7 @@ class ResolverConfig:
         default_factory=lambda: list(DEFAULT_RESOLVER_ORDER)
     )
     resolver_toggles: Dict[str, bool] = field(
-        default_factory=lambda: {name: True for name in DEFAULT_RESOLVER_ORDER}
+        default_factory=lambda: dict(_DEFAULT_RESOLVER_TOGGLES)
     )
     max_attempts_per_work: int = 25
     timeout: float = 30.0
@@ -120,7 +207,7 @@ class ResolverConfig:
     semantic_scholar_api_key: Optional[str] = None
     doaj_api_key: Optional[str] = None
     resolver_timeouts: Dict[str, float] = field(default_factory=dict)
-    resolver_rate_limits: Dict[str, float] = field(default_factory=dict)
+    resolver_min_interval_s: Dict[str, float] = field(default_factory=dict)
     mailto: Optional[str] = None
 
     def get_timeout(self, resolver_name: str) -> float:
@@ -142,6 +229,9 @@ class AttemptRecord:
     elapsed_ms: Optional[float]
     reason: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    sha256: Optional[str] = None
+    content_length: Optional[int] = None
+    dry_run: bool = False
 
 
 class AttemptLogger(Protocol):
@@ -157,6 +247,11 @@ class DownloadOutcome:
     content_type: Optional[str]
     elapsed_ms: Optional[float]
     error: Optional[str] = None
+    sha256: Optional[str] = None
+    content_length: Optional[int] = None
+    etag: Optional[str] = None
+    last_modified: Optional[str] = None
+    extracted_text_path: Optional[str] = None
 
     @property
     def is_pdf(self) -> bool:
@@ -215,7 +310,14 @@ class ResolverMetrics:
         }
 
 
-DownloadFunc = Callable[[requests.Session, "WorkArtifact", str, Optional[str], float], DownloadOutcome]
+DownloadFunc = Callable[[
+    requests.Session,
+    "WorkArtifact",
+    str,
+    Optional[str],
+    float,
+    Dict[str, Any],
+], DownloadOutcome]
 
 
 class ResolverPipeline:
@@ -235,12 +337,14 @@ class ResolverPipeline:
         self.logger = logger
         self.metrics = metrics or ResolverMetrics()
         self._last_invocation: Dict[str, float] = defaultdict(lambda: 0.0)
+        self._lock = threading.Lock()
 
     def _respect_rate_limit(self, resolver_name: str) -> None:
-        limit = self.config.resolver_rate_limits.get(resolver_name)
+        limit = self.config.resolver_min_interval_s.get(resolver_name)
         if not limit:
             return
-        last = self._last_invocation[resolver_name]
+        with self._lock:
+            last = self._last_invocation[resolver_name]
         now = time.monotonic()
         delta = now - last
         if delta < limit:
@@ -255,7 +359,10 @@ class ResolverPipeline:
         self,
         session: requests.Session,
         artifact: "WorkArtifact",
+        context: Optional[Dict[str, Any]] = None,
     ) -> PipelineResult:
+        context_data: Dict[str, Any] = context or {}
+        dry_run = bool(context_data.get("dry_run", False))
         seen_urls: set[str] = set()
         html_paths: List[str] = []
         attempt_counter = 0
@@ -274,6 +381,7 @@ class ResolverPipeline:
                         content_type=None,
                         elapsed_ms=None,
                         reason="resolver-missing",
+                        dry_run=dry_run,
                     )
                 )
                 self.metrics.record_skip(resolver_name, "missing")
@@ -291,6 +399,7 @@ class ResolverPipeline:
                         content_type=None,
                         elapsed_ms=None,
                         reason="resolver-disabled",
+                        dry_run=dry_run,
                     )
                 )
                 self.metrics.record_skip(resolver_name, "disabled")
@@ -308,13 +417,15 @@ class ResolverPipeline:
                         content_type=None,
                         elapsed_ms=None,
                         reason="resolver-not-applicable",
+                        dry_run=dry_run,
                     )
                 )
                 self.metrics.record_skip(resolver_name, "not-applicable")
                 continue
 
             self._respect_rate_limit(resolver_name)
-            self._last_invocation[resolver_name] = time.monotonic()
+            with self._lock:
+                self._last_invocation[resolver_name] = time.monotonic()
 
             for result in resolver.iter_urls(session, self.config, artifact):
                 if result.is_event:
@@ -330,6 +441,7 @@ class ResolverPipeline:
                             elapsed_ms=None,
                             reason=result.event_reason,
                             metadata=result.metadata,
+                            dry_run=dry_run,
                         )
                     )
                     if result.event_reason:
@@ -352,6 +464,7 @@ class ResolverPipeline:
                             elapsed_ms=None,
                             reason="duplicate-url",
                             metadata=result.metadata,
+                            dry_run=dry_run,
                         )
                     )
                     self.metrics.record_skip(resolver_name, "duplicate-url")
@@ -365,6 +478,7 @@ class ResolverPipeline:
                     url,
                     result.referer,
                     self.config.get_timeout(resolver_name),
+                    context_data,
                 )
                 self.logger.log(
                     AttemptRecord(
@@ -378,6 +492,9 @@ class ResolverPipeline:
                         elapsed_ms=outcome.elapsed_ms,
                         reason=outcome.error,
                         metadata=result.metadata,
+                        sha256=outcome.sha256,
+                        content_length=outcome.content_length,
+                        dry_run=dry_run,
                     )
                 )
                 self.metrics.record_attempt(resolver_name, outcome)
@@ -438,14 +555,21 @@ class UnpaywallResolver:
             )
             return
         try:
-            resp = _request_with_retries(
-                session,
-                "get",
-                f"https://api.unpaywall.org/v2/{quote(doi)}",
-                params={"email": config.unpaywall_email},
-                timeout=config.get_timeout(self.name),
-                headers=config.polite_headers,
+            data = _fetch_unpaywall_data(
+                doi,
+                config.unpaywall_email,
+                config.get_timeout(self.name),
+                _headers_cache_key(config.polite_headers),
             )
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response else None
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="http-error",
+                http_status=status,
+            )
+            return
         except requests.RequestException as exc:  # pragma: no cover - network errors
             yield ResolverResult(
                 url=None,
@@ -454,18 +578,6 @@ class UnpaywallResolver:
                 metadata={"message": str(exc)},
             )
             return
-
-        if resp.status_code != 200:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="http-error",
-                http_status=resp.status_code,
-            )
-            return
-
-        try:
-            data = resp.json()
         except ValueError:
             yield ResolverResult(
                 url=None,
@@ -515,19 +627,23 @@ class CrossrefResolver:
                 event_reason="no-doi",
             )
             return
-        params: Dict[str, str] = {}
         email = config.mailto or config.unpaywall_email
-        if email:
-            params["mailto"] = email
         try:
-            resp = _request_with_retries(
-                session,
-                "get",
-                f"https://api.crossref.org/works/{quote(doi)}",
-                timeout=config.get_timeout(self.name),
-                params=params or None,
-                headers=config.polite_headers,
+            data = _fetch_crossref_data(
+                doi,
+                email,
+                config.get_timeout(self.name),
+                _headers_cache_key(config.polite_headers),
             )
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response else None
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="http-error",
+                http_status=status,
+            )
+            return
         except requests.RequestException as exc:  # pragma: no cover - network errors
             yield ResolverResult(
                 url=None,
@@ -536,18 +652,6 @@ class CrossrefResolver:
                 metadata={"message": str(exc)},
             )
             return
-
-        if resp.status_code != 200:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="http-error",
-                http_status=resp.status_code,
-            )
-            return
-
-        try:
-            data = resp.json()
         except ValueError:
             yield ResolverResult(
                 url=None,
@@ -929,16 +1033,47 @@ class SemanticScholarResolver:
         doi = normalize_doi(artifact.doi)
         if not doi:
             return []
-        headers = dict(config.polite_headers)
-        if config.semantic_scholar_api_key:
-            headers["x-api-key"] = config.semantic_scholar_api_key
+        try:
+            data = _fetch_semantic_scholar_data(
+                doi,
+                config.semantic_scholar_api_key,
+                config.get_timeout(self.name),
+                _headers_cache_key(config.polite_headers),
+            )
+        except requests.HTTPError:
+            return []
+        except requests.RequestException:
+            return []
+        except ValueError:
+            return []
+        pdf = (data.get("openAccessPdf") or {}).get("url")
+        if pdf:
+            return [ResolverResult(url=pdf, metadata={"source": "semantic-scholar"})]
+        return []
+
+
+class OpenAireResolver:
+    name = "openaire"
+
+    def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        return artifact.doi is not None
+
+    def iter_urls(
+        self,
+        session: requests.Session,
+        config: ResolverConfig,
+        artifact: "WorkArtifact",
+    ) -> Iterable[ResolverResult]:
+        doi = normalize_doi(artifact.doi)
+        if not doi:
+            return []
         try:
             resp = _request_with_retries(
                 session,
                 "get",
-                f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(doi)}",
-                params={"fields": "title,openAccessPdf"},
-                headers=headers,
+                "https://api.openaire.eu/search/publications",
+                params={"doi": doi},
+                headers=config.polite_headers,
                 timeout=config.get_timeout(self.name),
             )
         except requests.RequestException:
@@ -949,10 +1084,119 @@ class SemanticScholarResolver:
             data = resp.json()
         except ValueError:
             return []
-        pdf = (data.get("openAccessPdf") or {}).get("url")
-        if pdf:
-            return [ResolverResult(url=pdf, metadata={"source": "semantic-scholar"})]
-        return []
+        results = (
+            data.get("response", {})
+            .get("results", {})
+            .get("result", [])
+        )
+        urls: List[str] = []
+        for entry in results or []:
+            metadata = entry.get("metadata") or {}
+            _collect_candidate_urls(metadata, urls)
+        for url in dedupe(urls):
+            if url.lower().endswith(".pdf"):
+                yield ResolverResult(url=url, metadata={"source": "openaire"})
+
+
+class HalResolver:
+    name = "hal"
+
+    def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        return artifact.doi is not None
+
+    def iter_urls(
+        self,
+        session: requests.Session,
+        config: ResolverConfig,
+        artifact: "WorkArtifact",
+    ) -> Iterable[ResolverResult]:
+        doi = normalize_doi(artifact.doi)
+        if not doi:
+            return []
+        try:
+            resp = _request_with_retries(
+                session,
+                "get",
+                "https://api.archives-ouvertes.fr/search/",
+                params={"q": f"doiId_s:{doi}", "fl": "fileMain_s,file_s"},
+                headers=config.polite_headers,
+                timeout=config.get_timeout(self.name),
+            )
+        except requests.RequestException:
+            return []
+        if resp.status_code != 200:
+            return []
+        try:
+            data = resp.json()
+        except ValueError:
+            return []
+        docs = (data.get("response") or {}).get("docs") or []
+        urls: List[str] = []
+        for doc in docs:
+            if not isinstance(doc, dict):
+                continue
+            main = doc.get("fileMain_s")
+            if isinstance(main, str):
+                urls.append(main)
+            files = doc.get("file_s")
+            if isinstance(files, list):
+                for item in files:
+                    if isinstance(item, str):
+                        urls.append(item)
+        for url in dedupe(urls):
+            if url.lower().endswith(".pdf"):
+                yield ResolverResult(url=url, metadata={"source": "hal"})
+
+
+class OsfResolver:
+    name = "osf"
+
+    def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        return artifact.doi is not None
+
+    def iter_urls(
+        self,
+        session: requests.Session,
+        config: ResolverConfig,
+        artifact: "WorkArtifact",
+    ) -> Iterable[ResolverResult]:
+        doi = normalize_doi(artifact.doi)
+        if not doi:
+            return []
+        try:
+            resp = _request_with_retries(
+                session,
+                "get",
+                "https://api.osf.io/v2/preprints/",
+                params={"filter[doi]": doi},
+                headers=config.polite_headers,
+                timeout=config.get_timeout(self.name),
+            )
+        except requests.RequestException:
+            return []
+        if resp.status_code != 200:
+            return []
+        try:
+            data = resp.json()
+        except ValueError:
+            return []
+        urls: List[str] = []
+        for item in data.get("data", []) or []:
+            if not isinstance(item, dict):
+                continue
+            links = item.get("links") or {}
+            download = links.get("download")
+            if isinstance(download, str):
+                urls.append(download)
+            attributes = item.get("attributes") or {}
+            primary = attributes.get("primary_file") or {}
+            if isinstance(primary, dict):
+                file_links = primary.get("links") or {}
+                href = file_links.get("download")
+                if isinstance(href, str):
+                    urls.append(href)
+        for url in dedupe(urls):
+            yield ResolverResult(url=url, metadata={"source": "osf"})
 
 
 class WaybackResolver:
@@ -993,6 +1237,12 @@ class WaybackResolver:
                 yield ResolverResult(url=closest["url"], metadata=metadata)
 
 
+def clear_resolver_caches() -> None:
+    _fetch_unpaywall_data.cache_clear()
+    _fetch_crossref_data.cache_clear()
+    _fetch_semantic_scholar_data.cache_clear()
+
+
 def default_resolvers() -> List[Resolver]:
     return [
         UnpaywallResolver(),
@@ -1004,6 +1254,9 @@ def default_resolvers() -> List[Resolver]:
         CoreResolver(),
         DoajResolver(),
         SemanticScholarResolver(),
+        OpenAireResolver(),
+        HalResolver(),
+        OsfResolver(),
         WaybackResolver(),
     ]
 
@@ -1020,4 +1273,5 @@ __all__ = [
     "ResolverMetrics",
     "default_resolvers",
     "DEFAULT_RESOLVER_ORDER",
+    "clear_resolver_caches",
 ]
