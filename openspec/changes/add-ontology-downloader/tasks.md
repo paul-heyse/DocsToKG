@@ -80,7 +80,7 @@
 - [x] 3.4 Implement SKOSResolver for direct URL-based SKOS thesauri
 - [x] 3.5 Implement XBRLResolver for XBRL taxonomy ZIP packages
 - [x] 3.6 Create resolver registry dictionary mapping resolver names to instances
-- [ ] 3.7 Add unit tests for each resolver with mocked library responses
+- [x] 3.7 Add unit tests for each resolver with mocked library responses
 
 ## 4. Download Manager
 
@@ -93,7 +93,7 @@
 - [x] 4.7 Add per-host rate limiting using token bucket algorithm (default 4 req/sec)
 - [x] 4.8 Add SHA-256 verification on completed downloads
 - [x] 4.9 Add structured logging for HTTP status, elapsed time, retry count, cache hit/miss
-- [ ] 4.10 Create test fixture: local HTTP server supporting ETag, Last-Modified, Range headers for download tests
+- [x] 4.10 Create test fixture: local HTTP server supporting ETag, Last-Modified, Range headers for download tests
 
 ## 5. Validation Pipeline
 
@@ -107,7 +107,7 @@
 - [x] 5.8 Implement ROBOT report subprocess call for SPARQL QC checks
 - [x] 5.9 Implement Arelle validator for XBRL taxonomy packages with JSON result export
 - [x] 5.10 Write validation results to validation/<parser>_parse.json
-- [ ] 5.11 Create mini-ontology test fixtures (5-10 terms) in Turtle, OBO, OWL for parser tests
+- [x] 5.11 Create mini-ontology test fixtures (5-10 terms) in Turtle, OBO, OWL for parser tests
 
 ## 6. Storage and Manifests
 
@@ -115,89 +115,89 @@
 - [x] 6.2 Implement manifest.json write with comprehensive provenance fields
 - [x] 6.3 Implement manifest.json read for cache invalidation decisions (ETag/Last-Modified)
 - [x] 6.4 Add version resolution logic (use provided version or generate from timestamp)
-- [ ] 6.5 Implement safe ZIP extraction with path validation for XBRL taxonomies
-- [ ] 6.6 Add manifest validation and schema checks
+- [x] 6.5 Implement safe ZIP extraction with path validation for XBRL taxonomies
+- [x] 6.6 Add manifest validation and schema checks
 
 ## 7. Configuration
 
-- [ ] 7.1 Implement YAML parser for sources.yaml with schema validation
-- [ ] 7.2 Parse defaults section: accept_licenses, normalize_to, prefer_source, http settings
-- [ ] 7.3 Parse ontologies list into FetchSpec objects with per-ontology overrides
-- [ ] 7.4 Implement license allowlist checking with fail-closed behavior
-- [ ] 7.5 Add configuration validation command (ontofetch config validate)
-- [ ] 7.6 Document configuration schema with examples
+- [x] 7.1 Implement YAML parser for sources.yaml with schema validation
+- [x] 7.2 Parse defaults section: accept_licenses, normalize_to, prefer_source, http settings
+- [x] 7.3 Parse ontologies list into FetchSpec objects with per-ontology overrides
+- [x] 7.4 Implement license allowlist checking with fail-closed behavior
+- [x] 7.5 Add configuration validation command (ontofetch config validate)
+- [x] 7.6 Document configuration schema with examples
 
 ## 8. Orchestration
 
-- [ ] 8.1 Implement fetch_one() function orchestrating resolver plan → download → validation → manifest
-- [ ] 8.2 Add error handling and structured logging at each pipeline stage
-- [ ] 8.3 Implement batch fetch_all() for multiple ontologies from sources.yaml
-- [ ] 8.4 Add progress reporting for batch operations
-- [ ] 8.5 Implement graceful failure recording (continue on error, log failures)
+- [x] 8.1 Implement fetch_one() function orchestrating resolver plan → download → validation → manifest
+- [x] 8.2 Add error handling and structured logging at each pipeline stage
+- [x] 8.3 Implement batch fetch_all() for multiple ontologies from sources.yaml
+- [x] 8.4 Add progress reporting for batch operations
+- [x] 8.5 Implement graceful failure recording (continue on error, log failures)
 
 ## 9. CLI
 
-- [ ] 9.1 Set up CLI framework (argparse or Click) with ontofetch entry point
-- [ ] 9.2 Implement `ontofetch pull` subcommand with --spec FILE and positional ID arguments
-- [ ] 9.3 Add --force flag to bypass cache and force redownload
-- [ ] 9.4 Implement `ontofetch show ID` subcommand to display manifest
-- [ ] 9.5 Add --versions flag to list all downloaded versions
-- [ ] 9.6 Implement `ontofetch validate ID[@VERSION]` subcommand to re-run validators
-- [ ] 9.7 Add validator selection flags: --robot, --rdflib, --pronto, --owlready2, --arelle
-- [ ] 9.8 Add --json flag for machine-readable output across all subcommands
-- [ ] 9.9 Implement human-friendly formatted output (tables, summaries)
-- [ ] 9.10 Configure structured JSON logging with custom formatter
+- [x] 9.1 Set up CLI framework (argparse or Click) with ontofetch entry point
+- [x] 9.2 Implement `ontofetch pull` subcommand with --spec FILE and positional ID arguments
+- [x] 9.3 Add --force flag to bypass cache and force redownload
+- [x] 9.4 Implement `ontofetch show ID` subcommand to display manifest
+- [x] 9.5 Add --versions flag to list all downloaded versions
+- [x] 9.6 Implement `ontofetch validate ID[@VERSION]` subcommand to re-run validators
+- [x] 9.7 Add validator selection flags: --robot, --rdflib, --pronto, --owlready2, --arelle
+- [x] 9.8 Add --json flag for machine-readable output across all subcommands
+- [x] 9.9 Implement human-friendly formatted output (tables, summaries)
+- [x] 9.10 Configure structured JSON logging with custom formatter
 
 ## 10. Testing
 
-- [ ] 10.1 Write resolver unit tests with mocked library responses (one test suite per resolver)
-- [ ] 10.2 Write download manager tests using local HTTP server fixture
-- [ ] 10.3 Test ETag/Last-Modified conditional requests (304 response)
-- [ ] 10.4 Test Range request resume on partial download
-- [ ] 10.5 Test exponential backoff retry on transient failures (500, 503)
-- [ ] 10.6 Test per-host rate limiting enforcement
-- [ ] 10.7 Write parser tests using mini-ontology fixtures (RDFLib, Pronto, Owlready2)
-- [ ] 10.8 Test ROBOT integration with optional runtime detection
-- [ ] 10.9 Test Arelle XBRL validation with minimal taxonomy package
-- [ ] 10.10 Write integration smoke test: fetch PATO (OBO), BFO (OLS), verify manifests and validation outputs
-- [ ] 10.11 Add configuration validation tests (schema checks, invalid YAML)
-- [ ] 10.12 Test safe ZIP extraction with malicious paths (zip-slip guard)
+- [x] 10.1 Write resolver unit tests with mocked library responses (one test suite per resolver)
+- [x] 10.2 Write download manager tests using local HTTP server fixture
+- [x] 10.3 Test ETag/Last-Modified conditional requests (304 response)
+- [x] 10.4 Test Range request resume on partial download
+- [x] 10.5 Test exponential backoff retry on transient failures (500, 503)
+- [x] 10.6 Test per-host rate limiting enforcement
+- [x] 10.7 Write parser tests using mini-ontology fixtures (RDFLib, Pronto, Owlready2)
+- [x] 10.8 Test ROBOT integration with optional runtime detection
+- [x] 10.9 Test Arelle XBRL validation with minimal taxonomy package
+- [x] 10.10 Write integration smoke test: fetch PATO (OBO), BFO (OLS), verify manifests and validation outputs
+- [x] 10.11 Add configuration validation tests (schema checks, invalid YAML)
+- [x] 10.12 Test safe ZIP extraction with malicious paths (zip-slip guard)
 
 ## 11. Documentation
 
-- [ ] 11.1 Write installation instructions with dependency installation command
-- [ ] 11.2 Document pystow configuration: env vars, credential paths for BioPortal API keys
-- [ ] 11.3 Create sources.yaml schema documentation with field descriptions
-- [ ] 11.4 Write CLI usage guide with examples for pull/show/validate subcommands
-- [ ] 11.5 Document resolver-specific requirements (BioPortal API key, ROBOT Java runtime)
-- [ ] 11.6 Add troubleshooting guide for common issues (rate limits, auth failures, validation errors)
-- [ ] 11.7 Document storage layout and manifest schema
-- [ ] 11.8 Add example workflows: batch download, incremental update, validation-only re-runs
+- [x] 11.1 Write installation instructions with dependency installation command
+- [x] 11.2 Document pystow configuration: env vars, credential paths for BioPortal API keys
+- [x] 11.3 Create sources.yaml schema documentation with field descriptions
+- [x] 11.4 Write CLI usage guide with examples for pull/show/validate subcommands
+- [x] 11.5 Document resolver-specific requirements (BioPortal API key, ROBOT Java runtime)
+- [x] 11.6 Add troubleshooting guide for common issues (rate limits, auth failures, validation errors)
+- [x] 11.7 Document storage layout and manifest schema
+- [x] 11.8 Add example workflows: batch download, incremental update, validation-only re-runs
 
 ## 12. Integration and Polish
 
-- [ ] 12.1 Run integration smoke tests with real API calls (HP from OBO, EFO from OLS)
-- [ ] 12.2 Test end-to-end workflow with example sources.yaml
-- [ ] 12.3 Verify structured logs contain all required fields (resolver, status, timing, errors)
-- [ ] 12.4 Test force-refresh with --force flag on cached ontologies
-- [ ] 12.5 Verify SHA-256 checksums recorded correctly in manifests
-- [ ] 12.6 Test multi-version handling (download same ontology multiple times, check version directories)
-- [ ] 12.7 Verify normalized/ directory contains Turtle and OBO Graph JSON where applicable
-- [ ] 12.8 Run validation on large ontology (NCIT, ChEBI) to check memory usage
-- [ ] 12.9 Test CLI --json output is valid JSON and includes expected fields
-- [ ] 12.10 Add performance benchmarks for download/validation on representative ontologies
+- [x] 12.1 Run integration smoke tests with real API calls (HP from OBO, EFO from OLS)
+- [x] 12.2 Test end-to-end workflow with example sources.yaml
+- [x] 12.3 Verify structured logs contain all required fields (resolver, status, timing, errors)
+- [x] 12.4 Test force-refresh with --force flag on cached ontologies
+- [x] 12.5 Verify SHA-256 checksums recorded correctly in manifests
+- [x] 12.6 Test multi-version handling (download same ontology multiple times, check version directories)
+- [x] 12.7 Verify normalized/ directory contains Turtle and OBO Graph JSON where applicable
+- [x] 12.8 Run validation on large ontology (NCIT, ChEBI) to check memory usage
+- [x] 12.9 Test CLI --json output is valid JSON and includes expected fields
+- [x] 12.10 Add performance benchmarks for download/validation on representative ontologies
 
 ## 13. Error Handling and Recovery
 
-- [ ] 13.1 In download.py, wrap download_stream() with try/except for requests.exceptions (ConnectionError, Timeout, HTTPError) and implement retry logic using tenacity library or custom decorator
-- [ ] 13.2 Add specific exception classes: OntologyDownloadError, ResolverError, ValidationError, ConfigurationError in core.py with clear error messages
-- [ ] 13.3 In resolvers.py, handle HTTP 401/403 for BioPortal/OLS with error message including credential config path (e.g., "Configure API key at ~/.config/pystow/ontology-fetcher/bioportal_api_key.txt")
-- [ ] 13.4 In download.py, catch OSError during file write and check for "No space left on device"; log error with space requirements estimate, cleanup .part file, raise with exit code 1
-- [ ] 13.5 In validators.py, wrap each parser call (RDFLib, Pronto, Owlready2) in try/except for ParserError, MemoryError; write {"ok": false, "error": "<details>"} to validation JSON; continue with remaining validators
-- [ ] 13.6 In config.py, catch FileNotFoundError for missing sources.yaml; exit with code 2 and stderr message "Configuration file not found: <path>"
-- [ ] 13.7 In download.py, implement checksum verification: after download, if sha256_file(path) != expected_hash (from manifest or registry), log error with both hashes, delete file, retry as cache miss
-- [ ] 13.8 Add timeout handling: wrap resolver API calls with requests.get(..., timeout=30); catch Timeout exception, log "API timeout after 30s", retry with exponential backoff
-- [ ] 13.9 In validators.py, catch MemoryError during Owlready2 parsing of large files; log "Memory limit exceeded parsing <id>. Consider skipping reasoning"; write error to validation JSON without crashing
+- [x] 13.1 In download.py, wrap download_stream() with try/except for requests.exceptions (ConnectionError, Timeout, HTTPError) and implement retry logic using tenacity library or custom decorator
+- [x] 13.2 Add specific exception classes: OntologyDownloadError, ResolverError, ValidationError, ConfigurationError in core.py with clear error messages
+- [x] 13.3 In resolvers.py, handle HTTP 401/403 for BioPortal/OLS with error message including credential config path (e.g., "Configure API key at ~/.config/pystow/ontology-fetcher/bioportal_api_key.txt")
+- [x] 13.4 In download.py, catch OSError during file write and check for "No space left on device"; log error with space requirements estimate, cleanup .part file, raise with exit code 1
+- [x] 13.5 In validators.py, wrap each parser call (RDFLib, Pronto, Owlready2) in try/except for ParserError, MemoryError; write {"ok": false, "error": "<details>"} to validation JSON; continue with remaining validators
+- [x] 13.6 In config.py, catch FileNotFoundError for missing sources.yaml; exit with code 2 and stderr message "Configuration file not found: <path>"
+- [x] 13.7 In download.py, implement checksum verification: after download, if sha256_file(path) != expected_hash (from manifest or registry), log error with both hashes, delete file, retry as cache miss
+- [x] 13.8 Add timeout handling: wrap resolver API calls with requests.get(..., timeout=30); catch Timeout exception, log "API timeout after 30s", retry with exponential backoff
+- [x] 13.9 In validators.py, catch MemoryError during Owlready2 parsing of large files; log "Memory limit exceeded parsing <id>. Consider skipping reasoning"; write error to validation JSON without crashing
 - [ ] 13.10 Add permission error handling: catch PermissionError when creating pystow directories; log "Permission denied writing to <path>. Set PYSTOW_HOME env var"; exit code 1
 
 ## 14. Security Implementation

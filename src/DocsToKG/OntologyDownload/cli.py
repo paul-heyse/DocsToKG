@@ -8,8 +8,15 @@ import sys
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence
 
-from .config import ConfigError, ResolvedConfig, load_config
-from .core import ONTOLOGY_DIR, FetchResult, FetchSpec, fetch_all
+from .config import ConfigError, ResolvedConfig, load_config, validate_config
+from .core import (
+    CONFIG_DIR,
+    ONTOLOGY_DIR,
+    FetchResult,
+    FetchSpec,
+    OntologyDownloadError,
+    fetch_all,
+)
 from .logging_config import setup_logging
 from .validators import ValidationRequest, run_validators
 
@@ -44,6 +51,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--target-formats",
         help="Comma-separated formats (e.g., owl,obo)",
     )
+    pull.add_argument("--json", action="store_true", help="Emit pull results as JSON")
 
     show = subparsers.add_parser("show", help="Display ontology metadata")
     show.add_argument("id", help="Ontology identifier")
@@ -53,9 +61,26 @@ def _build_parser() -> argparse.ArgumentParser:
     validate = subparsers.add_parser("validate", help="Re-run validation on downloaded ontologies")
     validate.add_argument("id", help="Ontology identifier")
     validate.add_argument("version", nargs="?", help="Specific version to validate")
+    validate.add_argument("--json", action="store_true", help="Emit validation summary as JSON")
+    validate.add_argument("--rdflib", action="store_true", help="Run only the RDFLib validator")
+    validate.add_argument("--pronto", action="store_true", help="Include Pronto validation")
+    validate.add_argument("--owlready2", action="store_true", help="Include Owlready2 validation")
+    validate.add_argument("--robot", action="store_true", help="Include ROBOT validation")
+    validate.add_argument("--arelle", action="store_true", help="Include Arelle validation")
 
     init = subparsers.add_parser("init", help="Create example sources.yaml configuration")
     init.add_argument("path", nargs="?", default=Path("sources.yaml"), type=Path)
+
+    config_cmd = subparsers.add_parser("config", help="Configuration utilities")
+    config_sub = config_cmd.add_subparsers(dest="config_command", required=True)
+    config_validate = config_sub.add_parser("validate", help="Validate a configuration file")
+    config_validate.add_argument(
+        "--spec",
+        type=Path,
+        default=CONFIG_DIR / "sources.yaml",
+        help="Path to configuration file (default: ~/.data/ontology-fetcher/configs/sources.yaml)",
+    )
+    config_validate.add_argument("--json", action="store_true", help="Output validation result as JSON")
 
     return parser
 
@@ -101,6 +126,48 @@ def _parse_target_formats(value: Optional[str]) -> List[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _results_to_dict(result: FetchResult) -> dict:
+    return {
+        "id": result.spec.id,
+        "resolver": result.spec.resolver,
+        "status": result.status,
+        "file": str(result.local_path),
+        "sha256": result.sha256,
+        "manifest": str(result.manifest_path),
+        "artifacts": list(result.artifacts),
+    }
+
+
+def _format_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
+    widths = [len(header) for header in headers]
+    for row in rows:
+        for idx, cell in enumerate(row):
+            widths[idx] = max(widths[idx], len(cell))
+
+    def _format_row(values: Sequence[str]) -> str:
+        return " | ".join(value.ljust(widths[idx]) for idx, value in enumerate(values))
+
+    line = "-+-".join("-" * width for width in widths)
+    output = [_format_row(headers), line]
+    output.extend(_format_row(row) for row in rows)
+    return "\n".join(output)
+
+
+def _format_validation_summary(results: dict) -> str:
+    rows: List[Sequence[str]] = []
+    for name, payload in results.items():
+        status = "ok" if payload.get("ok") else "error"
+        details = payload.get("details", {})
+        message = ""
+        if isinstance(details, dict):
+            if "error" in details:
+                message = str(details["error"])
+            elif details:
+                message = ", ".join(f"{k}={v}" for k, v in details.items())
+        rows.append((name, status, message))
+    return _format_table(("validator", "status", "details"), rows)
+
+
 def _ensure_manifest_path(ontology_id: str, version: Optional[str]) -> Path:
     ontology_dir = ONTOLOGY_DIR / ontology_id
     if not ontology_dir.exists():
@@ -124,8 +191,13 @@ def _load_manifest(manifest_path: Path) -> dict:
 
 def _handle_pull(args, base_config: Optional[ResolvedConfig]) -> List[FetchResult]:
     target_formats = _parse_target_formats(args.target_formats)
-    if args.spec:
-        config = load_config(args.spec)
+    config_path = args.spec
+    if config_path is None and not args.ids:
+        default_config = CONFIG_DIR / "sources.yaml"
+        if default_config.exists():
+            config_path = default_config
+    if config_path:
+        config = load_config(config_path)
         config.defaults.logging.level = args.log_level
         results = fetch_all(config.specs, config=config, force=args.force)
         return results
@@ -155,32 +227,35 @@ def _handle_show(args) -> None:
             print(f"{key}: {value}")
 
 
-def _handle_validate(args, config: ResolvedConfig) -> None:
+def _selected_validators(args) -> Sequence[str]:
+    mapping = {
+        "rdflib": args.rdflib,
+        "pronto": args.pronto,
+        "owlready2": args.owlready2,
+        "robot": args.robot,
+        "arelle": args.arelle,
+    }
+    chosen = [name for name, enabled in mapping.items() if enabled]
+    return chosen or list(mapping.keys())
+
+
+def _handle_validate(args, config: ResolvedConfig) -> dict:
     manifest_path = _ensure_manifest_path(args.id, args.version)
     manifest = _load_manifest(manifest_path)
     version_dir = manifest_path.parent
     original_path = version_dir / "original" / manifest["filename"]
     validation_dir = version_dir / "validation"
     normalized_dir = version_dir / "normalized"
-    request = ValidationRequest(
-        name="rdflib",
-        file_path=original_path,
-        normalized_dir=normalized_dir,
-        validation_dir=validation_dir,
-        config=config,
-    )
-    additional = [
-        ValidationRequest("pronto", original_path, normalized_dir, validation_dir, config),
-        ValidationRequest("owlready2", original_path, normalized_dir, validation_dir, config),
-        ValidationRequest("robot", original_path, normalized_dir, validation_dir, config),
-        ValidationRequest("arelle", original_path, normalized_dir, validation_dir, config),
+    validator_names = _selected_validators(args)
+    requests = [
+        ValidationRequest(name, original_path, normalized_dir, validation_dir, config)
+        for name in validator_names
     ]
     logger = setup_logging(config.defaults.logging)
-    requests = [request, *additional]
     results = run_validators(requests, logger)
     manifest["validation"] = {name: result.to_dict() for name, result in results.items()}
     manifest_path.write_text(json.dumps(manifest, indent=2))
-    print(json.dumps(manifest["validation"], indent=2))
+    return manifest["validation"]
 
 
 def _handle_init(path: Path) -> None:
@@ -188,6 +263,15 @@ def _handle_init(path: Path) -> None:
         raise ConfigError(f"Refusing to overwrite existing file {path}")
     path.write_text(EXAMPLE_SOURCES_YAML)
     print(f"Wrote example configuration to {path}")
+
+
+def _handle_config_validate(path: Path) -> dict:
+    config = validate_config(path)
+    return {
+        "ok": True,
+        "ontologies": len(config.specs),
+        "path": str(path),
+    }
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -199,6 +283,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         logger = setup_logging(base_config.defaults.logging)
         if args.command == "pull":
             results = _handle_pull(args, base_config)
+            if args.json:
+                json.dump([_results_to_dict(result) for result in results], sys.stdout, indent=2)
+                sys.stdout.write("\n")
+            else:
+                if results:
+                    table = _format_table(
+                        ("id", "resolver", "status", "sha256", "file"),
+                        [
+                            (
+                                result.spec.id,
+                                result.spec.resolver,
+                                result.status,
+                                result.sha256[:12],
+                                result.local_path.name,
+                            )
+                            for result in results
+                        ],
+                    )
+                    print(table)
+                else:
+                    print("No ontologies to process")
             for result in results:
                 logger.info(
                     "ontology processed",
@@ -207,11 +312,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         elif args.command == "show":
             _handle_show(args)
         elif args.command == "validate":
-            _handle_validate(args, base_config)
+            summary = _handle_validate(args, base_config)
+            if args.json:
+                json.dump(summary, sys.stdout, indent=2)
+                sys.stdout.write("\n")
+            else:
+                print(_format_validation_summary(summary))
         elif args.command == "init":
             _handle_init(args.path)
+        elif args.command == "config" and args.config_command == "validate":
+            report = _handle_config_validate(args.spec)
+            if args.json:
+                json.dump(report, sys.stdout, indent=2)
+                sys.stdout.write("\n")
+            else:
+                status = "passed" if report["ok"] else "failed"
+                print(f"Configuration {status} ({report['ontologies']} ontologies) -> {report['path']}")
         return 0
     except ConfigError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    except OntologyDownloadError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
     except Exception as exc:  # pylint: disable=broad-except
