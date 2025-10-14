@@ -106,17 +106,10 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 
 from DocsToKG.HybridSearch.api import HybridSearchAPI
-from DocsToKG.HybridSearch.config import HybridSearchConfigManager
-from DocsToKG.HybridSearch.retrieval import HybridSearchService
-from DocsToKG.HybridSearch.storage import load_state
+from my_project.hybrid import build_hybrid_service  # see docs/06-operations/index.md
 
 app = FastAPI()
-
-config = HybridSearchConfigManager(Path("config/hybrid_config.json")).get()
-service = HybridSearchService.from_config(config)
-state = load_state(Path("artifacts/faiss.snapshot.json"))
-service.load_state(state)
-
+service = build_hybrid_service()
 api = HybridSearchAPI(service)
 
 @app.post("/v1/hybrid-search")
@@ -143,20 +136,17 @@ curl -X POST http://localhost:8000/v1/hybrid-search \
 
 ## Local Service Usage (No HTTP)
 
-When embedding DocsToKG directly inside Python code, call the service layer:
+When embedding DocsToKG directly inside Python code, call the service layer once you have constructed it (see `docs/06-operations/index.md` for a full build walkthrough):
 
 ```python
-from DocsToKG.HybridSearch.retrieval import HybridSearchRequest, HybridSearchService
-from DocsToKG.HybridSearch.storage import load_state
+from DocsToKG.HybridSearch.retrieval import HybridSearchRequest
 
-service = HybridSearchService.from_default_config()
-service.load_state(load_state(Path("artifacts/faiss.snapshot.json")))
-
+service = build_hybrid_service()
 request = HybridSearchRequest(query="ontology mapping pipeline")
 response = service.search(request)
 ```
 
-This approach avoids HTTP overhead when DocsToKG is part of a larger Python application.
+Working examples of service assembly live in `tests/conftest.py` and `tests/test_hybrid_search.py`.
 
 ## Related Resources
 

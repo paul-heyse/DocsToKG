@@ -68,6 +68,7 @@ pipeline = ChunkIngestionPipeline(
     observability=Observability(),
 )
 
+snapshot_path = Path("artifacts/faiss.snapshot.json")
 docs = [
     DocumentInput(
         doc_id="whitepaper-001",
@@ -103,13 +104,12 @@ Integrate `HybridSearchAPI` into your preferred web framework. Example with Fast
 
 ```python
 from fastapi import FastAPI
+
 from DocsToKG.HybridSearch.api import HybridSearchAPI
-from DocsToKG.HybridSearch.retrieval import HybridSearchService
-from DocsToKG.HybridSearch.storage import load_state
+from my_project.hybrid import build_hybrid_service  # assemble service as shown above
 
 app = FastAPI()
-service = HybridSearchService.from_default_config()
-service.load_state(load_state("artifacts/faiss.snapshot"))
+service = build_hybrid_service()
 api = HybridSearchAPI(service)
 
 @app.post("/v1/hybrid-search")
@@ -141,4 +141,3 @@ def hybrid_search(payload: dict):
 - Capture root-cause analyses and feed improvements back into this document.
 
 Keeping this guide current is part of the monthly documentation review. Submit updates when procedures change or new tools are introduced.
-snapshot_path = Path("artifacts/faiss.snapshot.json")

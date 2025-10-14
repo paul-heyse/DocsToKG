@@ -2,6 +2,13 @@
 
 Follow this guide to configure DocsToKG on a local workstation or development server.
 
+## Overview
+
+- Provision a Python 3.12+ environment with optional CUDA support.
+- Install project dependencies (core, GPU, documentation tooling).
+- Configure environment variables and working directories.
+- Run smoke checks to confirm the installation.
+
 ## Prerequisites
 
 - **Operating system**: Linux or macOS preferred (Windows users should use WSL2).
@@ -12,14 +19,16 @@ Follow this guide to configure DocsToKG on a local workstation or development se
 
 > ℹ️  Direnv is supported via `.envrc`, but optional. Install with `brew install direnv` or follow instructions at [direnv.net](https://direnv.net).
 
-## 1. Clone the Repository
+## Installation
+
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/paul-heyse/DocsToKG.git
 cd DocsToKG
 ```
 
-## 2. Create a Virtual Environment
+### 2. Create a Virtual Environment
 
 ```bash
 python -m venv .venv
@@ -28,7 +37,7 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 If you use direnv, run `direnv allow` after activation so `.envrc` can automatically load the environment next time.
 
-## 3. Install Dependencies
+### 3. Install Dependencies
 
 ```bash
 # Core project dependencies (editable install for development)
@@ -44,7 +53,7 @@ Install documentation tooling when you plan to regenerate docs:
 pip install -r docs/build/sphinx/requirements.txt
 ```
 
-## 4. Configure Environment Variables
+### 4. Configure Environment Variables
 
 Create a `.env` file in the repository root (or export variables manually):
 
@@ -63,7 +72,7 @@ EOF
 
 Load the file with `source .env` or rely on direnv to ingest it automatically.
 
-## 5. Prepare Local Directories
+### 5. Prepare Local Directories
 
 ```bash
 mkdir -p Data/DocTagsFiles Data/ChunkedDocTagFiles Data/Embeddings artifacts logs
@@ -71,7 +80,7 @@ mkdir -p Data/DocTagsFiles Data/ChunkedDocTagFiles Data/Embeddings artifacts log
 
 These directories store DocTags inputs, chunked outputs, embedding payloads, FAISS snapshots, and log output.
 
-## 6. Verify the Installation
+### 6. Verify the Installation
 
 Run the automated test suite:
 
@@ -92,7 +101,7 @@ For asynchronous link checks (optional):
 python docs/scripts/check_links.py --timeout 10
 ```
 
-## 7. Optional: Build Sphinx HTML Docs
+### 7. Optional: Build Sphinx HTML Docs
 
 ```bash
 python docs/scripts/build_docs.py --format html

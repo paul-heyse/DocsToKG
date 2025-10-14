@@ -1,4 +1,11 @@
-"""Logging configuration for the ontology downloader."""
+"""
+Structured Logging Utilities
+
+This module centralizes structured logging setup for the ontology downloader
+subsystem. It provides helpers for masking sensitive fields, emitting JSON log
+records, managing correlation identifiers, and rolling log files to maintain a
+clean retention window.
+"""
 
 from __future__ import annotations
 
@@ -18,6 +25,16 @@ from .download import sanitize_filename
 
 
 def mask_sensitive_data(payload: Dict[str, object]) -> Dict[str, object]:
+    """Remove secrets from structured payloads prior to logging.
+
+    Args:
+        payload: Arbitrary key-value pairs that may contain credentials or
+            tokens gathered from ontology download requests.
+
+    Returns:
+        Copy of the payload where common secret fields are replaced with
+        `***masked***`.
+    """
     sensitive_keys = {"authorization", "api_key", "apikey", "token", "secret", "password"}
     masked: Dict[str, object] = {}
     for key, value in payload.items():
@@ -32,6 +49,15 @@ def mask_sensitive_data(payload: Dict[str, object]) -> Dict[str, object]:
 
 
 def generate_correlation_id() -> str:
+    """Create a short-lived identifier that links related log entries.
+
+    Args:
+        None
+
+    Returns:
+        Twelve character hexadecimal identifier suitable for correlating log
+        events across the ontology download pipeline.
+    """
     return uuid.uuid4().hex[:12]
 
 
@@ -39,6 +65,14 @@ class JsonFormatter(logging.Formatter):
     """Formatter emitting JSON structured logs."""
 
     def format(self, record: logging.LogRecord) -> str:
+        """Serialize a logging record into a JSON line.
+
+        Args:
+            record: Log record emitted by the ontology download components.
+
+        Returns:
+            UTF-8 safe JSON string with masked secrets and correlation context.
+        """
         log_obj = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "level": record.levelname,
@@ -55,6 +89,11 @@ class JsonFormatter(logging.Formatter):
 
 
 def _compress_old_log(path: Path) -> None:
+    """Compress a log file in-place using gzip to reclaim disk space.
+
+    Args:
+        path: Path to the `.log` file that should be compressed.
+    """
     compressed_path = path.with_suffix(path.suffix + ".gz")
     with path.open("rb") as source, gzip.open(compressed_path, "wb") as target:
         target.write(source.read())
@@ -62,6 +101,13 @@ def _compress_old_log(path: Path) -> None:
 
 
 def _cleanup_logs(log_dir: Path, retention_days: int) -> None:
+    """Apply rotation and retention policy to the log directory.
+
+    Args:
+        log_dir: Directory containing daily log files.
+        retention_days: Number of days to keep uncompressed or compressed logs
+            before deleting them.
+    """
     now = datetime.utcnow()
     retention_delta = timedelta(days=retention_days)
     for file in log_dir.glob("*.log"):
@@ -75,6 +121,22 @@ def _cleanup_logs(log_dir: Path, retention_days: int) -> None:
 
 
 def setup_logging(config: LoggingConfiguration, log_dir: Optional[Path] = None) -> logging.Logger:
+    """Configure structured logging handlers for ontology downloads.
+
+    Args:
+        config: Logging configuration with retention, level, and maximum file
+            size settings defined by the ontology download configuration model.
+        log_dir: Optional override for the directory where logs are persisted.
+            Defaults to the directory resolved from configuration or the
+            `ONTOFETCH_LOG_DIR` environment variable.
+
+    Returns:
+        Configured logger instance named `DocsToKG.OntologyDownload`. The logger
+        emits JSON-formatted events to both stdout and rotated log files.
+
+    Raises:
+        OSError: Propagated if the log directory cannot be created.
+    """
     log_dir = log_dir or Path(os.environ.get("ONTOFETCH_LOG_DIR", ""))
     if not log_dir:
         from .core import LOG_DIR  # Local import to avoid circular dependency

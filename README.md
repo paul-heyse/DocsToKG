@@ -53,13 +53,11 @@ python docs/scripts/validate_docs.py
 ### Hybrid Search Service
 
 ```python
-from DocsToKG.HybridSearch.retrieval import HybridSearchRequest, HybridSearchService
-from DocsToKG.HybridSearch.storage import load_state
-
-service = HybridSearchService.from_default_config()
-service.load_state(load_state("artifacts/faiss.snapshot"))
+from DocsToKG.HybridSearch.retrieval import HybridSearchRequest
+from my_project.hybrid import build_hybrid_service  # see docs/06-operations/index.md
 
 request = HybridSearchRequest(query="ontology alignment best practices", page_size=3)
+service = build_hybrid_service()
 response = service.search(request)
 for result in response.results:
     print(result.doc_id, round(result.score, 3), result.highlights)

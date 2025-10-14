@@ -23,12 +23,10 @@ Use the generated documentation in `docs/04-api/api.md` and `docs/04-api/retriev
 `HybridSearchService` in `DocsToKG.HybridSearch.retrieval` exposes a `search` method returning strongly-typed response models (`HybridSearchResponse`, `HybridSearchResult`). Use this interface when embedding DocsToKG within other Python services.
 
 ```python
-from DocsToKG.HybridSearch.retrieval import HybridSearchRequest, HybridSearchService
-from DocsToKG.HybridSearch.storage import load_state
+from DocsToKG.HybridSearch.retrieval import HybridSearchRequest
+from my_project.hybrid import build_hybrid_service  # assemble service per docs/06-operations/index.md
 
-service = HybridSearchService.from_default_config()
-service.load_state(load_state("artifacts/faiss.snapshot"))
-
+service = build_hybrid_service()
 request = HybridSearchRequest(query="ontology alignment best practices", page_size=5)
 response = service.search(request)
 for hit in response.results:

@@ -1,4 +1,11 @@
-"""Core orchestration for ontology downloads."""
+"""
+Ontology Download Orchestration
+
+This module coordinates resolver planning, document downloading, validation,
+and manifest generation for ontology artifacts. It serves as the main entry
+point for fetching ontologies from configured sources and producing provenance
+metadata that downstream knowledge graph construction can rely upon.
+"""
 
 from __future__ import annotations
 
@@ -45,7 +52,14 @@ class ConfigurationError(OntologyDownloadError):
 
 @dataclass(slots=True)
 class FetchSpec:
-    """Specification describing a single ontology download."""
+    """Specification describing a single ontology download.
+
+    Attributes:
+        id: Stable identifier for the ontology to fetch.
+        resolver: Name of the resolver strategy used to locate resources.
+        extras: Resolver-specific configuration overrides.
+        target_formats: Normalized ontology formats that should be produced.
+    """
 
     id: str
     resolver: str
@@ -55,7 +69,16 @@ class FetchSpec:
 
 @dataclass(slots=True)
 class FetchResult:
-    """Outcome of a single ontology fetch operation."""
+    """Outcome of a single ontology fetch operation.
+
+    Attributes:
+        spec: Fetch specification that initiated the download.
+        local_path: Path to the downloaded ontology document.
+        status: Final download status (e.g., `success`, `skipped`).
+        sha256: SHA-256 digest of the downloaded file.
+        manifest_path: Path to the generated manifest JSON file.
+        artifacts: Ancillary files produced during extraction or validation.
+    """
 
     spec: FetchSpec
     local_path: Path
@@ -67,7 +90,24 @@ class FetchResult:
 
 @dataclass(slots=True)
 class Manifest:
-    """Provenance information for a downloaded ontology artifact."""
+    """Provenance information for a downloaded ontology artifact.
+
+    Attributes:
+        id: Ontology identifier recorded in the manifest.
+        resolver: Resolver used to retrieve the ontology.
+        url: Final URL from which the ontology was fetched.
+        filename: Local filename of the downloaded artifact.
+        version: Resolver-reported ontology version, if available.
+        license: License identifier associated with the ontology.
+        status: Result status reported by the downloader.
+        sha256: Hash of the downloaded artifact for integrity checking.
+        etag: HTTP ETag returned by the upstream server, when provided.
+        last_modified: Upstream last-modified timestamp, if supplied.
+        downloaded_at: UTC timestamp of the completed download.
+        target_formats: Desired conversion targets for normalization.
+        validation: Mapping of validator names to their results.
+        artifacts: Additional file paths generated during processing.
+    """
 
     id: str
     resolver: str
@@ -85,6 +125,14 @@ class Manifest:
     artifacts: Sequence[str]
 
     def to_json(self) -> str:
+        """Serialize the manifest to a stable, human-readable JSON string.
+
+        Args:
+            None
+
+        Returns:
+            JSON document encoding the manifest metadata.
+        """
         payload = {
             "id": self.id,
             "resolver": self.resolver,
@@ -108,7 +156,16 @@ class Resolver(Protocol):
     """Protocol describing resolver planning behaviour."""
 
     def plan(self, spec: FetchSpec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
-        """Return a FetchPlan describing how to obtain the ontology."""
+        """Return a FetchPlan describing how to obtain the ontology.
+
+        Args:
+            spec: Ontology fetch specification under consideration.
+            config: Fully resolved configuration containing defaults.
+            logger: Logger adapter scoped to the current fetch request.
+
+        Returns:
+            Concrete plan containing download URL, headers, and metadata.
+        """
 
 
 DATA_ROOT = pystow.join("ontology-fetcher")
@@ -190,7 +247,23 @@ def fetch_one(
     logger: Optional[logging.Logger] = None,
     force: bool = False,
 ) -> FetchResult:
-    """Fetch and validate a single ontology described by *spec*."""
+    """Fetch and validate a single ontology described by *spec*.
+
+    Args:
+        spec: Fetch specification outlining resolver and target formats.
+        config: Optional resolved configuration; defaults to library values.
+        correlation_id: Identifier that groups log entries for observability.
+        logger: Optional logger to reuse existing logging infrastructure.
+        force: When True, ignore existing manifests and re-download artifacts.
+
+    Returns:
+        FetchResult capturing download metadata and produced artifacts.
+
+    Raises:
+        ResolverError: If the resolver cannot produce a viable fetch plan.
+        OntologyDownloadError: If download or extraction steps fail.
+        ConfigurationError: If manifest validation or license checks fail.
+    """
 
     ensure_python_version()
     active_config = config or ResolvedConfig.from_defaults()
@@ -351,7 +424,21 @@ def fetch_all(
     logger: Optional[logging.Logger] = None,
     force: bool = False,
 ) -> List[FetchResult]:
-    """Fetch a sequence of ontologies sequentially."""
+    """Fetch a sequence of ontologies sequentially.
+
+    Args:
+        specs: Iterable of fetch specifications to process.
+        config: Optional resolved configuration shared across downloads.
+        logger: Logger used to emit progress and error events.
+        force: When True, skip manifest reuse and download everything again.
+
+    Returns:
+        List of FetchResult entries corresponding to completed downloads.
+
+    Raises:
+        OntologyDownloadError: Propagated when downloads fail and the pipeline
+            is configured to stop on error.
+    """
 
     ensure_python_version()
     active_config = config or ResolvedConfig.from_defaults()
