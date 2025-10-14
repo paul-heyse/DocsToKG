@@ -1,6 +1,7 @@
 import pytest
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
+from DocsToKG.ContentDownload.utils import normalize_doi, normalize_pmcid
 
 
 def test_slugify_truncates_and_normalises():
@@ -66,7 +67,7 @@ def test_collect_location_urls_dedupes_and_tracks_sources():
     ],
 )
 def test_normalize_doi(value, expected):
-    assert downloader._normalize_doi(value) == expected
+    assert normalize_doi(value) == expected
 
 
 @pytest.mark.parametrize(
@@ -91,7 +92,7 @@ def test_normalize_pmid(value, expected):
     ],
 )
 def test_normalize_pmcid(value, expected):
-    assert downloader._normalize_pmcid(value) == expected
+    assert normalize_pmcid(value) == expected
 
 
 @pytest.mark.parametrize(

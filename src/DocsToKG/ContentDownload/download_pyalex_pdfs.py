@@ -28,6 +28,12 @@ from DocsToKG.ContentDownload.resolvers import (
     ResolverPipeline,
     default_resolvers,
 )
+from DocsToKG.ContentDownload.utils import (
+    dedupe,
+    normalize_doi,
+    normalize_pmcid,
+    strip_prefix,
+)
 
 
 MAX_SNIFF_BYTES = 64 * 1024
@@ -147,24 +153,6 @@ class WorkArtifact:
         self.namespaces: Dict[str, Path] = {"pdf": self.pdf_dir, "html": self.html_dir}
 
 
-def _strip_prefix(value: Optional[str], prefix: str) -> Optional[str]:
-    if not value:
-        return None
-    value = value.strip()
-    if value.lower().startswith(prefix.lower()):
-        return value[len(prefix) :]
-    return value
-
-
-def _normalize_doi(doi: Optional[str]) -> Optional[str]:
-    if not doi:
-        return None
-    doi = doi.strip()
-    if doi.lower().startswith("https://doi.org/"):
-        doi = doi[16:]
-    return doi.strip()
-
-
 def _normalize_pmid(pmid: Optional[str]) -> Optional[str]:
     if not pmid:
         return None
@@ -173,20 +161,10 @@ def _normalize_pmid(pmid: Optional[str]) -> Optional[str]:
     return match.group(1) if match else None
 
 
-def _normalize_pmcid(pmcid: Optional[str]) -> Optional[str]:
-    if not pmcid:
-        return None
-    pmcid = pmcid.strip()
-    match = re.search(r"PMC?(\d+)", pmcid, flags=re.I)
-    if match:
-        return f"PMC{match.group(1)}"
-    return None
-
-
 def _normalize_arxiv(arxiv_id: Optional[str]) -> Optional[str]:
     if not arxiv_id:
         return None
-    arxiv_id = _strip_prefix(arxiv_id, "arxiv:") or arxiv_id
+    arxiv_id = strip_prefix(arxiv_id, "arxiv:") or arxiv_id
     arxiv_id = arxiv_id.replace("https://arxiv.org/abs/", "")
     return arxiv_id.strip()
 
@@ -217,16 +195,6 @@ def _collect_location_urls(work: Dict[str, Any]) -> Dict[str, List[str]]:
     oa_url = ((work.get("open_access") or {}).get("oa_url") or None)
     if oa_url:
         pdf_urls.append(oa_url)
-
-    # De-duplicate while preserving order
-    def dedupe(items: List[str]) -> List[str]:
-        seen = set()
-        uniq = []
-        for item in items:
-            if item and item not in seen:
-                uniq.append(item)
-                seen.add(item)
-        return uniq
 
     return {
         "landing": dedupe(landing_urls),
@@ -284,9 +252,9 @@ def create_artifact(work: Dict[str, Any], pdf_dir: Path, html_dir: Path) -> Work
     title = work.get("title") or work.get("display_name") or ""
     year = work.get("publication_year")
     ids = work.get("ids") or {}
-    doi = _normalize_doi(ids.get("doi"))
+    doi = normalize_doi(ids.get("doi"))
     pmid = _normalize_pmid(ids.get("pmid"))
-    pmcid = _normalize_pmcid(ids.get("pmcid"))
+    pmcid = normalize_pmcid(ids.get("pmcid"))
     arxiv_id = _normalize_arxiv(ids.get("arxiv"))
 
     locations = _collect_location_urls(work)
