@@ -1,293 +1,120 @@
 # DocsToKG
 
-**Document to Knowledge Graph** - A comprehensive system for transforming documents into structured knowledge graphs using vector search, machine learning, and AI technologies.
+DocsToKG turns raw documents into searchable knowledge artefacts by combining document acquisition, Docling-based parsing, ontology downloads, and a FAISS-backed hybrid search engine.
 
-[![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://python.org)
+[![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://docs.docstokg.dev)
 
-## 🚀 Overview
+## Overview
 
-DocsToKG transforms documents into intelligent, searchable knowledge graphs that enable:
+- **Content acquisition**: Fetch PDFs and metadata from external services such as Pyalex.
+- **Doc parsing & chunking**: Convert documents into DocTags, chunked Markdown, and embeddings using Docling pipelines.
+- **Hybrid search**: Fuse BM25, SPLADE, and FAISS dense retrieval with configurable ranking.
+- **Ontology management**: Download and validate ontologies for consistent terminology and enrichment.
+- **Documentation tooling**: Automated scripts generate API docs, run validations, and perform link checks.
 
-- **Intelligent Document Processing**: Extract and structure content from various document formats
-- **Knowledge Graph Construction**: Build interconnected representations of document content
-- **Semantic Search**: Natural language queries across document collections
-- **AI-Powered Analysis**: Modern language models for content understanding and classification
+See `docs/01-overview/` for a high-level introduction and `docs/03-architecture/` for subsystem details.
 
-### Key Features
-
-- **Multi-format Support**: Process PDF, DOCX, TXT, HTML, and other document types
-- **Scalable Architecture**: Handle large document collections efficiently
-- **AI Integration**: Leverage modern language models for content understanding
-- **Vector Search**: High-performance similarity search using FAISS
-- **RESTful API**: Complete API for integration with other systems
-- **Comprehensive Documentation**: Extensive guides and references
-
-## 📚 Documentation
-
-Our documentation is organized for easy navigation and comprehensive coverage:
-
-### 📋 **[Getting Started](./docs/01-overview/)**
-
-- Project overview and architecture
-- Key capabilities and use cases
-- Technology stack overview
-
-### ⚙️ **[Setup Guide](./docs/02-setup/)**
-
-- Installation and configuration
-- Development environment setup
-- Quick start examples
-
-### 🏗️ **[Architecture](./docs/03-architecture/)**
-
-- System design and components
-- Data flow and integration points
-- Performance considerations
-
-### 🔌 **[API Reference](./docs/04-api/)**
-
-- Complete REST API documentation
-- Authentication and usage examples
-- Integration guides
-
-### 👥 **[Development](./docs/05-development/)**
-
-- Contributing guidelines
-- Development workflow
-- Code standards and practices
-
-### 📖 **[Technical Reference](./docs/07-reference/)**
-
-- FAISS integration guide
-- External dependencies
-- Performance optimization
-
-### 📋 **[Documentation Framework](./docs/)**
-
-- Documentation standards and processes
-- Review and maintenance procedures
-- Contribution guidelines
-
-## 🛠️ Quick Start
-
-### Prerequisites
-
-- Python 3.8 or higher
-- 8GB RAM minimum (16GB recommended)
-- Git for version control
-
-### Installation
+## Quick Start
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourorg/docstokg.git
-cd docstokg
+git clone https://github.com/paul-heyse/DocsToKG.git
+cd DocsToKG
 
-# Set up virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Run tests to verify installation
-pytest tests/ -v
+pip install -e .
+pip install -r requirements.in         # optional GPU / ML stack
+pip install -r docs/build/sphinx/requirements.txt  # documentation tooling
 ```
 
-### Basic Usage
+Create a `.env` file (or export variables manually):
+
+```bash
+cat > .env <<'EOF'
+DOCSTOKG_DATA_ROOT=./Data
+HYBRID_SEARCH_CONFIG=./config/hybrid_config.json
+ONTOLOGY_FETCHER_CONFIG=./configs/sources.yaml
+PA_ALEX_KEY=replace-with-api-key
+EOF
+```
+
+Verify the environment:
+
+```bash
+pytest -q
+python docs/scripts/generate_api_docs.py
+python docs/scripts/validate_docs.py
+```
+
+## Example Usage
+
+### Hybrid Search Service
 
 ```python
-from docstokg import DocumentProcessor
+from DocsToKG.HybridSearch.retrieval import HybridSearchRequest, HybridSearchService
+from DocsToKG.HybridSearch.storage import load_state
 
-# Initialize processor
-processor = DocumentProcessor()
+service = HybridSearchService.from_default_config()
+service.load_state(load_state("artifacts/faiss.snapshot"))
 
-# Process a document
-result = await processor.process_document("path/to/document.pdf")
-print(f"Extracted {len(result.entities)} entities")
-
-# Search for similar documents
-similar_docs = processor.search_similar("machine learning algorithms", k=10)
+request = HybridSearchRequest(query="ontology alignment best practices", page_size=3)
+response = service.search(request)
+for result in response.results:
+    print(result.doc_id, round(result.score, 3), result.highlights)
 ```
 
-## 🔧 Development
-
-### Setting Up Development Environment
+### Ontology Download CLI
 
 ```bash
-# Install development dependencies
-pip install -r requirements-dev.txt
+python -m DocsToKG.OntologyDownload.cli pull --spec configs/sources.yaml --force --json
+python -m DocsToKG.OntologyDownload.cli validate hp latest
+```
 
-# Set up pre-commit hooks
-pre-commit install
+More operational examples are available in `docs/06-operations/index.md`.
 
-# Run code formatting
+## Development Workflow
+
+```bash
+# Formatting and linting
 black src/ tests/
 isort src/ tests/
+ruff check src/ tests/
+mypy src/ --strict
 
-# Run tests
-pytest tests/ -v
+# Tests
+pytest -q
+pytest -m real_vectors --real-vectors  # optional vector-backed suite
 
-# Check code quality
-flake8 src/ tests/
-mypy src/ --ignore-missing-imports
-```
-
-### Running Documentation
-
-```bash
-# Generate all documentation
+# Documentation
 python docs/scripts/generate_all_docs.py
-
-# Quick documentation build (skip validation)
-python docs/scripts/generate_all_docs.py --quick
-
-# Validate documentation only
-python docs/scripts/generate_all_docs.py --validate-only
-
-# Build HTML documentation
-python docs/scripts/build_docs.py --format html
+python docs/scripts/check_links.py --timeout 10
 ```
 
-### Contributing
+Refer to `docs/05-development/index.md` for contribution guidelines and review checklists.
 
-We welcome contributions! Please see our [Development Guide](./docs/05-development/) for detailed contribution guidelines.
-
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Make** your changes following our standards
-4. **Test** your changes thoroughly
-5. **Submit** a pull request with a clear description
-
-## 📊 Project Structure
+## Project Structure
 
 ```
-docstokg/
-├── src/                    # Source code
-│   ├── docstokg/          # Main package
-│   ├── processing/        # Document processing modules
-│   └── search/            # Search and indexing modules
-├── docs/                  # Documentation
-│   ├── 01-overview/       # Project overview
-│   ├── 02-setup/          # Installation guide
-│   ├── 03-architecture/   # System architecture
-│   ├── 04-api/            # API reference
-│   ├── 05-development/    # Development guide
-│   ├── 07-reference/      # Technical references
-│   ├── scripts/           # Documentation automation
-│   └── templates/         # Documentation templates
-├── tests/                 # Test suite
-├── requirements.txt       # Production dependencies
-├── requirements-dev.txt   # Development dependencies
-└── pyproject.toml        # Project configuration
+DocsToKG/
+├── src/DocsToKG/                 # Core packages
+│   ├── ContentDownload/          # Document acquisition utilities
+│   ├── DocParsing/               # Docling pipelines and embedding scripts
+│   ├── HybridSearch/             # Hybrid search configuration, storage, retrieval, API
+│   └── OntologyDownload/         # Ontology downloader CLI and validators
+├── docs/                         # Documentation framework (guides, templates, scripts)
+├── tests/                        # Automated tests and fixtures
+├── openspec/                     # Spec-driven change proposals and tasks
+├── requirements.in               # Optional GPU / ML dependencies
+├── pyproject.toml                # Project metadata and tooling configuration
+└── docs/scripts/                 # Documentation automation scripts
 ```
 
-## 🎯 Use Cases
+## Support & Community
 
-### Research & Academia
+- **Issues**: [GitHub Issues](https://github.com/paul-heyse/DocsToKG/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/paul-heyse/DocsToKG/discussions)
+- **License**: MIT (see [LICENSE](LICENSE))
 
-- Literature review automation
-- Cross-document concept linking
-- Research trend analysis
-
-### Enterprise Knowledge Management
-
-- Document discovery and retrieval
-- Knowledge base construction
-- Compliance and audit support
-
-### Content Management
-
-- Article and blog organization
-- Content recommendation systems
-- Automated tagging and categorization
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-pytest tests/
-
-# Run specific test categories
-pytest tests/test_api.py -v
-pytest tests/test_processing.py -v
-
-# Run with coverage
-pytest tests/ --cov=src --cov-report=html
-
-# Performance testing
-pytest tests/test_performance.py -v
-```
-
-## 📈 Performance
-
-### Benchmarks
-
-- **Document Processing**: ~2-5 seconds per document (depending on size)
-- **Search Latency**: <100ms for similarity search queries
-- **Index Construction**: Scales to millions of documents
-- **Memory Usage**: Optimized for various hardware configurations
-
-### Scalability
-
-- **Horizontal Scaling**: Support for multiple processing nodes
-- **GPU Acceleration**: FAISS GPU support for high-performance indexing
-- **Batch Processing**: Efficient handling of large document collections
-
-## 🔒 Security
-
-- Input validation and sanitization
-- Secure API authentication
-- Safe document processing
-- Regular security audits
-
-## 📞 Support
-
-### Getting Help
-
-- **📖 Documentation**: Comprehensive guides and references
-- **🐛 Issues**: [GitHub Issues](https://github.com/yourorg/docstokg/issues) for bug reports
-- **💬 Discussions**: [GitHub Discussions](https://github.com/yourorg/docstokg/discussions) for questions
-- **📧 Email**: Contact the development team
-
-### Community
-
-- **Contributors**: Join our community of contributors
-- **Discussions**: Participate in technical discussions
-- **Feedback**: Help improve the project
-
-## 📋 Roadmap
-
-### Current Release (v1.0.0)
-
-- ✅ Core document processing pipeline
-- ✅ Vector similarity search with FAISS
-- ✅ RESTful API for integration
-- ✅ Comprehensive documentation framework
-- ✅ Automated testing and validation
-
-### Upcoming Features
-
-- 🔄 Enhanced AI model integration
-- 🔄 Advanced knowledge graph features
-- 🔄 Multi-language support
-- 🔄 Enterprise security features
-
-## 🙏 Acknowledgments
-
-- **FAISS Team** for the excellent vector search library
-- **Hugging Face** for transformer models and tools
-- **Open Source Community** for various libraries and tools
-- **Contributors** for their valuable input and improvements
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-**Made with ❤️ for the developer community**
-
-*For detailed technical information, see our [Documentation](./docs/) and [API Reference](./docs/04-api/).*
+Read `CONTRIBUTING.md` before submitting changes, and keep documentation in sync with implementation using the provided automation scripts.

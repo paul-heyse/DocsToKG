@@ -12,7 +12,7 @@ Follow the [Setup Guide](../02-setup/) to get your local environment running.
 
 - **Start with the overview**: Read [Architecture Guide](../03-architecture/) to understand system components
 - **Explore the API**: Check [API Reference](../04-api/) for integration points
-- **Study key modules**: Focus on `src/app/`, `src/processing/`, and `src/search/`
+- **Study key modules**: Focus on `src/DocsToKG/ContentDownload`, `src/DocsToKG/DocParsing`, `src/DocsToKG/HybridSearch`, and `src/DocsToKG/OntologyDownload`
 
 ### 3. Find Your First Issue
 
@@ -25,15 +25,16 @@ Follow the [Setup Guide](../02-setup/) to get your local environment running.
 
 ### Branch Strategy
 
-We use a structured branching strategy:
+We keep the branching model lightweight:
 
 ```
-main                    # Production-ready code
-├── develop            # Integration branch for features
-    ├── feature/xyz    # New features (branch from develop)
-    ├── bugfix/xyz     # Bug fixes (branch from develop)
-    └── hotfix/xyz     # Critical fixes (branch from main)
+main                         # Default branch
+└── feature/<description>    # Short-lived branches for changes
 ```
+
+- Branch off `main` for every change (features, bug fixes, docs updates).
+- Rebase or merge `main` regularly when working on longer efforts.
+- Delete feature branches after merging to keep the repository tidy.
 
 ### Documentation-First Development
 
@@ -107,7 +108,7 @@ docs(architecture): update component diagram for new service
 
 ### Pull Request Process
 
-1. **Create a branch** from `develop` with descriptive name
+1. **Create a branch** from `main` with descriptive name (e.g., `feature/hybrid-metrics`)
 2. **Make your changes** following coding standards
 3. **Write tests** for new functionality
 4. **Update documentation** for all user-facing changes
@@ -156,9 +157,9 @@ docs(architecture): update component diagram for new service
 black src/ tests/
 isort src/ tests/
 
-# Check style
-flake8 src/ tests/
-mypy src/ --ignore-missing-imports
+# Lint and type-check
+ruff check src/ tests/
+mypy src/ --strict
 ```
 
 **Documentation**:
@@ -197,9 +198,10 @@ def process_document(
 
 **Test Structure**:
 
-- Unit tests in `tests/test_unit/`
-- Integration tests in `tests/test_integration/`
-- API tests in `tests/test_api/`
+- Hybrid search suites: `tests/test_hybrid_search.py`, `tests/test_hybrid_search_real_vectors.py`, `tests/test_hybrid_search_scale.py`
+- Ontology tooling: `tests/ontology_download/` and `tests/test_resolver_pipeline.py`
+- Parsing and ingestion: `tests/test_pipeline_behaviour.py`, `tests/test_content_download_utils.py`
+- CLI coverage: `tests/test_cli.py`, `tests/test_download_utils.py`
 
 **Test Coverage**:
 
@@ -210,18 +212,12 @@ def process_document(
 **Example Test**:
 
 ```python
-def test_document_processing_success():
-    """Test successful document processing workflow."""
-    # Arrange
-    document = create_test_document()
-
-    # Act
-    result = process_document(document.id)
-
-    # Assert
-    assert result.status == "completed"
-    assert len(result.entities) > 0
-    assert result.processing_time < 5000  # ms
+def test_hybrid_search_returns_results(hybrid_service, seeded_chunk_fixture):
+    """Hybrid search should return seeded document when query matches."""
+    request = HybridSearchRequest(query="knowledge graph", page_size=3)
+    response = hybrid_service.search(request)
+    assert response.results, "Expected at least one result"
+    assert response.results[0].doc_id == seeded_chunk_fixture.doc_id
 ```
 
 ## Documentation Contributions
@@ -252,12 +248,11 @@ We follow [Semantic Versioning](https://semver.org/):
 
 ### Release Checklist
 
-- [ ] All tests pass
-- [ ] Documentation updated
-- [ ] CHANGELOG.md updated
-- [ ] Version numbers bumped
-- [ ] Release notes drafted
-- [ ] Docker images built and tested
+- [ ] All tests pass (`pytest -q`, plus optional markers)
+- [ ] Documentation regenerated and validated
+- [ ] Version numbers bumped in `pyproject.toml`
+- [ ] Release notes drafted (GitHub release or docs entry)
+- [ ] FAISS and ontology snapshots archived for rollback
 
 ## Communication
 
@@ -265,7 +260,6 @@ We follow [Semantic Versioning](https://semver.org/):
 
 - **GitHub Issues**: For bug reports and feature requests
 - **GitHub Discussions**: For questions and community discussions
-- **Discord/Slack**: For real-time chat (links in README)
 
 ### Getting Help
 
