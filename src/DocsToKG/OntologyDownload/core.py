@@ -4,15 +4,29 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Protocol, Sequence
 from urllib.parse import urlparse
 
-import pystow
+try:  # pragma: no cover - exercised in environments without pystow installed
+    import pystow  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - provides lightweight fallback for tests
+    class _PystowFallback:
+        """Minimal pystow replacement used when the dependency is absent."""
+
+        def __init__(self) -> None:
+            self._root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
+
+        def join(self, *segments: str) -> Path:
+            return self._root.joinpath(*segments)
+
+    pystow = _PystowFallback()  # type: ignore
 
 from .config import ConfigError, ResolvedConfig, ensure_python_version
 from .download import (
@@ -118,7 +132,16 @@ LOG_DIR = DATA_ROOT / "logs"
 ONTOLOGY_DIR = DATA_ROOT / "ontologies"
 
 for directory in (CONFIG_DIR, CACHE_DIR, LOG_DIR, ONTOLOGY_DIR):
-    directory.mkdir(parents=True, exist_ok=True)
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except PermissionError as exc:  # pragma: no cover - dependent on environment
+        message = f"Permission denied writing to {directory}. Set PYSTOW_HOME env var"
+        logging.getLogger("DocsToKG.OntologyDownload").error(
+            "pystow directory permission error",
+            extra={"stage": "startup", "path": str(directory)},
+        )
+        print(message, file=sys.stderr)
+        raise SystemExit(1) from exc
 
 
 def _read_manifest(manifest_path: Path) -> Optional[dict]:
@@ -351,51 +374,80 @@ def fetch_all(
     logger: Optional[logging.Logger] = None,
     force: bool = False,
 ) -> List[FetchResult]:
-    """Fetch a sequence of ontologies sequentially."""
+    """Fetch a sequence of ontologies, respecting configured concurrency limits."""
 
     ensure_python_version()
     active_config = config or ResolvedConfig.from_defaults()
-    log = logger or setup_logging(active_config.defaults.logging)
+    if logger is not None:
+        log = logger
+    else:
+        candidate = logging.getLogger("DocsToKG.OntologyDownload")
+        if candidate.handlers:
+            log = candidate
+        else:
+            log = setup_logging(active_config.defaults.logging)
     correlation = generate_correlation_id()
     adapter = logging.LoggerAdapter(log, extra={"correlation_id": correlation})
 
     spec_list = list(specs)
     total = len(spec_list)
-    results: List[FetchResult] = []
-    for index, spec in enumerate(spec_list, start=1):
-        adapter.info(
-            "starting ontology fetch",
-            extra={
-                "stage": "start",
-                "ontology_id": spec.id,
-                "progress": {"current": index, "total": total},
-            },
-        )
-        try:
-            result = fetch_one(
+    if not spec_list:
+        return []
+
+    max_workers = max(1, active_config.defaults.http.concurrent_downloads)
+    adapter.info(
+        "starting batch",
+        extra={"stage": "batch", "progress": {"total": total}, "workers": max_workers},
+    )
+
+    results_map: Dict[int, FetchResult] = {}
+    futures: Dict[object, tuple[int, FetchSpec]] = {}
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for index, spec in enumerate(spec_list, start=1):
+            adapter.info(
+                "starting ontology fetch",
+                extra={
+                    "stage": "start",
+                    "ontology_id": spec.id,
+                    "progress": {"current": index, "total": total},
+                },
+            )
+            future = executor.submit(
+                fetch_one,
                 spec,
                 config=active_config,
                 correlation_id=correlation,
                 logger=log,
                 force=force,
             )
-            results.append(result)
-            adapter.info(
-                "progress update",
-                extra={
-                    "stage": "progress",
-                    "ontology_id": spec.id,
-                    "progress": {"current": index, "total": total},
-                },
-            )
-        except Exception as exc:  # pylint: disable=broad-except
-            adapter.error(
-                "ontology fetch failed",
-                extra={"stage": "error", "ontology_id": spec.id, "error": str(exc)},
-            )
-            if not active_config.defaults.continue_on_error:
-                raise
-    return results
+            futures[future] = (index, spec)
+
+        for future in as_completed(futures):
+            index, spec = futures[future]
+            try:
+                result = future.result()
+                results_map[index] = result
+                adapter.info(
+                    "progress update",
+                    extra={
+                        "stage": "progress",
+                        "ontology_id": spec.id,
+                        "progress": {"current": len(results_map), "total": total},
+                    },
+                )
+            except Exception as exc:  # pylint: disable=broad-except
+                adapter.error(
+                    "ontology fetch failed",
+                    extra={"stage": "error", "ontology_id": spec.id, "error": str(exc)},
+                )
+                if not active_config.defaults.continue_on_error:
+                    for pending in futures:
+                        pending.cancel()
+                    raise
+
+    ordered_results = [results_map[i] for i in sorted(results_map)]
+    return ordered_results
 
 
 __all__ = [
