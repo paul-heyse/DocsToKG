@@ -20,12 +20,12 @@ An automated validation harness SHALL cover ingest integrity (field presence, di
 ## ADDED Requirements
 
 ### Requirement: Real Vector Fixture Generation
-The system SHALL provide deterministic tooling that samples a configurable set of documents from production chunk/vector artifacts, strips or redacts sensitive metadata, and emits a reproducible real-vector fixture under `tests/data/real_hybrid_dataset/` containing aligned chunk JSONL, vector JSONL, a manifest with per-document metadata, and canonical query expectations. The process SHALL record the source artifact hashes and random seed used for sampling to preserve auditability.
+The system SHALL provide deterministic tooling that samples a configurable set of documents from production chunk/vector artifacts, strips or redacts sensitive metadata, and emits a reproducible real-vector fixture under `Data/HybridScaleFixture/` containing aligned chunk JSONL, vector JSONL, a manifest with per-document metadata, and canonical query expectations. The process SHALL record the source artifact hashes and random seed used for sampling to preserve auditability.
 
 #### Scenario: Build reproducible real-vector fixture
 - **GIVEN** the production `Data/ChunkedDocTagFiles` and `Data/Vectors` directories and a target sample size
 - **WHEN** the fixture builder script executes
-- **THEN** it validates input availability, samples the configured number of documents with a fixed seed, redacts configured metadata fields, and writes chunk/vector files plus `manifest.json` and `queries.json` into `tests/data/real_hybrid_dataset/`
+- **THEN** it validates input availability, samples the configured number of documents with a fixed seed, redacts configured metadata fields, and writes chunk/vector files plus `manifest.json` and `queries.json` into `Data/HybridScaleFixture/`
 - **AND** the manifest records the source file hashes, sample seed, and any redacted fields
 - **AND** rerunning the script with the same seed produces byte-identical fixtures
 

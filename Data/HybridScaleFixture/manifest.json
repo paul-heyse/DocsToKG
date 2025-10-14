@@ -1,0 +1,3474 @@
+{
+  "sample_seed": 20241014,
+  "source": {
+    "chunks_dir": "Data/ChunkedDocTagFiles",
+    "vectors_dir": "Data/Vectors"
+  },
+  "documents": [
+    {
+      "doc_id": "2025__A_Case_Report_Exploring_Early-Onset_Alzheimers_Disease_With_No_Known_Family_Hist__W4413353461",
+      "title": "A Case Report Exploring Early-Onset Alzheimer's Disease With No Known Family History | Cureus",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__A_Case_Report_Exploring_Early-Onset_Alzheimers_Disease_With_No_Known_Family_Hist__W4413353461.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__A_Case_Report_Exploring_Early-Onset_Alzheimers_Disease_With_No_Known_Family_Hist__W4413353461.vectors.jsonl",
+      "chunk_sha256": "9b3dbb3d38913a56bbf3656704cac097ee0ffa7d11714d14797a2a3a18ce397f",
+      "vector_sha256": "19b126c8270dfe999b35457912ebbfa3179674237ff05f8bd6995a7e635984fc",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "a case report exploring early onset alzheimer's disease",
+          "expected_doc_id": "2025__A_Case_Report_Exploring_Early-Onset_Alzheimers_Disease_With_No_Known_Family_Hist__W4413353461",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "A Case Report Exploring Early-Onset Alzheimer's Disease With No Known Family History | Cureus",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 6
+    },
+    {
+      "doc_id": "2025__A_comprehensive_review_on_novel_opportunities_for_Alzheimer_therapy_by_targeting__W4413033438",
+      "title": "A comprehensive review on novel opportunities for Alzheimer therapy by targeting BIN1 | Egyptian Journal of Medical Human Genetics | Full Text",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__A_comprehensive_review_on_novel_opportunities_for_Alzheimer_therapy_by_targeting__W4413033438.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__A_comprehensive_review_on_novel_opportunities_for_Alzheimer_therapy_by_targeting__W4413033438.vectors.jsonl",
+      "chunk_sha256": "8b08c70a2a7f7df9f7ec2d679ec8263afd4a6ea7668a8d1c16adac3dc579d7c7",
+      "vector_sha256": "3e427a4c3b6b943b1828efadadf46fb9e192c527c63dd8a1bed5453f13865d8c",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "a comprehensive review on novel opportunities for alzheimer",
+          "expected_doc_id": "2025__A_comprehensive_review_on_novel_opportunities_for_Alzheimer_therapy_by_targeting__W4413033438",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "A comprehensive review on novel opportunities for Alzheimer therapy by targeting BIN1 | Egyptian Journal of Medical Human Genetics | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 34
+    },
+    {
+      "doc_id": "2025__A_protective_role_of_SRC-1_against_aging_associated_cognitive_decline__W4413751913",
+      "title": "A protective role of SRC-1 against aging associated cognitive decline | Aging",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__A_protective_role_of_SRC-1_against_aging_associated_cognitive_decline__W4413751913.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__A_protective_role_of_SRC-1_against_aging_associated_cognitive_decline__W4413751913.vectors.jsonl",
+      "chunk_sha256": "b0608c34d60ecca913fea4c58cdcbcca0916e6171570d87c71e5362c9465f19f",
+      "vector_sha256": "c7ca249f9de5154770c038521d634ea83ffc1947015bbac58fce381ec7cd09db",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "a protective role of src 1 against aging",
+          "expected_doc_id": "2025__A_protective_role_of_SRC-1_against_aging_associated_cognitive_decline__W4413751913",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "A protective role of SRC-1 against aging associated cognitive decline | Aging",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 45
+    },
+    {
+      "doc_id": "2025__A_review_of_hypertension_and_vascular_cognitive_impairment__W4415061765",
+      "title": "A review of hypertension and vascular cognitive impairment",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__A_review_of_hypertension_and_vascular_cognitive_impairment__W4415061765.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__A_review_of_hypertension_and_vascular_cognitive_impairment__W4415061765.vectors.jsonl",
+      "chunk_sha256": "ec474f606bb8b62f84c42ea4e3e52e7fc5369c25338f5b38207002692ab5e2bc",
+      "vector_sha256": "85a62bfe3b4a0b2105e6b135fb870dbd854b1bd6ae2604a4debb26f75d5eea11",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "a review of hypertension and vascular cognitive impairment",
+          "expected_doc_id": "2025__A_review_of_hypertension_and_vascular_cognitive_impairment__W4415061765",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "A review of hypertension and vascular cognitive impairment",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 21
+    },
+    {
+      "doc_id": "2025__A_review_of_type_2_diabetes_mellitus_and_cognitive_impairment__W4412881335",
+      "title": "Frontiers | A review of type 2 diabetes mellitus and cognitive impairment",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__A_review_of_type_2_diabetes_mellitus_and_cognitive_impairment__W4412881335.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__A_review_of_type_2_diabetes_mellitus_and_cognitive_impairment__W4412881335.vectors.jsonl",
+      "chunk_sha256": "6a05a449f07e9fb292d28c03b7c528dc284aaa7c10ee825ea6d9362fa37aef4e",
+      "vector_sha256": "a231f36a64e19206f7419f077ce5ed3974d19cda53aab9ce89843a83538e4229",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers a review of type 2 diabetes mellitus",
+          "expected_doc_id": "2025__A_review_of_type_2_diabetes_mellitus_and_cognitive_impairment__W4412881335",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | A review of type 2 diabetes mellitus and cognitive impairment",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 49
+    },
+    {
+      "doc_id": "2025__Acceptability_of_wearable_technology_for_the_early_detection_of_dementia-causing__W4413786476",
+      "title": "Acceptability of wearable technology for the early detection of dementia-causing diseases: perspectives from the CODEC II cohort | BMC Digital Health | Full Text",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Acceptability_of_wearable_technology_for_the_early_detection_of_dementia-causing__W4413786476.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Acceptability_of_wearable_technology_for_the_early_detection_of_dementia-causing__W4413786476.vectors.jsonl",
+      "chunk_sha256": "5c282ac5c05a8da861301bc925f4264d28c9205c7934fc6d13a176880b708801",
+      "vector_sha256": "f3468751f0f601d387e2c66e0a598b76af79d252f75fe49fbd6838ec3e5a403f",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "acceptability of wearable technology for the early detection",
+          "expected_doc_id": "2025__Acceptability_of_wearable_technology_for_the_early_detection_of_dementia-causing__W4413786476",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Acceptability of wearable technology for the early detection of dementia-causing diseases: perspectives from the CODEC II cohort | BMC Digital Health | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 42
+    },
+    {
+      "doc_id": "2025__Acupuncture_for_patients_with_mild_cognitive_impairment_a_randomized_patientasse__W4412521969",
+      "title": "Acupuncture for patients with mild cognitive impairment: a randomized, patient-assessor-blinded, sham-controlled pilot study | BMC Complementary Medicine and Therapies | Full Text",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Acupuncture_for_patients_with_mild_cognitive_impairment_a_randomized_patientasse__W4412521969.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Acupuncture_for_patients_with_mild_cognitive_impairment_a_randomized_patientasse__W4412521969.vectors.jsonl",
+      "chunk_sha256": "4469f550f1b50d46a87a824bdecd0a648b076beee016a545003aed773af74a0c",
+      "vector_sha256": "f482f49f84108812fce0f306c7dd969a91e437d76de394d4e940869498c1a58d",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "acupuncture for patients with mild cognitive impairment a",
+          "expected_doc_id": "2025__Acupuncture_for_patients_with_mild_cognitive_impairment_a_randomized_patientasse__W4412521969",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Acupuncture for patients with mild cognitive impairment: a randomized, patient-assessor-blinded, sham-controlled pilot study | BMC Complementary Medicine and Therapies | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 40
+    },
+    {
+      "doc_id": "2025__Ambient_Air_Pollution_and_the_Severity_of_Alzheimer_Disease_Neuropathology__W4414058715",
+      "title": "Ambient Air pollution and the Severity of Alzheimer's Disease Neuropathology - PMC",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Ambient_Air_Pollution_and_the_Severity_of_Alzheimer_Disease_Neuropathology__W4414058715.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Ambient_Air_Pollution_and_the_Severity_of_Alzheimer_Disease_Neuropathology__W4414058715.vectors.jsonl",
+      "chunk_sha256": "833d3a355fd5044379575a4d2edd768155812e1481b22db0e4ec980fd742d944",
+      "vector_sha256": "ad11fc270dd324c6f755ece6a56e39c5d27f92f6d0896840937ca119b2925777",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "ambient air pollution and the severity of alzheimer's",
+          "expected_doc_id": "2025__Ambient_Air_Pollution_and_the_Severity_of_Alzheimer_Disease_Neuropathology__W4414058715",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Ambient Air pollution and the Severity of Alzheimer's Disease Neuropathology - PMC",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 39
+    },
+    {
+      "doc_id": "2025__An_innovative_health_systems_approach_to_support_early_detection_of_cognitive_im__W4413790860",
+      "title": "An innovative health systems approach to support early detection of cognitive impairment in primary care - the brain health navigator | BMC Primary Care | Full Text",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__An_innovative_health_systems_approach_to_support_early_detection_of_cognitive_im__W4413790860.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__An_innovative_health_systems_approach_to_support_early_detection_of_cognitive_im__W4413790860.vectors.jsonl",
+      "chunk_sha256": "0e19d4297c5cfc92cc53637cdad87c3408e6e1066566b5ed0ab800a7003ede2a",
+      "vector_sha256": "7986c3cb456e4f96fa48401d124234ed149764e0366e260a3494cd4734347de2",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "an innovative health systems approach to support early",
+          "expected_doc_id": "2025__An_innovative_health_systems_approach_to_support_early_detection_of_cognitive_im__W4413790860",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "An innovative health systems approach to support early detection of cognitive impairment in primary care - the brain health navigator | BMC Primary Care | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 33
+    },
+    {
+      "doc_id": "2025__Anticholinergic_Burden_and_Its_Association_with_Hospitalisation_Risk_and_Causes___W4414468114",
+      "title": "Anticholinergic burden and its association with hospitalisation risk a | CIA",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Anticholinergic_Burden_and_Its_Association_with_Hospitalisation_Risk_and_Causes___W4414468114.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Anticholinergic_Burden_and_Its_Association_with_Hospitalisation_Risk_and_Causes___W4414468114.vectors.jsonl",
+      "chunk_sha256": "875ce622b459288e0b13dcab9fd9334af288bdcc8066df2df798f4024317cbd5",
+      "vector_sha256": "e5a025fb232f1caf3309f7f88f71a234e9f970712ab39e6399435020619f091f",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "anticholinergic burden and its association with hospitalisation risk",
+          "expected_doc_id": "2025__Anticholinergic_Burden_and_Its_Association_with_Hospitalisation_Risk_and_Causes___W4414468114",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Anticholinergic burden and its association with hospitalisation risk a | CIA",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 25
+    },
+    {
+      "doc_id": "2025__Apraxic_deficits_predict_general_cognitive_impairment_in_patients_with_biomarker__W4414497753",
+      "title": "Determination of CSF and PET biomarker status",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Apraxic_deficits_predict_general_cognitive_impairment_in_patients_with_biomarker__W4414497753.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Apraxic_deficits_predict_general_cognitive_impairment_in_patients_with_biomarker__W4414497753.vectors.jsonl",
+      "chunk_sha256": "14c5ad9e45f6258e396183640f0f7e9f2c5b2dc81c9058960be6d080b7543e6b",
+      "vector_sha256": "96b8bbeb45284d05ae83d4d2f806161495559630aae3949e892a8024268e91aa",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "determination of csf and pet biomarker status apraxic",
+          "expected_doc_id": "2025__Apraxic_deficits_predict_general_cognitive_impairment_in_patients_with_biomarker__W4414497753",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Determination of CSF and PET biomarker status",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 29
+    },
+    {
+      "doc_id": "2025__Are_long-lasting_nonspecific_symptoms_related_to_vitamin_D_deficiency_among_olde__W4411573635",
+      "title": "Are long-lasting nonspecific symptoms related to vitamin D deficiency among older adults living in nursing homes? | BMC Geriatrics | Full Text",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Are_long-lasting_nonspecific_symptoms_related_to_vitamin_D_deficiency_among_olde__W4411573635.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Are_long-lasting_nonspecific_symptoms_related_to_vitamin_D_deficiency_among_olde__W4411573635.vectors.jsonl",
+      "chunk_sha256": "510f34b2946f3dd5c7ad6bade971e119e99cca2ff116652e1fee01a60432c50b",
+      "vector_sha256": "8f1d919d1a445e1de3c0602991fe91a7920a8f2984e63b9ff8a6e4e2fb21670a",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "are long lasting nonspecific symptoms related to vitamin",
+          "expected_doc_id": "2025__Are_long-lasting_nonspecific_symptoms_related_to_vitamin_D_deficiency_among_olde__W4411573635",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Are long-lasting nonspecific symptoms related to vitamin D deficiency among older adults living in nursing homes? | BMC Geriatrics | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 22
+    },
+    {
+      "doc_id": "2025__Beauty_in_the_shadow_of_neurodegenerative_disease_a_narrative_review_on_aestheti__W4414972538",
+      "title": "Beauty in the shadow of neurodegenerative disease: a narrative review on aesthetic experience, neural mechanisms, and therapeutic frontiers",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Beauty_in_the_shadow_of_neurodegenerative_disease_a_narrative_review_on_aestheti__W4414972538.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Beauty_in_the_shadow_of_neurodegenerative_disease_a_narrative_review_on_aestheti__W4414972538.vectors.jsonl",
+      "chunk_sha256": "dd47639b36f9fdae59891519fbf225567b96972f68e9332f4a76bb997b0dadae",
+      "vector_sha256": "20cd5842a789aee22df990eb946e480ad750675454a7d5384f73e7f879cc0f76",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "beauty in the shadow of neurodegenerative disease a",
+          "expected_doc_id": "2025__Beauty_in_the_shadow_of_neurodegenerative_disease_a_narrative_review_on_aestheti__W4414972538",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Beauty in the shadow of neurodegenerative disease: a narrative review on aesthetic experience, neural mechanisms, and therapeutic frontiers",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 60
+    },
+    {
+      "doc_id": "2025__Blood-based_biomarkers_and_neuroimaging_for_early_detection_of_post-stroke_cogni__W4413036846",
+      "title": "Frontiers | Blood-based biomarkers and neuroimaging for early detection of post-stroke cognitive impairment: current evidence and synergistic prospects",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Blood-based_biomarkers_and_neuroimaging_for_early_detection_of_post-stroke_cogni__W4413036846.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Blood-based_biomarkers_and_neuroimaging_for_early_detection_of_post-stroke_cogni__W4413036846.vectors.jsonl",
+      "chunk_sha256": "e609db80265f0ab30702608ed96a6256dc94daf4aa321ae90c19db7ff9da4952",
+      "vector_sha256": "e06308e149e3906bdd5a816bd1260ccc7699b2644dcf4f7c3c1f2f1986d8b419",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers blood based biomarkers and neuroimaging for early",
+          "expected_doc_id": "2025__Blood-based_biomarkers_and_neuroimaging_for_early_detection_of_post-stroke_cogni__W4413036846",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Blood-based biomarkers and neuroimaging for early detection of post-stroke cognitive impairment: current evidence and synergistic prospects",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 57
+    },
+    {
+      "doc_id": "2025__Brain_health_a_new_concept_to_the_neurologist_an_initiative_of_the_Lifestyle_Med__W4413866194",
+      "title": "Thieme E-Journals - Arquivos de Neuro-Psiquiatria / Abstract",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Brain_health_a_new_concept_to_the_neurologist_an_initiative_of_the_Lifestyle_Med__W4413866194.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Brain_health_a_new_concept_to_the_neurologist_an_initiative_of_the_Lifestyle_Med__W4413866194.vectors.jsonl",
+      "chunk_sha256": "d1d6f4204c2bac2f2ed446fbc9fc49afbfa1c65a4b4ac51777d051dff267016a",
+      "vector_sha256": "7853aed6651efffbea617bf304d33e476118b4187bb46cd79d9ff0824c43a5bf",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "thieme e journals arquivos de neuro psiquiatria abstract",
+          "expected_doc_id": "2025__Brain_health_a_new_concept_to_the_neurologist_an_initiative_of_the_Lifestyle_Med__W4413866194",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Thieme E-Journals - Arquivos de Neuro-Psiquiatria / Abstract",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 18
+    },
+    {
+      "doc_id": "2025__Brain_rot_and_Alzheimers_disease__W4413424816",
+      "title": "Brain rot and Alzheimer's disease",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Brain_rot_and_Alzheimers_disease__W4413424816.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Brain_rot_and_Alzheimers_disease__W4413424816.vectors.jsonl",
+      "chunk_sha256": "dfce4a2232e74baa3685ad7a2eb7eda91cef66fe4f0755754a9fd3ddd595b95d",
+      "vector_sha256": "2676e3ef1cd68230676061ef66544c641b578bb35d9e8e8c793ad7aaaecef653",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "brain rot and alzheimer's disease alzheimers w4413424816",
+          "expected_doc_id": "2025__Brain_rot_and_Alzheimers_disease__W4413424816",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Brain rot and Alzheimer's disease",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 3
+    },
+    {
+      "doc_id": "2025__CITA_GO-ON_study_A_community_based_multidomain_lifestyle_intervention_to_prevent__W4411325550",
+      "title": "Frontiers | CITA GO-ON study. A community based multidomain lifestyle intervention to prevent cognitive decline. Protocol design and recruitment process",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__CITA_GO-ON_study_A_community_based_multidomain_lifestyle_intervention_to_prevent__W4411325550.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__CITA_GO-ON_study_A_community_based_multidomain_lifestyle_intervention_to_prevent__W4411325550.vectors.jsonl",
+      "chunk_sha256": "9a37ae3c118b124ff61a4864e0cc9a5c6b024ecd5f7ecc751c2126c5f4d1ad89",
+      "vector_sha256": "e2e2e710969ec83bbae60bd47d4ce52e043c66851f94df800f9741221bf60baf",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers cita go on study a community based",
+          "expected_doc_id": "2025__CITA_GO-ON_study_A_community_based_multidomain_lifestyle_intervention_to_prevent__W4411325550",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | CITA GO-ON study. A community based multidomain lifestyle intervention to prevent cognitive decline. Protocol design and recruitment process",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 48
+    },
+    {
+      "doc_id": "2025__Cannabis_use_and_cognition_in_older_adults_Preliminary_performance-based_neurops__W4413874345",
+      "title": "Cannabis use and cognition in older adults: Preliminary performance-based neuropsychological test results and directions for future research | Journal of the International Neuropsychological Society | Cambridge Core",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Cannabis_use_and_cognition_in_older_adults_Preliminary_performance-based_neurops__W4413874345.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Cannabis_use_and_cognition_in_older_adults_Preliminary_performance-based_neurops__W4413874345.vectors.jsonl",
+      "chunk_sha256": "7ff55344f192535231a641b66d880b24b95da2ba844e3e27115e74a2118f3efb",
+      "vector_sha256": "82ce2c1282dbd29df3b68622f58af025073e40b02f97b5919170d986e45f63c2",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "cannabis use and cognition in older adults preliminary",
+          "expected_doc_id": "2025__Cannabis_use_and_cognition_in_older_adults_Preliminary_performance-based_neurops__W4413874345",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Cannabis use and cognition in older adults: Preliminary performance-based neuropsychological test results and directions for future research | Journal of the International Neuropsychological Society | Cambridge Core",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 42
+    },
+    {
+      "doc_id": "2025__Causal_Effects_of_the_Plasma_Proteome_on_Vascular_Dementia_Risk_A_Mendelian_Rand__W4412068972",
+      "title": "Causal Effects of the Plasma Proteome on Vascular Dementia Risk: A Mendelian Randomization Study with Experimental Validation | Cellular and Molecular Neurobiology",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Causal_Effects_of_the_Plasma_Proteome_on_Vascular_Dementia_Risk_A_Mendelian_Rand__W4412068972.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Causal_Effects_of_the_Plasma_Proteome_on_Vascular_Dementia_Risk_A_Mendelian_Rand__W4412068972.vectors.jsonl",
+      "chunk_sha256": "e6748b4b5a7db9892237363a9818b14e1b5bed2bf920f6cf4b91d29f7484ecd4",
+      "vector_sha256": "044f0339f5ff0bc73b0327abd530f952e58e9ce9743ad6ce4cc0112506d35fa8",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "causal effects of the plasma proteome on vascular",
+          "expected_doc_id": "2025__Causal_Effects_of_the_Plasma_Proteome_on_Vascular_Dementia_Risk_A_Mendelian_Rand__W4412068972",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Causal Effects of the Plasma Proteome on Vascular Dementia Risk: A Mendelian Randomization Study with Experimental Validation | Cellular and Molecular Neurobiology",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 41
+    },
+    {
+      "doc_id": "2025__Cognitive_Function_and_General_Anesthesia_Exposure_A_Cognitive_Impairment_Stage-__W4413894233",
+      "title": "Comparison of participant characteristics between the diagnostic groups",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Cognitive_Function_and_General_Anesthesia_Exposure_A_Cognitive_Impairment_Stage-__W4413894233.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Cognitive_Function_and_General_Anesthesia_Exposure_A_Cognitive_Impairment_Stage-__W4413894233.vectors.jsonl",
+      "chunk_sha256": "d750af2e1babd55a26262b786c1dbfaa249bc4aee2fe1244e1d500b072e32271",
+      "vector_sha256": "acde4dfd06c3ab2a1f0836d3200282e514aa33def00c8995d3f5d5458b70d5cd",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "comparison of participant characteristics between the diagnostic groups",
+          "expected_doc_id": "2025__Cognitive_Function_and_General_Anesthesia_Exposure_A_Cognitive_Impairment_Stage-__W4413894233",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Comparison of participant characteristics between the diagnostic groups",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 28
+    },
+    {
+      "doc_id": "2025__Cognitive_rehabilitation_using_virtual_reality_in_subjective_cognitive_decline_a__W4414218444",
+      "title": "Cognitive rehabilitation using virtual reality in subjective cognitive decline and mild cognitive impairment: a systematic review",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Cognitive_rehabilitation_using_virtual_reality_in_subjective_cognitive_decline_a__W4414218444.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Cognitive_rehabilitation_using_virtual_reality_in_subjective_cognitive_decline_a__W4414218444.vectors.jsonl",
+      "chunk_sha256": "68d7b84b348add812fe12e003892d7f2fad2e4668112f1151a2f1a8296c6924b",
+      "vector_sha256": "67bd0e15cc8fbb51a26088195f89bde8dab3e66c4574cbe7213a4f074716294e",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "cognitive rehabilitation using virtual reality in subjective decline",
+          "expected_doc_id": "2025__Cognitive_rehabilitation_using_virtual_reality_in_subjective_cognitive_decline_a__W4414218444",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Cognitive rehabilitation using virtual reality in subjective cognitive decline and mild cognitive impairment: a systematic review",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 74
+    },
+    {
+      "doc_id": "2025__Communicating_the_risk_of_dementia_a_scoping_review__W4412582631",
+      "title": "Communicating the risk of dementia: a scoping review | BMJ Neurology Open",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Communicating_the_risk_of_dementia_a_scoping_review__W4412582631.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Communicating_the_risk_of_dementia_a_scoping_review__W4412582631.vectors.jsonl",
+      "chunk_sha256": "4b9090841ed4a615a5999d1845d75c8fbdc8741e3343b324715f2c4e66bf2f4a",
+      "vector_sha256": "7f21b94cb0ed2a85cb23cf5e89de3282be358e2b59c2230ff56d326024d3241c",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "communicating the risk of dementia a scoping review",
+          "expected_doc_id": "2025__Communicating_the_risk_of_dementia_a_scoping_review__W4412582631",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Communicating the risk of dementia: a scoping review | BMJ Neurology Open",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 37
+    },
+    {
+      "doc_id": "2025__Comparison_of_two_preprocessing_methods_for_18F-Flortaucipir_PET_quantification___W4412521606",
+      "title": "Comparison of two preprocessing methods for 18F-Flortaucipir PET quantification in Alzheimer's disease | European Journal of Nuclear Medicine and Molecular Imaging",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Comparison_of_two_preprocessing_methods_for_18F-Flortaucipir_PET_quantification___W4412521606.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Comparison_of_two_preprocessing_methods_for_18F-Flortaucipir_PET_quantification___W4412521606.vectors.jsonl",
+      "chunk_sha256": "d39bd361f3088f47030842c64b9ca0b354d7db550269c8d07509c01c53be7afa",
+      "vector_sha256": "4236038564f17cf68f49128a3543c3d1938c0f92b4a4d5f9e5acc74c27d9e0d4",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "comparison of two preprocessing methods for 18f flortaucipir",
+          "expected_doc_id": "2025__Comparison_of_two_preprocessing_methods_for_18F-Flortaucipir_PET_quantification___W4412521606",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Comparison of two preprocessing methods for 18F-Flortaucipir PET quantification in Alzheimer's disease | European Journal of Nuclear Medicine and Molecular Imaging",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 32
+    },
+    {
+      "doc_id": "2025__Contribution_and_legacy_a_qualitative_study_of_older_peoples_attitudes_about_sha__W4410898545",
+      "title": "Contribution and legacy: a qualitative study of older people's attitudes about sharing their routinely collected health data for research purposes in New Zealand | BMC Medical Ethics | Full Text",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Contribution_and_legacy_a_qualitative_study_of_older_peoples_attitudes_about_sha__W4410898545.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Contribution_and_legacy_a_qualitative_study_of_older_peoples_attitudes_about_sha__W4410898545.vectors.jsonl",
+      "chunk_sha256": "cca374050ddd7c3c3a1edac96d4db7f8cbb67e64897951372f1f361e68a0a685",
+      "vector_sha256": "11236d46dbab3793ad6e7ed0fa186406d2da4910e33cdcc80258adaf26568ff4",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "contribution and legacy a qualitative study of older",
+          "expected_doc_id": "2025__Contribution_and_legacy_a_qualitative_study_of_older_peoples_attitudes_about_sha__W4410898545",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Contribution and legacy: a qualitative study of older people's attitudes about sharing their routinely collected health data for research purposes in New Zealand | BMC Medical Ethics | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 36
+    },
+    {
+      "doc_id": "2025__Cross-domain_latent_profiles_of_MCI_and_dementia_are_most_differentiated_by_soci__W4413896539",
+      "title": "Statement of Research Significance",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Cross-domain_latent_profiles_of_MCI_and_dementia_are_most_differentiated_by_soci__W4413896539.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Cross-domain_latent_profiles_of_MCI_and_dementia_are_most_differentiated_by_soci__W4413896539.vectors.jsonl",
+      "chunk_sha256": "3983d18d648c2367379b13bd0b38c3985924f57ec69eb85b61144ccfca1a220c",
+      "vector_sha256": "3d7cab719064c04610a5c1f5d3c893cb1e63b91b56d4880286d266b9692d17fb",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "statement of research significance cross domain latent profiles",
+          "expected_doc_id": "2025__Cross-domain_latent_profiles_of_MCI_and_dementia_are_most_differentiated_by_soci__W4413896539",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Statement of Research Significance",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 50
+    },
+    {
+      "doc_id": "2025__Developing_an_explainable_machine_learning_and_fog_computing-based_visual_rating__W4412486382",
+      "title": "Developing an explainable machine learning and fog computing-based visual rating scale for the prediction of dementia progression | Scientific Reports",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Developing_an_explainable_machine_learning_and_fog_computing-based_visual_rating__W4412486382.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Developing_an_explainable_machine_learning_and_fog_computing-based_visual_rating__W4412486382.vectors.jsonl",
+      "chunk_sha256": "189b1d2cbcd53a20c523b0ec706277fc638b24571cb4af6386f1b7f9cae51968",
+      "vector_sha256": "62c4b225f5ee39a17206c48031aa122ad8e393a866d2ab9232fbcbfa55929cee",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "developing an explainable machine learning and fog computing",
+          "expected_doc_id": "2025__Developing_an_explainable_machine_learning_and_fog_computing-based_visual_rating__W4412486382",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Developing an explainable machine learning and fog computing-based visual rating scale for the prediction of dementia progression | Scientific Reports",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 59
+    },
+    {
+      "doc_id": "2025__Development_of_a_predictive_model_for_long-term_care_and_support_eligibility_cer__W4413368004",
+      "title": "Development of a predictive model for long-term care and support eligibility certification associated with dementia-related functional impairments: the IRIDE cohort study | BMC Public Health | Full Text",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Development_of_a_predictive_model_for_long-term_care_and_support_eligibility_cer__W4413368004.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Development_of_a_predictive_model_for_long-term_care_and_support_eligibility_cer__W4413368004.vectors.jsonl",
+      "chunk_sha256": "c1f44e6cb1c96898c41c623d7b23d306c2c6b5ea98be67d174b1dd014cf0fe1e",
+      "vector_sha256": "1133b1ae441cb9936949f9accf729320f153676563a1c5ce846f05cba6842615",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "development of a predictive model for long term",
+          "expected_doc_id": "2025__Development_of_a_predictive_model_for_long-term_care_and_support_eligibility_cer__W4413368004",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Development of a predictive model for long-term care and support eligibility certification associated with dementia-related functional impairments: the IRIDE cohort study | BMC Public Health | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 32
+    },
+    {
+      "doc_id": "2025__Diffusion_tensor_imaging_analysis_of_aged_dogs_with_and_without_canine_cognitive__W4414753933",
+      "title": "Diffusion tensor imaging analysis of aged dogs with and without canine cognitive dysfunction | BMC Veterinary Research | Full Text",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Diffusion_tensor_imaging_analysis_of_aged_dogs_with_and_without_canine_cognitive__W4414753933.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Diffusion_tensor_imaging_analysis_of_aged_dogs_with_and_without_canine_cognitive__W4414753933.vectors.jsonl",
+      "chunk_sha256": "079afaa5ce5c25d4217c00b5aefa945dbe6868daa49356e77badb2daae90f11c",
+      "vector_sha256": "c2cab214db10254dc4654c7925164844c8225257ee69ed45db336be918fe138d",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "diffusion tensor imaging analysis of aged dogs with",
+          "expected_doc_id": "2025__Diffusion_tensor_imaging_analysis_of_aged_dogs_with_and_without_canine_cognitive__W4414753933",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Diffusion tensor imaging analysis of aged dogs with and without canine cognitive dysfunction | BMC Veterinary Research | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 30
+    },
+    {
+      "doc_id": "2025__Digital_tools_for_people_without_an_Alzheimers_disease_or_dementia_diagnosis_a_s__W4411863403",
+      "title": "Journal of Medical Internet Research - Digital Tools for People Without an Alzheimer Disease or Dementia Diagnosis: Scoping Review",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Digital_tools_for_people_without_an_Alzheimers_disease_or_dementia_diagnosis_a_s__W4411863403.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Digital_tools_for_people_without_an_Alzheimers_disease_or_dementia_diagnosis_a_s__W4411863403.vectors.jsonl",
+      "chunk_sha256": "278a73efb739d6c3807b05fdd0dc9d6968ee191e714275de5f2f79ffc11650f3",
+      "vector_sha256": "0027d9b7399cf90f5b3b79a443ad05a2f9c42a7c4529c17d49d3b56d4f2931b7",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "journal of medical internet research digital tools for",
+          "expected_doc_id": "2025__Digital_tools_for_people_without_an_Alzheimers_disease_or_dementia_diagnosis_a_s__W4411863403",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Journal of Medical Internet Research - Digital Tools for People Without an Alzheimer Disease or Dementia Diagnosis: Scoping Review",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 61
+    },
+    {
+      "doc_id": "2025__Disease_progression_and_social_cognition_in_behavioral_variant_frontotemporal_de__W4413438989",
+      "title": "Disease progression and social cognition in behavioral variant frontotemporal dementia: Defining changes of the social brain",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Disease_progression_and_social_cognition_in_behavioral_variant_frontotemporal_de__W4413438989.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Disease_progression_and_social_cognition_in_behavioral_variant_frontotemporal_de__W4413438989.vectors.jsonl",
+      "chunk_sha256": "632bb8e116f25fab3812fb3e071c3beb8972a8963c7669e361adf8da64ee8f6b",
+      "vector_sha256": "ed99a00fe7bb1408ca304702c7caa96cf91e50afba432485aae017e6dddd90a1",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "disease progression and social cognition in behavioral variant",
+          "expected_doc_id": "2025__Disease_progression_and_social_cognition_in_behavioral_variant_frontotemporal_de__W4413438989",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Disease progression and social cognition in behavioral variant frontotemporal dementia: Defining changes of the social brain",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 15
+    },
+    {
+      "doc_id": "2025__Dissecting_real-world_memory_clinical_cohort_heterogeneity_analysis_of_neuroanat__W4414704396",
+      "title": "Parsing heterogeneity using HYDA",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Dissecting_real-world_memory_clinical_cohort_heterogeneity_analysis_of_neuroanat__W4414704396.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Dissecting_real-world_memory_clinical_cohort_heterogeneity_analysis_of_neuroanat__W4414704396.vectors.jsonl",
+      "chunk_sha256": "7920d6a1b5ef396298851763307e9e6c909a718d1a75e8cb34b4470679d43a0a",
+      "vector_sha256": "0a2a8c54e4da163ea03416c606040ae5ee371703f89b1fd2e3642c8aad8315e2",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "parsing heterogeneity using hyda dissecting real world memory",
+          "expected_doc_id": "2025__Dissecting_real-world_memory_clinical_cohort_heterogeneity_analysis_of_neuroanat__W4414704396",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Parsing heterogeneity using HYDA",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 43
+    },
+    {
+      "doc_id": "2025__DunedinPACNI_estimates_the_longitudinal_Pace_of_Aging_from_a_single_brain_image___W4411900345",
+      "title": "DunedinPACNI estimates the longitudinal Pace of Aging from a single brain image to track health and disease | Nature Aging",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__DunedinPACNI_estimates_the_longitudinal_Pace_of_Aging_from_a_single_brain_image___W4411900345.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__DunedinPACNI_estimates_the_longitudinal_Pace_of_Aging_from_a_single_brain_image___W4411900345.vectors.jsonl",
+      "chunk_sha256": "d23ffb70e9665c490ebb4926b100faa62a434ff9006eccd1104aa25629084fbb",
+      "vector_sha256": "0aa6c81421053cfcf2b17ddf9e12ebb489ebacbfead89fc26d46c83d58fa4791",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "dunedinpacni estimates the longitudinal pace of aging from",
+          "expected_doc_id": "2025__DunedinPACNI_estimates_the_longitudinal_Pace_of_Aging_from_a_single_brain_image___W4411900345",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "DunedinPACNI estimates the longitudinal Pace of Aging from a single brain image to track health and disease | Nature Aging",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 79
+    },
+    {
+      "doc_id": "2025__Editorial_Advanced_fNIRS_applications_in_neuroscience_and_neurological_disorders__W4414261891",
+      "title": "Editorial on the Research Topic",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Editorial_Advanced_fNIRS_applications_in_neuroscience_and_neurological_disorders__W4414261891.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Editorial_Advanced_fNIRS_applications_in_neuroscience_and_neurological_disorders__W4414261891.vectors.jsonl",
+      "chunk_sha256": "0043133a398eacebb3e77bdbd35a588a8bc7eac0e3387d567551e92b44cfd059",
+      "vector_sha256": "bf5558e07230af078bc23d07dfc1158efa9eb9003b88fb96e32a8828229d48f8",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "editorial on the research topic advanced fnirs applications",
+          "expected_doc_id": "2025__Editorial_Advanced_fNIRS_applications_in_neuroscience_and_neurological_disorders__W4414261891",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Editorial on the Research Topic",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 7
+    },
+    {
+      "doc_id": "2025__Editorial_Decoding_vascular_aging_unraveling_the_enigma_of_pathological_conditio__W4414742927",
+      "title": "2025 Editorial Decoding vascular aging unraveling the enigma",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Editorial_Decoding_vascular_aging_unraveling_the_enigma_of_pathological_conditio__W4414742927.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Editorial_Decoding_vascular_aging_unraveling_the_enigma_of_pathological_conditio__W4414742927.vectors.jsonl",
+      "chunk_sha256": "bd5cc422cd6c10ae10d679bf4c716918e8a41cdc735cddc9c39319bbe4973c7c",
+      "vector_sha256": "bebd2627a62d83958028c4cc048472daa007d1c84358638cd3f0ea84cc779366",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "2025 editorial decoding vascular aging unraveling the enigma",
+          "expected_doc_id": "2025__Editorial_Decoding_vascular_aging_unraveling_the_enigma_of_pathological_conditio__W4414742927",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "2025 Editorial Decoding vascular aging unraveling the enigma",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 7
+    },
+    {
+      "doc_id": "2025__Editorial_Neurocognitive_disorders_in_the_community_a_global_perspective__W4414218012",
+      "title": "Editorial on the Research Topic",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Editorial_Neurocognitive_disorders_in_the_community_a_global_perspective__W4414218012.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Editorial_Neurocognitive_disorders_in_the_community_a_global_perspective__W4414218012.vectors.jsonl",
+      "chunk_sha256": "40f9e92d869ae7b2e38bfcf8117ca543444efaadedd28c8d8cec204c769cf236",
+      "vector_sha256": "e6e6cd823086dd619c3f574c29cba4d32ef3b6ea3f6d524cd565838b500fe7c8",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "editorial on the research topic neurocognitive disorders in",
+          "expected_doc_id": "2025__Editorial_Neurocognitive_disorders_in_the_community_a_global_perspective__W4414218012",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Editorial on the Research Topic",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 8
+    },
+    {
+      "doc_id": "2025__Editorial_Remedying_the_injured_brain_in_cognitive_impairment_potential_neuroimm__W4414672991",
+      "title": "Frontiers | Editorial: Remedying the injured brain in cognitive impairment: potential neuroimmune communication signaling and therapeutic opportunities",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Editorial_Remedying_the_injured_brain_in_cognitive_impairment_potential_neuroimm__W4414672991.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Editorial_Remedying_the_injured_brain_in_cognitive_impairment_potential_neuroimm__W4414672991.vectors.jsonl",
+      "chunk_sha256": "70e0a59fd7b7c92dcdb0a15ac2f719f0be9994529eb6bfbf0af3504d080fbbc1",
+      "vector_sha256": "7cce8deeb3093f64375735a5f86faaba402ad18b081bd2a672516ba99f013f87",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers editorial remedying the injured brain in cognitive",
+          "expected_doc_id": "2025__Editorial_Remedying_the_injured_brain_in_cognitive_impairment_potential_neuroimm__W4414672991",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Editorial: Remedying the injured brain in cognitive impairment: potential neuroimmune communication signaling and therapeutic opportunities",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 14
+    },
+    {
+      "doc_id": "2025__Editorial_The_open_challenges_of_cognitive_frailty_risk_factors_neuropsychologic__W4413303148",
+      "title": "Editorial on the Research Topic",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Editorial_The_open_challenges_of_cognitive_frailty_risk_factors_neuropsychologic__W4413303148.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Editorial_The_open_challenges_of_cognitive_frailty_risk_factors_neuropsychologic__W4413303148.vectors.jsonl",
+      "chunk_sha256": "a7af3cbfe4ddac61e3d890b074d88ffabc9e098a4f831d3ddab976dc0cfbe375",
+      "vector_sha256": "c87dc95b35dddee13fc650390cb81ea21701ba885c815d72e67bdbb836ef1af9",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "editorial on the research topic open challenges of",
+          "expected_doc_id": "2025__Editorial_The_open_challenges_of_cognitive_frailty_risk_factors_neuropsychologic__W4413303148",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Editorial on the Research Topic",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 7
+    },
+    {
+      "doc_id": "2025__Effect_of_aerobic_exercise_combined_with_meditation_on_cognitive_frailty_study_p__W4411718034",
+      "title": "Effect of aerobic exercise combined with meditation on cognitive frailty: study protocol for a parallel group randomised controlled trial | BMJ Open",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Effect_of_aerobic_exercise_combined_with_meditation_on_cognitive_frailty_study_p__W4411718034.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Effect_of_aerobic_exercise_combined_with_meditation_on_cognitive_frailty_study_p__W4411718034.vectors.jsonl",
+      "chunk_sha256": "8a08d1804a8db2d3369eac1d21a45472a9a7a8aa97be2df2f4a80a95f8cb9a2e",
+      "vector_sha256": "665080a796c79c3623dc00e8ba87b9a0ab91b845e8bcdb2f7032cac830b5d7f9",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "effect of aerobic exercise combined with meditation on",
+          "expected_doc_id": "2025__Effect_of_aerobic_exercise_combined_with_meditation_on_cognitive_frailty_study_p__W4411718034",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Effect of aerobic exercise combined with meditation on cognitive frailty: study protocol for a parallel group randomised controlled trial | BMJ Open",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 38
+    },
+    {
+      "doc_id": "2025__Effectiveness_of_VR-based_cognitive_training_and_games_on_cognitive_rehabilitati__W4413993402",
+      "title": "JMIR Preprints #82876: Effectiveness of VR-based cognitive training and games on cognitive rehabilitation in patients with MCI\uff1aA Systematic Review and Meta-Analysis",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Effectiveness_of_VR-based_cognitive_training_and_games_on_cognitive_rehabilitati__W4413993402.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Effectiveness_of_VR-based_cognitive_training_and_games_on_cognitive_rehabilitati__W4413993402.vectors.jsonl",
+      "chunk_sha256": "affc2eb82afd902ebaffe6e0499e43ea90178ee2c559bd3b2ebd3ed2bcbc1504",
+      "vector_sha256": "e79be6c9d74ddad683d6977d1f7cb528d9803501b1edfe6049dfbb8980fc793f",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "jmir preprints 82876 effectiveness of vr based cognitive",
+          "expected_doc_id": "2025__Effectiveness_of_VR-based_cognitive_training_and_games_on_cognitive_rehabilitati__W4413993402",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "JMIR Preprints #82876: Effectiveness of VR-based cognitive training and games on cognitive rehabilitation in patients with MCI\uff1aA Systematic Review and Meta-Analysis",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 6
+    },
+    {
+      "doc_id": "2025__Effectiveness_of_Walking_Prescription_Using_Mobile_Health_Technology_on_the_Chan__W4411201194",
+      "title": "JMIR Aging - Effectiveness of Walking Prescription Using Mobile Health Technology on the Changes in Daily Steps in Older Adults With Cognitive Impairment: Randomized Controlled Study",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Effectiveness_of_Walking_Prescription_Using_Mobile_Health_Technology_on_the_Chan__W4411201194.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Effectiveness_of_Walking_Prescription_Using_Mobile_Health_Technology_on_the_Chan__W4411201194.vectors.jsonl",
+      "chunk_sha256": "c99b48b0ca0d7d1309b144977e7480138fd179794bdc2a4b1c5ad30821268c8e",
+      "vector_sha256": "6fb3c2f7aa3c366b89d69f618cc67190cd89fe671e651fa2a9dc6670ae90aeb8",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "jmir aging effectiveness of walking prescription using mobile",
+          "expected_doc_id": "2025__Effectiveness_of_Walking_Prescription_Using_Mobile_Health_Technology_on_the_Chan__W4411201194",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "JMIR Aging - Effectiveness of Walking Prescription Using Mobile Health Technology on the Changes in Daily Steps in Older Adults With Cognitive Impairment: Randomized Controlled Study",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 44
+    },
+    {
+      "doc_id": "2025__Effects_of_Blood_Pressure_Variability_and_Its_Association_With_Dementia_and_Cogn__W4411804266",
+      "title": "Effects of Blood Pressure Variability and Its Association With Dementia and Cognitive Impairment: A Systematic Review",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Effects_of_Blood_Pressure_Variability_and_Its_Association_With_Dementia_and_Cogn__W4411804266.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Effects_of_Blood_Pressure_Variability_and_Its_Association_With_Dementia_and_Cogn__W4411804266.vectors.jsonl",
+      "chunk_sha256": "f60331ba070739b579b0461741dbc302e7adfb25bd1e53cde64df7343ef79530",
+      "vector_sha256": "18a15c6c16d82f41e5fbd133de9863630c4e4179d90c2f13dc381782345703aa",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "effects of blood pressure variability and its association",
+          "expected_doc_id": "2025__Effects_of_Blood_Pressure_Variability_and_Its_Association_With_Dementia_and_Cogn__W4411804266",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Effects of Blood Pressure Variability and Its Association With Dementia and Cognitive Impairment: A Systematic Review",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 12
+    },
+    {
+      "doc_id": "2025__Effects_of_Tai_Chi_on_Cognitive_Function_in_Older_Adults_with_T2DM_A_Randomized___W4412753123",
+      "title": "Journal of Medical Internet Research - Effects of Tai Chi on Cognitive Function in Older Adults With Type 2 Diabetes Mellitus: Randomized Controlled Trial Using Wearable Devices in a Mobile Health Model",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Effects_of_Tai_Chi_on_Cognitive_Function_in_Older_Adults_with_T2DM_A_Randomized___W4412753123.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Effects_of_Tai_Chi_on_Cognitive_Function_in_Older_Adults_with_T2DM_A_Randomized___W4412753123.vectors.jsonl",
+      "chunk_sha256": "c134b10d8460b0fd9bf11e3fe879f3ee772b7bb59a45a7b1a5b552414817d64b",
+      "vector_sha256": "a7ffb2f248b9aedf2cff4266620396771297c4c2aa64fb5ab6a69d6b3ae6c40b",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "journal of medical internet research effects tai chi",
+          "expected_doc_id": "2025__Effects_of_Tai_Chi_on_Cognitive_Function_in_Older_Adults_with_T2DM_A_Randomized___W4412753123",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Journal of Medical Internet Research - Effects of Tai Chi on Cognitive Function in Older Adults With Type 2 Diabetes Mellitus: Randomized Controlled Trial Using Wearable Devices in a Mobile Health Model",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 58
+    },
+    {
+      "doc_id": "2025__Effects_of_balance_physical_therapy_with_or_without_cognitive_training_in_adults__W4414700851",
+      "title": "Risk of bias assessment",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Effects_of_balance_physical_therapy_with_or_without_cognitive_training_in_adults__W4414700851.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Effects_of_balance_physical_therapy_with_or_without_cognitive_training_in_adults__W4414700851.vectors.jsonl",
+      "chunk_sha256": "afeb759dc1ab79d4f6dcd55cbfb78f3e9618f7e6ab6e47e52048f33cecae3ffd",
+      "vector_sha256": "1f3728cfa3e12eb371b90eac3852b2d5711b9fea19372be6b83c1a63bd85428c",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "risk of bias assessment effects balance physical therapy",
+          "expected_doc_id": "2025__Effects_of_balance_physical_therapy_with_or_without_cognitive_training_in_adults__W4414700851",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Risk of bias assessment",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 72
+    },
+    {
+      "doc_id": "2025__Effects_of_different_physical_activity_interventions_on_executive_function_in_ol__W4414757221",
+      "title": "2.1 Protocol and registration",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Effects_of_different_physical_activity_interventions_on_executive_function_in_ol__W4414757221.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Effects_of_different_physical_activity_interventions_on_executive_function_in_ol__W4414757221.vectors.jsonl",
+      "chunk_sha256": "95a772e3c8e2fe18be936d4228193fbc7d1dff68810d8b90969ec9d8b573eead",
+      "vector_sha256": "6e816e9adf07f4690e41ae84e21f5b410a40b4d2e0a7429d219e62a64085449b",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "2 1 protocol and registration effects of different",
+          "expected_doc_id": "2025__Effects_of_different_physical_activity_interventions_on_executive_function_in_ol__W4414757221",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "2.1 Protocol and registration",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 49
+    },
+    {
+      "doc_id": "2025__Effects_of_exercise_interventions_on_cognitive_function_in_patients_with_cogniti__W4410453504",
+      "title": "Frontiers | Effects of exercise interventions on cognitive function in patients with cognitive dysfunction: an umbrella review of meta-analyses",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Effects_of_exercise_interventions_on_cognitive_function_in_patients_with_cogniti__W4410453504.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Effects_of_exercise_interventions_on_cognitive_function_in_patients_with_cogniti__W4410453504.vectors.jsonl",
+      "chunk_sha256": "cd2d0c0d61b697e0552c797eb520bdef06ee9f06769e9f66ecf4df19218432fe",
+      "vector_sha256": "501268980af245963056252f052a4a13190fe668268dd0ef63a9d8834180e6d4",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers effects of exercise interventions on cognitive function",
+          "expected_doc_id": "2025__Effects_of_exercise_interventions_on_cognitive_function_in_patients_with_cogniti__W4410453504",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Effects of exercise interventions on cognitive function in patients with cognitive dysfunction: an umbrella review of meta-analyses",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 71
+    },
+    {
+      "doc_id": "2025__Efficacy_and_safety_of_Cheonwangbosim-dan_Tian_Wang_Bu_Xin_Dan_for_treatment_of___W4412352541",
+      "title": "Efficacy and safety of Cheonwangbosim-dan (Tian Wang Bu Xin Dan) for treatment of mild cognitive impairment: A randomized placebo-controlled pilot trial | PLOS One",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Efficacy_and_safety_of_Cheonwangbosim-dan_Tian_Wang_Bu_Xin_Dan_for_treatment_of___W4412352541.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Efficacy_and_safety_of_Cheonwangbosim-dan_Tian_Wang_Bu_Xin_Dan_for_treatment_of___W4412352541.vectors.jsonl",
+      "chunk_sha256": "510b975a777fa0256a3b395a90db631c42e0e053e3b4b72baa950d4bed7f3190",
+      "vector_sha256": "436134b6d71b7eb68db9bfdccefb65c6f6683b65d3f1c22359378092eb65d54d",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "efficacy and safety of cheonwangbosim dan tian wang",
+          "expected_doc_id": "2025__Efficacy_and_safety_of_Cheonwangbosim-dan_Tian_Wang_Bu_Xin_Dan_for_treatment_of___W4412352541",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Efficacy and safety of Cheonwangbosim-dan (Tian Wang Bu Xin Dan) for treatment of mild cognitive impairment: A randomized placebo-controlled pilot trial | PLOS One",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 33
+    },
+    {
+      "doc_id": "2025__Emerging_Role_of_Oligodendrocytes_Malfunction_in_the_Progression_of_Alzheimers_D__W4413865689",
+      "title": "Emerging Role of Oligodendrocytes Malfunction in the Progression of Alzheimer's Disease | Journal of Neuroimmune Pharmacology",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Emerging_Role_of_Oligodendrocytes_Malfunction_in_the_Progression_of_Alzheimers_D__W4413865689.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Emerging_Role_of_Oligodendrocytes_Malfunction_in_the_Progression_of_Alzheimers_D__W4413865689.vectors.jsonl",
+      "chunk_sha256": "b767a61732e4689f63ee3a32204cb43a8743bc513b564df15da439666d86224d",
+      "vector_sha256": "a39a0f265bd98933df0f6ce58d8187cb7a64c90fa7219232fbf54198fe0c26bd",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "emerging role of oligodendrocytes malfunction in the progression",
+          "expected_doc_id": "2025__Emerging_Role_of_Oligodendrocytes_Malfunction_in_the_Progression_of_Alzheimers_D__W4413865689",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Emerging Role of Oligodendrocytes Malfunction in the Progression of Alzheimer's Disease | Journal of Neuroimmune Pharmacology",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 66
+    },
+    {
+      "doc_id": "2025__Emerging_biomarkers_and_frontier_therapies_unveiling_the_role_of_endothelial_dys__W4412185119",
+      "title": "Frontiers | Emerging biomarkers and frontier therapies: unveiling the role of endothelial dysfunction in cerebral small vessel disease",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Emerging_biomarkers_and_frontier_therapies_unveiling_the_role_of_endothelial_dys__W4412185119.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Emerging_biomarkers_and_frontier_therapies_unveiling_the_role_of_endothelial_dys__W4412185119.vectors.jsonl",
+      "chunk_sha256": "ec67dd28b5a0613dcff4b2af1adec11c5d1ec89138a89ec650b5c72c230b724b",
+      "vector_sha256": "060414d80bd48388907918707fe7355b5249e9eaa66a95efbf2e52051e428428",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers emerging biomarkers and frontier therapies unveiling the",
+          "expected_doc_id": "2025__Emerging_biomarkers_and_frontier_therapies_unveiling_the_role_of_endothelial_dys__W4412185119",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Emerging biomarkers and frontier therapies: unveiling the role of endothelial dysfunction in cerebral small vessel disease",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 43
+    },
+    {
+      "doc_id": "2025__Emerging_biomarkers_of_postoperative_delirium_at_the_intersection_of_neuroinflam__W4413803443",
+      "title": "Frontiers | Emerging biomarkers of postoperative delirium at the intersection of neuroinflammation and neurodegeneration",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Emerging_biomarkers_of_postoperative_delirium_at_the_intersection_of_neuroinflam__W4413803443.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Emerging_biomarkers_of_postoperative_delirium_at_the_intersection_of_neuroinflam__W4413803443.vectors.jsonl",
+      "chunk_sha256": "497a2f99801b53bbaad86c83e5dddf3c248d08a5aaf88d3e9c5a665dddaaef41",
+      "vector_sha256": "f17a4ab0154f911fb3e200a71e747dadea89a822ae2560b1246b7e20a1326a5c",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers emerging biomarkers of postoperative delirium at the",
+          "expected_doc_id": "2025__Emerging_biomarkers_of_postoperative_delirium_at_the_intersection_of_neuroinflam__W4413803443",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Emerging biomarkers of postoperative delirium at the intersection of neuroinflammation and neurodegeneration",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 55
+    },
+    {
+      "doc_id": "2025__Emotional_intelligence_as_a_mediator_of_anxiety_and_role_ambiguity_among_nurses___W4412157161",
+      "title": "Emotional intelligence as a mediator of anxiety and role ambiguity among nurses caring for critically ill geriatric patients | BMC Nursing | Full Text",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Emotional_intelligence_as_a_mediator_of_anxiety_and_role_ambiguity_among_nurses___W4412157161.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Emotional_intelligence_as_a_mediator_of_anxiety_and_role_ambiguity_among_nurses___W4412157161.vectors.jsonl",
+      "chunk_sha256": "45dd8488f6d9db265f8e3f898d350a6c7b89888fe258e74fa615ee6f95edf05a",
+      "vector_sha256": "6ab2b12ae3a6d397d7ef55692a89fd024c20b0a0bc668ee8d794dbf15459473c",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "emotional intelligence as a mediator of anxiety and",
+          "expected_doc_id": "2025__Emotional_intelligence_as_a_mediator_of_anxiety_and_role_ambiguity_among_nurses___W4412157161",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Emotional intelligence as a mediator of anxiety and role ambiguity among nurses caring for critically ill geriatric patients | BMC Nursing | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 36
+    },
+    {
+      "doc_id": "2025__Exploring_the_impact_of_coffee_consumption_and_caffeine_intake_on_cognitive_perf__W4411868829",
+      "title": "Exploring the impact of coffee consumption and caffeine intake on cognitive performance in older adults: a comprehensive analysis using NHANES data and gene correlation analysis | Nutrition Journal | Full Text",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Exploring_the_impact_of_coffee_consumption_and_caffeine_intake_on_cognitive_perf__W4411868829.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Exploring_the_impact_of_coffee_consumption_and_caffeine_intake_on_cognitive_perf__W4411868829.vectors.jsonl",
+      "chunk_sha256": "fed29ae03efa8c328da82b5d365d1f0b54a7bc643b94670de65bb22117e7bfd6",
+      "vector_sha256": "e6ed742b12e402762832534ef57eb4a5bbaf401a9d278fac2c34e72ca6ef4b04",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "exploring the impact of coffee consumption and caffeine",
+          "expected_doc_id": "2025__Exploring_the_impact_of_coffee_consumption_and_caffeine_intake_on_cognitive_perf__W4411868829",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Exploring the impact of coffee consumption and caffeine intake on cognitive performance in older adults: a comprehensive analysis using NHANES data and gene correlation analysis | Nutrition Journal | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 56
+    },
+    {
+      "doc_id": "2025__Factors_associated_with_health_care_trajectories_of_people_living_with_dementia__W4413358070",
+      "title": "Factors associated with health care trajectories of people living with dementia  | International Journal of Integrated Care",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Factors_associated_with_health_care_trajectories_of_people_living_with_dementia__W4413358070.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Factors_associated_with_health_care_trajectories_of_people_living_with_dementia__W4413358070.vectors.jsonl",
+      "chunk_sha256": "4329733ff9aa9b8681df6231a6de7c8f41e8c9f743b9181cb17e78ced5faaf53",
+      "vector_sha256": "f2380a980f709736216432ae6850ae3ca90dd521ba76ef646804494718d31bbe",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "factors associated with health care trajectories of people",
+          "expected_doc_id": "2025__Factors_associated_with_health_care_trajectories_of_people_living_with_dementia__W4413358070",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Factors associated with health care trajectories of people living with dementia  | International Journal of Integrated Care",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 2
+    },
+    {
+      "doc_id": "2025__Federated_learning_for_cognitive_impairment_detection_using_speech_data__W4414992495",
+      "title": "Frontiers | Federated learning for cognitive impairment detection using speech data",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Federated_learning_for_cognitive_impairment_detection_using_speech_data__W4414992495.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Federated_learning_for_cognitive_impairment_detection_using_speech_data__W4414992495.vectors.jsonl",
+      "chunk_sha256": "b1f5d84f6ec345ac2423b221e84c3a692a1a3b7c08d9db1a2205da2a0b0ddd92",
+      "vector_sha256": "7f7eff2ca6b2792deb79c42f99577b7ed7ec6076772d5a0599e6623008bb64d4",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers federated learning for cognitive impairment detection using",
+          "expected_doc_id": "2025__Federated_learning_for_cognitive_impairment_detection_using_speech_data__W4414992495",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Federated learning for cognitive impairment detection using speech data",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 32
+    },
+    {
+      "doc_id": "2025__Feeding_the_mind_Nutritional_strategies_across_different_stages_of_Alzheimers_di__W4412738223",
+      "title": "Feeding the mind: Nutritional strategies across different stages of Alzheimer's disease and their significance",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Feeding_the_mind_Nutritional_strategies_across_different_stages_of_Alzheimers_di__W4412738223.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Feeding_the_mind_Nutritional_strategies_across_different_stages_of_Alzheimers_di__W4412738223.vectors.jsonl",
+      "chunk_sha256": "16847287dfe9ebbec6253425d12f937fbcad6befa2272689cb53ff9a72cb9f81",
+      "vector_sha256": "26cd615a809d5f9798ec1213397ce1fd6ca56c31af9f68be911eb380f8a175bd",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "feeding the mind nutritional strategies across different stages",
+          "expected_doc_id": "2025__Feeding_the_mind_Nutritional_strategies_across_different_stages_of_Alzheimers_di__W4412738223",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Feeding the mind: Nutritional strategies across different stages of Alzheimer's disease and their significance",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 5
+    },
+    {
+      "doc_id": "2025__Functional_Cognitive_Disorder_diagnostic_challenges_clinical_features_and_future__W4414253990",
+      "title": "2 Definition and diagnostic challenges",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Functional_Cognitive_Disorder_diagnostic_challenges_clinical_features_and_future__W4414253990.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Functional_Cognitive_Disorder_diagnostic_challenges_clinical_features_and_future__W4414253990.vectors.jsonl",
+      "chunk_sha256": "c8ab78dc1da19b64bad85415132c24af2973f04717e542fed67f46214925a215",
+      "vector_sha256": "3459a9ddbec7361abc84c7f27f11a363d6ab30d35945c1ce49f5068c696a75fe",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "2 definition and diagnostic challenges functional cognitive disorder",
+          "expected_doc_id": "2025__Functional_Cognitive_Disorder_diagnostic_challenges_clinical_features_and_future__W4414253990",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "2 Definition and diagnostic challenges",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 41
+    },
+    {
+      "doc_id": "2025__Functional_near-infrared_spectroscopy_for_identifying_mild_cognitive_impairment___W4413834869",
+      "title": "Frontiers | Functional near-infrared spectroscopy for identifying mild cognitive impairment and Alzheimer's disease: a systematic review",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Functional_near-infrared_spectroscopy_for_identifying_mild_cognitive_impairment___W4413834869.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Functional_near-infrared_spectroscopy_for_identifying_mild_cognitive_impairment___W4413834869.vectors.jsonl",
+      "chunk_sha256": "de79198ef66731ab1829502bdacbd17e429efe1f179e9bb14c3b449f1c05f44f",
+      "vector_sha256": "33b8908d159ea3fbc6212566d630a1c69fda50af77dc18e3f8a2893826d7cff9",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers functional near infrared spectroscopy for identifying mild",
+          "expected_doc_id": "2025__Functional_near-infrared_spectroscopy_for_identifying_mild_cognitive_impairment___W4413834869",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Functional near-infrared spectroscopy for identifying mild cognitive impairment and Alzheimer's disease: a systematic review",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 47
+    },
+    {
+      "doc_id": "2025__GLP-1_receptor_agonists_in_delirium_and_encephalopathies_a_neuroprotective_scopi__W4412779459",
+      "title": "GLP-1 receptor agonists in delirium and encephalopathies: a neuroprotective scoping review | Discover Medicine",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__GLP-1_receptor_agonists_in_delirium_and_encephalopathies_a_neuroprotective_scopi__W4412779459.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__GLP-1_receptor_agonists_in_delirium_and_encephalopathies_a_neuroprotective_scopi__W4412779459.vectors.jsonl",
+      "chunk_sha256": "1ae47682d5e00a915ccdfad9b4908bfdf0438008a745a746130900411699f1a2",
+      "vector_sha256": "189109697236edff13d80d4ceaa9f9703307bacd360afdc4232b40e7e07822a5",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "glp 1 receptor agonists in delirium and encephalopathies",
+          "expected_doc_id": "2025__GLP-1_receptor_agonists_in_delirium_and_encephalopathies_a_neuroprotective_scopi__W4412779459",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "GLP-1 receptor agonists in delirium and encephalopathies: a neuroprotective scoping review | Discover Medicine",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 55
+    },
+    {
+      "doc_id": "2025__Gait_analysis_in_older_adults_with_mild_cognitive_impairment_a_bibliometric_anal__W4411462690",
+      "title": "Frontiers | Gait analysis in older adults with mild cognitive impairment: a bibliometric analysis of global trends, hotspots, and emerging frontiers",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Gait_analysis_in_older_adults_with_mild_cognitive_impairment_a_bibliometric_anal__W4411462690.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Gait_analysis_in_older_adults_with_mild_cognitive_impairment_a_bibliometric_anal__W4411462690.vectors.jsonl",
+      "chunk_sha256": "f6f3fe56fd511b94b9259037b43ddd7505c88e8b103ac07aeefb69e2f98ca41d",
+      "vector_sha256": "df89516663a342890229a969fbe358f32a468cf698f66c0302e9acf857b6a4fd",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers gait analysis in older adults with mild",
+          "expected_doc_id": "2025__Gait_analysis_in_older_adults_with_mild_cognitive_impairment_a_bibliometric_anal__W4411462690",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Gait analysis in older adults with mild cognitive impairment: a bibliometric analysis of global trends, hotspots, and emerging frontiers",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 63
+    },
+    {
+      "doc_id": "2025__GeronGnosis_A_Database_for_Diagnosing_Dementias_Using_EEG_and_Machine_Learning__W4413436706",
+      "title": "GeronGnosis: A Database for Diagnosing Dementias Using EEG and Machine Learning | Research Square",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__GeronGnosis_A_Database_for_Diagnosing_Dementias_Using_EEG_and_Machine_Learning__W4413436706.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__GeronGnosis_A_Database_for_Diagnosing_Dementias_Using_EEG_and_Machine_Learning__W4413436706.vectors.jsonl",
+      "chunk_sha256": "c8139c85c401829224252885bb7fbfaee55e68e4fd84f5b1f91eb4d0e242250e",
+      "vector_sha256": "10fa61180c413952c3389f00a63e47e87eccfcf49b90ffbb63d47ecb7e815c9a",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "gerongnosis a database for diagnosing dementias using eeg",
+          "expected_doc_id": "2025__GeronGnosis_A_Database_for_Diagnosing_Dementias_Using_EEG_and_Machine_Learning__W4413436706",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "GeronGnosis: A Database for Diagnosing Dementias Using EEG and Machine Learning | Research Square",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 3
+    },
+    {
+      "doc_id": "2025__Glucagon-Like_Peptide-1_Receptor_Agonists_in_Cognitive_and_Mental_Health_Disorde__W4411493551",
+      "title": "Glucagon-Like Peptide-1 Receptor Agonists in Cognitive and Mental Health Disorders: A Comprehensive Review of Pre-Clinical and Clinical Evidence | BJPsych Open | Cambridge Core",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Glucagon-Like_Peptide-1_Receptor_Agonists_in_Cognitive_and_Mental_Health_Disorde__W4411493551.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Glucagon-Like_Peptide-1_Receptor_Agonists_in_Cognitive_and_Mental_Health_Disorde__W4411493551.vectors.jsonl",
+      "chunk_sha256": "4da4446fabdfc6ef3861167563602e99073046b9347e06b1435addc02979708c",
+      "vector_sha256": "af029dad5670acfeceadd017d0eb930088a9525b0196478b9e2fe0937396c84a",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "glucagon like peptide 1 receptor agonists in cognitive",
+          "expected_doc_id": "2025__Glucagon-Like_Peptide-1_Receptor_Agonists_in_Cognitive_and_Mental_Health_Disorde__W4411493551",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Glucagon-Like Peptide-1 Receptor Agonists in Cognitive and Mental Health Disorders: A Comprehensive Review of Pre-Clinical and Clinical Evidence | BJPsych Open | Cambridge Core",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 9
+    },
+    {
+      "doc_id": "2025__Gut-brain_axis_and_vascular_dementia_a_review_on_mechanisms_and_Chinese_herbal_m__W4410379897",
+      "title": "Frontiers | Gut-brain axis and vascular dementia: a review on mechanisms and Chinese herbal medicine therapeutics",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Gut-brain_axis_and_vascular_dementia_a_review_on_mechanisms_and_Chinese_herbal_m__W4410379897.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Gut-brain_axis_and_vascular_dementia_a_review_on_mechanisms_and_Chinese_herbal_m__W4410379897.vectors.jsonl",
+      "chunk_sha256": "c36bfc9050e851a98958fe739a0948227010b5102c95aea3a4d60c04d456a980",
+      "vector_sha256": "4a4653b70d9c8c8bb939ef693dc40c1261df9803fe07736f4de9cf2632821fcc",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers gut brain axis and vascular dementia a",
+          "expected_doc_id": "2025__Gut-brain_axis_and_vascular_dementia_a_review_on_mechanisms_and_Chinese_herbal_m__W4410379897",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Gut-brain axis and vascular dementia: a review on mechanisms and Chinese herbal medicine therapeutics",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 47
+    },
+    {
+      "doc_id": "2025__Health_Professionals_Perspectives_on_the_Referral_Process_in_Mild_Cognitive_Impa__W4414534702",
+      "title": "Data collection and analysis",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Health_Professionals_Perspectives_on_the_Referral_Process_in_Mild_Cognitive_Impa__W4414534702.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Health_Professionals_Perspectives_on_the_Referral_Process_in_Mild_Cognitive_Impa__W4414534702.vectors.jsonl",
+      "chunk_sha256": "8b4b8250e732e69bbea99d0d0df53c3c28370c8eae7fce8d1cf4bbe815f01bfc",
+      "vector_sha256": "dfe80ab59f364eaeb42e9ccbd65abbd537e23f8b3cfa3fd6f510a8c18f871967",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "data collection and analysis health professionals perspectives on",
+          "expected_doc_id": "2025__Health_Professionals_Perspectives_on_the_Referral_Process_in_Mild_Cognitive_Impa__W4414534702",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Data collection and analysis",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 28
+    },
+    {
+      "doc_id": "2025__Hormonal_modulation_mitochondria_and_Alzheimers_prevention_the_role_of_GLP-1_ago__W4411640834",
+      "title": "Frontiers | Hormonal modulation, mitochondria and Alzheimer's prevention: the role of GLP-1 agonists and estrogens",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Hormonal_modulation_mitochondria_and_Alzheimers_prevention_the_role_of_GLP-1_ago__W4411640834.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Hormonal_modulation_mitochondria_and_Alzheimers_prevention_the_role_of_GLP-1_ago__W4411640834.vectors.jsonl",
+      "chunk_sha256": "c61ec7539b3a0443df4c9966b71e2564596b073b1fef4476282101b6ce9c78dc",
+      "vector_sha256": "f7208ef63822524388a7a6036cfbedb682f71abc162759dfd49161808e0874ba",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers hormonal modulation mitochondria and alzheimer's prevention the",
+          "expected_doc_id": "2025__Hormonal_modulation_mitochondria_and_Alzheimers_prevention_the_role_of_GLP-1_ago__W4411640834",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Hormonal modulation, mitochondria and Alzheimer's prevention: the role of GLP-1 agonists and estrogens",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 72
+    },
+    {
+      "doc_id": "2025__Hubungan_antara_kualitas_tidur_dengan_kesejahteraan_psikologis_pada_keluarga_den__W4412956189",
+      "title": "Hubungan antara kualitas tidur dengan kesejahteraan psikologis pada keluarga  dengan lansia",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Hubungan_antara_kualitas_tidur_dengan_kesejahteraan_psikologis_pada_keluarga_den__W4412956189.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Hubungan_antara_kualitas_tidur_dengan_kesejahteraan_psikologis_pada_keluarga_den__W4412956189.vectors.jsonl",
+      "chunk_sha256": "391ab01f19161e8bc57d4698fd7a07a8fd03500b7a302bff9b8ebaeecc56f563",
+      "vector_sha256": "0d2db8c5bb2d01528dc31c157adf88d0da1411478f9e9176430e942fe1ee3bcd",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "hubungan antara kualitas tidur dengan kesejahteraan psikologis pada",
+          "expected_doc_id": "2025__Hubungan_antara_kualitas_tidur_dengan_kesejahteraan_psikologis_pada_keluarga_den__W4412956189",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Hubungan antara kualitas tidur dengan kesejahteraan psikologis pada keluarga  dengan lansia",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 14
+    },
+    {
+      "doc_id": "2025__Identification_and_synthesis_of_end-of-life_decision-making_measures_a_scoping_r__W4412775151",
+      "title": "Frontiers | Identification and synthesis of end-of-life decision-making measures: a scoping review",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Identification_and_synthesis_of_end-of-life_decision-making_measures_a_scoping_r__W4412775151.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Identification_and_synthesis_of_end-of-life_decision-making_measures_a_scoping_r__W4412775151.vectors.jsonl",
+      "chunk_sha256": "f74a90e9808035b4d63c1a604c57215e176ea922c593473c0613dabbf9cf15c1",
+      "vector_sha256": "01cec17a1c5018d0faa8ec7e64bcfd29eef56553c467b985b964fbe059127446",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers identification and synthesis of end life decision",
+          "expected_doc_id": "2025__Identification_and_synthesis_of_end-of-life_decision-making_measures_a_scoping_r__W4412775151",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Identification and synthesis of end-of-life decision-making measures: a scoping review",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 38
+    },
+    {
+      "doc_id": "2025__Impact_of_Hearing_Loss_on_Memory_Loss_in_Patients_With_Self-Reported_Olfactory_D__W4414566738",
+      "title": "Data source and participants",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Impact_of_Hearing_Loss_on_Memory_Loss_in_Patients_With_Self-Reported_Olfactory_D__W4414566738.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Impact_of_Hearing_Loss_on_Memory_Loss_in_Patients_With_Self-Reported_Olfactory_D__W4414566738.vectors.jsonl",
+      "chunk_sha256": "e854b3d6789f92eab385dbbe44302e39703c10bbae0f1c6d1c3de6c8d36ef996",
+      "vector_sha256": "43d707a57a3338ab13f314917631aa391636b82909ad544f50e4a0d18b4d1356",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "data source and participants impact of hearing loss",
+          "expected_doc_id": "2025__Impact_of_Hearing_Loss_on_Memory_Loss_in_Patients_With_Self-Reported_Olfactory_D__W4414566738",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Data source and participants",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 12
+    },
+    {
+      "doc_id": "2025__Impact_of_motor_symptom_asymmetry_on_non-motor_outcomes_in_Parkinsons_disease_a___W4411857849",
+      "title": "Impact of motor symptom asymmetry on non-motor outcomes in Parkinson's disease: a systematic review | npj Parkinson's Disease",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Impact_of_motor_symptom_asymmetry_on_non-motor_outcomes_in_Parkinsons_disease_a___W4411857849.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Impact_of_motor_symptom_asymmetry_on_non-motor_outcomes_in_Parkinsons_disease_a___W4411857849.vectors.jsonl",
+      "chunk_sha256": "bc8912220e33a7b92014f52c19cc1eea2b511223ffe428ff802540d3387386e7",
+      "vector_sha256": "96bb70efe6ff1ea23b9d31b38abea9c90a16316d16e00dfe1d5503f1b0bf9675",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "impact of motor symptom asymmetry on non outcomes",
+          "expected_doc_id": "2025__Impact_of_motor_symptom_asymmetry_on_non-motor_outcomes_in_Parkinsons_disease_a___W4411857849",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Impact of motor symptom asymmetry on non-motor outcomes in Parkinson's disease: a systematic review | npj Parkinson's Disease",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 51
+    },
+    {
+      "doc_id": "2025__Incidence_of_Nonsimultaneous_Contralateral_Neck_of_Femur_Fractures_A_Single-Cent__W4410569452",
+      "title": "Incidence of Nonsimultaneous Contralateral Neck of Femur Fractures: A Single-Center Retrospective Cohort Study | Cureus",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Incidence_of_Nonsimultaneous_Contralateral_Neck_of_Femur_Fractures_A_Single-Cent__W4410569452.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Incidence_of_Nonsimultaneous_Contralateral_Neck_of_Femur_Fractures_A_Single-Cent__W4410569452.vectors.jsonl",
+      "chunk_sha256": "5a019c8bd89522b17289ecf12ed1afd4ff8b978e8e0943f809fb6ce6a60c1a5a",
+      "vector_sha256": "663356b2734601a36c5604dd1d62770cb502a8330475619ba2f3d2cc41702380",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "incidence of nonsimultaneous contralateral neck femur fractures a",
+          "expected_doc_id": "2025__Incidence_of_Nonsimultaneous_Contralateral_Neck_of_Femur_Fractures_A_Single-Cent__W4410569452",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Incidence of Nonsimultaneous Contralateral Neck of Femur Fractures: A Single-Center Retrospective Cohort Study | Cureus",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 6
+    },
+    {
+      "doc_id": "2025__Independent_validation_and_outlier_analysis_of_EuroPOND_alzheimers_disease_stagi__W4411345784",
+      "title": "Independent validation and outlier analysis of EuroPOND Alzheimer's disease staging model using ADNI and real-world clinical data | Alzheimer's Research & Therapy | Full Text",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Independent_validation_and_outlier_analysis_of_EuroPOND_alzheimers_disease_stagi__W4411345784.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Independent_validation_and_outlier_analysis_of_EuroPOND_alzheimers_disease_stagi__W4411345784.vectors.jsonl",
+      "chunk_sha256": "383a2e37d61b2da881da4b54a8b1516bc60ab5637a759d2b55d4a654449de96e",
+      "vector_sha256": "064d80c2055343ed39ac8296dc51cbc85c42967990c8575f672451e705f53c02",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "independent validation and outlier analysis of europond alzheimer's",
+          "expected_doc_id": "2025__Independent_validation_and_outlier_analysis_of_EuroPOND_alzheimers_disease_stagi__W4411345784",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Independent validation and outlier analysis of EuroPOND Alzheimer's disease staging model using ADNI and real-world clinical data | Alzheimer's Research & Therapy | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 45
+    },
+    {
+      "doc_id": "2025__Intelligent_Alzheimers_diagnosis_and_disability_assessment_robust_medical_imagin__W4413902196",
+      "title": "Intelligent Alzheimer's diagnosis and disability assessment: robust medical imaging analysis using ensemble learning with ResNet-50 and EfficientNet-B3",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Intelligent_Alzheimers_diagnosis_and_disability_assessment_robust_medical_imagin__W4413902196.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Intelligent_Alzheimers_diagnosis_and_disability_assessment_robust_medical_imagin__W4413902196.vectors.jsonl",
+      "chunk_sha256": "35fb0697bfd6ecf2832ee337547cb1c7329dab3bf84ddadc0f8d92c9a95aeaec",
+      "vector_sha256": "916c5b1f363026b0b16f99238e704af9959850ed70bc04211fa4e42348c78b7c",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "intelligent alzheimer's diagnosis and disability assessment robust medical",
+          "expected_doc_id": "2025__Intelligent_Alzheimers_diagnosis_and_disability_assessment_robust_medical_imagin__W4413902196",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Intelligent Alzheimer's diagnosis and disability assessment: robust medical imaging analysis using ensemble learning with ResNet-50 and EfficientNet-B3",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 60
+    },
+    {
+      "doc_id": "2025__Interventions_for_cognitive_frailty_developing_a_Delphi_consensus_with_multidisc__W4411042016",
+      "title": "Frontiers | Interventions for cognitive frailty: developing a Delphi consensus with multidisciplinary and multisectoral experts",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Interventions_for_cognitive_frailty_developing_a_Delphi_consensus_with_multidisc__W4411042016.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Interventions_for_cognitive_frailty_developing_a_Delphi_consensus_with_multidisc__W4411042016.vectors.jsonl",
+      "chunk_sha256": "a50a59dfe7f8699d4020483f3a66acfb7945c52d938a31aa7677dccc22298abf",
+      "vector_sha256": "54d8d9a79da1851896b1259f92c10affb3459e608f6fbfefc97108f703a2c80c",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers interventions for cognitive frailty developing a delphi",
+          "expected_doc_id": "2025__Interventions_for_cognitive_frailty_developing_a_Delphi_consensus_with_multidisc__W4411042016",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Interventions for cognitive frailty: developing a Delphi consensus with multidisciplinary and multisectoral experts",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 52
+    },
+    {
+      "doc_id": "2025__Korean_medicine_registry_for_cognitive_disorder_A_protocol_for_prospective_obser__W4410395861",
+      "title": "Korean medicine registry for cognitive disorder: A protocol for prospective observational multi-center study | PLOS One",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Korean_medicine_registry_for_cognitive_disorder_A_protocol_for_prospective_obser__W4410395861.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Korean_medicine_registry_for_cognitive_disorder_A_protocol_for_prospective_obser__W4410395861.vectors.jsonl",
+      "chunk_sha256": "5c82e4e58be08758193d9b0462ca9758962b24eeb20475af05e93c3a9e85b04d",
+      "vector_sha256": "dac133fc2270bcc4acc8a01d53200f82568b201d659e3c1d64c67aec1c541dce",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "korean medicine registry for cognitive disorder a protocol",
+          "expected_doc_id": "2025__Korean_medicine_registry_for_cognitive_disorder_A_protocol_for_prospective_obser__W4410395861",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Korean medicine registry for cognitive disorder: A protocol for prospective observational multi-center study | PLOS One",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 33
+    },
+    {
+      "doc_id": "2025__Listened_to_but_Rarely_Heard_A_Scoping_Review_of_Resident_Engagement_in_the_Orga__W4414866552",
+      "title": "Canadian Journal on Aging / La Revue canadienne du vieilissement",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Listened_to_but_Rarely_Heard_A_Scoping_Review_of_Resident_Engagement_in_the_Orga__W4414866552.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Listened_to_but_Rarely_Heard_A_Scoping_Review_of_Resident_Engagement_in_the_Orga__W4414866552.vectors.jsonl",
+      "chunk_sha256": "4033f1af9878ab976c47ae61de7acad15f353ebf5bc9fd4b14417de18c4bcc9a",
+      "vector_sha256": "e7e49757663ba75646d1504134c282f5e7b44b3a22ebd0e6abf0a49ce5d07568",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "canadian journal on aging la revue canadienne du",
+          "expected_doc_id": "2025__Listened_to_but_Rarely_Heard_A_Scoping_Review_of_Resident_Engagement_in_the_Orga__W4414866552",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Canadian Journal on Aging / La Revue canadienne du vieilissement",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 46
+    },
+    {
+      "doc_id": "2025__Machine_Learning_multiclassification_for_stage_diagnosis_of_Alzheimers_disease_u__W4411231219",
+      "title": "'Machine Learning' multiclassification for stage diagnosis of Alzheimer's disease utilizing augmented blood gene expression and feature fusion | Discover Applied Sciences",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Machine_Learning_multiclassification_for_stage_diagnosis_of_Alzheimers_disease_u__W4411231219.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Machine_Learning_multiclassification_for_stage_diagnosis_of_Alzheimers_disease_u__W4411231219.vectors.jsonl",
+      "chunk_sha256": "6947a932575dcc29e53d9e445be25a39938f94c954206d09414c2b475d92208d",
+      "vector_sha256": "b0325d237666f45aacedc2b26e303c6fd52e193f73ef8fac7e3c15992f8b4e72",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "'machine learning' multiclassification for stage diagnosis of alzheimer's",
+          "expected_doc_id": "2025__Machine_Learning_multiclassification_for_stage_diagnosis_of_Alzheimers_disease_u__W4411231219",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "'Machine Learning' multiclassification for stage diagnosis of Alzheimer's disease utilizing augmented blood gene expression and feature fusion | Discover Applied Sciences",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 49
+    },
+    {
+      "doc_id": "2025__Machine_learning_applied_to_mild_cognitive_impairment_bibliometric_and_visual_an__W4410572269",
+      "title": "Frontiers | Machine learning applied to mild cognitive impairment: bibliometric and visual analysis from 2015 to 2024",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Machine_learning_applied_to_mild_cognitive_impairment_bibliometric_and_visual_an__W4410572269.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Machine_learning_applied_to_mild_cognitive_impairment_bibliometric_and_visual_an__W4410572269.vectors.jsonl",
+      "chunk_sha256": "548fb51ac573a29a2e580e2107b48dc7ad205271473647bbf52e694a0370fb30",
+      "vector_sha256": "2932dd6ee373c7f826a36ddb6745d20c4e40668f543e4c5008857967df60eb3c",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers machine learning applied to mild cognitive impairment",
+          "expected_doc_id": "2025__Machine_learning_applied_to_mild_cognitive_impairment_bibliometric_and_visual_an__W4410572269",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Machine learning applied to mild cognitive impairment: bibliometric and visual analysis from 2015 to 2024",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 44
+    },
+    {
+      "doc_id": "2025__Mapping_the_research_landscape_of_Mild_Cognitive_Impairment_in_Parkinsons_diseas__W4414086640",
+      "title": "Frontiers | Mapping the research landscape of Mild Cognitive Impairment in Parkinson's disease: a bibliometric and visualization analysis",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Mapping_the_research_landscape_of_Mild_Cognitive_Impairment_in_Parkinsons_diseas__W4414086640.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Mapping_the_research_landscape_of_Mild_Cognitive_Impairment_in_Parkinsons_diseas__W4414086640.vectors.jsonl",
+      "chunk_sha256": "aec6b095bf9ebd8fc0a056e69b263ae66d3afb5fc16253da915d0b707a25f24a",
+      "vector_sha256": "65f8600455654c592d7d61fa9b9a1bc15b3a2f091ff8b09dfca4cfc460606969",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers mapping the research landscape of mild cognitive",
+          "expected_doc_id": "2025__Mapping_the_research_landscape_of_Mild_Cognitive_Impairment_in_Parkinsons_diseas__W4414086640",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Mapping the research landscape of Mild Cognitive Impairment in Parkinson's disease: a bibliometric and visualization analysis",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 48
+    },
+    {
+      "doc_id": "2025__Mechanistic_Insights_and_Translational_Therapeutics_of_Neurovascular_Unit_Dysreg__W4414066180",
+      "title": "2. The Physiological Function of the NVU",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Mechanistic_Insights_and_Translational_Therapeutics_of_Neurovascular_Unit_Dysreg__W4414066180.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Mechanistic_Insights_and_Translational_Therapeutics_of_Neurovascular_Unit_Dysreg__W4414066180.vectors.jsonl",
+      "chunk_sha256": "59e09d190a4a22df00fb1062157dbfd9dac080db37c4883e13886b33f151c086",
+      "vector_sha256": "e18226f0550eb7c7f0e19d1ba2223226c5fc5acaf4c171ed404a5a4bf6020bc2",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "2 the physiological function of nvu mechanistic insights",
+          "expected_doc_id": "2025__Mechanistic_Insights_and_Translational_Therapeutics_of_Neurovascular_Unit_Dysreg__W4414066180",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "2. The Physiological Function of the NVU",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 61
+    },
+    {
+      "doc_id": "2025__Mobile_applications_for_individuals_living_with_dementia_and_their_caregivers_De__W4411154372",
+      "title": "Mobile applications for individuals living with dementia and their caregivers. Dementia prevention - Aktualno\u015bci Neurologiczne - Current Neurology",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Mobile_applications_for_individuals_living_with_dementia_and_their_caregivers_De__W4411154372.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Mobile_applications_for_individuals_living_with_dementia_and_their_caregivers_De__W4411154372.vectors.jsonl",
+      "chunk_sha256": "c3e21276622ba63aeb58ea9c771593b36693964df94a45e893070d071c8c51b7",
+      "vector_sha256": "f3128e1d18ddeb91baa464dd762458f31b3b80063f4c9995934f4b3beec4517e",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "mobile applications for individuals living with dementia and",
+          "expected_doc_id": "2025__Mobile_applications_for_individuals_living_with_dementia_and_their_caregivers_De__W4411154372",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Mobile applications for individuals living with dementia and their caregivers. Dementia prevention - Aktualno\u015bci Neurologiczne - Current Neurology",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 3
+    },
+    {
+      "doc_id": "2025__Muscle-brain_crosstalk_as_a_driver_of_brain_health_in_aging__W4413139975",
+      "title": "Muscle-brain crosstalk as a driver of brain health in aging",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Muscle-brain_crosstalk_as_a_driver_of_brain_health_in_aging__W4413139975.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Muscle-brain_crosstalk_as_a_driver_of_brain_health_in_aging__W4413139975.vectors.jsonl",
+      "chunk_sha256": "e0710c4126572f650453c318eaa53e15c841412b5b946630ce4d6250da753680",
+      "vector_sha256": "2744bb8d0895ab12880f133f50b6c5b0b1cecad8f1543efb3f3446fa49e3ce7b",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "muscle brain crosstalk as a driver of health",
+          "expected_doc_id": "2025__Muscle-brain_crosstalk_as_a_driver_of_brain_health_in_aging__W4413139975",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Muscle-brain crosstalk as a driver of brain health in aging",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 47
+    },
+    {
+      "doc_id": "2025__Neurodegeneration_in_Alzheimers_disease_A_narrative_review_of_mechanistic_insigh__W4413867325",
+      "title": "Neurodegeneration in Alzheimer's disease: A narrative review of mechanistic insights and emerging therapeutic approaches",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Neurodegeneration_in_Alzheimers_disease_A_narrative_review_of_mechanistic_insigh__W4413867325.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Neurodegeneration_in_Alzheimers_disease_A_narrative_review_of_mechanistic_insigh__W4413867325.vectors.jsonl",
+      "chunk_sha256": "0fb1339173a977ddef49e23b8f7f033f9bd761c6e28bee3960413dee849e7b63",
+      "vector_sha256": "1094b85a748933bcf0241b251ae4e58178e01d382b43bdb62af21ed6ea60cb82",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "neurodegeneration in alzheimer's disease a narrative review of",
+          "expected_doc_id": "2025__Neurodegeneration_in_Alzheimers_disease_A_narrative_review_of_mechanistic_insigh__W4413867325",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Neurodegeneration in Alzheimer's disease: A narrative review of mechanistic insights and emerging therapeutic approaches",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 27
+    },
+    {
+      "doc_id": "2025__Neuroimaging_of_affective_symptoms_in_Lewy_body_dementia_A_systematic_review__W4413876650",
+      "title": "Neuroimaging of affective symptoms in Lewy body dementia: A systematic review | Research Square",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Neuroimaging_of_affective_symptoms_in_Lewy_body_dementia_A_systematic_review__W4413876650.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Neuroimaging_of_affective_symptoms_in_Lewy_body_dementia_A_systematic_review__W4413876650.vectors.jsonl",
+      "chunk_sha256": "08a2286b0b7427900028b5ed1f3de1fcdfa68d4bb8a8f934207e28fb8cd074c5",
+      "vector_sha256": "7c29cc548b4d63d796d677ff9fae82358a855a7890fd92d347056b089e88e199",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "neuroimaging of affective symptoms in lewy body dementia",
+          "expected_doc_id": "2025__Neuroimaging_of_affective_symptoms_in_Lewy_body_dementia_A_systematic_review__W4413876650",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Neuroimaging of affective symptoms in Lewy body dementia: A systematic review | Research Square",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 42
+    },
+    {
+      "doc_id": "2025__Neuroinflammation_in_Chronic_Neurological_Conditions_Following_COVID-19_A_Litera__W4414259898",
+      "title": "4 Mechanisms of Neuroinflammation",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Neuroinflammation_in_Chronic_Neurological_Conditions_Following_COVID-19_A_Litera__W4414259898.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Neuroinflammation_in_Chronic_Neurological_Conditions_Following_COVID-19_A_Litera__W4414259898.vectors.jsonl",
+      "chunk_sha256": "9ffe7424b10fcaf9c53f4cb31046ee239f27daa042487639dfbdeb7093f7d363",
+      "vector_sha256": "7434bc9fb0d21c4477d8ffb78868103a4c655a7869ed0164b713f92e3b33f4a5",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "4 mechanisms of neuroinflammation in chronic neurological conditions",
+          "expected_doc_id": "2025__Neuroinflammation_in_Chronic_Neurological_Conditions_Following_COVID-19_A_Litera__W4414259898",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "4 Mechanisms of Neuroinflammation",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 11
+    },
+    {
+      "doc_id": "2025__Neurotoxic_Effects_of_PM25_Mechanisms_Evidence_and_Public_Health_Implications__W4414145558",
+      "title": "Neurotoxic Effects of PM2.5: Mechanisms, Evidence, and Public Health Implications",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Neurotoxic_Effects_of_PM25_Mechanisms_Evidence_and_Public_Health_Implications__W4414145558.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Neurotoxic_Effects_of_PM25_Mechanisms_Evidence_and_Public_Health_Implications__W4414145558.vectors.jsonl",
+      "chunk_sha256": "7bbb56c441dcc639db6137bae6533640d6e6e89520b805f8e1874636dac78fa6",
+      "vector_sha256": "0008ba4e1402570374a667cb41263b930edabe8d60919eb54be2438ede86de5c",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "neurotoxic effects of pm2 5 mechanisms evidence and",
+          "expected_doc_id": "2025__Neurotoxic_Effects_of_PM25_Mechanisms_Evidence_and_Public_Health_Implications__W4414145558",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Neurotoxic Effects of PM2.5: Mechanisms, Evidence, and Public Health Implications",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 18
+    },
+    {
+      "doc_id": "2025__Olfactory_dysfunction_increases_progression_to_dementia_in_cognitively_impaired___W4410804130",
+      "title": "Olfactory dysfunction increases progression to dementia in cognitively impaired older adults: a 12-year population-based study | GeroScience",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Olfactory_dysfunction_increases_progression_to_dementia_in_cognitively_impaired___W4410804130.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Olfactory_dysfunction_increases_progression_to_dementia_in_cognitively_impaired___W4410804130.vectors.jsonl",
+      "chunk_sha256": "d71099d6a19cab50029441f4f3a4505cb0fc56e5a1eb2fb5502e688935c0aeee",
+      "vector_sha256": "d3c9275a9369e181affa3b1736a48113e1359038fcb6e3b63e9f9ee8269db302",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "olfactory dysfunction increases progression to dementia in cognitively",
+          "expected_doc_id": "2025__Olfactory_dysfunction_increases_progression_to_dementia_in_cognitively_impaired___W4410804130",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Olfactory dysfunction increases progression to dementia in cognitively impaired older adults: a 12-year population-based study | GeroScience",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 29
+    },
+    {
+      "doc_id": "2025__Oral_health_interventions_and_strategies_delivered_by_care_workers_to_older_peop__W4414966816",
+      "title": "Information sources and search",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Oral_health_interventions_and_strategies_delivered_by_care_workers_to_older_peop__W4414966816.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Oral_health_interventions_and_strategies_delivered_by_care_workers_to_older_peop__W4414966816.vectors.jsonl",
+      "chunk_sha256": "3c1b8bbb78eaf91853505a04b96dcdcebcdd0742997817220e5062d93b145848",
+      "vector_sha256": "0cccfdc68e033b50aacd342ec431076c1f75de5bf8d05880c416705a34ceae69",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "information sources and search oral health interventions strategies",
+          "expected_doc_id": "2025__Oral_health_interventions_and_strategies_delivered_by_care_workers_to_older_peop__W4414966816",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Information sources and search",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 34
+    },
+    {
+      "doc_id": "2025__Physical_Activity_and_the_Myokine_Irisin_in_Non-pharmacological_Treatment_of_Alz__W4413367152",
+      "title": "Physical Activity and the Myokine Irisin in Non-pharmacological Treatment of Alzheimer Disease - Gibizov - Russian Journal of Physiotherapy, Balneology and Rehabilitation",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Physical_Activity_and_the_Myokine_Irisin_in_Non-pharmacological_Treatment_of_Alz__W4413367152.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Physical_Activity_and_the_Myokine_Irisin_in_Non-pharmacological_Treatment_of_Alz__W4413367152.vectors.jsonl",
+      "chunk_sha256": "c81acb0cf0646729b90d6b5f93cacb1fc6de96240259a1ea6549b762172253be",
+      "vector_sha256": "1a2c9bd7ce7182b40b6e44f60ecb3681fa9dd458d267931b434c3d8994a4b25d",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "physical activity and the myokine irisin in non",
+          "expected_doc_id": "2025__Physical_Activity_and_the_Myokine_Irisin_in_Non-pharmacological_Treatment_of_Alz__W4413367152",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Physical Activity and the Myokine Irisin in Non-pharmacological Treatment of Alzheimer Disease - Gibizov - Russian Journal of Physiotherapy, Balneology and Rehabilitation",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 26
+    },
+    {
+      "doc_id": "2025__Polypharmacy_appropriateness_in_Italian_Long-Term_Care_Facilities_the_nationwide__W4415057475",
+      "title": "Polypharmacy appropriateness in Italian Long-Term Care Facilities: the nationwide prescription day point survey | Aging Clinical and Experimental Research",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Polypharmacy_appropriateness_in_Italian_Long-Term_Care_Facilities_the_nationwide__W4415057475.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Polypharmacy_appropriateness_in_Italian_Long-Term_Care_Facilities_the_nationwide__W4415057475.vectors.jsonl",
+      "chunk_sha256": "1a3b987c9a70ddf0e2dd0abb6eb23959a439537d1a6fa6f7642dd3fe388df597",
+      "vector_sha256": "9756edaff7b630132041617da009ea30be7d35be3f0411d0ee720a61bd5a8a8c",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "polypharmacy appropriateness in italian long term care facilities",
+          "expected_doc_id": "2025__Polypharmacy_appropriateness_in_Italian_Long-Term_Care_Facilities_the_nationwide__W4415057475",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Polypharmacy appropriateness in Italian Long-Term Care Facilities: the nationwide prescription day point survey | Aging Clinical and Experimental Research",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 45
+    },
+    {
+      "doc_id": "2025__Potential_Role_of_Lymphovenous_Bypass_in_Mitigating_Alzheimers_Disease_Dementia__W4411263775",
+      "title": "Thieme E-Journals - Archives of Plastic Surgery / Abstract",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Potential_Role_of_Lymphovenous_Bypass_in_Mitigating_Alzheimers_Disease_Dementia__W4411263775.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Potential_Role_of_Lymphovenous_Bypass_in_Mitigating_Alzheimers_Disease_Dementia__W4411263775.vectors.jsonl",
+      "chunk_sha256": "2d38fa82b02a6f897b70dcf9848bb4279c49401f3b1d42e592b19e9b6213c4f8",
+      "vector_sha256": "97d98f7350421b357909e4fbc1c88cb66366184ee6739d17a1010d2ae0a5d2e3",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "thieme e journals archives of plastic surgery abstract",
+          "expected_doc_id": "2025__Potential_Role_of_Lymphovenous_Bypass_in_Mitigating_Alzheimers_Disease_Dementia__W4411263775",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Thieme E-Journals - Archives of Plastic Surgery / Abstract",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 8
+    },
+    {
+      "doc_id": "2025__Potential_utility_of_salivary_gland_amyloid_uptake_as_a_surrogate_marker_for_adi__W4412457943",
+      "title": "Potential utility of salivary gland amyloid uptake as a surrogate marker for adipose tissue and amyloid-beta dynamics based on its association with BMI and cerebral amyloid burden | Scientific Reports",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Potential_utility_of_salivary_gland_amyloid_uptake_as_a_surrogate_marker_for_adi__W4412457943.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Potential_utility_of_salivary_gland_amyloid_uptake_as_a_surrogate_marker_for_adi__W4412457943.vectors.jsonl",
+      "chunk_sha256": "0c2b1193cf1c2cc4672e54ade2203ff37b0e1cdb219fd909943727547ee39292",
+      "vector_sha256": "aa5de00a21934a9d4ef7c5eb69c5c7b68849e3d57bbc89978548b2de0ca3e00e",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "potential utility of salivary gland amyloid uptake as",
+          "expected_doc_id": "2025__Potential_utility_of_salivary_gland_amyloid_uptake_as_a_surrogate_marker_for_adi__W4412457943",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Potential utility of salivary gland amyloid uptake as a surrogate marker for adipose tissue and amyloid-beta dynamics based on its association with BMI and cerebral amyloid burden | Scientific Reports",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 30
+    },
+    {
+      "doc_id": "2025__Prevalence_of_mild_cognitive_impairment_among_former_elite_athletes_without_a_hi__W4412756335",
+      "title": "Prevalence of mild cognitive impairment among former elite athletes without a history of sport-related concussions compared to the general older population: a protocol for a cross-sectional study with exploratory subgroup analyses | BMJ Open",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Prevalence_of_mild_cognitive_impairment_among_former_elite_athletes_without_a_hi__W4412756335.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Prevalence_of_mild_cognitive_impairment_among_former_elite_athletes_without_a_hi__W4412756335.vectors.jsonl",
+      "chunk_sha256": "6239b76eb885740e0a92c450a39bf2717324275cfb1570b1e32e481025d9bb07",
+      "vector_sha256": "2f4415935f0a01e5a5d1f8cf425e9a2952bccaafd69b8d35b7093d4687cd7b5f",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "prevalence of mild cognitive impairment among former elite",
+          "expected_doc_id": "2025__Prevalence_of_mild_cognitive_impairment_among_former_elite_athletes_without_a_hi__W4412756335",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Prevalence of mild cognitive impairment among former elite athletes without a history of sport-related concussions compared to the general older population: a protocol for a cross-sectional study with exploratory subgroup analyses | BMJ Open",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 32
+    },
+    {
+      "doc_id": "2025__Progress_of_radiomics_research_on_white_matter_hyperintensity_lesions__W4413612251",
+      "title": "3.2.1 Diagnostic MRI techniques for WMH",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Progress_of_radiomics_research_on_white_matter_hyperintensity_lesions__W4413612251.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Progress_of_radiomics_research_on_white_matter_hyperintensity_lesions__W4413612251.vectors.jsonl",
+      "chunk_sha256": "2874fa3f6f25379d2ff2540dcb5e925391aaeb092b263b11d6e1d0a1bebab63a",
+      "vector_sha256": "e77850a91982d924d28c3fa808253099b3ea7ebccd4fe8009e692822327a5efd",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "3 2 1 diagnostic mri techniques for wmh",
+          "expected_doc_id": "2025__Progress_of_radiomics_research_on_white_matter_hyperintensity_lesions__W4413612251",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "3.2.1 Diagnostic MRI techniques for WMH",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 52
+    },
+    {
+      "doc_id": "2025__Protein-profile_alterations_induced_by_a_model_of_sporadic_Alzheimers_disease__W4413281328",
+      "title": "2025 Protein profile alterations induced by a model",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Protein-profile_alterations_induced_by_a_model_of_sporadic_Alzheimers_disease__W4413281328.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Protein-profile_alterations_induced_by_a_model_of_sporadic_Alzheimers_disease__W4413281328.vectors.jsonl",
+      "chunk_sha256": "241179233c6681ad2256341c8573b990442b77671f126b4d4bbbbe00989f1558",
+      "vector_sha256": "0fa05a06675f462f7b27dcebf93cfcfbc8b0807631492040c4ac9b25119f2594",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "2025 protein profile alterations induced by a model",
+          "expected_doc_id": "2025__Protein-profile_alterations_induced_by_a_model_of_sporadic_Alzheimers_disease__W4413281328",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "2025 Protein profile alterations induced by a model",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 18
+    },
+    {
+      "doc_id": "2025__Psychedelics_meet_human_brain_organoids_insights_into_proteomics_and_potential_f__W4412883205",
+      "title": "Frontiers | Psychedelics meet human brain organoids: insights into proteomics and potential for Alzheimer's disease treatment",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Psychedelics_meet_human_brain_organoids_insights_into_proteomics_and_potential_f__W4412883205.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Psychedelics_meet_human_brain_organoids_insights_into_proteomics_and_potential_f__W4412883205.vectors.jsonl",
+      "chunk_sha256": "5805990c2d90ec0ae1682b443b1af8e7a32020330719a3c9ac1a29cfa121d23c",
+      "vector_sha256": "ab6f399cfbf7f165b7e171ecbc45bf6cf252925a69059630abe07c357e372f0f",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers psychedelics meet human brain organoids insights into",
+          "expected_doc_id": "2025__Psychedelics_meet_human_brain_organoids_insights_into_proteomics_and_potential_f__W4412883205",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Psychedelics meet human brain organoids: insights into proteomics and potential for Alzheimer's disease treatment",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 31
+    },
+    {
+      "doc_id": "2025__Relationship_between_caregiving_burden_and_alterations_in_circadian_rhythms_amon__W4413471237",
+      "title": "Relationship between caregiving burden and alterations in circadian rhythms among spousal caregivers of individuals with cognitive impairment | BMC Geriatrics | Full Text",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Relationship_between_caregiving_burden_and_alterations_in_circadian_rhythms_amon__W4413471237.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Relationship_between_caregiving_burden_and_alterations_in_circadian_rhythms_amon__W4413471237.vectors.jsonl",
+      "chunk_sha256": "22916cd913ca02aea378f301bbf2c04c550d61006bf8ff3167003609761e66c6",
+      "vector_sha256": "7778c6417886d15528d1eb93064060eed19fc45f7261d32897456e375a8005e6",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "relationship between caregiving burden and alterations in circadian",
+          "expected_doc_id": "2025__Relationship_between_caregiving_burden_and_alterations_in_circadian_rhythms_amon__W4413471237",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Relationship between caregiving burden and alterations in circadian rhythms among spousal caregivers of individuals with cognitive impairment | BMC Geriatrics | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 31
+    },
+    {
+      "doc_id": "2025__Reliability_and_validity_of_the_total_cerebral_small_vessel_disease_score_a_syst__W4411714456",
+      "title": "Frontiers | Reliability and validity of the total cerebral small vessel disease score: a systematic review and meta-analysis",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Reliability_and_validity_of_the_total_cerebral_small_vessel_disease_score_a_syst__W4411714456.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Reliability_and_validity_of_the_total_cerebral_small_vessel_disease_score_a_syst__W4411714456.vectors.jsonl",
+      "chunk_sha256": "db24844c032f8fbe5d5388bc290bd32c27fd8d56bea49ee71f5b01af2846ede0",
+      "vector_sha256": "546c57d1e53e08aff57c5c4cfaae3f7d35ee354930062b2a1d16111973f4a2fd",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers reliability and validity of the total cerebral",
+          "expected_doc_id": "2025__Reliability_and_validity_of_the_total_cerebral_small_vessel_disease_score_a_syst__W4411714456",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Reliability and validity of the total cerebral small vessel disease score: a systematic review and meta-analysis",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 31
+    },
+    {
+      "doc_id": "2025__Reliability_of_remote_self-administered_digital_cognitive_assessments_preliminar__W4412012853",
+      "title": "Frontiers | Reliability of remote self-administered digital cognitive assessments: preliminary validation study",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Reliability_of_remote_self-administered_digital_cognitive_assessments_preliminar__W4412012853.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Reliability_of_remote_self-administered_digital_cognitive_assessments_preliminar__W4412012853.vectors.jsonl",
+      "chunk_sha256": "747edff57cb58b9d43a26dd8ce8b81d89226da0ddb1225197a200f2fb0bb8d54",
+      "vector_sha256": "f08317015b9c9983c97f0c186dde29a9e2e66ac67fb05a79a16215136a40d460",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers reliability of remote self administered digital cognitive",
+          "expected_doc_id": "2025__Reliability_of_remote_self-administered_digital_cognitive_assessments_preliminar__W4412012853",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Reliability of remote self-administered digital cognitive assessments: preliminary validation study",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 34
+    },
+    {
+      "doc_id": "2025__Remote_Ischemic_Conditioning_and_Vascular_Contributions_to_Cognitive_Impairment___W4414129995",
+      "title": "Remote Ischemic Conditioning and Vascular Contributions to Cognitive Impairment and Dementia (VCID)",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Remote_Ischemic_Conditioning_and_Vascular_Contributions_to_Cognitive_Impairment___W4414129995.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Remote_Ischemic_Conditioning_and_Vascular_Contributions_to_Cognitive_Impairment___W4414129995.vectors.jsonl",
+      "chunk_sha256": "30cdce19057ec5ecf44ce924f5e480f3734b5bb107a698c060a1415d3e14a552",
+      "vector_sha256": "316d3e5a5fbe1028d551e4cd4fa91ab307e691da8431738902e7d58fc41d3e2f",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "remote ischemic conditioning and vascular contributions to cognitive",
+          "expected_doc_id": "2025__Remote_Ischemic_Conditioning_and_Vascular_Contributions_to_Cognitive_Impairment___W4414129995",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Remote Ischemic Conditioning and Vascular Contributions to Cognitive Impairment and Dementia (VCID)",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 2
+    },
+    {
+      "doc_id": "2025__Repetitive_negative_thinking_self-reflection_and_perceived_cognitive_dysfunction__W4413050772",
+      "title": "Repetitive negative thinking, self-reflection, and perceived cognitive dysfunction in older adults: a cross-sectional study | BMC Psychiatry | Full Text",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Repetitive_negative_thinking_self-reflection_and_perceived_cognitive_dysfunction__W4413050772.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Repetitive_negative_thinking_self-reflection_and_perceived_cognitive_dysfunction__W4413050772.vectors.jsonl",
+      "chunk_sha256": "fc88559f16d0f2f7424803e905cf724e27a7a69c27d5a958cb1d35b52e581a34",
+      "vector_sha256": "894599dd906195a9130ce8bce8da34ea5818cfe4f91934209590598c38208490",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "repetitive negative thinking self reflection and perceived cognitive",
+          "expected_doc_id": "2025__Repetitive_negative_thinking_self-reflection_and_perceived_cognitive_dysfunction__W4413050772",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Repetitive negative thinking, self-reflection, and perceived cognitive dysfunction in older adults: a cross-sectional study | BMC Psychiatry | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 29
+    },
+    {
+      "doc_id": "2025__Research_collaboration_with_care_home_residents_a_systematic_review_of_public_in__W4410395807",
+      "title": "Research collaboration with care home residents: a systematic review of public involvement approaches | Research Involvement and Engagement | Full Text",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Research_collaboration_with_care_home_residents_a_systematic_review_of_public_in__W4410395807.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Research_collaboration_with_care_home_residents_a_systematic_review_of_public_in__W4410395807.vectors.jsonl",
+      "chunk_sha256": "17a6b9a9dba11e7908e94b301cc29acc9b5da305ac3482ebd031d11abe86c3c3",
+      "vector_sha256": "fafa676b394d4d2ddd7ccbbf43dfa00158fdedf508faadc569e0d57c2d2d794f",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "research collaboration with care home residents a systematic",
+          "expected_doc_id": "2025__Research_collaboration_with_care_home_residents_a_systematic_review_of_public_in__W4410395807",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Research collaboration with care home residents: a systematic review of public involvement approaches | Research Involvement and Engagement | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 25
+    },
+    {
+      "doc_id": "2025__Research_progress_in_predicting_the_conversion_from_mild_cognitive_impairment_to__W4410972585",
+      "title": "Frontiers | Research progress in predicting the conversion from mild cognitive impairment to Alzheimer's disease via multimodal MRI and artificial intelligence",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Research_progress_in_predicting_the_conversion_from_mild_cognitive_impairment_to__W4410972585.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Research_progress_in_predicting_the_conversion_from_mild_cognitive_impairment_to__W4410972585.vectors.jsonl",
+      "chunk_sha256": "c90758054addf6c89477ac444db69f9113e902af782a244c1168eecda9ce22ce",
+      "vector_sha256": "c78f8b2fd7ac069f95725f8ec2ba4587fb964ef3589a087a12f6ab5d95056d04",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers research progress in predicting the conversion from",
+          "expected_doc_id": "2025__Research_progress_in_predicting_the_conversion_from_mild_cognitive_impairment_to__W4410972585",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Research progress in predicting the conversion from mild cognitive impairment to Alzheimer's disease via multimodal MRI and artificial intelligence",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 43
+    },
+    {
+      "doc_id": "2025__Research_progress_of_multimodal_biomarkers_in_the_early_diagnosis_of_mild_cognit__W4413834771",
+      "title": "Frontiers | Research progress of multimodal biomarkers in the early diagnosis of mild cognitive impairment in Parkinson's disease",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Research_progress_of_multimodal_biomarkers_in_the_early_diagnosis_of_mild_cognit__W4413834771.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Research_progress_of_multimodal_biomarkers_in_the_early_diagnosis_of_mild_cognit__W4413834771.vectors.jsonl",
+      "chunk_sha256": "4678c1d396a4bec9e9fb7b905687ff718f44d5c9ab9b21d1660fc3cc640bb8a9",
+      "vector_sha256": "6543d69d96ccf6c36f8f8606279e5bab3bc3837ad145934b7eaa1b90e3505be8",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers research progress of multimodal biomarkers in the",
+          "expected_doc_id": "2025__Research_progress_of_multimodal_biomarkers_in_the_early_diagnosis_of_mild_cognit__W4413834771",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Research progress of multimodal biomarkers in the early diagnosis of mild cognitive impairment in Parkinson's disease",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 40
+    },
+    {
+      "doc_id": "2025__Research_trend_of_functional_magnetic_resonance_imaging_in_diabetes_mellitus_res__W4413384210",
+      "title": "Frontiers | Research trend of functional magnetic resonance imaging in diabetes mellitus research: a visualization and bibliometric analysis",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Research_trend_of_functional_magnetic_resonance_imaging_in_diabetes_mellitus_res__W4413384210.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Research_trend_of_functional_magnetic_resonance_imaging_in_diabetes_mellitus_res__W4413384210.vectors.jsonl",
+      "chunk_sha256": "6658da91292c46d330fdb9f41df32fe7e347592bc1e1c553cce4c7f6ce0ae2ff",
+      "vector_sha256": "9a2c63b544e6911754b83c8e1fb7e99c430b8ee01072091cf3ea69a2e5e772a3",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers research trend of functional magnetic resonance imaging",
+          "expected_doc_id": "2025__Research_trend_of_functional_magnetic_resonance_imaging_in_diabetes_mellitus_res__W4413384210",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Research trend of functional magnetic resonance imaging in diabetes mellitus research: a visualization and bibliometric analysis",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 31
+    },
+    {
+      "doc_id": "2025__Rethinking_neuropsychological_test_validity_in_dementia_assessment_a_critical_re__W4414925154",
+      "title": "Criterion validity of clinical outcome",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Rethinking_neuropsychological_test_validity_in_dementia_assessment_a_critical_re__W4414925154.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Rethinking_neuropsychological_test_validity_in_dementia_assessment_a_critical_re__W4414925154.vectors.jsonl",
+      "chunk_sha256": "5bf20d73290bb7191e3e18e9bc1246d175bc90247f8a5880207dc265d070f559",
+      "vector_sha256": "8cfa5812aa6ce83944838db2231c18e94509699ccd80fc0e67a0bf6fe27c098e",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "criterion validity of clinical outcome rethinking neuropsychological test",
+          "expected_doc_id": "2025__Rethinking_neuropsychological_test_validity_in_dementia_assessment_a_critical_re__W4414925154",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Criterion validity of clinical outcome",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 57
+    },
+    {
+      "doc_id": "2025__Retired_contact_sports_athletes_with_cognitive_concerns_promoting_lifelong_brain__W4414957420",
+      "title": "Retired contact sports athletes with cognitive concerns: promoting lifelong brain health | Practical Neurology",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Retired_contact_sports_athletes_with_cognitive_concerns_promoting_lifelong_brain__W4414957420.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Retired_contact_sports_athletes_with_cognitive_concerns_promoting_lifelong_brain__W4414957420.vectors.jsonl",
+      "chunk_sha256": "859d4e02818f855bf2c6be36f76169e8205ecc7cf291cf335c5a90739c9eaf4e",
+      "vector_sha256": "1328a626340931185113f10bfe43b9ef233927324a8b0c3905c55d3b4c1f0e76",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "retired contact sports athletes with cognitive concerns promoting",
+          "expected_doc_id": "2025__Retired_contact_sports_athletes_with_cognitive_concerns_promoting_lifelong_brain__W4414957420",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Retired contact sports athletes with cognitive concerns: promoting lifelong brain health | Practical Neurology",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 38
+    },
+    {
+      "doc_id": "2025__Risk_factors_for_mild_cognitive_impairment_in_type_2_diabetes_a_systematic_revie__W4411324676",
+      "title": "Frontiers | Risk factors for mild cognitive impairment in type 2 diabetes: a systematic review and meta-analysis",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Risk_factors_for_mild_cognitive_impairment_in_type_2_diabetes_a_systematic_revie__W4411324676.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Risk_factors_for_mild_cognitive_impairment_in_type_2_diabetes_a_systematic_revie__W4411324676.vectors.jsonl",
+      "chunk_sha256": "af2ebf93cb14a8b8f7a6f35d2803a5206e6072fd5505e181202d0fd8d3f22b1d",
+      "vector_sha256": "bd42be35f7917601a6572cd98d90e870952d0a8c440163a0594dc6e8652eff08",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers risk factors for mild cognitive impairment in",
+          "expected_doc_id": "2025__Risk_factors_for_mild_cognitive_impairment_in_type_2_diabetes_a_systematic_revie__W4411324676",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Risk factors for mild cognitive impairment in type 2 diabetes: a systematic review and meta-analysis",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 54
+    },
+    {
+      "doc_id": "2025__Self-testing_for_symptoms_and_signs_of_prodromal_alpha-synucleinopathies_results__W4411793510",
+      "title": "Self-testing for symptoms and signs of prodromal alpha-synucleinopathies: results from the Tasmanian ISLAND Sleep Study | GeroScience",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Self-testing_for_symptoms_and_signs_of_prodromal_alpha-synucleinopathies_results__W4411793510.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Self-testing_for_symptoms_and_signs_of_prodromal_alpha-synucleinopathies_results__W4411793510.vectors.jsonl",
+      "chunk_sha256": "6789604edd795a0b4316fc6e6e53ec3b4023d40bd6fc466aff2209b98da166c0",
+      "vector_sha256": "dcda7ad2c3a1ef0733342082bdb8bbd0c38ec3580ff8c697a29e33df0086b63b",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "self testing for symptoms and signs of prodromal",
+          "expected_doc_id": "2025__Self-testing_for_symptoms_and_signs_of_prodromal_alpha-synucleinopathies_results__W4411793510",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Self-testing for symptoms and signs of prodromal alpha-synucleinopathies: results from the Tasmanian ISLAND Sleep Study | GeroScience",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 47
+    },
+    {
+      "doc_id": "2025__Sensitivity_and_specificity_of_the_Montreal_cognitive_assessment_using_US_Nation__W4414443841",
+      "title": "2025 Sensitivity and specificity of the Montreal cognitive",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Sensitivity_and_specificity_of_the_Montreal_cognitive_assessment_using_US_Nation__W4414443841.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Sensitivity_and_specificity_of_the_Montreal_cognitive_assessment_using_US_Nation__W4414443841.vectors.jsonl",
+      "chunk_sha256": "7abde6fce6ca8ccbc5630cd48376dfae982fb6e8971242b74bf54d7dac7dee99",
+      "vector_sha256": "843a19060f581ce941947ce160d9ba22130ced0f9f4b0d43092ae88890e2f6b0",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "2025 sensitivity and specificity of the montreal cognitive",
+          "expected_doc_id": "2025__Sensitivity_and_specificity_of_the_Montreal_cognitive_assessment_using_US_Nation__W4414443841",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "2025 Sensitivity and specificity of the Montreal cognitive",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 30
+    },
+    {
+      "doc_id": "2025__Sleep_quality_mental_health_and_cognitive_function_among_older_adults_in_Chinese__W4415001897",
+      "title": "Wangsheng Fu 1 and Wei Li 2*",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Sleep_quality_mental_health_and_cognitive_function_among_older_adults_in_Chinese__W4415001897.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Sleep_quality_mental_health_and_cognitive_function_among_older_adults_in_Chinese__W4415001897.vectors.jsonl",
+      "chunk_sha256": "2be71cc9d1ff1006f39bd3ad2d8414dc9d5970e95be1884131ebd0b7784db62f",
+      "vector_sha256": "ed8c1a8552d26b71f273169e2019d386729de82bdecac9da582c481d0b3732b4",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "wangsheng fu 1 and wei li 2 sleep",
+          "expected_doc_id": "2025__Sleep_quality_mental_health_and_cognitive_function_among_older_adults_in_Chinese__W4415001897",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Wangsheng Fu 1 and Wei Li 2*",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 25
+    },
+    {
+      "doc_id": "2025__Speech-language_therapy_and_occupational_therapy_for_patients_with_mild_cognitiv__W4412956792",
+      "title": "Speech-language therapy and occupational therapy for patients with mild cognitive impairment and dementia: a retrospective cohort study using German health claims data | BMC Health Services Research | Full Text",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Speech-language_therapy_and_occupational_therapy_for_patients_with_mild_cognitiv__W4412956792.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Speech-language_therapy_and_occupational_therapy_for_patients_with_mild_cognitiv__W4412956792.vectors.jsonl",
+      "chunk_sha256": "2cdf18001c122f4be4118f4862786d72b6f647f6748eeac74865cdfb610384fd",
+      "vector_sha256": "a334fb4ed4100f26bb22b1da989c41e618de26b1002ef181e7858fbf668931cd",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "speech language therapy and occupational for patients with",
+          "expected_doc_id": "2025__Speech-language_therapy_and_occupational_therapy_for_patients_with_mild_cognitiv__W4412956792",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Speech-language therapy and occupational therapy for patients with mild cognitive impairment and dementia: a retrospective cohort study using German health claims data | BMC Health Services Research | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 42
+    },
+    {
+      "doc_id": "2025__Status_Nutrisi_Komorbiditas_dan_Fungsi_Kognitif_pada_Lansia_Perempuan_di_Panti_W__W4413130491",
+      "title": "Status Nutrisi, Komorbiditas dan Fungsi Kognitif pada Lansia Perempuan di Panti Wreda",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Status_Nutrisi_Komorbiditas_dan_Fungsi_Kognitif_pada_Lansia_Perempuan_di_Panti_W__W4413130491.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Status_Nutrisi_Komorbiditas_dan_Fungsi_Kognitif_pada_Lansia_Perempuan_di_Panti_W__W4413130491.vectors.jsonl",
+      "chunk_sha256": "744c97049fa7562cc1d7a75d61cddae70f303dc391db33455ca5929424c7c54b",
+      "vector_sha256": "e7cac1ddc9ad4a1e4acaeca6530115161142051ff20e86b791a582619d7c3c96",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "status nutrisi komorbiditas dan fungsi kognitif pada lansia",
+          "expected_doc_id": "2025__Status_Nutrisi_Komorbiditas_dan_Fungsi_Kognitif_pada_Lansia_Perempuan_di_Panti_W__W4413130491",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Status Nutrisi, Komorbiditas dan Fungsi Kognitif pada Lansia Perempuan di Panti Wreda",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 7
+    },
+    {
+      "doc_id": "2025__Stem_cell_therapy_use_in_patients_with_dementia_a_systematic_review__W4410277989",
+      "title": "Stem cell therapy use in patients with dementia: a systematic review | International Journal of Emergency Medicine | Full Text",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Stem_cell_therapy_use_in_patients_with_dementia_a_systematic_review__W4410277989.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Stem_cell_therapy_use_in_patients_with_dementia_a_systematic_review__W4410277989.vectors.jsonl",
+      "chunk_sha256": "2bc0351790ec7baefc16e306431c08c58eb83ce19e70a67e3fe8f5e1a4719f13",
+      "vector_sha256": "37665e77be702e9fe0bd086c5f1731a308e89ec74dc2cb3066b2411b9f37afed",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "stem cell therapy use in patients with dementia",
+          "expected_doc_id": "2025__Stem_cell_therapy_use_in_patients_with_dementia_a_systematic_review__W4410277989",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Stem cell therapy use in patients with dementia: a systematic review | International Journal of Emergency Medicine | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 36
+    },
+    {
+      "doc_id": "2025__Structural_Neuroimaging_Markers_of_Dementia_Insights_from_ROC_Curve_Analysis__W4414290125",
+      "title": "2025 Structural Neuroimaging Markers of Dementia Insights from",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Structural_Neuroimaging_Markers_of_Dementia_Insights_from_ROC_Curve_Analysis__W4414290125.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Structural_Neuroimaging_Markers_of_Dementia_Insights_from_ROC_Curve_Analysis__W4414290125.vectors.jsonl",
+      "chunk_sha256": "3893d94fb0ea61c9b91729f8f704e9f2a50e3571af345e7ec31df97d1ade3fc5",
+      "vector_sha256": "7a33f193765716750ebb20364b19e05e524382ea1961f6cf658885f89691e68c",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "2025 structural neuroimaging markers of dementia insights from",
+          "expected_doc_id": "2025__Structural_Neuroimaging_Markers_of_Dementia_Insights_from_ROC_Curve_Analysis__W4414290125",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "2025 Structural Neuroimaging Markers of Dementia Insights from",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 26
+    },
+    {
+      "doc_id": "2025__Summary_of_the_best_evidence_for_non-pharmaceutical_interventions_for_mild_cogni__W4411962832",
+      "title": "Frontiers | Summary of the best evidence for non-pharmaceutical interventions for mild cognitive impairment in Parkinson's disease",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Summary_of_the_best_evidence_for_non-pharmaceutical_interventions_for_mild_cogni__W4411962832.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Summary_of_the_best_evidence_for_non-pharmaceutical_interventions_for_mild_cogni__W4411962832.vectors.jsonl",
+      "chunk_sha256": "ba003f08b377b3f22ba506d1e0f70496108b7498bff776ef5f9686512b1b6504",
+      "vector_sha256": "61583097df7994018fe407fc9567b22b1eb1270547ac3634d5940ce9a461ccf8",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers summary of the best evidence for non",
+          "expected_doc_id": "2025__Summary_of_the_best_evidence_for_non-pharmaceutical_interventions_for_mild_cogni__W4411962832",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | Summary of the best evidence for non-pharmaceutical interventions for mild cognitive impairment in Parkinson's disease",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 25
+    },
+    {
+      "doc_id": "2025__The_Efficacy_of_Citicoline_Combined_with_Ginkgo_Biloba_in_Patients_with_Moderate__W4414792657",
+      "title": "\u0415\u0444\u0435\u043a\u0442\u0438\u0432\u043d\u0456\u0441\u0442\u044c \u043a\u043e\u043c\u0431\u0456\u043d\u0430\u0446\u0456\u0457 \u0446\u0438\u0442\u0438\u043a\u043e\u043b\u0456\u043d\u0443 \u0437 \u0433\u0456\u043d\u043a\u0433\u043e \u0431\u0456\u043b\u043e\u0431\u0430 \u0443 \u043f\u0430\u0446\u0456\u0454\u043d\u0442\u0456\u0432 \u0456\u0437 \u043f\u043e\u043c\u0456\u0440\u043d\u0438\u043c\u0438 \u043a\u043e\u0433\u043d\u0456\u0442\u0438\u0432\u043d\u0438\u043c\u0438 \u043f\u043e\u0440\u0443\u0448\u0435\u043d\u043d\u044f\u043c\u0438: \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u0438 \u043f\u043e\u0440\u0456\u0432\u043d\u044f\u043b\u044c\u043d\u043e\u0433\u043e \u0434\u043e\u0441\u043b\u0456\u0434\u0436\u0435\u043d\u043d\u044f \u0437 \u043c\u043e\u043d\u043e\u0442\u0435\u0440\u0430\u043f\u0456\u0454\u044e",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__The_Efficacy_of_Citicoline_Combined_with_Ginkgo_Biloba_in_Patients_with_Moderate__W4414792657.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__The_Efficacy_of_Citicoline_Combined_with_Ginkgo_Biloba_in_Patients_with_Moderate__W4414792657.vectors.jsonl",
+      "chunk_sha256": "58c31dc0203cebdd05f6be453a6c7c97fdaa5c887b1e4246887360a5dab2a8ec",
+      "vector_sha256": "134f0e639b163882f58cdce06f01b595dfbbd0f5f60bfc74cb581ec78116351d",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "the efficacy of citicoline combined with ginkgo biloba",
+          "expected_doc_id": "2025__The_Efficacy_of_Citicoline_Combined_with_Ginkgo_Biloba_in_Patients_with_Moderate__W4414792657",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "\u0415\u0444\u0435\u043a\u0442\u0438\u0432\u043d\u0456\u0441\u0442\u044c \u043a\u043e\u043c\u0431\u0456\u043d\u0430\u0446\u0456\u0457 \u0446\u0438\u0442\u0438\u043a\u043e\u043b\u0456\u043d\u0443 \u0437 \u0433\u0456\u043d\u043a\u0433\u043e \u0431\u0456\u043b\u043e\u0431\u0430 \u0443 \u043f\u0430\u0446\u0456\u0454\u043d\u0442\u0456\u0432 \u0456\u0437 \u043f\u043e\u043c\u0456\u0440\u043d\u0438\u043c\u0438 \u043a\u043e\u0433\u043d\u0456\u0442\u0438\u0432\u043d\u0438\u043c\u0438 \u043f\u043e\u0440\u0443\u0448\u0435\u043d\u043d\u044f\u043c\u0438: \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u0438 \u043f\u043e\u0440\u0456\u0432\u043d\u044f\u043b\u044c\u043d\u043e\u0433\u043e \u0434\u043e\u0441\u043b\u0456\u0434\u0436\u0435\u043d\u043d\u044f \u0437 \u043c\u043e\u043d\u043e\u0442\u0435\u0440\u0430\u043f\u0456\u0454\u044e",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 79
+    },
+    {
+      "doc_id": "2025__The_Role_of_Diet_Physical_Activity_and_Lifestyle_in_Alzheimers_Disease_Preventio__W4410239170",
+      "title": "The Role of Diet, Physical Activity, and Lifestyle in Alzheimer's Disease Prevention: A Literature Review",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__The_Role_of_Diet_Physical_Activity_and_Lifestyle_in_Alzheimers_Disease_Preventio__W4410239170.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__The_Role_of_Diet_Physical_Activity_and_Lifestyle_in_Alzheimers_Disease_Preventio__W4410239170.vectors.jsonl",
+      "chunk_sha256": "c097a664eeee27db9a0201d060a572270d3ed4d5ad0e6698e6ec8e61ed352c22",
+      "vector_sha256": "d04f7bda4f84fd5fa67d909a9ec7e43c30b3cb6cd72fb1579aaff25c8836f204",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "the role of diet physical activity and lifestyle",
+          "expected_doc_id": "2025__The_Role_of_Diet_Physical_Activity_and_Lifestyle_in_Alzheimers_Disease_Preventio__W4410239170",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "The Role of Diet, Physical Activity, and Lifestyle in Alzheimer's Disease Prevention: A Literature Review",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 1
+    },
+    {
+      "doc_id": "2025__The_Role_of_Sleep_Disturbances_in_Alzheimers_Disease_Progression_A_Systematic_Re__W4411482777",
+      "title": "The Role of Sleep Disturbances in Alzheimer's Disease Progression: A Systematic Review | Cureus",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__The_Role_of_Sleep_Disturbances_in_Alzheimers_Disease_Progression_A_Systematic_Re__W4411482777.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__The_Role_of_Sleep_Disturbances_in_Alzheimers_Disease_Progression_A_Systematic_Re__W4411482777.vectors.jsonl",
+      "chunk_sha256": "8946327c4aa448ede889cff645133d0ba8743a19a8b687d1073524562351c408",
+      "vector_sha256": "853c00dc0e7f502bce8b030d80dd6f28b2dd47cc554c59b6ccca9a5ee5f45e6c",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "the role of sleep disturbances in alzheimer's disease",
+          "expected_doc_id": "2025__The_Role_of_Sleep_Disturbances_in_Alzheimers_Disease_Progression_A_Systematic_Re__W4411482777",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "The Role of Sleep Disturbances in Alzheimer's Disease Progression: A Systematic Review | Cureus",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 6
+    },
+    {
+      "doc_id": "2025__The_association_between_anosognosia_and_neuropsychiatric_symptoms_in_neurodegene__W4414552288",
+      "title": "The association between anosognosia and neuropsychiatric symptoms in neurodegenerative dementias: a narrative review",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__The_association_between_anosognosia_and_neuropsychiatric_symptoms_in_neurodegene__W4414552288.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__The_association_between_anosognosia_and_neuropsychiatric_symptoms_in_neurodegene__W4414552288.vectors.jsonl",
+      "chunk_sha256": "ec9d05a9c2f2ee1485a63fdb8450e32c3afbc5bf23801d661e0408cf58310502",
+      "vector_sha256": "e317a05809a99689e76a6e32d35af868b649e381079837de3d2cf51679612e4e",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "the association between anosognosia and neuropsychiatric symptoms in",
+          "expected_doc_id": "2025__The_association_between_anosognosia_and_neuropsychiatric_symptoms_in_neurodegene__W4414552288",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "The association between anosognosia and neuropsychiatric symptoms in neurodegenerative dementias: a narrative review",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 54
+    },
+    {
+      "doc_id": "2025__The_association_between_cognitive_domains_and_suicidal_ideation_in_patients_with__W4414930634",
+      "title": "The association between cognitive domains and suicidal ideation in patients with mild dementia: the crucial role of judgement domain | BMC Geriatrics | Full Text",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__The_association_between_cognitive_domains_and_suicidal_ideation_in_patients_with__W4414930634.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__The_association_between_cognitive_domains_and_suicidal_ideation_in_patients_with__W4414930634.vectors.jsonl",
+      "chunk_sha256": "d509c6e8919673952c6ebcb143c0ef39d4e5eb77385bef9c3d07d58cec8c1d0e",
+      "vector_sha256": "a5596efdcbb47a404f7dbd9e0fb2b24f75f3933863ed86e6d396eca695741dc1",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "the association between cognitive domains and suicidal ideation",
+          "expected_doc_id": "2025__The_association_between_cognitive_domains_and_suicidal_ideation_in_patients_with__W4414930634",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "The association between cognitive domains and suicidal ideation in patients with mild dementia: the crucial role of judgement domain | BMC Geriatrics | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 25
+    },
+    {
+      "doc_id": "2025__The_contributing_role_of_CCR5_in_dementia__W4412157540",
+      "title": "Frontiers | The contributing role of CCR5 in dementia",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__The_contributing_role_of_CCR5_in_dementia__W4412157540.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__The_contributing_role_of_CCR5_in_dementia__W4412157540.vectors.jsonl",
+      "chunk_sha256": "856edd136931e65271c54438a172f1c7c1db03c3afaa695df768c7ad4dd54340",
+      "vector_sha256": "344e5ba7dd43becdd53546af3c85d927ad566d8e13c43ee17dd284b18d350895",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "frontiers the contributing role of ccr5 in dementia",
+          "expected_doc_id": "2025__The_contributing_role_of_CCR5_in_dementia__W4412157540",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "Frontiers | The contributing role of CCR5 in dementia",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 43
+    },
+    {
+      "doc_id": "2025__The_effect_of_exogenous_\u03b2-OHB_supplementation_on_cerebral_blood_flow_and_functio__W4414595241",
+      "title": "Background and rationale {6a}",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__The_effect_of_exogenous_\u03b2-OHB_supplementation_on_cerebral_blood_flow_and_functio__W4414595241.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__The_effect_of_exogenous_\u03b2-OHB_supplementation_on_cerebral_blood_flow_and_functio__W4414595241.vectors.jsonl",
+      "chunk_sha256": "cec2944357d1ce77f74eb2f6d59082789efc4e3dfba8c0bf072611b419c646e6",
+      "vector_sha256": "3eedf376b925b5be858bdcbc3027d32f8ae523bb93cb4bb71689a95c787acd00",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "background and rationale 6a the effect of exogenous",
+          "expected_doc_id": "2025__The_effect_of_exogenous_\u03b2-OHB_supplementation_on_cerebral_blood_flow_and_functio__W4414595241",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Background and rationale {6a}",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 41
+    },
+    {
+      "doc_id": "2025__The_frequently_impaired_health_of_leaders_of_nuclear_weapon_states_an_analysis_o__W4412156883",
+      "title": "The frequently impaired health of leaders of nuclear weapon states: an analysis of 51 deceased leaders | BMC Research Notes | Full Text",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__The_frequently_impaired_health_of_leaders_of_nuclear_weapon_states_an_analysis_o__W4412156883.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__The_frequently_impaired_health_of_leaders_of_nuclear_weapon_states_an_analysis_o__W4412156883.vectors.jsonl",
+      "chunk_sha256": "73075ba970e85822609eeb0440b4b8a3d9e372706e8889ca1f81fa4efaca7f32",
+      "vector_sha256": "2961245810b68b29d69eee18c0898e032d432b3eceebd42b98a89dc076c46a99",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "the frequently impaired health of leaders nuclear weapon",
+          "expected_doc_id": "2025__The_frequently_impaired_health_of_leaders_of_nuclear_weapon_states_an_analysis_o__W4412156883",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "The frequently impaired health of leaders of nuclear weapon states: an analysis of 51 deceased leaders | BMC Research Notes | Full Text",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 23
+    },
+    {
+      "doc_id": "2025__The_future_of_biomarkers_for_vascular_contributions_to_cognitive_impairment_and___W4411519614",
+      "title": "The future of biomarkers for vascular contributions to cognitive impairment and dementia (VCID): proceedings of the 2025 annual workshop of the Albert research institute for white matter and cognition | GeroScience",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__The_future_of_biomarkers_for_vascular_contributions_to_cognitive_impairment_and___W4411519614.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__The_future_of_biomarkers_for_vascular_contributions_to_cognitive_impairment_and___W4411519614.vectors.jsonl",
+      "chunk_sha256": "00d714765789cda7dcdd979b7985b5e2e07aa71862a51efb2134e063db68b975",
+      "vector_sha256": "66c40b61113c889acc337fd37a9af6cf97f38ffa4e6c0ddd41bc041bd545383d",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "the future of biomarkers for vascular contributions to",
+          "expected_doc_id": "2025__The_future_of_biomarkers_for_vascular_contributions_to_cognitive_impairment_and___W4411519614",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "The future of biomarkers for vascular contributions to cognitive impairment and dementia (VCID): proceedings of the 2025 annual workshop of the Albert research institute for white matter and cognition | GeroScience",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 43
+    },
+    {
+      "doc_id": "2025__The_need_for_dengue_and_chikungunya_awareness_among_mental_health_professionals___W4414397994",
+      "title": "Chronic psychiatric manifestations of DENV and CHIKV infection",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__The_need_for_dengue_and_chikungunya_awareness_among_mental_health_professionals___W4414397994.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__The_need_for_dengue_and_chikungunya_awareness_among_mental_health_professionals___W4414397994.vectors.jsonl",
+      "chunk_sha256": "25feaa44f43b4e8e1ea252eee00efb390aea6b9a64185a58696f0eebc8728547",
+      "vector_sha256": "45bfac191a1fe5ebe672b6059376f465a49bac3d74e080e94cc946e75db87fd2",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "chronic psychiatric manifestations of denv and chikv infection",
+          "expected_doc_id": "2025__The_need_for_dengue_and_chikungunya_awareness_among_mental_health_professionals___W4414397994",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Chronic psychiatric manifestations of DENV and CHIKV infection",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 11
+    },
+    {
+      "doc_id": "2025__The_role_of_cognitive_and_brain_reserve_in_the_clinical_presentation_and_progres__W4411490345",
+      "title": "The role of cognitive and brain reserve in the clinical presentation and progression of amyotrophic lateral sclerosis | Scientific Reports",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__The_role_of_cognitive_and_brain_reserve_in_the_clinical_presentation_and_progres__W4411490345.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__The_role_of_cognitive_and_brain_reserve_in_the_clinical_presentation_and_progres__W4411490345.vectors.jsonl",
+      "chunk_sha256": "e9384c96c8888cf4b9f291f55ff2c90e9a887cbfd206143df070e08239eb3de1",
+      "vector_sha256": "bc4eb892a5254f2118c9ce4d92f114a1c47d177d7d35a5d06ebdc29f5be497de",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "the role of cognitive and brain reserve in",
+          "expected_doc_id": "2025__The_role_of_cognitive_and_brain_reserve_in_the_clinical_presentation_and_progres__W4411490345",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "The role of cognitive and brain reserve in the clinical presentation and progression of amyotrophic lateral sclerosis | Scientific Reports",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 28
+    },
+    {
+      "doc_id": "2025__Undiagnosed_Dementia_A_Scoping_Review_of_Prevalence_Barriers_Impacts_Diagnostic___W4411493520",
+      "title": "Undiagnosed Dementia: A Scoping Review of Prevalence, Barriers, Impacts, Diagnostic Tools, and Intervention | BJPsych Open | Cambridge Core",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Undiagnosed_Dementia_A_Scoping_Review_of_Prevalence_Barriers_Impacts_Diagnostic___W4411493520.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Undiagnosed_Dementia_A_Scoping_Review_of_Prevalence_Barriers_Impacts_Diagnostic___W4411493520.vectors.jsonl",
+      "chunk_sha256": "b008e8630f0f9cad793886a47e71a19c0092bb8f5dbf2b3707b8c9cfc582802a",
+      "vector_sha256": "4e5a608f7229bc8a32159dd77db7dc6ef2e72bfd3c5e07bef34d886bd578729e",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "undiagnosed dementia a scoping review of prevalence barriers",
+          "expected_doc_id": "2025__Undiagnosed_Dementia_A_Scoping_Review_of_Prevalence_Barriers_Impacts_Diagnostic___W4411493520",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Undiagnosed Dementia: A Scoping Review of Prevalence, Barriers, Impacts, Diagnostic Tools, and Intervention | BJPsych Open | Cambridge Core",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 9
+    },
+    {
+      "doc_id": "2025__Vascular_Dementia_Beyond_Conventional_Treatment_The_Role_of_Neuroprotective_Agen__W4410908518",
+      "title": "Middle Black Sea Journal of Health Science \u00bb  Submission  \u00bb Vascular Dementia Beyond Conventional Treatment: The Role of Neuroprotective Agents and Personalized Antiplatelet Therapy",
+      "namespace": "research",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Vascular_Dementia_Beyond_Conventional_Treatment_The_Role_of_Neuroprotective_Agen__W4410908518.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Vascular_Dementia_Beyond_Conventional_Treatment_The_Role_of_Neuroprotective_Agen__W4410908518.vectors.jsonl",
+      "chunk_sha256": "7181c70ce269143d208c3444a610de18b02f775539044850d186da149ba50380",
+      "vector_sha256": "651bfa96c6a294456d06cf975f756dfb4baf12be0f54a4bf8d3b7a2939583d92",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "middle black sea journal of health science submission",
+          "expected_doc_id": "2025__Vascular_Dementia_Beyond_Conventional_Treatment_The_Role_of_Neuroprotective_Agen__W4410908518",
+          "namespace": "research"
+        }
+      ],
+      "metadata": {
+        "title": "Middle Black Sea Journal of Health Science \u00bb  Submission  \u00bb Vascular Dementia Beyond Conventional Treatment: The Role of Neuroprotective Agents and Personalized Antiplatelet Therapy",
+        "source": "real_fixture",
+        "acl": [
+          "acl::research"
+        ]
+      },
+      "chunk_count": 7
+    },
+    {
+      "doc_id": "2025__Visual_perception_and_cognitive_functioning_in_MCI_and_mild_Alzheimers_disease_a__W4413037087",
+      "title": "Visual perception and cognitive functioning in MCI and mild Alzheimer's disease: a cross-sectional study protocol from the DEM-VIS study in Germany | BMJ Open",
+      "namespace": "operations",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__Visual_perception_and_cognitive_functioning_in_MCI_and_mild_Alzheimers_disease_a__W4413037087.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__Visual_perception_and_cognitive_functioning_in_MCI_and_mild_Alzheimers_disease_a__W4413037087.vectors.jsonl",
+      "chunk_sha256": "7cf558ee283ab2defc9a89051788c8e8765bf0240889911b4d33221adf6f3496",
+      "vector_sha256": "5c1a2f15c5ff6dcb0929b780283d2531b5f6a11d58f956e697e1047057ace900",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "visual perception and cognitive functioning in mci mild",
+          "expected_doc_id": "2025__Visual_perception_and_cognitive_functioning_in_MCI_and_mild_Alzheimers_disease_a__W4413037087",
+          "namespace": "operations"
+        }
+      ],
+      "metadata": {
+        "title": "Visual perception and cognitive functioning in MCI and mild Alzheimer's disease: a cross-sectional study protocol from the DEM-VIS study in Germany | BMJ Open",
+        "source": "real_fixture",
+        "acl": [
+          "acl::operations"
+        ]
+      },
+      "chunk_count": 39
+    },
+    {
+      "doc_id": "2025__XGBoost_models_based_on_non_imaging_features_for_the_prediction_of_mild_cognitiv__W4413117078",
+      "title": "XGBoost models based on non imaging features for the prediction of mild cognitive impairment in older adults | Scientific Reports",
+      "namespace": "support",
+      "chunk_file": "Data/HybridScaleFixture/chunks/2025__XGBoost_models_based_on_non_imaging_features_for_the_prediction_of_mild_cognitiv__W4413117078.chunks.jsonl",
+      "vector_file": "Data/HybridScaleFixture/vectors/2025__XGBoost_models_based_on_non_imaging_features_for_the_prediction_of_mild_cognitiv__W4413117078.vectors.jsonl",
+      "chunk_sha256": "3541e9b471b424df50b24e8fbd37e7af04c9f52233512521fb0efe7717624599",
+      "vector_sha256": "0fd4f5dcd542526061446b6c44e6578a3128c2632d97893aa9d36c3523a59e1f",
+      "redacted_fields": [
+        "source_path"
+      ],
+      "queries": [
+        {
+          "query": "xgboost models based on non imaging features for",
+          "expected_doc_id": "2025__XGBoost_models_based_on_non_imaging_features_for_the_prediction_of_mild_cognitiv__W4413117078",
+          "namespace": "support"
+        }
+      ],
+      "metadata": {
+        "title": "XGBoost models based on non imaging features for the prediction of mild cognitive impairment in older adults | Scientific Reports",
+        "source": "real_fixture",
+        "acl": [
+          "acl::support"
+        ]
+      },
+      "chunk_count": 35
+    }
+  ],
+  "stats": {
+    "total_documents": 128,
+    "total_chunks": 4425,
+    "namespaces": [
+      "operations",
+      "research",
+      "support"
+    ]
+  }
+}

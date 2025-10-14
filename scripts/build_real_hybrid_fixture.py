@@ -17,14 +17,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Mapping, Dict, Sequence
 
-
+import numpy as np
 DEFAULT_CHUNKS_DIR = Path("Data/ChunkedDocTagFiles")
 DEFAULT_VECTORS_DIR = Path("Data/Vectors")
-DEFAULT_OUTPUT_DIR = Path("tests/data/real_hybrid_dataset")
-DEFAULT_NAMESPACE = "real-fixture"
+DEFAULT_OUTPUT_DIR = Path("Data/HybridScaleFixture")
+DEFAULT_NAMESPACE = "hybrid-scale"
+DEFAULT_NAMESPACES = ("research", "operations", "support")
 DEFAULT_SAMPLE_SIZE = 3
 DEFAULT_SEED = 1337
 REDACTED_FIELDS = ("source_path",)
+DEFAULT_MAX_CHUNKS_PER_DOC = 0
 
 
 @dataclass(frozen=True)
@@ -38,6 +40,15 @@ class FixtureDocument:
     vector_sha256: str
     redacted_fields: Sequence[str]
     queries: Sequence[Mapping[str, object]]
+    metadata: Mapping[str, object]
+    chunk_count: int
+
+
+def _parse_namespaces(raw: str | None) -> List[str]:
+    if raw is None:
+        return []
+    parts = [part.strip() for part in raw.split(",")]
+    return [part for part in parts if part]
 
 
 def parse_args() -> argparse.Namespace:
@@ -46,8 +57,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--vectors-dir", type=Path, default=DEFAULT_VECTORS_DIR)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--namespace", default=DEFAULT_NAMESPACE)
+    parser.add_argument(
+        "--namespaces",
+        type=str,
+        default=None,
+        help="Comma-separated namespaces to distribute sampled documents across",
+    )
     parser.add_argument("--sample-size", type=int, default=DEFAULT_SAMPLE_SIZE)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    parser.add_argument(
+        "--max-chunks-per-doc",
+        type=int,
+        default=DEFAULT_MAX_CHUNKS_PER_DOC,
+        help="Maximum chunks to retain per sampled document (0 disables the limit)",
+    )
     parser.add_argument(
         "--overwrite",
         action="store_true",
@@ -103,6 +126,14 @@ def sha256_digest(path: Path) -> str:
     return digest.hexdigest()
 
 
+def repo_relative(path: Path) -> str:
+    repo_root = Path.cwd().resolve()
+    try:
+        return str(path.resolve().relative_to(repo_root))
+    except ValueError:
+        return str(path.resolve())
+
+
 def clean_chunk_records(records: List[Dict[str, object]]) -> List[Dict[str, object]]:
     cleaned: List[Dict[str, object]] = []
     for record in records:
@@ -125,24 +156,58 @@ def derive_title(doc_id: str, chunk_records: Sequence[Mapping[str, object]]) -> 
     return " ".join(words[:8]).strip()
 
 
-def derive_query(title: str) -> str:
-    tokens = re.findall(r"[A-Za-z0-9']+", title)
-    if not tokens:
-        return title
-    return " ".join(tokens[:6]).lower()
+def derive_query(doc_id: str, title: str) -> str:
+    title_tokens = [token.lower() for token in re.findall(r"[A-Za-z0-9']+", title)]
+    doc_tokens = [
+        token.lower()
+        for token in re.findall(r"[A-Za-z0-9']+", doc_id)
+        if not re.fullmatch(r"\d+", token)
+    ]
+    combined = title_tokens + doc_tokens
+    if not combined:
+        return doc_id.lower()
+    seen = []
+    for token in combined:
+        if token not in seen:
+            seen.append(token)
+        if len(seen) == 8:
+            break
+    return " ".join(seen)
 
 
 def build_fixture_document(
     doc_id: str,
     *,
     namespace: str,
+    acl_tag: str,
     source_chunk: Path,
     source_vector: Path,
     output_dir: Path,
+    max_chunks: int,
 ) -> FixtureDocument:
     chunk_records = load_jsonl(source_chunk)
     cleaned_chunks = clean_chunk_records(chunk_records)
-    vector_records = load_jsonl(source_vector)
+    if max_chunks and len(cleaned_chunks) > max_chunks:
+        cleaned_chunks = cleaned_chunks[:max_chunks]
+    vector_entries = {entry["UUID"]: entry for entry in load_jsonl(source_vector)}
+    vector_records: List[Dict[str, object]] = []
+    for record in cleaned_chunks:
+        vector_id = str(record.get("uuid"))
+        vector_payload = vector_entries.get(vector_id)
+        if vector_payload is None:
+            raise ValueError(f"Missing vector entry for chunk {vector_id}")
+        vector = vector_payload.get("Qwen3-4B", {}).get("vector", [])
+        if not isinstance(vector, list) or not vector:
+            raise ValueError(f"Invalid dense vector for {vector_id}")
+        arr = np.asarray(vector, dtype=np.float32)
+        if arr.ndim != 1:
+            raise ValueError(f"Dense vector must be 1-D for {vector_id}")
+        if np.isnan(arr).any() or np.isinf(arr).any():
+            raise ValueError(f"Dense vector contains NaN/Inf values for {vector_id}")
+        norm = float(np.linalg.norm(arr))
+        if norm <= 0.0:
+            raise ValueError(f"Dense vector has zero norm for {vector_id}")
+        vector_records.append(vector_payload)
 
     chunk_output = output_dir / "chunks" / source_chunk.name
     vector_output = output_dir / "vectors" / source_vector.name
@@ -151,7 +216,7 @@ def build_fixture_document(
     write_jsonl(vector_output, vector_records)
 
     title = derive_title(doc_id, cleaned_chunks)
-    query = derive_query(title)
+    query = derive_query(doc_id, title)
     chunk_hash = sha256_digest(chunk_output)
     vector_hash = sha256_digest(vector_output)
 
@@ -173,6 +238,12 @@ def build_fixture_document(
         vector_sha256=vector_hash,
         redacted_fields=REDACTED_FIELDS,
         queries=queries,
+        metadata={
+            "title": title,
+            "source": "real_fixture",
+            "acl": [acl_tag],
+        },
+        chunk_count=len(cleaned_chunks),
     )
 
 
@@ -195,15 +266,22 @@ def write_manifest(
                 "doc_id": doc.doc_id,
                 "title": doc.title,
                 "namespace": doc.namespace,
-                "chunk_file": str(doc.chunk_file.relative_to(output_dir.parent.parent.parent)),
-                "vector_file": str(doc.vector_file.relative_to(output_dir.parent.parent.parent)),
+                "chunk_file": repo_relative(doc.chunk_file),
+                "vector_file": repo_relative(doc.vector_file),
                 "chunk_sha256": doc.chunk_sha256,
                 "vector_sha256": doc.vector_sha256,
                 "redacted_fields": list(doc.redacted_fields),
                 "queries": list(doc.queries),
+                "metadata": doc.metadata,
+                "chunk_count": doc.chunk_count,
             }
             for doc in documents
         ],
+        "stats": {
+            "total_documents": len(documents),
+            "total_chunks": sum(doc.chunk_count for doc in documents),
+            "namespaces": sorted({doc.namespace for doc in documents}),
+        },
     }
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -227,20 +305,16 @@ def write_queries(output_dir: Path, documents: Sequence[FixtureDocument]) -> Non
 def write_dataset_jsonl(output_dir: Path, documents: Sequence[FixtureDocument]) -> None:
     dataset_path = output_dir / "dataset.jsonl"
     dataset_entries = []
-    root_relative = output_dir.parent.parent  # tests/
     for doc in documents:
-        chunk_rel = str(doc.chunk_file.relative_to(root_relative.parent))
-        vector_rel = str(doc.vector_file.relative_to(root_relative.parent))
+        chunk_rel = repo_relative(doc.chunk_file)
+        vector_rel = repo_relative(doc.vector_file)
         entry = {
             "document": {
                 "doc_id": doc.doc_id,
                 "namespace": doc.namespace,
                 "chunk_file": chunk_rel,
                 "vector_file": vector_rel,
-                "metadata": {
-                    "title": doc.title,
-                    "source": "real_fixture",
-                },
+                "metadata": dict(doc.metadata),
             },
             "queries": list(doc.queries),
         }
@@ -251,21 +325,33 @@ def write_dataset_jsonl(output_dir: Path, documents: Sequence[FixtureDocument]) 
             handle.write("\n")
 
 
-def write_readme(output_dir: Path, *, seed: int, namespace: str, sample_size: int) -> None:
+def write_readme(
+    output_dir: Path,
+    *,
+    seed: int,
+    namespaces: Sequence[str],
+    sample_size: int,
+    max_chunks: int,
+) -> None:
     readme_path = output_dir / "README.md"
+    namespace_text = ", ".join(namespaces) if namespaces else DEFAULT_NAMESPACE
+    namespace_flag = (
+        f" --namespaces {','.join(namespaces)}" if namespaces else f" --namespace {DEFAULT_NAMESPACE}"
+    )
     content = f"""# Real Hybrid Search Fixture
 
 This directory contains a deterministic sample of chunk/vector artifacts used for
 real-vector regression tests. The fixture was generated with the following parameters:
 
-- Namespace: `{namespace}`
+- Namespaces: `{namespace_text}`
 - Sample size: `{sample_size}`
 - Seed: `{seed}`
+- Max chunks per document: `{max_chunks}`
 
 To regenerate the fixture, run:
 
 ```bash
-python scripts/build_real_hybrid_fixture.py --seed {seed} --sample-size {sample_size}
+python scripts/build_real_hybrid_fixture.py --seed {seed} --sample-size {sample_size}{namespace_flag} --max-chunks-per-doc {max_chunks}
 ```
 
 Ensure the `Data/ChunkedDocTagFiles` and `Data/Vectors` directories are populated
@@ -299,29 +385,47 @@ def main() -> None:
         raise SystemExit("No matching chunk/vector artifact pairs found.")
     if args.sample_size < 1:
         raise SystemExit("Sample size must be positive.")
-    if args.sample_size > len(candidates):
-        raise SystemExit(f"Sample size {args.sample_size} exceeds available documents ({len(candidates)}).")
+
+    namespaces = _parse_namespaces(args.namespaces)
+    if not namespaces:
+        namespaces = [args.namespace] if args.namespace else list(DEFAULT_NAMESPACES)
+
+    sample_size = min(args.sample_size, len(candidates))
 
     ensure_output_dir(args.output_dir, args.overwrite)
 
     rng = random.Random(args.seed)
-    selection = rng.sample(candidates, args.sample_size)
+    selection = rng.sample(candidates, sample_size)
 
     documents: List[FixtureDocument] = []
-    for doc_id in selection:
+    total_chunks = 0
+    for idx, doc_id in enumerate(selection):
         chunk_source = args.chunks_dir / f"{doc_id}.chunks.jsonl"
         vector_source = args.vectors_dir / f"{doc_id}.vectors.jsonl"
+        namespace = namespaces[idx % len(namespaces)]
+        acl_tag = f"acl::{namespace}"
         document = build_fixture_document(
             doc_id,
-            namespace=args.namespace,
+            namespace=namespace,
+            acl_tag=acl_tag,
             source_chunk=chunk_source,
             source_vector=vector_source,
             output_dir=args.output_dir,
+            max_chunks=args.max_chunks_per_doc,
         )
         documents.append(document)
+        total_chunks += document.chunk_count
 
     # Keep the dataset stable by sorting on doc_id after sampling.
     documents.sort(key=lambda doc: doc.doc_id)
+
+    namespaces_used = sorted({doc.namespace for doc in documents})
+
+    if total_chunks < 500:
+        print(
+            f"[WARN] Fixture contains {total_chunks} chunks (< 500). "
+            "Consider increasing --sample-size or --max-chunks-per-doc."
+        )
 
     write_manifest(
         args.output_dir,
@@ -333,10 +437,18 @@ def main() -> None:
     write_queries(args.output_dir, documents)
     write_dataset_jsonl(args.output_dir, documents)
     write_readme(
-        args.output_dir, seed=args.seed, namespace=args.namespace, sample_size=args.sample_size
+        args.output_dir,
+        seed=args.seed,
+        namespaces=namespaces_used,
+        sample_size=sample_size,
+        max_chunks=args.max_chunks_per_doc,
     )
 
-    print(f"Fixture generated with {len(documents)} documents at {args.output_dir}")
+    print(
+        "Fixture generated with "
+        f"{len(documents)} documents ({total_chunks} chunks) across namespaces {namespaces_used} "
+        f"at {args.output_dir}"
+    )
 
 
 if __name__ == "__main__":

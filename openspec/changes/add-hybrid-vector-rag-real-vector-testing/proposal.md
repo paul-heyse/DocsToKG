@@ -4,7 +4,7 @@ Our hybrid search suite only exercises ingestion, validation, and retrieval agai
 
 ## What Changes
 
-- Real fixture curation: deterministic tooling to sample, sanitize, and publish a reproducible dataset under `tests/data/real_hybrid_dataset/` with paired chunk/vector JSONL and query expectations.
+- Real fixture curation: deterministic tooling to sample, sanitize, and publish a reproducible dataset under `Data/HybridScaleFixture/` with paired chunk/vector JSONL and query expectations.
 - Test harness updates: gated pytest marker/flag for real-vector suites, extended ingestion/reingest/API/assertion coverage, validator invocation with report verification, and serialization roundtrip tests.
 - FAISS manager hardening: graceful CPU fallback for destructive operations (`remove_ids`) when GPU indexes lack the method, with regression coverage that exercises the downgraded path and validates `ntotal`.
 - Validation CLI and docs: default dataset pointing at the real fixture, updated runbook instructions, and calibration narrative aligned to production embeddings.

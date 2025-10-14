@@ -1,0 +1,770 @@
+[
+  {
+    "doc_id": "2025__A_Case_Report_Exploring_Early-Onset_Alzheimers_Disease_With_No_Known_Family_Hist__W4413353461",
+    "namespace": "research",
+    "query": "a case report exploring early onset alzheimer's disease",
+    "expected_doc_id": "2025__A_Case_Report_Exploring_Early-Onset_Alzheimers_Disease_With_No_Known_Family_Hist__W4413353461"
+  },
+  {
+    "doc_id": "2025__A_comprehensive_review_on_novel_opportunities_for_Alzheimer_therapy_by_targeting__W4413033438",
+    "namespace": "research",
+    "query": "a comprehensive review on novel opportunities for alzheimer",
+    "expected_doc_id": "2025__A_comprehensive_review_on_novel_opportunities_for_Alzheimer_therapy_by_targeting__W4413033438"
+  },
+  {
+    "doc_id": "2025__A_protective_role_of_SRC-1_against_aging_associated_cognitive_decline__W4413751913",
+    "namespace": "operations",
+    "query": "a protective role of src 1 against aging",
+    "expected_doc_id": "2025__A_protective_role_of_SRC-1_against_aging_associated_cognitive_decline__W4413751913"
+  },
+  {
+    "doc_id": "2025__A_review_of_hypertension_and_vascular_cognitive_impairment__W4415061765",
+    "namespace": "support",
+    "query": "a review of hypertension and vascular cognitive impairment",
+    "expected_doc_id": "2025__A_review_of_hypertension_and_vascular_cognitive_impairment__W4415061765"
+  },
+  {
+    "doc_id": "2025__A_review_of_type_2_diabetes_mellitus_and_cognitive_impairment__W4412881335",
+    "namespace": "research",
+    "query": "frontiers a review of type 2 diabetes mellitus",
+    "expected_doc_id": "2025__A_review_of_type_2_diabetes_mellitus_and_cognitive_impairment__W4412881335"
+  },
+  {
+    "doc_id": "2025__Acceptability_of_wearable_technology_for_the_early_detection_of_dementia-causing__W4413786476",
+    "namespace": "operations",
+    "query": "acceptability of wearable technology for the early detection",
+    "expected_doc_id": "2025__Acceptability_of_wearable_technology_for_the_early_detection_of_dementia-causing__W4413786476"
+  },
+  {
+    "doc_id": "2025__Acupuncture_for_patients_with_mild_cognitive_impairment_a_randomized_patientasse__W4412521969",
+    "namespace": "research",
+    "query": "acupuncture for patients with mild cognitive impairment a",
+    "expected_doc_id": "2025__Acupuncture_for_patients_with_mild_cognitive_impairment_a_randomized_patientasse__W4412521969"
+  },
+  {
+    "doc_id": "2025__Ambient_Air_Pollution_and_the_Severity_of_Alzheimer_Disease_Neuropathology__W4414058715",
+    "namespace": "research",
+    "query": "ambient air pollution and the severity of alzheimer's",
+    "expected_doc_id": "2025__Ambient_Air_Pollution_and_the_Severity_of_Alzheimer_Disease_Neuropathology__W4414058715"
+  },
+  {
+    "doc_id": "2025__An_innovative_health_systems_approach_to_support_early_detection_of_cognitive_im__W4413790860",
+    "namespace": "operations",
+    "query": "an innovative health systems approach to support early",
+    "expected_doc_id": "2025__An_innovative_health_systems_approach_to_support_early_detection_of_cognitive_im__W4413790860"
+  },
+  {
+    "doc_id": "2025__Anticholinergic_Burden_and_Its_Association_with_Hospitalisation_Risk_and_Causes___W4414468114",
+    "namespace": "operations",
+    "query": "anticholinergic burden and its association with hospitalisation risk",
+    "expected_doc_id": "2025__Anticholinergic_Burden_and_Its_Association_with_Hospitalisation_Risk_and_Causes___W4414468114"
+  },
+  {
+    "doc_id": "2025__Apraxic_deficits_predict_general_cognitive_impairment_in_patients_with_biomarker__W4414497753",
+    "namespace": "operations",
+    "query": "determination of csf and pet biomarker status apraxic",
+    "expected_doc_id": "2025__Apraxic_deficits_predict_general_cognitive_impairment_in_patients_with_biomarker__W4414497753"
+  },
+  {
+    "doc_id": "2025__Are_long-lasting_nonspecific_symptoms_related_to_vitamin_D_deficiency_among_olde__W4411573635",
+    "namespace": "research",
+    "query": "are long lasting nonspecific symptoms related to vitamin",
+    "expected_doc_id": "2025__Are_long-lasting_nonspecific_symptoms_related_to_vitamin_D_deficiency_among_olde__W4411573635"
+  },
+  {
+    "doc_id": "2025__Beauty_in_the_shadow_of_neurodegenerative_disease_a_narrative_review_on_aestheti__W4414972538",
+    "namespace": "operations",
+    "query": "beauty in the shadow of neurodegenerative disease a",
+    "expected_doc_id": "2025__Beauty_in_the_shadow_of_neurodegenerative_disease_a_narrative_review_on_aestheti__W4414972538"
+  },
+  {
+    "doc_id": "2025__Blood-based_biomarkers_and_neuroimaging_for_early_detection_of_post-stroke_cogni__W4413036846",
+    "namespace": "research",
+    "query": "frontiers blood based biomarkers and neuroimaging for early",
+    "expected_doc_id": "2025__Blood-based_biomarkers_and_neuroimaging_for_early_detection_of_post-stroke_cogni__W4413036846"
+  },
+  {
+    "doc_id": "2025__Brain_health_a_new_concept_to_the_neurologist_an_initiative_of_the_Lifestyle_Med__W4413866194",
+    "namespace": "operations",
+    "query": "thieme e journals arquivos de neuro psiquiatria abstract",
+    "expected_doc_id": "2025__Brain_health_a_new_concept_to_the_neurologist_an_initiative_of_the_Lifestyle_Med__W4413866194"
+  },
+  {
+    "doc_id": "2025__Brain_rot_and_Alzheimers_disease__W4413424816",
+    "namespace": "operations",
+    "query": "brain rot and alzheimer's disease alzheimers w4413424816",
+    "expected_doc_id": "2025__Brain_rot_and_Alzheimers_disease__W4413424816"
+  },
+  {
+    "doc_id": "2025__CITA_GO-ON_study_A_community_based_multidomain_lifestyle_intervention_to_prevent__W4411325550",
+    "namespace": "support",
+    "query": "frontiers cita go on study a community based",
+    "expected_doc_id": "2025__CITA_GO-ON_study_A_community_based_multidomain_lifestyle_intervention_to_prevent__W4411325550"
+  },
+  {
+    "doc_id": "2025__Cannabis_use_and_cognition_in_older_adults_Preliminary_performance-based_neurops__W4413874345",
+    "namespace": "research",
+    "query": "cannabis use and cognition in older adults preliminary",
+    "expected_doc_id": "2025__Cannabis_use_and_cognition_in_older_adults_Preliminary_performance-based_neurops__W4413874345"
+  },
+  {
+    "doc_id": "2025__Causal_Effects_of_the_Plasma_Proteome_on_Vascular_Dementia_Risk_A_Mendelian_Rand__W4412068972",
+    "namespace": "operations",
+    "query": "causal effects of the plasma proteome on vascular",
+    "expected_doc_id": "2025__Causal_Effects_of_the_Plasma_Proteome_on_Vascular_Dementia_Risk_A_Mendelian_Rand__W4412068972"
+  },
+  {
+    "doc_id": "2025__Cognitive_Function_and_General_Anesthesia_Exposure_A_Cognitive_Impairment_Stage-__W4413894233",
+    "namespace": "research",
+    "query": "comparison of participant characteristics between the diagnostic groups",
+    "expected_doc_id": "2025__Cognitive_Function_and_General_Anesthesia_Exposure_A_Cognitive_Impairment_Stage-__W4413894233"
+  },
+  {
+    "doc_id": "2025__Cognitive_rehabilitation_using_virtual_reality_in_subjective_cognitive_decline_a__W4414218444",
+    "namespace": "research",
+    "query": "cognitive rehabilitation using virtual reality in subjective decline",
+    "expected_doc_id": "2025__Cognitive_rehabilitation_using_virtual_reality_in_subjective_cognitive_decline_a__W4414218444"
+  },
+  {
+    "doc_id": "2025__Communicating_the_risk_of_dementia_a_scoping_review__W4412582631",
+    "namespace": "research",
+    "query": "communicating the risk of dementia a scoping review",
+    "expected_doc_id": "2025__Communicating_the_risk_of_dementia_a_scoping_review__W4412582631"
+  },
+  {
+    "doc_id": "2025__Comparison_of_two_preprocessing_methods_for_18F-Flortaucipir_PET_quantification___W4412521606",
+    "namespace": "support",
+    "query": "comparison of two preprocessing methods for 18f flortaucipir",
+    "expected_doc_id": "2025__Comparison_of_two_preprocessing_methods_for_18F-Flortaucipir_PET_quantification___W4412521606"
+  },
+  {
+    "doc_id": "2025__Contribution_and_legacy_a_qualitative_study_of_older_peoples_attitudes_about_sha__W4410898545",
+    "namespace": "operations",
+    "query": "contribution and legacy a qualitative study of older",
+    "expected_doc_id": "2025__Contribution_and_legacy_a_qualitative_study_of_older_peoples_attitudes_about_sha__W4410898545"
+  },
+  {
+    "doc_id": "2025__Cross-domain_latent_profiles_of_MCI_and_dementia_are_most_differentiated_by_soci__W4413896539",
+    "namespace": "operations",
+    "query": "statement of research significance cross domain latent profiles",
+    "expected_doc_id": "2025__Cross-domain_latent_profiles_of_MCI_and_dementia_are_most_differentiated_by_soci__W4413896539"
+  },
+  {
+    "doc_id": "2025__Developing_an_explainable_machine_learning_and_fog_computing-based_visual_rating__W4412486382",
+    "namespace": "research",
+    "query": "developing an explainable machine learning and fog computing",
+    "expected_doc_id": "2025__Developing_an_explainable_machine_learning_and_fog_computing-based_visual_rating__W4412486382"
+  },
+  {
+    "doc_id": "2025__Development_of_a_predictive_model_for_long-term_care_and_support_eligibility_cer__W4413368004",
+    "namespace": "support",
+    "query": "development of a predictive model for long term",
+    "expected_doc_id": "2025__Development_of_a_predictive_model_for_long-term_care_and_support_eligibility_cer__W4413368004"
+  },
+  {
+    "doc_id": "2025__Diffusion_tensor_imaging_analysis_of_aged_dogs_with_and_without_canine_cognitive__W4414753933",
+    "namespace": "operations",
+    "query": "diffusion tensor imaging analysis of aged dogs with",
+    "expected_doc_id": "2025__Diffusion_tensor_imaging_analysis_of_aged_dogs_with_and_without_canine_cognitive__W4414753933"
+  },
+  {
+    "doc_id": "2025__Digital_tools_for_people_without_an_Alzheimers_disease_or_dementia_diagnosis_a_s__W4411863403",
+    "namespace": "operations",
+    "query": "journal of medical internet research digital tools for",
+    "expected_doc_id": "2025__Digital_tools_for_people_without_an_Alzheimers_disease_or_dementia_diagnosis_a_s__W4411863403"
+  },
+  {
+    "doc_id": "2025__Disease_progression_and_social_cognition_in_behavioral_variant_frontotemporal_de__W4413438989",
+    "namespace": "research",
+    "query": "disease progression and social cognition in behavioral variant",
+    "expected_doc_id": "2025__Disease_progression_and_social_cognition_in_behavioral_variant_frontotemporal_de__W4413438989"
+  },
+  {
+    "doc_id": "2025__Dissecting_real-world_memory_clinical_cohort_heterogeneity_analysis_of_neuroanat__W4414704396",
+    "namespace": "operations",
+    "query": "parsing heterogeneity using hyda dissecting real world memory",
+    "expected_doc_id": "2025__Dissecting_real-world_memory_clinical_cohort_heterogeneity_analysis_of_neuroanat__W4414704396"
+  },
+  {
+    "doc_id": "2025__DunedinPACNI_estimates_the_longitudinal_Pace_of_Aging_from_a_single_brain_image___W4411900345",
+    "namespace": "research",
+    "query": "dunedinpacni estimates the longitudinal pace of aging from",
+    "expected_doc_id": "2025__DunedinPACNI_estimates_the_longitudinal_Pace_of_Aging_from_a_single_brain_image___W4411900345"
+  },
+  {
+    "doc_id": "2025__Editorial_Advanced_fNIRS_applications_in_neuroscience_and_neurological_disorders__W4414261891",
+    "namespace": "operations",
+    "query": "editorial on the research topic advanced fnirs applications",
+    "expected_doc_id": "2025__Editorial_Advanced_fNIRS_applications_in_neuroscience_and_neurological_disorders__W4414261891"
+  },
+  {
+    "doc_id": "2025__Editorial_Decoding_vascular_aging_unraveling_the_enigma_of_pathological_conditio__W4414742927",
+    "namespace": "support",
+    "query": "2025 editorial decoding vascular aging unraveling the enigma",
+    "expected_doc_id": "2025__Editorial_Decoding_vascular_aging_unraveling_the_enigma_of_pathological_conditio__W4414742927"
+  },
+  {
+    "doc_id": "2025__Editorial_Neurocognitive_disorders_in_the_community_a_global_perspective__W4414218012",
+    "namespace": "support",
+    "query": "editorial on the research topic neurocognitive disorders in",
+    "expected_doc_id": "2025__Editorial_Neurocognitive_disorders_in_the_community_a_global_perspective__W4414218012"
+  },
+  {
+    "doc_id": "2025__Editorial_Remedying_the_injured_brain_in_cognitive_impairment_potential_neuroimm__W4414672991",
+    "namespace": "support",
+    "query": "frontiers editorial remedying the injured brain in cognitive",
+    "expected_doc_id": "2025__Editorial_Remedying_the_injured_brain_in_cognitive_impairment_potential_neuroimm__W4414672991"
+  },
+  {
+    "doc_id": "2025__Editorial_The_open_challenges_of_cognitive_frailty_risk_factors_neuropsychologic__W4413303148",
+    "namespace": "operations",
+    "query": "editorial on the research topic open challenges of",
+    "expected_doc_id": "2025__Editorial_The_open_challenges_of_cognitive_frailty_risk_factors_neuropsychologic__W4413303148"
+  },
+  {
+    "doc_id": "2025__Effect_of_aerobic_exercise_combined_with_meditation_on_cognitive_frailty_study_p__W4411718034",
+    "namespace": "support",
+    "query": "effect of aerobic exercise combined with meditation on",
+    "expected_doc_id": "2025__Effect_of_aerobic_exercise_combined_with_meditation_on_cognitive_frailty_study_p__W4411718034"
+  },
+  {
+    "doc_id": "2025__Effectiveness_of_VR-based_cognitive_training_and_games_on_cognitive_rehabilitati__W4413993402",
+    "namespace": "support",
+    "query": "jmir preprints 82876 effectiveness of vr based cognitive",
+    "expected_doc_id": "2025__Effectiveness_of_VR-based_cognitive_training_and_games_on_cognitive_rehabilitati__W4413993402"
+  },
+  {
+    "doc_id": "2025__Effectiveness_of_Walking_Prescription_Using_Mobile_Health_Technology_on_the_Chan__W4411201194",
+    "namespace": "support",
+    "query": "jmir aging effectiveness of walking prescription using mobile",
+    "expected_doc_id": "2025__Effectiveness_of_Walking_Prescription_Using_Mobile_Health_Technology_on_the_Chan__W4411201194"
+  },
+  {
+    "doc_id": "2025__Effects_of_Blood_Pressure_Variability_and_Its_Association_With_Dementia_and_Cogn__W4411804266",
+    "namespace": "operations",
+    "query": "effects of blood pressure variability and its association",
+    "expected_doc_id": "2025__Effects_of_Blood_Pressure_Variability_and_Its_Association_With_Dementia_and_Cogn__W4411804266"
+  },
+  {
+    "doc_id": "2025__Effects_of_Tai_Chi_on_Cognitive_Function_in_Older_Adults_with_T2DM_A_Randomized___W4412753123",
+    "namespace": "research",
+    "query": "journal of medical internet research effects tai chi",
+    "expected_doc_id": "2025__Effects_of_Tai_Chi_on_Cognitive_Function_in_Older_Adults_with_T2DM_A_Randomized___W4412753123"
+  },
+  {
+    "doc_id": "2025__Effects_of_balance_physical_therapy_with_or_without_cognitive_training_in_adults__W4414700851",
+    "namespace": "operations",
+    "query": "risk of bias assessment effects balance physical therapy",
+    "expected_doc_id": "2025__Effects_of_balance_physical_therapy_with_or_without_cognitive_training_in_adults__W4414700851"
+  },
+  {
+    "doc_id": "2025__Effects_of_different_physical_activity_interventions_on_executive_function_in_ol__W4414757221",
+    "namespace": "research",
+    "query": "2 1 protocol and registration effects of different",
+    "expected_doc_id": "2025__Effects_of_different_physical_activity_interventions_on_executive_function_in_ol__W4414757221"
+  },
+  {
+    "doc_id": "2025__Effects_of_exercise_interventions_on_cognitive_function_in_patients_with_cogniti__W4410453504",
+    "namespace": "research",
+    "query": "frontiers effects of exercise interventions on cognitive function",
+    "expected_doc_id": "2025__Effects_of_exercise_interventions_on_cognitive_function_in_patients_with_cogniti__W4410453504"
+  },
+  {
+    "doc_id": "2025__Efficacy_and_safety_of_Cheonwangbosim-dan_Tian_Wang_Bu_Xin_Dan_for_treatment_of___W4412352541",
+    "namespace": "support",
+    "query": "efficacy and safety of cheonwangbosim dan tian wang",
+    "expected_doc_id": "2025__Efficacy_and_safety_of_Cheonwangbosim-dan_Tian_Wang_Bu_Xin_Dan_for_treatment_of___W4412352541"
+  },
+  {
+    "doc_id": "2025__Emerging_Role_of_Oligodendrocytes_Malfunction_in_the_Progression_of_Alzheimers_D__W4413865689",
+    "namespace": "research",
+    "query": "emerging role of oligodendrocytes malfunction in the progression",
+    "expected_doc_id": "2025__Emerging_Role_of_Oligodendrocytes_Malfunction_in_the_Progression_of_Alzheimers_D__W4413865689"
+  },
+  {
+    "doc_id": "2025__Emerging_biomarkers_and_frontier_therapies_unveiling_the_role_of_endothelial_dys__W4412185119",
+    "namespace": "operations",
+    "query": "frontiers emerging biomarkers and frontier therapies unveiling the",
+    "expected_doc_id": "2025__Emerging_biomarkers_and_frontier_therapies_unveiling_the_role_of_endothelial_dys__W4412185119"
+  },
+  {
+    "doc_id": "2025__Emerging_biomarkers_of_postoperative_delirium_at_the_intersection_of_neuroinflam__W4413803443",
+    "namespace": "support",
+    "query": "frontiers emerging biomarkers of postoperative delirium at the",
+    "expected_doc_id": "2025__Emerging_biomarkers_of_postoperative_delirium_at_the_intersection_of_neuroinflam__W4413803443"
+  },
+  {
+    "doc_id": "2025__Emotional_intelligence_as_a_mediator_of_anxiety_and_role_ambiguity_among_nurses___W4412157161",
+    "namespace": "support",
+    "query": "emotional intelligence as a mediator of anxiety and",
+    "expected_doc_id": "2025__Emotional_intelligence_as_a_mediator_of_anxiety_and_role_ambiguity_among_nurses___W4412157161"
+  },
+  {
+    "doc_id": "2025__Exploring_the_impact_of_coffee_consumption_and_caffeine_intake_on_cognitive_perf__W4411868829",
+    "namespace": "operations",
+    "query": "exploring the impact of coffee consumption and caffeine",
+    "expected_doc_id": "2025__Exploring_the_impact_of_coffee_consumption_and_caffeine_intake_on_cognitive_perf__W4411868829"
+  },
+  {
+    "doc_id": "2025__Factors_associated_with_health_care_trajectories_of_people_living_with_dementia__W4413358070",
+    "namespace": "support",
+    "query": "factors associated with health care trajectories of people",
+    "expected_doc_id": "2025__Factors_associated_with_health_care_trajectories_of_people_living_with_dementia__W4413358070"
+  },
+  {
+    "doc_id": "2025__Federated_learning_for_cognitive_impairment_detection_using_speech_data__W4414992495",
+    "namespace": "support",
+    "query": "frontiers federated learning for cognitive impairment detection using",
+    "expected_doc_id": "2025__Federated_learning_for_cognitive_impairment_detection_using_speech_data__W4414992495"
+  },
+  {
+    "doc_id": "2025__Feeding_the_mind_Nutritional_strategies_across_different_stages_of_Alzheimers_di__W4412738223",
+    "namespace": "research",
+    "query": "feeding the mind nutritional strategies across different stages",
+    "expected_doc_id": "2025__Feeding_the_mind_Nutritional_strategies_across_different_stages_of_Alzheimers_di__W4412738223"
+  },
+  {
+    "doc_id": "2025__Functional_Cognitive_Disorder_diagnostic_challenges_clinical_features_and_future__W4414253990",
+    "namespace": "research",
+    "query": "2 definition and diagnostic challenges functional cognitive disorder",
+    "expected_doc_id": "2025__Functional_Cognitive_Disorder_diagnostic_challenges_clinical_features_and_future__W4414253990"
+  },
+  {
+    "doc_id": "2025__Functional_near-infrared_spectroscopy_for_identifying_mild_cognitive_impairment___W4413834869",
+    "namespace": "research",
+    "query": "frontiers functional near infrared spectroscopy for identifying mild",
+    "expected_doc_id": "2025__Functional_near-infrared_spectroscopy_for_identifying_mild_cognitive_impairment___W4413834869"
+  },
+  {
+    "doc_id": "2025__GLP-1_receptor_agonists_in_delirium_and_encephalopathies_a_neuroprotective_scopi__W4412779459",
+    "namespace": "research",
+    "query": "glp 1 receptor agonists in delirium and encephalopathies",
+    "expected_doc_id": "2025__GLP-1_receptor_agonists_in_delirium_and_encephalopathies_a_neuroprotective_scopi__W4412779459"
+  },
+  {
+    "doc_id": "2025__Gait_analysis_in_older_adults_with_mild_cognitive_impairment_a_bibliometric_anal__W4411462690",
+    "namespace": "support",
+    "query": "frontiers gait analysis in older adults with mild",
+    "expected_doc_id": "2025__Gait_analysis_in_older_adults_with_mild_cognitive_impairment_a_bibliometric_anal__W4411462690"
+  },
+  {
+    "doc_id": "2025__GeronGnosis_A_Database_for_Diagnosing_Dementias_Using_EEG_and_Machine_Learning__W4413436706",
+    "namespace": "support",
+    "query": "gerongnosis a database for diagnosing dementias using eeg",
+    "expected_doc_id": "2025__GeronGnosis_A_Database_for_Diagnosing_Dementias_Using_EEG_and_Machine_Learning__W4413436706"
+  },
+  {
+    "doc_id": "2025__Glucagon-Like_Peptide-1_Receptor_Agonists_in_Cognitive_and_Mental_Health_Disorde__W4411493551",
+    "namespace": "support",
+    "query": "glucagon like peptide 1 receptor agonists in cognitive",
+    "expected_doc_id": "2025__Glucagon-Like_Peptide-1_Receptor_Agonists_in_Cognitive_and_Mental_Health_Disorde__W4411493551"
+  },
+  {
+    "doc_id": "2025__Gut-brain_axis_and_vascular_dementia_a_review_on_mechanisms_and_Chinese_herbal_m__W4410379897",
+    "namespace": "research",
+    "query": "frontiers gut brain axis and vascular dementia a",
+    "expected_doc_id": "2025__Gut-brain_axis_and_vascular_dementia_a_review_on_mechanisms_and_Chinese_herbal_m__W4410379897"
+  },
+  {
+    "doc_id": "2025__Health_Professionals_Perspectives_on_the_Referral_Process_in_Mild_Cognitive_Impa__W4414534702",
+    "namespace": "research",
+    "query": "data collection and analysis health professionals perspectives on",
+    "expected_doc_id": "2025__Health_Professionals_Perspectives_on_the_Referral_Process_in_Mild_Cognitive_Impa__W4414534702"
+  },
+  {
+    "doc_id": "2025__Hormonal_modulation_mitochondria_and_Alzheimers_prevention_the_role_of_GLP-1_ago__W4411640834",
+    "namespace": "research",
+    "query": "frontiers hormonal modulation mitochondria and alzheimer's prevention the",
+    "expected_doc_id": "2025__Hormonal_modulation_mitochondria_and_Alzheimers_prevention_the_role_of_GLP-1_ago__W4411640834"
+  },
+  {
+    "doc_id": "2025__Hubungan_antara_kualitas_tidur_dengan_kesejahteraan_psikologis_pada_keluarga_den__W4412956189",
+    "namespace": "operations",
+    "query": "hubungan antara kualitas tidur dengan kesejahteraan psikologis pada",
+    "expected_doc_id": "2025__Hubungan_antara_kualitas_tidur_dengan_kesejahteraan_psikologis_pada_keluarga_den__W4412956189"
+  },
+  {
+    "doc_id": "2025__Identification_and_synthesis_of_end-of-life_decision-making_measures_a_scoping_r__W4412775151",
+    "namespace": "operations",
+    "query": "frontiers identification and synthesis of end life decision",
+    "expected_doc_id": "2025__Identification_and_synthesis_of_end-of-life_decision-making_measures_a_scoping_r__W4412775151"
+  },
+  {
+    "doc_id": "2025__Impact_of_Hearing_Loss_on_Memory_Loss_in_Patients_With_Self-Reported_Olfactory_D__W4414566738",
+    "namespace": "research",
+    "query": "data source and participants impact of hearing loss",
+    "expected_doc_id": "2025__Impact_of_Hearing_Loss_on_Memory_Loss_in_Patients_With_Self-Reported_Olfactory_D__W4414566738"
+  },
+  {
+    "doc_id": "2025__Impact_of_motor_symptom_asymmetry_on_non-motor_outcomes_in_Parkinsons_disease_a___W4411857849",
+    "namespace": "support",
+    "query": "impact of motor symptom asymmetry on non outcomes",
+    "expected_doc_id": "2025__Impact_of_motor_symptom_asymmetry_on_non-motor_outcomes_in_Parkinsons_disease_a___W4411857849"
+  },
+  {
+    "doc_id": "2025__Incidence_of_Nonsimultaneous_Contralateral_Neck_of_Femur_Fractures_A_Single-Cent__W4410569452",
+    "namespace": "operations",
+    "query": "incidence of nonsimultaneous contralateral neck femur fractures a",
+    "expected_doc_id": "2025__Incidence_of_Nonsimultaneous_Contralateral_Neck_of_Femur_Fractures_A_Single-Cent__W4410569452"
+  },
+  {
+    "doc_id": "2025__Independent_validation_and_outlier_analysis_of_EuroPOND_alzheimers_disease_stagi__W4411345784",
+    "namespace": "research",
+    "query": "independent validation and outlier analysis of europond alzheimer's",
+    "expected_doc_id": "2025__Independent_validation_and_outlier_analysis_of_EuroPOND_alzheimers_disease_stagi__W4411345784"
+  },
+  {
+    "doc_id": "2025__Intelligent_Alzheimers_diagnosis_and_disability_assessment_robust_medical_imagin__W4413902196",
+    "namespace": "operations",
+    "query": "intelligent alzheimer's diagnosis and disability assessment robust medical",
+    "expected_doc_id": "2025__Intelligent_Alzheimers_diagnosis_and_disability_assessment_robust_medical_imagin__W4413902196"
+  },
+  {
+    "doc_id": "2025__Interventions_for_cognitive_frailty_developing_a_Delphi_consensus_with_multidisc__W4411042016",
+    "namespace": "research",
+    "query": "frontiers interventions for cognitive frailty developing a delphi",
+    "expected_doc_id": "2025__Interventions_for_cognitive_frailty_developing_a_Delphi_consensus_with_multidisc__W4411042016"
+  },
+  {
+    "doc_id": "2025__Korean_medicine_registry_for_cognitive_disorder_A_protocol_for_prospective_obser__W4410395861",
+    "namespace": "research",
+    "query": "korean medicine registry for cognitive disorder a protocol",
+    "expected_doc_id": "2025__Korean_medicine_registry_for_cognitive_disorder_A_protocol_for_prospective_obser__W4410395861"
+  },
+  {
+    "doc_id": "2025__Listened_to_but_Rarely_Heard_A_Scoping_Review_of_Resident_Engagement_in_the_Orga__W4414866552",
+    "namespace": "support",
+    "query": "canadian journal on aging la revue canadienne du",
+    "expected_doc_id": "2025__Listened_to_but_Rarely_Heard_A_Scoping_Review_of_Resident_Engagement_in_the_Orga__W4414866552"
+  },
+  {
+    "doc_id": "2025__Machine_Learning_multiclassification_for_stage_diagnosis_of_Alzheimers_disease_u__W4411231219",
+    "namespace": "support",
+    "query": "'machine learning' multiclassification for stage diagnosis of alzheimer's",
+    "expected_doc_id": "2025__Machine_Learning_multiclassification_for_stage_diagnosis_of_Alzheimers_disease_u__W4411231219"
+  },
+  {
+    "doc_id": "2025__Machine_learning_applied_to_mild_cognitive_impairment_bibliometric_and_visual_an__W4410572269",
+    "namespace": "support",
+    "query": "frontiers machine learning applied to mild cognitive impairment",
+    "expected_doc_id": "2025__Machine_learning_applied_to_mild_cognitive_impairment_bibliometric_and_visual_an__W4410572269"
+  },
+  {
+    "doc_id": "2025__Mapping_the_research_landscape_of_Mild_Cognitive_Impairment_in_Parkinsons_diseas__W4414086640",
+    "namespace": "support",
+    "query": "frontiers mapping the research landscape of mild cognitive",
+    "expected_doc_id": "2025__Mapping_the_research_landscape_of_Mild_Cognitive_Impairment_in_Parkinsons_diseas__W4414086640"
+  },
+  {
+    "doc_id": "2025__Mechanistic_Insights_and_Translational_Therapeutics_of_Neurovascular_Unit_Dysreg__W4414066180",
+    "namespace": "support",
+    "query": "2 the physiological function of nvu mechanistic insights",
+    "expected_doc_id": "2025__Mechanistic_Insights_and_Translational_Therapeutics_of_Neurovascular_Unit_Dysreg__W4414066180"
+  },
+  {
+    "doc_id": "2025__Mobile_applications_for_individuals_living_with_dementia_and_their_caregivers_De__W4411154372",
+    "namespace": "operations",
+    "query": "mobile applications for individuals living with dementia and",
+    "expected_doc_id": "2025__Mobile_applications_for_individuals_living_with_dementia_and_their_caregivers_De__W4411154372"
+  },
+  {
+    "doc_id": "2025__Muscle-brain_crosstalk_as_a_driver_of_brain_health_in_aging__W4413139975",
+    "namespace": "operations",
+    "query": "muscle brain crosstalk as a driver of health",
+    "expected_doc_id": "2025__Muscle-brain_crosstalk_as_a_driver_of_brain_health_in_aging__W4413139975"
+  },
+  {
+    "doc_id": "2025__Neurodegeneration_in_Alzheimers_disease_A_narrative_review_of_mechanistic_insigh__W4413867325",
+    "namespace": "research",
+    "query": "neurodegeneration in alzheimer's disease a narrative review of",
+    "expected_doc_id": "2025__Neurodegeneration_in_Alzheimers_disease_A_narrative_review_of_mechanistic_insigh__W4413867325"
+  },
+  {
+    "doc_id": "2025__Neuroimaging_of_affective_symptoms_in_Lewy_body_dementia_A_systematic_review__W4413876650",
+    "namespace": "research",
+    "query": "neuroimaging of affective symptoms in lewy body dementia",
+    "expected_doc_id": "2025__Neuroimaging_of_affective_symptoms_in_Lewy_body_dementia_A_systematic_review__W4413876650"
+  },
+  {
+    "doc_id": "2025__Neuroinflammation_in_Chronic_Neurological_Conditions_Following_COVID-19_A_Litera__W4414259898",
+    "namespace": "operations",
+    "query": "4 mechanisms of neuroinflammation in chronic neurological conditions",
+    "expected_doc_id": "2025__Neuroinflammation_in_Chronic_Neurological_Conditions_Following_COVID-19_A_Litera__W4414259898"
+  },
+  {
+    "doc_id": "2025__Neurotoxic_Effects_of_PM25_Mechanisms_Evidence_and_Public_Health_Implications__W4414145558",
+    "namespace": "research",
+    "query": "neurotoxic effects of pm2 5 mechanisms evidence and",
+    "expected_doc_id": "2025__Neurotoxic_Effects_of_PM25_Mechanisms_Evidence_and_Public_Health_Implications__W4414145558"
+  },
+  {
+    "doc_id": "2025__Olfactory_dysfunction_increases_progression_to_dementia_in_cognitively_impaired___W4410804130",
+    "namespace": "research",
+    "query": "olfactory dysfunction increases progression to dementia in cognitively",
+    "expected_doc_id": "2025__Olfactory_dysfunction_increases_progression_to_dementia_in_cognitively_impaired___W4410804130"
+  },
+  {
+    "doc_id": "2025__Oral_health_interventions_and_strategies_delivered_by_care_workers_to_older_peop__W4414966816",
+    "namespace": "research",
+    "query": "information sources and search oral health interventions strategies",
+    "expected_doc_id": "2025__Oral_health_interventions_and_strategies_delivered_by_care_workers_to_older_peop__W4414966816"
+  },
+  {
+    "doc_id": "2025__Physical_Activity_and_the_Myokine_Irisin_in_Non-pharmacological_Treatment_of_Alz__W4413367152",
+    "namespace": "support",
+    "query": "physical activity and the myokine irisin in non",
+    "expected_doc_id": "2025__Physical_Activity_and_the_Myokine_Irisin_in_Non-pharmacological_Treatment_of_Alz__W4413367152"
+  },
+  {
+    "doc_id": "2025__Polypharmacy_appropriateness_in_Italian_Long-Term_Care_Facilities_the_nationwide__W4415057475",
+    "namespace": "operations",
+    "query": "polypharmacy appropriateness in italian long term care facilities",
+    "expected_doc_id": "2025__Polypharmacy_appropriateness_in_Italian_Long-Term_Care_Facilities_the_nationwide__W4415057475"
+  },
+  {
+    "doc_id": "2025__Potential_Role_of_Lymphovenous_Bypass_in_Mitigating_Alzheimers_Disease_Dementia__W4411263775",
+    "namespace": "operations",
+    "query": "thieme e journals archives of plastic surgery abstract",
+    "expected_doc_id": "2025__Potential_Role_of_Lymphovenous_Bypass_in_Mitigating_Alzheimers_Disease_Dementia__W4411263775"
+  },
+  {
+    "doc_id": "2025__Potential_utility_of_salivary_gland_amyloid_uptake_as_a_surrogate_marker_for_adi__W4412457943",
+    "namespace": "support",
+    "query": "potential utility of salivary gland amyloid uptake as",
+    "expected_doc_id": "2025__Potential_utility_of_salivary_gland_amyloid_uptake_as_a_surrogate_marker_for_adi__W4412457943"
+  },
+  {
+    "doc_id": "2025__Prevalence_of_mild_cognitive_impairment_among_former_elite_athletes_without_a_hi__W4412756335",
+    "namespace": "support",
+    "query": "prevalence of mild cognitive impairment among former elite",
+    "expected_doc_id": "2025__Prevalence_of_mild_cognitive_impairment_among_former_elite_athletes_without_a_hi__W4412756335"
+  },
+  {
+    "doc_id": "2025__Progress_of_radiomics_research_on_white_matter_hyperintensity_lesions__W4413612251",
+    "namespace": "support",
+    "query": "3 2 1 diagnostic mri techniques for wmh",
+    "expected_doc_id": "2025__Progress_of_radiomics_research_on_white_matter_hyperintensity_lesions__W4413612251"
+  },
+  {
+    "doc_id": "2025__Protein-profile_alterations_induced_by_a_model_of_sporadic_Alzheimers_disease__W4413281328",
+    "namespace": "support",
+    "query": "2025 protein profile alterations induced by a model",
+    "expected_doc_id": "2025__Protein-profile_alterations_induced_by_a_model_of_sporadic_Alzheimers_disease__W4413281328"
+  },
+  {
+    "doc_id": "2025__Psychedelics_meet_human_brain_organoids_insights_into_proteomics_and_potential_f__W4412883205",
+    "namespace": "research",
+    "query": "frontiers psychedelics meet human brain organoids insights into",
+    "expected_doc_id": "2025__Psychedelics_meet_human_brain_organoids_insights_into_proteomics_and_potential_f__W4412883205"
+  },
+  {
+    "doc_id": "2025__Relationship_between_caregiving_burden_and_alterations_in_circadian_rhythms_amon__W4413471237",
+    "namespace": "operations",
+    "query": "relationship between caregiving burden and alterations in circadian",
+    "expected_doc_id": "2025__Relationship_between_caregiving_burden_and_alterations_in_circadian_rhythms_amon__W4413471237"
+  },
+  {
+    "doc_id": "2025__Reliability_and_validity_of_the_total_cerebral_small_vessel_disease_score_a_syst__W4411714456",
+    "namespace": "support",
+    "query": "frontiers reliability and validity of the total cerebral",
+    "expected_doc_id": "2025__Reliability_and_validity_of_the_total_cerebral_small_vessel_disease_score_a_syst__W4411714456"
+  },
+  {
+    "doc_id": "2025__Reliability_of_remote_self-administered_digital_cognitive_assessments_preliminar__W4412012853",
+    "namespace": "support",
+    "query": "frontiers reliability of remote self administered digital cognitive",
+    "expected_doc_id": "2025__Reliability_of_remote_self-administered_digital_cognitive_assessments_preliminar__W4412012853"
+  },
+  {
+    "doc_id": "2025__Remote_Ischemic_Conditioning_and_Vascular_Contributions_to_Cognitive_Impairment___W4414129995",
+    "namespace": "operations",
+    "query": "remote ischemic conditioning and vascular contributions to cognitive",
+    "expected_doc_id": "2025__Remote_Ischemic_Conditioning_and_Vascular_Contributions_to_Cognitive_Impairment___W4414129995"
+  },
+  {
+    "doc_id": "2025__Repetitive_negative_thinking_self-reflection_and_perceived_cognitive_dysfunction__W4413050772",
+    "namespace": "research",
+    "query": "repetitive negative thinking self reflection and perceived cognitive",
+    "expected_doc_id": "2025__Repetitive_negative_thinking_self-reflection_and_perceived_cognitive_dysfunction__W4413050772"
+  },
+  {
+    "doc_id": "2025__Research_collaboration_with_care_home_residents_a_systematic_review_of_public_in__W4410395807",
+    "namespace": "research",
+    "query": "research collaboration with care home residents a systematic",
+    "expected_doc_id": "2025__Research_collaboration_with_care_home_residents_a_systematic_review_of_public_in__W4410395807"
+  },
+  {
+    "doc_id": "2025__Research_progress_in_predicting_the_conversion_from_mild_cognitive_impairment_to__W4410972585",
+    "namespace": "operations",
+    "query": "frontiers research progress in predicting the conversion from",
+    "expected_doc_id": "2025__Research_progress_in_predicting_the_conversion_from_mild_cognitive_impairment_to__W4410972585"
+  },
+  {
+    "doc_id": "2025__Research_progress_of_multimodal_biomarkers_in_the_early_diagnosis_of_mild_cognit__W4413834771",
+    "namespace": "research",
+    "query": "frontiers research progress of multimodal biomarkers in the",
+    "expected_doc_id": "2025__Research_progress_of_multimodal_biomarkers_in_the_early_diagnosis_of_mild_cognit__W4413834771"
+  },
+  {
+    "doc_id": "2025__Research_trend_of_functional_magnetic_resonance_imaging_in_diabetes_mellitus_res__W4413384210",
+    "namespace": "operations",
+    "query": "frontiers research trend of functional magnetic resonance imaging",
+    "expected_doc_id": "2025__Research_trend_of_functional_magnetic_resonance_imaging_in_diabetes_mellitus_res__W4413384210"
+  },
+  {
+    "doc_id": "2025__Rethinking_neuropsychological_test_validity_in_dementia_assessment_a_critical_re__W4414925154",
+    "namespace": "support",
+    "query": "criterion validity of clinical outcome rethinking neuropsychological test",
+    "expected_doc_id": "2025__Rethinking_neuropsychological_test_validity_in_dementia_assessment_a_critical_re__W4414925154"
+  },
+  {
+    "doc_id": "2025__Retired_contact_sports_athletes_with_cognitive_concerns_promoting_lifelong_brain__W4414957420",
+    "namespace": "support",
+    "query": "retired contact sports athletes with cognitive concerns promoting",
+    "expected_doc_id": "2025__Retired_contact_sports_athletes_with_cognitive_concerns_promoting_lifelong_brain__W4414957420"
+  },
+  {
+    "doc_id": "2025__Risk_factors_for_mild_cognitive_impairment_in_type_2_diabetes_a_systematic_revie__W4411324676",
+    "namespace": "operations",
+    "query": "frontiers risk factors for mild cognitive impairment in",
+    "expected_doc_id": "2025__Risk_factors_for_mild_cognitive_impairment_in_type_2_diabetes_a_systematic_revie__W4411324676"
+  },
+  {
+    "doc_id": "2025__Self-testing_for_symptoms_and_signs_of_prodromal_alpha-synucleinopathies_results__W4411793510",
+    "namespace": "operations",
+    "query": "self testing for symptoms and signs of prodromal",
+    "expected_doc_id": "2025__Self-testing_for_symptoms_and_signs_of_prodromal_alpha-synucleinopathies_results__W4411793510"
+  },
+  {
+    "doc_id": "2025__Sensitivity_and_specificity_of_the_Montreal_cognitive_assessment_using_US_Nation__W4414443841",
+    "namespace": "support",
+    "query": "2025 sensitivity and specificity of the montreal cognitive",
+    "expected_doc_id": "2025__Sensitivity_and_specificity_of_the_Montreal_cognitive_assessment_using_US_Nation__W4414443841"
+  },
+  {
+    "doc_id": "2025__Sleep_quality_mental_health_and_cognitive_function_among_older_adults_in_Chinese__W4415001897",
+    "namespace": "research",
+    "query": "wangsheng fu 1 and wei li 2 sleep",
+    "expected_doc_id": "2025__Sleep_quality_mental_health_and_cognitive_function_among_older_adults_in_Chinese__W4415001897"
+  },
+  {
+    "doc_id": "2025__Speech-language_therapy_and_occupational_therapy_for_patients_with_mild_cognitiv__W4412956792",
+    "namespace": "operations",
+    "query": "speech language therapy and occupational for patients with",
+    "expected_doc_id": "2025__Speech-language_therapy_and_occupational_therapy_for_patients_with_mild_cognitiv__W4412956792"
+  },
+  {
+    "doc_id": "2025__Status_Nutrisi_Komorbiditas_dan_Fungsi_Kognitif_pada_Lansia_Perempuan_di_Panti_W__W4413130491",
+    "namespace": "support",
+    "query": "status nutrisi komorbiditas dan fungsi kognitif pada lansia",
+    "expected_doc_id": "2025__Status_Nutrisi_Komorbiditas_dan_Fungsi_Kognitif_pada_Lansia_Perempuan_di_Panti_W__W4413130491"
+  },
+  {
+    "doc_id": "2025__Stem_cell_therapy_use_in_patients_with_dementia_a_systematic_review__W4410277989",
+    "namespace": "support",
+    "query": "stem cell therapy use in patients with dementia",
+    "expected_doc_id": "2025__Stem_cell_therapy_use_in_patients_with_dementia_a_systematic_review__W4410277989"
+  },
+  {
+    "doc_id": "2025__Structural_Neuroimaging_Markers_of_Dementia_Insights_from_ROC_Curve_Analysis__W4414290125",
+    "namespace": "support",
+    "query": "2025 structural neuroimaging markers of dementia insights from",
+    "expected_doc_id": "2025__Structural_Neuroimaging_Markers_of_Dementia_Insights_from_ROC_Curve_Analysis__W4414290125"
+  },
+  {
+    "doc_id": "2025__Summary_of_the_best_evidence_for_non-pharmaceutical_interventions_for_mild_cogni__W4411962832",
+    "namespace": "operations",
+    "query": "frontiers summary of the best evidence for non",
+    "expected_doc_id": "2025__Summary_of_the_best_evidence_for_non-pharmaceutical_interventions_for_mild_cogni__W4411962832"
+  },
+  {
+    "doc_id": "2025__The_Efficacy_of_Citicoline_Combined_with_Ginkgo_Biloba_in_Patients_with_Moderate__W4414792657",
+    "namespace": "research",
+    "query": "the efficacy of citicoline combined with ginkgo biloba",
+    "expected_doc_id": "2025__The_Efficacy_of_Citicoline_Combined_with_Ginkgo_Biloba_in_Patients_with_Moderate__W4414792657"
+  },
+  {
+    "doc_id": "2025__The_Role_of_Diet_Physical_Activity_and_Lifestyle_in_Alzheimers_Disease_Preventio__W4410239170",
+    "namespace": "support",
+    "query": "the role of diet physical activity and lifestyle",
+    "expected_doc_id": "2025__The_Role_of_Diet_Physical_Activity_and_Lifestyle_in_Alzheimers_Disease_Preventio__W4410239170"
+  },
+  {
+    "doc_id": "2025__The_Role_of_Sleep_Disturbances_in_Alzheimers_Disease_Progression_A_Systematic_Re__W4411482777",
+    "namespace": "support",
+    "query": "the role of sleep disturbances in alzheimer's disease",
+    "expected_doc_id": "2025__The_Role_of_Sleep_Disturbances_in_Alzheimers_Disease_Progression_A_Systematic_Re__W4411482777"
+  },
+  {
+    "doc_id": "2025__The_association_between_anosognosia_and_neuropsychiatric_symptoms_in_neurodegene__W4414552288",
+    "namespace": "support",
+    "query": "the association between anosognosia and neuropsychiatric symptoms in",
+    "expected_doc_id": "2025__The_association_between_anosognosia_and_neuropsychiatric_symptoms_in_neurodegene__W4414552288"
+  },
+  {
+    "doc_id": "2025__The_association_between_cognitive_domains_and_suicidal_ideation_in_patients_with__W4414930634",
+    "namespace": "research",
+    "query": "the association between cognitive domains and suicidal ideation",
+    "expected_doc_id": "2025__The_association_between_cognitive_domains_and_suicidal_ideation_in_patients_with__W4414930634"
+  },
+  {
+    "doc_id": "2025__The_contributing_role_of_CCR5_in_dementia__W4412157540",
+    "namespace": "support",
+    "query": "frontiers the contributing role of ccr5 in dementia",
+    "expected_doc_id": "2025__The_contributing_role_of_CCR5_in_dementia__W4412157540"
+  },
+  {
+    "doc_id": "2025__The_effect_of_exogenous_\u03b2-OHB_supplementation_on_cerebral_blood_flow_and_functio__W4414595241",
+    "namespace": "operations",
+    "query": "background and rationale 6a the effect of exogenous",
+    "expected_doc_id": "2025__The_effect_of_exogenous_\u03b2-OHB_supplementation_on_cerebral_blood_flow_and_functio__W4414595241"
+  },
+  {
+    "doc_id": "2025__The_frequently_impaired_health_of_leaders_of_nuclear_weapon_states_an_analysis_o__W4412156883",
+    "namespace": "operations",
+    "query": "the frequently impaired health of leaders nuclear weapon",
+    "expected_doc_id": "2025__The_frequently_impaired_health_of_leaders_of_nuclear_weapon_states_an_analysis_o__W4412156883"
+  },
+  {
+    "doc_id": "2025__The_future_of_biomarkers_for_vascular_contributions_to_cognitive_impairment_and___W4411519614",
+    "namespace": "operations",
+    "query": "the future of biomarkers for vascular contributions to",
+    "expected_doc_id": "2025__The_future_of_biomarkers_for_vascular_contributions_to_cognitive_impairment_and___W4411519614"
+  },
+  {
+    "doc_id": "2025__The_need_for_dengue_and_chikungunya_awareness_among_mental_health_professionals___W4414397994",
+    "namespace": "operations",
+    "query": "chronic psychiatric manifestations of denv and chikv infection",
+    "expected_doc_id": "2025__The_need_for_dengue_and_chikungunya_awareness_among_mental_health_professionals___W4414397994"
+  },
+  {
+    "doc_id": "2025__The_role_of_cognitive_and_brain_reserve_in_the_clinical_presentation_and_progres__W4411490345",
+    "namespace": "operations",
+    "query": "the role of cognitive and brain reserve in",
+    "expected_doc_id": "2025__The_role_of_cognitive_and_brain_reserve_in_the_clinical_presentation_and_progres__W4411490345"
+  },
+  {
+    "doc_id": "2025__Undiagnosed_Dementia_A_Scoping_Review_of_Prevalence_Barriers_Impacts_Diagnostic___W4411493520",
+    "namespace": "research",
+    "query": "undiagnosed dementia a scoping review of prevalence barriers",
+    "expected_doc_id": "2025__Undiagnosed_Dementia_A_Scoping_Review_of_Prevalence_Barriers_Impacts_Diagnostic___W4411493520"
+  },
+  {
+    "doc_id": "2025__Vascular_Dementia_Beyond_Conventional_Treatment_The_Role_of_Neuroprotective_Agen__W4410908518",
+    "namespace": "research",
+    "query": "middle black sea journal of health science submission",
+    "expected_doc_id": "2025__Vascular_Dementia_Beyond_Conventional_Treatment_The_Role_of_Neuroprotective_Agen__W4410908518"
+  },
+  {
+    "doc_id": "2025__Visual_perception_and_cognitive_functioning_in_MCI_and_mild_Alzheimers_disease_a__W4413037087",
+    "namespace": "operations",
+    "query": "visual perception and cognitive functioning in mci mild",
+    "expected_doc_id": "2025__Visual_perception_and_cognitive_functioning_in_MCI_and_mild_Alzheimers_disease_a__W4413037087"
+  },
+  {
+    "doc_id": "2025__XGBoost_models_based_on_non_imaging_features_for_the_prediction_of_mild_cognitiv__W4413117078",
+    "namespace": "support",
+    "query": "xgboost models based on non imaging features for",
+    "expected_doc_id": "2025__XGBoost_models_based_on_non_imaging_features_for_the_prediction_of_mild_cognitiv__W4413117078"
+  }
+]

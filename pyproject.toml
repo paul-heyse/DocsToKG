@@ -20,4 +20,6 @@ strict = true
 [tool.pytest.ini_options]
 markers = [
     "real_vectors: tests that require the real-vector fixture (enable with --real-vectors)",
+    "scale_vectors: tests that require the large real-vector fixture (enable with --scale-vectors)",
 ]
+testpaths = ["tests"]

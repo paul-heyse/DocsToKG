@@ -1,6 +1,7 @@
 """FAISS index management with GPU-aware fallbacks."""
 from __future__ import annotations
 
+import base64
 import io
 import json
 import logging
@@ -133,7 +134,13 @@ class FaissIndexManager:
     def serialize(self) -> bytes:
         if self._use_native and self._index is not None:
             cpu_index = self._to_cpu(self._index)
-            return faiss.serialize_index(cpu_index)
+            index_bytes = faiss.serialize_index(cpu_index)
+            payload = {
+                "mode": "native",
+                "index": base64.b64encode(index_bytes).decode("ascii"),
+                "id_lookup": {str(internal_id): vector_id for internal_id, vector_id in self._id_lookup.items()},
+            }
+            return json.dumps(payload).encode("utf-8")
         buffer = io.BytesIO()
         payload = {vector_id: vector.tolist() for vector_id, vector in self._vectors.items()}
         buffer.write(json.dumps(payload).encode("utf-8"))
@@ -141,9 +148,26 @@ class FaissIndexManager:
 
     def restore(self, payload: bytes) -> None:
         if self._use_native:
-            cpu_index = faiss.deserialize_index(payload)
-            self._index = self._maybe_to_gpu(cpu_index)
-            self._id_lookup = {}
+            try:
+                data = json.loads(payload.decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                cpu_index = faiss.deserialize_index(np.frombuffer(payload, dtype=np.uint8))
+                self._index = self._maybe_to_gpu(cpu_index)
+                self._id_lookup = {}
+                return
+            if data.get("mode") == "native":
+                encoded = data.get("index")
+                if not isinstance(encoded, str):
+                    raise ValueError("Invalid FAISS payload")
+                index_bytes = base64.b64decode(encoded.encode("ascii"))
+                cpu_index = faiss.deserialize_index(np.frombuffer(index_bytes, dtype=np.uint8))
+                self._index = self._maybe_to_gpu(cpu_index)
+                raw_lookup = data.get("id_lookup", {})
+                self._id_lookup = {int(key): str(value) for key, value in raw_lookup.items()}
+            else:
+                cpu_index = faiss.deserialize_index(np.frombuffer(payload, dtype=np.uint8))
+                self._index = self._maybe_to_gpu(cpu_index)
+                self._id_lookup = {}
         else:
             data = json.loads(payload.decode("utf-8"))
             self._vectors = {
@@ -241,6 +265,9 @@ class FaissIndexManager:
             cpu_index = self._to_cpu(self._index)
             cpu_index.remove_ids(selector)
             self._index = self._maybe_to_gpu(cpu_index)
+        finally:
+            for internal_id in id_array:
+                self._id_lookup.pop(int(internal_id), None)
 
     def _normalize(self, matrix: np.ndarray) -> None:
         norms = np.linalg.norm(matrix, axis=1, keepdims=True)

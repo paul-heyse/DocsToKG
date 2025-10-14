@@ -18,18 +18,30 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=False,
         help="Run tests that require the real-vector fixture",
     )
+    parser.addoption(
+        "--scale-vectors",
+        action="store_true",
+        default=False,
+        help="Run tests that require the large-scale real-vector fixture",
+    )
 
 
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers", "real_vectors: mark test as requiring the real-vector fixture"
     )
+    config.addinivalue_line(
+        "markers", "scale_vectors: mark test as requiring the large-scale real-vector fixture"
+    )
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    if config.getoption("--real-vectors"):
-        return
-    skip_marker = pytest.mark.skip(reason="requires --real-vectors")
+    have_real = config.getoption("--real-vectors")
+    have_scale = config.getoption("--scale-vectors")
+    skip_real = pytest.mark.skip(reason="requires --real-vectors")
+    skip_scale = pytest.mark.skip(reason="requires --scale-vectors")
     for item in items:
-        if "real_vectors" in item.keywords:
-            item.add_marker(skip_marker)
+        if "real_vectors" in item.keywords and not have_real:
+            item.add_marker(skip_real)
+        if "scale_vectors" in item.keywords and not have_scale:
+            item.add_marker(skip_scale)

@@ -7,10 +7,11 @@ __pycache__/
 .ipynb_checkpoints/
 .DS_Store
 .mypy_cache/
-Data/
+Data/*
+!Data/HybridScaleFixture/
+!Data/HybridScaleFixture/**
 Models/
 .docling_artifacts/
 DocsToKG.code-workspace
 faiss/
 vllm/
-
