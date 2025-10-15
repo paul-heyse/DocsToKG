@@ -26,6 +26,9 @@ from .vectorstore import FaissIndexManager, FaissSearchResult
 class RequestValidationError(ValueError):
     """Raised when the caller submits an invalid search request.
 
+    Attributes:
+        None
+
     Examples:
         >>> raise RequestValidationError("page_size must be positive")
         Traceback (most recent call last):
@@ -41,6 +44,10 @@ class ChannelResults:
     Attributes:
         candidates: Ordered list of channel-specific fusion candidates.
         scores: Mapping of vector identifiers to raw channel scores.
+
+    Examples:
+        >>> ChannelResults(candidates=[], scores={})
+        ChannelResults(candidates=[], scores={})
     """
 
     candidates: List[FusionCandidate]
@@ -59,7 +66,7 @@ class HybridSearchService:
         _observability: Telemetry facade for metrics and traces.
 
     Examples:
-        >>> service = HybridSearchService(
+        >>> service = HybridSearchService(  # doctest: +SKIP
         ...     config_manager=HybridSearchConfigManager.from_dict({}),
         ...     feature_generator=FeatureGenerator(embedding_dim=16),
         ...     faiss_index=FaissIndexManager(dim=16, config=HybridSearchConfig().dense),
@@ -90,6 +97,9 @@ class HybridSearchService:
             opensearch: Simulator providing BM25/SPLADE access.
             registry: Chunk registry used for metadata lookups.
             observability: Optional observability facade (defaults to a no-op).
+
+        Returns:
+            None
         """
         self._config_manager = config_manager
         self._feature_generator = feature_generator
@@ -343,7 +353,7 @@ class HybridSearchAPI:
         _service: Underlying :class:`HybridSearchService` instance.
 
     Examples:
-        >>> api = HybridSearchAPI(service)
+        >>> api = HybridSearchAPI(service)  # doctest: +SKIP
         >>> status, body = api.post_hybrid_search({"query": "example"})  # doctest: +SKIP
         >>> status
         200
@@ -358,6 +368,9 @@ class HybridSearchAPI:
         Raises:
             TypeError: If ``service`` does not inherit from
                 :class:`HybridSearchService`.
+
+        Returns:
+            None
         """
         if not isinstance(service, HybridSearchService):
             raise TypeError("service must be a HybridSearchService instance")

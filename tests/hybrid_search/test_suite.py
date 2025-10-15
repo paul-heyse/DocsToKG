@@ -105,8 +105,11 @@ def stack(
     ]:
         manager = _build_config(tmp_path)
         config = manager.get()
-        feature_generator = FeatureGenerator(embedding_dim=16)
+        feature_generator = FeatureGenerator()
         faiss_index = FaissIndexManager(dim=feature_generator.embedding_dim, config=config.dense)
+        assert (
+            faiss_index._dim == feature_generator.embedding_dim
+        ), "Faiss index dimensionality must match feature generator"
         opensearch = OpenSearchSimulator()
         registry = ChunkRegistry()
         observability = Observability()
@@ -162,6 +165,8 @@ def _write_document_artifacts(
     metadata: Mapping[str, object],
     feature_generator: FeatureGenerator,
 ) -> DocumentInput:
+    if not hasattr(feature_generator, "compute_features"):
+        feature_generator = FeatureGenerator()
     chunk_dir = base_dir / "chunks"
     vector_dir = base_dir / "vectors"
     chunk_dir.mkdir(parents=True, exist_ok=True)

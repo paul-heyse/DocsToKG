@@ -8,11 +8,22 @@ import json
 import os
 import subprocess
 import sys
+import warnings
 from pathlib import Path
 
 import pytest
 
+warnings.filterwarnings(
+    "ignore",
+    message=".*SwigPy.*__module__ attribute",
+    category=DeprecationWarning,
+)
+
 pytest.importorskip("transformers")
+
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:.*SwigPy.*__module__ attribute:DeprecationWarning"
+)
 
 from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (  # noqa: E402
     Rec,

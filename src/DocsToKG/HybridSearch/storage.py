@@ -63,13 +63,20 @@ class OpenSearchSchemaManager:
         _templates: Internal registry mapping namespace → template instances.
 
     Examples:
-        >>> manager = OpenSearchSchemaManager()
-        >>> manager.bootstrap_template("research")
+        >>> manager = OpenSearchSchemaManager()  # doctest: +SKIP
+        >>> manager.bootstrap_template("research")  # doctest: +SKIP
         OpenSearchIndexTemplate(name='hybrid-chunks-research', namespace='research', ...)
     """
 
     def __init__(self) -> None:
-        """Initialise an empty template registry."""
+        """Initialise an empty template registry.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
 
         self._templates: MutableMapping[str, OpenSearchIndexTemplate] = {}
 

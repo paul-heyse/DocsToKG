@@ -109,6 +109,10 @@ class FaissVectorStore:
         self._gpu_resources: Optional["faiss.StandardGpuResources"] = None
         self.init_gpu()
         self._index = self._create_index()
+        if self._dim != dim:
+            raise RuntimeError(
+                f"HybridSearch initialised with dim={dim} but created index expects {self._dim}"
+            )
         self._id_resolver: Optional[Callable[[int], Optional[str]]] = None
         self._remove_fallbacks = 0
         self._tombstones: set[int] = set()
@@ -119,22 +123,50 @@ class FaissVectorStore:
 
     @property
     def ntotal(self) -> int:
-        """Number of vectors currently stored in the FAISS index."""
+        """Number of vectors currently stored in the FAISS index.
+
+        Args:
+            None
+
+        Returns:
+            int: Total number of stored vectors.
+        """
         return int(self._index.ntotal)
 
     @property
     def config(self) -> DenseIndexConfig:
-        """Return the resolved dense index configuration."""
+        """Return the resolved dense index configuration.
+
+        Args:
+            None
+
+        Returns:
+            DenseIndexConfig: Active dense index configuration.
+        """
         return self._config
 
     @property
     def gpu_resources(self) -> "faiss.StandardGpuResources | None":
-        """Expose the underlying FAISS GPU resource manager."""
+        """Expose the underlying FAISS GPU resource manager.
+
+        Args:
+            None
+
+        Returns:
+            faiss.StandardGpuResources | None: GPU resource manager when initialised.
+        """
         return self._gpu_resources
 
     @property
     def device(self) -> int:
-        """Return the CUDA device id used for the FAISS index."""
+        """Return the CUDA device id used for the FAISS index.
+
+        Args:
+            None
+
+        Returns:
+            int: Configured CUDA device identifier.
+        """
         return int(getattr(self._config, "device", self._device))
 
     def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
@@ -143,6 +175,9 @@ class FaissVectorStore:
         Args:
             resolver: Callable receiving the FAISS integer id and returning the
                 application-level identifier (or ``None`` when unresolved).
+
+        Returns:
+            None
         """
         self._id_resolver = resolver
 
@@ -154,6 +189,9 @@ class FaissVectorStore:
 
         Raises:
             ValueError: If no vectors are supplied for a trainable index type.
+
+        Returns:
+            None
         """
         if not hasattr(self._index, "is_trained"):
             return
@@ -169,7 +207,14 @@ class FaissVectorStore:
         self._index.train(matrix[:ntrain])
 
     def needs_training(self) -> bool:
-        """Return ``True`` when the current FAISS index still requires training."""
+        """Return ``True`` when the current FAISS index still requires training.
+
+        Args:
+            None
+
+        Returns:
+            bool: ``True`` when additional training is required.
+        """
         is_trained = getattr(self._index, "is_trained", True)
         return not bool(is_trained)
 
@@ -182,6 +227,9 @@ class FaissVectorStore:
 
         Raises:
             ValueError: When the vector and id sequences differ in length.
+
+        Returns:
+            None
         """
         self._flush_pending_deletes(force=False)
         if len(vectors) != len(vector_ids):
@@ -222,6 +270,9 @@ class FaissVectorStore:
 
         Args:
             vector_ids: Sequence of vector ids scheduled for deletion.
+
+        Returns:
+            None
         """
         if not vector_ids:
             return
@@ -328,6 +379,9 @@ class FaissVectorStore:
 
         Returns:
             Fresh :class:`FaissVectorStore` instance initialised from ``path``.
+
+        Raises:
+            OSError: If ``path`` cannot be read from disk.
         """
         blob = Path(path).read_bytes()
         manager = cls(dim=dim, config=config)
@@ -342,6 +396,9 @@ class FaissVectorStore:
 
         Raises:
             ValueError: If the payload is empty.
+
+        Returns:
+            None
         """
         if not payload:
             raise ValueError("Empty FAISS payload")
@@ -354,6 +411,9 @@ class FaissVectorStore:
 
     def stats(self) -> dict[str, float | str]:
         """Return diagnostic metrics describing the active FAISS index.
+
+        Args:
+            None
 
         Returns:
             Mapping of human-readable metric names to values (counts or strings).
@@ -736,7 +796,9 @@ class FaissVectorStore:
         if arr.ndim != 1:
             raise ValueError("vector must be 1-dimensional")
         if arr.size != self._dim:
-            raise ValueError(f"vector dimension mismatch: expected {self._dim}, got {arr.size}")
+            raise ValueError(
+                f"vector dimension mismatch: expected {self._dim}, got {arr.size}"
+            )
         return arr
 
     def _detect_device(self, index: "faiss.Index") -> Optional[int]:

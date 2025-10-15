@@ -669,7 +669,19 @@ class ResolverRegistry:
 
 
 class RegisteredResolver:
-    """Mixin ensuring subclasses register with :class:`ResolverRegistry`."""
+    """Mixin ensuring subclasses register with :class:`ResolverRegistry`.
+
+    Attributes:
+        None: Subclasses inherit registration behaviour automatically.
+
+    Examples:
+        >>> class ExampleResolver(RegisteredResolver):
+        ...     name = "example"
+        ...     def is_enabled(self, config, artifact):
+        ...         return True
+        ...     def iter_urls(self, session, config, artifact):
+        ...         yield ResolverResult(url="https://example.org")
+    """
 
     def __init_subclass__(cls, register: bool = True, **kwargs: Any) -> None:  # type: ignore[override]
         super().__init_subclass__(**kwargs)
@@ -774,7 +786,15 @@ def _fetch_semantic_scholar_data(
 
 
 class ArxivResolver(RegisteredResolver):
-    """Resolve arXiv preprints using arXiv identifier lookups."""
+    """Resolve arXiv preprints using arXiv identifier lookups.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> ArxivResolver().name
+        'arxiv'
+    """
 
     name = "arxiv"
 
@@ -818,7 +838,15 @@ class ArxivResolver(RegisteredResolver):
 
 
 class CoreResolver(RegisteredResolver):
-    """Resolve PDFs using the CORE API."""
+    """Resolve PDFs using the CORE API.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> CoreResolver().name
+        'core'
+    """
 
     name = "core"
 
@@ -932,7 +960,15 @@ class CoreResolver(RegisteredResolver):
 
 
 class CrossrefResolver(RegisteredResolver):
-    """Resolve candidate URLs from the Crossref metadata API."""
+    """Resolve candidate URLs from the Crossref metadata API.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> CrossrefResolver().name
+        'crossref'
+    """
 
     name = "crossref"
 
@@ -1118,7 +1154,15 @@ class CrossrefResolver(RegisteredResolver):
 
 
 class DoajResolver(RegisteredResolver):
-    """Resolve Open Access links using the DOAJ API."""
+    """Resolve Open Access links using the DOAJ API.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> DoajResolver().name
+        'doaj'
+    """
 
     name = "doaj"
 
@@ -1233,7 +1277,15 @@ class DoajResolver(RegisteredResolver):
 
 
 class EuropePmcResolver(RegisteredResolver):
-    """Resolve Open Access links via the Europe PMC REST API."""
+    """Resolve Open Access links via the Europe PMC REST API.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> EuropePmcResolver().name
+        'europe_pmc'
+    """
 
     name = "europe_pmc"
 
@@ -1333,7 +1385,15 @@ class EuropePmcResolver(RegisteredResolver):
 
 
 class FigshareResolver(RegisteredResolver):
-    """Resolve Figshare repository metadata into download URLs."""
+    """Resolve Figshare repository metadata into download URLs.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> FigshareResolver().name
+        'figshare'
+    """
 
     name = "figshare"
 
@@ -1472,7 +1532,15 @@ class FigshareResolver(RegisteredResolver):
 
 
 class HalResolver(RegisteredResolver):
-    """Resolve publications from the HAL open archive."""
+    """Resolve publications from the HAL open archive.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> HalResolver().name
+        'hal'
+    """
 
     name = "hal"
 
@@ -1589,7 +1657,15 @@ class HalResolver(RegisteredResolver):
 
 
 class LandingPageResolver(RegisteredResolver):
-    """Attempt to scrape landing pages when explicit PDFs are unavailable."""
+    """Attempt to scrape landing pages when explicit PDFs are unavailable.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> LandingPageResolver().name
+        'landing_page'
+    """
 
     name = "landing_page"
 
@@ -1722,7 +1798,15 @@ class LandingPageResolver(RegisteredResolver):
 
 
 class OpenAireResolver(RegisteredResolver):
-    """Resolve URLs using the OpenAIRE API."""
+    """Resolve URLs using the OpenAIRE API.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> OpenAireResolver().name
+        'openaire'
+    """
 
     name = "openaire"
 
@@ -1840,7 +1924,15 @@ class OpenAireResolver(RegisteredResolver):
 
 
 class OpenAlexResolver(RegisteredResolver):
-    """Resolve OpenAlex work metadata into candidate download URLs."""
+    """Resolve OpenAlex work metadata into candidate download URLs.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> OpenAlexResolver().name
+        'openalex'
+    """
 
     name = "openalex"
 
@@ -1887,7 +1979,15 @@ class OpenAlexResolver(RegisteredResolver):
 
 
 class OsfResolver(RegisteredResolver):
-    """Resolve artefacts hosted on the Open Science Framework."""
+    """Resolve artefacts hosted on the Open Science Framework.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> OsfResolver().name
+        'osf'
+    """
 
     name = "osf"
 
@@ -2005,7 +2105,15 @@ class OsfResolver(RegisteredResolver):
 
 
 class PmcResolver(RegisteredResolver):
-    """Resolve PubMed Central articles via identifiers and lookups."""
+    """Resolve PubMed Central articles via identifiers and lookups.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> PmcResolver().name
+        'pmc'
+    """
 
     name = "pmc"
 
@@ -2193,7 +2301,15 @@ class PmcResolver(RegisteredResolver):
 
 
 class SemanticScholarResolver(RegisteredResolver):
-    """Resolve PDFs via the Semantic Scholar Graph API."""
+    """Resolve PDFs via the Semantic Scholar Graph API.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> SemanticScholarResolver().name
+        'semantic_scholar'
+    """
 
     name = "semantic_scholar"
 
@@ -2303,7 +2419,15 @@ class SemanticScholarResolver(RegisteredResolver):
 
 
 class UnpaywallResolver(RegisteredResolver):
-    """Resolve PDFs via the Unpaywall API."""
+    """Resolve PDFs via the Unpaywall API.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> UnpaywallResolver().name
+        'unpaywall'
+    """
 
     name = "unpaywall"
 
@@ -2490,7 +2614,15 @@ class UnpaywallResolver(RegisteredResolver):
 
 
 class WaybackResolver(RegisteredResolver):
-    """Fallback resolver that queries the Internet Archive Wayback Machine."""
+    """Fallback resolver that queries the Internet Archive Wayback Machine.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> WaybackResolver().name
+        'wayback'
+    """
 
     name = "wayback"
 
@@ -2608,7 +2740,15 @@ class WaybackResolver(RegisteredResolver):
 
 
 class ZenodoResolver(RegisteredResolver):
-    """Resolve Zenodo records into downloadable open-access PDF URLs."""
+    """Resolve Zenodo records into downloadable open-access PDF URLs.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> ZenodoResolver().name
+        'zenodo'
+    """
 
     name = "zenodo"
 

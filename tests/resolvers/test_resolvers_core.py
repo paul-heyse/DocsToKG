@@ -525,7 +525,7 @@ def test_cli_integration_happy_path(monkeypatch, tmp_path):
         "default_resolvers",
         lambda: [FakeResolver("openalex"), FakeResolver("unpaywall")],
     )
-    monkeypatch.setattr(module._requests, "Session", FakeSession)
+    monkeypatch.setattr(module.requests, "Session", FakeSession)
 
     log_csv = tmp_path / "attempts.csv"
     pdf_dir = tmp_path / "pdfs"
@@ -1746,7 +1746,7 @@ def test_fetch_crossref_data_http_error(monkeypatch) -> None:
             raise requests.HTTPError("boom", response=Mock(status_code=502))
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.requests.get",
+        "DocsToKG.ContentDownload.resolvers._requests.get",
         lambda *args, **kwargs: _Resp(),
     )
 
@@ -1765,7 +1765,7 @@ def test_fetch_crossref_data_success(monkeypatch) -> None:
             return {"message": "ok"}
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.requests.get",
+        "DocsToKG.ContentDownload.resolvers._requests.get",
         lambda *args, **kwargs: _Resp(),
     )
 

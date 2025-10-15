@@ -48,7 +48,7 @@ if VENV_ROOT.exists():
 
 warnings.filterwarnings(
     "ignore",
-    message="builtin type SwigPy.* has no __module__ attribute",
+    message=".*SwigPy.*__module__ attribute",
     category=DeprecationWarning,
 )
 

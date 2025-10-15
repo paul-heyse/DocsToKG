@@ -132,7 +132,19 @@ def apply_mmr_diversification(
 
 
 class ResultShaper:
-    """Collapse duplicates, enforce quotas, and generate highlights."""
+    """Collapse duplicates, enforce quotas, and generate highlights.
+
+    Attributes:
+        _opensearch: Simulator providing metadata and highlights.
+        _fusion_config: Fusion configuration controlling result shaping.
+        _gpu_device: CUDA device used for optional similarity checks.
+        _gpu_resources: Optional FAISS resources for GPU pairwise similarity.
+
+    Examples:
+        >>> shaper = ResultShaper(OpenSearchSimulator(), FusionConfig())  # doctest: +SKIP
+        >>> shaper.shape([], {}, HybridSearchRequest(query="", namespace=None, filters={}, page_size=1), {})  # doctest: +SKIP
+        []
+    """
 
     def __init__(
         self,
@@ -142,6 +154,14 @@ class ResultShaper:
         device: int = 0,
         resources: Optional["faiss.StandardGpuResources"] = None,
     ) -> None:
+        """Initialise the shaper with supporting components.
+
+        Args:
+            opensearch: Simulator used to fetch highlights and metadata.
+            fusion_config: Fusion configuration influencing dedupe limits.
+            device: CUDA device index for GPU-assisted operations.
+            resources: Optional FAISS GPU resources passed to similarity helpers.
+        """
         self._opensearch = opensearch
         self._fusion_config = fusion_config
         self._gpu_device = int(device)
