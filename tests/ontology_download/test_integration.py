@@ -57,6 +57,7 @@ class _StubResolver:
             version=self.version,
             license="CC0-1.0",
             media_type="application/rdf+xml",
+            service=spec.resolver,
         )
 
 

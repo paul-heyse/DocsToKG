@@ -38,9 +38,9 @@ _owlready2: Any = None
 
 **Acceptance Criteria**:
 
-- [ ] File created at correct path
-- [ ] Module imports without errors
-- [ ] Empty module passes linting
+- [x] File created at correct path
+- [x] Module imports without errors
+- [x] Empty module passes linting
 
 #### 1.1.2 Implement `get_pystow()` with fallback stub
 
@@ -112,10 +112,10 @@ def test_pystow_fallback_respects_env_var(monkeypatch):
 
 **Acceptance Criteria**:
 
-- [ ] `get_pystow()` function implemented
-- [ ] Fallback class provides `join()` method
-- [ ] Caching works (same object returned on repeated calls)
-- [ ] All tests pass
+- [x] `get_pystow()` function implemented
+- [x] Fallback class provides `join()` method
+- [x] Caching works (same object returned on repeated calls)
+- [x] All tests pass
 
 #### 1.1.3 Implement `get_rdflib()` with stub Graph class
 
@@ -208,10 +208,10 @@ def test_rdflib_stub_serialize_copies_source():
 
 **Acceptance Criteria**:
 
-- [ ] `get_rdflib()` function implemented
-- [ ] Stub Graph has parse, serialize, **len** methods
-- [ ] Stub behavior matches real rdflib interface for testing
-- [ ] Tests pass
+- [x] `get_rdflib()` function implemented
+- [x] Stub Graph has parse, serialize, **len** methods
+- [x] Stub behavior matches real rdflib interface for testing
+- [x] Tests pass
 
 #### 1.1.4 Implement `get_pronto()` with stub Ontology class
 
@@ -291,9 +291,9 @@ def test_pronto_stub_dump_creates_file():
 
 **Acceptance Criteria**:
 
-- [ ] `get_pronto()` function implemented
-- [ ] Stub Ontology has terms(), dump() methods
-- [ ] Tests pass
+- [x] `get_pronto()` function implemented
+- [x] Stub Ontology has terms(), dump() methods
+- [x] Tests pass
 
 #### 1.1.5 Implement `get_owlready2()` with stub wrapper
 
@@ -381,9 +381,9 @@ def test_owlready2_stub_load_returns_ontology():
 
 **Acceptance Criteria**:
 
-- [ ] `get_owlready2()` function implemented
-- [ ] Stub provides get_ontology() → wrapper → load() → classes() chain
-- [ ] Tests pass
+- [x] `get_owlready2()` function implemented
+- [x] Stub provides get_ontology() → wrapper → load() → classes() chain
+- [x] Tests pass
 
 #### 1.1.6 Add comprehensive docstrings and type hints
 
@@ -421,10 +421,10 @@ __all__ = [
 
 **Acceptance Criteria**:
 
-- [ ] All functions have Google-style docstrings
-- [ ] All functions have type hints
-- [ ] Module docstring explains purpose
-- [ ] `__all__` list defined
+- [x] All functions have Google-style docstrings
+- [x] All functions have type hints
+- [x] Module docstring explains purpose
+- [x] `__all__` list defined
 
 ### 1.2 Migrate Code to Use optdeps Module
 
@@ -465,10 +465,10 @@ pystow = get_pystow()
 
 **Acceptance Criteria**:
 
-- [ ] Local stub removed
-- [ ] optdeps import added
-- [ ] All tests pass
-- [ ] No functionality change
+- [x] Local stub removed
+- [x] optdeps import added
+- [x] All tests pass
+- [x] No functionality change
 
 #### 1.2.2 Update `resolvers.py` to import pystow from `optdeps.get_pystow()`
 
@@ -484,9 +484,9 @@ pystow = get_pystow()
 
 **Acceptance Criteria**:
 
-- [ ] Local stub removed
-- [ ] optdeps import added
-- [ ] Resolver tests pass
+- [x] Local stub removed
+- [x] optdeps import added
+- [x] Resolver tests pass
 
 #### 1.2.3 Update `validators.py` to import rdflib, pronto, owlready2 from optdeps
 
@@ -511,9 +511,9 @@ pystow = get_pystow()
 
 **Acceptance Criteria**:
 
-- [ ] All local stubs removed (135 lines deleted)
-- [ ] optdeps imports added
-- [ ] All validator tests pass
+- [x] All local stubs removed (135 lines deleted)
+- [x] optdeps imports added
+- [x] All validator tests pass
 
 #### 1.2.4 Remove all local stub implementations
 
@@ -527,8 +527,8 @@ pystow = get_pystow()
 
 **Acceptance Criteria**:
 
-- [ ] `grep -r "class _Stub" src/DocsToKG/OntologyDownload/` returns only optdeps.py
-- [ ] No duplicate stub implementations exist
+- [x] `grep -r "class _Stub" src/DocsToKG/OntologyDownload/` returns only optdeps.py
+- [x] No duplicate stub implementations exist
 
 #### 1.2.5 Verify tests pass with centralized stubs
 
@@ -551,9 +551,9 @@ pip install pystow
 
 **Acceptance Criteria**:
 
-- [ ] All tests pass with real dependencies
-- [ ] All tests pass with stubs (dependencies uninstalled)
-- [ ] No test breakage from migration
+- [x] All tests pass with real dependencies
+- [x] All tests pass with stubs (dependencies uninstalled)
+- [x] No test breakage from migration
 
 ### 1.3 Extract CLI Formatting Utilities
 
@@ -581,9 +581,9 @@ __all__ = [
 
 **Acceptance Criteria**:
 
-- [ ] File created
-- [ ] Module imports successfully
-- [ ] Has `__all__` export list
+- [x] File created
+- [x] Module imports successfully
+- [x] Has `__all__` export list
 
 #### 1.3.2-1.3.4 Move formatting functions from cli.py to cli_utils.py
 
@@ -656,10 +656,10 @@ def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
 
 **Acceptance Criteria**:
 
-- [ ] Functions moved from cli.py lines 143-170
-- [ ] Functions renamed (remove `_` prefix, now public API)
-- [ ] Docstrings added with examples
-- [ ] Type hints added
+- [x] Functions moved from cli.py lines 143-170
+- [x] Functions renamed (remove `_` prefix, now public API)
+- [x] Docstrings added with examples
+- [x] Type hints added
 
 #### 1.3.5 Update cli.py imports to use cli_utils
 
@@ -689,10 +689,10 @@ from .cli_utils import format_table, format_validation_summary
 
 **Acceptance Criteria**:
 
-- [ ] cli.py imports from cli_utils
-- [ ] All calls updated to new names
-- [ ] Old function definitions removed
-- [ ] CLI tests pass
+- [x] cli.py imports from cli_utils
+- [x] All calls updated to new names
+- [x] Old function definitions removed
+- [x] CLI tests pass
 
 #### 1.3.6 Add unit tests for cli_utils formatting functions
 
@@ -799,10 +799,10 @@ def test_format_validation_summary_multiple():
 
 **Acceptance Criteria**:
 
-- [ ] Test file created with 6+ test cases
-- [ ] Tests cover basic formatting, alignment, empty cases, errors
-- [ ] All tests pass
-- [ ] Coverage >95% for cli_utils.py
+- [x] Test file created with 6+ test cases
+- [x] Tests cover basic formatting, alignment, empty cases, errors
+- [x] All tests pass
+- [x] Coverage >95% for cli_utils.py
 
 ### 1.4 Migrate Configuration to Pydantic v2
 
@@ -829,9 +829,9 @@ python -c "import pydantic; print(pydantic.__version__)"
 
 **Acceptance Criteria**:
 
-- [ ] Pydantic 2.x added to requirements
-- [ ] Installs successfully
-- [ ] Version constraint prevents Pydantic 1.x
+- [x] Pydantic 2.x added to requirements
+- [x] Installs successfully
+- [x] Version constraint prevents Pydantic 1.x
 
 #### 1.4.2 Convert `LoggingConfiguration` dataclass to Pydantic `BaseModel`
 
@@ -922,11 +922,11 @@ def test_logging_config_validates_positive_values():
 
 **Acceptance Criteria**:
 
-- [ ] Dataclass decorator removed
-- [ ] Inherits from BaseModel
-- [ ] Field() definitions with constraints
-- [ ] field_validator for level
-- [ ] Tests updated and passing
+- [x] Dataclass decorator removed
+- [x] Inherits from BaseModel
+- [x] Field() definitions with constraints
+- [x] field_validator for level
+- [x] Tests updated and passing
 
 #### 1.4.3 Convert `ValidationConfig` dataclass to Pydantic `BaseModel`
 
@@ -987,9 +987,9 @@ def test_validation_config_timeout_bounds():
 
 **Acceptance Criteria**:
 
-- [ ] Converted to BaseModel
-- [ ] Constraints on timeout (1 second to 1 hour)
-- [ ] Tests updated
+- [x] Converted to BaseModel
+- [x] Constraints on timeout (1 second to 1 hour)
+- [x] Tests updated
 
 #### 1.4.4 Convert `DownloadConfiguration` dataclass to Pydantic `BaseModel`
 
@@ -1161,11 +1161,11 @@ def test_download_config_allowed_hosts():
 
 **Acceptance Criteria**:
 
-- [ ] Converted to BaseModel
-- [ ] New fields: validate_media_type, rate_limits, allowed_hosts
-- [ ] rate_limit_per_second() method works
-- [ ] parse_service_rate_limit() method added
-- [ ] All tests pass
+- [x] Converted to BaseModel
+- [x] New fields: validate_media_type, rate_limits, allowed_hosts
+- [x] rate_limit_per_second() method works
+- [x] parse_service_rate_limit() method added
+- [x] All tests pass
 
 #### 1.4.5-1.4.6 Convert `DefaultsConfig` and `ResolvedConfig` to Pydantic
 
@@ -1226,10 +1226,10 @@ class ResolvedConfig(BaseModel):
 
 **Acceptance Criteria**:
 
-- [ ] Both classes converted
-- [ ] Nested models work (http, validation, logging)
-- [ ] from_defaults() class method works
-- [ ] Tests updated
+- [x] Both classes converted
+- [x] Nested models work (http, validation, logging)
+- [x] from_defaults() class method works
+- [x] Tests updated
 
 #### 1.4.7 Remove custom YAML fallback parser
 
@@ -1255,10 +1255,10 @@ except ModuleNotFoundError as exc:
 
 **Acceptance Criteria**:
 
-- [ ] Lines 23-141 deleted (~120 lines removed)
-- [ ] yaml.safe_load is only YAML parser used
-- [ ] Clear error if PyYAML not installed
-- [ ] Tests pass
+- [x] Lines 23-141 deleted (~120 lines removed)
+- [x] yaml.safe_load is only YAML parser used
+- [x] Clear error if PyYAML not installed
+- [x] Tests pass
 
 #### 1.4.8 Update `build_resolved_config()` to use Pydantic model_validate
 
@@ -1313,10 +1313,10 @@ def build_resolved_config(raw_config: Mapping[str, object]) -> ResolvedConfig:
 
 **Acceptance Criteria**:
 
-- [ ] Uses DefaultsConfig.model_validate()
-- [ ] Catches ValidationError and converts to ConfigError
-- [ ] Clear error messages with field locations
-- [ ] Tests pass
+- [x] Uses DefaultsConfig.model_validate()
+- [x] Catches ValidationError and converts to ConfigError
+- [x] Clear error messages with field locations
+- [x] Tests pass
 
 #### 1.4.9 Implement Pydantic field validators for config constraints
 
@@ -1341,9 +1341,9 @@ def validate_prefer_source(cls, v: List[str]) -> List[str]:
 
 **Acceptance Criteria**:
 
-- [ ] Validators added for critical fields
-- [ ] Tests cover validation failures
-- [ ] Error messages are actionable
+- [x] Validators added for critical fields
+- [x] Tests cover validation failures
+- [x] Error messages are actionable
 
 #### 1.4.10 Update environment variable merging to use Pydantic settings
 
@@ -1392,10 +1392,10 @@ def _apply_env_overrides(defaults: DefaultsConfig) -> None:
 
 **Acceptance Criteria**:
 
-- [ ] EnvironmentOverrides class created
-- [ ] _apply_env_overrides uses Pydantic settings
-- [ ] Tests verify env vars override config file
-- [ ] Logging shows which overrides applied
+- [x] EnvironmentOverrides class created
+- [x] _apply_env_overrides uses Pydantic settings
+- [x] Tests verify env vars override config file
+- [x] Logging shows which overrides applied
 
 #### 1.4.11 Update all config tests to work with Pydantic models
 
@@ -1435,10 +1435,10 @@ def test_download_config_validation_error():
 
 **Acceptance Criteria**:
 
-- [ ] All config tests pass
-- [ ] Tests use ValidationError where appropriate
-- [ ] New tests for Pydantic features
-- [ ] Coverage maintained >85%
+- [x] All config tests pass
+- [x] Tests use ValidationError where appropriate
+- [x] New tests for Pydantic features
+- [x] Coverage maintained >85%
 
 #### 1.4.12 Verify JSON Schema generation works for documentation
 
@@ -1490,10 +1490,10 @@ check-jsonschema --schemafile docs/schemas/ontology-downloader-config.json docs/
 
 **Acceptance Criteria**:
 
-- [ ] JSON Schema generates successfully
-- [ ] Schema validates as valid JSON Schema
-- [ ] Example sources.yaml validates against schema
-- [ ] Schema documented in docs/
+- [x] JSON Schema generates successfully
+- [x] Schema validates as valid JSON Schema
+- [x] Example sources.yaml validates against schema
+- [x] Schema documented in docs/
 
 ---
 
@@ -1585,11 +1585,11 @@ def _preliminary_head_check(
 
 **Acceptance Criteria**:
 
-- [ ] Method added to StreamingDownloader
-- [ ] Returns content_type and content_length tuple
-- [ ] Raises ConfigError if size exceeds limit
-- [ ] Logs HEAD failures at debug level
-- [ ] Non-fatal if HEAD not supported
+- [x] Method added to StreamingDownloader
+- [x] Returns content_type and content_length tuple
+- [x] Raises ConfigError if size exceeds limit
+- [x] Logs HEAD failures at debug level
+- [x] Non-fatal if HEAD not supported
 
 #### 2.1.2 Implement Content-Type header extraction and validation
 
@@ -1672,10 +1672,10 @@ def _validate_media_type(
 
 **Acceptance Criteria**:
 
-- [ ] Validates Content-Type against expected
-- [ ] Handles acceptable variations (XML types)
-- [ ] Logs warnings for mismatches
-- [ ] Configurable via validate_media_type flag
+- [x] Validates Content-Type against expected
+- [x] Handles acceptable variations (XML types)
+- [x] Logs warnings for mismatches
+- [x] Configurable via validate_media_type flag
 
 #### 2.1.3 Implement early Content-Length check against size limits
 
@@ -1695,9 +1695,9 @@ def test_head_check_rejects_oversized_file():
 
 **Acceptance Criteria**:
 
-- [ ] Raises ConfigError if Content-Length > limit
-- [ ] Error message includes size and limit
-- [ ] Works before starting GET request
+- [x] Raises ConfigError if Content-Length > limit
+- [x] Error message includes size and limit
+- [x] Works before starting GET request
 
 #### 2.1.4 Add config flag `http.validate_media_type` (default: true)
 
@@ -1721,10 +1721,10 @@ defaults:
 
 **Acceptance Criteria**:
 
-- [ ] Field added to DownloadConfiguration
-- [ ] Defaults to True
-- [ ] Can be set False in config
-- [ ] Documented in example sources.yaml
+- [x] Field added to DownloadConfiguration
+- [x] Defaults to True
+- [x] Can be set False in config
+- [x] Documented in example sources.yaml
 
 #### 2.1.5 Log warnings for media-type mismatches with override instructions
 
@@ -1748,9 +1748,9 @@ defaults:
 
 **Acceptance Criteria**:
 
-- [ ] Warning logged with both types
-- [ ] Hint provided for disabling validation
-- [ ] URL included for troubleshooting
+- [x] Warning logged with both types
+- [x] Hint provided for disabling validation
+- [x] URL included for troubleshooting
 
 #### 2.1.6 Add tests for HEAD request success, failure, and mismatch scenarios
 
@@ -1907,20 +1907,68 @@ def test_validate_media_type_disabled():
 
 **Acceptance Criteria**:
 
-- [ ] 7+ test cases covering HEAD scenarios
-- [ ] Tests pass
-- [ ] Coverage >90% for new methods
+- [x] 7+ test cases covering HEAD scenarios
+- [x] Tests pass
+- [x] Coverage >90% for new methods
 
 ### 2.2 Implement Per-Service Rate Limiting
 
-[Continue with similarly detailed implementation instructions for all remaining tasks...]
+#### 2.2.1 Propagate service identifiers through fetch planning
+
+**Objective**: Ensure resolvers and core download orchestration expose service metadata for rate limiting and logging.
+
+**Implementation**:
+
+- Extend `FetchPlan` dataclass with an optional `service` field (string).
+- Update `BaseResolver._build_plan()` helper to accept `service` and forward it when instantiating `FetchPlan`.
+- Modify each resolver to populate `service=spec.resolver` (e.g., `obo`, `ols`, `bioportal`, `skos`, `xbrl`).
+- In `core.fetch_one()`, attach `plan.service` to the logger adapter extras and pass it into `download_stream()`.
+
+**Acceptance Criteria**:
+
+- [x] `FetchPlan` exposes a `service` attribute with docstring updates.
+- [x] All resolver implementations populate `service` consistently.
+- [x] `core.fetch_one()` includes `service` in logging context and download invocation.
+
+#### 2.2.2 Add per-service token bucket selection
+
+**Objective**: Key rate limit buckets by service and host while respecting service-specific overrides.
+
+**Implementation**:
+
+- Update `_get_bucket()` signature to accept optional `service` and construct cache keys as `"service:host"`.
+- Use `DownloadConfiguration.parse_service_rate_limit()` to override the default per-host rate when available.
+- Ensure default per-host buckets remain functional when `service` is absent.
+- Reset or isolate `_TOKEN_BUCKETS` entries in unit tests to prevent leakage between scenarios.
+
+**Acceptance Criteria**:
+
+- [x] `_get_bucket()` caches buckets per service/host combination.
+- [x] Buckets fall back to `per_host_rate_limit` when no override exists.
+- [x] Unit tests cover service-specific, fallback, and host-only buckets.
+
+#### 2.2.3 Document and test per-service rate limiting
+
+**Objective**: Update examples, API docs, and tests to reflect the new behaviour.
+
+**Implementation**:
+
+- Add `rate_limits` examples for OLS and BioPortal in `docs/examples/sources.yaml`.
+- Expand API docs (`DocsToKG.OntologyDownload.download.md`, `DocsToKG.OntologyDownload.resolvers.md`) to describe service-aware rate limiting.
+- Add/extend unit tests in `tests/ontology_download/test_download.py`, `test_config.py`, and `test_integration.py` for the new service metadata.
+
+**Acceptance Criteria**:
+
+- [x] Example configuration demonstrates per-service overrides.
+- [x] API docs mention `service` usage in fetch plans and download rate limiting.
+- [x] New and existing tests pass validating per-service rate limiting.
 
 ---
 
 ## Task Completion Tracking
 
-**Foundation (1.1-1.4)**: 0/52 tasks complete
-**Robustness Downloads (2.1-2.4)**: 0/24 tasks complete
+**Foundation (1.1-1.4)**: 27/52 tasks complete
+**Robustness Downloads (2.1-2.4)**: 9/24 tasks complete
 **Robustness Validation (3.1-3.4)**: 0/21 tasks complete
 **Capabilities (4.1-5.2)**: 0/32 tasks complete
 **Storage (6.1)**: 0/10 tasks complete
@@ -1928,7 +1976,7 @@ def test_validate_media_type_disabled():
 **Testing (8.1-8.5)**: 0/30 tasks complete
 **Deployment (9.1-9.3)**: 0/13 tasks complete
 
-**Total**: 0/195 tasks complete (0%)
+**Total**: 36/195 tasks complete (18.5%)
 
 ## Notes for AI Programming Agents
 
