@@ -39,7 +39,12 @@ from typing import Dict, List, Optional, Sequence
 
 import requests
 
-from .cli_utils import format_table, format_validation_summary
+from .cli_utils import (
+    format_plan_rows,
+    format_results_table,
+    format_table,
+    format_validation_summary,
+)
 from .config import ConfigError, ResolvedConfig, load_config, validate_config
 from .core import (
     FetchResult,
@@ -226,6 +231,19 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
         for serialization.
     """
 
+    candidates = [
+        {
+            "resolver": candidate.resolver,
+            "url": candidate.plan.url,
+            "service": candidate.plan.service,
+            "media_type": candidate.plan.media_type,
+            "headers": candidate.plan.headers,
+            "version": candidate.plan.version,
+            "license": candidate.plan.license,
+        }
+        for candidate in getattr(plan, "candidates", ())
+    ]
+
     return {
         "id": plan.spec.id,
         "resolver": plan.resolver,
@@ -235,6 +253,7 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
         "media_type": plan.plan.media_type,
         "service": plan.plan.service,
         "headers": plan.plan.headers,
+        "candidates": candidates,
     }
 
 
@@ -535,7 +554,12 @@ def _handle_validate(args, config: ResolvedConfig) -> dict:
         ValidationRequest(name, original_path, normalized_dir, validation_dir, config)
         for name in validator_names
     ]
-    logger = setup_logging(config.defaults.logging)
+    logging_config = config.defaults.logging
+    logger = setup_logging(
+        level=logging_config.level,
+        retention_days=logging_config.retention_days,
+        max_log_size_mb=logging_config.max_log_size_mb,
+    )
     results = run_validators(requests, logger)
     manifest["validation"] = {name: result.to_dict() for name, result in results.items()}
     manifest_path.write_text(json.dumps(manifest, indent=2))
@@ -595,7 +619,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         base_config = ResolvedConfig.from_defaults()
         base_config.defaults.logging.level = args.log_level
-        logger = setup_logging(base_config.defaults.logging)
+        logging_config = base_config.defaults.logging
+        logger = setup_logging(
+            level=logging_config.level,
+            retention_days=logging_config.retention_days,
+            max_log_size_mb=logging_config.max_log_size_mb,
+        )
         if args.command == "pull":
             if getattr(args, "dry_run", False):
                 plans = _handle_pull(args, base_config, dry_run=True)
@@ -604,20 +633,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     sys.stdout.write("\n")
                 else:
                     if plans:
-                        table = format_table(
-                            ("id", "resolver", "service", "media_type", "url"),
-                            [
-                                (
-                                    plan.spec.id,
-                                    plan.resolver,
-                                    plan.plan.service or "-",
-                                    plan.plan.media_type or "-",
-                                    plan.plan.url,
-                                )
-                                for plan in plans
-                            ],
+                        rows = format_plan_rows(plans)
+                        print(
+                            format_table(
+                                ("id", "resolver", "service", "media_type", "url"),
+                                rows,
+                            )
                         )
-                        print(table)
                     else:
                         print("No ontologies to process")
             else:
@@ -629,20 +651,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     sys.stdout.write("\n")
                 else:
                     if results:
-                        table = format_table(
-                            ("id", "resolver", "status", "sha256", "file"),
-                            [
-                                (
-                                    result.spec.id,
-                                    result.spec.resolver,
-                                    result.status,
-                                    result.sha256[:12],
-                                    result.local_path.name,
-                                )
-                                for result in results
-                            ],
-                        )
-                        print(table)
+                        print(format_results_table(results))
                     else:
                         print("No ontologies to process")
                 for result in results:
@@ -661,20 +670,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 sys.stdout.write("\n")
             else:
                 if plans:
-                    table = format_table(
-                        ("id", "resolver", "service", "media_type", "url"),
-                        [
-                            (
-                                plan.spec.id,
-                                plan.resolver,
-                                plan.plan.service or "-",
-                                plan.plan.media_type or "-",
-                                plan.plan.url,
-                            )
-                            for plan in plans
-                        ],
+                    rows = format_plan_rows(plans)
+                    print(
+                        format_table(
+                            ("id", "resolver", "service", "media_type", "url"),
+                            rows,
+                        )
                     )
-                    print(table)
                 else:
                     print("No ontologies to process")
         elif args.command == "show":

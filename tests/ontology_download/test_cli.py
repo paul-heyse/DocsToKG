@@ -19,6 +19,7 @@ Usage:
 """
 
 import json
+from importlib.machinery import ModuleSpec
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -29,7 +30,12 @@ pytest.importorskip("pydantic_settings")
 
 from DocsToKG.OntologyDownload import cli
 from DocsToKG.OntologyDownload.config import DefaultsConfig, ResolvedConfig
-from DocsToKG.OntologyDownload.core import FetchResult, FetchSpec, PlannedFetch
+from DocsToKG.OntologyDownload.core import (
+    FetchResult,
+    FetchSpec,
+    PlannedFetch,
+    ResolverCandidate,
+)
 from DocsToKG.OntologyDownload.resolvers import FetchPlan
 
 
@@ -74,7 +80,7 @@ def test_cli_pull_json_output(monkeypatch, stub_logger, tmp_path, capsys):
         artifacts=[str(tmp_path / "hp.owl")],
     )
     monkeypatch.setattr(cli, "fetch_all", lambda specs, config, force: [result])
-    monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
         cli.ResolvedConfig,
         "from_defaults",
@@ -96,7 +102,7 @@ def test_cli_pull_table_output(monkeypatch, stub_logger, tmp_path, capsys):
         artifacts=[str(tmp_path / "hp.owl")],
     )
     monkeypatch.setattr(cli, "fetch_all", lambda specs, config, force: [result])
-    monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
         cli.ResolvedConfig,
         "from_defaults",
@@ -110,25 +116,27 @@ def test_cli_pull_table_output(monkeypatch, stub_logger, tmp_path, capsys):
 
 
 def test_cli_pull_dry_run(monkeypatch, stub_logger, capsys):
+    plan = FetchPlan(
+        url="https://example.org/hp.owl",
+        headers={},
+        filename_hint=None,
+        version="2024",
+        license="CC-BY",
+        media_type="application/rdf+xml",
+        service="obo",
+    )
     planned = PlannedFetch(
         spec=FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"]),
         resolver="obo",
-        plan=FetchPlan(
-            url="https://example.org/hp.owl",
-            headers={},
-            filename_hint=None,
-            version="2024",
-            license="CC-BY",
-            media_type="application/rdf+xml",
-            service="obo",
-        ),
+        plan=plan,
+        candidates=(ResolverCandidate(resolver="obo", plan=plan),),
     )
 
     monkeypatch.setattr(cli, "plan_all", lambda specs, config: [planned])
     monkeypatch.setattr(
         cli, "fetch_all", lambda *_, **__: pytest.fail("dry-run should not download")
     )
-    monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
 
     assert cli.main(["pull", "hp", "--dry-run"]) == 0
     output = capsys.readouterr().out
@@ -137,27 +145,30 @@ def test_cli_pull_dry_run(monkeypatch, stub_logger, capsys):
 
 
 def test_cli_plan_json_output(monkeypatch, stub_logger, capsys):
+    plan = FetchPlan(
+        url="https://example.org/hp.owl",
+        headers={},
+        filename_hint=None,
+        version="2024",
+        license="CC-BY",
+        media_type="application/rdf+xml",
+        service="obo",
+    )
     planned = PlannedFetch(
         spec=FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"]),
         resolver="obo",
-        plan=FetchPlan(
-            url="https://example.org/hp.owl",
-            headers={},
-            filename_hint=None,
-            version="2024",
-            license="CC-BY",
-            media_type="application/rdf+xml",
-            service="obo",
-        ),
+        plan=plan,
+        candidates=(ResolverCandidate(resolver="obo", plan=plan),),
     )
 
     monkeypatch.setattr(cli, "plan_all", lambda specs, config: [planned])
-    monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
 
     assert cli.main(["plan", "hp", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload[0]["id"] == "hp"
     assert payload[0]["url"] == "https://example.org/hp.owl"
+    assert payload[0]["candidates"][0]["resolver"] == "obo"
 
 
 def test_cli_validate_json_output(monkeypatch, stub_logger, tmp_path, capsys):
@@ -187,9 +198,10 @@ def test_cli_validate_json_output(monkeypatch, stub_logger, tmp_path, capsys):
         "target_formats": ["owl"],
         "validation": {},
         "artifacts": [str(original_file)],
+        "resolver_attempts": [],
     }
     (manifest_dir / "manifest.json").write_text(json.dumps(manifest))
-    monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
         cli,
         "run_validators",
@@ -236,9 +248,10 @@ def test_cli_validate_table_output(monkeypatch, stub_logger, tmp_path, capsys):
         "target_formats": ["owl"],
         "validation": {},
         "artifacts": [str(original_file)],
+        "resolver_attempts": [],
     }
     (manifest_dir / "manifest.json").write_text(json.dumps(manifest))
-    monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
 
     class _Result:
         def __init__(self, payload):
@@ -271,7 +284,7 @@ def test_cli_validate_table_output(monkeypatch, stub_logger, tmp_path, capsys):
 def test_cli_config_validate(monkeypatch, stub_logger, tmp_path, capsys):
     config_path = tmp_path / "sources.yaml"
     config_path.write_text("ontologies:\n  - id: hp\n    resolver: obo\n")
-    monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
         cli.ResolvedConfig,
         "from_defaults",
@@ -285,7 +298,7 @@ def test_cli_config_validate(monkeypatch, stub_logger, tmp_path, capsys):
 def test_cli_config_validate_json(monkeypatch, stub_logger, tmp_path, capsys):
     config_path = tmp_path / "sources.yaml"
     config_path.write_text("ontologies:\n  - id: hp\n    resolver: obo\n")
-    monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
         cli.ResolvedConfig,
         "from_defaults",
@@ -298,7 +311,7 @@ def test_cli_config_validate_json(monkeypatch, stub_logger, tmp_path, capsys):
 
 def test_cli_config_validate_missing_file(monkeypatch, stub_logger, tmp_path):
     missing = tmp_path / "missing.yaml"
-    monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
         cli.ResolvedConfig,
         "from_defaults",
@@ -311,7 +324,7 @@ def test_cli_config_validate_missing_file(monkeypatch, stub_logger, tmp_path):
 
 def test_cli_init_writes_example(monkeypatch, stub_logger, tmp_path, capsys):
     target = tmp_path / "sources.yaml"
-    monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
 
     exit_code = cli.main(["init", str(target)])
 
@@ -326,7 +339,7 @@ def test_cli_init_writes_example(monkeypatch, stub_logger, tmp_path, capsys):
 def test_cli_init_refuses_overwrite(monkeypatch, stub_logger, tmp_path, capsys):
     target = tmp_path / "sources.yaml"
     target.write_text("existing")
-    monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
 
     exit_code = cli.main(["init", str(target)])
 
@@ -339,7 +352,15 @@ def test_cli_doctor_json(monkeypatch, stub_logger, capsys):
     monkeypatch.setattr(
         cli.requests, "get", lambda url, timeout: SimpleNamespace(ok=True, status_code=200)
     )
-    monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
+    original_find_spec = cli.importlib.util.find_spec
+
+    def _fake_find_spec(name: str):
+        if name in {"rdflib", "pronto", "owlready2", "arelle"}:
+            return ModuleSpec(name, loader=None)
+        return original_find_spec(name)
+
+    monkeypatch.setattr(cli.importlib.util, "find_spec", _fake_find_spec)
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
 
     assert cli.main(["doctor", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)

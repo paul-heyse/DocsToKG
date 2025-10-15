@@ -4,110 +4,110 @@
 
 ### 1.1 Refactor Logging Configuration
 
-- [ ] Modify `setup_logging()` function in `logging_config.py` to accept explicit parameters for log directory path, logging level string, retention days integer, and maximum log file size in megabytes
-- [ ] Remove all imports from orchestration modules within the logging configuration module, specifically eliminating any imports from `core.py` or other downloader components
-- [ ] Implement environment variable reading as fallback defaults when parameters are not explicitly provided, reading from `ONTOFETCH_LOG_DIR` for directory location
-- [ ] Update `cli.py` to pass logging configuration values explicitly from parsed configuration or command arguments when initializing logging
-- [ ] Update `core.py` to pass logging configuration values from resolved configuration when setting up logging for orchestration functions
-- [ ] Verify that logging module can be imported in isolation without triggering import of other package modules
+- [x] Modify `setup_logging()` function in `logging_config.py` to accept explicit parameters for log directory path, logging level string, retention days integer, and maximum log file size in megabytes
+- [x] Remove all imports from orchestration modules within the logging configuration module, specifically eliminating any imports from `core.py` or other downloader components
+- [x] Implement environment variable reading as fallback defaults when parameters are not explicitly provided, reading from `ONTOFETCH_LOG_DIR` for directory location
+- [x] Update `cli.py` to pass logging configuration values explicitly from parsed configuration or command arguments when initializing logging
+- [x] Update `core.py` to pass logging configuration values from resolved configuration when setting up logging for orchestration functions
+- [x] Verify that logging module can be imported in isolation without triggering import of other package modules
 
 ### 1.2 Deprecate Legacy Configuration Aliases
 
-- [ ] Add deprecation warnings module-level for legacy configuration class names including `DefaultsConfiguration`, `LoggingConfig`, and `ValidationConfiguration` in `config.py`
-- [ ] Implement deprecation warning emission using warnings module that fires exactly once per interpreter session when legacy names are accessed
-- [ ] Update module `__all__` export list to exclude legacy alias names so they do not appear in public API documentation
-- [ ] Search all internal package code for uses of legacy names and replace with canonical names including `DefaultsConfig`, `LoggingConfiguration`, and `ValidationConfig`
-- [ ] Add unit test verifying that importing legacy class name triggers deprecation warning exactly once
-- [ ] Add unit test verifying that legacy names remain functional despite deprecation to maintain backward compatibility
+- [x] Add deprecation warnings module-level for legacy configuration class names including `DefaultsConfiguration`, `LoggingConfig`, and `ValidationConfiguration` in `config.py`
+- [x] Implement deprecation warning emission using warnings module that fires exactly once per interpreter session when legacy names are accessed
+- [x] Update module `__all__` export list to exclude legacy alias names so they do not appear in public API documentation
+- [x] Search all internal package code for uses of legacy names and replace with canonical names including `DefaultsConfig`, `LoggingConfiguration`, and `ValidationConfig`
+- [x] Add unit test verifying that importing legacy class name triggers deprecation warning exactly once
+- [x] Add unit test verifying that legacy names remain functional despite deprecation to maintain backward compatibility
 
 ### 1.3 Centralize Archive Extraction
 
-- [ ] Create unified `extract_archive_safe()` function in `download.py` that accepts archive path and destination directory as parameters
-- [ ] Implement archive format detection logic examining file suffix including consideration of double extensions like `.tar.gz` and `.tar.xz`
-- [ ] Add dispatch logic routing to appropriate extraction function based on detected format including ZIP for `.zip` and TAR for `.tar`, `.tgz`, `.tar.gz`, `.txz`, `.tar.xz` extensions
-- [ ] Ensure TAR extraction function includes same security checks as ZIP extraction including path traversal prevention and compression ratio validation
-- [ ] Implement safe path validation checking for absolute paths, parent directory traversal attempts using `..` segments, and empty path components
-- [ ] Add compression bomb detection calculating ratio of uncompressed to compressed size and rejecting archives exceeding ten-to-one ratio
-- [ ] Update all validators currently performing inline ZIP extraction to call centralized `extract_archive_safe()` function
-- [ ] Remove duplicate extraction implementations from validator modules once centralized function is integrated
-- [ ] Add error case for unsupported archive formats raising descriptive exception with format name
+- [x] Create unified `extract_archive_safe()` function in `download.py` that accepts archive path and destination directory as parameters
+- [x] Implement archive format detection logic examining file suffix including consideration of double extensions like `.tar.gz` and `.tar.xz`
+- [x] Add dispatch logic routing to appropriate extraction function based on detected format including ZIP for `.zip` and TAR for `.tar`, `.tgz`, `.tar.gz`, `.txz`, `.tar.xz` extensions
+- [x] Ensure TAR extraction function includes same security checks as ZIP extraction including path traversal prevention and compression ratio validation
+- [x] Implement safe path validation checking for absolute paths, parent directory traversal attempts using `..` segments, and empty path components
+- [x] Add compression bomb detection calculating ratio of uncompressed to compressed size and rejecting archives exceeding ten-to-one ratio
+- [x] Update all validators currently performing inline ZIP extraction to call centralized `extract_archive_safe()` function
+- [x] Remove duplicate extraction implementations from validator modules once centralized function is integrated
+- [x] Add error case for unsupported archive formats raising descriptive exception with format name
 
 ### 1.4 Standardize Subprocess Worker Execution
 
-- [ ] Modify `validator_workers.py` to support execution as module using standard Python module invocation with `python -m` syntax
-- [ ] Implement proper `if __name__ == "__main__":` guard with command-line argument parsing for worker selection in worker module
-- [ ] Update `validators.py` subprocess invocation to use module execution pattern building command as list with interpreter path, `-m` flag, full module name, and validator arguments
-- [ ] Remove all `sys.path` modification code from validator worker module that attempts to add source directories dynamically
-- [ ] Remove file path imports that locate worker script using `__file__` or relative path resolution
-- [ ] Verify worker processes inherit correct module search path from parent process without manual path manipulation
-- [ ] Test worker invocation succeeds in clean virtual environment without development source tree mounted
-- [ ] Ensure worker can be invoked from any working directory without dependency on relative file paths
+- [x] Modify `validator_workers.py` to support execution as module using standard Python module invocation with `python -m` syntax
+- [x] Implement proper `if __name__ == "__main__":` guard with command-line argument parsing for worker selection in worker module
+- [x] Update `validators.py` subprocess invocation to use module execution pattern building command as list with interpreter path, `-m` flag, full module name, and validator arguments
+- [x] Remove all `sys.path` modification code from validator worker module that attempts to add source directories dynamically
+- [x] Remove file path imports that locate worker script using `__file__` or relative path resolution
+- [x] Verify worker processes inherit correct module search path from parent process without manual path manipulation
+- [x] Test worker invocation succeeds in clean virtual environment without development source tree mounted
+- [x] Ensure worker can be invoked from any working directory without dependency on relative file paths
 
 ### 1.5 Convert Optional Dependency Stubs to Module Types
 
-- [ ] Import `types` module at top of `optdeps.py` to access `ModuleType` constructor
-- [ ] Create helper function accepting module name string and attributes dictionary, returning properly constructed `ModuleType` instance
-- [ ] Have helper function create new module instance using `ModuleType(name)` constructor
-- [ ] Have helper function set attributes on module instance by iterating attributes dictionary and using `setattr()`
-- [ ] Have helper function insert completed module into `sys.modules` dictionary using module name as key
-- [ ] Update `_PystowFallback` creation to wrap instance in `ModuleType` before storing in module cache
-- [ ] Update `_StubRDFLib` creation to wrap class in `ModuleType` with `Graph` attribute before caching
-- [ ] Update `_StubPronto` creation to wrap class in `ModuleType` with `Ontology` attribute before caching
-- [ ] Update `_StubOwlready2` creation to wrap class in `ModuleType` with `get_ontology` attribute before caching
-- [ ] Verify that import machinery accepts stub modules without warnings or errors
-- [ ] Verify that type checkers can resolve imports to stub modules without reporting missing modules
+- [x] Import `types` module at top of `optdeps.py` to access `ModuleType` constructor
+- [x] Create helper function accepting module name string and attributes dictionary, returning properly constructed `ModuleType` instance
+- [x] Have helper function create new module instance using `ModuleType(name)` constructor
+- [x] Have helper function set attributes on module instance by iterating attributes dictionary and using `setattr()`
+- [x] Have helper function insert completed module into `sys.modules` dictionary using module name as key
+- [x] Update `_PystowFallback` creation to wrap instance in `ModuleType` before storing in module cache
+- [x] Update `_StubRDFLib` creation to wrap class in `ModuleType` with `Graph` attribute before caching
+- [x] Update `_StubPronto` creation to wrap class in `ModuleType` with `Ontology` attribute before caching
+- [x] Update `_StubOwlready2` creation to wrap class in `ModuleType` with `get_ontology` attribute before caching
+- [x] Verify that import machinery accepts stub modules without warnings or errors
+- [x] Verify that type checkers can resolve imports to stub modules without reporting missing modules
 
 ### 1.6 Deduplicate Archive Extraction in Validators
 
-- [ ] Search `validators.py` for inline ZIP file opening and extraction code within validator functions
-- [ ] Identify XBRL validator and any other validators performing direct archive extraction
-- [ ] Replace inline `zipfile.ZipFile` opening and member extraction with calls to `extract_archive_safe()` from download module
-- [ ] Ensure extraction destination directories match previous inline extraction behavior for manifest path compatibility
-- [ ] Remove now-unused imports of `zipfile` module from validators file
-- [ ] Add tests verifying extracted file paths match expected structure after validator execution
-- [ ] Verify no duplicate path traversal checks remain in validators after centralization
+- [x] Search `validators.py` for inline ZIP file opening and extraction code within validator functions
+- [x] Identify XBRL validator and any other validators performing direct archive extraction
+- [x] Replace inline `zipfile.ZipFile` opening and member extraction with calls to `extract_archive_safe()` from download module
+- [x] Ensure extraction destination directories match previous inline extraction behavior for manifest path compatibility
+- [x] Remove now-unused imports of `zipfile` module from validators file
+- [x] Add tests verifying extracted file paths match expected structure after validator execution
+- [x] Verify no duplicate path traversal checks remain in validators after centralization
 
 ### 1.7 Centralize MIME Type Alias Mapping
 
-- [ ] Define module-level constant `RDF_MIME_ALIASES` in `download.py` as set containing all recognized RDF MIME type strings
-- [ ] Include primary types `application/rdf+xml`, `text/turtle`, `application/n-triples` in alias set
-- [ ] Include acceptable variations `application/xml`, `text/xml`, `application/x-turtle`, `text/plain` for RDF formats
-- [ ] Include additional formats `application/trig`, `application/ld+json` commonly returned by ontology services
-- [ ] Update `_validate_media_type()` method in `StreamingDownloader` to check actual content type against alias set when expected type is RDF format
-- [ ] Update CLI output formatting in `cli.py` to use alias set when summarizing downloaded content types
-- [ ] Update validator format detection logic to reference alias set for identifying parseable RDF formats
-- [ ] Consider adding secondary mapping for MIME type to format name for consistent labeling across modules
+- [x] Define module-level constant `RDF_MIME_ALIASES` in `download.py` as set containing all recognized RDF MIME type strings
+- [x] Include primary types `application/rdf+xml`, `text/turtle`, `application/n-triples` in alias set
+- [x] Include acceptable variations `application/xml`, `text/xml`, `application/x-turtle`, `text/plain` for RDF formats
+- [x] Include additional formats `application/trig`, `application/ld+json` commonly returned by ontology services
+- [x] Update `_validate_media_type()` method in `StreamingDownloader` to check actual content type against alias set when expected type is RDF format
+- [x] Update CLI output formatting in `cli.py` to use alias set when summarizing downloaded content types
+- [x] Update validator format detection logic to reference alias set for identifying parseable RDF formats
+- [x] Consider adding secondary mapping for MIME type to format name for consistent labeling across modules
 
 ### 1.8 Extract CLI Formatting Utilities
 
-- [ ] Create new `cli_utils.py` module in OntologyDownload package directory
-- [ ] Move `_format_table()` function from `cli.py` to `cli_utils.py` making it public with `format_table` name
-- [ ] Move `_format_row()` helper function to `cli_utils.py` as private function supporting table formatter
-- [ ] Keep existing `format_validation_summary()` in `cli_utils.py` since it already exists there
-- [ ] Create `format_plan_rows()` function accepting list of `PlannedFetch` objects and returning formatted table rows
-- [ ] Create `format_results_table()` function accepting list of `FetchResult` objects and returning formatted table string
-- [ ] Update imports in `cli.py` to use formatting functions from `cli_utils` module
-- [ ] Replace inline table formatting code in `pull` command handler with call to `format_results_table()`
-- [ ] Replace inline table formatting code in `plan` command handler with call to `format_plan_rows()`
-- [ ] Add module docstring to `cli_utils.py` describing purpose as CLI output formatting helpers
-- [ ] Add `__all__` export list to `cli_utils.py` including all public formatting functions
+- [x] Create new `cli_utils.py` module in OntologyDownload package directory
+- [x] Move `_format_table()` function from `cli.py` to `cli_utils.py` making it public with `format_table` name
+- [x] Move `_format_row()` helper function to `cli_utils.py` as private function supporting table formatter
+- [x] Keep existing `format_validation_summary()` in `cli_utils.py` since it already exists there
+- [x] Create `format_plan_rows()` function accepting list of `PlannedFetch` objects and returning formatted table rows
+- [x] Create `format_results_table()` function accepting list of `FetchResult` objects and returning formatted table string
+- [x] Update imports in `cli.py` to use formatting functions from `cli_utils` module
+- [x] Replace inline table formatting code in `pull` command handler with call to `format_results_table()`
+- [x] Replace inline table formatting code in `plan` command handler with call to `format_plan_rows()`
+- [x] Add module docstring to `cli_utils.py` describing purpose as CLI output formatting helpers
+- [x] Add `__all__` export list to `cli_utils.py` including all public formatting functions
 
 ## 2. Reliability and Robustness
 
 ### 2.1 Implement Download-Time Resolver Fallback
 
-- [ ] Extend `PlannedFetch` dataclass to include `candidates` attribute containing ordered list of alternative resolver fetch plans
-- [ ] Modify `_resolve_plan_with_fallback()` in `core.py` to populate candidates list with all viable resolver plans during planning phase
-- [ ] Store resolver name, URL, headers, and media type for each candidate in structured format enabling later retry attempts
-- [ ] Wrap `download_stream()` call in `fetch_one()` with retry loop that iterates through candidate plans on retryable failures
-- [ ] Define retryable failures as HTTP 503 service unavailable, HTTP 403 forbidden, network timeouts, and connection errors
-- [ ] Preserve polite headers and user agent when constructing request for fallback candidate
-- [ ] Log warning message for each fallback attempt including original resolver failure reason and candidate resolver being attempted
-- [ ] Record complete fallback chain in manifest including primary attempt and all fallback attempts with their outcomes
-- [ ] Add `resolver_attempts` field to manifest JSON containing array of dictionaries with resolver name, URL, and result status
-- [ ] Ensure manifest reflects actual successful resolver used rather than originally planned resolver when fallback occurs
-- [ ] Test fallback mechanism with mock HTTP server returning 503 for first URL and 200 for second URL
-- [ ] Verify fallback chain appears correctly in saved manifest after successful fallback
+- [x] Extend `PlannedFetch` dataclass to include `candidates` attribute containing ordered list of alternative resolver fetch plans
+- [x] Modify `_resolve_plan_with_fallback()` in `core.py` to populate candidates list with all viable resolver plans during planning phase
+- [x] Store resolver name, URL, headers, and media type for each candidate in structured format enabling later retry attempts
+- [x] Wrap `download_stream()` call in `fetch_one()` with retry loop that iterates through candidate plans on retryable failures
+- [x] Define retryable failures as HTTP 503 service unavailable, HTTP 403 forbidden, network timeouts, and connection errors
+- [x] Preserve polite headers and user agent when constructing request for fallback candidate
+- [x] Log warning message for each fallback attempt including original resolver failure reason and candidate resolver being attempted
+- [x] Record complete fallback chain in manifest including primary attempt and all fallback attempts with their outcomes
+- [x] Add `resolver_attempts` field to manifest JSON containing array of dictionaries with resolver name, URL, and result status
+- [x] Ensure manifest reflects actual successful resolver used rather than originally planned resolver when fallback occurs
+- [x] Test fallback mechanism with mock HTTP server returning 503 for first URL and 200 for second URL
+- [x] Verify fallback chain appears correctly in saved manifest after successful fallback
 
 ### 2.2 Add Streaming Normalization for Large Ontologies
 
