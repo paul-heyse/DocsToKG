@@ -197,7 +197,16 @@ def _request_with_retries(
 
 @dataclass
 class ResolverResult:
-    """Represents either a candidate URL or an informational event."""
+    """Either a candidate download URL or an informational resolver event.
+
+    Attributes:
+        url: Candidate download URL emitted by the resolver (``None`` for events).
+        referer: Optional referer header to accompany the download request.
+        metadata: Arbitrary metadata recorded alongside the result.
+        event: Optional event label (e.g., ``"error"`` or ``"skipped"``).
+        event_reason: Human-readable reason describing the event.
+        http_status: HTTP status associated with the event, when available.
+    """
 
     url: Optional[str]
     referer: Optional[str] = None
@@ -208,11 +217,37 @@ class ResolverResult:
 
     @property
     def is_event(self) -> bool:
+        """Return ``True`` when this result represents an informational event.
+
+        Args:
+            None
+
+        Returns:
+            bool: ``True`` if the resolver emitted an event instead of a URL.
+        """
         return self.url is None
 
 
 @dataclass
 class ResolverConfig:
+    """Runtime configuration options applied across resolvers.
+
+    Attributes:
+        resolver_order: Ordered list of resolver names to execute.
+        resolver_toggles: Mapping toggling individual resolvers on/off.
+        max_attempts_per_work: Maximum number of resolver attempts per work item.
+        timeout: Default HTTP timeout applied to resolvers.
+        sleep_jitter: Random jitter added between retries.
+        polite_headers: HTTP headers to apply for polite crawling.
+        unpaywall_email: Contact email registered with Unpaywall.
+        core_api_key: API key used for the CORE resolver.
+        semantic_scholar_api_key: API key for Semantic Scholar resolver.
+        doaj_api_key: API key for DOAJ resolver.
+        resolver_timeouts: Resolver-specific timeout overrides.
+        resolver_min_interval_s: Minimum interval between resolver requests.
+        resolver_rate_limits: Deprecated rate limit configuration retained for compat.
+        mailto: Contact email appended to polite headers and user agent string.
+    """
     resolver_order: List[str] = field(default_factory=lambda: list(DEFAULT_RESOLVER_ORDER))
     resolver_toggles: Dict[str, bool] = field(
         default_factory=lambda: dict(_DEFAULT_RESOLVER_TOGGLES)
@@ -231,9 +266,25 @@ class ResolverConfig:
     mailto: Optional[str] = None
 
     def get_timeout(self, resolver_name: str) -> float:
+        """Return the timeout to use for a resolver, falling back to defaults.
+
+        Args:
+            resolver_name: Name of the resolver requesting a timeout.
+
+        Returns:
+            float: Timeout value in seconds.
+        """
         return self.resolver_timeouts.get(resolver_name, self.timeout)
 
     def is_enabled(self, resolver_name: str) -> bool:
+        """Return ``True`` when the resolver is enabled for the current run.
+
+        Args:
+            resolver_name: Name of the resolver.
+
+        Returns:
+            bool: ``True`` if the resolver is enabled.
+        """
         return self.resolver_toggles.get(resolver_name, True)
 
     def __post_init__(self) -> None:
@@ -244,6 +295,23 @@ class ResolverConfig:
 
 @dataclass
 class AttemptRecord:
+    """Structured log record describing a resolver attempt.
+
+    Attributes:
+        work_id: Identifier of the work being processed.
+        resolver_name: Name of the resolver that produced the record.
+        resolver_order: Ordinal position of the resolver in the pipeline.
+        url: Candidate URL that was attempted.
+        status: Classification or status string for the attempt.
+        http_status: HTTP status code (when available).
+        content_type: Response content type.
+        elapsed_ms: Approximate elapsed time for the attempt in milliseconds.
+        reason: Optional descriptive reason for failures or skips.
+        metadata: Arbitrary metadata supplied by the resolver.
+        sha256: SHA-256 digest of downloaded content, when available.
+        content_length: Size of the downloaded content in bytes.
+        dry_run: Flag indicating whether the attempt occurred in dry-run mode.
+    """
     work_id: str
     resolver_name: str
     resolver_order: Optional[int]
@@ -260,11 +328,22 @@ class AttemptRecord:
 
 
 class AttemptLogger(Protocol):
-    def log(self, record: AttemptRecord) -> None: ...
+    """Protocol for logging resolver attempts."""
+
+    def log(self, record: AttemptRecord) -> None:
+        """Log a resolver attempt.
+
+        Args:
+            record: Attempt record describing the resolver execution.
+
+        Returns:
+            None
+        """
 
 
 @dataclass
 class DownloadOutcome:
+    """Outcome of a resolver download attempt."""
     classification: str
     path: Optional[str]
     http_status: Optional[int]
@@ -279,11 +358,29 @@ class DownloadOutcome:
 
     @property
     def is_pdf(self) -> bool:
+        """Return ``True`` when the classification represents a PDF.
+
+        Args:
+            None
+
+        Returns:
+            bool: ``True`` if the outcome corresponds to a PDF download.
+        """
         return self.classification in {"pdf", "pdf_unknown"}
 
 
 @dataclass
 class PipelineResult:
+    """Aggregate result returned by the resolver pipeline.
+
+    Attributes:
+        success: Indicates whether the pipeline found a suitable asset.
+        resolver_name: Resolver that produced the successful result.
+        url: URL that was ultimately fetched.
+        outcome: Download outcome associated with the result.
+        html_paths: Collected HTML artefacts from the pipeline.
+        reason: Optional reason string explaining failures.
+    """
     success: bool
     resolver_name: Optional[str] = None
     url: Optional[str] = None
@@ -293,26 +390,67 @@ class PipelineResult:
 
 
 class Resolver(Protocol):
+    """Protocol that resolver implementations must follow."""
+
     name: str
 
-    def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool: ...
+    def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` if this resolver should run for the given artifact.
+
+        Args:
+            config: Resolver configuration options.
+            artifact: Work artifact under consideration.
+
+        Returns:
+            bool: ``True`` when the resolver should run for the artifact.
+        """
 
     def iter_urls(
         self,
         session: requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
-    ) -> Iterable[ResolverResult]: ...
+    ) -> Iterable[ResolverResult]:
+        """Yield candidate PMC download URLs derived from identifiers.
+
+        Args:
+            session: Requests session used to query PMC utilities.
+            config: Resolver configuration supplying headers/timeouts.
+            artifact: Work artifact containing PMC/PMID/DOI identifiers.
+
+        Returns:
+            Iterable[ResolverResult]: Candidate PMC download URLs.
+        """
+        """Yield candidate URLs or events for the given artifact.
+
+        Args:
+            session: HTTP session used for outbound requests.
+            config: Resolver configuration.
+            artifact: Work artifact describing the current item.
+
+        Returns:
+            Iterable[ResolverResult]: Stream of download candidates or events.
+        """
 
 
 @dataclass
 class ResolverMetrics:
+    """Lightweight metrics collector for resolver execution."""
     attempts: Counter = field(default_factory=Counter)
     successes: Counter = field(default_factory=Counter)
     html: Counter = field(default_factory=Counter)
     skips: Counter = field(default_factory=Counter)
 
     def record_attempt(self, resolver_name: str, outcome: DownloadOutcome) -> None:
+        """Record a resolver attempt and update success/html counters.
+
+        Args:
+            resolver_name: Name of the resolver that executed.
+            outcome: Download outcome produced by the resolver.
+
+        Returns:
+            None
+        """
         self.attempts[resolver_name] += 1
         if outcome.classification == "html":
             self.html[resolver_name] += 1
@@ -320,10 +458,27 @@ class ResolverMetrics:
             self.successes[resolver_name] += 1
 
     def record_skip(self, resolver_name: str, reason: str) -> None:
+        """Record a skip event for a resolver with a reason tag.
+
+        Args:
+            resolver_name: Resolver that was skipped.
+            reason: Short description explaining the skip.
+
+        Returns:
+            None
+        """
         key = f"{resolver_name}:{reason}"
         self.skips[key] += 1
 
     def summary(self) -> Dict[str, Any]:
+        """Return aggregated metrics summarizing resolver behaviour.
+
+        Args:
+            None
+
+        Returns:
+            Dict[str, Any]: Snapshot of attempts, successes, HTML hits, and skips.
+        """
         return {
             "attempts": dict(self.attempts),
             "successes": dict(self.successes),
@@ -378,12 +533,16 @@ class ResolverPipeline:
             limit = self.config.resolver_rate_limits.get(resolver_name)
         if not limit:
             return
+        wait = 0.0
         with self._lock:
             last = self._last_invocation[resolver_name]
-        now = time.monotonic()
-        delta = now - last
-        if delta < limit:
-            time.sleep(limit - delta)
+            now = time.monotonic()
+            delta = now - last
+            if delta < limit:
+                wait = limit - delta
+            self._last_invocation[resolver_name] = now + wait
+        if wait > 0:
+            time.sleep(wait)
 
     def _jitter_sleep(self) -> None:
         if self.config.sleep_jitter <= 0:
@@ -396,6 +555,16 @@ class ResolverPipeline:
         artifact: "WorkArtifact",
         context: Optional[Dict[str, Any]] = None,
     ) -> PipelineResult:
+        """Execute resolvers sequentially until a PDF is obtained or exhausted.
+
+        Args:
+            session: Requests session shared across resolver invocations.
+            artifact: Work artifact describing the current work item.
+            context: Optional context dictionary (dry-run flags, previous manifest).
+
+        Returns:
+            PipelineResult summarizing the pipeline outcome.
+        """
         context_data: Dict[str, Any] = context or {}
         dry_run = bool(context_data.get("dry_run", False))
         seen_urls: set[str] = set()
@@ -579,9 +748,19 @@ def _absolute_url(base: str, href: str) -> str:
 
 
 class UnpaywallResolver:
+    """Resolve PDFs via the Unpaywall API."""
     name = "unpaywall"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when Unpaywall is configured and the work has a DOI.
+
+        Args:
+            config: Resolver configuration containing Unpaywall credentials.
+            artifact: Work artifact whose identifiers are being considered.
+
+        Returns:
+            bool: ``True`` if the resolver should run for this artifact.
+        """
         return bool(config.unpaywall_email and artifact.doi)
 
     def iter_urls(
@@ -590,6 +769,16 @@ class UnpaywallResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield candidate PDF URLs discovered via the Unpaywall API.
+
+        Args:
+            session: Requests session used to query the Unpaywall API.
+            config: Resolver configuration containing credentials.
+            artifact: Work artifact providing a DOI for lookup.
+
+        Returns:
+            Iterable[ResolverResult]: Resolver results with candidate URLs.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(
@@ -599,39 +788,7 @@ class UnpaywallResolver:
             )
             return
         endpoint = f"https://api.unpaywall.org/v2/{quote(doi)}"
-        if isinstance(session, requests.Session):
-            try:
-                data = _fetch_unpaywall_data(
-                    doi,
-                    config.unpaywall_email,
-                    config.get_timeout(self.name),
-                    _headers_cache_key(config.polite_headers),
-                )
-            except requests.HTTPError as exc:
-                status = exc.response.status_code if exc.response else None
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="http-error",
-                    http_status=status,
-                )
-                return
-            except requests.RequestException as exc:  # pragma: no cover - network errors
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="request-error",
-                    metadata={"message": str(exc)},
-                )
-                return
-            except ValueError:
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="json-error",
-                )
-                return
-        else:
+        if hasattr(session, "get"):
             try:
                 response = session.get(
                     endpoint,
@@ -666,6 +823,38 @@ class UnpaywallResolver:
                     event_reason="json-error",
                 )
                 return
+        else:
+            try:
+                data = _fetch_unpaywall_data(
+                    doi,
+                    config.unpaywall_email,
+                    config.get_timeout(self.name),
+                    _headers_cache_key(config.polite_headers),
+                )
+            except requests.HTTPError as exc:
+                status = exc.response.status_code if exc.response else None
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="http-error",
+                    http_status=status,
+                )
+                return
+            except requests.RequestException as exc:  # pragma: no cover - network errors
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="request-error",
+                    metadata={"message": str(exc)},
+                )
+                return
+            except ValueError:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="json-error",
+                )
+                return
 
         candidates: List[Tuple[str, Dict[str, Any]]] = []
         best = (data or {}).get("best_oa_location") or {}
@@ -689,9 +878,20 @@ class UnpaywallResolver:
 
 
 class CrossrefResolver:
+    """Resolve candidate URLs from the Crossref metadata API."""
+
     name = "crossref"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when the artifact has a DOI available for lookup.
+
+        Args:
+            config: Resolver configuration (unused).
+            artifact: Work artifact containing identifiers.
+
+        Returns:
+            bool: ``True`` if the resolver should execute.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -700,6 +900,16 @@ class CrossrefResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield URLs discovered via the Crossref API for a given artifact.
+
+        Args:
+            session: Requests session used for API requests.
+            config: Resolver configuration (polite headers, mailto info).
+            artifact: Work artifact containing a DOI.
+
+        Returns:
+            Iterable[ResolverResult]: Candidate URL results.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(
@@ -817,9 +1027,20 @@ class CrossrefResolver:
 
 
 class LandingPageResolver:
+    """Attempt to scrape landing pages when explicit PDFs are unavailable."""
+
     name = "landing_page"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when the artifact exposes landing page URLs.
+
+        Args:
+            config: Resolver configuration (unused).
+            artifact: Work artifact with landing page URLs.
+
+        Returns:
+            bool: ``True`` if landing page URLs are available.
+        """
         return bool(artifact.landing_urls)
 
     def iter_urls(
@@ -828,6 +1049,16 @@ class LandingPageResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield candidate URLs discovered by scraping landing pages.
+
+        Args:
+            session: Requests session used for HTTP calls.
+            config: Resolver configuration.
+            artifact: Work artifact providing landing page URLs.
+
+        Returns:
+            Iterable[ResolverResult]: Candidate URL results.
+        """
         if BeautifulSoup is None:
             yield ResolverResult(
                 url=None,
@@ -897,9 +1128,20 @@ class LandingPageResolver:
 
 
 class ArxivResolver:
+    """Resolve arXiv preprints using arXiv identifier lookups."""
+
     name = "arxiv"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when the artifact has an arXiv identifier.
+
+        Args:
+            config: Resolver configuration (unused).
+            artifact: Work artifact containing identifiers.
+
+        Returns:
+            bool: ``True`` if an arXiv ID is present.
+        """
         return bool(artifact.arxiv_id)
 
     def iter_urls(
@@ -908,6 +1150,16 @@ class ArxivResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield candidate arXiv download URLs.
+
+        Args:
+            session: Requests session (unused for static URLs).
+            config: Resolver configuration (unused).
+            artifact: Work artifact containing an arXiv identifier.
+
+        Returns:
+            Iterable[ResolverResult]: Candidate URLs for the arXiv PDF.
+        """
         arxiv_id = artifact.arxiv_id
         if not arxiv_id:
             return []
@@ -921,9 +1173,20 @@ class ArxivResolver:
 
 
 class PmcResolver:
+    """Resolve PubMed Central articles via identifiers and lookups."""
+
     name = "pmc"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when the artifact has PMC, PMID, or DOI identifiers.
+
+        Args:
+            config: Resolver configuration (unused).
+            artifact: Work artifact containing identifiers.
+
+        Returns:
+            bool: ``True`` if identifier data is available.
+        """
         return bool(artifact.pmcid or artifact.pmid or artifact.doi)
 
     def _lookup_pmcids(
@@ -966,19 +1229,31 @@ class PmcResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield candidate PMC download URLs derived from identifiers.
+
+        Args:
+            session: Requests session used for PMC utility calls.
+            config: Resolver configuration supplying headers/timeouts.
+            artifact: Work artifact containing PMC, PMID, or DOI identifiers.
+
+        Returns:
+            Iterable[ResolverResult]: Candidate PMC URLs.
+        """
         pmcids: List[str] = []
         if artifact.pmcid:
             pmcids.append(normalize_pmcid(artifact.pmcid))
-        identifiers = []
-        if artifact.doi:
-            identifiers.append(normalize_doi(artifact.doi))
-        if artifact.pmid:
+        identifiers: List[str] = []
+        doi = normalize_doi(artifact.doi)
+        if doi:
+            identifiers.append(doi)
+        elif artifact.pmid:
             identifiers.append(artifact.pmid)
         if not pmcids:
             pmcids.extend(self._lookup_pmcids(session, identifiers, config))
 
         for pmcid in dedupe(pmcids):
             oa_url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id={pmcid}"
+            fallback_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/pdf/"
             try:
                 resp = _request_with_retries(
                     session,
@@ -988,8 +1263,16 @@ class PmcResolver:
                     headers=config.polite_headers,
                 )
             except requests.RequestException:
+                yield ResolverResult(
+                    url=fallback_url,
+                    metadata={"pmcid": pmcid, "source": "pdf-fallback"},
+                )
                 continue
             if resp.status_code != 200:
+                yield ResolverResult(
+                    url=fallback_url,
+                    metadata={"pmcid": pmcid, "source": "pdf-fallback"},
+                )
                 continue
             for match in re.finditer(r'href="([^"]+\.pdf)"', resp.text, flags=re.I):
                 href = match.group(1)
@@ -999,15 +1282,26 @@ class PmcResolver:
                     metadata={"pmcid": pmcid, "source": "oa"},
                 )
             yield ResolverResult(
-                url=f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/pdf/",
+                url=fallback_url,
                 metadata={"pmcid": pmcid, "source": "pdf-fallback"},
             )
 
 
 class EuropePmcResolver:
+    """Resolve Open Access links via the Europe PMC REST API."""
+
     name = "europe_pmc"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when the artifact has a DOI suitable for lookup.
+
+        Args:
+            config: Resolver configuration (unused).
+            artifact: Work artifact containing metadata.
+
+        Returns:
+            bool: ``True`` if a DOI is present.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -1016,6 +1310,16 @@ class EuropePmcResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield candidate URLs from the Europe PMC API.
+
+        Args:
+            session: Requests session used for API calls.
+            config: Resolver configuration.
+            artifact: Work artifact containing a DOI.
+
+        Returns:
+            Iterable[ResolverResult]: Candidate Europe PMC URLs.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             return []
@@ -1046,9 +1350,20 @@ class EuropePmcResolver:
 
 
 class CoreResolver:
+    """Resolve PDFs using the CORE API."""
+
     name = "core"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when a CORE API key and DOI are available.
+
+        Args:
+            config: Resolver configuration containing credentials.
+            artifact: Work artifact containing identifiers.
+
+        Returns:
+            bool: ``True`` if the resolver should run.
+        """
         return bool(config.core_api_key and artifact.doi)
 
     def iter_urls(
@@ -1057,6 +1372,16 @@ class CoreResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield candidate URLs returned by the CORE API.
+
+        Args:
+            session: Requests session used for API requests.
+            config: Resolver configuration containing API keys.
+            artifact: Work artifact containing a DOI.
+
+        Returns:
+            Iterable[ResolverResult]: Candidate CORE URLs.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             return []
@@ -1093,9 +1418,20 @@ class CoreResolver:
 
 
 class DoajResolver:
+    """Resolve Open Access links using the DOAJ API."""
+
     name = "doaj"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when the artifact has a DOI for DOAJ lookup.
+
+        Args:
+            config: Resolver configuration with optional API key.
+            artifact: Work artifact containing identifiers.
+
+        Returns:
+            bool: ``True`` if the resolver should run for this artifact.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -1104,6 +1440,16 @@ class DoajResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield candidate URLs discovered via DOAJ article metadata.
+
+        Args:
+            session: Requests session used for DOAJ API calls.
+            config: Resolver configuration containing optional API key.
+            artifact: Work artifact containing a DOI.
+
+        Returns:
+            Iterable[ResolverResult]: Candidate DOAJ URLs.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             return []
@@ -1140,9 +1486,20 @@ class DoajResolver:
 
 
 class SemanticScholarResolver:
+    """Resolve PDFs using the Semantic Scholar Graph API."""
+
     name = "semantic_scholar"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when the artifact has a DOI for lookup.
+
+        Args:
+            config: Resolver configuration containing API credentials.
+            artifact: Work artifact containing identifiers.
+
+        Returns:
+            bool: ``True`` if lookup should be attempted.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -1151,6 +1508,15 @@ class SemanticScholarResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield candidate URLs returned from the Semantic Scholar API.
+
+        Args:
+            session: Requests session (unused; API call uses cached helper).
+            config: Resolver configuration containing API key.
+            artifact: Work artifact containing a DOI.
+
+        Returns:
+            Iterable[ResolverResult]: Candidate Semantic Scholar URLs."""
         doi = normalize_doi(artifact.doi)
         if not doi:
             return []
@@ -1174,9 +1540,20 @@ class SemanticScholarResolver:
 
 
 class OpenAireResolver:
+    """Resolve URLs using the OpenAIRE API."""
+
     name = "openaire"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when the artifact has a DOI.
+
+        Args:
+            config: Resolver configuration (unused).
+            artifact: Work artifact containing identifiers.
+
+        Returns:
+            bool: ``True`` if the resolver should run.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -1185,6 +1562,16 @@ class OpenAireResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield candidate URLs discovered via OpenAIRE search.
+
+        Args:
+            session: Requests session for API calls.
+            config: Resolver configuration.
+            artifact: Work artifact with DOI metadata.
+
+        Returns:
+            Iterable[ResolverResult]: Candidate OpenAIRE URLs.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             return []
@@ -1216,9 +1603,20 @@ class OpenAireResolver:
 
 
 class HalResolver:
+    """Resolve publications from the HAL open archive."""
+
     name = "hal"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when the artifact has a DOI for HAL lookup.
+
+        Args:
+            config: Resolver configuration (unused).
+            artifact: Work artifact containing identifiers.
+
+        Returns:
+            bool: ``True`` when the resolver should execute.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -1227,6 +1625,16 @@ class HalResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield candidate HAL download URLs.
+
+        Args:
+            session: Requests session.
+            config: Resolver configuration with polite headers.
+            artifact: Work artifact containing a DOI.
+
+        Returns:
+            Iterable[ResolverResult]: Candidate HAL URLs.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             return []
@@ -1266,9 +1674,20 @@ class HalResolver:
 
 
 class OsfResolver:
+    """Resolve artefacts hosted on the Open Science Framework."""
+
     name = "osf"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when the artifact has a DOI for OSF lookup.
+
+        Args:
+            config: Resolver configuration (unused).
+            artifact: Work artifact containing identifiers.
+
+        Returns:
+            bool: ``True`` if the resolver should run for this artifact.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -1277,6 +1696,16 @@ class OsfResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield candidate download URLs from the OSF API.
+
+        Args:
+            session: Requests session for OSF API calls.
+            config: Resolver configuration with polite headers.
+            artifact: Work artifact containing a DOI.
+
+        Returns:
+            Iterable[ResolverResult]: Candidate OSF URLs.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             return []
@@ -1317,9 +1746,20 @@ class OsfResolver:
 
 
 class WaybackResolver:
+    """Fallback resolver that queries the Internet Archive Wayback Machine."""
+
     name = "wayback"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when previous resolvers have recorded failed URLs.
+
+        Args:
+            config: Resolver configuration (unused).
+            artifact: Work artifact containing resolver metadata.
+
+        Returns:
+            bool: ``True`` if failed URLs exist for the artifact.
+        """
         return bool(artifact.failed_pdf_urls)
 
     def iter_urls(
@@ -1328,6 +1768,16 @@ class WaybackResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield archived URLs from the Internet Archive when available.
+
+        Args:
+            session: Requests session for Wayback API calls.
+            config: Resolver configuration.
+            artifact: Work artifact with previously failed URLs.
+
+        Returns:
+            Iterable[ResolverResult]: Candidate archived URLs.
+        """
         for original in artifact.failed_pdf_urls:
             try:
                 resp = _request_with_retries(
@@ -1355,12 +1805,28 @@ class WaybackResolver:
 
 
 def clear_resolver_caches() -> None:
+    """Clear resolver-level LRU caches to avoid stale results.
+
+    Args:
+        None
+
+    Returns:
+        None
+    """
     _fetch_unpaywall_data.cache_clear()
     _fetch_crossref_data.cache_clear()
     _fetch_semantic_scholar_data.cache_clear()
 
 
 def default_resolvers() -> List[Resolver]:
+    """Return the default resolver instances in priority order.
+
+    Args:
+        None
+
+    Returns:
+        List[Resolver]: Resolver instances in execution order.
+    """
     return [
         UnpaywallResolver(),
         CrossrefResolver(),

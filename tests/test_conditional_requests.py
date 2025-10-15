@@ -1,3 +1,22 @@
+"""
+Conditional Request Handling Tests
+
+This module verifies the downloader's HTTP caching semantics by simulating
+conditional requests, ensuring cached assets are reused when remote
+servers respond with 304 Not Modified.
+
+Key Scenarios:
+- Ensures cached payloads short-circuit redundant downloads
+- Confirms manifest entries preserve ETag and Last-Modified metadata
+
+Dependencies:
+- pytest: Assertions and fixtures
+- DocsToKG.ContentDownload.download_pyalex_pdfs: Conditional request logic
+
+Usage:
+    pytest tests/test_conditional_requests.py
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

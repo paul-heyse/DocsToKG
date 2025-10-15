@@ -1,3 +1,23 @@
+"""
+Resolver Pipeline Behaviour Tests
+
+This module verifies the orchestration logic within the resolver pipeline
+including ordering, attempt limits, deduplication, artifact collection,
+and rate limiting to ensure predictable download flows.
+
+Key Scenarios:
+- Enforces resolver execution order and configurable attempt limits
+- Deduplicates resolver URLs while capturing HTML fallback paths
+- Validates rate limiting and logging side effects across runs
+
+Dependencies:
+- pytest/requests: Simulation of HTTP sessions
+- DocsToKG.ContentDownload: Resolver pipeline under test
+
+Usage:
+    pytest tests/test_pipeline_behaviour.py
+"""
+
 from pathlib import Path
 from typing import List
 

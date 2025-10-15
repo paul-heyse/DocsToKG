@@ -1,3 +1,21 @@
+"""
+Ontology Logging Tests
+
+This module validates logging helpers for the ontology download service,
+ensuring sensitive fields are masked and structured JSON logs include
+expected metadata.
+
+Key Scenarios:
+- Redacts API keys across header and payload fields
+- Writes JSON log entries with contextual attributes for observability
+
+Dependencies:
+- DocsToKG.OntologyDownload.logging_config: Logging utilities under test
+
+Usage:
+    pytest tests/ontology_download/test_logging.py
+"""
+
 import json
 
 from DocsToKG.OntologyDownload.config import LoggingConfig

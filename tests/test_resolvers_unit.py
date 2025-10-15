@@ -1,3 +1,23 @@
+"""
+Resolver Unit Tests
+
+This module exercises each resolver implementation in isolation to ensure
+they surface candidate URLs, propagate metadata, and emit meaningful
+events when remote APIs fail.
+
+Key Scenarios:
+- Covers Unpaywall, Crossref, Semantic Scholar, landing page, PMC, and topic resolvers
+- Validates request headers, query string parameters, and error reporting
+- Ensures HTML parsing heuristics resolve direct PDF download links
+
+Dependencies:
+- pytest/responses: HTTP mocking for resolver APIs
+- DocsToKG.ContentDownload: Resolver and artifact implementations
+
+Usage:
+    pytest tests/test_resolvers_unit.py
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

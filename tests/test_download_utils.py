@@ -1,3 +1,23 @@
+"""
+Content Download Utility Tests
+
+This module covers the helper primitives used by the OpenAlex downloader
+for slug generation, payload classification, and identifier normalization
+to guarantee consistent artifact naming and metadata hygiene.
+
+Key Scenarios:
+- Normalizes DOIs, PMIDs, PMCIDs, and arXiv identifiers
+- Classifies payload content types across PDF and HTML responses
+- Deduplicates candidate URLs while preserving provenance metadata
+
+Dependencies:
+- pytest: Parametrization and assertions
+- DocsToKG.ContentDownload: Utility functions under test
+
+Usage:
+    pytest tests/test_download_utils.py
+"""
+
 import pytest
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader

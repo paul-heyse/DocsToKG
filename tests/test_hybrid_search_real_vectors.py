@@ -1,3 +1,23 @@
+"""
+Hybrid Search Real Vector Tests
+
+This module runs hybrid search validation against the real vector fixture
+produced by CI, covering ingestion idempotency, retrieval correctness,
+metrics reporting, and snapshot lifecycle management.
+
+Key Scenarios:
+- Ingests real chunk datasets and executes semantic queries
+- Exercises re-ingestion pathways including GPU fallback handling
+- Generates validator reports and verifies serialization helpers
+
+Dependencies:
+- pytest/numpy: Numeric comparisons and fixture orchestration
+- DocsToKG.HybridSearch: Full hybrid search stack under test
+
+Usage:
+    pytest tests/test_hybrid_search_real_vectors.py
+"""
+
 from __future__ import annotations
 
 import json

@@ -1,3 +1,18 @@
+"""
+Ontology Test Environment Stubs
+
+This module wires lightweight stubs for optional dependencies used in the
+ontology download suite so tests can run without network access or heavy
+third-party packages.
+
+Key Scenarios:
+- Provides fallback implementations for requests, BioPortal, OLS, and Pystow
+- Supplies stubbed telemetry/logging clients for validator invocation
+
+Usage:
+    pytest tests/ontology_download -k ontology_download
+"""
+
 import logging
 import os
 import sys

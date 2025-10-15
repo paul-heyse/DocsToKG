@@ -1,3 +1,23 @@
+"""
+Content Download CLI Tests
+
+This module validates the OpenAlex PDF download command line entry point,
+covering configuration loading, mailto propagation, and manifest output
+generation for downstream analytics.
+
+Key Scenarios:
+- Enforces optional PyYAML dependency for YAML configuration files
+- Confirms CLI arguments map to resolver configuration correctly
+- Verifies manifest output and topic resolution side effects
+
+Dependencies:
+- pytest: Fixture and assertion framework
+- DocsToKG.ContentDownload.download_pyalex_pdfs: CLI implementation
+
+Usage:
+    pytest tests/test_cli.py
+"""
+
 from __future__ import annotations
 
 import json

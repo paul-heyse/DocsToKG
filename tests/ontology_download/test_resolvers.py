@@ -1,3 +1,23 @@
+"""
+Ontology Resolver Tests
+
+This module covers individual ontology resolver implementations, ensuring
+they derive download plans with correct URLs, versions, licensing, and
+authentication behaviour across supported providers.
+
+Key Scenarios:
+- Prefers requested formats across OBO, OLS, BioPortal, SKOS, and XBRL
+- Handles API credential loading and retries on transient errors
+- Validates configuration error paths for missing metadata
+
+Dependencies:
+- pytest: Fixtures and assertions
+- DocsToKG.OntologyDownload.resolvers: Resolver implementations under test
+
+Usage:
+    pytest tests/ontology_download/test_resolvers.py
+"""
+
 import logging
 from types import SimpleNamespace
 

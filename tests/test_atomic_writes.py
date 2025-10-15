@@ -1,3 +1,22 @@
+"""
+Atomic Download Tests
+
+This module validates the downloader's atomic write guarantees by
+simulating partial failures and verifying checksum bookkeeping for
+successful PDF retrievals.
+
+Key Scenarios:
+- Ensures incomplete downloads leave `.part` files for forensic retries
+- Confirms successful downloads compute digests and clean partial files
+
+Dependencies:
+- pytest: Assertions and fixtures
+- DocsToKG.ContentDownload.download_pyalex_pdfs: Streaming download logic
+
+Usage:
+    pytest tests/test_atomic_writes.py
+"""
+
 import hashlib
 from pathlib import Path
 from typing import Any, Dict

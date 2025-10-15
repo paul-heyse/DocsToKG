@@ -177,3 +177,22 @@ def test_fetch_all_logs_progress(monkeypatch, patched_dirs, stubbed_validators, 
     caplog.set_level(logging.INFO)
     core.fetch_all([core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"])], config=config)
     assert any("progress" in record.getMessage() for record in caplog.records)
+"""
+Ontology Download Integration Tests
+
+This module exercises the ontology download workflow end-to-end using
+fixture resolvers, validating manifest generation, validator integration,
+multi-version storage, and logging side effects.
+
+Key Scenarios:
+- Fetches multiple ontologies and persists manifests plus normalized artefacts
+- Ensures force downloads bypass cached manifests
+- Confirms versioned storage structure and progress logging
+
+Dependencies:
+- pytest: Fixtures and monkeypatching
+- DocsToKG.OntologyDownload: Core orchestration under test
+
+Usage:
+    pytest tests/ontology_download/test_integration.py
+"""

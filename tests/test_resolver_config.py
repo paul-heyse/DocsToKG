@@ -1,3 +1,22 @@
+"""
+Resolver Configuration Tests
+
+This module validates resolver configuration parsing, backwards
+compatibility warnings, and header composition for the OpenAlex content
+download pipeline.
+
+Key Scenarios:
+- Emits deprecation warnings when legacy rate limit fields are provided
+- Ensures mailto metadata flows into polite HTTP headers and toggles
+
+Dependencies:
+- pytest: Assertions and fixtures
+- DocsToKG.ContentDownload.download_pyalex_pdfs: Configuration loader under test
+
+Usage:
+    pytest tests/test_resolver_config.py
+"""
+
 from argparse import Namespace
 from pathlib import Path
 
@@ -22,6 +41,7 @@ def test_deprecated_resolver_rate_limits_warning(tmp_path: Path, caplog: pytest.
         max_resolver_attempts=None,
         resolver_timeout=None,
         disable_resolver=[],
+        enable_resolver=[],
         resolver_order=None,
         log_jsonl=None,
         log_format="jsonl",
@@ -44,12 +64,15 @@ def test_user_agent_includes_mailto(tmp_path: Path) -> None:
         max_resolver_attempts=None,
         resolver_timeout=None,
         disable_resolver=[],
+        enable_resolver=["openaire"],
         resolver_order=None,
         log_jsonl=None,
         log_format="jsonl",
         resume_from=None,
     )
 
-    config = load_resolver_config(args, ["unpaywall", "crossref"], None)
+    config = load_resolver_config(args, ["unpaywall", "crossref", "openaire"], None)
     user_agent = config.polite_headers.get("User-Agent")
     assert user_agent == "DocsToKGDownloader/1.0 (+ua-tester@example.org; mailto:ua-tester@example.org)"
+    assert config.polite_headers.get("mailto") == "ua-tester@example.org"
+    assert config.resolver_toggles["openaire"] is True

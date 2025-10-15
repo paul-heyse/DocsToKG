@@ -1,3 +1,23 @@
+"""
+HTML Extraction Tests
+
+This module validates the fallback HTML download path when resolver
+candidates return web pages instead of PDFs, ensuring the extracted text
+artifact aligns with trafilatura processing expectations.
+
+Key Scenarios:
+- Confirms HTML responses persist alongside normalized text derivatives
+- Verifies temporary extraction directory management for text outputs
+
+Dependencies:
+- pytest: Test orchestration
+- requests/responses: HTTP simulation for resolver candidates
+- DocsToKG.ContentDownload.download_pyalex_pdfs: Download helpers under test
+
+Usage:
+    pytest tests/test_html_extraction.py
+"""
+
 from __future__ import annotations
 
 import sys

@@ -1,3 +1,23 @@
+"""
+Ontology Download Streaming Tests
+
+This module validates the ontology download subsystem, focusing on HTTP
+streaming, caching, resume support, and archive extraction safety for the
+DocsToKG ontology ingestion workflow.
+
+Key Scenarios:
+- Streams ontology payloads with resumable and cached responses
+- Applies retry and rate limiting controls during transfer
+- Guards against path traversal when extracting downloaded archives
+
+Dependencies:
+- pytest/requests: Network simulation and assertions
+- DocsToKG.OntologyDownload.download: Streaming implementation under test
+
+Usage:
+    pytest tests/ontology_download/test_download.py
+"""
+
 import io
 from dataclasses import dataclass
 from pathlib import Path

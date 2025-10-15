@@ -1,3 +1,23 @@
+"""
+Resolver Pipeline Integration Tests
+
+This module validates the resolver pipeline orchestration, covering
+candidate selection, resolver order, CLI integration, and classification
+helpers that support the OpenAlex download CLI.
+
+Key Scenarios:
+- Confirms pipeline stops after first successful download
+- Exercises Unpaywall and landing page resolvers in isolation
+- Validates CLI happy path flows including manifest creation
+
+Dependencies:
+- pytest: Assertions and fixtures
+- DocsToKG.ContentDownload: Resolver pipeline and CLI under test
+
+Usage:
+    pytest tests/test_resolver_pipeline.py
+"""
+
 from pathlib import Path
 import sys
 

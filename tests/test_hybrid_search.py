@@ -1,3 +1,25 @@
+"""
+Hybrid Search End-to-End Tests
+
+This module exercises the hybrid search stack, covering ingestion,
+vector management, retrieval orchestration, and observability helpers to
+ensure the demo configuration behaves as expected with synthetic data.
+
+Key Scenarios:
+- Builds feature artifacts and indexes documents through the ingestion pipeline
+- Executes full-text and vector fusion searches to validate ranking
+- Serializes and restores state snapshots to confirm determinism
+- Checks pagination boundaries and stats reporting for client consumption
+
+Dependencies:
+- pytest: Fixture orchestration and parameterization
+- numpy: Vector manipulation for assertions
+- DocsToKG.HybridSearch: Primary system under test
+
+Usage:
+    pytest tests/test_hybrid_search.py
+"""
+
 from __future__ import annotations
 
 import json
@@ -366,4 +388,3 @@ def test_faiss_index_uses_registry_bridge(tmp_path: Path) -> None:
 
     hits = manager.search(embedding, 1)
     assert hits and hits[0].vector_id == chunk.vector_id
-

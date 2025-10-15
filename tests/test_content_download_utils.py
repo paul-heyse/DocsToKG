@@ -1,3 +1,21 @@
+"""
+Content Download Utility Regression Tests
+
+This module provides narrow regression coverage for lightweight helper
+functions such as normalization, prefix stripping, and deduplication that
+support resolver metadata preparation.
+
+Key Scenarios:
+- Normalizes DOI and PMC identifiers regardless of input formatting
+- Strips case-insensitive prefixes and deduplicates ordered collections
+
+Dependencies:
+- DocsToKG.ContentDownload.utils: Utility functions under test
+
+Usage:
+    pytest tests/test_content_download_utils.py
+"""
+
 from DocsToKG.ContentDownload.utils import (
     dedupe,
     normalize_doi,
@@ -44,4 +62,3 @@ def test_dedupe_preserves_order() -> None:
 
 def test_dedupe_filters_falsey_values() -> None:
     assert dedupe(["a", "", None, "a"]) == ["a"]
-

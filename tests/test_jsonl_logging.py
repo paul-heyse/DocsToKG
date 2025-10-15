@@ -1,3 +1,23 @@
+"""
+JSONL Logging Integration Tests
+
+This module ensures the JSON Lines logging utilities capture resolver
+attempt metadata and remain compatible with CSV export tooling used for
+post-processing download telemetry.
+
+Key Scenarios:
+- Validates attempt, manifest, and summary records persist correctly
+- Confirms CSV export maintains schema and preserves structured metadata
+
+Dependencies:
+- pytest: Provides fixtures and assertions
+- DocsToKG.ContentDownload.download_pyalex_pdfs: Logging helpers under test
+- scripts.export_attempts_csv: CSV conversion routine
+
+Usage:
+    pytest tests/test_jsonl_logging.py
+"""
+
 import csv
 import json
 from pathlib import Path

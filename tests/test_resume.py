@@ -1,3 +1,22 @@
+"""
+Resume Workflow Tests
+
+This module verifies resume functionality that skips already-processed
+works while still emitting manifest records so downstream tooling can
+track skipped documents.
+
+Key Scenarios:
+- Ensures pipeline is bypassed when work identifier is marked completed
+- Confirms manifest entries reflect skipped state without dry-run flags
+
+Dependencies:
+- pytest: Assertions and fixtures
+- DocsToKG.ContentDownload: Resume-aware processing helpers
+
+Usage:
+    pytest tests/test_resume.py
+"""
+
 from __future__ import annotations
 
 import json

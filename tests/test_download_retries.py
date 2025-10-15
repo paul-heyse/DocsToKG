@@ -1,3 +1,23 @@
+"""
+Download Retry Behaviour Tests
+
+This module simulates HTTP responses to verify how the content download
+pipeline handles transient failures, rate limit guidance, and fatal
+errors when retrieving OpenAlex artifacts.
+
+Key Scenarios:
+- Ensures exponential retry loop continues through recoverable statuses
+- Confirms Retry-After headers gate subsequent attempts
+- Verifies non-retryable HTTP errors short-circuit additional requests
+
+Dependencies:
+- pytest: Fixture orchestration and assertions
+- DocsToKG.ContentDownload.download_pyalex_pdfs: Download routines under test
+
+Usage:
+    pytest tests/test_download_retries.py
+"""
+
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer

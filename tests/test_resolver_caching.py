@@ -1,3 +1,22 @@
+"""
+Resolver Caching Tests
+
+This module confirms resolver implementations reuse cached HTTP
+responses to avoid redundant traffic across repeated DOI lookups while
+still allowing caches to be reset between test cases.
+
+Key Scenarios:
+- Ensures Unpaywall, Crossref, and Semantic Scholar resolvers share caches
+- Verifies cache clearing restores original network behaviour
+
+Dependencies:
+- pytest: Fixtures and monkeypatching
+- DocsToKG.ContentDownload.resolvers: Resolver implementations under test
+
+Usage:
+    pytest tests/test_resolver_caching.py
+"""
+
 from types import SimpleNamespace
 
 import pytest

@@ -1,3 +1,16 @@
+"""
+Sphinx Documentation Configuration
+
+This configuration drives the DocsToKG technical documentation site,
+enabling autodoc, autosummary, and Google-style docstrings so our
+annotation standards surface consistently in HTML builds.
+
+Key Features:
+- Enables Napoleon, Intersphinx, and coverage reporting extensions
+- Configures Read the Docs theme with custom styling hooks
+- Mocks heavyweight dependencies (Faiss, Torch) for offline builds
+"""
+
 # Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:

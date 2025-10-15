@@ -1,3 +1,22 @@
+"""
+Dry Run Behaviour Tests
+
+This module asserts that dry-run execution of the downloader preserves
+logging outputs without touching the filesystem, ensuring staging runs
+can collect metrics safely.
+
+Key Scenarios:
+- Verifies `download_candidate` avoids writing artifacts in dry-run mode
+- Confirms manifest entries are still emitted for analytics
+
+Dependencies:
+- pytest/responses: HTTP mocking of resolver downloads
+- DocsToKG.ContentDownload: Dry-run pathways under test
+
+Usage:
+    pytest tests/test_dry_run.py
+"""
+
 from __future__ import annotations
 
 import json

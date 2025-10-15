@@ -1,3 +1,24 @@
+"""
+Content Download Edge Case Tests
+
+This module captures regression tests for less common scenarios within
+the OpenAlex download pipeline, exercising HTML misclassification,
+Wayback fallbacks, logging integrity, and retry budgeting.
+
+Key Scenarios:
+- Reclassifies misleading content types based on payload inspection
+- Validates Wayback resolver behaviour when archives are unavailable
+- Ensures manifest and attempt logs stay synchronized on success/failure
+- Confirms retry budgeting halts processing after configured limits
+
+Dependencies:
+- pytest/responses: HTTP mocking for resolver interactions
+- DocsToKG.ContentDownload: Resolver pipeline and helpers under test
+
+Usage:
+    pytest tests/test_edge_cases.py
+"""
+
 from __future__ import annotations
 
 import json

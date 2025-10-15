@@ -1,3 +1,4 @@
+
 import json
 
 import pytest
@@ -122,3 +123,22 @@ def test_cli_config_validate_missing_file(monkeypatch, stub_logger, tmp_path):
     with pytest.raises(SystemExit) as exc_info:
         cli.main(["config", "validate", "--spec", str(missing)])
     assert exc_info.value.code == 2
+"""
+Ontology Download CLI Tests
+
+This module exercises the ontology download command line interface to
+ensure pull, validate, and configuration commands emit structured output
+for both human-readable and JSON modes.
+
+Key Scenarios:
+- Fetches ontologies via `pull` with table and JSON output formatting
+- Validates manifests using optional backends such as RDFLib
+- Checks configuration validation including missing file error handling
+
+Dependencies:
+- pytest: Monkeypatching and fixtures
+- DocsToKG.OntologyDownload.cli: CLI entry point under test
+
+Usage:
+    pytest tests/ontology_download/test_cli.py
+"""

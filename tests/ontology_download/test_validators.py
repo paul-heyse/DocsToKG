@@ -1,3 +1,23 @@
+"""
+Ontology Validator Tests
+
+This module verifies the ontology validation adapters across RDFLib,
+Pronto, Owlready2, ROBOT, and Arelle to ensure normalization artefacts
+and diagnostic reports are generated consistently.
+
+Key Scenarios:
+- Validates TTL, OBO, and OWL fixtures with in-process validators
+- Confirms external tool fallbacks like ROBOT and Arelle integrate cleanly
+- Exercises failure paths such as Owlready2 memory exhaustion
+
+Dependencies:
+- pytest: Fixtures and monkeypatching
+- DocsToKG.OntologyDownload.validators: Validation entry points under test
+
+Usage:
+    pytest tests/ontology_download/test_validators.py
+"""
+
 import json
 import shutil
 import sys

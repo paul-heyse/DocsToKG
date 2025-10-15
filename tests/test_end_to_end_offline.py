@@ -1,3 +1,22 @@
+"""
+Offline Resolver Pipeline Tests
+
+This module validates the resolver pipeline in an offline, fully mocked
+environment to ensure PDFs are downloaded, verified, and classified
+without reaching external services.
+
+Key Scenarios:
+- Executes an end-to-end pipeline run using Unpaywall metadata responses
+- Detects corrupt PDF payloads lacking EOF markers during download
+
+Dependencies:
+- pytest/responses: HTTP mocking for Unpaywall and content servers
+- DocsToKG.ContentDownload: Resolver pipeline and artifact helpers
+
+Usage:
+    pytest tests/test_end_to_end_offline.py
+"""
+
 from pathlib import Path
 
 import pytest

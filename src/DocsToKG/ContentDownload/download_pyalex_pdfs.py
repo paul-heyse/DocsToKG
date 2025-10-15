@@ -15,7 +15,7 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
@@ -46,6 +46,12 @@ MAX_SNIFF_BYTES = 64 * 1024
 SUCCESS_STATUSES = {"pdf", "pdf_unknown"}
 
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
+
+
+def _utc_timestamp() -> str:
+    """Return an ISO 8601 UTC timestamp with a trailing 'Z' suffix."""
+
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _accepts_argument(func: Callable[..., Any], name: str) -> bool:
@@ -203,14 +209,28 @@ class JsonlLogger:
     """Structured logger that emits attempt, manifest, and summary JSONL records."""
 
     def __init__(self, path: Path) -> None:
-        """Create a logger backing to the given JSONL file path."""
+        """Create a logger backing to the given JSONL file path.
+
+        Args:
+            path: Destination JSONL log file.
+
+        Returns:
+            None
+        """
         self._path = path
         ensure_dir(path.parent)
         self._file = path.open("a", encoding="utf-8")
 
     def _write(self, payload: Dict[str, Any]) -> None:
-        """Append a JSON record to the log file ensuring timestamps are present."""
-        payload.setdefault("timestamp", datetime.utcnow().isoformat() + "Z")
+        """Append a JSON record to the log file ensuring timestamps are present.
+
+        Args:
+            payload: JSON-serializable mapping to write.
+
+        Returns:
+            None
+        """
+        payload.setdefault("timestamp", _utc_timestamp())
         self._file.write(json.dumps(payload, sort_keys=True) + "\n")
         self._file.flush()
 
@@ -220,8 +240,11 @@ class JsonlLogger:
         Args:
             record: Attempt metadata captured from the resolver pipeline.
             timestamp: Optional override timestamp (ISO format).
+
+        Returns:
+            None
         """
-        ts = timestamp or (datetime.utcnow().isoformat() + "Z")
+        ts = timestamp or _utc_timestamp()
         self._write(
             {
                 "record_type": "attempt",
@@ -243,11 +266,25 @@ class JsonlLogger:
         )
 
     def log(self, record: AttemptRecord) -> None:
-        """Compatibility shim mapping to :meth:`log_attempt`."""
+        """Compatibility shim mapping to :meth:`log_attempt`.
+
+        Args:
+            record: Attempt record to forward to :meth:`log_attempt`.
+
+        Returns:
+            None
+        """
         self.log_attempt(record)
 
     def log_manifest(self, entry: ManifestEntry) -> None:
-        """Persist a manifest entry to the JSONL log."""
+        """Persist a manifest entry to the JSONL log.
+
+        Args:
+            entry: Manifest entry to write.
+
+        Returns:
+            None
+        """
         self._write(
             {
                 "record_type": "manifest",
@@ -272,16 +309,30 @@ class JsonlLogger:
         )
 
     def log_summary(self, summary: Dict[str, Any]) -> None:
-        """Write a summary record to the log."""
+        """Write a summary record to the log.
+
+        Args:
+            summary: Mapping containing summary metrics.
+
+        Returns:
+            None
+        """
         payload = {
             "record_type": "summary",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": _utc_timestamp(),
         }
         payload.update(summary)
         self._write(payload)
 
     def close(self) -> None:
-        """Close the underlying file handle."""
+        """Close the underlying file handle.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         self._file.close()
 
 
@@ -315,8 +366,15 @@ class CsvAttemptLoggerAdapter:
             self._writer.writeheader()
 
     def log_attempt(self, record: AttemptRecord) -> None:
-        """Write an attempt record to both JSONL and CSV outputs."""
-        ts = datetime.utcnow().isoformat() + "Z"
+        """Write an attempt record to both JSONL and CSV outputs.
+
+        Args:
+            record: Attempt record to persist.
+
+        Returns:
+            None
+        """
+        ts = _utc_timestamp()
         self._logger.log_attempt(record, timestamp=ts)
         self._writer.writerow(
             {
@@ -339,19 +397,47 @@ class CsvAttemptLoggerAdapter:
         self._file.flush()
 
     def log_manifest(self, entry: ManifestEntry) -> None:
-        """Forward manifest entries to the JSONL logger."""
+        """Forward manifest entries to the JSONL logger.
+
+        Args:
+            entry: Manifest entry to forward.
+
+        Returns:
+            None
+        """
         self._logger.log_manifest(entry)
 
     def log_summary(self, summary: Dict[str, Any]) -> None:
-        """Forward summary entries to the JSONL logger."""
+        """Forward summary entries to the JSONL logger.
+
+        Args:
+            summary: Summary mapping to forward.
+
+        Returns:
+            None
+        """
         self._logger.log_summary(summary)
 
     def log(self, record: AttemptRecord) -> None:
-        """Compatibility shim mapping to :meth:`log_attempt`."""
+        """Compatibility shim mapping to :meth:`log_attempt`.
+
+        Args:
+            record: Attempt record to log.
+
+        Returns:
+            None
+        """
         self.log_attempt(record)
 
     def close(self) -> None:
-        """Close both the JSONL logger and the CSV file handle."""
+        """Close both the JSONL logger and the CSV file handle.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         self._logger.close()
         self._file.close()
 
@@ -423,7 +509,7 @@ def build_manifest_entry(
     Returns:
         ManifestEntry populated with download metadata.
     """
-    timestamp = datetime.utcnow().isoformat() + "Z"
+    timestamp = _utc_timestamp()
     classification = outcome.classification if outcome else "miss"
     return ManifestEntry(
         timestamp=timestamp,
@@ -483,7 +569,26 @@ def classify_payload(head_bytes: bytes, content_type: str, url: str) -> Optional
 
 @dataclass
 class WorkArtifact:
-    """Normalized artifact describing an OpenAlex work to process."""
+    """Normalized artifact describing an OpenAlex work to process.
+
+    Attributes:
+        work_id: OpenAlex work identifier.
+        title: Work title suitable for logging.
+        publication_year: Publication year or None.
+        doi: Canonical DOI string.
+        pmid: PubMed identifier (normalized).
+        pmcid: PubMed Central identifier (normalized).
+        arxiv_id: Normalized arXiv identifier.
+        landing_urls: Candidate landing page URLs.
+        pdf_urls: Candidate PDF download URLs.
+        open_access_url: Open access URL provided by OpenAlex.
+        source_display_names: Source names for provenance.
+        base_stem: Base filename stem for local artefacts.
+        pdf_dir: Directory where PDFs are stored.
+        html_dir: Directory where HTML assets are stored.
+        failed_pdf_urls: URLs that failed during resolution.
+        metadata: Arbitrary metadata collected during processing.
+    """
 
     work_id: str
     title: str
@@ -740,46 +845,17 @@ def download_candidate(
 ) -> DownloadOutcome:
     """Download a single candidate URL and classify the payload.
 
-    Parameters
-    ----------
-    session:
-        HTTP session produced by :func:`_make_session` or compatible object. The session
-        **must** provide ``head`` and ``get`` methods with the same semantics as
-        :mod:`requests`.
-    artifact:
-        Work metadata and output directory handles describing the current OpenAlex
-        record.
-    url:
-        Candidate download URL discovered by a resolver.
-    referer:
-        Optional referer header supplied by the resolver. ``None`` implies no referer
-        override.
-    timeout:
-        Per-request timeout in seconds.
-    context:
-        Execution context containing ``dry_run`` and ``extract_html_text`` flags plus a
-        ``previous`` manifest lookup for conditional requests.
+    Args:
+        session: HTTP session providing ``head`` and ``get`` methods.
+        artifact: Work metadata and output directory handles for the current record.
+        url: Candidate download URL discovered by a resolver.
+        referer: Optional referer header override provided by the resolver.
+        timeout: Per-request timeout in seconds.
+        context: Execution context containing ``dry_run``, ``extract_html_text``,
+            and ``previous`` manifest lookup data.
 
-    Returns
-    -------
-    DownloadOutcome
-        Structured download result used for manifest logging.
-
-    Examples
-    --------
-    A minimal invocation that honours ``--dry-run``::
-
-        outcome = download_candidate(
-            session,
-            artifact,
-            "https://example.org/paper.pdf",
-            referer=None,
-            timeout=30.0,
-            context={"dry_run": True, "extract_html_text": False, "previous": {}},
-        )
-
-    The returned outcome reports ``classification='pdf'`` yet ``path`` remains ``None``
-    because files are not materialised while running in dry-run mode.
+    Returns:
+        DownloadOutcome describing the result of the download attempt.
     """
     context = context or {}
     headers: Dict[str, str] = {}
@@ -979,7 +1055,17 @@ def download_candidate(
 
 
 def read_resolver_config(path: Path) -> Dict[str, Any]:
-    """Read resolver configuration from JSON or YAML files."""
+    """Read resolver configuration from JSON or YAML files.
+
+    Args:
+        path: Path to the configuration file.
+
+    Returns:
+        Parsed configuration mapping.
+
+    Raises:
+        RuntimeError: If YAML parsing is requested but PyYAML is unavailable.
+    """
     text = path.read_text(encoding="utf-8")
     ext = path.suffix.lower()
     if ext in {".yaml", ".yml"}:
@@ -1016,6 +1102,9 @@ def apply_config_overrides(
         config: Resolver configuration object to mutate.
         data: Mapping loaded from a configuration file.
         resolver_names: Known resolver names to seed toggle defaults.
+
+    Returns:
+        None
     """
     for field_name in (
         "resolver_order",
@@ -1103,13 +1192,20 @@ def load_resolver_config(
     for disabled in args.disable_resolver or []:
         config.resolver_toggles[disabled] = False
 
+    for enabled in getattr(args, "enable_resolver", []) or []:
+        config.resolver_toggles[enabled] = True
+
     # Polite headers include mailto when available
     headers = dict(config.polite_headers)
-    headers.pop("mailto", None)
+    existing_mailto = headers.get("mailto")
+    mailto_value = config.mailto or existing_mailto
     base_agent = headers.get("User-Agent") or "DocsToKGDownloader/1.0"
-    if config.mailto:
-        user_agent = f"DocsToKGDownloader/1.0 (+{config.mailto}; mailto:{config.mailto})"
+    if mailto_value:
+        config.mailto = config.mailto or mailto_value
+        headers["mailto"] = mailto_value
+        user_agent = f"DocsToKGDownloader/1.0 (+{mailto_value}; mailto:{mailto_value})"
     else:
+        headers.pop("mailto", None)
         user_agent = base_agent
     headers["User-Agent"] = user_agent
     config.polite_headers = headers
@@ -1132,6 +1228,9 @@ def iterate_openalex(
 
     Yields:
         Work payload dictionaries returned by the OpenAlex API.
+
+    Returns:
+        Iterable yielding work payload dictionaries.
     """
     pager = query.paginate(per_page=per_page, n_max=None)
     retrieved = 0
@@ -1406,6 +1505,9 @@ def process_one_work(
 def main() -> None:
     """CLI entrypoint for the OpenAlex PDF downloader.
 
+    Args:
+        None
+
     Returns:
         None
     """
@@ -1468,6 +1570,12 @@ def main() -> None:
         action="append",
         default=[],
         help="Disable a resolver by name (can be repeated).",
+    )
+    parser.add_argument(
+        "--enable-resolver",
+        action="append",
+        default=[],
+        help="Enable a resolver by name (can be repeated).",
     )
     parser.add_argument(
         "--max-resolver-attempts",
@@ -1645,8 +1753,8 @@ def main() -> None:
             with ThreadPoolExecutor(max_workers=args.workers) as executor:
                 futures = []
 
-                def submit_work(work_item: Dict[str, Any]) -> None:
-                    def runner() -> Dict[str, Any]:
+                def _submit_work(work_item: Dict[str, Any]) -> None:
+                    def _runner() -> Dict[str, Any]:
                         session = _session_factory()
                         try:
                             return process_one_work(
@@ -1666,10 +1774,10 @@ def main() -> None:
                             if hasattr(session, "close"):
                                 session.close()
 
-                    futures.append(executor.submit(runner))
+                    futures.append(executor.submit(_runner))
 
                 for work in iterate_openalex(query, per_page=args.per_page, max_results=args.max):
-                    submit_work(work)
+                    _submit_work(work)
 
                 for future in as_completed(futures):
                     _record_result(future.result())

@@ -1,3 +1,18 @@
+"""
+Pytest Configuration
+
+This module configures shared pytest behaviour, including dynamic sys.path
+management for `src`, CLI options for enabling real-vector suites, and
+collection-time markers that gate hardware-intensive tests.
+
+Key Scenarios:
+- Adds command-line switches to opt into real-vector and scale suites
+- Applies skip markers when vector fixtures are unavailable
+
+Usage:
+    pytest --help  # to inspect custom options
+"""
+
 from __future__ import annotations
 
 import sys

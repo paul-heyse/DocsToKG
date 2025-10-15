@@ -1,3 +1,22 @@
+"""
+Parallel Resolver Rate Limiting Tests
+
+This module exercises the resolver pipeline rate limiter under concurrent
+execution to ensure cross-thread coordination respects the configured
+minimum interval between resolver calls.
+
+Key Scenarios:
+- Validates multiple workers share rate state when using ThreadPoolExecutor
+- Confirms the enforced delay never falls below the configured threshold
+
+Dependencies:
+- pytest: Provides fixtures and assertions
+- DocsToKG.ContentDownload.resolvers: Supplies ResolverPipeline utilities
+
+Usage:
+    pytest tests/test_parallel_execution.py
+"""
+
 from __future__ import annotations
 
 import time

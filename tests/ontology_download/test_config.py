@@ -1,3 +1,22 @@
+"""
+Ontology Configuration Tests
+
+This module validates configuration parsing, environment overrides,
+resolver selection, and error handling for the ontology download system.
+
+Key Scenarios:
+- Parses defaults/ontologies from YAML with environment variable merges
+- Rejects invalid schema keys or malformed extras blocks
+- Propagates resolver and download failures as domain-specific errors
+
+Dependencies:
+- pytest: Assertions and monkeypatch utilities
+- DocsToKG.OntologyDownload.config/core: Configuration helpers under test
+
+Usage:
+    pytest tests/ontology_download/test_config.py
+"""
+
 import logging
 import textwrap
 

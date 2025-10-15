@@ -1,3 +1,23 @@
+"""
+Hybrid Search Scale Tests
+
+This module runs the large-scale hybrid search validation suite against
+real vector fixtures to guarantee embedding dimensionality, indexing
+performance, and retrieval quality match production expectations.
+
+Key Scenarios:
+- Builds ingestion stack with on-disk dataset fixtures
+- Executes validator scale suite to assert accuracy and latency targets
+- Confirms metrics artifacts are generated for CI inspection
+
+Dependencies:
+- pytest: Fixture management and markers for selective execution
+- DocsToKG.HybridSearch: Scale validation tooling
+
+Usage:
+    pytest tests/test_hybrid_search_scale.py
+"""
+
 from __future__ import annotations
 
 import json
