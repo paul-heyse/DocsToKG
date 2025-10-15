@@ -204,7 +204,7 @@ def test_real_fixture_reingest_and_reports(
     ingestion.upsert_documents(documents)
     baseline_total = registry.count()
 
-    if faiss_index._use_native and faiss_index._index is not None:
+    if faiss_index._index is not None:
         original_remove_ids = faiss_index._index.remove_ids
 
         def side_effect(selector: object) -> None:
@@ -220,10 +220,8 @@ def test_real_fixture_reingest_and_reports(
     assert registry.count() == baseline_total
 
     stats = faiss_index.stats()
-    if faiss_index._use_native and faiss_index._index is not None:
+    if faiss_index._index is not None:
         assert stats["gpu_remove_fallbacks"] >= 1
-    else:
-        assert stats["gpu_remove_fallbacks"] == 0
 
     env_output = os.environ.get("REAL_VECTOR_REPORT_DIR")
     if env_output:

@@ -109,9 +109,17 @@ def test_gpu_ivfpq_build_and_search() -> None:
 def test_gpu_cosine_against_corpus() -> None:
     xb, xq = _toy_data(n=512)
     query = xq[0]
-    sims = cosine_against_corpus_gpu(query, xb, device=_target_device())
+    resources = faiss.StandardGpuResources()
+    sims = cosine_against_corpus_gpu(query, xb, device=_target_device(), resources=resources)
     assert sims.shape == (1, xb.shape[0])
-    self_sim = float(cosine_against_corpus_gpu(query, query.reshape(1, -1))[0, 0])
+    self_sim = float(
+        cosine_against_corpus_gpu(
+            query,
+            query.reshape(1, -1),
+            device=_target_device(),
+            resources=resources,
+        )[0, 0]
+    )
     assert 0.98 <= self_sim <= 1.001
 
 

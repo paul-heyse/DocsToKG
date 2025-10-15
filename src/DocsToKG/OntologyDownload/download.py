@@ -18,11 +18,12 @@ import shutil
 import socket
 import threading
 import time
+import unicodedata
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import ParseResult, urlparse, urlunparse
 
 import pooch
 import psutil
@@ -144,17 +145,67 @@ def sanitize_filename(filename: str) -> str:
     return safe
 
 
-def validate_url_security(url: str) -> str:
-    """Validate URLs to avoid SSRF and insecure schemes.
+def _enforce_idn_safety(host: str) -> None:
+    """Raise ``ConfigError`` when hostname contains suspicious IDN patterns."""
+
+    if all(ord(char) < 128 for char in host):
+        return
+
+    scripts = set()
+    for char in host:
+        if ord(char) < 128:
+            continue
+
+        category = unicodedata.category(char)
+        if category in {"Mn", "Me", "Cf"}:
+            raise ConfigError("Internationalized host contains invisible characters")
+
+        try:
+            name = unicodedata.name(char)
+        except ValueError as exc:
+            raise ConfigError("Internationalized host contains unknown characters") from exc
+
+        for script in ("LATIN", "CYRILLIC", "GREEK"):
+            if script in name:
+                scripts.add(script)
+                break
+
+    if len(scripts) > 1:
+        raise ConfigError("Internationalized host mixes multiple scripts")
+
+
+def _rebuild_netloc(parsed: ParseResult, ascii_host: str) -> str:
+    """Reconstruct URL netloc with normalized hostname."""
+
+    auth = ""
+    if parsed.username:
+        auth = parsed.username
+        if parsed.password:
+            auth = f"{auth}:{parsed.password}"
+        auth = f"{auth}@"
+
+    host_component = ascii_host
+    if ":" in host_component and not host_component.startswith("["):
+        host_component = f"[{host_component}]"
+
+    port = f":{parsed.port}" if parsed.port else ""
+    return f"{auth}{host_component}{port}"
+
+
+def validate_url_security(
+    url: str, http_config: Optional[DownloadConfiguration] = None
+) -> str:
+    """Validate URLs to avoid SSRF, enforce HTTPS, and honor host allowlists.
 
     Args:
         url: URL returned by a resolver for ontology download.
+        http_config: Download configuration providing optional host allowlist.
 
     Returns:
         HTTPS URL safe for downstream download operations.
 
     Raises:
-        ConfigError: If the URL uses an insecure scheme or resolves to private addresses.
+        ConfigError: If the URL violates security requirements or allowlists.
     """
 
     parsed = urlparse(url)
@@ -167,32 +218,63 @@ def validate_url_security(url: str) -> str:
         parsed = parsed._replace(scheme="https")
     if parsed.scheme != "https":
         raise ConfigError("Only HTTPS URLs are allowed for ontology downloads")
+
     host = parsed.hostname
     if not host:
         raise ConfigError("URL must include hostname")
+
     try:
         ipaddress.ip_address(host)
         is_ip = True
     except ValueError:
         is_ip = False
-    if is_ip:
-        address = ipaddress.ip_address(host)
-        if address.is_private or address.is_loopback or address.is_reserved or address.is_multicast:
-            raise ConfigError(f"Refusing to download from private address {host}")
-    else:
+
+    ascii_host = host.lower()
+    if not is_ip:
+        _enforce_idn_safety(host)
         try:
-            infos = socket.getaddrinfo(host, None)
-        except socket.gaierror as exc:
-            raise ConfigError(f"Unable to resolve hostname {host}") from exc
-        for info in infos:
-            candidate_ip = ipaddress.ip_address(info[4][0])
-            if (
-                candidate_ip.is_private
-                or candidate_ip.is_loopback
-                or candidate_ip.is_reserved
-                or candidate_ip.is_multicast
-            ):
-                raise ConfigError(f"Refusing to download from private address resolved for {host}")
+            ascii_host = host.encode("idna").decode("ascii").lower()
+        except UnicodeError as exc:
+            raise ConfigError(f"Invalid internationalized hostname: {host}") from exc
+
+    parsed = parsed._replace(netloc=_rebuild_netloc(parsed, ascii_host))
+
+    allowed = http_config.normalized_allowed_hosts() if http_config else None
+    if allowed:
+        exact, suffixes = allowed
+        if ascii_host not in exact and not any(
+            ascii_host == suffix or ascii_host.endswith(f".{suffix}") for suffix in suffixes
+        ):
+            raise ConfigError(f"Host {host} not in allowlist")
+
+    if is_ip:
+        address = ipaddress.ip_address(ascii_host)
+        if (
+            address.is_private
+            or address.is_loopback
+            or address.is_reserved
+            or address.is_multicast
+        ):
+            raise ConfigError(f"Refusing to download from private address {host}")
+        return urlunparse(parsed)
+
+    try:
+        infos = socket.getaddrinfo(ascii_host, None)
+    except socket.gaierror as exc:
+        raise ConfigError(f"Unable to resolve hostname {host}") from exc
+
+    for info in infos:
+        candidate_ip = ipaddress.ip_address(info[4][0])
+        if (
+            candidate_ip.is_private
+            or candidate_ip.is_loopback
+            or candidate_ip.is_reserved
+            or candidate_ip.is_multicast
+        ):
+            raise ConfigError(
+                f"Refusing to download from private address resolved for {host}"
+            )
+
     return urlunparse(parsed)
 
 
@@ -647,7 +729,7 @@ def download_stream(
     Raises:
         ConfigError: If validation fails, limits are exceeded, or HTTP errors occur.
     """
-    secure_url = validate_url_security(url)
+    secure_url = validate_url_security(url, http_config)
     parsed = urlparse(secure_url)
     bucket = _get_bucket(parsed.hostname or "default", http_config, service)
     bucket.consume()

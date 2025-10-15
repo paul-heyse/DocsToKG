@@ -16,6 +16,8 @@ from typing import (
     MutableMapping,
     Optional,
     Sequence,
+    Set,
+    Tuple,
 )
 
 try:  # pragma: no cover - dependency check
@@ -294,6 +296,51 @@ class DownloadConfiguration(BaseModel):
         if unit in {"hour", "h"}:
             return value / 3600.0
         return None
+
+    def normalized_allowed_hosts(self) -> Optional[Tuple[Set[str], Set[str]]]:
+        """Return allowlist entries normalized to lowercase punycode labels.
+
+        Returns:
+            Tuple of (exact hostnames, wildcard suffixes) when entries exist,
+            otherwise ``None`` if no valid allowlist entries are configured.
+
+        Raises:
+            ValueError: If any configured hostname cannot be converted to punycode.
+        """
+
+        if not self.allowed_hosts:
+            return None
+
+        exact: Set[str] = set()
+        suffixes: Set[str] = set()
+
+        for entry in self.allowed_hosts:
+            candidate = entry.strip()
+            if not candidate:
+                continue
+
+            wildcard = False
+            if candidate.startswith("*."):
+                wildcard = True
+                candidate = candidate[2:]
+            elif candidate.startswith("."):
+                wildcard = True
+                candidate = candidate[1:]
+
+            try:
+                normalized = candidate.encode("idna").decode("ascii").lower()
+            except UnicodeError as exc:
+                raise ValueError(f"Invalid hostname in allowlist: {entry}") from exc
+
+            if wildcard:
+                suffixes.add(normalized)
+            else:
+                exact.add(normalized)
+
+        if not exact and not suffixes:
+            return None
+
+        return exact, suffixes
 
     model_config = {
         "frozen": False,
