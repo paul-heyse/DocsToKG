@@ -54,6 +54,8 @@ def _assert_gpu_index(manager: FaissIndexManager) -> None:
         except Exception:
             pass
     assert "Gpu" in type(base).__name__, f"Expected GPU index type, got {type(base)}"
+    assert stats.get("gpu_base") is True
+    assert float(stats.get("gpu_remove_fallbacks", 0.0)) == 0.0
 
 
 def test_gpu_flat_end_to_end() -> None:
@@ -149,7 +151,12 @@ def test_gpu_near_duplicate_detection_filters_duplicates() -> None:
     )
     opensearch = OpenSearchSimulator()
     opensearch.bulk_upsert([chunk_a, chunk_b])
-    shaper = ResultShaper(opensearch, FusionConfig(cosine_dedupe_threshold=0.9))
+    shaper = ResultShaper(
+        opensearch,
+        FusionConfig(cosine_dedupe_threshold=0.9),
+        device=_target_device(),
+        resources=faiss.StandardGpuResources(),
+    )
     request = HybridSearchRequest(query="hybrid search", namespace=None, filters={}, page_size=5)
     fused_scores = {chunk_a.vector_id: 1.0, chunk_b.vector_id: 0.95}
     channel_scores = {"dense": fused_scores}
@@ -170,3 +177,24 @@ def test_gpu_nprobe_applied_during_search() -> None:
         base = faiss.downcast_index(base)
     assert hasattr(base, "nprobe")
     assert int(base.nprobe) == cfg.nprobe
+
+
+def test_gpu_similarity_uses_supplied_device(monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = DenseIndexConfig(index_type="flat", device=_target_device())
+    manager = FaissIndexManager(dim=32, config=cfg)
+
+    captured: dict[str, object] = {}
+
+    def fake_pairwise(resources, A, B, metric, device):  # type: ignore[no-untyped-def]
+        captured["resources"] = resources
+        captured["device"] = device
+        return np.zeros((A.shape[0], B.shape[0]), dtype=np.float32)
+
+    monkeypatch.setattr(faiss, "pairwise_distance_gpu", fake_pairwise)
+
+    q = np.ones(32, dtype=np.float32)
+    corpus = np.ones((3, 32), dtype=np.float32)
+    cosine_against_corpus_gpu(q, corpus, device=manager.device, resources=manager.gpu_resources)
+
+    assert captured.get("device") == manager.device
+    assert captured.get("resources") is manager.gpu_resources

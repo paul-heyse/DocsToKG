@@ -4,7 +4,7 @@ Reciprocal Rank Fusion and diversification utilities.
 
 ## Functions
 
-### `apply_mmr_diversification(fused_candidates, fused_scores, lambda_param, top_k)`
+### `apply_mmr_diversification(fused_candidates, fused_scores, lambda_param, top_k, *, device=0, resources=None)`
 
 Apply maximal marginal relevance to promote diversity.
 
@@ -13,6 +13,8 @@ fused_candidates: Candidates ranked by initial fusion stage.
 fused_scores: Pre-computed relevance scores keyed by vector ID.
 lambda_param: Balance factor between relevance and diversity [0,1].
 top_k: Number of candidates to retain after diversification.
+device: GPU device identifier used for cosine diversification.
+resources: Shared `faiss.StandardGpuResources` instance reused for cosine calls.
 
 Returns:
 List of diversified candidates ordered by selection.

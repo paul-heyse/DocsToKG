@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Dict, List, Mapping, Sequence
+from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 
@@ -17,6 +17,9 @@ from .types import (
     HybridSearchRequest,
     HybridSearchResult,
 )
+
+if TYPE_CHECKING:  # pragma: no cover - used for type hints only
+    import faiss  # type: ignore
 
 
 class ResultShaper:
@@ -32,9 +35,18 @@ class ResultShaper:
         3
     """
 
-    def __init__(self, opensearch: OpenSearchSimulator, fusion_config: FusionConfig) -> None:
+    def __init__(
+        self,
+        opensearch: OpenSearchSimulator,
+        fusion_config: FusionConfig,
+        *,
+        device: int = 0,
+        resources: Optional["faiss.StandardGpuResources"] = None,
+    ) -> None:
         self._opensearch = opensearch
         self._fusion_config = fusion_config
+        self._gpu_device = int(device)
+        self._gpu_resources = resources
 
     def shape(
         self,
@@ -120,7 +132,12 @@ class ResultShaper:
             return False
         query = embeddings[current_idx]
         corpus = embeddings[list(emitted_indices)]
-        sims = cosine_against_corpus_gpu(query, corpus)
+        sims = cosine_against_corpus_gpu(
+            query,
+            corpus,
+            device=self._gpu_device,
+            resources=self._gpu_resources,
+        )
         return float(sims[0].max()) >= self._fusion_config.cosine_dedupe_threshold
 
     def _build_highlights(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
