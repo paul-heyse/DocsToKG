@@ -1364,6 +1364,13 @@
   - Run tests on: Python 3.9, 3.10, 3.11
   - Install dependencies: pytest, hypothesis, pydantic
   - Run: `pytest tests/test_docparsing_*.py -v --cov=src/DocsToKG/DocParsing`
+- [x] 16.6 Add synthetic CLI integration coverage
+  - Install dependency stubs for Docling/vLLM/sentence-transformers
+  - Run chunking and embedding CLIs against synthetic DocTags inputs
+  - Validate manifest entries and schema conformance end-to-end
+- [x] 16.7 Exercise optional dependency guards
+  - Verify SPLADE guard surfaces actionable ImportError when sentence-transformers is absent
+  - Verify pydantic stub raises helpful RuntimeError from validation helpers
 
 ## 17. Documentation
 
@@ -1395,6 +1402,9 @@
   - Show jq queries for common questions:
     - Failed documents: `jq 'select(.status=="failure")' docparse.manifest.jsonl`
     - Average duration by stage: `jq -s 'group_by(.stage) | map({stage: .[0].stage, avg_duration: (map(.duration_s) | add / length)})'`
+- [x] 17.7 Document synthetic benchmarking harness and testing stubs
+  - Reference the new CLI benchmark command in the README and changelog
+  - Describe how `DocsToKG.DocParsing.testing` enables optional dependency stubbing
 
 ## 18. Integration & Validation
 

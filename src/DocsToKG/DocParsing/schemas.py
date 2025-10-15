@@ -19,7 +19,54 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+PYDANTIC_AVAILABLE = True
+
+try:  # Optional dependency
+    from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+    _PYDANTIC_IMPORT_ERROR: Exception | None = None
+except Exception as exc:  # pragma: no cover - exercised via tests with stubs
+    PYDANTIC_AVAILABLE = False
+    _PYDANTIC_IMPORT_ERROR = exc
+
+    class _PydanticStubBase:
+        """Minimal stub that raises an actionable error on instantiation."""
+
+        def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: D401 - tiny helper
+            raise RuntimeError(_missing_pydantic_message()) from _PYDANTIC_IMPORT_ERROR
+
+        def model_dump(self, *args: Any, **kwargs: Any) -> Any:  # pragma: no cover - stub
+            raise RuntimeError(_missing_pydantic_message()) from _PYDANTIC_IMPORT_ERROR
+
+    class BaseModel(_PydanticStubBase):  # type: ignore[no-redef]
+        model_config: Dict[str, Any] = {}
+
+    def Field(*args: Any, **kwargs: Any) -> Any:  # type: ignore[override]
+        return kwargs.get("default", args[0] if args else None)
+
+    def field_validator(*_args: Any, **_kwargs: Any):  # type: ignore[override]
+        def decorator(func):
+            return func
+
+        return decorator
+
+    def model_validator(*_args: Any, **_kwargs: Any):  # type: ignore[override]
+        def decorator(func):
+            return func
+
+        return decorator
+
+    def ConfigDict(**kwargs: Any) -> Dict[str, Any]:  # type: ignore[override]
+        return dict(kwargs)
+
+
+def _missing_pydantic_message() -> str:
+    """Return a consistent optional dependency warning message."""
+
+    return (
+        "Optional dependency 'pydantic' is required for DocParsing schema "
+        "validation. Install it with `pip install 'pydantic>=2,<3'` to enable "
+        "the validation helpers."
+    )
 
 CHUNK_SCHEMA_VERSION = "docparse/1.1.0"
 VECTOR_SCHEMA_VERSION = "embeddings/1.0.0"
@@ -27,6 +74,7 @@ COMPATIBLE_CHUNK_VERSIONS = ["docparse/1.0.0", "docparse/1.1.0"]
 COMPATIBLE_VECTOR_VERSIONS = ["embeddings/1.0.0"]
 
 __all__ = [
+    "PYDANTIC_AVAILABLE",
     "CHUNK_SCHEMA_VERSION",
     "VECTOR_SCHEMA_VERSION",
     "COMPATIBLE_CHUNK_VERSIONS",
@@ -369,6 +417,9 @@ def validate_chunk_row(row: dict) -> ChunkRow:
         'docparse/1.1.0'
     """
 
+    if not PYDANTIC_AVAILABLE:
+        raise RuntimeError(_missing_pydantic_message()) from _PYDANTIC_IMPORT_ERROR
+
     try:
         return ChunkRow(**row)
     except Exception as exc:  # pragma: no cover - exercised by tests raising ValueError
@@ -398,6 +449,9 @@ def validate_vector_row(row: dict) -> VectorRow:
         >>> vector.UUID
         'uuid'
     """
+
+    if not PYDANTIC_AVAILABLE:
+        raise RuntimeError(_missing_pydantic_message()) from _PYDANTIC_IMPORT_ERROR
 
     try:
         return VectorRow(**row)
@@ -452,5 +506,6 @@ def validate_schema_version(version: str, compatible_versions: List[str]) -> boo
     return version in compatible_versions
 
 
-ChunkRow.model_rebuild()
-VectorRow.model_rebuild()
+if PYDANTIC_AVAILABLE:
+    ChunkRow.model_rebuild()
+    VectorRow.model_rebuild()
