@@ -45,6 +45,8 @@ DenseIndexConfig(
     ivfpq_use_precomputed=True,
     ivfpq_float16_lut=True,
     multi_gpu_mode="single",
+    gpu_temp_memory_bytes=None,
+    gpu_indices_32_bit=True,
 )
 ```
 
@@ -54,6 +56,10 @@ DenseIndexConfig(
 - `oversample` controls training sample size (`nlist * oversample`).
 - `multi_gpu_mode="replicate"` fans the index out to every visible GPU using
   `GpuMultipleClonerOptions`; leave as `"single"` to pin the index to one device.
+- `gpu_temp_memory_bytes` configures FAISS' temporary scratch allocator (set it
+  when you want deterministic peak VRAM usage).
+- `gpu_indices_32_bit=True` stores FAISS indices in 32-bit format, reducing VRAM
+  pressure when you know `ntotal < 2**31`.
 
 Training samples for IVF indexes draw from a deterministic NumPy RNG, so repeated
 runs over the same corpus will reuse the exact calibration set. This makes it

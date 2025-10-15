@@ -83,6 +83,8 @@ class FaissIndexManager:
         self._config = config
         self._device = self._resolve_device(config)
         self._multi_gpu_mode = getattr(config, "multi_gpu_mode", "single")
+        self._indices_32_bit = bool(getattr(config, "gpu_indices_32_bit", True))
+        self._temp_memory_bytes = getattr(config, "gpu_temp_memory_bytes", None)
         self._replicated = False
         self._gpu_opts = GPUOpts(
             device=self._device,
@@ -359,7 +361,10 @@ class FaissIndexManager:
             "device": "*" if device is None else str(device),
             "gpu_remove_fallbacks": float(self._remove_fallbacks),
             "multi_gpu_mode": self._multi_gpu_mode,
+            "gpu_indices_32_bit": str(self._indices_32_bit).lower(),
         }
+        if self._temp_memory_bytes is not None:
+            stats["gpu_temp_memory_bytes"] = float(self._temp_memory_bytes)
         if device is not None:
             stats["gpu_device"] = str(device)
             resources = self._gpu_resources
@@ -414,6 +419,10 @@ class FaissIndexManager:
                     cloner.shard = False
                     cloner.verbose = True
                     cloner.allowCpuCoarseQuantizer = False
+                    if hasattr(cloner, "indicesOptions") and self._indices_32_bit and hasattr(
+                        faiss, "INDICES_32_BIT"
+                    ):
+                        cloner.indicesOptions = faiss.INDICES_32_BIT
                     if hasattr(cloner, "usePrecomputed"):
                         cloner.usePrecomputed = bool(
                             getattr(self._config, "ivfpq_use_precomputed", True)
@@ -442,7 +451,10 @@ class FaissIndexManager:
             raise RuntimeError("GPU resources are not initialised")
         try:
             gpu_index = maybe_clone_to_gpu(
-                index, device=self._device, resources=self._gpu_resources
+                index,
+                device=self._device,
+                resources=self._gpu_resources,
+                indices_32_bits=self._indices_32_bit,
             )
         except Exception as exc:  # pragma: no cover - hardware specific failure
             raise RuntimeError(
@@ -581,6 +593,15 @@ class FaissIndexManager:
             raise RuntimeError(
                 f"Unable to initialise FAISS GPU resources (StandardGpuResources): {exc}"
             ) from exc
+        if self._temp_memory_bytes:
+            try:
+                resources.setTempMemory(int(self._temp_memory_bytes))
+            except Exception:  # pragma: no cover - advisory only
+                logger.debug(
+                    "Unable to set FAISS GPU temp memory",
+                    extra={"event": {"requested_bytes": self._temp_memory_bytes}},
+                    exc_info=True,
+                )
         return resources
 
     def _ensure_dim(self, vector: np.ndarray) -> np.ndarray:
