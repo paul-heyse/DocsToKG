@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 
-from .similarity import cosine_against_corpus_gpu
+from .similarity_gpu import cosine_batch
 from .types import FusionCandidate
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
@@ -89,8 +89,10 @@ def apply_mmr_diversification(
             vector_id = fused_candidates[idx].chunk.vector_id
             relevance = fused_scores.get(vector_id, 0.0)
             if selected_indices:
+                if resources is None:
+                    raise RuntimeError("GPU resources are required for MMR diversification")
                 selected_embeddings = embeddings[selected_indices]
-                sims = cosine_against_corpus_gpu(
+                sims = cosine_batch(
                     embeddings[idx],
                     selected_embeddings,
                     device=device,

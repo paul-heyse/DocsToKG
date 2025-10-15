@@ -126,6 +126,17 @@ def request_with_retries(
             )
 
         def request_func(*, method: str, url: str, **call_kwargs: Any) -> requests.Response:
+            """Invoke the fallback HTTP method when ``Session.request`` is unavailable.
+
+            Args:
+                method: HTTP method name passed through for parity with ``Session.request``.
+                url: URL targeted by the outgoing request.
+                **call_kwargs: Keyword arguments forwarded to the fallback method.
+
+            Returns:
+                ``requests.Response`` produced by the fallback invocation.
+            """
+
             return fallback(url, **call_kwargs)
 
     last_exception: Optional[Exception] = None

@@ -171,6 +171,10 @@ class DocumentationValidator:
         for i, line in enumerate(lines, 1):
             stripped = line.lstrip()
 
+            if line.startswith("    "):
+                # Treat indented blocks as code to avoid false heading positives
+                continue
+
             if stripped.startswith("```"):
                 in_code_block = not in_code_block
                 continue

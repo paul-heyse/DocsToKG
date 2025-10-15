@@ -1,0 +1,285 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Refactor ContentDownload Pipeline &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/custom.css" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Refactor ContentDownload Pipeline</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/openspec/changes/archive/2025-10-15-refactor-content-download-pipeline/SUMMARY.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="refactor-contentdownload-pipeline">
+<h1>Refactor ContentDownload Pipeline<a class="headerlink" href="#refactor-contentdownload-pipeline" title="Link to this heading"></a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>This change proposal refactors the ContentDownload module (<code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload</span></code>) to improve operational reliability, reduce code duplication, and enable optional parallel processing while maintaining full backward compatibility with existing resolver behavior. The enhancements address production pain points including transient HTTP failures, partial file corruption, and ambiguous rate-limit configuration.</p>
+</section>
+<section id="motivation">
+<h2>Motivation<a class="headerlink" href="#motivation" title="Link to this heading"></a></h2>
+<p>Current production runs show 5-8% miss rate attributable to transient HTTP errors (429, 503) that could be automatically retried, and 2-3% corrupted artifacts from interrupted downloads requiring manual cleanup. The codebase contains ~15% code duplication across <code class="docutils literal notranslate"><span class="pre">download_pyalex_pdfs.py</span></code> and <code class="docutils literal notranslate"><span class="pre">resolvers/__init__.py</span></code>, and single-threaded processing leaves 2-5x throughput on the table despite per-resolver rate limits being honored.</p>
+</section>
+<section id="key-changes">
+<h2>Key Changes<a class="headerlink" href="#key-changes" title="Link to this heading"></a></h2>
+<section id="operational-polish-quick-wins">
+<h3>1. Operational Polish (Quick Wins)<a class="headerlink" href="#operational-polish-quick-wins" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Automatic HTTP retries</strong>: Mount urllib3 Retry on session (429, 502, 503, 504) with exponential backoff and Retry-After support → eliminates ~80% of retryable misses</p></li>
+<li><p><strong>Atomic file writes</strong>: *.part → os.replace() pattern prevents partial corruption; SHA-256 digests enable deduplication</p></li>
+<li><p><strong>Explicit rate limits</strong>: Rename <code class="docutils literal notranslate"><span class="pre">resolver_rate_limits</span></code> → <code class="docutils literal notranslate"><span class="pre">resolver_min_interval_s</span></code> with deprecation warning for unambiguous configuration</p></li>
+<li><p><strong>Crossref User-Agent</strong>: Include mailto: in UA string per Crossref best practices for polite pool access</p></li>
+<li><p><strong>LRU caching</strong>: Cache resolver API responses (Unpaywall/Crossref/S2) with functools.lru_cache to eliminate duplicate lookups</p></li>
+<li><p><strong>Conditional requests</strong>: Support If-None-Match/If-Modified-Since for instant 304 responses on unchanged resources</p></li>
+</ul>
+</section>
+<section id="code-streamlining">
+<h3>2. Code Streamlining<a class="headerlink" href="#code-streamlining" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Shared utilities</strong>: Extract duplicated normalization (<code class="docutils literal notranslate"><span class="pre">normalize_doi</span></code>, <code class="docutils literal notranslate"><span class="pre">normalize_pmcid</span></code>, etc.) to <code class="docutils literal notranslate"><span class="pre">ContentDownload/utils.py</span></code> → 15% code reduction</p></li>
+<li><p><strong>Unified logging</strong>: Replace separate CSV + manifest with single JSONL logger, CSV export script for backward compat</p></li>
+<li><p><strong>State machine refactor</strong>: Explicit DownloadState enum (PENDING/WRITING) with single outcome builder improves readability</p></li>
+</ul>
+</section>
+<section id="functionality-upgrades-opt-in">
+<h3>3. Functionality Upgrades (Opt-In)<a class="headerlink" href="#functionality-upgrades-opt-in" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Parallel execution</strong>: <code class="docutils literal notranslate"><span class="pre">--workers</span> <span class="pre">N</span></code> flag with ThreadPoolExecutor for 2-5x throughput while respecting per-resolver rate limits</p></li>
+<li><p><strong>Dry run mode</strong>: <code class="docutils literal notranslate"><span class="pre">--dry-run</span></code> measures resolver coverage without writing files</p></li>
+<li><p><strong>Resume support</strong>: <code class="docutils literal notranslate"><span class="pre">--resume-from</span> <span class="pre">manifest.jsonl</span></code> skips completed works for efficient re-runs</p></li>
+<li><p><strong>HTML text extraction</strong>: <code class="docutils literal notranslate"><span class="pre">--extract-html-text</span></code> saves plaintext via trafilatura alongside raw HTML</p></li>
+<li><p><strong>Extended resolvers</strong>: Optional OpenAIRE, HAL, OSF Preprints (disabled by default) for EU OA and preprint coverage</p></li>
+</ul>
+</section>
+</section>
+<section id="breaking-changes">
+<h2>Breaking Changes<a class="headerlink" href="#breaking-changes" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p><strong>Config field rename</strong>: <code class="docutils literal notranslate"><span class="pre">resolver_rate_limits</span></code> → <code class="docutils literal notranslate"><span class="pre">resolver_min_interval_s</span></code></p>
+<ul class="simple">
+<li><p>Migration: Auto-detect old field, log deprecation warning, copy value</p></li>
+<li><p>Operators: Update YAML configs or rely on auto-migration (no hard break)</p></li>
+</ul>
+</li>
+<li><p><strong>Logging format</strong>: JSONL replaces separate CSV + manifest files</p>
+<ul class="simple">
+<li><p>Migration: <code class="docutils literal notranslate"><span class="pre">scripts/export_attempts_csv.py</span></code> converts JSONL → CSV</p></li>
+<li><p>Operators: Existing CSV parsers need jq wrapper or export script</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="implementation-metrics">
+<h2>Implementation Metrics<a class="headerlink" href="#implementation-metrics" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Requirements</strong>: 13 ADDED, 3 MODIFIED, 0 REMOVED</p></li>
+<li><p><strong>Scenarios</strong>: 48 total across all requirements</p></li>
+<li><p><strong>Tasks</strong>: 120 tasks across 16 phases (enhanced with explicit implementation details)</p></li>
+<li><p><strong>Estimated effort</strong>: 3-4 weeks (1 week quick wins, 1 week streamlining, 1 week functionality upgrades, 1 week testing/docs)</p></li>
+<li><p><strong>Code changes</strong>: ~1500 lines added (including full function implementations), ~800 lines removed (net +700 with tests and scripts)</p></li>
+<li><p><strong>Test coverage</strong>: Target &gt;=85% for ContentDownload modules</p></li>
+</ul>
+</section>
+<section id="implementation-phases">
+<h2>Implementation Phases<a class="headerlink" href="#implementation-phases" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p><strong>Shared Utilities Extraction</strong> (6 tasks) - Extract duplicates to utils.py</p></li>
+<li><p><strong>HTTP Retry Infrastructure</strong> (5 tasks) - Add session with HTTPAdapter + Retry</p></li>
+<li><p><strong>Atomic File Writes and Digests</strong> (8 tasks) - *.part pattern + SHA-256</p></li>
+<li><p><strong>Rate Limit Configuration Clarity</strong> (7 tasks) - Rename field + deprecation</p></li>
+<li><p><strong>LRU Cache for Resolver APIs</strong> (10 tasks) - Cache Unpaywall/Crossref/S2</p></li>
+<li><p><strong>Conditional Requests Support</strong> (9 tasks) - ETag/Last-Modified handling</p></li>
+<li><p><strong>Unified JSONL Logging</strong> (10 tasks) - Single logger + CSV export</p></li>
+<li><p><strong>Refactor Download State Machine</strong> (7 tasks) - State enum + single builder</p></li>
+<li><p><strong>Parallel Execution with ThreadPoolExecutor</strong> (10 tasks) - –workers flag</p></li>
+<li><p><strong>Dry Run and Resume Modes</strong> (9 tasks) - –dry-run + –resume-from</p></li>
+<li><p><strong>HTML Text Extraction</strong> (8 tasks) - trafilatura integration</p></li>
+<li><p><strong>Additional Resolvers</strong> (7 tasks) - OpenAIRE/HAL/OSF</p></li>
+<li><p><strong>Enhanced User-Agent for Crossref</strong> (3 tasks) - mailto in UA</p></li>
+<li><p><strong>Testing Gaps</strong> (5 tasks) - Edge cases + integration tests</p></li>
+<li><p><strong>Documentation and Migration</strong> (7 tasks) - Migration guide + examples</p></li>
+<li><p><strong>End-to-End Validation</strong> (10 tasks) - Smoke tests + benchmarks</p></li>
+</ol>
+</section>
+<section id="success-metrics">
+<h2>Success Metrics<a class="headerlink" href="#success-metrics" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Reliability</strong>: Reduce retryable miss rate from 5-8% to &lt;1%</p></li>
+<li><p><strong>Integrity</strong>: Zero corrupted artifacts (atomic writes)</p></li>
+<li><p><strong>Throughput</strong>: 2-5x speedup with –workers=3-5 (opt-in)</p></li>
+<li><p><strong>Code quality</strong>: 15% reduction via shared utilities</p></li>
+<li><p><strong>Observability</strong>: SHA-256 digests in manifests, structured JSONL logs</p></li>
+</ul>
+</section>
+<section id="migration-path">
+<h2>Migration Path<a class="headerlink" href="#migration-path" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>Deploy with <code class="docutils literal notranslate"><span class="pre">resolver_rate_limits</span></code> auto-migration enabled (logs deprecation warnings)</p></li>
+<li><p>Run parallel with existing CSV/manifest parsers using export script</p></li>
+<li><p>Update YAML configs to use <code class="docutils literal notranslate"><span class="pre">resolver_min_interval_s</span></code> explicitly</p></li>
+<li><p>Migrate downstream parsers to JSONL (or keep using CSV export)</p></li>
+<li><p>Enable –workers for production runs after rate-limit validation</p></li>
+<li><p>Enable optional resolvers (OpenAIRE/HAL/OSF) if desired</p></li>
+</ol>
+</section>
+<section id="risk-mitigation">
+<h2>Risk Mitigation<a class="headerlink" href="#risk-mitigation" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Retry delays</strong>: Capped at 5 attempts, &lt;5% overall runtime increase</p></li>
+<li><p><strong>Memory usage</strong>: –workers default=1 (opt-in), N=5 adds ~50MB</p></li>
+<li><p><strong>Cache staleness</strong>: Cleared per batch run, false negatives acceptable</p></li>
+<li><p><strong>Rate limit violations</strong>: Shared Lock enforces global intervals, tested at –workers=10</p></li>
+<li><p><strong>Backward compatibility</strong>: Auto-migration + CSV export script prevent hard breaks</p></li>
+</ul>
+</section>
+<section id="testing-strategy">
+<h2>Testing Strategy<a class="headerlink" href="#testing-strategy" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Unit tests</strong>: Shared utilities, retry logic, atomic writes, state machine, caching</p></li>
+<li><p><strong>Integration tests</strong>: 429 + Retry-After, 304 conditional requests, parallel rate limiting</p></li>
+<li><p><strong>Edge case tests</strong>: Corrupt HTML, Wayback unavailable, manifest alignment</p></li>
+<li><p><strong>End-to-end tests</strong>: 100-work batch with –workers=3, digest verification, no .part files</p></li>
+<li><p><strong>Performance benchmarks</strong>: Single-thread vs –workers=5 on 500 works</p></li>
+</ul>
+</section>
+<section id="documentation">
+<h2>Documentation<a class="headerlink" href="#documentation" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Migration guide</strong>: Config/logging changes, CLI additions, CSV export</p></li>
+<li><p><strong>README updates</strong>: New flags (–workers, –dry-run, –resume-from, –extract-html-text)</p></li>
+<li><p><strong>Rate limit semantics</strong>: Explicit “min_interval_s = seconds between calls” documentation</p></li>
+<li><p><strong>Troubleshooting</strong>: Partial files, rate violations, memory issues</p></li>
+</ul>
+</section>
+<section id="open-questions-for-review">
+<h2>Open Questions for Review<a class="headerlink" href="#open-questions-for-review" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>Should –workers default to 1 (safe) or 3 (faster) in production?</p></li>
+<li><p>Prefer conditional requests opt-in (–use-etags) or opt-out (–ignore-etags)?</p></li>
+<li><p>Add Prometheus metrics export for production monitoring?</p></li>
+<li><p>Need separate –max-retries flag to override HTTPAdapter default (5)?</p></li>
+<li><p>HTML extraction: trafilatura vs newspaper3k vs BeautifulSoup.get_text()?</p></li>
+<li><p>Value in content-addressable storage (store by SHA-256) for natural dedup?</p></li>
+</ol>
+</section>
+<section id="related-changes">
+<h2>Related Changes<a class="headerlink" href="#related-changes" title="Link to this heading"></a></h2>
+<p>This change is independent and does not conflict with:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">add-ontology-downloader</span></code> (separate module, no shared code)</p></li>
+</ul>
+</section>
+<section id="approval-checklist">
+<h2>Approval Checklist<a class="headerlink" href="#approval-checklist" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>[ ] Review proposal.md (Why, What, Impact)</p></li>
+<li><p>[ ] Review design.md (Decisions, Architecture, Risks)</p></li>
+<li><p>[ ] Review tasks.md (Implementation checklist)</p></li>
+<li><p>[ ] Review specs/content-download/spec.md (Requirements + Scenarios)</p></li>
+<li><p>[ ] Validate change: <code class="docutils literal notranslate"><span class="pre">openspec</span> <span class="pre">validate</span> <span class="pre">refactor-content-download-pipeline</span> <span class="pre">--strict</span></code> ✅</p></li>
+<li><p>[ ] Approve breaking changes (config rename, JSONL logging)</p></li>
+<li><p>[ ] Approve opt-in features (–workers, –dry-run, –resume-from)</p></li>
+<li><p>[ ] Sign off on 3-4 week timeline and 101 tasks</p></li>
+</ul>
+<hr class="docutils" />
+<p><strong>Status</strong>: Ready for review and approval
+<strong>Created</strong>: 2025-10-14
+<strong>Validated</strong>: ✅ <code class="docutils literal notranslate"><span class="pre">openspec</span> <span class="pre">validate</span> <span class="pre">--strict</span></code> passes</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

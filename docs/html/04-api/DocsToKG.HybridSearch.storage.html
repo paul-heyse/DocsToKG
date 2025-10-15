@@ -1,0 +1,383 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: storage &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: storage</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.HybridSearch.storage.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-storage">
+<h1>1. Module: storage<a class="headerlink" href="#module-storage" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.storage</span></code>.</p>
+<p>In-memory storage simulators for OpenSearch and chunk registry.</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="matches-filters-chunk-filters">
+<h3><code class="docutils literal notranslate"><span class="pre">matches_filters(chunk,</span> <span class="pre">filters)</span></code><a class="headerlink" href="#matches-filters-chunk-filters" title="Link to this heading"></a></h3>
+<p>Check whether a chunk satisfies OpenSearch-style filter conditions.</p>
+<p>Args:
+chunk: Chunk payload under evaluation.
+filters: Mapping of filter names to expected values or lists.</p>
+<p>Returns:
+True if the chunk matches all supplied filters, False otherwise.</p>
+</section>
+<section id="upsert-self-chunks">
+<h3><code class="docutils literal notranslate"><span class="pre">upsert(self,</span> <span class="pre">chunks)</span></code><a class="headerlink" href="#upsert-self-chunks" title="Link to this heading"></a></h3>
+<p>Insert or update chunk metadata for the provided vector IDs.</p>
+<p>Args:
+chunks: Sequence of chunks to cache by vector identifier.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="delete-self-vector-ids">
+<h3><code class="docutils literal notranslate"><span class="pre">delete(self,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#delete-self-vector-ids" title="Link to this heading"></a></h3>
+<p>Remove chunk entries associated with the supplied vector IDs.</p>
+<p>Args:
+vector_ids: Vector identifiers whose payloads should be removed.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+None</p>
+</section>
+<section id="get-self-vector-id">
+<h3><code class="docutils literal notranslate"><span class="pre">get(self,</span> <span class="pre">vector_id)</span></code><a class="headerlink" href="#get-self-vector-id" title="Link to this heading"></a></h3>
+<p>Retrieve a chunk payload by its vector identifier.</p>
+<p>Args:
+vector_id: Vector identifier to look up.</p>
+<p>Returns:
+Matching <code class="docutils literal notranslate"><span class="pre">ChunkPayload</span></code> or None if not present.</p>
+</section>
+<section id="bulk-get-self-vector-ids">
+<h3><code class="docutils literal notranslate"><span class="pre">bulk_get(self,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#bulk-get-self-vector-ids" title="Link to this heading"></a></h3>
+<p>Return existing chunks for the provided vector identifiers.</p>
+<p>Args:
+vector_ids: Collection of vector identifiers to fetch.</p>
+<p>Returns:
+List of chunk payloads found in the registry.</p>
+</section>
+<section id="resolve-faiss-id-self-internal-id">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_faiss_id(self,</span> <span class="pre">internal_id)</span></code><a class="headerlink" href="#resolve-faiss-id-self-internal-id" title="Link to this heading"></a></h3>
+<p>Translate a FAISS internal ID back to the original vector UUID.</p>
+<p>Args:
+internal_id: Integer identifier assigned by FAISS.</p>
+<p>Returns:
+Vector UUID if the mapping exists, else None.</p>
+</section>
+<section id="all-self">
+<h3><code class="docutils literal notranslate"><span class="pre">all(self)</span></code><a class="headerlink" href="#all-self" title="Link to this heading"></a></h3>
+<p>Return a list of all registered chunk payloads.</p>
+<p>Args:
+None</p>
+<p>Returns:
+List of all cached chunk payloads.</p>
+</section>
+<section id="count-self">
+<h3><code class="docutils literal notranslate"><span class="pre">count(self)</span></code><a class="headerlink" href="#count-self" title="Link to this heading"></a></h3>
+<p>Return the total number of tracked chunks.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Number of chunks currently cached.</p>
+</section>
+<section id="vector-ids-self">
+<h3><code class="docutils literal notranslate"><span class="pre">vector_ids(self)</span></code><a class="headerlink" href="#vector-ids-self" title="Link to this heading"></a></h3>
+<p>List all vector identifiers in insertion order.</p>
+<p>Args:
+None</p>
+<p>Returns:
+List of vector identifiers tracked by the registry.</p>
+</section>
+<section id="bulk-upsert-self-chunks">
+<h3><code class="docutils literal notranslate"><span class="pre">bulk_upsert(self,</span> <span class="pre">chunks)</span></code><a class="headerlink" href="#bulk-upsert-self-chunks" title="Link to this heading"></a></h3>
+<p>Insert or replace OpenSearch documents for the provided chunks.</p>
+<p>Args:
+chunks: Sequence of chunk payloads to index.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="bulk-delete-self-vector-ids">
+<h3><code class="docutils literal notranslate"><span class="pre">bulk_delete(self,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#bulk-delete-self-vector-ids" title="Link to this heading"></a></h3>
+<p>Delete OpenSearch documents associated with the vector identifiers.</p>
+<p>Args:
+vector_ids: Vector identifiers whose documents should be removed.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+None</p>
+</section>
+<section id="fetch-self-vector-ids">
+<h3><code class="docutils literal notranslate"><span class="pre">fetch(self,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#fetch-self-vector-ids" title="Link to this heading"></a></h3>
+<p>Fetch stored chunk payloads for a list of vector IDs.</p>
+<p>Args:
+vector_ids: Vector identifiers to retrieve.</p>
+<p>Returns:
+List of chunk payloads matching the provided identifiers.</p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">vector_ids(self)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Return all vector identifiers currently stored in OpenSearch.</p>
+<p>Args:
+None</p>
+<p>Returns:
+List of vector identifiers present in the simulator.</p>
+</section>
+<section id="register-template-self-template">
+<h3><code class="docutils literal notranslate"><span class="pre">register_template(self,</span> <span class="pre">template)</span></code><a class="headerlink" href="#register-template-self-template" title="Link to this heading"></a></h3>
+<p>Register an index template used for namespace-specific behavior.</p>
+<p>Args:
+template: Template to associate with its namespace.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="template-for-self-namespace">
+<h3><code class="docutils literal notranslate"><span class="pre">template_for(self,</span> <span class="pre">namespace)</span></code><a class="headerlink" href="#template-for-self-namespace" title="Link to this heading"></a></h3>
+<p>Look up an index template for the given namespace.</p>
+<p>Args:
+namespace: Namespace identifier whose template is needed.</p>
+<p>Returns:
+Matching <code class="docutils literal notranslate"><span class="pre">OpenSearchIndexTemplate</span></code>, or None when missing.</p>
+</section>
+<section id="search-bm25-self-query-weights-filters-top-k-cursor">
+<h3><code class="docutils literal notranslate"><span class="pre">search_bm25(self,</span> <span class="pre">query_weights,</span> <span class="pre">filters,</span> <span class="pre">top_k,</span> <span class="pre">cursor)</span></code><a class="headerlink" href="#search-bm25-self-query-weights-filters-top-k-cursor" title="Link to this heading"></a></h3>
+<p>Execute a BM25-style search over stored chunks.</p>
+<p>Args:
+query_weights: Weighted token map for the query.
+filters: Filter constraints to apply before scoring.
+top_k: Maximum number of results to return.
+cursor: Optional pagination offset.</p>
+<p>Returns:
+Tuple of scored results and optional next cursor.</p>
+</section>
+<section id="search-splade-self-query-weights-filters-top-k-cursor">
+<h3><code class="docutils literal notranslate"><span class="pre">search_splade(self,</span> <span class="pre">query_weights,</span> <span class="pre">filters,</span> <span class="pre">top_k,</span> <span class="pre">cursor)</span></code><a class="headerlink" href="#search-splade-self-query-weights-filters-top-k-cursor" title="Link to this heading"></a></h3>
+<p>Execute a SPLADE-style sparse search over stored chunks.</p>
+<p>Args:
+query_weights: Weighted token map for SPLADE features.
+filters: Filter constraints applied before scoring.
+top_k: Maximum results to return.
+cursor: Optional pagination offset.</p>
+<p>Returns:
+Tuple of scored results and optional next cursor.</p>
+</section>
+<section id="highlight-self-chunk-query-tokens">
+<h3><code class="docutils literal notranslate"><span class="pre">highlight(self,</span> <span class="pre">chunk,</span> <span class="pre">query_tokens)</span></code><a class="headerlink" href="#highlight-self-chunk-query-tokens" title="Link to this heading"></a></h3>
+<p>Return basic term highlights for the given chunk.</p>
+<p>Args:
+chunk: Chunk payload whose text requires highlighting.
+query_tokens: Tokens derived from the query.</p>
+<p>Returns:
+List of highlight strings.</p>
+</section>
+<section id="filtered-chunks-self-filters">
+<h3><code class="docutils literal notranslate"><span class="pre">_filtered_chunks(self,</span> <span class="pre">filters)</span></code><a class="headerlink" href="#filtered-chunks-self-filters" title="Link to this heading"></a></h3>
+<p>Return chunks that match the provided filter constraints.</p>
+<p>Args:
+filters: Filter mapping applied to chunk metadata.</p>
+<p>Returns:
+List of stored chunks satisfying the filters.</p>
+</section>
+<section id="bm25-score-self-stored-query-weights">
+<h3><code class="docutils literal notranslate"><span class="pre">_bm25_score(self,</span> <span class="pre">stored,</span> <span class="pre">query_weights)</span></code><a class="headerlink" href="#bm25-score-self-stored-query-weights" title="Link to this heading"></a></h3>
+<p>Compute BM25 similarity between a stored chunk and query weights.</p>
+<p>Args:
+stored: Chunk under evaluation.
+query_weights: Weighted token map for the query.</p>
+<p>Returns:
+BM25 score for the chunk.</p>
+</section>
+<section id="paginate-self-scores-top-k-cursor">
+<h3><code class="docutils literal notranslate"><span class="pre">_paginate(self,</span> <span class="pre">scores,</span> <span class="pre">top_k,</span> <span class="pre">cursor)</span></code><a class="headerlink" href="#paginate-self-scores-top-k-cursor" title="Link to this heading"></a></h3>
+<p>Slice scored results according to the pagination cursor.</p>
+<p>Args:
+scores: Pre-sorted list of chunk-score tuples.
+top_k: Maximum number of items to emit.
+cursor: Optional offset into the ranked list.</p>
+<p>Returns:
+Tuple of the current page and optional next cursor.</p>
+</section>
+<section id="search-sparse-self-scoring-fn-filters-top-k-cursor">
+<h3><code class="docutils literal notranslate"><span class="pre">_search_sparse(self,</span> <span class="pre">scoring_fn,</span> <span class="pre">filters,</span> <span class="pre">top_k,</span> <span class="pre">cursor)</span></code><a class="headerlink" href="#search-sparse-self-scoring-fn-filters-top-k-cursor" title="Link to this heading"></a></h3>
+<p>Search sparse features using the supplied scoring function.</p>
+<p>Args:
+scoring_fn: Callable to compute a score for each stored chunk.
+filters: Filter mapping applied prior to scoring.
+top_k: Maximum number of results to return.
+cursor: Optional pagination offset.</p>
+<p>Returns:
+Tuple of scored results and optional next cursor.</p>
+</section>
+<section id="recompute-avg-length-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_recompute_avg_length(self)</span></code><a class="headerlink" href="#recompute-avg-length-self" title="Link to this heading"></a></h3>
+<p>Maintain the running average token length for stored chunks.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+</section>
+<section id="stats-self">
+<h3><code class="docutils literal notranslate"><span class="pre">stats(self)</span></code><a class="headerlink" href="#stats-self" title="Link to this heading"></a></h3>
+<p>Return summary statistics for stored documents.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Mapping containing document count and average token length.</p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="storedchunk">
+<h3><code class="docutils literal notranslate"><span class="pre">StoredChunk</span></code><a class="headerlink" href="#storedchunk" title="Link to this heading"></a></h3>
+<p>Internal representation of a chunk stored in the OpenSearch simulator.</p>
+<p>Attributes:
+payload: Chunk payload persisted in the simulator.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p class="rubric" id="from-docstokg-hybridsearch-types-import-chunkfeatures-chunkpayload-doctest-skip">from DocsToKG.HybridSearch.types import ChunkFeatures, ChunkPayload  # doctest: +SKIP</p>
+<p class="rubric" id="import-numpy-as-np-doctest-skip">import numpy as np  # doctest: +SKIP</p>
+<p class="rubric" id="payload-chunkpayload-features-chunkfeatures-doctest-skip">payload = ChunkPayload(…, features=ChunkFeatures(…))  # doctest: +SKIP</p>
+<p class="rubric" id="stored-storedchunk-payload-payload-doctest-skip">stored = StoredChunk(payload=payload)  # doctest: +SKIP</p>
+<p class="rubric" id="stored-payload-is-payload-doctest-skip">stored.payload is payload  # doctest: +SKIP</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+<p>True</p>
+</section>
+<section id="chunkregistry">
+<h3><code class="docutils literal notranslate"><span class="pre">ChunkRegistry</span></code><a class="headerlink" href="#chunkregistry" title="Link to this heading"></a></h3>
+<p>Durable mapping of <code class="docutils literal notranslate"><span class="pre">vector_id</span></code> → <code class="docutils literal notranslate"><span class="pre">ChunkPayload</span></code> for joins and reconciliation.</p>
+<p>Attributes:
+_chunks: Mapping from vector identifiers to chunk payloads.
+_bridge: Mapping from FAISS integer IDs to vector identifiers.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>registry = ChunkRegistry()
+registry.count()
+0</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="opensearchsimulator">
+<h3><code class="docutils literal notranslate"><span class="pre">OpenSearchSimulator</span></code><a class="headerlink" href="#opensearchsimulator" title="Link to this heading"></a></h3>
+<p>Subset of OpenSearch capabilities required for hybrid retrieval tests.</p>
+<p>Attributes:
+_chunks: Mapping from vector IDs to stored chunk metadata.
+_avg_length: Average chunk length for BM25 scoring.
+_templates: Registered namespace templates for index behavior.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>os_sim = OpenSearchSimulator()
+os_sim.vector_ids()
+[]</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

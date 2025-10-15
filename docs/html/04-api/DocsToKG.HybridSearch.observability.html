@@ -1,0 +1,321 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: observability &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: observability</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.HybridSearch.observability.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-observability">
+<h1>1. Module: observability<a class="headerlink" href="#module-observability" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.observability</span></code>.</p>
+<p>Lightweight observability primitives for ingestion and retrieval.</p>
+<p>This module provides comprehensive observability and monitoring capabilities
+for DocsToKG’s hybrid search operations, including metrics collection,
+timing utilities, and performance tracking for ingestion and retrieval
+operations.</p>
+<p>The observability system supports:</p>
+<ul class="simple">
+<li><p>Counter and histogram metrics collection</p></li>
+<li><p>Timing context managers for operation measurement</p></li>
+<li><p>Prometheus-style metric export</p></li>
+<li><p>Performance monitoring and alerting</p></li>
+<li><p>Structured logging integration</p></li>
+</ul>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="increment-self-name-amount">
+<h3><code class="docutils literal notranslate"><span class="pre">increment(self,</span> <span class="pre">name,</span> <span class="pre">amount)</span></code><a class="headerlink" href="#increment-self-name-amount" title="Link to this heading"></a></h3>
+<p>Increase a counter metric by the given amount.</p>
+<p>Args:
+name: Metric identifier.
+amount: Increment to apply to the counter (default: 1.0).
+**labels: Arbitrary label key/value pairs for dimensioning.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="observe-self-name-value">
+<h3><code class="docutils literal notranslate"><span class="pre">observe(self,</span> <span class="pre">name,</span> <span class="pre">value)</span></code><a class="headerlink" href="#observe-self-name-value" title="Link to this heading"></a></h3>
+<p>Record an observation for a histogram metric.</p>
+<p>Args:
+name: Metric identifier.
+value: Observation value to append to the histogram.
+**labels: Arbitrary label key/value pairs for dimensioning.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="export-counters-self">
+<h3><code class="docutils literal notranslate"><span class="pre">export_counters(self)</span></code><a class="headerlink" href="#export-counters-self" title="Link to this heading"></a></h3>
+<p>Iterate over collected counter metrics as structured samples.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Iterable of <code class="docutils literal notranslate"><span class="pre">CounterSample</span></code> entries representing current counters.</p>
+</section>
+<section id="export-histograms-self">
+<h3><code class="docutils literal notranslate"><span class="pre">export_histograms(self)</span></code><a class="headerlink" href="#export-histograms-self" title="Link to this heading"></a></h3>
+<p>Iterate over collected histogram metrics summarized by percentiles.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Iterable of <code class="docutils literal notranslate"><span class="pre">HistogramSample</span></code> entries containing percentile stats.</p>
+</section>
+<section id="span-self-name">
+<h3><code class="docutils literal notranslate"><span class="pre">span(self,</span> <span class="pre">name)</span></code><a class="headerlink" href="#span-self-name" title="Link to this heading"></a></h3>
+<p>Record execution duration for a traced operation.</p>
+<p>Args:
+name: Span name, used in metric and log emission.
+**attributes: Additional context attached to metrics and logs.</p>
+<p>Returns:
+None</p>
+<p>Yields:
+None</p>
+<p>Raises:
+Exception: Propagates any exception raised inside the traced block.</p>
+</section>
+<section id="metrics-self">
+<h3><code class="docutils literal notranslate"><span class="pre">metrics(self)</span></code><a class="headerlink" href="#metrics-self" title="Link to this heading"></a></h3>
+<p>Access the shared metrics collector for hybrid search components.</p>
+<p>Args:
+None</p>
+<p>Returns:
+MetricsCollector instance tracking counters and histograms.</p>
+</section>
+<section id="logger-self">
+<h3><code class="docutils literal notranslate"><span class="pre">logger(self)</span></code><a class="headerlink" href="#logger-self" title="Link to this heading"></a></h3>
+<p>Structured logger scoped to hybrid search observability events.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Logger configured for DocsToKG hybrid search messages.</p>
+</section>
+<section id="trace-self-name">
+<h3><code class="docutils literal notranslate"><span class="pre">trace(self,</span> <span class="pre">name)</span></code><a class="headerlink" href="#trace-self-name" title="Link to this heading"></a></h3>
+<p>Create a tracing span context for measuring critical operations.</p>
+<p>Args:
+name: Span name describing the operation being timed.
+**attributes: Additional context for metrics and structured logging.</p>
+<p>Returns:
+Context manager yielding control to the caller.</p>
+</section>
+<section id="metrics-snapshot-self">
+<h3><code class="docutils literal notranslate"><span class="pre">metrics_snapshot(self)</span></code><a class="headerlink" href="#metrics-snapshot-self" title="Link to this heading"></a></h3>
+<p>Produce a serializable snapshot of counters and histograms.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Dictionary containing lists of counter and histogram samples.</p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="countersample">
+<h3><code class="docutils literal notranslate"><span class="pre">CounterSample</span></code><a class="headerlink" href="#countersample" title="Link to this heading"></a></h3>
+<p>Sample from a counter metric with labels and value.</p>
+<p>This class represents a single measurement from a counter metric,
+including the metric name, associated labels, and current value.</p>
+<p>Attributes:
+name: Name of the counter metric
+labels: Dictionary of label key-value pairs
+value: Current counter value</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>sample = CounterSample(
+…     name=”documents_processed”,
+…     labels={“status”: “success”},
+…     value=150.0
+… )</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="histogramsample">
+<h3><code class="docutils literal notranslate"><span class="pre">HistogramSample</span></code><a class="headerlink" href="#histogramsample" title="Link to this heading"></a></h3>
+<p>Sample from a histogram metric with percentile statistics.</p>
+<p>This class represents statistical information from a histogram metric,
+including count and percentile values for performance analysis.</p>
+<p>Attributes:
+name: Name of the histogram metric
+labels: Dictionary of label key-value pairs
+count: Total number of observations
+p50: 50th percentile (median) value
+p95: 95th percentile value
+p99: 99th percentile value</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>sample = HistogramSample(
+…     name=”search_latency”,
+…     labels={“method”: “hybrid”},
+…     count=1000,
+…     p50=45.2,
+…     p95=89.1,
+…     p99=156.7
+… )</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="metricscollector">
+<h3><code class="docutils literal notranslate"><span class="pre">MetricsCollector</span></code><a class="headerlink" href="#metricscollector" title="Link to this heading"></a></h3>
+<p>In-memory metrics collector compatible with Prometheus-style summaries.</p>
+<p>This class provides lightweight, in-memory metrics collection for
+monitoring DocsToKG operations, supporting both counter and histogram
+metrics with labeled dimensions for detailed observability.</p>
+<p>The collector uses thread-safe operations and provides Prometheus-style
+metric export for integration with monitoring systems.</p>
+<p>Attributes:
+_counters: Internal storage for counter metrics
+_histograms: Internal storage for histogram metrics</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>collector = MetricsCollector()
+collector.increment(“documents_processed”, labels={“type”: “pdf”})
+collector.observe(“search_latency”, 45.2, method=”hybrid”)
+counters = list(collector.export_counters())</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="tracerecorder">
+<h3><code class="docutils literal notranslate"><span class="pre">TraceRecorder</span></code><a class="headerlink" href="#tracerecorder" title="Link to this heading"></a></h3>
+<p>Context manager producing timing spans for tracing.</p>
+<p>Attributes:
+_metrics: MetricsCollector used to record span durations.
+_logger: Logger that emits structured span events.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>recorder = TraceRecorder(MetricsCollector(), logging.getLogger(“test”))
+with recorder.span(“example”):
+…     pass</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="observability">
+<h3><code class="docutils literal notranslate"><span class="pre">Observability</span></code><a class="headerlink" href="#observability" title="Link to this heading"></a></h3>
+<p>Facade for metrics, structured logging, and tracing.</p>
+<p>Attributes:
+_metrics: Shared metrics collector capturing counters and histograms.
+_logger: Logger scoped to the hybrid search subsystem.
+_tracer: TraceRecorder producing timing spans.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>obs = Observability()
+isinstance(obs.metrics_snapshot(), dict)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

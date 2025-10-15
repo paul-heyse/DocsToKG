@@ -1,0 +1,630 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: download_pyalex_pdfs &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: download_pyalex_pdfs</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.ContentDownload.download_pyalex_pdfs.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-download-pyalex-pdfs">
+<h1>1. Module: download_pyalex_pdfs<a class="headerlink" href="#module-download-pyalex-pdfs" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.download_pyalex_pdfs</span></code>.</p>
+<p>Download PDFs for OpenAlex works with a configurable resolver stack.</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="utc-timestamp">
+<h3><code class="docutils literal notranslate"><span class="pre">_utc_timestamp()</span></code><a class="headerlink" href="#utc-timestamp" title="Link to this heading"></a></h3>
+<p>Return an ISO 8601 UTC timestamp with a trailing ‘Z’ suffix.</p>
+</section>
+<section id="accepts-argument-func-name">
+<h3><code class="docutils literal notranslate"><span class="pre">_accepts_argument(func,</span> <span class="pre">name)</span></code><a class="headerlink" href="#accepts-argument-func-name" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="has-pdf-eof-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_has_pdf_eof(path)</span></code><a class="headerlink" href="#has-pdf-eof-path" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="slugify-text-keep">
+<h3><code class="docutils literal notranslate"><span class="pre">slugify(text,</span> <span class="pre">keep)</span></code><a class="headerlink" href="#slugify-text-keep" title="Link to this heading"></a></h3>
+<p>Create a filesystem-friendly slug for a work title.</p>
+<p>Args:
+text: Input string to normalize into a slug.
+keep: Maximum number of characters to retain.</p>
+<p>Returns:
+Sanitized slug string suitable for filenames.</p>
+</section>
+<section id="ensure-dir-path">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_dir(path)</span></code><a class="headerlink" href="#ensure-dir-path" title="Link to this heading"></a></h3>
+<p>Create a directory if it does not already exist.</p>
+<p>Args:
+path: Directory path to create.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="make-session-headers">
+<h3><code class="docutils literal notranslate"><span class="pre">_make_session(headers)</span></code><a class="headerlink" href="#make-session-headers" title="Link to this heading"></a></h3>
+<p>Create a retry-enabled :class:<code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> configured for polite crawling.</p>
+</section>
+</section>
+<section id="parameters">
+<h2>Parameters<a class="headerlink" href="#parameters" title="Link to this heading"></a></h2>
+<p>headers:
+Header dictionary returned by :func:<code class="docutils literal notranslate"><span class="pre">load_resolver_config</span></code>. The mapping <strong>must</strong>
+already include the project user agent and mailto contact address. The factory
+copies the mapping before applying it to the outgoing session so tests may pass
+mutable dictionaries without worrying about side effects.</p>
+</section>
+<section id="returns">
+<h2>Returns<a class="headerlink" href="#returns" title="Link to this heading"></a></h2>
+<p>requests.Session
+A session with exponential backoff retry behaviour suitable for resolver
+traffic. Both <code class="docutils literal notranslate"><span class="pre">http</span></code> and <code class="docutils literal notranslate"><span class="pre">https</span></code> transports share the same
+:class:<code class="docutils literal notranslate"><span class="pre">urllib3.util.retry.Retry</span></code> configuration.</p>
+</section>
+<section id="notes">
+<h2>Notes<a class="headerlink" href="#notes" title="Link to this heading"></a></h2>
+<p>Each worker should call this helper to obtain an isolated session instance. Example
+usage::</p>
+<p>session = _make_session({“User-Agent”: “DocsToKGDownloader/1.0”, “mailto”: “ops&#64;example.org”})</p>
+<p>Subsequent resolver requests automatically include the polite headers and retry
+policy.</p>
+<section id="make-session-for-worker-headers">
+<h3><code class="docutils literal notranslate"><span class="pre">_make_session_for_worker(headers)</span></code><a class="headerlink" href="#make-session-for-worker-headers" title="Link to this heading"></a></h3>
+<p>Factory helper for per-worker sessions.</p>
+</section>
+<section id="load-previous-manifest-path">
+<h3><code class="docutils literal notranslate"><span class="pre">load_previous_manifest(path)</span></code><a class="headerlink" href="#load-previous-manifest-path" title="Link to this heading"></a></h3>
+<p>Load manifest JSONL entries indexed by work identifier.</p>
+<p>Args:
+path: Path to a previous manifest JSONL log, or None.</p>
+<p>Returns:
+Tuple containing:</p>
+<ul class="simple">
+<li><p>Mapping of work_id -&gt; url -&gt; manifest payloads</p></li>
+<li><p>Set of work IDs already completed</p></li>
+</ul>
+<p>Raises:
+json.JSONDecodeError: If the manifest contains invalid JSON.</p>
+</section>
+<section id="build-manifest-entry-artifact-resolver-url-outcome-html-paths">
+<h3><code class="docutils literal notranslate"><span class="pre">build_manifest_entry(artifact,</span> <span class="pre">resolver,</span> <span class="pre">url,</span> <span class="pre">outcome,</span> <span class="pre">html_paths)</span></code><a class="headerlink" href="#build-manifest-entry-artifact-resolver-url-outcome-html-paths" title="Link to this heading"></a></h3>
+<p>Create a manifest entry summarizing a download attempt.</p>
+<p>Args:
+artifact: Work artifact providing metadata.
+resolver: Resolver name responsible for the download.
+url: URL that was attempted.
+outcome: Download outcome describing classification and metadata.
+html_paths: Any HTML paths captured during the attempt.
+dry_run: Whether this was a dry-run execution.
+reason: Optional reason string for failures.</p>
+<p>Returns:
+ManifestEntry populated with download metadata.</p>
+</section>
+<section id="classify-payload-head-bytes-content-type-url">
+<h3><code class="docutils literal notranslate"><span class="pre">classify_payload(head_bytes,</span> <span class="pre">content_type,</span> <span class="pre">url)</span></code><a class="headerlink" href="#classify-payload-head-bytes-content-type-url" title="Link to this heading"></a></h3>
+<p>Return ‘pdf’, ‘html’, or None if undecided.</p>
+<p>Args:
+head_bytes: Leading bytes from the HTTP payload.
+content_type: Content-Type header reported by the server.
+url: Source URL of the payload.</p>
+<p>Returns:
+Optional[str]: Classification string or <code class="docutils literal notranslate"><span class="pre">None</span></code> when unknown.</p>
+<p>Raises:
+UnicodeDecodeError: If payload sniffing encounters invalid encoding when
+decoding the tail of the file (rare; captured by fallback logic).
+requests.RequestException: Propagated if header or GET requests fail
+before protective guards are applied.
+OSError: If filesystem writes fail while persisting the payload.
+ValueError: If payload metadata cannot be interpreted while classifying.</p>
+</section>
+<section id="build-download-outcome">
+<h3><code class="docutils literal notranslate"><span class="pre">_build_download_outcome()</span></code><a class="headerlink" href="#build-download-outcome" title="Link to this heading"></a></h3>
+<p>Create a :class:<code class="docutils literal notranslate"><span class="pre">DownloadOutcome</span></code> applying PDF validation rules.</p>
+<p>The helper normalises classification labels, performs the terminal <code class="docutils literal notranslate"><span class="pre">%%EOF</span></code>
+check for PDFs (skipping when running in <code class="docutils literal notranslate"><span class="pre">--dry-run</span></code> mode), and attaches
+bookkeeping metadata such as digests and conditional request headers.</p>
+</section>
+<section id="normalize-pmid-pmid">
+<h3><code class="docutils literal notranslate"><span class="pre">_normalize_pmid(pmid)</span></code><a class="headerlink" href="#normalize-pmid-pmid" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="normalize-arxiv-arxiv-id">
+<h3><code class="docutils literal notranslate"><span class="pre">_normalize_arxiv(arxiv_id)</span></code><a class="headerlink" href="#normalize-arxiv-arxiv-id" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="collect-location-urls-work">
+<h3><code class="docutils literal notranslate"><span class="pre">_collect_location_urls(work)</span></code><a class="headerlink" href="#collect-location-urls-work" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="build-query-args">
+<h3><code class="docutils literal notranslate"><span class="pre">build_query(args)</span></code><a class="headerlink" href="#build-query-args" title="Link to this heading"></a></h3>
+<p>Build a pyalex Works query based on CLI arguments.</p>
+<p>Args:
+args: Parsed command-line arguments.</p>
+<p>Returns:
+Configured Works query object ready for iteration.</p>
+</section>
+<section id="resolve-topic-id-if-needed-topic-text">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_topic_id_if_needed(topic_text)</span></code><a class="headerlink" href="#resolve-topic-id-if-needed-topic-text" title="Link to this heading"></a></h3>
+<p>Resolve a textual topic label into an OpenAlex topic identifier.</p>
+<p>Args:
+topic_text: Free-form topic text supplied via CLI.</p>
+<p>Returns:
+OpenAlex topic identifier string if resolved, else None.</p>
+</section>
+<section id="create-artifact-work-pdf-dir-html-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">create_artifact(work,</span> <span class="pre">pdf_dir,</span> <span class="pre">html_dir)</span></code><a class="headerlink" href="#create-artifact-work-pdf-dir-html-dir" title="Link to this heading"></a></h3>
+<p>Normalize an OpenAlex work into a WorkArtifact instance.</p>
+<p>Args:
+work: Raw OpenAlex work payload.
+pdf_dir: Directory where PDFs should be stored.
+html_dir: Directory where HTML resources should be stored.</p>
+<p>Returns:
+WorkArtifact describing the work and candidate URLs.</p>
+<p>Raises:
+KeyError: If required identifiers are missing from the work payload.</p>
+</section>
+<section id="download-candidate-session-artifact-url-referer-timeout-context">
+<h3><code class="docutils literal notranslate"><span class="pre">download_candidate(session,</span> <span class="pre">artifact,</span> <span class="pre">url,</span> <span class="pre">referer,</span> <span class="pre">timeout,</span> <span class="pre">context)</span></code><a class="headerlink" href="#download-candidate-session-artifact-url-referer-timeout-context" title="Link to this heading"></a></h3>
+<p>Download a single candidate URL and classify the payload.</p>
+<p>Args:
+session: HTTP session providing <code class="docutils literal notranslate"><span class="pre">head</span></code> and <code class="docutils literal notranslate"><span class="pre">get</span></code> methods.
+artifact: Work metadata and output directory handles for the current record.
+url: Candidate download URL discovered by a resolver.
+referer: Optional referer header override provided by the resolver.
+timeout: Per-request timeout in seconds.
+context: Execution context containing <code class="docutils literal notranslate"><span class="pre">dry_run</span></code>, <code class="docutils literal notranslate"><span class="pre">extract_html_text</span></code>,
+and <code class="docutils literal notranslate"><span class="pre">previous</span></code> manifest lookup data.</p>
+<p>Returns:
+DownloadOutcome describing the result of the download attempt.</p>
+<p>Raises:
+requests.RequestException: If HTTP requests fail unexpectedly outside
+guarded sections.
+OSError: If writing the downloaded payload to disk fails.
+ValueError: If response payloads cannot be interpreted during
+classification.</p>
+</section>
+<section id="read-resolver-config-path">
+<h3><code class="docutils literal notranslate"><span class="pre">read_resolver_config(path)</span></code><a class="headerlink" href="#read-resolver-config-path" title="Link to this heading"></a></h3>
+<p>Read resolver configuration from JSON or YAML files.</p>
+<p>Args:
+path: Path to the configuration file.</p>
+<p>Returns:
+Parsed configuration mapping.</p>
+<p>Raises:
+RuntimeError: If YAML parsing is requested but PyYAML is unavailable.</p>
+</section>
+<section id="apply-config-overrides-config-data-resolver-names">
+<h3><code class="docutils literal notranslate"><span class="pre">apply_config_overrides(config,</span> <span class="pre">data,</span> <span class="pre">resolver_names)</span></code><a class="headerlink" href="#apply-config-overrides-config-data-resolver-names" title="Link to this heading"></a></h3>
+<p>Apply overrides from configuration data onto a ResolverConfig.</p>
+<p>Args:
+config: Resolver configuration object to mutate.
+data: Mapping loaded from a configuration file.
+resolver_names: Known resolver names to seed toggle defaults.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="load-resolver-config-args-resolver-names-resolver-order-override">
+<h3><code class="docutils literal notranslate"><span class="pre">load_resolver_config(args,</span> <span class="pre">resolver_names,</span> <span class="pre">resolver_order_override)</span></code><a class="headerlink" href="#load-resolver-config-args-resolver-names-resolver-order-override" title="Link to this heading"></a></h3>
+<p>Construct resolver configuration combining CLI, config files, and env vars.</p>
+<p>Args:
+args: Parsed CLI arguments.
+resolver_names: Sequence of resolver names supported by the pipeline.
+resolver_order_override: Optional override list for resolver order.</p>
+<p>Returns:
+Populated ResolverConfig instance.</p>
+<p>Raises:
+FileNotFoundError: If the resolver configuration file does not exist.
+RuntimeError: If YAML parsing is requested but PyYAML is unavailable.</p>
+</section>
+<section id="iterate-openalex-query-per-page-max-results">
+<h3><code class="docutils literal notranslate"><span class="pre">iterate_openalex(query,</span> <span class="pre">per_page,</span> <span class="pre">max_results)</span></code><a class="headerlink" href="#iterate-openalex-query-per-page-max-results" title="Link to this heading"></a></h3>
+<p>Iterate over OpenAlex works respecting pagination and limits.</p>
+<p>Args:
+query: Configured Works query instance.
+per_page: Number of results to request per page.
+max_results: Optional maximum number of works to yield.</p>
+<p>Yields:
+Work payload dictionaries returned by the OpenAlex API.</p>
+<p>Returns:
+Iterable yielding work payload dictionaries.</p>
+</section>
+<section id="attempt-openalex-candidates-session-artifact-logger-metrics-context">
+<h3><code class="docutils literal notranslate"><span class="pre">attempt_openalex_candidates(session,</span> <span class="pre">artifact,</span> <span class="pre">logger,</span> <span class="pre">metrics,</span> <span class="pre">context)</span></code><a class="headerlink" href="#attempt-openalex-candidates-session-artifact-logger-metrics-context" title="Link to this heading"></a></h3>
+<p>Attempt downloads for all candidate URLs associated with an artifact.</p>
+<p>Args:
+session: Requests session configured for resolver usage.
+artifact: Work artifact containing candidate URLs.
+logger: Attempt logger receiving structured records.
+metrics: Resolver metrics collector.
+context: Optional context dict (dry-run flags, previous entries).</p>
+<p>Returns:
+Pair of (DownloadOutcome, URL) on success, otherwise None.</p>
+</section>
+<section id="process-one-work-work-session-pdf-dir-html-dir-pipeline-logger-metrics">
+<h3><code class="docutils literal notranslate"><span class="pre">process_one_work(work,</span> <span class="pre">session,</span> <span class="pre">pdf_dir,</span> <span class="pre">html_dir,</span> <span class="pre">pipeline,</span> <span class="pre">logger,</span> <span class="pre">metrics)</span></code><a class="headerlink" href="#process-one-work-work-session-pdf-dir-html-dir-pipeline-logger-metrics" title="Link to this heading"></a></h3>
+<p>Process a single OpenAlex work through the resolver pipeline.</p>
+<p>Args:
+work: OpenAlex work payload from :func:<code class="docutils literal notranslate"><span class="pre">iterate_openalex</span></code>.
+session: Requests session configured for resolver usage.
+pdf_dir: Directory where PDF artefacts are written.
+html_dir: Directory where HTML artefacts are written.
+pipeline: Resolver pipeline orchestrating downstream resolvers.
+logger: Structured attempt logger capturing manifest records.
+metrics: Resolver metrics collector.
+dry_run: When True, simulate downloads without writing files.
+extract_html_text: Whether to extract plaintext from HTML artefacts.
+previous_lookup: Mapping of work_id/URL to prior manifest entries.
+resume_completed: Set of work IDs already processed in resume mode.</p>
+<p>Returns:
+Dictionary summarizing the outcome (saved/html_only/skipped flags).</p>
+<p>Raises:
+requests.RequestException: Propagated if resolver HTTP requests fail
+unexpectedly outside guarded sections.
+Exception: Bubbling from resolver pipeline internals when not handled.</p>
+</section>
+<section id="main">
+<h3><code class="docutils literal notranslate"><span class="pre">main()</span></code><a class="headerlink" href="#main" title="Link to this heading"></a></h3>
+<p>CLI entrypoint for the OpenAlex PDF downloader.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+</section>
+<section id="write-self-payload">
+<h3><code class="docutils literal notranslate"><span class="pre">_write(self,</span> <span class="pre">payload)</span></code><a class="headerlink" href="#write-self-payload" title="Link to this heading"></a></h3>
+<p>Append a JSON record to the log file ensuring timestamps are present.</p>
+<p>Args:
+payload: JSON-serializable mapping to write.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="log-attempt-self-record">
+<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#log-attempt-self-record" title="Link to this heading"></a></h3>
+<p>Record a resolver attempt entry.</p>
+<p>Args:
+record: Attempt metadata captured from the resolver pipeline.
+timestamp: Optional override timestamp (ISO format).</p>
+<p>Returns:
+None</p>
+</section>
+<section id="log-self-record">
+<h3><code class="docutils literal notranslate"><span class="pre">log(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#log-self-record" title="Link to this heading"></a></h3>
+<p>Compatibility shim mapping to :meth:<code class="docutils literal notranslate"><span class="pre">log_attempt</span></code>.</p>
+<p>Args:
+record: Attempt record to forward to :meth:<code class="docutils literal notranslate"><span class="pre">log_attempt</span></code>.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="log-manifest-self-entry">
+<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#log-manifest-self-entry" title="Link to this heading"></a></h3>
+<p>Persist a manifest entry to the JSONL log.</p>
+<p>Args:
+entry: Manifest entry to write.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="log-summary-self-summary">
+<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#log-summary-self-summary" title="Link to this heading"></a></h3>
+<p>Write a summary record to the log.</p>
+<p>Args:
+summary: Mapping containing summary metrics.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="close-self">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#close-self" title="Link to this heading"></a></h3>
+<p>Close the underlying file handle.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Write an attempt record to both JSONL and CSV outputs.</p>
+<p>Args:
+record: Attempt record to persist.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id2">
+<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<p>Forward manifest entries to the JSONL logger.</p>
+<p>Args:
+entry: Manifest entry to forward.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id3">
+<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<p>Forward summary entries to the JSONL logger.</p>
+<p>Args:
+summary: Summary mapping to forward.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id4">
+<h3><code class="docutils literal notranslate"><span class="pre">log(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<p>Compatibility shim mapping to :meth:<code class="docutils literal notranslate"><span class="pre">log_attempt</span></code>.</p>
+<p>Args:
+record: Attempt record to log.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id5">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
+<p>Close both the JSONL logger and the CSV file handle.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+</section>
+<section id="post-init-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__post_init__(self)</span></code><a class="headerlink" href="#post-init-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="append-location-loc">
+<h3><code class="docutils literal notranslate"><span class="pre">_append_location(loc)</span></code><a class="headerlink" href="#append-location-loc" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="session-factory">
+<h3><code class="docutils literal notranslate"><span class="pre">_session_factory()</span></code><a class="headerlink" href="#session-factory" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="record-result-res">
+<h3><code class="docutils literal notranslate"><span class="pre">_record_result(res)</span></code><a class="headerlink" href="#record-result-res" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="submit-work-work-item">
+<h3><code class="docutils literal notranslate"><span class="pre">_submit_work(work_item)</span></code><a class="headerlink" href="#submit-work-work-item" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="runner">
+<h3><code class="docutils literal notranslate"><span class="pre">_runner()</span></code><a class="headerlink" href="#runner" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="manifestentry">
+<h3><code class="docutils literal notranslate"><span class="pre">ManifestEntry</span></code><a class="headerlink" href="#manifestentry" title="Link to this heading"></a></h3>
+<p>Structured record capturing the outcome of a resolver attempt.</p>
+<p>Attributes:
+timestamp: ISO timestamp when the manifest entry was created.
+work_id: OpenAlex work identifier associated with the download.
+title: Human-readable work title.
+publication_year: Publication year when available.
+resolver: Name of the resolver that produced the asset.
+url: Source URL of the downloaded artifact.
+path: Local filesystem path to the stored artifact.
+classification: Classification label describing the outcome (e.g., ‘pdf’).
+content_type: MIME type reported by the server.
+reason: Failure or status reason for non-successful attempts.
+html_paths: Paths to any captured HTML artifacts.
+sha256: SHA-256 digest of the downloaded content.
+content_length: Size of the artifact in bytes.
+etag: HTTP ETag header value if provided.
+last_modified: HTTP Last-Modified timestamp.
+extracted_text_path: Optional path to extracted text content.
+dry_run: Flag indicating whether the download was simulated.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>ManifestEntry(
+…     timestamp=”2024-01-01T00:00:00Z”,
+…     work_id=”W123”,
+…     title=”Sample Work”,
+…     publication_year=2024,
+…     resolver=”unpaywall”,
+…     url=”https://example.org/sample.pdf”,
+…     path=”pdfs/sample.pdf”,
+…     classification=”pdf”,
+…     content_type=”application/pdf”,
+…     reason=None,
+…     dry_run=False,
+… )</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="jsonllogger">
+<h3><code class="docutils literal notranslate"><span class="pre">JsonlLogger</span></code><a class="headerlink" href="#jsonllogger" title="Link to this heading"></a></h3>
+<p>Structured logger that emits attempt, manifest, and summary JSONL records.</p>
+<p>Attributes:
+_path: Destination JSONL log path.
+_file: Underlying file handle used for writes.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>logger = JsonlLogger(Path(“logs/attempts.jsonl”))
+logger.log_summary({“processed”: 10})
+logger.close()</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="csvattemptloggeradapter">
+<h3><code class="docutils literal notranslate"><span class="pre">CsvAttemptLoggerAdapter</span></code><a class="headerlink" href="#csvattemptloggeradapter" title="Link to this heading"></a></h3>
+<p>Adapter that mirrors attempt records to CSV for backward compatibility.</p>
+<p>Attributes:
+_logger: Underlying :class:<code class="docutils literal notranslate"><span class="pre">JsonlLogger</span></code> instance.
+_file: CSV file handle used for writing.
+_writer: <code class="docutils literal notranslate"><span class="pre">csv.DictWriter</span></code> writing to :attr:<code class="docutils literal notranslate"><span class="pre">_file</span></code>.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>adapter = CsvAttemptLoggerAdapter(JsonlLogger(Path(“attempts.jsonl”)), Path(“attempts.csv”))
+adapter.log_attempt(AttemptRecord(work_id=”W1”, resolver_name=”unpaywall”, resolver_order=1,
+…                                   url=”https://example”, status=”pdf”, http_status=200,
+…                                   content_type=”application/pdf”, elapsed_ms=120.0))
+adapter.close()</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="workartifact">
+<h3><code class="docutils literal notranslate"><span class="pre">WorkArtifact</span></code><a class="headerlink" href="#workartifact" title="Link to this heading"></a></h3>
+<p>Normalized artifact describing an OpenAlex work to process.</p>
+<p>Attributes:
+work_id: OpenAlex work identifier.
+title: Work title suitable for logging.
+publication_year: Publication year or None.
+doi: Canonical DOI string.
+pmid: PubMed identifier (normalized).
+pmcid: PubMed Central identifier (normalized).
+arxiv_id: Normalized arXiv identifier.
+landing_urls: Candidate landing page URLs.
+pdf_urls: Candidate PDF download URLs.
+open_access_url: Open access URL provided by OpenAlex.
+source_display_names: Source names for provenance.
+base_stem: Base filename stem for local artefacts.
+pdf_dir: Directory where PDFs are stored.
+html_dir: Directory where HTML assets are stored.
+failed_pdf_urls: URLs that failed during resolution.
+metadata: Arbitrary metadata collected during processing.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>artifact = WorkArtifact(
+…     work_id=”W123”,
+…     title=”Sample Work”,
+…     publication_year=2024,
+…     doi=”10.1234/example”,
+…     pmid=None,
+…     pmcid=None,
+…     arxiv_id=None,
+…     landing_urls=[“https://example.org”],
+…     pdf_urls=[],
+…     open_access_url=None,
+…     source_display_names=[“Example Source”],
+…     base_stem=”2024__Sample_Work__W123”,
+…     pdf_dir=Path(“pdfs”),
+…     html_dir=Path(“html”),
+… )</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="downloadstate">
+<h3><code class="docutils literal notranslate"><span class="pre">DownloadState</span></code><a class="headerlink" href="#downloadstate" title="Link to this heading"></a></h3>
+<p>State machine for streaming downloads.</p>
+<p>Attributes:
+PENDING: Payload type is being sniffed.
+WRITING: Payload bytes are being streamed to disk.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>DownloadState.PENDING is DownloadState.WRITING
+False</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

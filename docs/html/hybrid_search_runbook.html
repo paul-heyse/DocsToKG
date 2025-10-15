@@ -1,0 +1,176 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Hybrid Search Operations Runbook &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/css/custom.css" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=8d563738"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Hybrid Search Operations Runbook</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/hybrid_search_runbook.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="hybrid-search-operations-runbook">
+<h1>1. Hybrid Search Operations Runbook<a class="headerlink" href="#hybrid-search-operations-runbook" title="Link to this heading"></a></h1>
+<section id="overview">
+<h2>2. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Hybrid search combines BM25, SPLADE, and FAISS dense retrieval. This runbook summarizes
+daily operations, calibration routines, and contingency procedures for the ingestion and
+retrieval subsystems.</p>
+</section>
+<section id="calibration-sweeps">
+<h2>3. Calibration Sweeps<a class="headerlink" href="#calibration-sweeps" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>Launch the validation harness:
+<code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.HybridSearch.tools.run_real_vector_ci</span> <span class="pre">--pytest-args</span> <span class="pre">&quot;-q</span> <span class="pre">--real-vectors&quot;</span></code>
+or invoke <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.HybridSearch.validation</span> <span class="pre">--dataset</span> <span class="pre">tests/data/hybrid_dataset.jsonl</span></code> for ad-hoc checks.</p></li>
+<li><p>Review <code class="docutils literal notranslate"><span class="pre">calibration.json</span></code> in the generated report directory. Confirm that self-hit accuracy is ≥0.95 for oversample ≥2.</p></li>
+<li><p>If accuracy drops below threshold:</p>
+<ul class="simple">
+<li><p>Increase <code class="docutils literal notranslate"><span class="pre">dense.oversample</span></code> in <code class="docutils literal notranslate"><span class="pre">hybrid_config.json</span></code>.</p></li>
+<li><p>Reload the configuration (<code class="docutils literal notranslate"><span class="pre">HybridSearchConfigManager.reload</span></code>).</p></li>
+<li><p>Re-run the validation harness and compare the new report.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="namespace-onboarding">
+<h2>4. Namespace Onboarding<a class="headerlink" href="#namespace-onboarding" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>Create a namespace entry in the configuration with chunk window overrides if needed.</p></li>
+<li><p>Run the ingestion pipeline with a smoke dataset for the new namespace.</p></li>
+<li><p>Verify OpenSearch stats using <code class="docutils literal notranslate"><span class="pre">build_stats_snapshot</span></code> and ensure <code class="docutils literal notranslate"><span class="pre">document_count</span></code> &gt; 0 for the namespace.</p></li>
+<li><p>Execute <code class="docutils literal notranslate"><span class="pre">verify_pagination</span></code> for a representative query to confirm cursor stability.</p></li>
+</ol>
+</section>
+<section id="failover-and-rollback">
+<h2>5. Failover and Rollback<a class="headerlink" href="#failover-and-rollback" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>Serialize the FAISS index with <code class="docutils literal notranslate"><span class="pre">serialize_state</span></code> and persist the payload alongside OpenSearch snapshots.</p></li>
+<li><p>During failover, restore OpenSearch from snapshot and call <code class="docutils literal notranslate"><span class="pre">restore_state</span></code> on the FAISS
+manager. Confirm startup logs include a <code class="docutils literal notranslate"><span class="pre">faiss-index-config</span></code> event with the expected
+<code class="docutils literal notranslate"><span class="pre">index_type</span></code>, <code class="docutils literal notranslate"><span class="pre">nlist</span></code>, <code class="docutils literal notranslate"><span class="pre">nprobe</span></code>, and device metadata before serving traffic.</p></li>
+<li><p>Warm the cache by issuing <code class="docutils literal notranslate"><span class="pre">HybridSearchRequest</span></code> probes for top queries.</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">verify_pagination</span></code> to ensure cursor continuity after failover.</p></li>
+<li><p>If errors persist, revert to the previous config file and call <code class="docutils literal notranslate"><span class="pre">HybridSearchConfigManager.reload</span></code>.</p></li>
+</ol>
+</section>
+<section id="backup-and-restore-drills">
+<h2>6. Backup and Restore Drills<a class="headerlink" href="#backup-and-restore-drills" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>Schedule weekly jobs to run <code class="docutils literal notranslate"><span class="pre">serialize_state</span></code> and OpenSearch snapshots.</p></li>
+<li><p>Store artifacts in durable object storage with retention &gt;=30 days.</p></li>
+<li><p>Quarterly, perform a restore into a staging environment and execute the validation harness to confirm parity.</p></li>
+<li><p>Record results in the operational log and escalate if any validation report fails.</p></li>
+</ol>
+</section>
+<section id="delete-churn-monitoring">
+<h2>7. Delete Churn Monitoring<a class="headerlink" href="#delete-churn-monitoring" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Track <code class="docutils literal notranslate"><span class="pre">delete_chunks</span></code> and <code class="docutils literal notranslate"><span class="pre">ingest_chunks</span></code> counters from <code class="docutils literal notranslate"><span class="pre">Observability.metrics_snapshot</span></code>.</p></li>
+<li><p>When <code class="docutils literal notranslate"><span class="pre">should_rebuild_index</span></code> returns <code class="docutils literal notranslate"><span class="pre">True</span></code>, schedule a full rebuild:</p>
+<ol class="arabic simple">
+<li><p>Drain ingestion traffic.</p></li>
+<li><p>Reconstruct FAISS from the authoritative registry list.</p></li>
+<li><p>Re-enable ingestion and confirm <code class="docutils literal notranslate"><span class="pre">ntotal</span></code> aligns with registry count.</p></li>
+</ol>
+</li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,127 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Why &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/custom.css" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Why</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/openspec/changes/archive/2025-10-14-extend-hybrid-vector-scale-tests/proposal.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="why">
+<h1>Why<a class="headerlink" href="#why" title="Link to this heading"></a></h1>
+<p>Our hybrid-vector validation today focuses on small curated fixtures (≈3 documents) that exercise correctness but do not emulate production scale or the comprehensive operational checks outlined in the test plan. As a result we cannot confidently assess behavior once hundreds of vectors are present, nor do we cover performance, pagination, ACL, calibration sweeps, or deterministic replay expectations. We need to extend the regression harness so it ingests at least 500 real vectors and executes the broader suite to catch scale-specific regressions before onboarding production corpora.</p>
+</section>
+<section id="what-changes">
+<h1>What Changes<a class="headerlink" href="#what-changes" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Expand the hybrid test harness to build and load a ≥500-vector fixture sourced from the real corpus, preserving namespaces, ACL metadata, and reproducible sampling/hashing for auditability.</p></li>
+<li><p>Add automated test flows that cover the complete large-scale suite: (1) data sanity/schema validation, (2) CRUD + namespace isolation, (3) dense FAISS self-hit/recall and optional ground truth comparisons, (4) BM25 relevance, (5) SPLADE relevance, (6) pagination stability (OpenSearch PIT and FAISS slicing), (7) hybrid fusion + MMR diversification effectiveness, (8) result shaping collapse/dedupe/highlighting, (9) backup/restore parity, (10) ACL enforcement, (11) performance &amp; capacity profiling, (12) stability/determinism replays, (13) calibration sweeps for FAISS/fusion parameters, and (14) consolidated regression reporting with explicit acceptance thresholds.</p></li>
+<li><p>Instrument the harness to emit structured artifacts (JSON/CSV summaries, latency/throughput traces, calibration heatmaps) and integrate with CI jobs that fail when thresholds (e.g., dense self-hit ≥0.99, BM25/SPLADE hit-rate&#64;10 ≥0.8, RRF redundancy reduction ≥20%, p95 latency ≤ SLA, GPU headroom ≥20%) are not satisfied.</p></li>
+</ul>
+</section>
+<section id="impact">
+<h1>Impact<a class="headerlink" href="#impact" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Affected specs: <code class="docutils literal notranslate"><span class="pre">hybrid-search</span></code></p></li>
+<li><p>Affected code: hybrid validation harness, test fixtures, performance instrumentation, CI scripts for hybrid regression suites.</p></li>
+</ul>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

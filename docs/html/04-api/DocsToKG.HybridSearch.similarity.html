@@ -1,0 +1,167 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: similarity &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: similarity</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.HybridSearch.similarity.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-similarity">
+<h1>1. Module: similarity<a class="headerlink" href="#module-similarity" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.similarity</span></code>.</p>
+<p>GPU-accelerated cosine similarity helpers for HybridSearch.</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="normalize-rows-matrix">
+<h3><code class="docutils literal notranslate"><span class="pre">normalize_rows(matrix)</span></code><a class="headerlink" href="#normalize-rows-matrix" title="Link to this heading"></a></h3>
+<p>Normalise rows in-place for cosine similarity operations.</p>
+<p>Args:
+matrix: Contiguous <code class="docutils literal notranslate"><span class="pre">float32</span></code> array whose rows will be normalised.</p>
+<p>Returns:
+The same array instance with each row scaled to unit length.</p>
+<p>Raises:
+TypeError: If <code class="docutils literal notranslate"><span class="pre">matrix</span></code> is not a contiguous <code class="docutils literal notranslate"><span class="pre">float32</span></code> array.</p>
+</section>
+<section id="cosine-against-corpus-gpu-query-corpus">
+<h3><code class="docutils literal notranslate"><span class="pre">cosine_against_corpus_gpu(query,</span> <span class="pre">corpus)</span></code><a class="headerlink" href="#cosine-against-corpus-gpu-query-corpus" title="Link to this heading"></a></h3>
+<p>Compute cosine similarities between a query vector and a corpus on GPU.</p>
+<p>Args:
+query: 1D or 2D array containing the query vector(s).
+corpus: 2D array of candidate vectors to compare against <code class="docutils literal notranslate"><span class="pre">query</span></code>.
+device: GPU device ordinal passed to FAISS.
+resources: Initialised FAISS GPU resources object.</p>
+<p>Returns:
+<code class="docutils literal notranslate"><span class="pre">float32</span></code> matrix of cosine similarities shaped <code class="docutils literal notranslate"><span class="pre">(len(query),</span> <span class="pre">len(corpus))</span></code>.</p>
+<p>Raises:
+RuntimeError: If GPU resources are not provided.
+ValueError: If <code class="docutils literal notranslate"><span class="pre">query</span></code> and <code class="docutils literal notranslate"><span class="pre">corpus</span></code> dimensions are incompatible.</p>
+</section>
+<section id="pairwise-inner-products-a-b">
+<h3><code class="docutils literal notranslate"><span class="pre">pairwise_inner_products(a,</span> <span class="pre">b)</span></code><a class="headerlink" href="#pairwise-inner-products-a-b" title="Link to this heading"></a></h3>
+<p>Return pairwise cosine similarities between rows of <code class="docutils literal notranslate"><span class="pre">a</span></code> and <code class="docutils literal notranslate"><span class="pre">b</span></code> on GPU.</p>
+<p>Args:
+a: Matrix holding the first set of vectors to compare.
+b: Optional matrix of comparison vectors; defaults to <code class="docutils literal notranslate"><span class="pre">a</span></code> when omitted.
+device: GPU device ordinal supplied to FAISS.
+resources: Initialised FAISS GPU resources object.</p>
+<p>Returns:
+<code class="docutils literal notranslate"><span class="pre">float32</span></code> matrix of cosine similarities.</p>
+<p>Raises:
+RuntimeError: If GPU resources are not provided.
+ValueError: When <code class="docutils literal notranslate"><span class="pre">a</span></code> and <code class="docutils literal notranslate"><span class="pre">b</span></code> have mismatching dimensionality.</p>
+</section>
+<section id="max-inner-product-target-corpus">
+<h3><code class="docutils literal notranslate"><span class="pre">max_inner_product(target,</span> <span class="pre">corpus)</span></code><a class="headerlink" href="#max-inner-product-target-corpus" title="Link to this heading"></a></h3>
+<p>Return the maximum cosine similarity between <code class="docutils literal notranslate"><span class="pre">target</span></code> and rows in <code class="docutils literal notranslate"><span class="pre">corpus</span></code>.</p>
+<p>Args:
+target: Vector whose similarity to the corpus is evaluated.
+corpus: Matrix containing comparison vectors.
+device: GPU device ordinal supplied to FAISS.
+resources: Initialised FAISS GPU resources object.</p>
+<p>Returns:
+Maximum cosine similarity value as a <code class="docutils literal notranslate"><span class="pre">float</span></code>. Returns <code class="docutils literal notranslate"><span class="pre">-inf</span></code> for an empty corpus.</p>
+<p>Raises:
+RuntimeError: If GPU resources are not provided.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

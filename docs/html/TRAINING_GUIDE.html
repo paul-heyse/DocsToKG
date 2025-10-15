@@ -1,0 +1,506 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Documentation Framework Training Guide &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/css/custom.css" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=8d563738"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Documentation Framework Training Guide</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/TRAINING_GUIDE.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="documentation-framework-training-guide">
+<h1>1. Documentation Framework Training Guide<a class="headerlink" href="#documentation-framework-training-guide" title="Link to this heading"></a></h1>
+<p>This training guide introduces team members to DocsToKG’s comprehensive documentation framework, including automated tools, standards, and processes.</p>
+<section id="training-objectives">
+<h2>2. Training Objectives 🎯<a class="headerlink" href="#training-objectives" title="Link to this heading"></a></h2>
+<p>After completing this training, you will be able to:</p>
+<ul class="simple">
+<li><p><strong>Navigate</strong> the new documentation structure effectively</p></li>
+<li><p><strong>Use automated tools</strong> for documentation generation and validation</p></li>
+<li><p><strong>Follow documentation standards</strong> for consistent, high-quality content</p></li>
+<li><p><strong>Integrate documentation</strong> into your development workflow</p></li>
+<li><p><strong>Contribute effectively</strong> to the documentation ecosystem</p></li>
+</ul>
+</section>
+<section id="session-1-documentation-framework-overview">
+<h2>3. Session 1: Documentation Framework Overview 📚<a class="headerlink" href="#session-1-documentation-framework-overview" title="Link to this heading"></a></h2>
+<section id="what-is-the-documentation-framework">
+<h3>What is the Documentation Framework?<a class="headerlink" href="#what-is-the-documentation-framework" title="Link to this heading"></a></h3>
+<p>DocsToKG’s documentation framework provides:</p>
+<ul class="simple">
+<li><p><strong>Structured organization</strong> for easy navigation and maintenance</p></li>
+<li><p><strong>Automated generation</strong> from code annotations and content</p></li>
+<li><p><strong>Quality assurance</strong> through validation and review processes</p></li>
+<li><p><strong>Standards compliance</strong> for consistency and AI compatibility</p></li>
+</ul>
+</section>
+<section id="framework-components">
+<h3>Framework Components<a class="headerlink" href="#framework-components" title="Link to this heading"></a></h3>
+<section id="documentation-structure">
+<h4>📁 Documentation Structure<a class="headerlink" href="#documentation-structure" title="Link to this heading"></a></h4>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>docs/
+├── 01-overview/        # Project introduction and high-level concepts
+├── 02-setup/          # Installation and configuration guides
+├── 03-architecture/   # System design and component details
+├── 04-api/            # REST API reference and examples
+├── 05-development/    # Contributing guidelines and workflows
+├── 07-reference/      # Technical references and external integrations
+├── templates/         # Reusable documentation templates
+├── scripts/           # Automation tools and utilities
+└── STYLE_GUIDE.md     # Writing standards and conventions
+</pre></div>
+</div>
+</section>
+<section id="automation-tools">
+<h4>🤖 Automation Tools<a class="headerlink" href="#automation-tools" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>generate_api_docs.py</strong> - Extract documentation from Python code</p></li>
+<li><p><strong>validate_docs.py</strong> - Check documentation quality and consistency</p></li>
+<li><p><strong>check_links.py</strong> - Validate internal and external links</p></li>
+<li><p><strong>build_docs.py</strong> - Generate HTML documentation with Sphinx</p></li>
+</ul>
+</section>
+</section>
+<section id="key-benefits">
+<h3>Key Benefits<a class="headerlink" href="#key-benefits" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Faster onboarding</strong> for new team members and AI agents</p></li>
+<li><p><strong>Reduced maintenance burden</strong> through automation</p></li>
+<li><p><strong>Higher quality</strong> through consistent standards and validation</p></li>
+<li><p><strong>Better user experience</strong> with clear, comprehensive documentation</p></li>
+</ul>
+</section>
+</section>
+<section id="session-2-using-automation-tools">
+<h2>4. Session 2: Using Automation Tools 🛠️<a class="headerlink" href="#session-2-using-automation-tools" title="Link to this heading"></a></h2>
+<section id="basic-tool-usage">
+<h3>Basic Tool Usage<a class="headerlink" href="#basic-tool-usage" title="Link to this heading"></a></h3>
+<section id="generate-documentation-from-code">
+<h4>Generate Documentation from Code<a class="headerlink" href="#generate-documentation-from-code" title="Link to this heading"></a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Generate API documentation from source code</span>
+python<span class="w"> </span>docs/scripts/generate_api_docs.py
+
+<span class="c1"># Generate all documentation (API + content)</span>
+python<span class="w"> </span>docs/scripts/generate_all_docs.py
+
+<span class="c1"># Quick generation (skip validation for speed)</span>
+python<span class="w"> </span>docs/scripts/generate_all_docs.py<span class="w"> </span>--quick
+</pre></div>
+</div>
+</section>
+<section id="validate-documentation-quality">
+<h4>Validate Documentation Quality<a class="headerlink" href="#validate-documentation-quality" title="Link to this heading"></a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Validate all documentation for quality issues</span>
+python<span class="w"> </span>docs/scripts/validate_docs.py
+
+<span class="c1"># Check for broken links</span>
+python<span class="w"> </span>docs/scripts/check_links.py
+
+<span class="c1"># Validate code annotations</span>
+python<span class="w"> </span>docs/scripts/validate_code_annotations.py<span class="w"> </span>src/
+</pre></div>
+</div>
+</section>
+</section>
+<section id="tool-integration">
+<h3>Tool Integration<a class="headerlink" href="#tool-integration" title="Link to this heading"></a></h3>
+<section id="pre-commit-hooks">
+<h4>Pre-commit Hooks<a class="headerlink" href="#pre-commit-hooks" title="Link to this heading"></a></h4>
+<p>Add to your development workflow:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Install pre-commit hooks</span>
+pre-commit<span class="w"> </span>install
+
+<span class="c1"># Run documentation validation before commits</span>
+pre-commit<span class="w"> </span>run<span class="w"> </span>--files<span class="w"> </span>docs/**/*.md
+</pre></div>
+</div>
+</section>
+<section id="ci-cd-integration">
+<h4>CI/CD Integration<a class="headerlink" href="#ci-cd-integration" title="Link to this heading"></a></h4>
+<p>The framework automatically:</p>
+<ul class="simple">
+<li><p>Validates documentation on pull requests</p></li>
+<li><p>Generates updated documentation on merges</p></li>
+<li><p>Deploys HTML documentation to GitHub Pages</p></li>
+<li><p>Reports issues and status in PR comments</p></li>
+</ul>
+</section>
+</section>
+</section>
+<section id="session-3-documentation-standards">
+<h2>5. Session 3: Documentation Standards 📝<a class="headerlink" href="#session-3-documentation-standards" title="Link to this heading"></a></h2>
+<section id="writing-standards">
+<h3>Writing Standards<a class="headerlink" href="#writing-standards" title="Link to this heading"></a></h3>
+<section id="follow-the-style-guide">
+<h4>Follow the Style Guide<a class="headerlink" href="#follow-the-style-guide" title="Link to this heading"></a></h4>
+<p>Key principles from <a class="reference internal" href="STYLE_GUIDE.html"><span class="std std-doc">STYLE_GUIDE.md</span></a>:</p>
+<ul class="simple">
+<li><p><strong>Audience-first approach</strong> - Write for both humans and AI agents</p></li>
+<li><p><strong>Clear structure</strong> - Use consistent headings and formatting</p></li>
+<li><p><strong>Practical examples</strong> - Include working code examples</p></li>
+<li><p><strong>Progressive disclosure</strong> - Start simple, then dive deeper</p></li>
+</ul>
+</section>
+<section id="code-annotation-standards">
+<h4>Code Annotation Standards<a class="headerlink" href="#code-annotation-standards" title="Link to this heading"></a></h4>
+<p>From <a class="reference internal" href="CODE_ANNOTATION_STANDARDS.html"><span class="std std-doc">CODE_ANNOTATION_STANDARDS.md</span></a>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">process_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProcessingResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process a document through the knowledge graph pipeline.</span>
+
+<span class="sd">    This function handles the complete document processing workflow</span>
+<span class="sd">    including validation, content extraction, and knowledge graph</span>
+<span class="sd">    construction.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        document_id: Unique identifier for the document</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        ProcessingResult with status and extracted entities</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        DocumentProcessingError: If processing fails</span>
+<span class="sd">        ValidationError: If document format is invalid</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; result = await process_document(&quot;doc_123&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; print(f&quot;Processed {len(result.entities)} entities&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="documentation-types">
+<h3>Documentation Types<a class="headerlink" href="#documentation-types" title="Link to this heading"></a></h3>
+<section id="api-documentation-template">
+<h4>API Documentation Template<a class="headerlink" href="#api-documentation-template" title="Link to this heading"></a></h4>
+<p>Use <a class="reference internal" href="templates/api-endpoint.html"><span class="std std-doc">templates/api-endpoint.md</span></a> for:</p>
+<ul class="simple">
+<li><p>Endpoint specifications</p></li>
+<li><p>Parameter documentation</p></li>
+<li><p>Response examples</p></li>
+<li><p>Error handling</p></li>
+</ul>
+</section>
+<section id="architecture-documentation-template">
+<h4>Architecture Documentation Template<a class="headerlink" href="#architecture-documentation-template" title="Link to this heading"></a></h4>
+<p>Use <a class="reference internal" href="templates/architecture-component.html"><span class="std std-doc">templates/architecture-component.md</span></a> for:</p>
+<ul class="simple">
+<li><p>Component responsibilities</p></li>
+<li><p>Dependencies and interfaces</p></li>
+<li><p>Performance characteristics</p></li>
+<li><p>Deployment considerations</p></li>
+</ul>
+</section>
+</section>
+</section>
+<section id="session-4-development-workflow-integration">
+<h2>6. Session 4: Development Workflow Integration 🔄<a class="headerlink" href="#session-4-development-workflow-integration" title="Link to this heading"></a></h2>
+<section id="documentation-first-development">
+<h3>Documentation-First Development<a class="headerlink" href="#documentation-first-development" title="Link to this heading"></a></h3>
+<section id="before-writing-code">
+<h4>Before Writing Code<a class="headerlink" href="#before-writing-code" title="Link to this heading"></a></h4>
+<ol class="arabic simple">
+<li><p><strong>Document requirements</strong> in the appropriate section</p></li>
+<li><p><strong>Create API specifications</strong> for new endpoints</p></li>
+<li><p><strong>Define data models</strong> and their relationships</p></li>
+<li><p><strong>Plan examples</strong> and use cases</p></li>
+</ol>
+</section>
+<section id="during-development">
+<h4>During Development<a class="headerlink" href="#during-development" title="Link to this heading"></a></h4>
+<ol class="arabic simple">
+<li><p><strong>Write comprehensive docstrings</strong> for all public interfaces</p></li>
+<li><p><strong>Update documentation</strong> as functionality evolves</p></li>
+<li><p><strong>Test documentation examples</strong> to ensure they work</p></li>
+<li><p><strong>Validate changes</strong> using automated tools</p></li>
+</ol>
+</section>
+<section id="before-submitting">
+<h4>Before Submitting<a class="headerlink" href="#before-submitting" title="Link to this heading"></a></h4>
+<ol class="arabic simple">
+<li><p><strong>Run validation tools</strong> to check for issues</p></li>
+<li><p><strong>Generate updated documentation</strong> to verify changes</p></li>
+<li><p><strong>Review changes</strong> using the documentation checklist</p></li>
+<li><p><strong>Submit pull request</strong> with clear description</p></li>
+</ol>
+</section>
+</section>
+<section id="review-process">
+<h3>Review Process<a class="headerlink" href="#review-process" title="Link to this heading"></a></h3>
+<section id="documentation-review-checklist">
+<h4>Documentation Review Checklist<a class="headerlink" href="#documentation-review-checklist" title="Link to this heading"></a></h4>
+<p>From <a class="reference internal" href="DOCUMENTATION_REVIEW_PROCESS.html"><span class="std std-doc">DOCUMENTATION_REVIEW_PROCESS.md</span></a>:</p>
+<ul class="simple">
+<li><p>[ ] <strong>Accuracy</strong> - Information is factually correct and current</p></li>
+<li><p>[ ] <strong>Completeness</strong> - All necessary information is provided</p></li>
+<li><p>[ ] <strong>Clarity</strong> - Content is easy to understand</p></li>
+<li><p>[ ] <strong>Consistency</strong> - Terminology and style are consistent</p></li>
+<li><p>[ ] <strong>AI Compatibility</strong> - Content supports automated understanding</p></li>
+</ul>
+</section>
+</section>
+</section>
+<section id="session-5-maintenance-and-quality-assurance">
+<h2>7. Session 5: Maintenance and Quality Assurance 📊<a class="headerlink" href="#session-5-maintenance-and-quality-assurance" title="Link to this heading"></a></h2>
+<section id="regular-maintenance-tasks">
+<h3>Regular Maintenance Tasks<a class="headerlink" href="#regular-maintenance-tasks" title="Link to this heading"></a></h3>
+<section id="daily-activities">
+<h4>Daily Activities<a class="headerlink" href="#daily-activities" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>Quick content review</strong> of recently modified files</p></li>
+<li><p><strong>Link validation</strong> through automated checks</p></li>
+<li><p><strong>Style compliance</strong> verification</p></li>
+</ul>
+</section>
+<section id="weekly-activities">
+<h4>Weekly Activities<a class="headerlink" href="#weekly-activities" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>Documentation metrics review</strong> and trend analysis</p></li>
+<li><p><strong>Content freshness audit</strong> for outdated information</p></li>
+<li><p><strong>Code annotation validation</strong> for new code</p></li>
+</ul>
+</section>
+<section id="monthly-activities">
+<h4>Monthly Activities<a class="headerlink" href="#monthly-activities" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>Comprehensive content audit</strong> using review checklist</p></li>
+<li><p><strong>User experience review</strong> from reader perspective</p></li>
+<li><p><strong>Standards update review</strong> for needed improvements</p></li>
+</ul>
+</section>
+</section>
+<section id="quality-metrics">
+<h3>Quality Metrics<a class="headerlink" href="#quality-metrics" title="Link to this heading"></a></h3>
+<section id="track-these-indicators">
+<h4>Track These Indicators<a class="headerlink" href="#track-these-indicators" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>Documentation coverage</strong> percentage</p></li>
+<li><p><strong>Link integrity</strong> score</p></li>
+<li><p><strong>Validation pass rate</strong></p></li>
+<li><p><strong>User engagement</strong> metrics</p></li>
+<li><p><strong>Maintenance task completion</strong> rates</p></li>
+</ul>
+</section>
+</section>
+</section>
+<section id="hands-on-exercises">
+<h2>8. Hands-On Exercises 🎯<a class="headerlink" href="#hands-on-exercises" title="Link to this heading"></a></h2>
+<section id="exercise-1-navigate-documentation">
+<h3>Exercise 1: Navigate Documentation<a class="headerlink" href="#exercise-1-navigate-documentation" title="Link to this heading"></a></h3>
+<p><strong>Objective</strong>: Learn to find information quickly in the new structure</p>
+<ol class="arabic simple">
+<li><p>Find installation instructions</p></li>
+<li><p>Locate API documentation for document upload</p></li>
+<li><p>Find code annotation standards</p></li>
+<li><p>Locate the development workflow guide</p></li>
+</ol>
+</section>
+<section id="exercise-2-use-automation-tools">
+<h3>Exercise 2: Use Automation Tools<a class="headerlink" href="#exercise-2-use-automation-tools" title="Link to this heading"></a></h3>
+<p><strong>Objective</strong>: Practice using the automated documentation tools</p>
+<ol class="arabic simple">
+<li><p>Run <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">docs/scripts/generate_api_docs.py</span></code></p></li>
+<li><p>Run <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">docs/scripts/validate_docs.py</span></code></p></li>
+<li><p>Check the generated output for any issues</p></li>
+<li><p>Fix any validation errors you find</p></li>
+</ol>
+</section>
+<section id="exercise-3-write-documentation">
+<h3>Exercise 3: Write Documentation<a class="headerlink" href="#exercise-3-write-documentation" title="Link to this heading"></a></h3>
+<p><strong>Objective</strong>: Practice following documentation standards</p>
+<ol class="arabic simple">
+<li><p>Choose a simple function from the codebase</p></li>
+<li><p>Write comprehensive docstring following standards</p></li>
+<li><p>Create a usage example</p></li>
+<li><p>Validate your documentation</p></li>
+</ol>
+</section>
+<section id="exercise-4-review-process">
+<h3>Exercise 4: Review Process<a class="headerlink" href="#exercise-4-review-process" title="Link to this heading"></a></h3>
+<p><strong>Objective</strong>: Practice the documentation review process</p>
+<ol class="arabic simple">
+<li><p>Review a small documentation change</p></li>
+<li><p>Use the review checklist</p></li>
+<li><p>Provide constructive feedback</p></li>
+<li><p>Suggest improvements</p></li>
+</ol>
+</section>
+</section>
+<section id="assessment">
+<h2>9. Assessment 📋<a class="headerlink" href="#assessment" title="Link to this heading"></a></h2>
+<section id="knowledge-check">
+<h3>Knowledge Check<a class="headerlink" href="#knowledge-check" title="Link to this heading"></a></h3>
+<p>Answer these questions to verify understanding:</p>
+<ol class="arabic simple">
+<li><p><strong>What are the main benefits</strong> of the new documentation framework?</p></li>
+<li><p><strong>How do you generate</strong> API documentation from code?</p></li>
+<li><p><strong>What standards</strong> should code annotations follow?</p></li>
+<li><p><strong>When is documentation review</strong> required?</p></li>
+<li><p><strong>How do you validate</strong> documentation quality?</p></li>
+</ol>
+</section>
+<section id="skills-demonstration">
+<h3>Skills Demonstration<a class="headerlink" href="#skills-demonstration" title="Link to this heading"></a></h3>
+<p>Complete these tasks to demonstrate proficiency:</p>
+<ol class="arabic simple">
+<li><p><strong>Navigate</strong> to find specific information in under 2 minutes</p></li>
+<li><p><strong>Generate</strong> API documentation and identify any issues</p></li>
+<li><p><strong>Write</strong> a properly formatted docstring for a function</p></li>
+<li><p><strong>Validate</strong> documentation and fix any issues found</p></li>
+</ol>
+</section>
+</section>
+<section id="next-steps">
+<h2>10. Next Steps 🚀<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
+<section id="immediate-actions">
+<h3>Immediate Actions<a class="headerlink" href="#immediate-actions" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p><strong>Explore the documentation</strong> structure and find familiar topics</p></li>
+<li><p><strong>Run the automation tools</strong> on existing code to see them in action</p></li>
+<li><p><strong>Practice writing</strong> a few docstrings following the standards</p></li>
+<li><p><strong>Set up your environment</strong> for documentation work</p></li>
+</ol>
+</section>
+<section id="ongoing-learning">
+<h3>Ongoing Learning<a class="headerlink" href="#ongoing-learning" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p><strong>Regular participation</strong> in documentation maintenance tasks</p></li>
+<li><p><strong>Continuous improvement</strong> of documentation skills</p></li>
+<li><p><strong>Mentoring</strong> new team members on documentation practices</p></li>
+<li><p><strong>Feedback contribution</strong> to improve the framework</p></li>
+</ol>
+</section>
+</section>
+<section id="support-and-resources">
+<h2>11. Support and Resources 📞<a class="headerlink" href="#support-and-resources" title="Link to this heading"></a></h2>
+<section id="getting-help">
+<h3>Getting Help<a class="headerlink" href="#getting-help" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>📚 Documentation Team</strong> - For documentation-specific questions</p></li>
+<li><p><strong>🛠️ Development Tools</strong> - For automation and tooling issues</p></li>
+<li><p><strong>📖 Standards Documents</strong> - Reference materials for best practices</p></li>
+</ul>
+</section>
+<section id="additional-resources">
+<h3>Additional Resources<a class="headerlink" href="#additional-resources" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong><a class="reference internal" href="STYLE_GUIDE.html"><span class="std std-doc">Style Guide</span></a></strong> - Writing standards and conventions</p></li>
+<li><p><strong><a class="reference internal" href="CODE_ANNOTATION_STANDARDS.html"><span class="std std-doc">Code Annotation Standards</span></a></strong> - Code documentation requirements</p></li>
+<li><p><strong><a class="reference internal" href="DOCUMENTATION_REVIEW_PROCESS.html"><span class="std std-doc">Review Process</span></a></strong> - How documentation changes are reviewed</p></li>
+<li><p><strong><a class="reference internal" href="DOCUMENTATION_MAINTENANCE_SCHEDULE.html"><span class="std std-doc">Maintenance Schedule</span></a></strong> - Regular maintenance activities</p></li>
+</ul>
+</section>
+<section id="training-schedule">
+<h3>Training Schedule<a class="headerlink" href="#training-schedule" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Weekly office hours</strong> for documentation questions</p></li>
+<li><p><strong>Monthly workshops</strong> on advanced topics</p></li>
+<li><p><strong>Quarterly reviews</strong> of framework effectiveness</p></li>
+<li><p><strong>Annual refreshers</strong> on standards and processes</p></li>
+</ul>
+<hr class="docutils" />
+<p><strong>Training Version</strong>: 1.0.0
+<strong>Last Updated</strong>: 2025-01-13
+<strong>Next Training</strong>: 2025-02-13</p>
+<p><em>This training guide ensures all team members can effectively use and contribute to DocsToKG’s comprehensive documentation framework.</em></p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

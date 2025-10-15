@@ -1,0 +1,422 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: config &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: config</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.OntologyDownload.config.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-config">
+<h1>1. Module: config<a class="headerlink" href="#module-config" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.config</span></code>.</p>
+<p>Configuration models, parsing, and validation for the ontology downloader.</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="ensure-python-version">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_python_version()</span></code><a class="headerlink" href="#ensure-python-version" title="Link to this heading"></a></h3>
+<p>Ensure the interpreter meets the minimum supported Python version.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+<p>Raises:
+SystemExit: If the current interpreter version is below the minimum.</p>
+</section>
+<section id="coerce-sequence-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_coerce_sequence(value)</span></code><a class="headerlink" href="#coerce-sequence-value" title="Link to this heading"></a></h3>
+<p>Normalize configuration entries into a list of strings.</p>
+<p>Args:
+value: Input value that may be <code class="docutils literal notranslate"><span class="pre">None</span></code>, a string, or an iterable of strings.</p>
+<p>Returns:
+List of strings suitable for downstream configuration processing.</p>
+</section>
+<section id="get-env-overrides">
+<h3><code class="docutils literal notranslate"><span class="pre">get_env_overrides()</span></code><a class="headerlink" href="#get-env-overrides" title="Link to this heading"></a></h3>
+<p>Return raw environment override values for backwards compatibility.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Mapping of configuration field name to override value sourced from the environment.</p>
+</section>
+<section id="apply-env-overrides-defaults">
+<h3><code class="docutils literal notranslate"><span class="pre">_apply_env_overrides(defaults)</span></code><a class="headerlink" href="#apply-env-overrides-defaults" title="Link to this heading"></a></h3>
+<p>Apply environment variable overrides to default configuration.</p>
+<p>Args:
+defaults: Defaults configuration object that will be mutated in place.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="make-fetch-spec-ontology-id-resolver-extras-target-formats">
+<h3><code class="docutils literal notranslate"><span class="pre">_make_fetch_spec(ontology_id,</span> <span class="pre">resolver,</span> <span class="pre">extras,</span> <span class="pre">target_formats)</span></code><a class="headerlink" href="#make-fetch-spec-ontology-id-resolver-extras-target-formats" title="Link to this heading"></a></h3>
+<p>Instantiate a FetchSpec from raw YAML fields.</p>
+<p>Args:
+ontology_id: Identifier of the ontology being configured.
+resolver: Name of the resolver responsible for fetching content.
+extras: Additional resolver-specific configuration parameters.
+target_formats: Desired output formats for the ontology artefact.</p>
+<p>Returns:
+Fully initialised <code class="docutils literal notranslate"><span class="pre">FetchSpec</span></code> object ready for execution.</p>
+</section>
+<section id="merge-defaults-ontology-spec-defaults">
+<h3><code class="docutils literal notranslate"><span class="pre">merge_defaults(ontology_spec,</span> <span class="pre">defaults)</span></code><a class="headerlink" href="#merge-defaults-ontology-spec-defaults" title="Link to this heading"></a></h3>
+<p>Merge an ontology specification with resolved default settings.</p>
+<p>Args:
+ontology_spec: Raw ontology specification mapping loaded from YAML.
+defaults: Optional resolved defaults to merge with the specification.</p>
+<p>Returns:
+FetchSpec instance describing the fully-merged ontology configuration.</p>
+<p>Raises:
+ConfigError: If required fields are missing or invalid in the specification.</p>
+</section>
+<section id="build-resolved-config-raw-config">
+<h3><code class="docutils literal notranslate"><span class="pre">build_resolved_config(raw_config)</span></code><a class="headerlink" href="#build-resolved-config-raw-config" title="Link to this heading"></a></h3>
+<p>Construct fully-resolved configuration from raw YAML contents.</p>
+<p>Args:
+raw_config: Parsed YAML mapping defining defaults and ontologies.</p>
+<p>Returns:
+ResolvedConfig combining defaults and individual fetch specifications.</p>
+<p>Raises:
+ConfigError: If validation fails or required sections are missing.</p>
+</section>
+<section id="validate-schema-raw-config">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_schema(raw,</span> <span class="pre">config)</span></code><a class="headerlink" href="#validate-schema-raw-config" title="Link to this heading"></a></h3>
+<p>Perform additional structural validation beyond Pydantic models.</p>
+<p>Args:
+raw: Raw configuration mapping used for structural checks.
+config: Optional resolved configuration for cross-field validation.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+ConfigError: When structural constraints are violated.</p>
+</section>
+<section id="load-raw-yaml-config-path">
+<h3><code class="docutils literal notranslate"><span class="pre">load_raw_yaml(config_path)</span></code><a class="headerlink" href="#load-raw-yaml-config-path" title="Link to this heading"></a></h3>
+<p>Load and parse a YAML configuration file into a mutable mapping.</p>
+<p>Args:
+config_path: Path to the YAML configuration file.</p>
+<p>Returns:
+Mutable mapping representation of the YAML content.</p>
+<p>Raises:
+SystemExit: If the file is not found on disk.
+ConfigError: If the YAML cannot be parsed or is structurally invalid.</p>
+</section>
+<section id="load-config-config-path">
+<h3><code class="docutils literal notranslate"><span class="pre">load_config(config_path)</span></code><a class="headerlink" href="#load-config-config-path" title="Link to this heading"></a></h3>
+<p>Load configuration from disk without performing additional schema validation.</p>
+<p>Args:
+config_path: Path to the YAML configuration file.</p>
+<p>Returns:
+ResolvedConfig produced from the raw file contents.</p>
+<p>Raises:
+ConfigError: If the configuration cannot be parsed or validated.</p>
+</section>
+<section id="validate-config-config-path">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_config(config_path)</span></code><a class="headerlink" href="#validate-config-config-path" title="Link to this heading"></a></h3>
+<p>Validate a configuration file and return the resolved settings.</p>
+<p>Args:
+config_path: Path to the YAML configuration file.</p>
+<p>Returns:
+ResolvedConfig object after validation.</p>
+<p>Raises:
+ConfigError: If validation fails.</p>
+</section>
+<section id="validate-level-cls-value">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_level(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-level-cls-value" title="Link to this heading"></a></h3>
+<p>Validate logging level values.</p>
+<p>Args:
+value: Logging level provided in configuration.</p>
+<p>Returns:
+Uppercase logging level string accepted by :mod:<code class="docutils literal notranslate"><span class="pre">logging</span></code>.</p>
+<p>Raises:
+ValueError: If the supplied level is not among the supported options.</p>
+</section>
+<section id="validate-rate-limits-cls-value">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_rate_limits(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-rate-limits-cls-value" title="Link to this heading"></a></h3>
+<p>Ensure rate limit strings follow the expected pattern.</p>
+<p>Args:
+value: Mapping of service name to rate limit expression.</p>
+<p>Returns:
+Validated mapping preserving the original values.</p>
+<p>Raises:
+ValueError: If any rate limit fails to match the accepted pattern.</p>
+</section>
+<section id="rate-limit-per-second-self">
+<h3><code class="docutils literal notranslate"><span class="pre">rate_limit_per_second(self)</span></code><a class="headerlink" href="#rate-limit-per-second-self" title="Link to this heading"></a></h3>
+<p>Convert <code class="docutils literal notranslate"><span class="pre">per_host_rate_limit</span></code> to a requests-per-second value.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Floating-point requests-per-second value derived from configuration.</p>
+<p>Raises:
+ValueError: If the configured rate limit string is invalid.</p>
+</section>
+<section id="parse-service-rate-limit-self-service">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_service_rate_limit(self,</span> <span class="pre">service)</span></code><a class="headerlink" href="#parse-service-rate-limit-self-service" title="Link to this heading"></a></h3>
+<p>Parse a per-service rate limit to requests per second.</p>
+<p>Args:
+service: Logical service name to look up.</p>
+<p>Returns:
+Requests-per-second value when configured, otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+<p>Raises:
+None.</p>
+</section>
+<section id="validate-prefer-source-cls-value">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_prefer_source(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-prefer-source-cls-value" title="Link to this heading"></a></h3>
+<p>Ensure resolver names are recognized.</p>
+<p>Args:
+value: Ordered list of resolver names provided in configuration.</p>
+<p>Returns:
+Validated list containing only supported resolver identifiers.</p>
+<p>Raises:
+ValueError: If any resolver name is not part of the supported set.</p>
+</section>
+<section id="from-defaults-cls">
+<h3><code class="docutils literal notranslate"><span class="pre">from_defaults(cls)</span></code><a class="headerlink" href="#from-defaults-cls" title="Link to this heading"></a></h3>
+<p>Create an empty resolved configuration with library defaults.</p>
+<p>Args:
+None</p>
+<p>Returns:
+ResolvedConfig populated with default settings and no fetch specs.</p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="configerror">
+<h3><code class="docutils literal notranslate"><span class="pre">ConfigError</span></code><a class="headerlink" href="#configerror" title="Link to this heading"></a></h3>
+<p>Raised when ontology configuration files are invalid or inconsistent.</p>
+<p>Attributes:
+message: Human-readable explanation of the configuration flaw.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>try:
+…     raise ConfigError(“missing id”)
+… except ConfigError as exc:
+…     assert “missing id” in str(exc)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="loggingconfiguration">
+<h3><code class="docutils literal notranslate"><span class="pre">LoggingConfiguration</span></code><a class="headerlink" href="#loggingconfiguration" title="Link to this heading"></a></h3>
+<p>Structured logging options for ontology download operations.</p>
+<p>Attributes:
+level: Logging level for downloader telemetry (DEBUG, INFO, etc.).
+max_log_size_mb: Maximum size of log files before rotation occurs.
+retention_days: Number of days log files are retained on disk.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>config = LoggingConfiguration(level=”debug”)
+config.level
+‘DEBUG’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="validationconfig">
+<h3><code class="docutils literal notranslate"><span class="pre">ValidationConfig</span></code><a class="headerlink" href="#validationconfig" title="Link to this heading"></a></h3>
+<p>Validation limits governing parser execution.</p>
+<p>Attributes:
+parser_timeout_sec: Maximum runtime allowed for ontology parsing.
+max_memory_mb: Memory ceiling allocated to validation routines.
+skip_reasoning_if_size_mb: Threshold above which reasoning is skipped.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>ValidationConfig(parser_timeout_sec=120).parser_timeout_sec
+120</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="downloadconfiguration">
+<h3><code class="docutils literal notranslate"><span class="pre">DownloadConfiguration</span></code><a class="headerlink" href="#downloadconfiguration" title="Link to this heading"></a></h3>
+<p>HTTP download and retry settings.</p>
+<p>Attributes:
+max_retries: Maximum retry attempts for failed download requests.
+timeout_sec: Base timeout applied to metadata requests.
+download_timeout_sec: Timeout applied to streaming download operations.
+backoff_factor: Exponential backoff multiplier between retry attempts.
+per_host_rate_limit: Token bucket rate limit string for host throttling.
+max_download_size_gb: Maximum permitted download size in gigabytes.
+concurrent_downloads: Allowed number of simultaneous downloads.
+validate_media_type: Whether to enforce Content-Type validation.
+rate_limits: Optional per-service rate limit overrides.
+allowed_hosts: Optional allowlist restricting download hostnames.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>cfg = DownloadConfiguration(per_host_rate_limit=”10/second”)
+round(cfg.rate_limit_per_second(), 2)
+10.0</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="defaultsconfig">
+<h3><code class="docutils literal notranslate"><span class="pre">DefaultsConfig</span></code><a class="headerlink" href="#defaultsconfig" title="Link to this heading"></a></h3>
+<p>Collection of default settings for ontology fetch specifications.</p>
+<p>Attributes:
+accept_licenses: Licenses accepted by default during downloads.
+normalize_to: Preferred formats for normalized ontology output.
+prefer_source: Ordered list of resolver priorities.
+http: Download configuration defaults.
+validation: Validation configuration defaults.
+logging: Logging configuration defaults.
+continue_on_error: Whether processing continues after failures.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>defaults = DefaultsConfig()
+“obo” in defaults.prefer_source
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="resolvedconfig">
+<h3><code class="docutils literal notranslate"><span class="pre">ResolvedConfig</span></code><a class="headerlink" href="#resolvedconfig" title="Link to this heading"></a></h3>
+<p>Container for merged configuration defaults and fetch specifications.</p>
+<p>Attributes:
+defaults: Default configuration applied to all ontology fetch specs.
+specs: List of individual fetch specifications after merging defaults.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>config = ResolvedConfig.from_defaults()
+isinstance(config.defaults, DefaultsConfig)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="environmentoverrides">
+<h3><code class="docutils literal notranslate"><span class="pre">EnvironmentOverrides</span></code><a class="headerlink" href="#environmentoverrides" title="Link to this heading"></a></h3>
+<p>Environment variable overrides for ontology downloader defaults.</p>
+<p>Attributes:
+max_retries: Override for retry count via <code class="docutils literal notranslate"><span class="pre">ONTOFETCH_MAX_RETRIES</span></code>.
+timeout_sec: Override for metadata timeout via <code class="docutils literal notranslate"><span class="pre">ONTOFETCH_TIMEOUT_SEC</span></code>.
+download_timeout_sec: Override for streaming timeout.
+per_host_rate_limit: Override for per-host rate limit string.
+backoff_factor: Override for exponential backoff multiplier.
+log_level: Override for logging level.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>overrides = EnvironmentOverrides()
+overrides.model_config[‘env_prefix’]
+‘ONTOFETCH_’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

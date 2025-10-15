@@ -1,0 +1,937 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Document Parsing Pipeline Specification &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/custom.css" />
+
+  
+      <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Document Parsing Pipeline Specification</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../../_sources/openspec/changes/refactor-docparsing-pipeline/specs/doc-parsing/spec.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="document-parsing-pipeline-specification">
+<h1>Document Parsing Pipeline Specification<a class="headerlink" href="#document-parsing-pipeline-specification" title="Link to this heading"></a></h1>
+<section id="added-requirements">
+<h2>ADDED Requirements<a class="headerlink" href="#added-requirements" title="Link to this heading"></a></h2>
+<section id="requirement-unified-path-resolution">
+<h3>Requirement: Unified Path Resolution<a class="headerlink" href="#requirement-unified-path-resolution" title="Link to this heading"></a></h3>
+<p>The system SHALL provide a centralized path resolution mechanism that discovers the DocsToKG data directory through environment variable lookup or ancestor directory scanning.</p>
+<section id="scenario-environment-variable-takes-precedence">
+<h4>Scenario: Environment variable takes precedence<a class="headerlink" href="#scenario-environment-variable-takes-precedence" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_DATA_ROOT</span></code> environment variable is set to <code class="docutils literal notranslate"><span class="pre">/custom/path/Data</span></code></p></li>
+<li><p><strong>THEN</strong> all scripts SHALL use <code class="docutils literal notranslate"><span class="pre">/custom/path/Data</span></code> as the data root</p></li>
+<li><p><strong>AND</strong> no ancestor directory scanning SHALL occur</p></li>
+</ul>
+</section>
+<section id="scenario-automatic-discovery-via-ancestor-scan">
+<h4>Scenario: Automatic discovery via ancestor scan<a class="headerlink" href="#scenario-automatic-discovery-via-ancestor-scan" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_DATA_ROOT</span></code> is not set</p></li>
+<li><p><strong>AND</strong> the script is invoked from <code class="docutils literal notranslate"><span class="pre">/home/paul/DocsToKG/src/DocsToKG/DocParsing/</span></code></p></li>
+<li><p><strong>THEN</strong> the system SHALL scan ancestors for a <code class="docutils literal notranslate"><span class="pre">Data/</span></code> directory containing expected subdirectories</p></li>
+<li><p><strong>AND</strong> SHALL return <code class="docutils literal notranslate"><span class="pre">/home/paul/DocsToKG/Data</span></code> if it contains <code class="docutils literal notranslate"><span class="pre">PDFs/</span></code>, <code class="docutils literal notranslate"><span class="pre">HTML/</span></code>, or other expected structure</p></li>
+</ul>
+</section>
+<section id="scenario-typed-path-getters-prevent-hardcoded-paths">
+<h4>Scenario: Typed path getters prevent hardcoded paths<a class="headerlink" href="#scenario-typed-path-getters-prevent-hardcoded-paths" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a script requires the chunks directory</p></li>
+<li><p><strong>THEN</strong> it SHALL call <code class="docutils literal notranslate"><span class="pre">data_chunks()</span></code> from the common utilities module</p></li>
+<li><p><strong>AND</strong> SHALL NOT hardcode absolute paths like <code class="docutils literal notranslate"><span class="pre">/home/paul/DocsToKG/Data/ChunkedDocTagFiles</span></code></p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-cuda-safe-multiprocessing">
+<h3>Requirement: CUDA-Safe Multiprocessing<a class="headerlink" href="#requirement-cuda-safe-multiprocessing" title="Link to this heading"></a></h3>
+<p>The system SHALL enforce the ‘spawn’ start method for multiprocessing in all scripts that perform GPU operations in worker processes to prevent CUDA re-initialization errors.</p>
+<section id="scenario-pdf-conversion-with-vllm-workers">
+<h4>Scenario: PDF conversion with vLLM workers<a class="headerlink" href="#scenario-pdf-conversion-with-vllm-workers" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> the PDF-to-DocTags converter initializes multiprocessing</p></li>
+<li><p><strong>THEN</strong> it SHALL call <code class="docutils literal notranslate"><span class="pre">multiprocessing.set_start_method('spawn',</span> <span class="pre">force=True)</span></code> before creating the ProcessPoolExecutor</p></li>
+<li><p><strong>AND</strong> each worker process SHALL initialize CUDA independently</p></li>
+</ul>
+</section>
+<section id="scenario-graceful-handling-of-already-set-start-method">
+<h4>Scenario: Graceful handling of already-set start method<a class="headerlink" href="#scenario-graceful-handling-of-already-set-start-method" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> the start method has already been set by a parent process or framework</p></li>
+<li><p><strong>THEN</strong> the system SHALL catch the RuntimeError from <code class="docutils literal notranslate"><span class="pre">force=True</span></code></p></li>
+<li><p><strong>AND</strong> SHALL verify the current method is ‘spawn’</p></li>
+<li><p><strong>AND</strong> SHALL proceed without error if already spawn</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-streaming-embeddings-architecture">
+<h3>Requirement: Streaming Embeddings Architecture<a class="headerlink" href="#requirement-streaming-embeddings-architecture" title="Link to this heading"></a></h3>
+<p>The system SHALL implement a two-pass streaming architecture for embedding generation to bound memory usage and enable processing of arbitrarily large document corpora.</p>
+<section id="scenario-pass-a-collects-global-statistics-without-retaining-text">
+<h4>Scenario: Pass A collects global statistics without retaining text<a class="headerlink" href="#scenario-pass-a-collects-global-statistics-without-retaining-text" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> the embedding pipeline begins processing</p></li>
+<li><p><strong>THEN</strong> Pass A SHALL iterate through all chunk files exactly once</p></li>
+<li><p><strong>AND</strong> SHALL assign UUIDs to chunks missing identifiers</p></li>
+<li><p><strong>AND</strong> SHALL accumulate BM25 document frequency and token statistics</p></li>
+<li><p><strong>AND</strong> SHALL NOT retain chunk text in memory after processing each file</p></li>
+</ul>
+</section>
+<section id="scenario-pass-b-processes-chunks-in-configurable-batches">
+<h4>Scenario: Pass B processes chunks in configurable batches<a class="headerlink" href="#scenario-pass-b-processes-chunks-in-configurable-batches" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> Pass A completes and BM25 statistics are available</p></li>
+<li><p><strong>THEN</strong> Pass B SHALL iterate through chunk files in document order</p></li>
+<li><p><strong>AND</strong> SHALL load chunks in batches of size <code class="docutils literal notranslate"><span class="pre">--batch-size-splade</span></code> for SPLADE encoding</p></li>
+<li><p><strong>AND</strong> SHALL load chunks in batches of size <code class="docutils literal notranslate"><span class="pre">--batch-size-qwen</span></code> for Qwen encoding</p></li>
+<li><p><strong>AND</strong> SHALL write vector shards atomically with <code class="docutils literal notranslate"><span class="pre">.tmp</span></code> suffix before renaming</p></li>
+</ul>
+</section>
+<section id="scenario-shard-merging-produces-final-vector-files">
+<h4>Scenario: Shard merging produces final vector files<a class="headerlink" href="#scenario-shard-merging-produces-final-vector-files" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> all batches for a document have been encoded</p></li>
+<li><p><strong>THEN</strong> the system SHALL concatenate all shard files (<code class="docutils literal notranslate"><span class="pre">*.vectors.partNN.jsonl</span></code>)</p></li>
+<li><p><strong>AND</strong> SHALL write the final <code class="docutils literal notranslate"><span class="pre">*.vectors.jsonl</span></code> atomically</p></li>
+<li><p><strong>AND</strong> SHALL delete intermediate shard files after successful merge</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-schema-validation-with-versioning">
+<h3>Requirement: Schema Validation with Versioning<a class="headerlink" href="#requirement-schema-validation-with-versioning" title="Link to this heading"></a></h3>
+<p>The system SHALL define and enforce Pydantic schemas for all JSONL output formats and include deterministic schema version identifiers to track evolution.</p>
+<section id="scenario-chunkrow-validation-on-write">
+<h4>Scenario: ChunkRow validation on write<a class="headerlink" href="#scenario-chunkrow-validation-on-write" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> writing a chunk record to JSONL</p></li>
+<li><p><strong>THEN</strong> the system SHALL validate the record against the <code class="docutils literal notranslate"><span class="pre">ChunkRow</span></code> Pydantic model</p></li>
+<li><p><strong>AND</strong> SHALL reject records missing required fields (<code class="docutils literal notranslate"><span class="pre">doc_id</span></code>, <code class="docutils literal notranslate"><span class="pre">chunk_id</span></code>, <code class="docutils literal notranslate"><span class="pre">text</span></code>, <code class="docutils literal notranslate"><span class="pre">num_tokens</span></code>)</p></li>
+<li><p><strong>AND</strong> SHALL include <code class="docutils literal notranslate"><span class="pre">schema_version</span></code> field with value <code class="docutils literal notranslate"><span class="pre">&quot;docparse/1.1.0&quot;</span></code></p></li>
+</ul>
+</section>
+<section id="scenario-vectorrow-validation-enforces-structure">
+<h4>Scenario: VectorRow validation enforces structure<a class="headerlink" href="#scenario-vectorrow-validation-enforces-structure" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> writing a vector record to JSONL</p></li>
+<li><p><strong>THEN</strong> the system SHALL validate against the <code class="docutils literal notranslate"><span class="pre">VectorRow</span></code> Pydantic model</p></li>
+<li><p><strong>AND</strong> SHALL enforce nested structure for <code class="docutils literal notranslate"><span class="pre">BM25</span></code>, <code class="docutils literal notranslate"><span class="pre">SPLADEv3</span></code>, and <code class="docutils literal notranslate"><span class="pre">Qwen3-4B</span></code> fields</p></li>
+<li><p><strong>AND</strong> SHALL include <code class="docutils literal notranslate"><span class="pre">schema_version</span></code> field with value <code class="docutils literal notranslate"><span class="pre">&quot;embeddings/1.0.0&quot;</span></code></p></li>
+</ul>
+</section>
+<section id="scenario-schema-version-enables-backward-compatibility">
+<h4>Scenario: Schema version enables backward compatibility<a class="headerlink" href="#scenario-schema-version-enables-backward-compatibility" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a downstream consumer reads a JSONL file</p></li>
+<li><p><strong>THEN</strong> it SHALL parse the <code class="docutils literal notranslate"><span class="pre">schema_version</span></code> field from each record</p></li>
+<li><p><strong>AND</strong> SHALL implement version-specific deserialization logic</p></li>
+<li><p><strong>AND</strong> SHALL fail fast with a clear error message for unsupported versions</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-embedding-invariant-validation">
+<h3>Requirement: Embedding Invariant Validation<a class="headerlink" href="#requirement-embedding-invariant-validation" title="Link to this heading"></a></h3>
+<p>The system SHALL validate embedding outputs against expected dimensions, norms, and sparsity constraints to detect silent computation errors.</p>
+<section id="scenario-qwen-dimension-assertion">
+<h4>Scenario: Qwen dimension assertion<a class="headerlink" href="#scenario-qwen-dimension-assertion" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> Qwen3-4B generates an embedding vector</p></li>
+<li><p><strong>THEN</strong> the system SHALL assert the vector dimension equals 2560</p></li>
+<li><p><strong>AND</strong> SHALL raise an error with the document ID if dimension mismatch occurs</p></li>
+</ul>
+</section>
+<section id="scenario-qwen-l2-norm-sanity-check">
+<h4>Scenario: Qwen L2 norm sanity check<a class="headerlink" href="#scenario-qwen-l2-norm-sanity-check" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> Qwen3-4B generates an embedding vector</p></li>
+<li><p><strong>THEN</strong> the system SHALL compute the L2 norm</p></li>
+<li><p><strong>AND</strong> SHALL assert the norm is greater than zero</p></li>
+<li><p><strong>AND</strong> SHALL log an error with the document ID if the norm is zero or negative</p></li>
+</ul>
+</section>
+<section id="scenario-splade-sparsity-validation">
+<h4>Scenario: SPLADE sparsity validation<a class="headerlink" href="#scenario-splade-sparsity-validation" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> SPLADE-v3 encodes all chunks in a corpus</p></li>
+<li><p><strong>THEN</strong> the system SHALL count chunks with zero non-zero elements (nnz == 0)</p></li>
+<li><p><strong>AND</strong> SHALL emit a warning if more than 1% of chunks have nnz == 0</p></li>
+<li><p><strong>AND</strong> SHALL list the document IDs of affected chunks</p></li>
+</ul>
+</section>
+<section id="scenario-bm25-corpus-summary">
+<h4>Scenario: BM25 corpus summary<a class="headerlink" href="#scenario-bm25-corpus-summary" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> Pass A completes BM25 statistics collection</p></li>
+<li><p><strong>THEN</strong> the system SHALL print a summary including total document count (N), average document length (avgdl), and the 10 most frequent tokens</p></li>
+<li><p><strong>AND</strong> SHALL log this summary to the manifest for audit</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-tokenizer-alignment">
+<h3>Requirement: Tokenizer Alignment<a class="headerlink" href="#requirement-tokenizer-alignment" title="Link to this heading"></a></h3>
+<p>The system SHALL align chunk tokenization with the dense embedding model’s tokenizer to ensure consistent token counts between chunking and embedding stages.</p>
+<section id="scenario-configurable-tokenizer-model">
+<h4>Scenario: Configurable tokenizer model<a class="headerlink" href="#scenario-configurable-tokenizer-model" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> invoking the chunking script</p></li>
+<li><p><strong>THEN</strong> the system SHALL accept a <code class="docutils literal notranslate"><span class="pre">--tokenizer-model</span></code> flag</p></li>
+<li><p><strong>AND</strong> SHALL default to <code class="docutils literal notranslate"><span class="pre">Qwen/Qwen3-Embedding-4B</span></code> to match the dense embedder</p></li>
+<li><p><strong>AND</strong> SHALL initialize the HuggingFace tokenizer from the specified model</p></li>
+</ul>
+</section>
+<section id="scenario-calibration-guidance-for-legacy-tokenizer">
+<h4>Scenario: Calibration guidance for legacy tokenizer<a class="headerlink" href="#scenario-calibration-guidance-for-legacy-tokenizer" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a user specifies <code class="docutils literal notranslate"><span class="pre">--tokenizer-model</span> <span class="pre">bert-base-uncased</span></code></p></li>
+<li><p><strong>THEN</strong> the system SHALL emit a deprecation warning</p></li>
+<li><p><strong>AND</strong> SHALL reference the calibration script for computing token count discrepancies</p></li>
+<li><p><strong>AND</strong> SHALL recommend a tuned <code class="docutils literal notranslate"><span class="pre">--min-tokens</span></code> value based on documented calibration</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-topic-aware-chunk-coalescence">
+<h3>Requirement: Topic-Aware Chunk Coalescence<a class="headerlink" href="#requirement-topic-aware-chunk-coalescence" title="Link to this heading"></a></h3>
+<p>The system SHALL detect structural boundaries (headings, captions) during chunk merging and apply relaxed size constraints to preserve topical coherence.</p>
+<section id="scenario-soft-boundary-at-markdown-heading">
+<h4>Scenario: Soft boundary at markdown heading<a class="headerlink" href="#scenario-soft-boundary-at-markdown-heading" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> coalescing small chunks</p></li>
+<li><p><strong>AND</strong> the next candidate chunk starts with a markdown heading (<code class="docutils literal notranslate"><span class="pre">#</span></code>, <code class="docutils literal notranslate"><span class="pre">##</span></code>, etc.)</p></li>
+<li><p><strong>THEN</strong> the system SHALL only merge if the combined size is ≤ (max_tokens - 64)</p></li>
+<li><p><strong>AND</strong> SHALL NOT merge if the combined size exceeds this threshold</p></li>
+</ul>
+</section>
+<section id="scenario-soft-boundary-at-figure-caption">
+<h4>Scenario: Soft boundary at figure caption<a class="headerlink" href="#scenario-soft-boundary-at-figure-caption" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> coalescing small chunks</p></li>
+<li><p><strong>AND</strong> the next candidate chunk starts with “Figure caption:” or “Table:”</p></li>
+<li><p><strong>THEN</strong> the system SHALL apply the soft boundary rule (max_tokens - 64)</p></li>
+<li><p><strong>AND</strong> SHALL preserve the caption with its associated content</p></li>
+</ul>
+</section>
+<section id="scenario-no-boundary-detected-allows-normal-merge">
+<h4>Scenario: No boundary detected allows normal merge<a class="headerlink" href="#scenario-no-boundary-detected-allows-normal-merge" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> coalescing small chunks</p></li>
+<li><p><strong>AND</strong> the next candidate chunk does not start with a structural marker</p></li>
+<li><p><strong>THEN</strong> the system SHALL apply standard merge logic up to <code class="docutils literal notranslate"><span class="pre">max_tokens</span></code></p></li>
+<li><p><strong>AND</strong> SHALL NOT apply the 64-token buffer</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-structured-logging-and-progress-manifest">
+<h3>Requirement: Structured Logging and Progress Manifest<a class="headerlink" href="#requirement-structured-logging-and-progress-manifest" title="Link to this heading"></a></h3>
+<p>The system SHALL adopt structured JSON logging and maintain a centralized progress manifest for all document processing operations.</p>
+<section id="scenario-structured-logger-configuration">
+<h4>Scenario: Structured logger configuration<a class="headerlink" href="#scenario-structured-logger-configuration" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a DocParsing script initializes</p></li>
+<li><p><strong>THEN</strong> it SHALL call <code class="docutils literal notranslate"><span class="pre">get_logger(name)</span></code> from the common utilities</p></li>
+<li><p><strong>AND</strong> SHALL configure the logger with a JSON formatter</p></li>
+<li><p><strong>AND</strong> SHALL support <code class="docutils literal notranslate"><span class="pre">extra</span></code> fields for context metadata (doc_id, stage, etc.)</p></li>
+</ul>
+</section>
+<section id="scenario-manifest-entry-on-successful-processing">
+<h4>Scenario: Manifest entry on successful processing<a class="headerlink" href="#scenario-manifest-entry-on-successful-processing" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a document completes processing at any stage</p></li>
+<li><p><strong>THEN</strong> the system SHALL append a manifest entry to <code class="docutils literal notranslate"><span class="pre">Data/Manifests/docparse.manifest.jsonl</span></code></p></li>
+<li><p><strong>AND</strong> the entry SHALL include fields: <code class="docutils literal notranslate"><span class="pre">timestamp</span></code>, <code class="docutils literal notranslate"><span class="pre">stage</span></code>, <code class="docutils literal notranslate"><span class="pre">doc_id</span></code>, <code class="docutils literal notranslate"><span class="pre">status</span></code>, <code class="docutils literal notranslate"><span class="pre">duration_s</span></code>, <code class="docutils literal notranslate"><span class="pre">warnings</span></code>, <code class="docutils literal notranslate"><span class="pre">schema_version</span></code></p></li>
+<li><p><strong>AND</strong> the write SHALL be atomic (append-only, no locks required)</p></li>
+</ul>
+</section>
+<section id="scenario-manifest-entry-on-processing-failure">
+<h4>Scenario: Manifest entry on processing failure<a class="headerlink" href="#scenario-manifest-entry-on-processing-failure" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a document fails processing at any stage</p></li>
+<li><p><strong>THEN</strong> the system SHALL append a manifest entry with <code class="docutils literal notranslate"><span class="pre">status:</span> <span class="pre">&quot;failure&quot;</span></code></p></li>
+<li><p><strong>AND</strong> SHALL include <code class="docutils literal notranslate"><span class="pre">error_message</span></code> and <code class="docutils literal notranslate"><span class="pre">error_type</span></code> in the metadata</p></li>
+<li><p><strong>AND</strong> SHALL ensure the failure is logged for retry/debugging</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-vllm-server-lifecycle-management">
+<h3>Requirement: vLLM Server Lifecycle Management<a class="headerlink" href="#requirement-vllm-server-lifecycle-management" title="Link to this heading"></a></h3>
+<p>The system SHALL manage vLLM server startup, health checking, reuse, and validation to prevent silent failures from misconfigured or unavailable servers.</p>
+<section id="scenario-model-validation-before-processing">
+<h4>Scenario: Model validation before processing<a class="headerlink" href="#scenario-model-validation-before-processing" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> the PDF converter ensures vLLM is ready</p></li>
+<li><p><strong>THEN</strong> it SHALL query the <code class="docutils literal notranslate"><span class="pre">/v1/models</span></code> endpoint</p></li>
+<li><p><strong>AND</strong> SHALL verify the served model name matches <code class="docutils literal notranslate"><span class="pre">--served-model-name</span></code> flag</p></li>
+<li><p><strong>AND</strong> SHALL refuse to proceed if the model is not available or incorrect</p></li>
+</ul>
+</section>
+<section id="scenario-health-check-requires-non-empty-models-list">
+<h4>Scenario: Health check requires non-empty models list<a class="headerlink" href="#scenario-health-check-requires-non-empty-models-list" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> reusing an existing vLLM server on the preferred port</p></li>
+<li><p><strong>THEN</strong> the system SHALL probe <code class="docutils literal notranslate"><span class="pre">/v1/models</span></code></p></li>
+<li><p><strong>AND</strong> SHALL verify the response status is 200</p></li>
+<li><p><strong>AND</strong> SHALL verify the models list is non-empty</p></li>
+<li><p><strong>AND</strong> SHALL start a new server if any check fails</p></li>
+</ul>
+</section>
+<section id="scenario-configurable-gpu-memory-utilization">
+<h4>Scenario: Configurable GPU memory utilization<a class="headerlink" href="#scenario-configurable-gpu-memory-utilization" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> starting a new vLLM server</p></li>
+<li><p><strong>THEN</strong> the system SHALL pass <code class="docutils literal notranslate"><span class="pre">--gpu-memory-utilization</span></code> from the CLI flag to the vLLM command</p></li>
+<li><p><strong>AND</strong> SHALL default to 0.30 if not specified</p></li>
+<li><p><strong>AND</strong> SHALL log the utilization setting for diagnostics</p></li>
+</ul>
+</section>
+<section id="scenario-early-failure-detection-during-warmup">
+<h4>Scenario: Early failure detection during warmup<a class="headerlink" href="#scenario-early-failure-detection-during-warmup" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> waiting for vLLM to become ready</p></li>
+<li><p><strong>AND</strong> the vLLM process exits prematurely</p></li>
+<li><p><strong>THEN</strong> the system SHALL detect the exit via <code class="docutils literal notranslate"><span class="pre">proc.poll()</span></code></p></li>
+<li><p><strong>AND</strong> SHALL print the last 800 characters of stdout/stderr</p></li>
+<li><p><strong>AND</strong> SHALL raise a RuntimeError with the exit code</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-idempotent-processing-with-content-hashing">
+<h3>Requirement: Idempotent Processing with Content Hashing<a class="headerlink" href="#requirement-idempotent-processing-with-content-hashing" title="Link to this heading"></a></h3>
+<p>The system SHALL support idempotent processing and resume capability by tracking content hashes and output states in the manifest.</p>
+<section id="scenario-skip-processing-when-output-exists-and-is-valid">
+<h4>Scenario: Skip processing when output exists and is valid<a class="headerlink" href="#scenario-skip-processing-when-output-exists-and-is-valid" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> invoking a processing script with <code class="docutils literal notranslate"><span class="pre">--resume</span></code> flag</p></li>
+<li><p><strong>AND</strong> the output file exists for a document</p></li>
+<li><p><strong>AND</strong> the content hash in the manifest matches the current input</p></li>
+<li><p><strong>THEN</strong> the system SHALL skip processing for that document</p></li>
+<li><p><strong>AND</strong> SHALL log a skip event to the manifest</p></li>
+</ul>
+</section>
+<section id="scenario-reprocess-when-input-content-changes">
+<h4>Scenario: Reprocess when input content changes<a class="headerlink" href="#scenario-reprocess-when-input-content-changes" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> invoking a processing script with <code class="docutils literal notranslate"><span class="pre">--resume</span></code> flag</p></li>
+<li><p><strong>AND</strong> the output file exists</p></li>
+<li><p><strong>AND</strong> the content hash in the manifest does NOT match the current input</p></li>
+<li><p><strong>THEN</strong> the system SHALL reprocess the document</p></li>
+<li><p><strong>AND</strong> SHALL update the manifest with the new hash</p></li>
+</ul>
+</section>
+<section id="scenario-lock-file-prevents-concurrent-writes">
+<h4>Scenario: Lock file prevents concurrent writes<a class="headerlink" href="#scenario-lock-file-prevents-concurrent-writes" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> beginning to write an output file</p></li>
+<li><p><strong>THEN</strong> the system SHALL create a <code class="docutils literal notranslate"><span class="pre">.lock</span></code> sentinel file</p></li>
+<li><p><strong>AND</strong> SHALL check if the lock already exists before proceeding</p></li>
+<li><p><strong>AND</strong> SHALL wait or fail if another process holds the lock</p></li>
+<li><p><strong>AND</strong> SHALL remove the lock on completion or error</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-provenance-metadata-enrichment">
+<h3>Requirement: Provenance Metadata Enrichment<a class="headerlink" href="#requirement-provenance-metadata-enrichment" title="Link to this heading"></a></h3>
+<p>The system SHALL include provenance metadata in chunk records to enable downstream analysis and quality assessment.</p>
+<section id="scenario-parse-engine-identification">
+<h4>Scenario: Parse engine identification<a class="headerlink" href="#scenario-parse-engine-identification" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> writing a chunk record</p></li>
+<li><p><strong>THEN</strong> the system SHALL include a <code class="docutils literal notranslate"><span class="pre">provenance.parse_engine</span></code> field</p></li>
+<li><p><strong>AND</strong> SHALL set the value to “docling-html” for HTML conversions</p></li>
+<li><p><strong>AND</strong> SHALL set the value to “docling-vlm” for PDF conversions with VLM</p></li>
+</ul>
+</section>
+<section id="scenario-docling-version-tracking">
+<h4>Scenario: Docling version tracking<a class="headerlink" href="#scenario-docling-version-tracking" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> writing a chunk record</p></li>
+<li><p><strong>THEN</strong> the system SHALL detect the installed docling package version</p></li>
+<li><p><strong>AND</strong> SHALL include <code class="docutils literal notranslate"><span class="pre">provenance.docling_version</span></code> field with the detected version</p></li>
+</ul>
+</section>
+<section id="scenario-image-annotation-flags">
+<h4>Scenario: Image annotation flags<a class="headerlink" href="#scenario-image-annotation-flags" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> writing a chunk record</p></li>
+<li><p><strong>AND</strong> the chunk includes picture serializer output</p></li>
+<li><p><strong>THEN</strong> the system SHALL set <code class="docutils literal notranslate"><span class="pre">provenance.has_image_captions</span></code> to true if captions are present</p></li>
+<li><p><strong>AND</strong> SHALL set <code class="docutils literal notranslate"><span class="pre">provenance.has_image_classification</span></code> to true if classification annotations exist</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-unified-cli-entry-point">
+<h3>Requirement: Unified CLI Entry Point<a class="headerlink" href="#requirement-unified-cli-entry-point" title="Link to this heading"></a></h3>
+<p>The system SHALL provide a single command-line interface for DocTags conversion that supports both HTML and PDF inputs via a mode selection parameter.</p>
+<section id="scenario-pdf-mode-invocation">
+<h4>Scenario: PDF mode invocation<a class="headerlink" href="#scenario-pdf-mode-invocation" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> invoking <code class="docutils literal notranslate"><span class="pre">cli/doctags_convert.py</span> <span class="pre">--mode</span> <span class="pre">pdf</span> <span class="pre">--input</span> <span class="pre">Data/PDFs</span> <span class="pre">--output</span> <span class="pre">Data/DocTagsFiles</span></code></p></li>
+<li><p><strong>THEN</strong> the system SHALL dispatch to the PDF conversion backend</p></li>
+<li><p><strong>AND</strong> SHALL start or reuse a vLLM server as needed</p></li>
+<li><p><strong>AND</strong> SHALL process all PDF files in the input directory</p></li>
+</ul>
+</section>
+<section id="scenario-html-mode-invocation">
+<h4>Scenario: HTML mode invocation<a class="headerlink" href="#scenario-html-mode-invocation" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> invoking <code class="docutils literal notranslate"><span class="pre">cli/doctags_convert.py</span> <span class="pre">--mode</span> <span class="pre">html</span> <span class="pre">--input</span> <span class="pre">Data/HTML</span> <span class="pre">--output</span> <span class="pre">Data/DocTagsFiles</span></code></p></li>
+<li><p><strong>THEN</strong> the system SHALL dispatch to the HTML conversion backend</p></li>
+<li><p><strong>AND</strong> SHALL NOT attempt to start vLLM</p></li>
+<li><p><strong>AND</strong> SHALL process all HTML files in the input directory</p></li>
+</ul>
+</section>
+<section id="scenario-auto-mode-detection">
+<h4>Scenario: Auto mode detection<a class="headerlink" href="#scenario-auto-mode-detection" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> invoking <code class="docutils literal notranslate"><span class="pre">cli/doctags_convert.py</span> <span class="pre">--mode</span> <span class="pre">auto</span> <span class="pre">--input</span> <span class="pre">Data/Mixed</span></code></p></li>
+<li><p><strong>THEN</strong> the system SHALL scan the input directory for file extensions</p></li>
+<li><p><strong>AND</strong> SHALL group files by type (<em>.pdf,</em>.html, *.htm)</p></li>
+<li><p><strong>AND</strong> SHALL process each group with the appropriate backend</p></li>
+</ul>
+</section>
+<section id="scenario-shared-flags-apply-to-all-modes">
+<h4>Scenario: Shared flags apply to all modes<a class="headerlink" href="#scenario-shared-flags-apply-to-all-modes" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> invoking the unified CLI with <code class="docutils literal notranslate"><span class="pre">--workers</span> <span class="pre">8</span> <span class="pre">--overwrite</span> <span class="pre">--logging-level</span> <span class="pre">DEBUG</span></code></p></li>
+<li><p><strong>THEN</strong> these flags SHALL be passed to the backend implementation</p></li>
+<li><p><strong>AND</strong> SHALL apply consistently regardless of mode</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-atomic-file-operations">
+<h3>Requirement: Atomic File Operations<a class="headerlink" href="#requirement-atomic-file-operations" title="Link to this heading"></a></h3>
+<p>The system SHALL perform all file writes atomically using temporary files and rename operations to prevent partial writes and corruption.</p>
+<section id="scenario-atomic-jsonl-write-with-temporary-suffix">
+<h4>Scenario: Atomic JSONL write with temporary suffix<a class="headerlink" href="#scenario-atomic-jsonl-write-with-temporary-suffix" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> writing a chunk or vector JSONL file</p></li>
+<li><p><strong>THEN</strong> the system SHALL write to a temporary file with <code class="docutils literal notranslate"><span class="pre">.tmp</span></code> suffix</p></li>
+<li><p><strong>AND</strong> SHALL only rename to the final filename after successful write and flush</p></li>
+<li><p><strong>AND</strong> SHALL ensure the rename operation is atomic on POSIX systems</p></li>
+</ul>
+</section>
+<section id="scenario-cleanup-on-write-failure">
+<h4>Scenario: Cleanup on write failure<a class="headerlink" href="#scenario-cleanup-on-write-failure" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> an error occurs during JSONL writing</p></li>
+<li><p><strong>THEN</strong> the system SHALL delete the temporary file</p></li>
+<li><p><strong>AND</strong> SHALL NOT leave partial outputs</p></li>
+<li><p><strong>AND</strong> SHALL log the failure to the manifest with error details</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-corpus-statistics-reporting">
+<h3>Requirement: Corpus Statistics Reporting<a class="headerlink" href="#requirement-corpus-statistics-reporting" title="Link to this heading"></a></h3>
+<p>The system SHALL compute and report corpus-level statistics at the end of each processing stage for validation and monitoring.</p>
+<section id="scenario-chunking-statistics-report">
+<h4>Scenario: Chunking statistics report<a class="headerlink" href="#scenario-chunking-statistics-report" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> the chunking stage completes for all documents</p></li>
+<li><p><strong>THEN</strong> the system SHALL print a summary including total chunks, median token count, min/max tokens</p></li>
+<li><p><strong>AND</strong> SHALL log this summary to the manifest</p></li>
+</ul>
+</section>
+<section id="scenario-embedding-statistics-report">
+<h4>Scenario: Embedding statistics report<a class="headerlink" href="#scenario-embedding-statistics-report" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> the embedding stage completes</p></li>
+<li><p><strong>THEN</strong> the system SHALL print a summary including total vectors, SPLADE average nnz, percentage of chunks with SPLADE zero-vectors</p></li>
+<li><p><strong>AND</strong> SHALL include BM25 corpus statistics (N, avgdl)</p></li>
+<li><p><strong>AND</strong> SHALL log this summary to the manifest</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-configurable-batch-sizes">
+<h3>Requirement: Configurable Batch Sizes<a class="headerlink" href="#requirement-configurable-batch-sizes" title="Link to this heading"></a></h3>
+<p>The system SHALL expose batch size parameters for all encoding operations to enable tuning for different hardware configurations and memory constraints.</p>
+<section id="scenario-splade-batch-size-configuration">
+<h4>Scenario: SPLADE batch size configuration<a class="headerlink" href="#scenario-splade-batch-size-configuration" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> invoking the embedding script with <code class="docutils literal notranslate"><span class="pre">--batch-size-splade</span> <span class="pre">64</span></code></p></li>
+<li><p><strong>THEN</strong> SPLADE encoding SHALL process texts in batches of 64</p></li>
+<li><p><strong>AND</strong> SHALL not load more than 64 texts into GPU memory simultaneously</p></li>
+</ul>
+</section>
+<section id="scenario-qwen-batch-size-configuration">
+<h4>Scenario: Qwen batch size configuration<a class="headerlink" href="#scenario-qwen-batch-size-configuration" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> invoking the embedding script with <code class="docutils literal notranslate"><span class="pre">--batch-size-qwen</span> <span class="pre">32</span></code></p></li>
+<li><p><strong>THEN</strong> Qwen encoding SHALL process texts in batches of 32</p></li>
+<li><p><strong>AND</strong> SHALL call <code class="docutils literal notranslate"><span class="pre">llm.embed()</span></code> with batches of exactly 32 texts</p></li>
+</ul>
+</section>
+<section id="scenario-automatic-batch-size-adjustment-on-oom">
+<h4>Scenario: Automatic batch size adjustment on OOM<a class="headerlink" href="#scenario-automatic-batch-size-adjustment-on-oom" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> GPU out-of-memory error occurs during encoding</p></li>
+<li><p><strong>THEN</strong> the system SHALL log the error with current batch size</p></li>
+<li><p><strong>AND</strong> SHALL recommend reducing batch size via CLI flag</p></li>
+<li><p><strong>AND</strong> SHALL exit with a clear error message (not continue with corrupted state)</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-shared-serializer-providers">
+<h3>Requirement: Shared Serializer Providers<a class="headerlink" href="#requirement-shared-serializer-providers" title="Link to this heading"></a></h3>
+<p>The system SHALL extract picture and table serializers into a shared module to eliminate duplication and ensure consistent formatting across processing stages.</p>
+<section id="scenario-caption-and-annotation-serializer-reuse">
+<h4>Scenario: Caption and annotation serializer reuse<a class="headerlink" href="#scenario-caption-and-annotation-serializer-reuse" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> the chunking script needs to serialize picture items</p></li>
+<li><p><strong>THEN</strong> it SHALL import <code class="docutils literal notranslate"><span class="pre">CaptionPlusAnnotationPictureSerializer</span></code> from the serializers module</p></li>
+<li><p><strong>AND</strong> SHALL NOT define a new serializer class locally</p></li>
+</ul>
+</section>
+<section id="scenario-markdown-table-serializer-reuse">
+<h4>Scenario: Markdown table serializer reuse<a class="headerlink" href="#scenario-markdown-table-serializer-reuse" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> the chunking script needs to serialize table items</p></li>
+<li><p><strong>THEN</strong> it SHALL import <code class="docutils literal notranslate"><span class="pre">MarkdownTableSerializer</span></code> from docling-core</p></li>
+<li><p><strong>AND</strong> the RichSerializerProvider SHALL configure both picture and table serializers</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-deprecation-path-for-legacy-scripts">
+<h3>Requirement: Deprecation Path for Legacy Scripts<a class="headerlink" href="#requirement-deprecation-path-for-legacy-scripts" title="Link to this heading"></a></h3>
+<p>The system SHALL maintain backward compatibility by preserving original scripts with clear deprecation notices during the transition period.</p>
+<section id="scenario-legacy-script-warns-and-delegates">
+<h4>Scenario: Legacy script warns and delegates<a class="headerlink" href="#scenario-legacy-script-warns-and-delegates" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a user invokes the original <code class="docutils literal notranslate"><span class="pre">run_docling_html_to_doctags_parallel.py</span></code></p></li>
+<li><p><strong>THEN</strong> the script SHALL print a deprecation warning recommending the unified CLI</p></li>
+<li><p><strong>AND</strong> SHALL delegate to the new implementation</p></li>
+<li><p><strong>AND</strong> SHALL maintain identical CLI interface for compatibility</p></li>
+</ul>
+</section>
+<section id="scenario-legacy-scripts-removed-after-transition">
+<h4>Scenario: Legacy scripts removed after transition<a class="headerlink" href="#scenario-legacy-scripts-removed-after-transition" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> one release cycle has passed since the unified CLI launch</p></li>
+<li><p><strong>AND</strong> no user issues have been reported with the new implementation</p></li>
+<li><p><strong>THEN</strong> the legacy scripts MAY be removed from the codebase</p></li>
+<li><p><strong>AND</strong> documentation SHALL be updated to reflect the removal</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-error-handling-and-recovery">
+<h3>Requirement: Error Handling and Recovery<a class="headerlink" href="#requirement-error-handling-and-recovery" title="Link to this heading"></a></h3>
+<p>The system SHALL implement comprehensive error handling with specific error codes, graceful degradation, and actionable error messages for operators.</p>
+<section id="scenario-validation-errors-provide-actionable-context">
+<h4>Scenario: Validation errors provide actionable context<a class="headerlink" href="#scenario-validation-errors-provide-actionable-context" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a Pydantic validation error occurs during JSONL writing</p></li>
+<li><p><strong>THEN</strong> the system SHALL log the error with document ID, row number, and field name</p></li>
+<li><p><strong>AND</strong> SHALL include the invalid value in the error message</p></li>
+<li><p><strong>AND</strong> SHALL continue processing other documents unless fatal error</p></li>
+</ul>
+</section>
+<section id="scenario-malformed-doctags-files-are-skipped-with-warning">
+<h4>Scenario: Malformed DocTags files are skipped with warning<a class="headerlink" href="#scenario-malformed-doctags-files-are-skipped-with-warning" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a DocTags file cannot be parsed by Docling</p></li>
+<li><p><strong>THEN</strong> the system SHALL log a warning with file path and error details</p></li>
+<li><p><strong>AND</strong> SHALL write a manifest entry with status “failure”</p></li>
+<li><p><strong>AND</strong> SHALL continue processing remaining files</p></li>
+</ul>
+</section>
+<section id="scenario-gpu-out-of-memory-triggers-batch-size-recommendation">
+<h4>Scenario: GPU out-of-memory triggers batch size recommendation<a class="headerlink" href="#scenario-gpu-out-of-memory-triggers-batch-size-recommendation" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a CUDA out-of-memory error occurs during embedding</p></li>
+<li><p><strong>THEN</strong> the system SHALL catch the error</p></li>
+<li><p><strong>AND</strong> SHALL log current batch sizes (SPLADE, Qwen)</p></li>
+<li><p><strong>AND</strong> SHALL recommend reducing batch size by 50%</p></li>
+<li><p><strong>AND</strong> SHALL exit with error code 137 (OOM-specific)</p></li>
+</ul>
+</section>
+<section id="scenario-network-errors-during-vllm-communication-are-retried">
+<h4>Scenario: Network errors during vLLM communication are retried<a class="headerlink" href="#scenario-network-errors-during-vllm-communication-are-retried" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> HTTP request to vLLM server fails with connection error</p></li>
+<li><p><strong>THEN</strong> the system SHALL retry up to 3 times with exponential backoff</p></li>
+<li><p><strong>AND</strong> SHALL log each retry attempt</p></li>
+<li><p><strong>AND</strong> SHALL fail document processing if all retries exhausted</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-performance-monitoring-and-benchmarks">
+<h3>Requirement: Performance Monitoring and Benchmarks<a class="headerlink" href="#requirement-performance-monitoring-and-benchmarks" title="Link to this heading"></a></h3>
+<p>The system SHALL track and report performance metrics at each processing stage to enable optimization and capacity planning.</p>
+<section id="scenario-per-stage-timing-is-recorded-in-manifest">
+<h4>Scenario: Per-stage timing is recorded in manifest<a class="headerlink" href="#scenario-per-stage-timing-is-recorded-in-manifest" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a document completes processing at any stage</p></li>
+<li><p><strong>THEN</strong> the system SHALL record duration_s with millisecond precision</p></li>
+<li><p><strong>AND</strong> SHALL include start_time and end_time timestamps in manifest</p></li>
+<li><p><strong>AND</strong> SHALL compute and log throughput (documents/minute)</p></li>
+</ul>
+</section>
+<section id="scenario-memory-usage-is-monitored-during-embeddings">
+<h4>Scenario: Memory usage is monitored during embeddings<a class="headerlink" href="#scenario-memory-usage-is-monitored-during-embeddings" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> Pass B begins encoding vectors</p></li>
+<li><p><strong>THEN</strong> the system SHALL start memory profiling with tracemalloc</p></li>
+<li><p><strong>AND</strong> SHALL log peak memory usage at the end</p></li>
+<li><p><strong>AND</strong> SHALL warn if peak exceeds 80% of available GPU memory</p></li>
+</ul>
+</section>
+<section id="scenario-batch-processing-throughput-meets-target">
+<h4>Scenario: Batch processing throughput meets target<a class="headerlink" href="#scenario-batch-processing-throughput-meets-target" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> processing a corpus of 1000 documents</p></li>
+<li><p><strong>THEN</strong> chunking SHALL complete at ≥10 documents/minute on CPU</p></li>
+<li><p><strong>AND</strong> embeddings SHALL complete at ≥5 documents/minute with single GPU</p></li>
+<li><p><strong>AND</strong> failures SHALL not exceed 1% of documents</p></li>
+</ul>
+</section>
+<section id="scenario-performance-regression-is-detected">
+<h4>Scenario: Performance regression is detected<a class="headerlink" href="#scenario-performance-regression-is-detected" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> running the test suite with golden fixtures</p></li>
+<li><p><strong>THEN</strong> processing time SHALL not exceed 110% of baseline</p></li>
+<li><p><strong>AND</strong> memory usage SHALL not exceed 120% of baseline</p></li>
+<li><p><strong>AND</strong> test SHALL fail if regression thresholds are exceeded</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-backward-compatibility-for-jsonl-formats">
+<h3>Requirement: Backward Compatibility for JSONL Formats<a class="headerlink" href="#requirement-backward-compatibility-for-jsonl-formats" title="Link to this heading"></a></h3>
+<p>The system SHALL read older schema versions and provide migration paths for consumers to handle format evolution.</p>
+<section id="scenario-old-chunk-files-without-schema-version-are-handled">
+<h4>Scenario: Old chunk files without schema_version are handled<a class="headerlink" href="#scenario-old-chunk-files-without-schema-version-are-handled" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> loading a chunk JSONL file without schema_version field</p></li>
+<li><p><strong>THEN</strong> the system SHALL assume schema version “docparse/1.0.0”</p></li>
+<li><p><strong>AND</strong> SHALL successfully parse rows with compatible fields</p></li>
+<li><p><strong>AND</strong> SHALL add schema_version field if re-writing file</p></li>
+</ul>
+</section>
+<section id="scenario-old-vector-files-without-provenance-are-compatible">
+<h4>Scenario: Old vector files without provenance are compatible<a class="headerlink" href="#scenario-old-vector-files-without-provenance-are-compatible" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> loading a vector JSONL file from pre-refactor pipeline</p></li>
+<li><p><strong>THEN</strong> the system SHALL successfully parse rows missing provenance metadata</p></li>
+<li><p><strong>AND</strong> SHALL NOT require provenance field for reads</p></li>
+<li><p><strong>AND</strong> SHALL only require provenance for new writes</p></li>
+</ul>
+</section>
+<section id="scenario-schema-version-mismatch-triggers-clear-error">
+<h4>Scenario: Schema version mismatch triggers clear error<a class="headerlink" href="#scenario-schema-version-mismatch-triggers-clear-error" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a consumer encounters an unsupported schema_version (e.g., “docparse/2.0.0”)</p></li>
+<li><p><strong>THEN</strong> the system SHALL raise ValueError with message: “Unsupported schema version: docparse/2.0.0. Compatible versions: [list]”</p></li>
+<li><p><strong>AND</strong> SHALL direct user to migration documentation</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-configuration-management-and-precedence">
+<h3>Requirement: Configuration Management and Precedence<a class="headerlink" href="#requirement-configuration-management-and-precedence" title="Link to this heading"></a></h3>
+<p>The system SHALL apply configuration from multiple sources with clearly defined precedence rules.</p>
+<section id="scenario-configuration-precedence-order">
+<h4>Scenario: Configuration precedence order<a class="headerlink" href="#scenario-configuration-precedence-order" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> multiple configuration sources provide the same parameter</p></li>
+<li><p><strong>THEN</strong> CLI flags SHALL take highest precedence</p></li>
+<li><p><strong>AND</strong> environment variables SHALL override defaults</p></li>
+<li><p><strong>AND</strong> default values SHALL be used only if no override</p></li>
+</ul>
+</section>
+<section id="scenario-configuration-validation-on-startup">
+<h4>Scenario: Configuration validation on startup<a class="headerlink" href="#scenario-configuration-validation-on-startup" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a processing script initializes</p></li>
+<li><p><strong>THEN</strong> it SHALL validate all configuration parameters</p></li>
+<li><p><strong>AND</strong> SHALL reject invalid combinations (e.g., min_tokens &gt; max_tokens)</p></li>
+<li><p><strong>AND</strong> SHALL log final effective configuration before processing</p></li>
+</ul>
+</section>
+<section id="scenario-sensitive-configuration-is-not-logged">
+<h4>Scenario: Sensitive configuration is not logged<a class="headerlink" href="#scenario-sensitive-configuration-is-not-logged" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> logging effective configuration</p></li>
+<li><p><strong>THEN</strong> API keys, tokens, and credentials SHALL be redacted</p></li>
+<li><p><strong>AND</strong> SHALL be replaced with “<em><strong>REDACTED</strong></em>” in logs</p></li>
+<li><p><strong>AND</strong> SHALL still be usable internally</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-data-quality-validation">
+<h3>Requirement: Data Quality Validation<a class="headerlink" href="#requirement-data-quality-validation" title="Link to this heading"></a></h3>
+<p>The system SHALL implement multi-level validation to detect and prevent silent data quality issues.</p>
+<section id="scenario-empty-documents-are-rejected">
+<h4>Scenario: Empty documents are rejected<a class="headerlink" href="#scenario-empty-documents-are-rejected" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a DocTags file converts to a document with zero pages</p></li>
+<li><p><strong>THEN</strong> the system SHALL log error: “Empty document: &lt;doc_id&gt;”</p></li>
+<li><p><strong>AND</strong> SHALL write manifest entry with status “failure” and error “empty-document”</p></li>
+<li><p><strong>AND</strong> SHALL NOT create output files for this document</p></li>
+</ul>
+</section>
+<section id="scenario-chunks-with-excessive-token-counts-are-flagged">
+<h4>Scenario: Chunks with excessive token counts are flagged<a class="headerlink" href="#scenario-chunks-with-excessive-token-counts-are-flagged" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a chunk exceeds max_tokens by more than 10%</p></li>
+<li><p><strong>THEN</strong> the system SHALL log warning with chunk_id and token count</p></li>
+<li><p><strong>AND</strong> SHALL include “oversized_chunk” in manifest warnings list</p></li>
+<li><p><strong>AND</strong> SHALL still write the chunk but mark for review</p></li>
+</ul>
+</section>
+<section id="scenario-vector-dimension-mismatches-are-fatal">
+<h4>Scenario: Vector dimension mismatches are fatal<a class="headerlink" href="#scenario-vector-dimension-mismatches-are-fatal" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> an embedding vector has incorrect dimension</p></li>
+<li><p><strong>THEN</strong> the system SHALL raise ValueError immediately</p></li>
+<li><p><strong>AND</strong> SHALL NOT write partial vector file</p></li>
+<li><p><strong>AND</strong> SHALL log expected vs actual dimensions</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-monitoring-and-alerting-support">
+<h3>Requirement: Monitoring and Alerting Support<a class="headerlink" href="#requirement-monitoring-and-alerting-support" title="Link to this heading"></a></h3>
+<p>The system SHALL expose metrics and structured logs to enable external monitoring and alerting systems.</p>
+<section id="scenario-manifest-entries-enable-failure-alerting">
+<h4>Scenario: Manifest entries enable failure alerting<a class="headerlink" href="#scenario-manifest-entries-enable-failure-alerting" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> an external monitoring system queries the manifest</p></li>
+<li><p><strong>THEN</strong> it SHALL filter entries by status=”failure”</p></li>
+<li><p><strong>AND</strong> SHALL group failures by stage and error type</p></li>
+<li><p><strong>AND</strong> SHALL alert if failure rate exceeds threshold (e.g., &gt;5% in 1 hour)</p></li>
+</ul>
+</section>
+<section id="scenario-progress-tracking-via-manifest">
+<h4>Scenario: Progress tracking via manifest<a class="headerlink" href="#scenario-progress-tracking-via-manifest" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a long-running pipeline is executing</p></li>
+<li><p><strong>THEN</strong> operators SHALL query manifest for latest timestamp per stage</p></li>
+<li><p><strong>AND</strong> SHALL compute documents_remaining = total - processed</p></li>
+<li><p><strong>AND</strong> SHALL estimate completion time based on recent throughput</p></li>
+</ul>
+</section>
+<section id="scenario-structured-logs-enable-log-aggregation">
+<h4>Scenario: Structured logs enable log aggregation<a class="headerlink" href="#scenario-structured-logs-enable-log-aggregation" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> logs are ingested by log aggregation system (e.g., ELK, Loki)</p></li>
+<li><p><strong>THEN</strong> JSON format SHALL be parseable without regex</p></li>
+<li><p><strong>AND</strong> extra_fields SHALL be indexed as structured data</p></li>
+<li><p><strong>AND</strong> operators SHALL query by doc_id, stage, or error type</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-calibration-and-tuning-tools">
+<h3>Requirement: Calibration and Tuning Tools<a class="headerlink" href="#requirement-calibration-and-tuning-tools" title="Link to this heading"></a></h3>
+<p>The system SHALL provide tools to calibrate parameters for specific document collections and hardware configurations.</p>
+<section id="scenario-tokenizer-calibration-recommends-adjustments">
+<h4>Scenario: Tokenizer calibration recommends adjustments<a class="headerlink" href="#scenario-tokenizer-calibration-recommends-adjustments" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> running calibration script on a corpus</p></li>
+<li><p><strong>THEN</strong> it SHALL sample at least 100 documents</p></li>
+<li><p><strong>AND</strong> SHALL compute mean and standard deviation of token count ratios</p></li>
+<li><p><strong>AND</strong> SHALL recommend min_tokens adjustment if ratio differs by &gt;10%</p></li>
+</ul>
+</section>
+<section id="scenario-batch-size-tuning-for-gpu-capacity">
+<h4>Scenario: Batch size tuning for GPU capacity<a class="headerlink" href="#scenario-batch-size-tuning-for-gpu-capacity" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> user runs embedding script with too-large batch size</p></li>
+<li><p><strong>AND</strong> OOM error occurs</p></li>
+<li><p><strong>THEN</strong> error message SHALL recommend: “Try –batch-size-qwen 32” (50% of current)</p></li>
+<li><p><strong>AND</strong> SHALL include current GPU memory utilization in message</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-deterministic-processing-for-reproducibility">
+<h3>Requirement: Deterministic Processing for Reproducibility<a class="headerlink" href="#requirement-deterministic-processing-for-reproducibility" title="Link to this heading"></a></h3>
+<p>The system SHALL produce bit-identical outputs when processing the same inputs with the same configuration.</p>
+<section id="scenario-chunk-ordering-is-deterministic">
+<h4>Scenario: Chunk ordering is deterministic<a class="headerlink" href="#scenario-chunk-ordering-is-deterministic" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> processing the same DocTags file twice</p></li>
+<li><p><strong>THEN</strong> chunk_id assignment SHALL be identical</p></li>
+<li><p><strong>AND</strong> chunk text SHALL be identical</p></li>
+<li><p><strong>AND</strong> source_chunk_idxs SHALL be identical</p></li>
+</ul>
+</section>
+<section id="scenario-uuids-are-stable-across-runs">
+<h4>Scenario: UUIDs are stable across runs<a class="headerlink" href="#scenario-uuids-are-stable-across-runs" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a chunk file already has UUIDs assigned</p></li>
+<li><p><strong>THEN</strong> Pass A SHALL NOT regenerate UUIDs</p></li>
+<li><p><strong>AND</strong> existing UUIDs SHALL be preserved</p></li>
+<li><p><strong>AND</strong> only chunks without UUIDs SHALL be assigned new ones</p></li>
+</ul>
+</section>
+<section id="scenario-bm25-statistics-are-reproducible">
+<h4>Scenario: BM25 statistics are reproducible<a class="headerlink" href="#scenario-bm25-statistics-are-reproducible" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> computing BM25 statistics for the same corpus twice</p></li>
+<li><p><strong>THEN</strong> N (document count) SHALL be identical</p></li>
+<li><p><strong>AND</strong> avgdl (average length) SHALL be identical to 3 decimal places</p></li>
+<li><p><strong>AND</strong> document frequency dict SHALL have identical term→count mappings</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-dry-run-and-validation-modes">
+<h3>Requirement: Dry Run and Validation Modes<a class="headerlink" href="#requirement-dry-run-and-validation-modes" title="Link to this heading"></a></h3>
+<p>The system SHALL support dry-run execution and validation-only modes for testing and auditing.</p>
+<section id="scenario-dry-run-shows-planned-operations-without-execution">
+<h4>Scenario: Dry run shows planned operations without execution<a class="headerlink" href="#scenario-dry-run-shows-planned-operations-without-execution" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> invoking any processing script with <code class="docutils literal notranslate"><span class="pre">--dry-run</span></code> flag</p></li>
+<li><p><strong>THEN</strong> the system SHALL enumerate input files</p></li>
+<li><p><strong>AND</strong> SHALL log planned operations (convert, chunk, embed)</p></li>
+<li><p><strong>AND</strong> SHALL NOT write any output files</p></li>
+<li><p><strong>AND</strong> SHALL exit with code 0</p></li>
+</ul>
+</section>
+<section id="scenario-validation-mode-checks-existing-outputs">
+<h4>Scenario: Validation mode checks existing outputs<a class="headerlink" href="#scenario-validation-mode-checks-existing-outputs" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> invoking with <code class="docutils literal notranslate"><span class="pre">--validate</span></code> flag</p></li>
+<li><p><strong>THEN</strong> the system SHALL load all output JSONL files</p></li>
+<li><p><strong>AND</strong> SHALL validate every row against schemas</p></li>
+<li><p><strong>AND</strong> SHALL report count of valid vs invalid rows</p></li>
+<li><p><strong>AND</strong> SHALL exit with code 1 if any validation failures</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-graceful-shutdown-and-signal-handling">
+<h3>Requirement: Graceful Shutdown and Signal Handling<a class="headerlink" href="#requirement-graceful-shutdown-and-signal-handling" title="Link to this heading"></a></h3>
+<p>The system SHALL handle interruption signals gracefully to prevent data corruption.</p>
+<section id="scenario-sigint-triggers-graceful-shutdown">
+<h4>Scenario: SIGINT triggers graceful shutdown<a class="headerlink" href="#scenario-sigint-triggers-graceful-shutdown" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> user sends SIGINT (Ctrl+C) during processing</p></li>
+<li><p><strong>THEN</strong> the system SHALL catch the signal</p></li>
+<li><p><strong>AND</strong> SHALL complete current document processing</p></li>
+<li><p><strong>AND</strong> SHALL write manifest entry for in-progress document</p></li>
+<li><p><strong>AND</strong> SHALL remove any lock files before exiting</p></li>
+</ul>
+</section>
+<section id="scenario-sigterm-allows-cleanup-before-exit">
+<h4>Scenario: SIGTERM allows cleanup before exit<a class="headerlink" href="#scenario-sigterm-allows-cleanup-before-exit" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> orchestration system sends SIGTERM</p></li>
+<li><p><strong>THEN</strong> the system SHALL flush all buffers</p></li>
+<li><p><strong>AND</strong> SHALL finalize manifest writes</p></li>
+<li><p><strong>AND</strong> SHALL stop vLLM server if it owns the process</p></li>
+<li><p><strong>AND</strong> SHALL exit with code 143 (128 + 15)</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-help-text-and-documentation-completeness">
+<h3>Requirement: Help Text and Documentation Completeness<a class="headerlink" href="#requirement-help-text-and-documentation-completeness" title="Link to this heading"></a></h3>
+<p>The system SHALL provide comprehensive help text and examples for all CLI tools.</p>
+<section id="scenario-help-displays-usage-examples">
+<h4>Scenario: –help displays usage examples<a class="headerlink" href="#scenario-help-displays-usage-examples" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> invoking any CLI script with <code class="docutils literal notranslate"><span class="pre">--help</span></code></p></li>
+<li><p><strong>THEN</strong> it SHALL display at least 3 usage examples</p></li>
+<li><p><strong>AND</strong> SHALL document all required and optional flags</p></li>
+<li><p><strong>AND</strong> SHALL indicate default values for optional flags</p></li>
+<li><p><strong>AND</strong> SHALL reference full documentation URL</p></li>
+</ul>
+</section>
+<section id="scenario-error-messages-link-to-troubleshooting-docs">
+<h4>Scenario: Error messages link to troubleshooting docs<a class="headerlink" href="#scenario-error-messages-link-to-troubleshooting-docs" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a known error condition occurs</p></li>
+<li><p><strong>THEN</strong> the error message SHALL include a documentation URL</p></li>
+<li><p><strong>AND</strong> SHALL use format: “See: <url>#section-name”</p></li>
+<li><p><strong>AND</strong> URL SHALL point to relevant troubleshooting section</p></li>
+</ul>
+</section>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,303 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: download &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: download</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.OntologyDownload.download.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-download">
+<h1>1. Module: download<a class="headerlink" href="#module-download" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.download</span></code>.</p>
+<p>Ontology Download Utilities</p>
+<p>This module houses secure download helpers that implement rate limiting,
+content validation, and resumable transfers for ontology documents. It works
+in concert with resolver planning to ensure that downloaded artifacts respect
+size limits and are safe for downstream document processing.</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="log-memory-logger-event">
+<h3><code class="docutils literal notranslate"><span class="pre">_log_memory(logger,</span> <span class="pre">event)</span></code><a class="headerlink" href="#log-memory-logger-event" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="sanitize-filename-filename">
+<h3><code class="docutils literal notranslate"><span class="pre">sanitize_filename(filename)</span></code><a class="headerlink" href="#sanitize-filename-filename" title="Link to this heading"></a></h3>
+<p>Sanitize filenames to prevent directory traversal and unsafe characters.</p>
+<p>Args:
+filename: Candidate filename provided by an upstream service.</p>
+<p>Returns:
+Safe filename compatible with local filesystem storage.</p>
+</section>
+<section id="validate-url-security-url">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_url_security(url)</span></code><a class="headerlink" href="#validate-url-security-url" title="Link to this heading"></a></h3>
+<p>Validate URLs to avoid SSRF and insecure schemes.</p>
+<p>Args:
+url: URL returned by a resolver for ontology download.</p>
+<p>Returns:
+HTTPS URL safe for downstream download operations.</p>
+<p>Raises:
+ConfigError: If the URL uses an insecure scheme or resolves to private addresses.</p>
+</section>
+<section id="sha256-file-path">
+<h3><code class="docutils literal notranslate"><span class="pre">sha256_file(path)</span></code><a class="headerlink" href="#sha256-file-path" title="Link to this heading"></a></h3>
+<p>Compute the SHA-256 digest for the provided file.</p>
+<p>Args:
+path: Path to the file whose digest should be calculated.</p>
+<p>Returns:
+Hexadecimal SHA-256 checksum string.</p>
+</section>
+<section id="extract-zip-safe-zip-path-destination">
+<h3><code class="docutils literal notranslate"><span class="pre">extract_zip_safe(zip_path,</span> <span class="pre">destination)</span></code><a class="headerlink" href="#extract-zip-safe-zip-path-destination" title="Link to this heading"></a></h3>
+<p>Extract a ZIP archive while preventing path traversal.</p>
+<p>Args:
+zip_path: Path to the ZIP file to extract.
+destination: Directory where extracted files should be stored.
+logger: Optional logger for emitting extraction telemetry.</p>
+<p>Returns:
+List of extracted file paths.</p>
+<p>Raises:
+ConfigError: If the archive contains unsafe paths or is missing.</p>
+</section>
+<section id="get-bucket-host-http-config-service">
+<h3><code class="docutils literal notranslate"><span class="pre">_get_bucket(host,</span> <span class="pre">http_config,</span> <span class="pre">service)</span></code><a class="headerlink" href="#get-bucket-host-http-config-service" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="download-stream">
+<h3><code class="docutils literal notranslate"><span class="pre">download_stream()</span></code><a class="headerlink" href="#download-stream" title="Link to this heading"></a></h3>
+<p>Download ontology content with caching, retries, and hash validation.</p>
+<p>Args:
+url: URL of the ontology document to download.
+destination: Target file path for the downloaded content.
+headers: HTTP headers forwarded to the download request.
+previous_manifest: Manifest metadata from a prior run, used for caching.
+http_config: Download configuration containing timeouts and limits.
+cache_dir: Directory where intermediary cached files are stored.
+logger: Logger adapter for structured download telemetry.
+expected_media_type: Expected Content-Type for validation, if known.
+service: Logical service identifier for per-service rate limiting.</p>
+<p>Returns:
+DownloadResult describing the final artifact and metadata.</p>
+<p>Raises:
+ConfigError: If validation fails, limits are exceeded, or HTTP errors occur.</p>
+</section>
+<section id="consume-self-tokens">
+<h3><code class="docutils literal notranslate"><span class="pre">consume(self,</span> <span class="pre">tokens)</span></code><a class="headerlink" href="#consume-self-tokens" title="Link to this heading"></a></h3>
+<p>Consume tokens from the bucket, sleeping until capacity is available.</p>
+<p>Args:
+tokens: Number of tokens required for the current download request.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="preliminary-head-check-self-url-session">
+<h3><code class="docutils literal notranslate"><span class="pre">_preliminary_head_check(self,</span> <span class="pre">url,</span> <span class="pre">session)</span></code><a class="headerlink" href="#preliminary-head-check-self-url-session" title="Link to this heading"></a></h3>
+<p>Probe the origin with HEAD to audit headers before downloading.</p>
+<p>Args:
+url: Fully qualified download URL resolved by the planner.
+session: Prepared requests session used for outbound calls.</p>
+<p>Returns:
+Tuple <code class="docutils literal notranslate"><span class="pre">(content_type,</span> <span class="pre">content_length)</span></code> extracted from response
+headers. Each element is <code class="docutils literal notranslate"><span class="pre">None</span></code> when the origin omits it.</p>
+<p>Raises:
+ConfigError: If the origin reports a payload larger than the
+configured <code class="docutils literal notranslate"><span class="pre">max_download_size_gb</span></code> limit.</p>
+</section>
+<section id="validate-media-type-self-actual-content-type-expected-media-type-url">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_media_type(self,</span> <span class="pre">actual_content_type,</span> <span class="pre">expected_media_type,</span> <span class="pre">url)</span></code><a class="headerlink" href="#validate-media-type-self-actual-content-type-expected-media-type-url" title="Link to this heading"></a></h3>
+<p>Validate that the received <code class="docutils literal notranslate"><span class="pre">Content-Type</span></code> header is acceptable.</p>
+<p>Args:
+actual_content_type: Raw header value reported by the origin server.
+expected_media_type: MIME type declared by resolver metadata.
+url: Download URL logged when mismatches occur.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="call-self-url-output-file-pooch-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">__call__(self,</span> <span class="pre">url,</span> <span class="pre">output_file,</span> <span class="pre">pooch_logger)</span></code><a class="headerlink" href="#call-self-url-output-file-pooch-logger" title="Link to this heading"></a></h3>
+<p>Stream ontology content to disk while enforcing download policies.</p>
+<p>Args:
+url: Secure download URL resolved by the planner.
+output_file: Temporary filename managed by pooch during download.
+pooch_logger: Logger instance supplied by pooch (unused).</p>
+<p>Raises:
+ConfigError: If download limits are exceeded or filesystem errors occur.
+requests.HTTPError: Propagated when HTTP status codes indicate failure.</p>
+<p>Returns:
+None</p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="downloadresult">
+<h3><code class="docutils literal notranslate"><span class="pre">DownloadResult</span></code><a class="headerlink" href="#downloadresult" title="Link to this heading"></a></h3>
+<p>Result metadata for a completed download operation.</p>
+<p>Attributes:
+path: Final file path where the ontology document was stored.
+status: Download status (<code class="docutils literal notranslate"><span class="pre">fresh</span></code>, <code class="docutils literal notranslate"><span class="pre">updated</span></code>, or <code class="docutils literal notranslate"><span class="pre">cached</span></code>).
+sha256: SHA-256 checksum of the downloaded artifact.
+etag: HTTP ETag returned by the upstream server, when available.
+last_modified: Upstream last-modified header value if provided.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>result = DownloadResult(Path(“ontology.owl”), “fresh”, “deadbeef”, None, None)
+result.status
+‘fresh’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="tokenbucket">
+<h3><code class="docutils literal notranslate"><span class="pre">TokenBucket</span></code><a class="headerlink" href="#tokenbucket" title="Link to this heading"></a></h3>
+<p>Simple token bucket implementation for per-host and per-service rate limiting.</p>
+<p>Attributes:
+rate: Token replenishment rate per second.
+capacity: Maximum number of tokens the bucket may hold.
+tokens: Current token balance available for consumption.
+timestamp: Monotonic timestamp of the last refill.
+lock: Threading lock protecting bucket state.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>bucket = TokenBucket(rate_per_sec=2.0, capacity=4.0)
+bucket.consume(1.0)  # consumes immediately
+isinstance(bucket.tokens, float)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="streamingdownloader">
+<h3><code class="docutils literal notranslate"><span class="pre">StreamingDownloader</span></code><a class="headerlink" href="#streamingdownloader" title="Link to this heading"></a></h3>
+<p>Custom downloader to support conditional requests, resume, and caching.</p>
+<p>Attributes:
+destination: Final location where the ontology will be stored.
+custom_headers: HTTP headers supplied by the resolver.
+http_config: Download configuration governing retries and limits.
+previous_manifest: Manifest from prior runs used for caching.
+logger: Logger used for structured telemetry.
+status: Final download status (<code class="docutils literal notranslate"><span class="pre">fresh</span></code>, <code class="docutils literal notranslate"><span class="pre">updated</span></code>, or <code class="docutils literal notranslate"><span class="pre">cached</span></code>).
+response_etag: ETag returned by the upstream server, if present.
+response_last_modified: Last-modified timestamp provided by the server.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>from pathlib import Path
+from DocsToKG.OntologyDownload.config import DownloadConfiguration
+downloader = StreamingDownloader(
+…     destination=Path(“/tmp/ontology.owl”),
+…     headers={},
+…     http_config=DownloadConfiguration(),
+…     previous_manifest={},
+…     logger=logging.getLogger(“test”),
+… )
+downloader.status
+‘fresh’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

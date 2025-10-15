@@ -1,0 +1,246 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: run_docling_parallel_with_vllm_debug &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: run_docling_parallel_with_vllm_debug</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.DocParsing.run_docling_parallel_with_vllm_debug.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-run-docling-parallel-with-vllm-debug">
+<h1>1. Module: run_docling_parallel_with_vllm_debug<a class="headerlink" href="#module-run-docling-parallel-with-vllm-debug" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.run_docling_parallel_with_vllm_debug</span></code>.</p>
+<p>Start (or reuse) a local vLLM server for Granite-Docling, then run parallel Docling conversions.</p>
+<p>Improvements:</p>
+<ul class="simple">
+<li><p>Port-smart: reuse healthy vLLM on 8000; else find another free port.</p></li>
+<li><p>Rich diagnostics: stream vLLM logs; print HTTP status and bodies from /v1/models and /metrics.</p></li>
+<li><p>tqdm progress bars for vLLM warmup and per-PDF conversion progress.</p></li>
+</ul>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="find-data-root-start">
+<h3><code class="docutils literal notranslate"><span class="pre">find_data_root(start)</span></code><a class="headerlink" href="#find-data-root-start" title="Link to this heading"></a></h3>
+<p>Locate the DocsToKG data directory starting from a filesystem path.</p>
+<p>Args:
+start: Directory to begin searching from; ancestors are inspected as well.</p>
+<p>Returns:
+Path pointing to a directory that contains the expected <code class="docutils literal notranslate"><span class="pre">PDFs</span></code> subdirectory.
+Falls back to <code class="docutils literal notranslate"><span class="pre">&lt;start&gt;/Data</span></code> when no ancestor contains the structure.</p>
+</section>
+<section id="port-is-free-port">
+<h3><code class="docutils literal notranslate"><span class="pre">port_is_free(port)</span></code><a class="headerlink" href="#port-is-free-port" title="Link to this heading"></a></h3>
+<p>Determine whether a TCP port on localhost is currently available.</p>
+<p>Args:
+port: Port number to probe on the loopback interface.</p>
+<p>Returns:
+True when the port is unused; otherwise False.</p>
+</section>
+<section id="probe-models-port-timeout">
+<h3><code class="docutils literal notranslate"><span class="pre">probe_models(port,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#probe-models-port-timeout" title="Link to this heading"></a></h3>
+<p>Inspect the <code class="docutils literal notranslate"><span class="pre">/v1/models</span></code> endpoint exposed by a vLLM HTTP server.</p>
+<p>Args:
+port: HTTP port where the vLLM server is expected to listen.
+timeout: Seconds to wait for the HTTP request before aborting.</p>
+<p>Returns:
+Tuple containing the list of model identifiers (if any), the raw response
+body, and the HTTP status code. Missing models or connection failures are
+represented by <code class="docutils literal notranslate"><span class="pre">(None,</span> <span class="pre">&lt;error&gt;,</span> <span class="pre">None)</span></code>.</p>
+</section>
+<section id="probe-metrics-port-timeout">
+<h3><code class="docutils literal notranslate"><span class="pre">probe_metrics(port,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#probe-metrics-port-timeout" title="Link to this heading"></a></h3>
+<p>Check whether the vLLM <code class="docutils literal notranslate"><span class="pre">/metrics</span></code> endpoint is healthy.</p>
+<p>Args:
+port: HTTP port where the vLLM server should expose metrics.
+timeout: Seconds to wait for the HTTP response before aborting.</p>
+<p>Returns:
+Tuple of <code class="docutils literal notranslate"><span class="pre">(is_healthy,</span> <span class="pre">status_code)</span></code> where <code class="docutils literal notranslate"><span class="pre">is_healthy</span></code> is True when the
+endpoint responds with HTTP 200.</p>
+</section>
+<section id="find-free-port-start-span">
+<h3><code class="docutils literal notranslate"><span class="pre">find_free_port(start,</span> <span class="pre">span)</span></code><a class="headerlink" href="#find-free-port-start-span" title="Link to this heading"></a></h3>
+<p>Find an available TCP port, scanning forwards from a starting point.</p>
+<p>Args:
+start: First port number to test.
+span: Maximum number of sequential ports to probe for availability.</p>
+<p>Returns:
+Available port number suitable for binding a local server.</p>
+</section>
+<section id="stream-logs-proc-prefix">
+<h3><code class="docutils literal notranslate"><span class="pre">stream_logs(proc,</span> <span class="pre">prefix)</span></code><a class="headerlink" href="#stream-logs-proc-prefix" title="Link to this heading"></a></h3>
+<p>Continuously stream stdout lines from a child process to the console.</p>
+<p>Args:
+proc: Running subprocess whose stdout should be tailed.
+prefix: Text prefix applied to each emitted log line for readability.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="start-vllm-port">
+<h3><code class="docutils literal notranslate"><span class="pre">start_vllm(port)</span></code><a class="headerlink" href="#start-vllm-port" title="Link to this heading"></a></h3>
+<p>Launch a vLLM server process on the requested port.</p>
+<p>Args:
+port: Port on which the vLLM HTTP server should listen.</p>
+<p>Returns:
+Started subprocess handle for the vLLM server.</p>
+<p>Raises:
+SystemExit: If the <code class="docutils literal notranslate"><span class="pre">vllm</span></code> executable is not present on <code class="docutils literal notranslate"><span class="pre">PATH</span></code>.</p>
+</section>
+<section id="wait-for-vllm-port-proc-timeout-s">
+<h3><code class="docutils literal notranslate"><span class="pre">wait_for_vllm(port,</span> <span class="pre">proc,</span> <span class="pre">timeout_s)</span></code><a class="headerlink" href="#wait-for-vllm-port-proc-timeout-s" title="Link to this heading"></a></h3>
+<p>Poll the vLLM server until <code class="docutils literal notranslate"><span class="pre">/v1/models</span></code> responds with success.</p>
+<p>Args:
+port: HTTP port where the server is expected to listen.
+proc: Subprocess handle representing the running vLLM instance.
+timeout_s: Maximum time in seconds to wait for readiness.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+RuntimeError: If the server exits prematurely or fails to become ready
+within the allotted timeout.</p>
+</section>
+<section id="stop-vllm-proc-own-grace">
+<h3><code class="docutils literal notranslate"><span class="pre">stop_vllm(proc,</span> <span class="pre">own,</span> <span class="pre">grace)</span></code><a class="headerlink" href="#stop-vllm-proc-own-grace" title="Link to this heading"></a></h3>
+<p>Terminate a managed vLLM process if this script launched it.</p>
+<p>Args:
+proc: Subprocess handle returned by <code class="docutils literal notranslate"><span class="pre">start_vllm</span></code>, or None.
+own: Indicates whether the caller owns the process lifetime.
+grace: Seconds to wait for graceful shutdown before forcing exit.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="ensure-vllm-preferred">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_vllm(preferred)</span></code><a class="headerlink" href="#ensure-vllm-preferred" title="Link to this heading"></a></h3>
+<p>Ensure a vLLM server is available, launching one when necessary.</p>
+<p>Args:
+preferred: Preferred TCP port for the server.</p>
+<p>Returns:
+Tuple containing <code class="docutils literal notranslate"><span class="pre">(port,</span> <span class="pre">process,</span> <span class="pre">owns_process)</span></code> where <code class="docutils literal notranslate"><span class="pre">process</span></code> is the
+managed subprocess handle (or None if reusing an existing server) and
+<code class="docutils literal notranslate"><span class="pre">owns_process</span></code> indicates whether the caller should terminate it.</p>
+</section>
+<section id="list-pdfs-root">
+<h3><code class="docutils literal notranslate"><span class="pre">list_pdfs(root)</span></code><a class="headerlink" href="#list-pdfs-root" title="Link to this heading"></a></h3>
+<p>Collect PDF files under a directory recursively.</p>
+<p>Args:
+root: Directory whose subtree should be scanned for PDFs.</p>
+<p>Returns:
+Sorted list of paths to PDF files.</p>
+</section>
+<section id="convert-one-args">
+<h3><code class="docutils literal notranslate"><span class="pre">convert_one(args)</span></code><a class="headerlink" href="#convert-one-args" title="Link to this heading"></a></h3>
+<p>Convert a single PDF into DocTags using a remote vLLM-backed pipeline.</p>
+<p>Args:
+args: Tuple containing <code class="docutils literal notranslate"><span class="pre">(pdf_path,</span> <span class="pre">output_dir,</span> <span class="pre">port)</span></code> for the work item.</p>
+<p>Returns:
+Tuple of <code class="docutils literal notranslate"><span class="pre">(pdf_name,</span> <span class="pre">status)</span></code> where status is one of <code class="docutils literal notranslate"><span class="pre">ok</span></code>, <code class="docutils literal notranslate"><span class="pre">skip</span></code>, or a
+<code class="docutils literal notranslate"><span class="pre">fail:&lt;reason&gt;</span></code> string describing the conversion issue.</p>
+</section>
+<section id="main">
+<h3><code class="docutils literal notranslate"><span class="pre">main()</span></code><a class="headerlink" href="#main" title="Link to this heading"></a></h3>
+<p>Entrypoint that coordinates vLLM setup and parallel DocTags conversion.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

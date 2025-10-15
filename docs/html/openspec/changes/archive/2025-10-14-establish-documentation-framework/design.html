@@ -1,0 +1,235 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Context &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/custom.css" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Context</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/openspec/changes/archive/2025-10-14-establish-documentation-framework/design.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="context">
+<h1>Context<a class="headerlink" href="#context" title="Link to this heading"></a></h1>
+<p>DocsToKG is a document-to-knowledge-graph conversion system using vector search (Faiss), machine learning, and AI. The project currently lacks structured documentation, making it difficult for AI agents and new contributors to understand requirements and contribute effectively. This change establishes a comprehensive documentation framework to address these gaps.</p>
+</section>
+<section id="goals-non-goals">
+<h1>Goals / Non-Goals<a class="headerlink" href="#goals-non-goals" title="Link to this heading"></a></h1>
+<p><strong>Goals:</strong></p>
+<ul class="simple">
+<li><p>Enable AI agents to quickly understand project requirements and produce aligned code</p></li>
+<li><p>Reduce onboarding time for new contributors (human and AI)</p></li>
+<li><p>Ensure documentation stays current with automated maintenance</p></li>
+<li><p>Provide clear architecture and API documentation</p></li>
+<li><p>Establish consistent documentation standards across the project</p></li>
+</ul>
+<p><strong>Non-Goals:</strong></p>
+<ul class="simple">
+<li><p>Create documentation tools from scratch</p></li>
+<li><p>Document every historical decision or legacy code pattern</p></li>
+<li><p>Replace existing working documentation without clear improvement</p></li>
+</ul>
+</section>
+<section id="decisions">
+<h1>Decisions<a class="headerlink" href="#decisions" title="Link to this heading"></a></h1>
+<section id="documentation-structure">
+<h2>Documentation Structure<a class="headerlink" href="#documentation-structure" title="Link to this heading"></a></h2>
+<p><strong>Decision:</strong> Adopt a hierarchical structure in <code class="docutils literal notranslate"><span class="pre">docs/</span></code> with clear separation of concerns:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>docs/
+├── 01-overview/          # Project introduction, goals, architecture
+├── 02-setup/            # Installation, configuration, development environment
+├── 03-architecture/     # System design, component relationships, data flow
+├── 04-api/             # API documentation, endpoints, data models
+├── 05-development/     # Contributing guidelines, coding standards, workflows
+├── 06-operations/      # Deployment, monitoring, troubleshooting
+└── 07-reference/       # Glossary, Faiss integration, external dependencies
+</pre></div>
+</div>
+<p><strong>Rationale:</strong> This structure provides logical progression from high-level concepts to implementation details, making it easy for AI agents to build context incrementally.</p>
+</section>
+<section id="documentation-tools">
+<h2>Documentation Tools<a class="headerlink" href="#documentation-tools" title="Link to this heading"></a></h2>
+<p><strong>Decision:</strong> Use a combination of:</p>
+<ul class="simple">
+<li><p><strong>Markdown</strong> for all documentation (human and AI readable)</p></li>
+<li><p><strong>Doxygen/Sphinx</strong> for API documentation generation from code comments</p></li>
+<li><p><strong>Vale</strong> or similar for style guide enforcement</p></li>
+<li><p><strong>LinkChecker</strong> for automated link validation</p></li>
+<li><p><strong>GitHub Actions</strong> for automated documentation building and validation</p></li>
+</ul>
+<p><strong>Rationale:</strong> Leverages proven open-source tools rather than building custom solutions. Markdown ensures maximum compatibility with AI agents and editing tools.</p>
+</section>
+<section id="code-annotation-standards">
+<h2>Code Annotation Standards<a class="headerlink" href="#code-annotation-standards" title="Link to this heading"></a></h2>
+<p><strong>Decision:</strong> Implement structured commenting system:</p>
+<ul class="simple">
+<li><p>File-level: Purpose, dependencies, key classes/functions</p></li>
+<li><p>Function-level: Parameters, return values, side effects, examples</p></li>
+<li><p>Class-level: Responsibility, key methods, relationships</p></li>
+<li><p>Module-level: Integration points, configuration requirements</p></li>
+</ul>
+<p><strong>Rationale:</strong> Enables automated documentation generation while providing clear guidance for AI agents analyzing code.</p>
+</section>
+<section id="documentation-maintenance-workflow">
+<h2>Documentation Maintenance Workflow<a class="headerlink" href="#documentation-maintenance-workflow" title="Link to this heading"></a></h2>
+<p><strong>Decision:</strong> Integrate documentation into development workflow:</p>
+<ul class="simple">
+<li><p>Documentation updates required for all PRs</p></li>
+<li><p>Automated checks run on every commit</p></li>
+<li><p>Monthly review cycle for documentation completeness</p></li>
+<li><p>AI agent accessible documentation index</p></li>
+</ul>
+<p><strong>Rationale:</strong> Ensures documentation evolves with code and remains current.</p>
+</section>
+</section>
+<section id="risks-trade-offs">
+<h1>Risks / Trade-offs<a class="headerlink" href="#risks-trade-offs" title="Link to this heading"></a></h1>
+<p><strong>Risk: Initial overhead for contributors</strong></p>
+<ul class="simple">
+<li><p><strong>Mitigation:</strong> Provide clear templates and automated tools to minimize manual effort</p></li>
+<li><p><strong>Trade-off:</strong> Short-term productivity impact for long-term maintainability gains</p></li>
+</ul>
+<p><strong>Risk: Documentation drift from implementation</strong></p>
+<ul class="simple">
+<li><p><strong>Mitigation:</strong> Automated validation and regular reviews</p></li>
+<li><p><strong>Trade-off:</strong> Additional CI/CD complexity for consistency assurance</p></li>
+</ul>
+<p><strong>Risk: Tool dependency and maintenance</strong></p>
+<ul class="simple">
+<li><p><strong>Mitigation:</strong> Choose mature, widely-adopted open-source tools</p></li>
+<li><p><strong>Trade-off:</strong> Dependency management overhead for reliability</p></li>
+</ul>
+</section>
+<section id="migration-plan">
+<h1>Migration Plan<a class="headerlink" href="#migration-plan" title="Link to this heading"></a></h1>
+<p><strong>Phase 1: Foundation (Week 1-2)</strong></p>
+<ul class="simple">
+<li><p>Set up documentation structure and templates</p></li>
+<li><p>Configure basic tooling</p></li>
+<li><p>Create initial core documentation</p></li>
+</ul>
+<p><strong>Phase 2: Integration (Week 3-4)</strong></p>
+<ul class="simple">
+<li><p>Add automated validation to CI/CD</p></li>
+<li><p>Migrate existing Faiss documentation</p></li>
+<li><p>Train team on new processes</p></li>
+</ul>
+<p><strong>Phase 3: Enhancement (Week 5-6)</strong></p>
+<ul class="simple">
+<li><p>Implement advanced automation features</p></li>
+<li><p>Establish review processes</p></li>
+<li><p>Optimize for AI agent consumption</p></li>
+</ul>
+<p><strong>Rollback Plan:</strong></p>
+<ul class="simple">
+<li><p>If issues arise, can temporarily disable automated checks</p></li>
+<li><p>Documentation can coexist with existing structure during transition</p></li>
+<li><p>Tools can be removed if they cause significant problems</p></li>
+</ul>
+</section>
+<section id="open-questions">
+<h1>Open Questions<a class="headerlink" href="#open-questions" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Should we prioritize certain documentation sections for AI agents (e.g., API docs over operations)?</p></li>
+<li><p>How should we handle documentation for experimental or rapidly changing features?</p></li>
+<li><p>What metrics should we use to measure documentation effectiveness for AI agents?</p></li>
+<li><p>Should we implement documentation versioning separate from code versioning?</p></li>
+</ul>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

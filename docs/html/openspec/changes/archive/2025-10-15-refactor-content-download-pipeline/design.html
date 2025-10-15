@@ -1,0 +1,377 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Context &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/custom.css" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Context</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/openspec/changes/archive/2025-10-15-refactor-content-download-pipeline/design.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="context">
+<h1>Context<a class="headerlink" href="#context" title="Link to this heading"></a></h1>
+<p>The ContentDownload module orchestrates PDF acquisition from OpenAlex with fallback to 10 resolver sources (Unpaywall, Crossref, landing pages, arXiv, PMC, Europe PMC, CORE, DOAJ, Semantic Scholar, Wayback). The current implementation handles ~90% of happy-path scenarios but exposes operational fragility: transient network errors cause unnecessary misses, partial downloads corrupt storage, and single-threaded processing underutilizes available bandwidth. Recent production runs show 5-8% miss rate attributable to retryable failures and 2-3% corrupted artifacts requiring manual cleanup.</p>
+</section>
+<section id="goals-non-goals">
+<h1>Goals / Non-Goals<a class="headerlink" href="#goals-non-goals" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Goals:</p>
+<ul>
+<li><p>Eliminate transient failure misses through automatic retry with backoff (target: &lt;1% miss rate from retryable errors)</p></li>
+<li><p>Prevent partial file corruption via atomic writes (zero corrupt artifacts)</p></li>
+<li><p>Clarify rate-limit configuration to prevent misconfiguration (explicit units)</p></li>
+<li><p>Reduce code duplication by 15% through shared utilities</p></li>
+<li><p>Enable 2-5x throughput via opt-in parallelism while respecting per-resolver rate limits</p></li>
+<li><p>Support idempotent re-runs with conditional requests (ETags)</p></li>
+<li><p>Unify logging for simplified operations</p></li>
+</ul>
+</li>
+<li><p>Non-Goals:</p>
+<ul>
+<li><p>Changing resolver priority order or adding new required dependencies</p></li>
+<li><p>Real-time streaming/event-driven architecture (batch processing sufficient)</p></li>
+<li><p>Distributed coordination across machines (single-process parallelism only)</p></li>
+<li><p>Replacing BeautifulSoup or modifying landing page scraping patterns</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="decisions">
+<h1>Decisions<a class="headerlink" href="#decisions" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Decision: <strong>Use urllib3 Retry with HTTPAdapter on shared session</strong> for transparent transient error handling (429, 502, 503, 504) with exponential backoff and Retry-After support.
+Alternatives: custom retry loop per request, no retry. Rationale: HTTPAdapter + Retry is battle-tested, respects Retry-After headers, and requires zero per-call changes; eliminates ~80% of retryable misses observed in production.</p></li>
+<li><p>Decision: *<em>Implement atomic writes with <em>.part + os.replace() pattern</em></em> and compute SHA-256 digests before finalizing.
+Alternatives: write direct to final path, use temp directory. Rationale:*.part suffix makes partials obvious; os.replace() is atomic on POSIX/Windows; SHA-256 enables deduplication and integrity verification; minimal code change.</p></li>
+<li><p>Decision: <strong>Rename <code class="docutils literal notranslate"><span class="pre">resolver_rate_limits</span></code> → <code class="docutils literal notranslate"><span class="pre">min_interval_s</span></code></strong> to clarify units (seconds between calls).
+Alternatives: keep ambiguous name, add documentation. Rationale: field name encodes units explicitly; prevents “1.0 means 1 QPS” misconfiguration seen in operator feedback; one-time migration cost justified by preventing ongoing confusion.</p></li>
+<li><p>Decision: <strong>Add LRU cache (maxsize=1000) for resolver API responses</strong> keyed by (resolver_name, identifier).
+Alternatives: no caching, external cache layer. Rationale: batch runs frequently retry same DOIs; in-memory LRU is trivial (functools.lru_cache), eliminates redundant API calls, cache size tuned to typical batch (500-2000 works); no external dependencies.</p></li>
+<li><p>Decision: <strong>Support conditional requests with If-None-Match/If-Modified-Since</strong> using ETag/Last-Modified from previous manifest.
+Alternatives: always redownload, external change detection. Rationale: HTTP 304 responses are instant and free; enables safe idempotent reruns; manifest already records these headers; minimal logic addition.</p></li>
+<li><p>Decision: <strong>Extract shared utilities to ContentDownload/utils.py</strong> for <code class="docutils literal notranslate"><span class="pre">_normalize_doi</span></code>, <code class="docutils literal notranslate"><span class="pre">_normalize_pmcid</span></code>, <code class="docutils literal notranslate"><span class="pre">_strip_prefix</span></code>, <code class="docutils literal notranslate"><span class="pre">dedupe</span></code>.
+Alternatives: keep duplicates, create separate package. Rationale: identical code in two modules; utils.py is single-responsibility, no circular imports; 15% code reduction; easier to test/maintain.</p></li>
+<li><p>Decision: <strong>Unify logging to single JSONL format</strong> with per-attempt records and per-work summaries, provide CSV export script.
+Alternatives: keep separate CSV/manifest, add third logger. Rationale: JSONL is machine-readable and human-inspectable; one logger = one truth; CSV export script maintains backward compatibility; reduces cognitive load; enables richer structured queries.</p></li>
+<li><p>Decision: <strong>Use ThreadPoolExecutor with max_workers=N</strong> for bounded parallelism across works, serialize per-work pipeline.
+Alternatives: asyncio, multiprocessing, no parallelism. Rationale: ThreadPoolExecutor simple and stdlib; GIL not bottleneck (network-bound); serialize per-work preserves rate-limit semantics; N=3-5 gives 3x throughput without overwhelming sources.</p></li>
+<li><p>Decision: <strong>Refactor <code class="docutils literal notranslate"><span class="pre">download_candidate</span></code> with state enum</strong> (PENDING/WRITING) and single outcome builder.
+Alternatives: keep existing if/else chains. Rationale: explicit state machine improves readability; single return path eases testing; preserves all existing validation (EOF check, sniff logic); reduces nesting.</p></li>
+<li><p>Decision: <strong>Make <code class="docutils literal notranslate"><span class="pre">--workers</span></code> opt-in (default=1)</strong> to avoid surprising existing deployments.
+Alternatives: enable by default. Rationale: parallelism changes egress patterns; operators should consciously enable; default=1 is backward compatible; documentation encourages tuning.</p></li>
+<li><p>Decision: <strong>Add <code class="docutils literal notranslate"><span class="pre">--dry-run</span></code> and <code class="docutils literal notranslate"><span class="pre">--resume-from</span></code> flags</strong> for coverage measurement and idempotent resumption.
+Alternatives: separate scripts, always full run. Rationale: dry-run enables quick resolver testing without storage; resume-from reduces wasted API calls on reruns; both fit naturally into CLI; minimal code.</p></li>
+<li><p>Decision: <strong>Extract plaintext from HTML fallbacks</strong> using trafilatura (optional dependency).
+Alternatives: keep raw HTML only, use BeautifulSoup get_text(). Rationale: trafilatura designed for article extraction; optional = no new hard dependency; *.html.txt simplifies downstream parsing; 1-5 line addition to existing HTML save.</p></li>
+<li><p>Decision: <strong>Add OpenAIRE, HAL, OSF resolvers as optional</strong> (disabled by default).
+Alternatives: enable by default, skip entirely. Rationale: increases EU OA and preprint coverage; mirrors existing JSON-parsing patterns; disabled by default = no surprise egress; operators enable via config.</p></li>
+</ul>
+</section>
+<section id="architecture-overview">
+<h1>Architecture Overview<a class="headerlink" href="#architecture-overview" title="Link to this heading"></a></h1>
+<ul>
+<li><p><strong>Session Management</strong>: Single <code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> created with polite headers and HTTPAdapter(Retry(…)) mounted on http:// and https://. Shared across OpenAlex attempts and resolver pipeline.</p></li>
+<li><p><strong>Atomic Write Flow</strong>: In <code class="docutils literal notranslate"><span class="pre">download_candidate</span></code>, after classification:</p>
+<ol class="arabic simple">
+<li><p>Open <code class="docutils literal notranslate"><span class="pre">dest_path.with_suffix('.part')</span></code></p></li>
+<li><p>Stream chunks to .part file</p></li>
+<li><p>On completion, compute SHA-256 digest</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">os.replace(part_path,</span> <span class="pre">dest_path)</span></code> (atomic)</p></li>
+<li><p>Return outcome with digest and content-length</p></li>
+</ol>
+</li>
+<li><p><strong>Rate Limiting</strong>: <code class="docutils literal notranslate"><span class="pre">ResolverPipeline._respect_rate_limit()</span></code> uses <code class="docutils literal notranslate"><span class="pre">min_interval_s</span></code> (renamed from <code class="docutils literal notranslate"><span class="pre">resolver_rate_limits</span></code>) to enforce minimum seconds between calls per resolver. ThreadPoolExecutor workers serialize through this bottleneck via shared <code class="docutils literal notranslate"><span class="pre">_last_invocation</span></code> dict with threading.Lock.</p></li>
+<li><p><strong>LRU Cache</strong>: Decorate resolver API helpers with <code class="docutils literal notranslate"><span class="pre">&#64;lru_cache(maxsize=1000)</span></code>, key=(resolver_name, normalized_identifier). Cache cleared between batch runs if <code class="docutils literal notranslate"><span class="pre">--resume-from</span></code> used.</p></li>
+<li><p><strong>Conditional Requests</strong>: In <code class="docutils literal notranslate"><span class="pre">download_candidate</span></code>, before streaming:</p>
+<ol class="arabic simple">
+<li><p>Read manifest for (work_id, url) to get previous ETag/Last-Modified</p></li>
+<li><p>Add If-None-Match/If-Modified-Since to request headers</p></li>
+<li><p>If 304 response, return DownloadOutcome(classification=’cached’, path=existing_path)</p></li>
+<li><p>Update manifest with new ETag/Last-Modified on success</p></li>
+</ol>
+</li>
+<li><p><strong>Unified Logging</strong>: <code class="docutils literal notranslate"><span class="pre">JsonlLogger</span></code> writes records with schema:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ISO8601&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;record_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;attempt&quot;</span><span class="err">|</span><span class="s2">&quot;summary&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;work_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;W123&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;resolver_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;unpaywall&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;resolver_order&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;url&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://...&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;pdf&quot;</span><span class="err">|</span><span class="s2">&quot;html&quot;</span><span class="err">|</span><span class="s2">&quot;http_error&quot;</span><span class="err">|</span><span class="s2">&quot;cached&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;http_status&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;content_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;application/pdf&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;elapsed_ms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1234.5</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;abc...&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;content_length&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">567890</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;reason&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="err">|</span><span class="s2">&quot;error details&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>CSV export script: <code class="docutils literal notranslate"><span class="pre">jq</span> <span class="pre">-r</span> <span class="pre">'[.timestamp,</span> <span class="pre">.work_id,</span> <span class="pre">...]</span> <span class="pre">|</span> <span class="pre">&#64;csv'</span> <span class="pre">&lt;</span> <span class="pre">attempts.jsonl</span> <span class="pre">&gt;</span> <span class="pre">attempts.csv</span></code></p>
+</li>
+<li><p><strong>Parallel Execution</strong>: Main loop:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">ThreadPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">workers</span><span class="p">)</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+    <span class="n">futures</span> <span class="o">=</span> <span class="p">{</span><span class="n">executor</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">process_work</span><span class="p">,</span> <span class="n">work</span><span class="p">,</span> <span class="n">session_factory</span><span class="p">()):</span> <span class="n">work</span> <span class="k">for</span> <span class="n">work</span> <span class="ow">in</span> <span class="n">batch</span><span class="p">}</span>
+    <span class="k">for</span> <span class="n">future</span> <span class="ow">in</span> <span class="n">as_completed</span><span class="p">(</span><span class="n">futures</span><span class="p">):</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">future</span><span class="o">.</span><span class="n">result</span><span class="p">()</span>
+        <span class="c1"># aggregate metrics</span>
+</pre></div>
+</div>
+<p>Each worker gets its own session (HTTPAdapter Retry is thread-safe), shares <code class="docutils literal notranslate"><span class="pre">ResolverPipeline._last_invocation</span></code> via Lock.</p>
+</li>
+<li><p><strong>Refactored Download State Machine</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">DownloadState</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">PENDING</span> <span class="o">=</span> <span class="s2">&quot;pending&quot;</span>
+    <span class="n">WRITING</span> <span class="o">=</span> <span class="s2">&quot;writing&quot;</span>
+
+<span class="c1"># In download_candidate:</span>
+<span class="n">state</span> <span class="o">=</span> <span class="n">DownloadState</span><span class="o">.</span><span class="n">PENDING</span>
+<span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">response</span><span class="o">.</span><span class="n">iter_content</span><span class="p">(</span><span class="o">...</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">state</span> <span class="o">==</span> <span class="n">PENDING</span><span class="p">:</span>
+        <span class="n">detected</span> <span class="o">=</span> <span class="n">classify_payload</span><span class="p">(</span><span class="n">sniff_buffer</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">detected</span><span class="p">:</span>
+            <span class="nb">open</span> <span class="n">file</span> <span class="n">handle</span><span class="p">,</span> <span class="n">state</span> <span class="o">=</span> <span class="n">WRITING</span>
+    <span class="k">elif</span> <span class="n">state</span> <span class="o">==</span> <span class="n">WRITING</span><span class="p">:</span>
+        <span class="n">handle</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+<span class="k">return</span> <span class="n">_build_outcome</span><span class="p">(</span><span class="n">detected</span><span class="p">,</span> <span class="n">dest_path</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Shared Utilities</strong> (<code class="docutils literal notranslate"><span class="pre">ContentDownload/utils.py</span></code>):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">normalize_doi</span><span class="p">(</span><span class="n">doi</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span> <span class="o">...</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_pmcid</span><span class="p">(</span><span class="n">pmcid</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span> <span class="o">...</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">strip_prefix</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span> <span class="o">...</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">dedupe</span><span class="p">(</span><span class="n">items</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span> <span class="o">...</span>
+</pre></div>
+</div>
+<p>Imported by both main module and resolvers.</p>
+</li>
+</ul>
+</section>
+<section id="risks-trade-offs">
+<h1>Risks / Trade-offs<a class="headerlink" href="#risks-trade-offs" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Risk: Retry logic delays failures, increasing overall runtime. Mitigation: Retry capped at 5 attempts with exponential backoff (max ~30s per URL); fail-fast on 4xx errors; overall runtime increase &lt;5% based on retry rate.</p></li>
+<li><p>Risk: ThreadPoolExecutor increases memory footprint. Mitigation: max_workers default=1 (opt-in); N=5 adds ~50MB overhead (5 sessions + buffers); document memory scaling.</p></li>
+<li><p>Risk: LRU cache stale on DOI updates. Mitigation: cache only within single run; cache cleared on –resume-from; DOI metadata changes rare; false negatives acceptable (just refetch).</p></li>
+<li><p>Risk: Breaking config change (<code class="docutils literal notranslate"><span class="pre">resolver_rate_limits</span></code> → <code class="docutils literal notranslate"><span class="pre">min_interval_s</span></code>) requires operator updates. Mitigation: detect old field name, log deprecation warning, auto-migrate value; document in migration guide; fail gracefully if both fields present.</p></li>
+<li><p>Risk: JSONL logging breaks existing CSV parsers. Mitigation: provide one-line jq/Python export script in migration guide; document JSONL schema; keep CSV export tested.</p></li>
+<li><p>Risk: Parallel workers overwhelm rate limits. Mitigation: shared <code class="docutils literal notranslate"><span class="pre">_last_invocation</span></code> dict with Lock enforces global per-resolver intervals; test with max_workers=10 and assert rate limit compliance.</p></li>
+<li><p>Risk: Conditional requests return stale PDFs. Mitigation: ETag/Last-Modified from authoritative sources (Unpaywall, Crossref) rarely change; operators can use –force to bypass conditional requests.</p></li>
+<li><p>Risk: Trafilatura dependency bloat. Mitigation: optional import with graceful fallback; –extract-html-text flag defaults to False; document as optional enhancement.</p></li>
+</ul>
+</section>
+<section id="migration-plan">
+<h1>Migration Plan<a class="headerlink" href="#migration-plan" title="Link to this heading"></a></h1>
+<ol class="arabic simple">
+<li><p>Implement shared utilities in ContentDownload/utils.py with unit tests for normalization/dedupe functions.</p></li>
+<li><p>Add HTTPAdapter + Retry to session creation; verify with integration test that mocks 503 → 200 sequence.</p></li>
+<li><p>Refactor download_candidate for atomic writes and state enum; run full test suite to ensure no regressions.</p></li>
+<li><p>Add SHA-256 digest and content-length to DownloadOutcome and manifest schema.</p></li>
+<li><p>Implement LRU cache decorators on resolver API helpers; measure cache hit rate in tests.</p></li>
+<li><p>Add conditional request support with If-None-Match/If-Modified-Since; test 304 handling.</p></li>
+<li><p>Rename <code class="docutils literal notranslate"><span class="pre">resolver_rate_limits</span></code> → <code class="docutils literal notranslate"><span class="pre">min_interval_s</span></code> with deprecation warning and auto-migration.</p></li>
+<li><p>Unify logging to JSONL format; create CSV export script and document in README.</p></li>
+<li><p>Extract duplicated code to utils.py; update imports in both modules.</p></li>
+<li><p>Implement ThreadPoolExecutor parallelism with –workers flag; add threading.Lock to rate limiter.</p></li>
+<li><p>Add –dry-run and –resume-from flags with corresponding logic.</p></li>
+<li><p>Implement HTML text extraction with trafilatura (optional); add –extract-html-text flag.</p></li>
+<li><p>Add OpenAIRE/HAL/OSF resolvers (disabled by default) following existing patterns.</p></li>
+<li><p>Add tests for retry (429), corrupt HTML, Wayback unavailable, manifest alignment.</p></li>
+<li><p>Update documentation: migration guide (config/logging changes), new CLI flags, rate limit units, parallelism tuning.</p></li>
+<li><p>Run end-to-end smoke test: batch of 100 works, –workers 3, verify no regressions in success rate, manifest integrity, file atomicity.</p></li>
+</ol>
+</section>
+<section id="dependencies-and-versions">
+<h1>Dependencies and Versions<a class="headerlink" href="#dependencies-and-versions" title="Link to this heading"></a></h1>
+<section id="required-dependencies">
+<h2>Required Dependencies<a class="headerlink" href="#required-dependencies" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">requests</span> <span class="pre">&gt;=</span> <span class="pre">2.28.0</span></code> - HTTP library with session support</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">urllib3</span> <span class="pre">&gt;=</span> <span class="pre">1.26.0</span></code> - For Retry logic (requests dependency)</p></li>
+<li><p>Existing: <code class="docutils literal notranslate"><span class="pre">pyalex</span></code>, <code class="docutils literal notranslate"><span class="pre">beautifulsoup4</span></code>, <code class="docutils literal notranslate"><span class="pre">lxml</span></code></p></li>
+</ul>
+</section>
+<section id="optional-dependencies">
+<h2>Optional Dependencies<a class="headerlink" href="#optional-dependencies" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">trafilatura</span> <span class="pre">&gt;=</span> <span class="pre">1.6.0</span></code> - For HTML text extraction</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">responses</span> <span class="pre">&gt;=</span> <span class="pre">0.23.0</span></code> - For HTTP mocking in tests</p></li>
+</ul>
+</section>
+<section id="constraints">
+<h2>Constraints<a class="headerlink" href="#constraints" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Python &gt;=3.9 required (type hint syntax, dict ops)</p></li>
+<li><p>No upper bound pins (allow security patches)</p></li>
+</ul>
+</section>
+</section>
+<section id="error-handling-details">
+<h1>Error Handling Details<a class="headerlink" href="#error-handling-details" title="Link to this heading"></a></h1>
+<section id="network-errors">
+<h2>Network Errors<a class="headerlink" href="#network-errors" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>HTTPAdapter retries: ConnectionError, Timeout, 429/502/503/504</p></li>
+<li><p>Does NOT retry: 4xx (except 429), SSL errors, ValueError</p></li>
+<li><p>Backoff formula: <code class="docutils literal notranslate"><span class="pre">0.5</span> <span class="pre">*</span> <span class="pre">(2</span> <span class="pre">**</span> <span class="pre">attempt)</span></code></p></li>
+</ul>
+</section>
+<section id="file-system-errors">
+<h2>File System Errors<a class="headerlink" href="#file-system-errors" title="Link to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">try</span><span class="p">:</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">part</span><span class="p">,</span> <span class="n">final</span><span class="p">)</span>  <span class="c1"># atomic</span>
+<span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">e</span><span class="o">.</span><span class="n">errno</span> <span class="o">==</span> <span class="n">ENOSPC</span><span class="p">:</span> <span class="n">log</span> <span class="s2">&quot;disk full&quot;</span>
+    <span class="k">elif</span> <span class="n">e</span><span class="o">.</span><span class="n">errno</span> <span class="o">==</span> <span class="n">EACCES</span><span class="p">:</span> <span class="n">log</span> <span class="s2">&quot;permission denied&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="thread-safety">
+<h2>Thread Safety<a class="headerlink" href="#thread-safety" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">_last_invocation</span></code> protected by Lock</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">JsonlLogger</span></code> writes atomic (file.write + flush)</p></li>
+<li><p>Each worker: own Session</p></li>
+<li><p>LRU cache: thread-safe (functools internal locks)</p></li>
+</ul>
+</section>
+</section>
+<section id="performance-metrics">
+<h1>Performance Metrics<a class="headerlink" href="#performance-metrics" title="Link to this heading"></a></h1>
+<section id="baseline-workers-1">
+<h2>Baseline (–workers=1)<a class="headerlink" href="#baseline-workers-1" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Work processing: 2-5s (OpenAlex + resolvers)</p></li>
+<li><p>API latency: 100-500ms</p></li>
+<li><p>Memory: ~50MB</p></li>
+</ul>
+</section>
+<section id="parallel-scaling">
+<h2>Parallel Scaling<a class="headerlink" href="#parallel-scaling" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>–workers=3: 2.5-3x throughput</p></li>
+<li><p>–workers=5: 3.5-4.5x (rate limits dominate)</p></li>
+<li><p>Memory per worker: ~30MB</p></li>
+<li><p>Lock contention: &lt;1% overhead</p></li>
+</ul>
+</section>
+<section id="overhead">
+<h2>Overhead<a class="headerlink" href="#overhead" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Retry: &lt;5% overall (most succeed first)</p></li>
+<li><p>SHA-256: ~50ms/MB (&lt;2% for 1-5MB PDFs)</p></li>
+<li><p>Cache hits: ~15% API call reduction</p></li>
+</ul>
+</section>
+</section>
+<section id="open-questions">
+<h1>Open Questions<a class="headerlink" href="#open-questions" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Should we add Prometheus metrics export for production monitoring (success rates, latencies per resolver)? <em>Proposed: defer to later PR</em></p></li>
+<li><p>What’s the preferred default for –workers in CI/production (1 for safety vs 3 for throughput)? <em>Proposed: 1 (safest), document 3-5 for production</em></p></li>
+<li><p>Should conditional requests be opt-in (–use-etags) or opt-out (–ignore-etags)? <em>Proposed: always-on (no flag)</em></p></li>
+<li><p>Do we need a separate –max-retries flag to override HTTPAdapter default (5 attempts)? <em>Proposed: no, 5 is sensible default</em></p></li>
+<li><p>Should HTML text extraction use trafilatura, newspaper3k, or BeautifulSoup get_text()? <em>Proposed: trafilatura (best for articles)</em></p></li>
+<li><p>Is there value in adding content-addressable storage (store by SHA-256) to enable natural deduplication? <em>Proposed: defer, manifest SHA-256 sufficient</em></p></li>
+</ul>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

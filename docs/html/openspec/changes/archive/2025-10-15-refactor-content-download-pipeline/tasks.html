@@ -1,0 +1,616 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Shared Utilities Extraction &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/custom.css" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Shared Utilities Extraction</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/openspec/changes/archive/2025-10-15-refactor-content-download-pipeline/tasks.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="shared-utilities-extraction">
+<h1>1. Shared Utilities Extraction<a class="headerlink" href="#shared-utilities-extraction" title="Link to this heading"></a></h1>
+<ul>
+<li><p>[x] 1.1 Create <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/utils.py</span></code> with exact implementation:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="sd">&quot;&quot;&quot;Shared utility functions for ContentDownload module.&quot;&quot;&quot;</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_doi</span><span class="p">(</span><span class="n">doi</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Normalize DOI by stripping https://doi.org/ prefix and whitespace.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        normalize_doi(&quot;https://doi.org/10.1234/abc&quot;) -&gt; &quot;10.1234/abc&quot;</span>
+<span class="sd">        normalize_doi(&quot;  10.1234/abc  &quot;) -&gt; &quot;10.1234/abc&quot;</span>
+<span class="sd">        normalize_doi(None) -&gt; None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">doi</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">doi</span> <span class="o">=</span> <span class="n">doi</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">doi</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;https://doi.org/&quot;</span><span class="p">):</span>
+        <span class="n">doi</span> <span class="o">=</span> <span class="n">doi</span><span class="p">[</span><span class="mi">16</span><span class="p">:]</span>
+    <span class="k">return</span> <span class="n">doi</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_pmcid</span><span class="p">(</span><span class="n">pmcid</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Normalize PMCID ensuring PMC prefix.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        normalize_pmcid(&quot;PMC123456&quot;) -&gt; &quot;PMC123456&quot;</span>
+<span class="sd">        normalize_pmcid(&quot;123456&quot;) -&gt; &quot;PMC123456&quot;</span>
+<span class="sd">        normalize_pmcid(&quot;pmc123456&quot;) -&gt; &quot;PMC123456&quot;</span>
+<span class="sd">        normalize_pmcid(None) -&gt; None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">pmcid</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">pmcid</span> <span class="o">=</span> <span class="n">pmcid</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;PMC?(\d+)&quot;</span><span class="p">,</span> <span class="n">pmcid</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="n">re</span><span class="o">.</span><span class="n">I</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;PMC</span><span class="si">{</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">return</span> <span class="kc">None</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">strip_prefix</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Strip case-insensitive prefix from value.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        strip_prefix(&quot;arxiv:2301.12345&quot;, &quot;arxiv:&quot;) -&gt; &quot;2301.12345&quot;</span>
+<span class="sd">        strip_prefix(&quot;ARXIV:2301.12345&quot;, &quot;arxiv:&quot;) -&gt; &quot;2301.12345&quot;</span>
+<span class="sd">        strip_prefix(None, &quot;prefix&quot;) -&gt; None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">value</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">prefix</span><span class="o">.</span><span class="n">lower</span><span class="p">()):</span>
+        <span class="k">return</span> <span class="n">value</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">prefix</span><span class="p">):]</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">dedupe</span><span class="p">(</span><span class="n">items</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Remove duplicates while preserving first occurrence order.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        dedupe([&#39;b&#39;, &#39;a&#39;, &#39;b&#39;, &#39;c&#39;]) -&gt; [&#39;b&#39;, &#39;a&#39;, &#39;c&#39;]</span>
+<span class="sd">        dedupe([]) -&gt; []</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">items</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">item</span> <span class="ow">and</span> <span class="n">item</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+            <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span>
+</pre></div>
+</div>
+</li>
+<li><p>[x] 1.2 Add unit tests in <code class="docutils literal notranslate"><span class="pre">tests/test_content_download_utils.py</span></code> with minimum coverage:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">normalize_doi</span><span class="p">,</span> <span class="n">normalize_pmcid</span><span class="p">,</span> <span class="n">strip_prefix</span><span class="p">,</span> <span class="n">dedupe</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_normalize_doi_with_https_prefix</span><span class="p">():</span>
+    <span class="k">assert</span> <span class="n">normalize_doi</span><span class="p">(</span><span class="s2">&quot;https://doi.org/10.1234/abc&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;10.1234/abc&quot;</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_normalize_doi_without_prefix</span><span class="p">():</span>
+    <span class="k">assert</span> <span class="n">normalize_doi</span><span class="p">(</span><span class="s2">&quot;10.1234/abc&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;10.1234/abc&quot;</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_normalize_doi_with_whitespace</span><span class="p">():</span>
+    <span class="k">assert</span> <span class="n">normalize_doi</span><span class="p">(</span><span class="s2">&quot;  10.1234/abc  &quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;10.1234/abc&quot;</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_normalize_doi_none</span><span class="p">():</span>
+    <span class="k">assert</span> <span class="n">normalize_doi</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_normalize_pmcid_with_pmc_prefix</span><span class="p">():</span>
+    <span class="k">assert</span> <span class="n">normalize_pmcid</span><span class="p">(</span><span class="s2">&quot;PMC123456&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;PMC123456&quot;</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_normalize_pmcid_without_prefix</span><span class="p">():</span>
+    <span class="k">assert</span> <span class="n">normalize_pmcid</span><span class="p">(</span><span class="s2">&quot;123456&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span>  <span class="c1"># requires PMC in input</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_normalize_pmcid_lowercase</span><span class="p">():</span>
+    <span class="k">assert</span> <span class="n">normalize_pmcid</span><span class="p">(</span><span class="s2">&quot;pmc123456&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;PMC123456&quot;</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_strip_prefix_case_insensitive</span><span class="p">():</span>
+    <span class="k">assert</span> <span class="n">strip_prefix</span><span class="p">(</span><span class="s2">&quot;ARXIV:2301.12345&quot;</span><span class="p">,</span> <span class="s2">&quot;arxiv:&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;2301.12345&quot;</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_dedupe_preserves_order</span><span class="p">():</span>
+    <span class="k">assert</span> <span class="n">dedupe</span><span class="p">([</span><span class="s1">&#39;b&#39;</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="s1">&#39;b&#39;</span><span class="p">,</span> <span class="s1">&#39;c&#39;</span><span class="p">])</span> <span class="o">==</span> <span class="p">[</span><span class="s1">&#39;b&#39;</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="s1">&#39;c&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+</li>
+<li><p>[x] 1.3 In <code class="docutils literal notranslate"><span class="pre">download_pyalex_pdfs.py</span></code>, delete lines 159-166 (old <code class="docutils literal notranslate"><span class="pre">_normalize_doi</span></code>) and add import at top: <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.utils</span> <span class="pre">import</span> <span class="pre">normalize_doi,</span> <span class="pre">normalize_pmcid,</span> <span class="pre">strip_prefix,</span> <span class="pre">dedupe</span></code>, then replace all calls to <code class="docutils literal notranslate"><span class="pre">_normalize_doi(doi)</span></code> with <code class="docutils literal notranslate"><span class="pre">normalize_doi(doi)</span></code> (lines 287, 765, etc.)</p></li>
+<li><p>[x] 1.4 In <code class="docutils literal notranslate"><span class="pre">resolvers/__init__.py</span></code>, delete lines 408-433 (old <code class="docutils literal notranslate"><span class="pre">_normalize_doi</span></code>, <code class="docutils literal notranslate"><span class="pre">_normalize_pmcid</span></code>, <code class="docutils literal notranslate"><span class="pre">_strip_prefix</span></code>) and add import at top: <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">.utils</span> <span class="pre">import</span> <span class="pre">normalize_doi,</span> <span class="pre">normalize_pmcid,</span> <span class="pre">strip_prefix,</span> <span class="pre">dedupe</span></code>, then replace all calls (lines 454, 534, 705, 814, 856, 902, 949)</p></li>
+<li><p>[x] 1.5 Update <code class="docutils literal notranslate"><span class="pre">_collect_location_urls</span></code> in <code class="docutils literal notranslate"><span class="pre">download_pyalex_pdfs.py</span></code> to use <code class="docutils literal notranslate"><span class="pre">utils.dedupe()</span></code> instead of inline dedupe logic</p></li>
+<li><p>[x] 1.6 Update resolver URL collection in <code class="docutils literal notranslate"><span class="pre">resolvers/__init__.py</span></code> (Unpaywall, Crossref) to use <code class="docutils literal notranslate"><span class="pre">utils.dedupe()</span></code></p></li>
+</ul>
+</section>
+<section id="http-retry-infrastructure">
+<h1>2. HTTP Retry Infrastructure<a class="headerlink" href="#http-retry-infrastructure" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 2.1 In <code class="docutils literal notranslate"><span class="pre">download_pyalex_pdfs.py</span></code>, create <code class="docutils literal notranslate"><span class="pre">_make_session(headers:</span> <span class="pre">Dict[str,</span> <span class="pre">str])</span> <span class="pre">-&gt;</span> <span class="pre">requests.Session</span></code> that constructs Session, mounts HTTPAdapter with Retry(total=5, backoff_factor=0.5, status_forcelist=[429, 502, 503, 504], respect_retry_after_header=True) on http:// and https://</p></li>
+<li><p>[x] 2.2 Replace <code class="docutils literal notranslate"><span class="pre">session</span> <span class="pre">=</span> <span class="pre">requests.Session()</span></code> in <code class="docutils literal notranslate"><span class="pre">main()</span></code> with <code class="docutils literal notranslate"><span class="pre">session</span> <span class="pre">=</span> <span class="pre">_make_session(config.polite_headers)</span></code></p></li>
+<li><p>[x] 2.3 Add integration test in <code class="docutils literal notranslate"><span class="pre">tests/test_download_retries.py</span></code> that mocks sequence [503, 503, 200] and verifies download succeeds after retries</p></li>
+<li><p>[x] 2.4 Add test verifying Retry-After header is respected (mock 429 with Retry-After: 2, assert delay &gt;=2s)</p></li>
+<li><p>[x] 2.5 Add test verifying 4xx errors (401, 404) do NOT retry (fail immediately)</p></li>
+</ul>
+</section>
+<section id="atomic-file-writes-and-digests">
+<h1>3. Atomic File Writes and Digests<a class="headerlink" href="#atomic-file-writes-and-digests" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 3.1 In <code class="docutils literal notranslate"><span class="pre">download_candidate()</span></code>, change file write pattern: open <code class="docutils literal notranslate"><span class="pre">dest_path.with_suffix(dest_path.suffix</span> <span class="pre">+</span> <span class="pre">'.part')</span></code> instead of <code class="docutils literal notranslate"><span class="pre">dest_path</span></code> directly</p></li>
+<li><p>[x] 3.2 After closing file handle, compute SHA-256 digest: <code class="docutils literal notranslate"><span class="pre">sha256</span> <span class="pre">=</span> <span class="pre">hashlib.sha256();</span> <span class="pre">with</span> <span class="pre">open(part_path,</span> <span class="pre">'rb')</span> <span class="pre">as</span> <span class="pre">f:</span> <span class="pre">for</span> <span class="pre">chunk</span> <span class="pre">in</span> <span class="pre">iter(lambda:</span> <span class="pre">f.read(1&lt;&lt;20),</span> <span class="pre">b''):</span> <span class="pre">sha256.update(chunk);</span> <span class="pre">digest</span> <span class="pre">=</span> <span class="pre">sha256.hexdigest()</span></code></p></li>
+<li><p>[x] 3.3 Get file size: <code class="docutils literal notranslate"><span class="pre">content_length</span> <span class="pre">=</span> <span class="pre">part_path.stat().st_size</span></code></p></li>
+<li><p>[x] 3.4 Perform atomic rename: <code class="docutils literal notranslate"><span class="pre">os.replace(part_path,</span> <span class="pre">dest_path)</span></code></p></li>
+<li><p>[x] 3.5 Add <code class="docutils literal notranslate"><span class="pre">sha256</span></code> and <code class="docutils literal notranslate"><span class="pre">content_length</span></code> fields to <code class="docutils literal notranslate"><span class="pre">DownloadOutcome</span></code> dataclass</p></li>
+<li><p>[x] 3.6 Update <code class="docutils literal notranslate"><span class="pre">DownloadOutcome</span></code> return statement to include <code class="docutils literal notranslate"><span class="pre">sha256=digest,</span> <span class="pre">content_length=content_length</span></code></p></li>
+<li><p>[x] 3.7 Add test in <code class="docutils literal notranslate"><span class="pre">tests/test_atomic_writes.py</span></code> that kills download mid-stream (using signal or mock exception), verifies .part file exists and final file does NOT exist</p></li>
+<li><p>[x] 3.8 Add test verifying SHA-256 digest matches expected value for known test file</p></li>
+</ul>
+</section>
+<section id="rate-limit-configuration-clarity">
+<h1>4. Rate Limit Configuration Clarity<a class="headerlink" href="#rate-limit-configuration-clarity" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 4.1 In <code class="docutils literal notranslate"><span class="pre">resolvers/__init__.py</span></code> ResolverConfig dataclass, rename field: <code class="docutils literal notranslate"><span class="pre">resolver_rate_limits:</span> <span class="pre">Dict[str,</span> <span class="pre">float]</span></code> → <code class="docutils literal notranslate"><span class="pre">resolver_min_interval_s:</span> <span class="pre">Dict[str,</span> <span class="pre">float]</span></code></p></li>
+<li><p>[x] 4.2 Update <code class="docutils literal notranslate"><span class="pre">ResolverPipeline._respect_rate_limit()</span></code> to read <code class="docutils literal notranslate"><span class="pre">config.resolver_min_interval_s.get(resolver_name)</span></code></p></li>
+<li><p>[x] 4.3 In <code class="docutils literal notranslate"><span class="pre">load_resolver_config()</span></code> in <code class="docutils literal notranslate"><span class="pre">download_pyalex_pdfs.py</span></code>, add deprecation handling: if <code class="docutils literal notranslate"><span class="pre">resolver_rate_limits</span></code> in config_data and <code class="docutils literal notranslate"><span class="pre">resolver_min_interval_s</span></code> not in config_data, copy value and log warning “resolver_rate_limits deprecated, use resolver_min_interval_s”</p></li>
+<li><p>[x] 4.4 Update <code class="docutils literal notranslate"><span class="pre">apply_config_overrides()</span></code> to handle both field names (old and new) for backward compatibility</p></li>
+<li><p>[x] 4.5 Update example resolver config YAML in docs/ to use <code class="docutils literal notranslate"><span class="pre">resolver_min_interval_s</span></code> with inline comment “# seconds between calls (e.g., 1.0 = max 1 QPS)”</p></li>
+<li><p>[x] 4.6 Update comment in <code class="docutils literal notranslate"><span class="pre">load_resolver_config()</span></code> where Unpaywall default is set: <code class="docutils literal notranslate"><span class="pre">#</span> <span class="pre">Unpaywall</span> <span class="pre">recommends</span> <span class="pre">1</span> <span class="pre">request</span> <span class="pre">per</span> <span class="pre">second</span></code></p></li>
+<li><p>[x] 4.7 Add test verifying deprecation warning is logged when old field name used</p></li>
+</ul>
+</section>
+<section id="lru-cache-for-resolver-apis">
+<h1>5. LRU Cache for Resolver APIs<a class="headerlink" href="#lru-cache-for-resolver-apis" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 5.1 In <code class="docutils literal notranslate"><span class="pre">resolvers/__init__.py</span></code>, add at module level: <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">functools</span> <span class="pre">import</span> <span class="pre">lru_cache</span></code></p></li>
+<li><p>[x] 5.2 Create cached helper for Unpaywall: <code class="docutils literal notranslate"><span class="pre">&#64;lru_cache(maxsize=1000)</span></code> decorator on new function <code class="docutils literal notranslate"><span class="pre">_fetch_unpaywall_data(doi:</span> <span class="pre">str,</span> <span class="pre">email:</span> <span class="pre">str,</span> <span class="pre">timeout:</span> <span class="pre">float,</span> <span class="pre">headers:</span> <span class="pre">Dict)</span> <span class="pre">-&gt;</span> <span class="pre">Optional[Dict]</span></code> that makes API call and returns JSON</p></li>
+<li><p>[x] 5.3 Update <code class="docutils literal notranslate"><span class="pre">UnpaywallResolver.iter_urls()</span></code> to call <code class="docutils literal notranslate"><span class="pre">_fetch_unpaywall_data(doi,</span> <span class="pre">config.unpaywall_email,</span> <span class="pre">config.get_timeout(self.name),</span> <span class="pre">...)</span></code></p></li>
+<li><p>[x] 5.4 Create cached helper for Crossref: <code class="docutils literal notranslate"><span class="pre">&#64;lru_cache(maxsize=1000)</span></code> decorator on <code class="docutils literal notranslate"><span class="pre">_fetch_crossref_data(doi:</span> <span class="pre">str,</span> <span class="pre">mailto:</span> <span class="pre">Optional[str],</span> <span class="pre">timeout:</span> <span class="pre">float,</span> <span class="pre">headers:</span> <span class="pre">Dict)</span> <span class="pre">-&gt;</span> <span class="pre">Optional[Dict]</span></code></p></li>
+<li><p>[x] 5.5 Update <code class="docutils literal notranslate"><span class="pre">CrossrefResolver.iter_urls()</span></code> to call <code class="docutils literal notranslate"><span class="pre">_fetch_crossref_data(...)</span></code></p></li>
+<li><p>[x] 5.6 Create cached helper for Semantic Scholar: <code class="docutils literal notranslate"><span class="pre">&#64;lru_cache(maxsize=1000)</span></code> decorator on <code class="docutils literal notranslate"><span class="pre">_fetch_s2_data(doi:</span> <span class="pre">str,</span> <span class="pre">api_key:</span> <span class="pre">Optional[str],</span> <span class="pre">timeout:</span> <span class="pre">float,</span> <span class="pre">headers:</span> <span class="pre">Dict)</span> <span class="pre">-&gt;</span> <span class="pre">Optional[Dict]</span></code></p></li>
+<li><p>[x] 5.7 Update <code class="docutils literal notranslate"><span class="pre">SemanticScholarResolver.iter_urls()</span></code> to call <code class="docutils literal notranslate"><span class="pre">_fetch_s2_data(...)</span></code></p></li>
+<li><p>[x] 5.8 Add <code class="docutils literal notranslate"><span class="pre">clear_resolver_caches()</span></code> function that calls <code class="docutils literal notranslate"><span class="pre">.cache_clear()</span></code> on all three cached functions</p></li>
+<li><p>[x] 5.9 In <code class="docutils literal notranslate"><span class="pre">main()</span></code>, call <code class="docutils literal notranslate"><span class="pre">clear_resolver_caches()</span></code> if <code class="docutils literal notranslate"><span class="pre">--resume-from</span></code> flag is set (to force fresh lookups)</p></li>
+<li><p>[x] 5.10 Add test in <code class="docutils literal notranslate"><span class="pre">tests/test_resolver_caching.py</span></code> that calls resolver twice with same DOI, verifies second call does not make HTTP request (mock session)</p></li>
+</ul>
+</section>
+<section id="conditional-requests-support">
+<h1>6. Conditional Requests Support<a class="headerlink" href="#conditional-requests-support" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 6.1 In <code class="docutils literal notranslate"><span class="pre">Manifest</span></code> dataclass in <code class="docutils literal notranslate"><span class="pre">download_pyalex_pdfs.py</span></code>, add fields: <code class="docutils literal notranslate"><span class="pre">etag:</span> <span class="pre">Optional[str]</span> <span class="pre">=</span> <span class="pre">None</span></code>, <code class="docutils literal notranslate"><span class="pre">last_modified:</span> <span class="pre">Optional[str]</span> <span class="pre">=</span> <span class="pre">None</span></code></p></li>
+<li><p>[x] 6.2 Update manifest.jsonl write to include etag and last_modified from FetchResult</p></li>
+<li><p>[x] 6.3 In <code class="docutils literal notranslate"><span class="pre">download_candidate()</span></code>, add parameter <code class="docutils literal notranslate"><span class="pre">previous_etag:</span> <span class="pre">Optional[str]</span> <span class="pre">=</span> <span class="pre">None</span></code>, <code class="docutils literal notranslate"><span class="pre">previous_last_modified:</span> <span class="pre">Optional[str]</span> <span class="pre">=</span> <span class="pre">None</span></code></p></li>
+<li><p>[x] 6.4 Before making GET request in <code class="docutils literal notranslate"><span class="pre">download_candidate()</span></code>, add to headers dict: if <code class="docutils literal notranslate"><span class="pre">previous_etag</span></code>: <code class="docutils literal notranslate"><span class="pre">headers['If-None-Match']</span> <span class="pre">=</span> <span class="pre">previous_etag</span></code>; if <code class="docutils literal notranslate"><span class="pre">previous_last_modified</span></code>: <code class="docutils literal notranslate"><span class="pre">headers['If-Modified-Since']</span> <span class="pre">=</span> <span class="pre">previous_last_modified</span></code></p></li>
+<li><p>[x] 6.5 After receiving response, if <code class="docutils literal notranslate"><span class="pre">response.status_code</span> <span class="pre">==</span> <span class="pre">304</span></code>: return <code class="docutils literal notranslate"><span class="pre">DownloadOutcome(classification='cached',</span> <span class="pre">path=str(existing_path),</span> <span class="pre">http_status=304,</span> <span class="pre">...)</span></code></p></li>
+<li><p>[x] 6.6 In <code class="docutils literal notranslate"><span class="pre">main()</span></code>, before calling <code class="docutils literal notranslate"><span class="pre">download_candidate()</span></code>, read manifest.jsonl, lookup (work_id, url) to get previous etag/last_modified</p></li>
+<li><p>[x] 6.7 Pass etag/last_modified to <code class="docutils literal notranslate"><span class="pre">download_candidate()</span></code> call</p></li>
+<li><p>[x] 6.8 Add test in <code class="docutils literal notranslate"><span class="pre">tests/test_conditional_requests.py</span></code> that mocks 304 response, verifies cached outcome returned and no file written</p></li>
+<li><p>[x] 6.9 Add test verifying ETag/Last-Modified recorded in manifest after successful download</p></li>
+</ul>
+</section>
+<section id="unified-jsonl-logging">
+<h1>7. Unified JSONL Logging<a class="headerlink" href="#unified-jsonl-logging" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 7.1 Create <code class="docutils literal notranslate"><span class="pre">JsonlLogger</span></code> class in <code class="docutils literal notranslate"><span class="pre">download_pyalex_pdfs.py</span></code> with methods: <code class="docutils literal notranslate"><span class="pre">log_attempt(record:</span> <span class="pre">AttemptRecord)</span></code>, <code class="docutils literal notranslate"><span class="pre">log_summary(summary:</span> <span class="pre">Dict)</span></code></p></li>
+<li><p>[x] 7.2 Implement <code class="docutils literal notranslate"><span class="pre">log_attempt()</span></code> to write JSON line with schema: <code class="docutils literal notranslate"><span class="pre">{&quot;timestamp&quot;:</span> <span class="pre">ISO8601,</span> <span class="pre">&quot;record_type&quot;:</span> <span class="pre">&quot;attempt&quot;,</span> <span class="pre">&quot;work_id&quot;:</span> <span class="pre">...,</span> <span class="pre">&quot;resolver_name&quot;:</span> <span class="pre">...,</span> <span class="pre">...}</span></code></p></li>
+<li><p>[x] 7.3 Implement <code class="docutils literal notranslate"><span class="pre">log_summary()</span></code> to write JSON line with schema: <code class="docutils literal notranslate"><span class="pre">{&quot;timestamp&quot;:</span> <span class="pre">ISO8601,</span> <span class="pre">&quot;record_type&quot;:</span> <span class="pre">&quot;summary&quot;,</span> <span class="pre">&quot;total_works&quot;:</span> <span class="pre">...,</span> <span class="pre">&quot;success_count&quot;:</span> <span class="pre">...,</span> <span class="pre">...}</span></code></p></li>
+<li><p>[x] 7.4 Replace <code class="docutils literal notranslate"><span class="pre">CsvAttemptLogger</span></code> instantiation in <code class="docutils literal notranslate"><span class="pre">main()</span></code> with <code class="docutils literal notranslate"><span class="pre">JsonlLogger(args.log_jsonl</span> <span class="pre">or</span> <span class="pre">(pdf_dir</span> <span class="pre">/</span> <span class="pre">&quot;attempts.jsonl&quot;))</span></code></p></li>
+<li><p>[x] 7.5 Replace <code class="docutils literal notranslate"><span class="pre">ManifestLogger</span></code> instantiation with same <code class="docutils literal notranslate"><span class="pre">JsonlLogger</span></code> instance (unify)</p></li>
+<li><p>[x] 7.6 Update <code class="docutils literal notranslate"><span class="pre">AttemptRecord</span></code> logging calls to add <code class="docutils literal notranslate"><span class="pre">sha256</span></code> and <code class="docutils literal notranslate"><span class="pre">content_length</span></code> fields</p></li>
+<li><p>[x] 7.7 Create CSV export script <code class="docutils literal notranslate"><span class="pre">scripts/export_attempts_csv.py</span></code> that reads JSONL and writes CSV with same columns as old CsvAttemptLogger</p></li>
+<li><p>[x] 7.8 Add CLI flag <code class="docutils literal notranslate"><span class="pre">--log-format</span> <span class="pre">[jsonl|csv]</span></code> (default: jsonl); if csv, wrap JsonlLogger with CSV adapter</p></li>
+<li><p>[x] 7.9 Add test in <code class="docutils literal notranslate"><span class="pre">tests/test_jsonl_logging.py</span></code> verifying JSONL lines are valid JSON and contain required fields</p></li>
+<li><p>[x] 7.10 Add test verifying CSV export script produces correct columns and values</p></li>
+</ul>
+</section>
+<section id="refactor-download-state-machine">
+<h1>8. Refactor Download State Machine<a class="headerlink" href="#refactor-download-state-machine" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 8.1 In <code class="docutils literal notranslate"><span class="pre">download_candidate()</span></code>, add <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">enum</span> <span class="pre">import</span> <span class="pre">Enum</span></code> and define: <code class="docutils literal notranslate"><span class="pre">class</span> <span class="pre">DownloadState(Enum):</span> <span class="pre">PENDING</span> <span class="pre">=</span> <span class="pre">&quot;pending&quot;;</span> <span class="pre">WRITING</span> <span class="pre">=</span> <span class="pre">&quot;writing&quot;</span></code></p></li>
+<li><p>[x] 8.2 Replace <code class="docutils literal notranslate"><span class="pre">detected:</span> <span class="pre">Optional[str]</span> <span class="pre">=</span> <span class="pre">None</span></code> with <code class="docutils literal notranslate"><span class="pre">state</span> <span class="pre">=</span> <span class="pre">DownloadState.PENDING;</span> <span class="pre">detected:</span> <span class="pre">Optional[str]</span> <span class="pre">=</span> <span class="pre">None</span></code></p></li>
+<li><p>[x] 8.3 Refactor chunk iteration loop: <code class="docutils literal notranslate"><span class="pre">if</span> <span class="pre">state</span> <span class="pre">==</span> <span class="pre">DownloadState.PENDING:</span> <span class="pre">...</span> <span class="pre">if</span> <span class="pre">detected:</span> <span class="pre">state</span> <span class="pre">=</span> <span class="pre">DownloadState.WRITING;</span> <span class="pre">elif</span> <span class="pre">state</span> <span class="pre">==</span> <span class="pre">DownloadState.WRITING:</span> <span class="pre">...</span></code></p></li>
+<li><p>[x] 8.4 Extract outcome building to helper function: <code class="docutils literal notranslate"><span class="pre">def</span> <span class="pre">_build_download_outcome(detected:</span> <span class="pre">Optional[str],</span> <span class="pre">dest_path:</span> <span class="pre">Optional[Path],</span> <span class="pre">response:</span> <span class="pre">requests.Response,</span> <span class="pre">elapsed_ms:</span> <span class="pre">float,</span> <span class="pre">flagged_unknown:</span> <span class="pre">bool,</span> <span class="pre">sha256:</span> <span class="pre">str,</span> <span class="pre">content_length:</span> <span class="pre">int)</span> <span class="pre">-&gt;</span> <span class="pre">DownloadOutcome:</span> <span class="pre">...</span></code></p></li>
+<li><p>[x] 8.5 Replace multiple <code class="docutils literal notranslate"><span class="pre">return</span> <span class="pre">DownloadOutcome(...)</span></code> statements with calls to <code class="docutils literal notranslate"><span class="pre">_build_download_outcome(...)</span></code></p></li>
+<li><p>[x] 8.6 Add docstring to <code class="docutils literal notranslate"><span class="pre">_build_download_outcome()</span></code> explaining classification logic and EOF check</p></li>
+<li><p>[ ] 8.7 Run existing test suite (<code class="docutils literal notranslate"><span class="pre">tests/test_download_pyalex_pdfs.py</span></code>, <code class="docutils literal notranslate"><span class="pre">tests/test_resolvers.py</span></code>) to verify no regressions</p></li>
+</ul>
+</section>
+<section id="parallel-execution-with-threadpoolexecutor">
+<h1>9. Parallel Execution with ThreadPoolExecutor<a class="headerlink" href="#parallel-execution-with-threadpoolexecutor" title="Link to this heading"></a></h1>
+<ul>
+<li><p>[x] 9.1 In <code class="docutils literal notranslate"><span class="pre">download_pyalex_pdfs.py</span></code> argparse section (around line 700), add: <code class="docutils literal notranslate"><span class="pre">parser.add_argument('--workers',</span> <span class="pre">type=int,</span> <span class="pre">default=1,</span> <span class="pre">help='Number</span> <span class="pre">of</span> <span class="pre">parallel</span> <span class="pre">workers</span> <span class="pre">for</span> <span class="pre">processing</span> <span class="pre">works</span> <span class="pre">(default:</span> <span class="pre">1</span> <span class="pre">for</span> <span class="pre">sequential).</span> <span class="pre">Recommended:</span> <span class="pre">3-5</span> <span class="pre">for</span> <span class="pre">production.')</span></code></p></li>
+<li><p>[x] 9.2 Before <code class="docutils literal notranslate"><span class="pre">main()</span></code> function, extract work processing logic into standalone function:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">process_one_work</span><span class="p">(</span>
+    <span class="n">work</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">session</span><span class="p">:</span> <span class="n">requests</span><span class="o">.</span><span class="n">Session</span><span class="p">,</span>
+    <span class="n">pdf_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">html_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">pipeline</span><span class="p">:</span> <span class="n">ResolverPipeline</span><span class="p">,</span>
+    <span class="n">logger</span><span class="p">:</span> <span class="n">JsonlLogger</span><span class="p">,</span>
+    <span class="n">metrics</span><span class="p">:</span> <span class="n">ResolverMetrics</span><span class="p">,</span>
+    <span class="n">sleep_sec</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process single work through OpenAlex + resolver pipeline.</span>
+
+<span class="sd">    Returns dict with keys: work_id, status, path, classification</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">artifact</span> <span class="o">=</span> <span class="n">create_artifact</span><span class="p">(</span><span class="n">work</span><span class="p">,</span> <span class="n">pdf_dir</span><span class="o">=</span><span class="n">pdf_dir</span><span class="p">,</span> <span class="n">html_dir</span><span class="o">=</span><span class="n">html_dir</span><span class="p">)</span>
+
+    <span class="c1"># Check if already exists</span>
+    <span class="n">existing</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">pdf_dir</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">artifact</span><span class="o">.</span><span class="n">base_stem</span><span class="si">}</span><span class="s2">.pdf&quot;</span>
+    <span class="k">if</span> <span class="n">existing</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">log_work_summary</span><span class="p">(</span>
+            <span class="n">artifact</span><span class="o">.</span><span class="n">work_id</span><span class="p">,</span> <span class="n">artifact</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="n">artifact</span><span class="o">.</span><span class="n">publication_year</span><span class="p">,</span>
+            <span class="s2">&quot;existing&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">existing</span><span class="p">),</span> <span class="s2">&quot;exists&quot;</span><span class="p">,</span> <span class="s2">&quot;already-downloaded&quot;</span><span class="p">,</span> <span class="p">[]</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;work_id&quot;</span><span class="p">:</span> <span class="n">artifact</span><span class="o">.</span><span class="n">work_id</span><span class="p">,</span> <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="s2">&quot;exists&quot;</span><span class="p">,</span> <span class="s2">&quot;path&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">existing</span><span class="p">)}</span>
+
+    <span class="c1"># Try OpenAlex candidates</span>
+    <span class="n">openalex_result</span> <span class="o">=</span> <span class="n">attempt_openalex_candidates</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">artifact</span><span class="p">,</span> <span class="n">logger</span><span class="p">,</span> <span class="n">metrics</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">openalex_result</span> <span class="ow">and</span> <span class="n">openalex_result</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">is_pdf</span><span class="p">:</span>
+        <span class="n">outcome</span><span class="p">,</span> <span class="n">url</span> <span class="o">=</span> <span class="n">openalex_result</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">log_work_summary</span><span class="p">(</span>
+            <span class="n">artifact</span><span class="o">.</span><span class="n">work_id</span><span class="p">,</span> <span class="n">artifact</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="n">artifact</span><span class="o">.</span><span class="n">publication_year</span><span class="p">,</span>
+            <span class="s2">&quot;openalex&quot;</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">outcome</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="n">outcome</span><span class="o">.</span><span class="n">classification</span><span class="p">,</span> <span class="n">outcome</span><span class="o">.</span><span class="n">error</span><span class="p">,</span>
+            <span class="n">artifact</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;openalex_html_paths&quot;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="p">)</span>
+        <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">sleep_sec</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;work_id&quot;</span><span class="p">:</span> <span class="n">artifact</span><span class="o">.</span><span class="n">work_id</span><span class="p">,</span> <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="s2">&quot;success&quot;</span><span class="p">,</span> <span class="s2">&quot;path&quot;</span><span class="p">:</span> <span class="n">outcome</span><span class="o">.</span><span class="n">path</span><span class="p">}</span>
+
+    <span class="c1"># Try resolver pipeline</span>
+    <span class="n">pipeline_result</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">artifact</span><span class="p">)</span>
+    <span class="n">combined_html</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">pipeline_result</span><span class="o">.</span><span class="n">html_paths</span><span class="p">)</span>
+    <span class="n">combined_html</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">artifact</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;openalex_html_paths&quot;</span><span class="p">,</span> <span class="p">[]))</span>
+
+    <span class="k">if</span> <span class="n">pipeline_result</span><span class="o">.</span><span class="n">success</span> <span class="ow">and</span> <span class="n">pipeline_result</span><span class="o">.</span><span class="n">outcome</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">log_work_summary</span><span class="p">(</span>
+            <span class="n">artifact</span><span class="o">.</span><span class="n">work_id</span><span class="p">,</span> <span class="n">artifact</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="n">artifact</span><span class="o">.</span><span class="n">publication_year</span><span class="p">,</span>
+            <span class="n">pipeline_result</span><span class="o">.</span><span class="n">resolver_name</span><span class="p">,</span> <span class="n">pipeline_result</span><span class="o">.</span><span class="n">url</span><span class="p">,</span>
+            <span class="n">pipeline_result</span><span class="o">.</span><span class="n">outcome</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="n">pipeline_result</span><span class="o">.</span><span class="n">outcome</span><span class="o">.</span><span class="n">classification</span><span class="p">,</span>
+            <span class="n">pipeline_result</span><span class="o">.</span><span class="n">outcome</span><span class="o">.</span><span class="n">error</span><span class="p">,</span> <span class="n">combined_html</span>
+        <span class="p">)</span>
+        <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">sleep_sec</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;work_id&quot;</span><span class="p">:</span> <span class="n">artifact</span><span class="o">.</span><span class="n">work_id</span><span class="p">,</span> <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="s2">&quot;success&quot;</span><span class="p">,</span> <span class="s2">&quot;path&quot;</span><span class="p">:</span> <span class="n">pipeline_result</span><span class="o">.</span><span class="n">outcome</span><span class="o">.</span><span class="n">path</span><span class="p">}</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
+            <span class="n">AttemptRecord</span><span class="p">(</span>
+                <span class="n">work_id</span><span class="o">=</span><span class="n">artifact</span><span class="o">.</span><span class="n">work_id</span><span class="p">,</span>
+                <span class="n">resolver_name</span><span class="o">=</span><span class="s2">&quot;final&quot;</span><span class="p">,</span>
+                <span class="n">resolver_order</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">url</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">status</span><span class="o">=</span><span class="s2">&quot;miss&quot;</span><span class="p">,</span>
+                <span class="n">http_status</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">content_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">elapsed_ms</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">reason</span><span class="o">=</span><span class="n">pipeline_result</span><span class="o">.</span><span class="n">reason</span> <span class="ow">or</span> <span class="s2">&quot;no-resolver-success&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">sleep_sec</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;work_id&quot;</span><span class="p">:</span> <span class="n">artifact</span><span class="o">.</span><span class="n">work_id</span><span class="p">,</span> <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="s2">&quot;miss&quot;</span><span class="p">,</span> <span class="s2">&quot;path&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
+</pre></div>
+</div>
+</li>
+<li><p>[x] 9.3 In <code class="docutils literal notranslate"><span class="pre">main()</span></code> function, replace the <code class="docutils literal notranslate"><span class="pre">for</span> <span class="pre">work</span> <span class="pre">in</span> <span class="pre">iterate_openalex(...)</span></code> loop (lines 835-945) with:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">workers</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+    <span class="c1"># Sequential processing (backward compatible)</span>
+    <span class="k">for</span> <span class="n">work</span> <span class="ow">in</span> <span class="n">iterate_openalex</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">per_page</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">per_page</span><span class="p">,</span> <span class="n">max_results</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">max</span><span class="p">):</span>
+        <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">process_one_work</span><span class="p">(</span>
+            <span class="n">work</span><span class="p">,</span> <span class="n">session</span><span class="p">,</span> <span class="n">pdf_dir</span><span class="p">,</span> <span class="n">html_dir</span><span class="p">,</span> <span class="n">pipeline</span><span class="p">,</span> <span class="n">logger</span><span class="p">,</span> <span class="n">metrics</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">sleep</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;success&quot;</span><span class="p">:</span>
+            <span class="n">saved</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">elif</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;miss&quot;</span><span class="p">:</span>
+            <span class="n">html_only</span> <span class="o">+=</span> <span class="mi">1</span>  <span class="c1"># Adjust logic as needed</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="c1"># Parallel processing with ThreadPoolExecutor</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">concurrent.futures</span><span class="w"> </span><span class="kn">import</span> <span class="n">ThreadPoolExecutor</span><span class="p">,</span> <span class="n">as_completed</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">make_worker_session</span><span class="p">():</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Each worker gets its own session.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">_make_session</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">polite_headers</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="n">ThreadPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">workers</span><span class="p">)</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+        <span class="c1"># Submit all works</span>
+        <span class="n">futures</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">work</span> <span class="ow">in</span> <span class="n">iterate_openalex</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">per_page</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">per_page</span><span class="p">,</span> <span class="n">max_results</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">max</span><span class="p">):</span>
+            <span class="n">future</span> <span class="o">=</span> <span class="n">executor</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span>
+                <span class="n">process_one_work</span><span class="p">,</span>
+                <span class="n">work</span><span class="p">,</span>
+                <span class="n">make_worker_session</span><span class="p">(),</span>  <span class="c1"># New session per worker</span>
+                <span class="n">pdf_dir</span><span class="p">,</span>
+                <span class="n">html_dir</span><span class="p">,</span>
+                <span class="n">pipeline</span><span class="p">,</span>
+                <span class="n">logger</span><span class="p">,</span>
+                <span class="n">metrics</span><span class="p">,</span>
+                <span class="n">args</span><span class="o">.</span><span class="n">sleep</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">futures</span><span class="p">[</span><span class="n">future</span><span class="p">]</span> <span class="o">=</span> <span class="n">work</span>
+            <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="c1"># Collect results</span>
+        <span class="k">for</span> <span class="n">future</span> <span class="ow">in</span> <span class="n">as_completed</span><span class="p">(</span><span class="n">futures</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">future</span><span class="o">.</span><span class="n">result</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;success&quot;</span><span class="p">:</span>
+                    <span class="n">saved</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">elif</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;miss&quot;</span><span class="p">:</span>
+                    <span class="n">html_only</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="n">work</span> <span class="o">=</span> <span class="n">futures</span><span class="p">[</span><span class="n">future</span><span class="p">]</span>
+                <span class="n">work_id</span> <span class="o">=</span> <span class="n">work</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;unknown&quot;</span><span class="p">)</span>
+                <span class="n">LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Worker failed for </span><span class="si">{</span><span class="n">work_id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+<li><p>[x] 9.4 Delete old task 9.4 (merged into 9.3)</p></li>
+<li><p>[x] 9.5 Delete old task 9.5 (merged into 9.3)</p></li>
+<li><p>[x] 9.6 In <code class="docutils literal notranslate"><span class="pre">resolvers/__init__.py</span></code> <code class="docutils literal notranslate"><span class="pre">ResolverPipeline.__init__()</span></code> (around line 224), add import and lock initialization:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">threading</span>
+
+<span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">...</span><span class="p">):</span>
+    <span class="c1"># ... existing init ...</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>  <span class="c1"># ADD THIS</span>
+</pre></div>
+</div>
+</li>
+<li><p>[x] 9.7 In <code class="docutils literal notranslate"><span class="pre">ResolverPipeline._respect_rate_limit()</span></code> (around line 232), wrap dict access in lock:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">_respect_rate_limit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resolver_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">limit</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">resolver_min_interval_s</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">resolver_name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">limit</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>  <span class="c1"># ADD THIS</span>
+        <span class="n">last</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_invocation</span><span class="p">[</span><span class="n">resolver_name</span><span class="p">]</span>
+        <span class="n">now</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()</span>
+        <span class="n">delta</span> <span class="o">=</span> <span class="n">now</span> <span class="o">-</span> <span class="n">last</span>
+
+    <span class="k">if</span> <span class="n">delta</span> <span class="o">&lt;</span> <span class="n">limit</span><span class="p">:</span>
+        <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">limit</span> <span class="o">-</span> <span class="n">delta</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>  <span class="c1"># ADD THIS</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_invocation</span><span class="p">[</span><span class="n">resolver_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()</span>
+</pre></div>
+</div>
+</li>
+<li><p>[x] 9.8 Delete old tasks 9.7 and 9.8 (merged into 9.6 and 9.7)</p></li>
+<li><p>[x] 9.9 Create <code class="docutils literal notranslate"><span class="pre">tests/test_parallel_execution.py</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">unittest.mock</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mock</span><span class="p">,</span> <span class="n">patch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">concurrent.futures</span><span class="w"> </span><span class="kn">import</span> <span class="n">ThreadPoolExecutor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.resolvers</span><span class="w"> </span><span class="kn">import</span> <span class="n">ResolverPipeline</span><span class="p">,</span> <span class="n">ResolverConfig</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_rate_limiting_with_parallel_workers</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Verify rate limiting enforced across parallel workers.&quot;&quot;&quot;</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">ResolverConfig</span><span class="p">()</span>
+    <span class="n">config</span><span class="o">.</span><span class="n">resolver_min_interval_s</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;test_resolver&quot;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">}</span>
+
+    <span class="n">pipeline</span> <span class="o">=</span> <span class="n">ResolverPipeline</span><span class="p">(</span>
+        <span class="n">resolvers</span><span class="o">=</span><span class="p">[],</span>
+        <span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span>
+        <span class="n">download_func</span><span class="o">=</span><span class="n">Mock</span><span class="p">(),</span>
+        <span class="n">logger</span><span class="o">=</span><span class="n">Mock</span><span class="p">(),</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Simulate 5 workers calling same resolver concurrently</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">call_respect_limit</span><span class="p">():</span>
+        <span class="n">pipeline</span><span class="o">.</span><span class="n">_respect_rate_limit</span><span class="p">(</span><span class="s2">&quot;test_resolver&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()</span>
+
+    <span class="k">with</span> <span class="n">ThreadPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+        <span class="n">futures</span> <span class="o">=</span> <span class="p">[</span><span class="n">executor</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">call_respect_limit</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">)]</span>
+        <span class="n">timestamps</span> <span class="o">=</span> <span class="p">[</span><span class="n">f</span><span class="o">.</span><span class="n">result</span><span class="p">()</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">futures</span><span class="p">]</span>
+
+    <span class="c1"># Verify minimum 1s intervals between calls</span>
+    <span class="n">timestamps</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">timestamps</span><span class="p">)):</span>
+        <span class="n">interval</span> <span class="o">=</span> <span class="n">timestamps</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">timestamps</span><span class="p">[</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">assert</span> <span class="n">interval</span> <span class="o">&gt;=</span> <span class="mf">0.95</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Interval </span><span class="si">{</span><span class="n">interval</span><span class="si">}</span><span class="s2">s &lt; 1.0s (rate limit violated)&quot;</span>
+</pre></div>
+</div>
+</li>
+<li><p>[x] 9.10 Update <code class="docutils literal notranslate"><span class="pre">README.md</span></code> or <code class="docutils literal notranslate"><span class="pre">docs/</span></code> with section:</p>
+<div class="highlight-markdown notranslate"><div class="highlight"><pre><span></span><span class="gu">## Parallel Execution</span>
+
+Use <span class="sb">`--workers N`</span> for bounded parallelism across works:
+
+```bash
+<span class="gh"># Sequential (default, safest)</span>
+python -m DocsToKG.ContentDownload.download_pyalex_pdfs --workers 1 ...
+
+<span class="gh"># Parallel (2-5x throughput)</span>
+python -m DocsToKG.ContentDownload.download_pyalex_pdfs --workers 3 ...
+</pre></div>
+</div>
+<p><strong>Recommendations:</strong></p>
+<ul class="simple">
+<li><p>Start with <code class="docutils literal notranslate"><span class="pre">--workers=3</span></code> for production</p></li>
+<li><p>Monitor rate limit compliance with resolver APIs</p></li>
+<li><p>Higher values (&gt;5) may overwhelm resolvers despite per-resolver rate limiting</p></li>
+<li><p>Each worker creates its own HTTP session with retry logic</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="dry-run-and-resume-modes">
+<h1>10. Dry Run and Resume Modes<a class="headerlink" href="#dry-run-and-resume-modes" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 10.1 Add CLI flag: <code class="docutils literal notranslate"><span class="pre">parser.add_argument('--dry-run',</span> <span class="pre">action='store_true',</span> <span class="pre">help='Measure</span> <span class="pre">resolver</span> <span class="pre">coverage</span> <span class="pre">without</span> <span class="pre">writing</span> <span class="pre">files')</span></code></p></li>
+<li><p>[x] 10.2 Add CLI flag: <code class="docutils literal notranslate"><span class="pre">parser.add_argument('--resume-from',</span> <span class="pre">type=Path,</span> <span class="pre">default=None,</span> <span class="pre">help='Resume</span> <span class="pre">from</span> <span class="pre">manifest.jsonl,</span> <span class="pre">only</span> <span class="pre">process</span> <span class="pre">missed</span> <span class="pre">works')</span></code></p></li>
+<li><p>[x] 10.3 In <code class="docutils literal notranslate"><span class="pre">main()</span></code>, if <code class="docutils literal notranslate"><span class="pre">args.resume_from</span></code>: read manifest.jsonl, collect set of work_ids with status ‘success’ or ‘cached’</p></li>
+<li><p>[x] 10.4 In work iteration loop, if <code class="docutils literal notranslate"><span class="pre">args.resume_from</span></code> and <code class="docutils literal notranslate"><span class="pre">work_id</span> <span class="pre">in</span> <span class="pre">completed_work_ids</span></code>: skip with log message “Skipping work_id (already completed)”</p></li>
+<li><p>[x] 10.5 If <code class="docutils literal notranslate"><span class="pre">args.dry_run</span></code>: in <code class="docutils literal notranslate"><span class="pre">download_candidate()</span></code>, after classification, return immediately without writing file (but still compute metrics)</p></li>
+<li><p>[x] 10.6 Update logger to include <code class="docutils literal notranslate"><span class="pre">dry_run:</span> <span class="pre">bool</span></code> field in records</p></li>
+<li><p>[x] 10.7 In final summary, if <code class="docutils literal notranslate"><span class="pre">args.dry_run</span></code>: print “DRY RUN: no files written, resolver coverage: …”</p></li>
+<li><p>[x] 10.8 Add test in <code class="docutils literal notranslate"><span class="pre">tests/test_dry_run.py</span></code> verifying no files written when –dry-run, but logs generated</p></li>
+<li><p>[x] 10.9 Add test in <code class="docutils literal notranslate"><span class="pre">tests/test_resume.py</span></code> verifying works in manifest are skipped on –resume-from</p></li>
+</ul>
+</section>
+<section id="html-text-extraction">
+<h1>11. HTML Text Extraction<a class="headerlink" href="#html-text-extraction" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 11.1 Add CLI flag: <code class="docutils literal notranslate"><span class="pre">parser.add_argument('--extract-html-text',</span> <span class="pre">action='store_true',</span> <span class="pre">help='Extract</span> <span class="pre">plaintext</span> <span class="pre">from</span> <span class="pre">HTML</span> <span class="pre">fallbacks</span> <span class="pre">(requires</span> <span class="pre">trafilatura)')</span></code></p></li>
+<li><p>[x] 11.2 In <code class="docutils literal notranslate"><span class="pre">download_candidate()</span></code>, after writing HTML file, if <code class="docutils literal notranslate"><span class="pre">extract_html_text</span></code> flag: <code class="docutils literal notranslate"><span class="pre">try:</span> <span class="pre">import</span> <span class="pre">trafilatura;</span> <span class="pre">text</span> <span class="pre">=</span> <span class="pre">trafilatura.extract(html_content);</span> <span class="pre">except</span> <span class="pre">ImportError:</span> <span class="pre">log</span> <span class="pre">warning</span></code></p></li>
+<li><p>[x] 11.3 If extraction succeeds, write text to <code class="docutils literal notranslate"><span class="pre">dest_path.with_suffix('.html.txt')</span></code></p></li>
+<li><p>[x] 11.4 Add <code class="docutils literal notranslate"><span class="pre">extracted_text_path</span></code> field to DownloadOutcome</p></li>
+<li><p>[x] 11.5 Update manifest to include extracted_text_path</p></li>
+<li><p>[x] 11.6 Add trafilatura to optional dependencies in pyproject.toml: <code class="docutils literal notranslate"><span class="pre">[tool.poetry.group.extract]</span></code></p></li>
+<li><p>[x] 11.7 Document in README: “For HTML text extraction: pip install trafilatura &amp;&amp; use –extract-html-text”</p></li>
+<li><p>[x] 11.8 Add test in <code class="docutils literal notranslate"><span class="pre">tests/test_html_extraction.py</span></code> (requires trafilatura) verifying .html.txt created with plaintext</p></li>
+</ul>
+</section>
+<section id="additional-resolvers">
+<h1>12. Additional Resolvers<a class="headerlink" href="#additional-resolvers" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 12.1 In <code class="docutils literal notranslate"><span class="pre">resolvers/__init__.py</span></code>, create <code class="docutils literal notranslate"><span class="pre">OpenAireResolver</span></code> class following pattern: <code class="docutils literal notranslate"><span class="pre">name</span> <span class="pre">=</span> <span class="pre">&quot;openaire&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">is_enabled()</span></code> checks DOI, <code class="docutils literal notranslate"><span class="pre">iter_urls()</span></code> calls <a class="reference external" href="https://api.openaire.eu/search/publications?doi=">https://api.openaire.eu/search/publications?doi=</a>… and parses bestlicense/instances</p></li>
+<li><p>[x] 12.2 Create <code class="docutils literal notranslate"><span class="pre">HalResolver</span></code> class: <code class="docutils literal notranslate"><span class="pre">name</span> <span class="pre">=</span> <span class="pre">&quot;hal&quot;</span></code>, checks DOI, calls <a class="reference external" href="https://api.archives-ouvertes.fr/search/?q=doiId_s">https://api.archives-ouvertes.fr/search/?q=doiId_s</a>:… and parses file_s field</p></li>
+<li><p>[x] 12.3 Create <code class="docutils literal notranslate"><span class="pre">OsfResolver</span></code> class: <code class="docutils literal notranslate"><span class="pre">name</span> <span class="pre">=</span> <span class="pre">&quot;osf&quot;</span></code>, checks DOI, calls <a class="reference external" href="https://api.osf.io/v2/preprints/?filter%5Bdoi%5D=">https://api.osf.io/v2/preprints/?filter[doi]=</a>… and parses links.download</p></li>
+<li><p>[x] 12.4 Add all three to <code class="docutils literal notranslate"><span class="pre">default_resolvers()</span></code> list</p></li>
+<li><p>[x] 12.5 Set all three to disabled by default in DEFAULT_RESOLVER_ORDER config: <code class="docutils literal notranslate"><span class="pre">resolver_toggles</span> <span class="pre">=</span> <span class="pre">{&quot;openaire&quot;:</span> <span class="pre">False,</span> <span class="pre">&quot;hal&quot;:</span> <span class="pre">False,</span> <span class="pre">&quot;osf&quot;:</span> <span class="pre">False,</span> <span class="pre">...}</span></code></p></li>
+<li><p>[x] 12.6 Document in README: “Enable additional resolvers for EU OA / preprints: –enable-resolver openaire”</p></li>
+<li><p>[x] 12.7 Add unit tests for each resolver mocking API responses</p></li>
+</ul>
+</section>
+<section id="enhanced-user-agent-for-crossref">
+<h1>13. Enhanced User-Agent for Crossref<a class="headerlink" href="#enhanced-user-agent-for-crossref" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 13.1 In <code class="docutils literal notranslate"><span class="pre">load_resolver_config()</span></code> where User-Agent is constructed, update format: <code class="docutils literal notranslate"><span class="pre">user_agent</span> <span class="pre">=</span> <span class="pre">f&quot;DocsToKGDownloader/1.0</span> <span class="pre">(+{config.mailto};</span> <span class="pre">mailto:{config.mailto})&quot;</span></code></p></li>
+<li><p>[x] 13.2 Ensure mailto is included directly in UA string even if polite_headers already has separate mailto header</p></li>
+<li><p>[x] 13.3 Add test verifying User-Agent includes mailto in correct format</p></li>
+</ul>
+</section>
+<section id="testing-gaps">
+<h1>14. Testing Gaps<a class="headerlink" href="#testing-gaps" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 14.1 Add test in <code class="docutils literal notranslate"><span class="pre">tests/test_edge_cases.py</span></code> for corrupt HTML with Content-Type: application/pdf, verify sniff overrides Content-Type</p></li>
+<li><p>[x] 14.2 Add test for Wayback resolver when <code class="docutils literal notranslate"><span class="pre">archived_snapshots.closest.available</span> <span class="pre">==</span> <span class="pre">False</span></code>, verify skip</p></li>
+<li><p>[x] 14.3 Add test verifying manifest and attempts have exactly one success row per saved PDF with matching work_id and path</p></li>
+<li><p>[x] 14.4 Add test for polite headers propagation: verify OpenAlex candidate attempts use same headers as pipeline</p></li>
+<li><p>[x] 14.5 Add test for retry budget exhaustion: mock 10 URLs all returning 503, verify max_attempts_per_work honored</p></li>
+</ul>
+</section>
+<section id="documentation-and-migration">
+<h1>15. Documentation and Migration<a class="headerlink" href="#documentation-and-migration" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 15.1 Create MIGRATION.md in docs/ with sections: Config Changes (resolver_rate_limits → resolver_min_interval_s), Logging Changes (CSV → JSONL with export script), CLI Additions (–workers, –dry-run, –resume-from, –extract-html-text)</p></li>
+<li><p>[x] 15.2 Update README.md with new CLI flags examples and recommended –workers values</p></li>
+<li><p>[x] 15.3 Document rate limit semantics: “resolver_min_interval_s: 1.0 means minimum 1 second between calls (max ~1 QPS)”</p></li>
+<li><p>[x] 15.4 Add troubleshooting section for common issues: partial files (check .part), rate limit violations (reduce –workers), memory issues (reduce –workers)</p></li>
+<li><p>[x] 15.5 Document CSV export: “To convert JSONL to CSV: jq -r ‘[.timestamp, .work_id, …] | &#64;csv’ attempts.jsonl &gt; attempts.csv” or use scripts/export_attempts_csv.py</p></li>
+<li><p>[x] 15.6 Update docstrings in <code class="docutils literal notranslate"><span class="pre">download_candidate()</span></code>, <code class="docutils literal notranslate"><span class="pre">_make_session()</span></code>, <code class="docutils literal notranslate"><span class="pre">process_one_work()</span></code> with parameter descriptions and examples</p></li>
+<li><p>[x] 15.7 Add example resolver config YAML in docs/examples/ showing all new fields</p></li>
+</ul>
+</section>
+<section id="end-to-end-validation">
+<h1>16. End-to-End Validation<a class="headerlink" href="#end-to-end-validation" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[ ] 16.1 Run smoke test: 100 works from OpenAlex, –workers=3, verify success rate &gt;=90%, no .part files left, all digests valid</p></li>
+<li><p>[ ] 16.2 Run smoke test with –dry-run, verify no files written but logs complete</p></li>
+<li><p>[ ] 16.3 Run smoke test with –resume-from, verify skipped works not re-attempted</p></li>
+<li><p>[ ] 16.4 Run full test suite: <code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tests/</span> <span class="pre">-v</span> <span class="pre">--cov=src/DocsToKG/ContentDownload</span> <span class="pre">--cov-report=html</span></code></p></li>
+<li><p>[ ] 16.5 Verify coverage &gt;=85% for ContentDownload modules</p></li>
+<li><p>[ ] 16.6 Run linter: <code class="docutils literal notranslate"><span class="pre">ruff</span> <span class="pre">check</span> <span class="pre">src/DocsToKG/ContentDownload/</span></code> and fix any issues</p></li>
+<li><p>[ ] 16.7 Run type checker: <code class="docutils literal notranslate"><span class="pre">mypy</span> <span class="pre">src/DocsToKG/ContentDownload/</span></code> and resolve any type errors</p></li>
+<li><p>[ ] 16.8 Performance benchmark: compare single-threaded vs –workers=5 throughput on 500 works, document speedup</p></li>
+<li><p>[ ] 16.9 Verify atomic writes: kill process mid-download (SIGKILL), verify no corrupt files, only .part files</p></li>
+<li><p>[ ] 16.10 Verify rate limiting under parallel load: –workers=10, monitor actual request rates per resolver, assert &lt;=1/min_interval_s</p></li>
+</ul>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

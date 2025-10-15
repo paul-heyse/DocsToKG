@@ -1,0 +1,198 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Technical Reference &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="1. Operations Guide" href="../06-operations/index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">1. Technical Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#reference-materials">2. Reference Materials</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#faiss-integration">🔗 <span class="xref myst">FAISS Integration</span></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#external-dependencies">📚 <span class="xref myst">External Dependencies</span></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#glossary">📖 <span class="xref myst">Glossary</span></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#integration-guides">3. Integration Guides</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#api-integrations">🔌 <span class="xref myst">API Integrations</span></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tool-configuration">🔧 <span class="xref myst">Tool Configuration</span></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#advanced-topics">4. Advanced Topics</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#performance-optimization">🚀 <span class="xref myst">Performance Optimization</span></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#security-considerations">🔒 <span class="xref myst">Security Considerations</span></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#testing-strategies">🧪 <span class="xref myst">Testing Strategies</span></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#maintenance-and-operations">5. Maintenance and Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#deployment-guide">🔄 <span class="xref myst">Deployment Guide</span></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#monitoring-and-observability">📊 <span class="xref myst">Monitoring and Observability</span></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#troubleshooting">🚨 <span class="xref myst">Troubleshooting</span></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Technical Reference</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/07-reference/index.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="technical-reference">
+<h1>1. Technical Reference<a class="headerlink" href="#technical-reference" title="Link to this heading"></a></h1>
+<p>This section contains technical references, external dependencies, and detailed implementation guides for the DocsToKG system.</p>
+<section id="reference-materials">
+<h2>2. Reference Materials<a class="headerlink" href="#reference-materials" title="Link to this heading"></a></h2>
+<section id="faiss-integration">
+<h3>🔗 <a class="reference internal" href="faiss/index.html"><span class="std std-doc">FAISS Integration</span></a><a class="headerlink" href="#faiss-integration" title="Link to this heading"></a></h3>
+<p>Comprehensive guide to FAISS vector similarity search integration, including GPU acceleration, index types, and performance optimization.</p>
+</section>
+<section id="external-dependencies">
+<h3>📚 <a class="reference internal" href="dependencies/index.html"><span class="std std-doc">External Dependencies</span></a><a class="headerlink" href="#external-dependencies" title="Link to this heading"></a></h3>
+<p>Documentation for external libraries, APIs, and services used by DocsToKG.</p>
+</section>
+<section id="glossary">
+<h3>📖 <a class="reference internal" href="glossary.html"><span class="std std-doc">Glossary</span></a><a class="headerlink" href="#glossary" title="Link to this heading"></a></h3>
+<p>Definitions of key terms, concepts, and domain-specific terminology used throughout the documentation.</p>
+</section>
+</section>
+<section id="integration-guides">
+<h2>3. Integration Guides<a class="headerlink" href="#integration-guides" title="Link to this heading"></a></h2>
+<section id="api-integrations">
+<h3>🔌 <a class="reference internal" href="api-integrations/index.html"><span class="std std-doc">API Integrations</span></a><a class="headerlink" href="#api-integrations" title="Link to this heading"></a></h3>
+<p>How to integrate DocsToKG with external systems and services.</p>
+</section>
+<section id="tool-configuration">
+<h3>🔧 <a class="reference internal" href="tooling/index.html"><span class="std std-doc">Tool Configuration</span></a><a class="headerlink" href="#tool-configuration" title="Link to this heading"></a></h3>
+<p>Configuration guides for development tools, testing frameworks, and deployment systems.</p>
+</section>
+</section>
+<section id="advanced-topics">
+<h2>4. Advanced Topics<a class="headerlink" href="#advanced-topics" title="Link to this heading"></a></h2>
+<section id="performance-optimization">
+<h3>🚀 <a class="reference internal" href="performance/index.html"><span class="std std-doc">Performance Optimization</span></a><a class="headerlink" href="#performance-optimization" title="Link to this heading"></a></h3>
+<p>Advanced performance tuning, scaling strategies, and optimization techniques.</p>
+</section>
+<section id="security-considerations">
+<h3>🔒 <a class="reference internal" href="security/index.html"><span class="std std-doc">Security Considerations</span></a><a class="headerlink" href="#security-considerations" title="Link to this heading"></a></h3>
+<p>Security best practices, authentication, authorization, and data protection.</p>
+</section>
+<section id="testing-strategies">
+<h3>🧪 <a class="reference internal" href="testing/index.html"><span class="std std-doc">Testing Strategies</span></a><a class="headerlink" href="#testing-strategies" title="Link to this heading"></a></h3>
+<p>Comprehensive testing approaches, frameworks, and quality assurance procedures.</p>
+</section>
+</section>
+<section id="maintenance-and-operations">
+<h2>5. Maintenance and Operations<a class="headerlink" href="#maintenance-and-operations" title="Link to this heading"></a></h2>
+<section id="deployment-guide">
+<h3>🔄 <a class="reference internal" href="deployment/index.html"><span class="std std-doc">Deployment Guide</span></a><a class="headerlink" href="#deployment-guide" title="Link to this heading"></a></h3>
+<p>Production deployment instructions, environment setup, and operational procedures.</p>
+</section>
+<section id="monitoring-and-observability">
+<h3>📊 <a class="reference internal" href="monitoring/index.html"><span class="std std-doc">Monitoring and Observability</span></a><a class="headerlink" href="#monitoring-and-observability" title="Link to this heading"></a></h3>
+<p>System monitoring, logging, metrics collection, and observability practices.</p>
+</section>
+<section id="troubleshooting">
+<h3>🚨 <a class="reference internal" href="troubleshooting/index.html"><span class="std std-doc">Troubleshooting</span></a><a class="headerlink" href="#troubleshooting" title="Link to this heading"></a></h3>
+<p>Common issues, error handling, debugging techniques, and support resources.</p>
+<hr class="docutils" />
+<p><em>This reference section provides deep technical knowledge for advanced users, maintainers, and system integrators.</em></p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../06-operations/index.html" class="btn btn-neutral float-left" title="1. Operations Guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

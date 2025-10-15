@@ -1,0 +1,156 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Why &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/custom.css" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Why</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/openspec/changes/archive/2025-10-14-add-hybrid-vector-rag-real-vector-testing/proposal.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="why">
+<h1>Why<a class="headerlink" href="#why" title="Link to this heading"></a></h1>
+<p>Our hybrid search suite only exercises ingestion, validation, and retrieval against synthetic 16‑dimension embeddings. Real production vectors already exist in <code class="docutils literal notranslate"><span class="pre">Data/ChunkedDocTagFiles</span></code> and <code class="docutils literal notranslate"><span class="pre">Data/Vectors</span></code>, yet no automated job loads them. When running the current tests with native FAISS bindings, the ingestion pipeline fails because promoted GPU indexes do not implement <code class="docutils literal notranslate"><span class="pre">remove_ids</span></code>, masking bugs that will surface once real corpora are connected. We need a scoped change that formalizes real-vector regression coverage and hardens the FAISS manager so the stack can be validated with production-like artifacts.</p>
+</section>
+<section id="what-changes">
+<h1>What Changes<a class="headerlink" href="#what-changes" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Real fixture curation: deterministic tooling to sample, sanitize, and publish a reproducible dataset under <code class="docutils literal notranslate"><span class="pre">Data/HybridScaleFixture/</span></code> with paired chunk/vector JSONL and query expectations.</p></li>
+<li><p>Test harness updates: gated pytest marker/flag for real-vector suites, extended ingestion/reingest/API/assertion coverage, validator invocation with report verification, and serialization roundtrip tests.</p></li>
+<li><p>FAISS manager hardening: graceful CPU fallback for destructive operations (<code class="docutils literal notranslate"><span class="pre">remove_ids</span></code>) when GPU indexes lack the method, with regression coverage that exercises the downgraded path and validates <code class="docutils literal notranslate"><span class="pre">ntotal</span></code>.</p></li>
+<li><p>Validation CLI and docs: default dataset pointing at the real fixture, updated runbook instructions, and calibration narrative aligned to production embeddings.</p></li>
+<li><p>CI / selective execution: pytest configuration that skips vendored FAISS/vLLM suites by default, documented make/tox targets for hybrid testing, and a scheduled job that enables real-vector coverage and publishes validation artifacts.</p></li>
+</ul>
+</section>
+<section id="impact">
+<h1>Impact<a class="headerlink" href="#impact" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Affected specs: <code class="docutils literal notranslate"><span class="pre">hybrid-search</span></code></p></li>
+<li><p>Affected code: <code class="docutils literal notranslate"><span class="pre">DocsToKG/HybridSearch/dense.py</span></code>, <code class="docutils literal notranslate"><span class="pre">DocsToKG/HybridSearch/validation.py</span></code>, real-vector test modules, fixture tooling under <code class="docutils literal notranslate"><span class="pre">scripts/</span></code>, <code class="docutils literal notranslate"><span class="pre">pytest.ini</span></code> / test runners, docs runbooks.</p></li>
+</ul>
+</section>
+<section id="current-state">
+<h1>Current State<a class="headerlink" href="#current-state" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Test fixtures rely on hashed toy embeddings; calibration never touches real SPLADE/Qwen payloads.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ChunkIngestionPipeline.delete_chunks</span></code> triggers <code class="docutils literal notranslate"><span class="pre">RuntimeError:</span> <span class="pre">remove_ids</span> <span class="pre">not</span> <span class="pre">implemented</span></code> when FAISS indexes run on GPU.</p></li>
+<li><p>Validation CLI lacks a baked real dataset and there is no automated assertion on generated reports.</p></li>
+<li><p>Pytest attempts to collect upstream FAISS/vLLM test suites, slowing runs and producing unrelated failures.</p></li>
+</ul>
+</section>
+<section id="success-metrics-acceptance">
+<h1>Success Metrics &amp; Acceptance<a class="headerlink" href="#success-metrics-acceptance" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Real-vector regression suite finishes within 5 minutes locally with &lt;2 GB RSS.</p></li>
+<li><p>Real-vector ingestion, re-ingest, API, validator, and serialization tests pass without manual intervention.</p></li>
+<li><p>FAISS removal flows no longer raise <code class="docutils literal notranslate"><span class="pre">remove_ids</span> <span class="pre">not</span> <span class="pre">implemented</span></code>; CPU fallback is covered by automated tests.</p></li>
+<li><p>Validation artifacts include real document IDs and calibration metrics and are archived by CI jobs.</p></li>
+<li><p>Documentation covers fixture refresh steps and test execution guidance.</p></li>
+</ul>
+</section>
+<section id="open-questions">
+<h1>Open Questions<a class="headerlink" href="#open-questions" title="Link to this heading"></a></h1>
+<ol class="arabic simple">
+<li><p>Do we need additional sampling or redaction to remove PHI/licensed metadata before committing fixtures?</p></li>
+<li><p>Should the real dataset live in git (curated sample) or be generated on demand from <code class="docutils literal notranslate"><span class="pre">Data/</span></code> to prevent drift?</p></li>
+<li><p>Are there GPU deployments where we must preserve the promoted index even during delete operations, or is CPU fallback sufficient for now?</p></li>
+</ol>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

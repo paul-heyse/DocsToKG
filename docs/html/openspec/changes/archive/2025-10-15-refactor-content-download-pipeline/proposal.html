@@ -1,0 +1,168 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Why &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/custom.css" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Why</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/openspec/changes/archive/2025-10-15-refactor-content-download-pipeline/proposal.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="why">
+<h1>Why<a class="headerlink" href="#why" title="Link to this heading"></a></h1>
+<p>The ContentDownload module (<code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload</span></code>) successfully downloads PDFs from OpenAlex with resolver fallbacks, but lacks operational polish that causes reliability issues in production: transient HTTP failures abort downloads, partial files corrupt storage on kill/timeout, rate-limit semantics are ambiguous leading to misconfiguration, and duplicate code/logging adds maintenance burden. Additionally, single-threaded work processing leaves throughput on the table despite per-resolver rate limits being respected.</p>
+</section>
+<section id="what-changes">
+<h1>What Changes<a class="headerlink" href="#what-changes" title="Link to this heading"></a></h1>
+<section id="quick-wins-operational-polish">
+<h2>Quick Wins (Operational Polish)<a class="headerlink" href="#quick-wins-operational-polish" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Mount HTTPAdapter with urllib3 Retry on shared session to handle transient 429/502/503/504 with exponential backoff and Retry-After header support, eliminating one-off failures</p></li>
+<li><p>Implement atomic file writes using *.part + os.replace() pattern, and compute SHA-256 digests + content-length for manifest integrity verification and deduplication</p></li>
+<li><p>Rename <code class="docutils literal notranslate"><span class="pre">resolver_rate_limits</span></code> config field to <code class="docutils literal notranslate"><span class="pre">min_interval_s</span></code> for unambiguous units (seconds between calls, not QPS)</p></li>
+<li><p>Enhance Crossref User-Agent to include mailto: directly in UA string per Crossref best practices (in addition to separate header)</p></li>
+<li><p>Add in-memory LRU cache for resolver API responses (Unpaywall/Crossref/S2) keyed by (resolver, DOI) to eliminate duplicate lookups within batch runs</p></li>
+<li><p>Support conditional requests (If-None-Match/If-Modified-Since) for idempotent re-runs using ETag/Last-Modified from manifest</p></li>
+</ul>
+</section>
+<section id="streamlining-reduce-code-same-behavior">
+<h2>Streamlining (Reduce Code, Same Behavior)<a class="headerlink" href="#streamlining-reduce-code-same-behavior" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Extract duplicated normalization utilities (<code class="docutils literal notranslate"><span class="pre">_normalize_doi</span></code>, <code class="docutils literal notranslate"><span class="pre">_normalize_pmcid</span></code>, <code class="docutils literal notranslate"><span class="pre">_strip_prefix</span></code>) from both <code class="docutils literal notranslate"><span class="pre">download_pyalex_pdfs.py</span></code> and <code class="docutils literal notranslate"><span class="pre">resolvers/__init__.py</span></code> into <code class="docutils literal notranslate"><span class="pre">ContentDownload/utils.py</span></code></p></li>
+<li><p>Create reusable <code class="docutils literal notranslate"><span class="pre">dedupe(seq)</span></code> utility for “preserve order while deduplicating” pattern used across location URL collection and resolver link lists</p></li>
+<li><p>Standardize OpenAlex candidate handling to always return structured result <code class="docutils literal notranslate"><span class="pre">{outcome,</span> <span class="pre">url,</span> <span class="pre">html_paths[]}</span></code> instead of mixed tuple/(outcome, url) returns</p></li>
+<li><p>Unify CsvAttemptLogger + ManifestLogger into single JSONL logger with per-attempt records and per-work summaries (CSV export remains available)</p></li>
+<li><p>Refactor <code class="docutils literal notranslate"><span class="pre">download_candidate</span></code> to use state enum (PENDING/WRITING) and single outcome-building function, reducing branching while preserving all validation</p></li>
+</ul>
+</section>
+<section id="functionality-upgrades">
+<h2>Functionality Upgrades<a class="headerlink" href="#functionality-upgrades" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Add <code class="docutils literal notranslate"><span class="pre">--workers</span> <span class="pre">N</span></code> flag for bounded ThreadPoolExecutor parallelism across works while maintaining sequential per-work pipeline and per-resolver rate limiting (2-5x throughput gain)</p></li>
+<li><p>Implement <code class="docutils literal notranslate"><span class="pre">--dry-run</span></code> mode to measure resolver coverage without writing files, and <code class="docutils literal notranslate"><span class="pre">--resume-from</span> <span class="pre">manifest.jsonl</span></code> to only process previously-missed works</p></li>
+<li><p>Enhance HTML fallback with readability/trafilatura extraction to save plaintext (<code class="docutils literal notranslate"><span class="pre">*.html.txt</span></code>) alongside raw HTML for downstream parsers</p></li>
+<li><p>Document topic resolution default behavior (text → Topic ID resolution for improved recall)</p></li>
+<li><p>Add optional OpenAIRE, HAL, and OSF Preprints resolvers for expanded EU OA and preprint coverage</p></li>
+</ul>
+</section>
+<section id="testing-observability">
+<h2>Testing &amp; Observability<a class="headerlink" href="#testing-observability" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Add tests for 429 handling + Retry-After, corrupt HTML with wrong Content-Type, Wayback “not available” path, manifest/attempts alignment</p></li>
+<li><p>Ensure polite headers propagate to pre-pipeline OpenAlex attempts for consistency</p></li>
+<li><p>Update documentation with rate limit unit clarifications and new CLI flags</p></li>
+</ul>
+</section>
+</section>
+<section id="impact">
+<h1>Impact<a class="headerlink" href="#impact" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Affected specs: existing <code class="docutils literal notranslate"><span class="pre">content-download</span></code> capability (already deployed, now enhanced)</p></li>
+<li><p>Affected code: <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/download_pyalex_pdfs.py</span></code>, <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/resolvers/__init__.py</span></code>, new <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/utils.py</span></code></p></li>
+<li><p><strong>BREAKING</strong>: Rename <code class="docutils literal notranslate"><span class="pre">resolver_rate_limits</span></code> → <code class="docutils literal notranslate"><span class="pre">min_interval_s</span></code> in YAML configs; provide migration guide</p></li>
+<li><p><strong>BREAKING</strong>: JSONL logging replaces separate CSV/manifest files; CSV export script provided for backward compatibility</p></li>
+<li><p>Improved reliability: automatic retry on transient failures, no partial file corruption</p></li>
+<li><p>Reduced maintenance: ~15% code reduction via shared utilities and unified logging</p></li>
+<li><p>Increased throughput: 2-5x with <code class="docutils literal notranslate"><span class="pre">--workers</span></code> flag (opt-in)</p></li>
+<li><p>Enhanced observability: SHA-256 digests in manifests, conditional request support for idempotency</p></li>
+<li><p><strong>Implementation Detail</strong>: 120 tasks include complete code blocks, function signatures, exact line numbers, and test templates for unambiguous AI agent execution</p></li>
+</ul>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

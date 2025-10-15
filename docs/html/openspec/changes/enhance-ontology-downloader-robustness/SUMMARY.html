@@ -1,0 +1,573 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Enhancement Summary: Ontology Downloader Robustness and Capabilities &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Enhancement Summary: Ontology Downloader Robustness and Capabilities</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/openspec/changes/enhance-ontology-downloader-robustness/SUMMARY.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="enhancement-summary-ontology-downloader-robustness-and-capabilities">
+<h1>Enhancement Summary: Ontology Downloader Robustness and Capabilities<a class="headerlink" href="#enhancement-summary-ontology-downloader-robustness-and-capabilities" title="Link to this heading"></a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>This change proposal implements a comprehensive set of 15 improvements to the ontology downloader based on a detailed code review. The enhancements span three categories: code quality/maintenance burden reduction, robustness/security hardening, and capability extensions.</p>
+</section>
+<section id="scope">
+<h2>Scope<a class="headerlink" href="#scope" title="Link to this heading"></a></h2>
+<p><strong>Affected Modules</strong>:</p>
+<ul class="simple">
+<li><p>8 modified Python files</p></li>
+<li><p>2 new Python files</p></li>
+<li><p>Comprehensive test suite additions</p></li>
+<li><p>Documentation updates</p></li>
+</ul>
+<p><strong>Lines of Code Impact</strong>:</p>
+<ul class="simple">
+<li><p><strong>Removed</strong>: ~150 lines (custom YAML parser)</p></li>
+<li><p><strong>Added</strong>: ~800-1000 lines (new features, tests)</p></li>
+<li><p><strong>Net Change</strong>: +650-850 lines</p></li>
+</ul>
+</section>
+<section id="key-improvements">
+<h2>Key Improvements<a class="headerlink" href="#key-improvements" title="Link to this heading"></a></h2>
+<section id="category-1-code-quality-reduce-maintenance-burden">
+<h3>Category 1: Code Quality (Reduce Maintenance Burden)<a class="headerlink" href="#category-1-code-quality-reduce-maintenance-burden" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p><strong>Pydantic v2 Configuration Models</strong></p>
+<ul class="simple">
+<li><p>Replaces custom YAML parser with industry-standard validation</p></li>
+<li><p>Provides clear error messages and JSON Schema generation</p></li>
+<li><p>Reduces code by ~150 lines</p></li>
+</ul>
+</li>
+<li><p><strong>Centralized Optional Dependency Handling</strong></p>
+<ul class="simple">
+<li><p>Eliminates duplicate stub implementations across 3 modules</p></li>
+<li><p>Single source of truth for fallback behavior</p></li>
+<li><p>Easier testing and maintenance</p></li>
+</ul>
+</li>
+<li><p><strong>CLI Formatting Utilities</strong></p>
+<ul class="simple">
+<li><p>Extracts reusable formatting functions</p></li>
+<li><p>Reduces duplication across subcommands</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="category-2-robustness-security">
+<h3>Category 2: Robustness &amp; Security<a class="headerlink" href="#category-2-robustness-security" title="Link to this heading"></a></h3>
+<ol class="arabic simple" start="4">
+<li><p><strong>HEAD Request with Media-Type Validation</strong></p>
+<ul class="simple">
+<li><p>Validates Content-Type before full download</p></li>
+<li><p>Early size checking to fail fast on oversized files</p></li>
+<li><p>Reduces bandwidth waste</p></li>
+</ul>
+</li>
+<li><p><strong>Per-Service Rate Limiting</strong></p>
+<ul class="simple">
+<li><p>Independent rate limits for OBO, OLS, BioPortal</p></li>
+<li><p>Supports /second, /minute, /hour units</p></li>
+<li><p>Prevents service-specific throttling</p></li>
+</ul>
+</li>
+<li><p><strong>Enhanced URL Security</strong></p>
+<ul class="simple">
+<li><p>IDN punycode normalization</p></li>
+<li><p>Optional host allowlist for multi-tenant deployments</p></li>
+<li><p>Strengthened SSRF protection</p></li>
+</ul>
+</li>
+<li><p><strong>Safe Tar Archive Extraction</strong></p>
+<ul class="simple">
+<li><p>Path traversal prevention for tar.gz/tar.xz</p></li>
+<li><p>Compression bomb detection</p></li>
+<li><p>Completes archive safety coverage</p></li>
+</ul>
+</li>
+<li><p><strong>Deterministic TTL Normalization</strong></p>
+<ul class="simple">
+<li><p>Canonical triple/prefix sorting</p></li>
+<li><p>Stable SHA-256 hashing</p></li>
+<li><p>Improved cache correctness</p></li>
+</ul>
+</li>
+<li><p><strong>Subprocess Validator Isolation</strong></p>
+<ul class="simple">
+<li><p>Memory leak prevention in batch operations</p></li>
+<li><p>Isolated execution for pronto/owlready2</p></li>
+<li><p>Preserves existing timeout mechanisms</p></li>
+</ul>
+</li>
+<li><p><strong>SPDX License Normalization</strong></p>
+<ul class="simple">
+<li><p>Maps common variants to standard IDs</p></li>
+<li><p>More robust allowlist matching</p></li>
+<li><p>Handles domain-specific license strings</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="category-3-extended-capabilities">
+<h3>Category 3: Extended Capabilities<a class="headerlink" href="#category-3-extended-capabilities" title="Link to this heading"></a></h3>
+<ol class="arabic simple" start="11">
+<li><p><strong>Automatic Multi-Resolver Fallback</strong></p>
+<ul class="simple">
+<li><p>Tries resolvers in prefer_source order</p></li>
+<li><p>5-10% improvement in download success rates</p></li>
+<li><p>No configuration changes required</p></li>
+</ul>
+</li>
+<li><p><strong>Polite API Headers</strong></p>
+<ul class="simple">
+<li><p>Reduces throttling from APIs</p></li>
+<li><p>Improves reproducibility</p></li>
+<li><p>Better tracing with X-Request-ID</p></li>
+</ul>
+</li>
+<li><p><strong>LOV and Ontobee Resolvers</strong></p>
+<ul class="simple">
+<li><p>Extends coverage to Linked Open Vocabularies</p></li>
+<li><p>Ontobee PURL construction for OBO fallback</p></li>
+<li><p>~20-30 lines each</p></li>
+</ul>
+</li>
+<li><p><strong>Remote Storage Backend (fsspec)</strong></p>
+<ul class="simple">
+<li><p>S3, GCS, Azure support via fsspec</p></li>
+<li><p>Team-wide cache sharing</p></li>
+<li><p>Backward compatible (opt-in)</p></li>
+</ul>
+</li>
+<li><p><strong>Enhanced CLI Commands</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ontofetch</span> <span class="pre">plan</span></code>: Preview FetchPlan without downloading</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ontofetch</span> <span class="pre">doctor</span></code>: Environment diagnostics</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--dry-run</span></code> flag: Preview pull operations</p></li>
+</ul>
+</li>
+</ol>
+</section>
+</section>
+<section id="requirements-summary">
+<h2>Requirements Summary<a class="headerlink" href="#requirements-summary" title="Link to this heading"></a></h2>
+<section id="added-requirements-13-new">
+<h3>Added Requirements (13 new)<a class="headerlink" href="#added-requirements-13-new" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Centralized Optional Dependency Management</p></li>
+<li><p>CLI Formatting Utility Module</p></li>
+<li><p>Pydantic v2 Configuration Models</p></li>
+<li><p>Per-Service Rate Limiting</p></li>
+<li><p>HEAD Request with Media Type Validation</p></li>
+<li><p>Hardened URL Validation</p></li>
+<li><p>Safe Tar Archive Extraction</p></li>
+<li><p>Deterministic TTL Normalization</p></li>
+<li><p>Subprocess Validator Isolation</p></li>
+<li><p>SPDX License Normalization</p></li>
+<li><p>Automatic Multi-Resolver Fallback</p></li>
+<li><p>Polite API Headers</p></li>
+<li><p>LOV Resolver, Ontobee Resolver</p></li>
+<li><p>Remote Storage Backend</p></li>
+<li><p>CLI Plan, Doctor, Dry-Run Commands</p></li>
+</ul>
+</section>
+<section id="modified-requirements-8-enhanced">
+<h3>Modified Requirements (8 enhanced)<a class="headerlink" href="#modified-requirements-8-enhanced" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Declarative YAML Configuration (→ Pydantic models)</p></li>
+<li><p>Robust HTTP Download (→ + HEAD validation, per-service limits)</p></li>
+<li><p>Multi-Parser Validation (→ + subprocess isolation, deterministic output)</p></li>
+<li><p>Comprehensive Provenance Manifests (→ + normalized hashes)</p></li>
+<li><p>License Compliance Enforcement (→ + SPDX normalization)</p></li>
+<li><p>Security and Integrity Validation (→ + IDN, allowlist, tar safety)</p></li>
+<li><p>CLI Operations (→ + plan, doctor, dry-run)</p></li>
+<li><p>Source-Agnostic Resolver Registry (→ + LOV, Ontobee, fallback)</p></li>
+</ul>
+</section>
+</section>
+<section id="implementation-phases">
+<h2>Implementation Phases<a class="headerlink" href="#implementation-phases" title="Link to this heading"></a></h2>
+<section id="phase-1-foundation-weeks-1-2">
+<h3>Phase 1: Foundation (Weeks 1-2)<a class="headerlink" href="#phase-1-foundation-weeks-1-2" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Create optdeps.py module</p></li>
+<li><p>Migrate to Pydantic v2 models</p></li>
+<li><p>Extract cli_utils.py</p></li>
+<li><p><strong>Deliverable</strong>: Cleaner, more maintainable codebase</p></li>
+</ul>
+</section>
+<section id="phase-2-robustness-weeks-2-3">
+<h3>Phase 2: Robustness (Weeks 2-3)<a class="headerlink" href="#phase-2-robustness-weeks-2-3" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Implement HEAD validation</p></li>
+<li><p>Add per-service rate limits</p></li>
+<li><p>Harden URL validation</p></li>
+<li><p>Add tar extraction safety</p></li>
+<li><p><strong>Deliverable</strong>: More secure, reliable downloads</p></li>
+</ul>
+</section>
+<section id="phase-3-validation-improvements-week-3">
+<h3>Phase 3: Validation Improvements (Week 3)<a class="headerlink" href="#phase-3-validation-improvements-week-3" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Implement deterministic normalization</p></li>
+<li><p>Add subprocess isolation</p></li>
+<li><p>Implement SPDX normalization</p></li>
+<li><p><strong>Deliverable</strong>: Better validation, memory safety</p></li>
+</ul>
+</section>
+<section id="phase-4-capabilities-weeks-3-4">
+<h3>Phase 4: Capabilities (Weeks 3-4)<a class="headerlink" href="#phase-4-capabilities-weeks-3-4" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Implement fallback resolver</p></li>
+<li><p>Add polite headers</p></li>
+<li><p>Add LOV/Ontobee resolvers</p></li>
+<li><p>Implement remote storage</p></li>
+<li><p><strong>Deliverable</strong>: Higher success rates, team workflows</p></li>
+</ul>
+</section>
+<section id="phase-5-cli-enhancements-week-4">
+<h3>Phase 5: CLI Enhancements (Week 4)<a class="headerlink" href="#phase-5-cli-enhancements-week-4" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Add plan command</p></li>
+<li><p>Add doctor command</p></li>
+<li><p>Add dry-run mode</p></li>
+<li><p><strong>Deliverable</strong>: Better troubleshooting, workflow development</p></li>
+</ul>
+</section>
+<section id="phase-6-testing-documentation-week-5">
+<h3>Phase 6: Testing &amp; Documentation (Week 5)<a class="headerlink" href="#phase-6-testing-documentation-week-5" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Comprehensive unit tests</p></li>
+<li><p>Integration tests</p></li>
+<li><p>Documentation updates</p></li>
+<li><p>Performance validation</p></li>
+<li><p><strong>Deliverable</strong>: Production-ready release</p></li>
+</ul>
+</section>
+</section>
+<section id="success-metrics">
+<h2>Success Metrics<a class="headerlink" href="#success-metrics" title="Link to this heading"></a></h2>
+<section id="code-quality">
+<h3>Code Quality<a class="headerlink" href="#code-quality" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Target</strong>: Reduce SLOC by ~150 lines (YAML parser removal)</p></li>
+<li><p><strong>Target</strong>: Maintain &gt;85% test coverage</p></li>
+<li><p><strong>Target</strong>: Zero increase in cyclomatic complexity</p></li>
+</ul>
+</section>
+<section id="robustness">
+<h3>Robustness<a class="headerlink" href="#robustness" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Target</strong>: 5-10% increase in download success rate (via fallback)</p></li>
+<li><p><strong>Target</strong>: Zero SSRF incidents post-deployment</p></li>
+<li><p><strong>Target</strong>: Stable memory usage in 100+ ontology batch operations</p></li>
+</ul>
+</section>
+<section id="usability">
+<h3>Usability<a class="headerlink" href="#usability" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Target</strong>: doctor command used in &gt;20% of support cases</p></li>
+<li><p><strong>Target</strong>: plan command used in &gt;10% of workflow development sessions</p></li>
+<li><p><strong>Target</strong>: Remote storage adopted by &gt;5% of team installations</p></li>
+</ul>
+</section>
+<section id="performance">
+<h3>Performance<a class="headerlink" href="#performance" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Target</strong>: Download performance within 5% of baseline</p></li>
+<li><p><strong>Target</strong>: Validation performance within 10% of baseline</p></li>
+<li><p><strong>Target</strong>: Config parsing &lt;100ms</p></li>
+</ul>
+</section>
+</section>
+<section id="risk-mitigation">
+<h2>Risk Mitigation<a class="headerlink" href="#risk-mitigation" title="Link to this heading"></a></h2>
+<section id="pydantic-v2-migration">
+<h3>Pydantic v2 Migration<a class="headerlink" href="#pydantic-v2-migration" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Risk</strong>: Users on old Pydantic may see conflicts</p></li>
+<li><p><strong>Mitigation</strong>: Pin pydantic&gt;=2.0.0, document upgrade</p></li>
+<li><p><strong>Likelihood</strong>: Low</p></li>
+</ul>
+</section>
+<section id="subprocess-overhead">
+<h3>Subprocess Overhead<a class="headerlink" href="#subprocess-overhead" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Risk</strong>: Performance regression from process spawning</p></li>
+<li><p><strong>Mitigation</strong>: Only heavy validators (pronto, owlready2); keep rdflib in-process</p></li>
+<li><p><strong>Impact</strong>: Low - acceptable trade-off for memory safety</p></li>
+</ul>
+</section>
+<section id="backward-compatibility">
+<h3>Backward Compatibility<a class="headerlink" href="#backward-compatibility" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Risk</strong>: Edge cases with existing manifests</p></li>
+<li><p><strong>Mitigation</strong>: Thorough testing with real manifests, graceful field addition</p></li>
+<li><p><strong>Likelihood</strong>: Low</p></li>
+</ul>
+</section>
+</section>
+<section id="dependencies">
+<h2>Dependencies<a class="headerlink" href="#dependencies" title="Link to this heading"></a></h2>
+<section id="new-required-dependencies">
+<h3>New Required Dependencies<a class="headerlink" href="#new-required-dependencies" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>pydantic&gt;=2.0.0 (replaces dataclasses + custom validation)</p></li>
+</ul>
+</section>
+<section id="new-optional-dependencies">
+<h3>New Optional Dependencies<a class="headerlink" href="#new-optional-dependencies" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>fsspec&gt;=2023.1.0 (for remote storage)</p></li>
+<li><p>s3fs&gt;=2023.1.0 (for S3 storage backend)</p></li>
+</ul>
+</section>
+<section id="unchanged-dependencies">
+<h3>Unchanged Dependencies<a class="headerlink" href="#unchanged-dependencies" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>All existing dependencies remain with same versions</p></li>
+</ul>
+</section>
+</section>
+<section id="testing-strategy">
+<h2>Testing Strategy<a class="headerlink" href="#testing-strategy" title="Link to this heading"></a></h2>
+<section id="unit-tests-50-new-tests">
+<h3>Unit Tests (~50 new tests)<a class="headerlink" href="#unit-tests-50-new-tests" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>optdeps stub behavior</p></li>
+<li><p>Pydantic validation</p></li>
+<li><p>Rate limiting (per-service)</p></li>
+<li><p>URL validation (IDN, allowlist)</p></li>
+<li><p>Archive extraction safety</p></li>
+<li><p>TTL canonicalization</p></li>
+<li><p>Subprocess isolation</p></li>
+<li><p>License normalization</p></li>
+<li><p>Fallback resolver</p></li>
+<li><p>New resolvers (LOV, Ontobee)</p></li>
+<li><p>Storage backends</p></li>
+<li><p>CLI commands</p></li>
+</ul>
+</section>
+<section id="integration-tests-10-new-tests">
+<h3>Integration Tests (~10 new tests)<a class="headerlink" href="#integration-tests-10-new-tests" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>End-to-end fallback scenarios</p></li>
+<li><p>Remote storage with mocked S3</p></li>
+<li><p>Complete pull workflow with all new features</p></li>
+<li><p>Doctor diagnostics in various states</p></li>
+<li><p>Dry-run mode</p></li>
+</ul>
+</section>
+<section id="regression-tests">
+<h3>Regression Tests<a class="headerlink" href="#regression-tests" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Existing test suite must pass</p></li>
+<li><p>Backward compatibility with old sources.yaml</p></li>
+<li><p>Backward compatibility with old manifest.json</p></li>
+<li><p>Performance benchmarks</p></li>
+</ul>
+</section>
+</section>
+<section id="documentation-updates">
+<h2>Documentation Updates<a class="headerlink" href="#documentation-updates" title="Link to this heading"></a></h2>
+<section id="user-documentation">
+<h3>User Documentation<a class="headerlink" href="#user-documentation" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Configuration reference (Pydantic models, new sections)</p></li>
+<li><p>CLI command reference (plan, doctor, dry-run)</p></li>
+<li><p>Troubleshooting guide (doctor command usage)</p></li>
+<li><p>Remote storage setup guide</p></li>
+<li><p>License normalization behavior</p></li>
+</ul>
+</section>
+<section id="developer-documentation">
+<h3>Developer Documentation<a class="headerlink" href="#developer-documentation" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>optdeps module usage</p></li>
+<li><p>Storage backend interface</p></li>
+<li><p>Pydantic model extension</p></li>
+<li><p>Resolver implementation guide</p></li>
+<li><p>Subprocess validator patterns</p></li>
+</ul>
+</section>
+<section id="api-documentation">
+<h3>API Documentation<a class="headerlink" href="#api-documentation" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>New function signatures</p></li>
+<li><p>Pydantic model schemas (JSON Schema)</p></li>
+<li><p>Configuration schema</p></li>
+<li><p>Migration guide</p></li>
+</ul>
+</section>
+</section>
+<section id="rollout-plan">
+<h2>Rollout Plan<a class="headerlink" href="#rollout-plan" title="Link to this heading"></a></h2>
+<section id="week-1-2-internal-development">
+<h3>Week 1-2: Internal Development<a class="headerlink" href="#week-1-2-internal-development" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Implement foundation (optdeps, Pydantic, cli_utils)</p></li>
+<li><p>CI/CD validation on multiple platforms</p></li>
+</ul>
+</section>
+<section id="week-3-alpha-testing">
+<h3>Week 3: Alpha Testing<a class="headerlink" href="#week-3-alpha-testing" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Deploy to staging</p></li>
+<li><p>Run batch pull on 50+ real ontologies</p></li>
+<li><p>Monitor logs for issues</p></li>
+</ul>
+</section>
+<section id="week-4-beta-release">
+<h3>Week 4: Beta Release<a class="headerlink" href="#week-4-beta-release" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Tag release candidate</p></li>
+<li><p>Canary deployment</p></li>
+<li><p>Collect user feedback</p></li>
+</ul>
+</section>
+<section id="week-5-general-availability">
+<h3>Week 5: General Availability<a class="headerlink" href="#week-5-general-availability" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Full release</p></li>
+<li><p>Documentation complete</p></li>
+<li><p>Monitor adoption metrics</p></li>
+</ul>
+</section>
+</section>
+<section id="approval-checklist">
+<h2>Approval Checklist<a class="headerlink" href="#approval-checklist" title="Link to this heading"></a></h2>
+<p>Before implementation begins:</p>
+<ul class="simple">
+<li><p>[ ] Proposal reviewed and approved by maintainer</p></li>
+<li><p>[ ] Design decisions validated</p></li>
+<li><p>[ ] Resource allocation confirmed (5 weeks estimated)</p></li>
+<li><p>[ ] Testing strategy agreed upon</p></li>
+<li><p>[ ] Documentation plan approved</p></li>
+<li><p>[ ] Rollout timeline accepted</p></li>
+</ul>
+</section>
+<section id="questions-for-reviewers">
+<h2>Questions for Reviewers<a class="headerlink" href="#questions-for-reviewers" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>Is 5-week timeline reasonable for full implementation?</p></li>
+<li><p>Should we phase the rollout (e.g., release in 2-3 increments)?</p></li>
+<li><p>Are there additional security concerns not addressed?</p></li>
+<li><p>Should we add telemetry for fallback success rates?</p></li>
+<li><p>Are there other optional dependencies to consider?</p></li>
+<li><p>Should we support additional storage backends beyond S3?</p></li>
+</ol>
+</section>
+<section id="conclusion">
+<h2>Conclusion<a class="headerlink" href="#conclusion" title="Link to this heading"></a></h2>
+<p>This comprehensive enhancement brings the ontology downloader to production-ready status with:</p>
+<ul class="simple">
+<li><p><strong>Cleaner code</strong>: -150 lines of custom parser</p></li>
+<li><p><strong>Stronger security</strong>: Enhanced SSRF protection, safe archives, IDN handling</p></li>
+<li><p><strong>Higher reliability</strong>: Multi-resolver fallback, subprocess isolation, deterministic output</p></li>
+<li><p><strong>Better operations</strong>: Diagnostics, planning, dry-run, remote storage</p></li>
+<li><p><strong>Full compatibility</strong>: No breaking changes, graceful migration</p></li>
+</ul>
+<p>The 15 improvements work synergistically to create a more maintainable, robust, and capable system while preserving the solid foundation already in place.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

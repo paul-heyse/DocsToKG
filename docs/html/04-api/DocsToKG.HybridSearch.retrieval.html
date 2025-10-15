@@ -1,0 +1,234 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: retrieval &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: retrieval</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.HybridSearch.retrieval.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-retrieval">
+<h1>1. Module: retrieval<a class="headerlink" href="#module-retrieval" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.retrieval</span></code>.</p>
+<p>Hybrid search execution across sparse and dense channels.</p>
+<p>This module provides the core hybrid search service for DocsToKG, orchestrating
+multiple retrieval methods (BM25, SPLADE, dense vectors) and fusing their results
+for optimal document retrieval performance.</p>
+<p>The service supports configurable search strategies, real-time observability,
+and comprehensive result ranking through advanced fusion techniques.</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="search-self-request">
+<h3><code class="docutils literal notranslate"><span class="pre">search(self,</span> <span class="pre">request)</span></code><a class="headerlink" href="#search-self-request" title="Link to this heading"></a></h3>
+<p>Execute a hybrid search request across all retrieval channels.</p>
+<p>Args:
+request: Validated hybrid search request describing query parameters.</p>
+<p>Returns:
+HybridSearchResponse containing fused results and cursor metadata.</p>
+<p>Raises:
+RequestValidationError: If the request fails validation checks.</p>
+</section>
+<section id="execute-bm25-self-request-filters-config-query-features-timings">
+<h3><code class="docutils literal notranslate"><span class="pre">_execute_bm25(self,</span> <span class="pre">request,</span> <span class="pre">filters,</span> <span class="pre">config,</span> <span class="pre">query_features,</span> <span class="pre">timings)</span></code><a class="headerlink" href="#execute-bm25-self-request-filters-config-query-features-timings" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="execute-splade-self-request-filters-config-query-features-timings">
+<h3><code class="docutils literal notranslate"><span class="pre">_execute_splade(self,</span> <span class="pre">request,</span> <span class="pre">filters,</span> <span class="pre">config,</span> <span class="pre">query_features,</span> <span class="pre">timings)</span></code><a class="headerlink" href="#execute-splade-self-request-filters-config-query-features-timings" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="execute-dense-self-request-filters-config-query-features-timings">
+<h3><code class="docutils literal notranslate"><span class="pre">_execute_dense(self,</span> <span class="pre">request,</span> <span class="pre">filters,</span> <span class="pre">config,</span> <span class="pre">query_features,</span> <span class="pre">timings)</span></code><a class="headerlink" href="#execute-dense-self-request-filters-config-query-features-timings" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="filter-dense-hits-self-hits-filters">
+<h3><code class="docutils literal notranslate"><span class="pre">_filter_dense_hits(self,</span> <span class="pre">hits,</span> <span class="pre">filters)</span></code><a class="headerlink" href="#filter-dense-hits-self-hits-filters" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="dedupe-candidates-self-candidates-fused-scores">
+<h3><code class="docutils literal notranslate"><span class="pre">_dedupe_candidates(self,</span> <span class="pre">candidates,</span> <span class="pre">fused_scores)</span></code><a class="headerlink" href="#dedupe-candidates-self-candidates-fused-scores" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="validate-request-self-request">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_request(self,</span> <span class="pre">request)</span></code><a class="headerlink" href="#validate-request-self-request" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="requestvalidationerror">
+<h3><code class="docutils literal notranslate"><span class="pre">RequestValidationError</span></code><a class="headerlink" href="#requestvalidationerror" title="Link to this heading"></a></h3>
+<p>Raised when the caller submits an invalid search request.</p>
+<p>This exception is raised when a hybrid search request contains invalid
+parameters, malformed data, or violates system constraints.</p>
+<p>Attributes:
+message: Description of the validation error
+field: Optional field name that caused the error</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>try:
+…     service.search(invalid_request)
+… except RequestValidationError as e:
+…     print(f”Invalid request: {e.message}”)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="channelresults">
+<h3><code class="docutils literal notranslate"><span class="pre">ChannelResults</span></code><a class="headerlink" href="#channelresults" title="Link to this heading"></a></h3>
+<p>Results from a single retrieval channel (BM25, SPLADE, or dense).</p>
+<p>This class encapsulates the candidates and scoring information returned
+by a specific retrieval method, preparing them for fusion with results
+from other channels.</p>
+<p>Attributes:
+candidates: List of fusion candidates from this channel
+scores: Performance metrics for this channel’s execution</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>bm25_results = ChannelResults(
+…     candidates=[candidate1, candidate2],
+…     scores={“recall”: 0.85, “latency”: 45}
+… )</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="hybridsearchservice">
+<h3><code class="docutils literal notranslate"><span class="pre">HybridSearchService</span></code><a class="headerlink" href="#hybridsearchservice" title="Link to this heading"></a></h3>
+<p>Execute BM25, SPLADE, and dense retrieval with fusion.</p>
+<p>This service orchestrates hybrid search operations by:</p>
+<ol class="arabic simple">
+<li><p>Executing parallel retrieval across multiple channels</p></li>
+<li><p>Fusing results using configurable strategies</p></li>
+<li><p>Applying diversification and ranking optimizations</p></li>
+<li><p>Providing comprehensive observability and metrics</p></li>
+</ol>
+<p>The service is designed for high-performance document retrieval
+combining traditional lexical search with modern semantic methods.</p>
+<p>Attributes:
+_config_manager: Configuration management for search parameters
+_feature_generator: Feature extraction for query processing
+_faiss: Dense vector search using FAISS
+_opensearch: Lexical search using OpenSearch
+_registry: Document and chunk registry management
+_observability: Performance monitoring and metrics collection</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>service = HybridSearchService(
+…     config_manager=config_manager,
+…     feature_generator=feature_generator,
+…     faiss_index=faiss_index,
+…     opensearch=opensearch,
+…     registry=registry
+… )
+results = service.search(request)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

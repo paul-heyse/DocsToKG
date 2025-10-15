@@ -92,7 +92,11 @@ class APIDocGenerator:
         lines = []
 
         # Module header
-        lines.append(f"# Module: {module_info['module_name']}")
+        lines.append(f"# 1. Module: {module_info['module_name']}")
+        lines.append("")
+        lines.append(
+            f"This reference documents the DocsToKG module ``{module_info['module_slug']}``."
+        )
         lines.append("")
 
         # Module description
@@ -100,9 +104,12 @@ class APIDocGenerator:
             lines.append(module_info["module_docstring"])
             lines.append("")
 
+        section_index = 1
+
         # Functions section
         if module_info.get("functions"):
-            lines.append("## Functions")
+            lines.append(f"## {section_index}. Functions")
+            section_index += 1
             lines.append("")
 
             for func in module_info["functions"]:
@@ -120,7 +127,7 @@ class APIDocGenerator:
 
         # Classes section
         if module_info.get("classes"):
-            lines.append("## Classes")
+            lines.append(f"## {section_index}. Classes")
             lines.append("")
 
             for cls in module_info["classes"]:
