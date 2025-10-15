@@ -10,6 +10,7 @@ from .doaj import DoajResolver
 from .europe_pmc import EuropePmcResolver
 from .hal import HalResolver
 from .landing_page import LandingPageResolver
+from .openalex import OpenAlexResolver
 from .openaire import OpenAireResolver
 from .osf import OsfResolver
 from .pmc import PmcResolver
@@ -30,6 +31,7 @@ def default_resolvers() -> List[Resolver]:
     """
 
     return [
+        OpenAlexResolver(),
         UnpaywallResolver(),
         CrossrefResolver(),
         LandingPageResolver(),

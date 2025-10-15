@@ -106,11 +106,41 @@ def test_main_writes_manifest_and_sets_mailto(monkeypatch, tmp_path):
         return "https://openalex.org/T1"
 
     monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", fake_resolve)
-    monkeypatch.setattr(
-        downloader,
-        "attempt_openalex_candidates",
-        lambda *args, **kwargs: (outcome, "https://oa.example/direct.pdf"),
-    )
+    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
+
+    class StubPipeline:
+        def __init__(self, resolvers_list, config, download_func, logger, metrics):
+            self.logger = logger
+            self.metrics = metrics
+
+        def run(self, session, artifact, context=None):
+            self.logger.log(
+                resolvers.AttemptRecord(
+                    work_id=artifact.work_id,
+                    resolver_name="openalex",
+                    resolver_order=1,
+                    url="https://oa.example/direct.pdf",
+                    status=outcome.classification,
+                    http_status=outcome.http_status,
+                    content_type=outcome.content_type,
+                    elapsed_ms=outcome.elapsed_ms,
+                    reason=outcome.error,
+                    sha256=outcome.sha256,
+                    content_length=outcome.content_length,
+                    dry_run=False,
+                )
+            )
+            self.metrics.record_attempt("openalex", outcome)
+            return resolvers.PipelineResult(
+                success=True,
+                resolver_name="openalex",
+                url="https://oa.example/direct.pdf",
+                outcome=outcome,
+                html_paths=[],
+                failed_urls=[],
+            )
+
+    monkeypatch.setattr(downloader, "ResolverPipeline", StubPipeline)
 
     argv = [
         "download_pyalex_pdfs.py",

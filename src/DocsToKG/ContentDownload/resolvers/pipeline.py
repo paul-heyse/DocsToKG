@@ -51,12 +51,19 @@ def _callable_accepts_argument(func: DownloadFunc, name: str) -> bool:
 class _RunState:
     """Mutable pipeline execution state shared across resolvers."""
 
-    __slots__ = ("dry_run", "seen_urls", "html_paths", "attempt_counter")
+    __slots__ = (
+        "dry_run",
+        "seen_urls",
+        "html_paths",
+        "failed_urls",
+        "attempt_counter",
+    )
 
     def __init__(self, dry_run: bool) -> None:
         self.dry_run = dry_run
         self.seen_urls: set[str] = set()
         self.html_paths: List[str] = []
+        self.failed_urls: List[str] = []
         self.attempt_counter = 0
 
 
@@ -114,6 +121,47 @@ class ResolverPipeline:
             return
         time.sleep(self.config.sleep_jitter + random.random() * 0.1)
 
+    def _should_attempt_head_check(self, resolver_name: str) -> bool:
+        if resolver_name in self.config.resolver_head_precheck:
+            return self.config.resolver_head_precheck[resolver_name]
+        return self.config.enable_head_precheck
+
+    def _head_precheck_url(
+        self,
+        session: requests.Session,
+        url: str,
+        timeout: float,
+    ) -> bool:
+        try:
+            from DocsToKG.ContentDownload.http import request_with_retries
+
+            response = request_with_retries(
+                session,
+                "HEAD",
+                url,
+                max_retries=1,
+                timeout=min(timeout, 5.0),
+                allow_redirects=True,
+            )
+        except Exception:
+            return True
+
+        try:
+            if response.status_code not in {200, 302, 304}:
+                return False
+
+            content_type = (response.headers.get("Content-Type") or "").lower()
+            content_length = response.headers.get("Content-Length", "")
+
+            if "text/html" in content_type:
+                return False
+            if content_length == "0":
+                return False
+
+            return True
+        finally:
+            response.close()
+
     def run(
         self,
         session: requests.Session,
@@ -159,7 +207,11 @@ class ResolverPipeline:
                 if pipeline_result is not None:
                     return pipeline_result
 
-        return PipelineResult(success=False, html_paths=list(state.html_paths))
+        return PipelineResult(
+            success=False,
+            html_paths=list(state.html_paths),
+            failed_urls=list(state.failed_urls),
+        )
 
     def _run_concurrent(
         self,
@@ -234,7 +286,11 @@ class ResolverPipeline:
 
                 next_index = submit_next(executor, next_index)
 
-        return PipelineResult(success=False, html_paths=list(state.html_paths))
+        return PipelineResult(
+            success=False,
+            html_paths=list(state.html_paths),
+            failed_urls=list(state.failed_urls),
+        )
 
     def _prepare_resolver(
         self,
@@ -378,6 +434,30 @@ class ResolverPipeline:
             return None
 
         state.seen_urls.add(url)
+        if self._should_attempt_head_check(resolver_name):
+            if not self._head_precheck_url(
+                session,
+                url,
+                self.config.get_timeout(resolver_name),
+            ):
+                self.logger.log(
+                    AttemptRecord(
+                        work_id=artifact.work_id,
+                        resolver_name=resolver_name,
+                        resolver_order=order_index,
+                        url=url,
+                        status="skipped",
+                        http_status=None,
+                        content_type=None,
+                        elapsed_ms=None,
+                        reason="head-precheck-failed",
+                        metadata=result.metadata,
+                        dry_run=state.dry_run,
+                    )
+                )
+                self.metrics.record_skip(resolver_name, "head-precheck-failed")
+                return None
+
         state.attempt_counter += 1
         if self._download_accepts_context:
             outcome = self.download_func(
@@ -419,6 +499,12 @@ class ResolverPipeline:
         if outcome.classification == "html" and outcome.path:
             state.html_paths.append(outcome.path)
 
+        if not outcome.is_pdf and url:
+            if url not in state.failed_urls:
+                state.failed_urls.append(url)
+            if url not in artifact.failed_pdf_urls:
+                artifact.failed_pdf_urls.append(url)
+
         if outcome.is_pdf:
             return PipelineResult(
                 success=True,
@@ -426,6 +512,7 @@ class ResolverPipeline:
                 url=url,
                 outcome=outcome,
                 html_paths=list(state.html_paths),
+                failed_urls=list(state.failed_urls),
             )
 
         if state.attempt_counter >= self.config.max_attempts_per_work:
@@ -435,6 +522,7 @@ class ResolverPipeline:
                 url=url,
                 outcome=outcome,
                 html_paths=list(state.html_paths),
+                failed_urls=list(state.failed_urls),
                 reason="max-attempts-reached",
             )
 

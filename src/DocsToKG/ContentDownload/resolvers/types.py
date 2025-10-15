@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
 DEFAULT_RESOLVER_ORDER: List[str] = [
+    "openalex",
     "unpaywall",
     "crossref",
     "landing_page",
@@ -89,6 +90,8 @@ class ResolverConfig:
         resolver_timeouts: Resolver-specific timeout overrides.
         resolver_min_interval_s: Minimum interval between resolver requests.
         resolver_rate_limits: Deprecated rate limit configuration retained for compat.
+        enable_head_precheck: Toggle applying HEAD filtering before downloads.
+        resolver_head_precheck: Per-resolver overrides for HEAD filtering behaviour.
         mailto: Contact email appended to polite headers and user agent string.
 
     Examples:
@@ -112,6 +115,8 @@ class ResolverConfig:
     resolver_timeouts: Dict[str, float] = field(default_factory=dict)
     resolver_min_interval_s: Dict[str, float] = field(default_factory=dict)
     resolver_rate_limits: Dict[str, float] = field(default_factory=dict)
+    enable_head_precheck: bool = True
+    resolver_head_precheck: Dict[str, bool] = field(default_factory=dict)
     mailto: Optional[str] = None
     max_concurrent_resolvers: int = 1
 
@@ -318,6 +323,7 @@ class PipelineResult:
         url: URL that was ultimately fetched.
         outcome: Download outcome associated with the result.
         html_paths: Collected HTML artefacts from the pipeline.
+        failed_urls: Candidate URLs that failed during this run.
         reason: Optional reason string explaining failures.
 
     Examples:
@@ -329,6 +335,7 @@ class PipelineResult:
     url: Optional[str] = None
     outcome: Optional[DownloadOutcome] = None
     html_paths: List[str] = field(default_factory=list)
+    failed_urls: List[str] = field(default_factory=list)
     reason: Optional[str] = None
 
 
