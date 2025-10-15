@@ -13,137 +13,30 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import List, Tuple
 
 # Third-party imports
 from docling_core.transforms.chunker.base import BaseChunk
-from docling_core.transforms.chunker.hierarchical_chunker import (
-    ChunkingDocSerializer,
-    ChunkingSerializerProvider,
-)
 from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
-from docling_core.transforms.serializer.base import BaseDocSerializer, SerializationResult
-from docling_core.transforms.serializer.common import create_ser_result
-from docling_core.transforms.serializer.markdown import (
-    MarkdownParams,
-    MarkdownPictureSerializer,
-    MarkdownTableSerializer,
-)
-from docling_core.types.doc.document import (
-    DoclingDocument,
-    DocTagsDocument,
-    PictureClassificationData,
-    PictureDescriptionData,
-    PictureItem,
-    PictureMoleculeData,
-)
-from docling_core.types.doc.document import (
-    DoclingDocument as _Doc,
-)
+from docling_core.types.doc.document import DoclingDocument, DocTagsDocument
 from transformers import AutoTokenizer
-from typing_extensions import override
 
-# ---------- I/O ----------
-DEFAULT_IN_DIR = Path("/home/paul/DocsToKG/Data/DocTagsFiles")
-DEFAULT_OUT_DIR = Path("/home/paul/DocsToKG/Data/ChunkedDocTagFiles")
+from DocsToKG.DocParsing._common import (
+    data_chunks,
+    data_doctags,
+    detect_data_root,
+    get_logger,
+    iter_doctags,
+)
+from DocsToKG.DocParsing.serializers import RichSerializerProvider
 
-
-# ---------- Picture serializer: inject CAPTIONS (+ optional annotations) ----------
-class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
-    """Serialize picture items with captions and rich annotation metadata.
-
-    Attributes:
-        None
-
-    Examples:
-        >>> serializer = CaptionPlusAnnotationPictureSerializer()
-        >>> isinstance(serializer, MarkdownPictureSerializer)
-        True
-    """
-
-    @override
-    def serialize(
-        self, *, item: PictureItem, doc_serializer: BaseDocSerializer, doc: _Doc, **_: Any
-    ) -> SerializationResult:
-        """Render picture metadata into Markdown-friendly text.
-
-        Args:
-            item: Picture element emitted by Docling.
-            doc_serializer: Parent serializer responsible for post-processing.
-            doc: Full Docling document containing the picture context.
-
-        Returns:
-            SerializationResult capturing the rendered string and provenance.
-        """
-        parts: List[str] = []
-        try:
-            cap = (item.caption_text(doc) or "").strip()
-            if cap:
-                parts.append(f"Figure caption: {cap}")
-        except Exception:
-            pass
-        try:
-            for ann in item.annotations or []:
-                if isinstance(ann, PictureDescriptionData) and ann.text:
-                    parts.append(f"Picture description: {ann.text}")
-                elif isinstance(ann, PictureClassificationData) and ann.predicted_classes:
-                    parts.append(f"Picture type: {ann.predicted_classes[0].class_name}")
-                elif isinstance(ann, PictureMoleculeData) and ann.smi:
-                    parts.append(f"SMILES: {ann.smi}")
-        except Exception:
-            pass
-        if not parts:
-            parts.append("<!-- image -->")
-        text = doc_serializer.post_process(text="\n".join(parts))
-        return create_ser_result(text=text, span_source=item)
-
-
-class RichSerializerProvider(ChunkingSerializerProvider):
-    """Provide a serializer that augments tables and pictures with Markdown.
-
-    Attributes:
-        None
-
-    Examples:
-        >>> provider = RichSerializerProvider()
-        >>> isinstance(provider, ChunkingSerializerProvider)
-        True
-    """
-
-    def get_serializer(self, doc: DoclingDocument) -> ChunkingDocSerializer:
-        """Construct a ChunkingDocSerializer tailored for DocTags documents.
-
-        Args:
-            doc: Docling document that will be serialized into chunk text.
-
-        Returns:
-            Configured ChunkingDocSerializer instance.
-        """
-        return ChunkingDocSerializer(
-            doc=doc,
-            table_serializer=MarkdownTableSerializer(),  # tables -> Markdown
-            picture_serializer=CaptionPlusAnnotationPictureSerializer(),  # pictures -> caption/annots
-            params=MarkdownParams(image_placeholder="<!-- image -->"),
-        )
-
+# ---------- Defaults ----------
+DEFAULT_DATA_ROOT = detect_data_root()
+DEFAULT_IN_DIR = data_doctags(DEFAULT_DATA_ROOT)
+DEFAULT_OUT_DIR = data_chunks(DEFAULT_DATA_ROOT)
 
 # ---------- Helpers ----------
-def find_doctags_files(in_dir: Path) -> List[Path]:
-    """Discover `.doctags` artifacts within a directory.
-
-    Args:
-        in_dir: Directory containing DocTags outputs.
-
-    Returns:
-        Sorted list of unique DocTags file paths.
-    """
-    files = []
-    for pat in ("*.doctags", "*.doctag"):
-        files.extend(in_dir.glob(pat))
-    return sorted({p.resolve() for p in files})
-
-
 def read_utf8(p: Path) -> str:
     """Load text from disk using UTF-8 with replacement for invalid bytes.
 
@@ -359,27 +252,65 @@ def coalesce_small_runs(
 
 # ---------- Main ----------
 def main():
-    """CLI driver that chunks DocTags files and enforces minimum token thresholds.
+    """CLI driver that chunks DocTags files and enforces minimum token thresholds."""
 
-    Args:
-        None
+    logger = get_logger(__name__)
 
-    Returns:
-        None
-    """
     ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--data-root",
+        type=Path,
+        default=None,
+        help=(
+            "Override DocsToKG Data directory. Defaults to auto-detection or "
+            "$DOCSTOKG_DATA_ROOT."
+        ),
+    )
     ap.add_argument("--in-dir", type=Path, default=DEFAULT_IN_DIR)
     ap.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     ap.add_argument("--min-tokens", type=int, default=256)
     ap.add_argument("--max-tokens", type=int, default=512)
     args = ap.parse_args()
 
-    in_dir, out_dir = args.in_dir, args.out_dir
+    data_root_override = args.data_root
+    resolved_data_root = (
+        detect_data_root(data_root_override)
+        if data_root_override is not None
+        else DEFAULT_DATA_ROOT
+    )
+
+    in_dir = (
+        data_doctags(resolved_data_root)
+        if args.in_dir == DEFAULT_IN_DIR and data_root_override is not None
+        else args.in_dir
+    )
+    out_dir = (
+        data_chunks(resolved_data_root)
+        if args.out_dir == DEFAULT_OUT_DIR and data_root_override is not None
+        else args.out_dir
+    )
+
+    logger.info(
+        "Chunking configuration",
+        extra={
+            "extra_fields": {
+                "data_root": str(resolved_data_root),
+                "input_dir": str(in_dir),
+                "output_dir": str(out_dir),
+                "min_tokens": args.min_tokens,
+                "max_tokens": args.max_tokens,
+            }
+        },
+    )
+
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    files = find_doctags_files(in_dir)
+    files = list(iter_doctags(in_dir))
     if not files:
-        print(f"[WARN] No *.doctags files found in {in_dir}")
+        logger.warning(
+            "No .doctags files found",
+            extra={"extra_fields": {"input_dir": str(in_dir)}},
+        )
         return
 
     # Tokenizer (BERT family) → 512 cap applied to contextualized text
@@ -432,7 +363,16 @@ def main():
                     "page_nos": r.pages,
                 }
                 f.write(json.dumps(obj, ensure_ascii=False) + "\n")
-        print(f"[OK] {name}: {len(final_recs)} chunks  →  {out_path.name}")
+        logger.info(
+            "Chunk file written",
+            extra={
+                "extra_fields": {
+                    "doc_id": name,
+                    "chunks": len(final_recs),
+                    "output_file": out_path.name,
+                }
+            },
+        )
 
 
 if __name__ == "__main__":

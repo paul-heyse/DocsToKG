@@ -35,14 +35,22 @@ from vllm import (
     PoolingParams,
 )  # PoolingParams(dimensions=...) selects output dim if model supports MRL
 
+from DocsToKG.DocParsing._common import (
+    data_chunks,
+    data_vectors,
+    detect_data_root,
+    get_logger,
+)
+
 # ---- Fixed locations ----
 HF_HOME = Path("/home/paul/hf-cache")
 MODEL_ROOT = HF_HOME
 QWEN_DIR = MODEL_ROOT / "Qwen" / "Qwen3-Embedding-4B"
 SPLADE_DIR = MODEL_ROOT / "naver" / "splade-v3"
 
-CHUNKS_DIR = Path("/home/paul/DocsToKG/Data/ChunkedDocTagFiles")
-VECTORS_DIR = Path("/home/paul/DocsToKG/Data/Vectors")
+DEFAULT_DATA_ROOT = detect_data_root()
+DEFAULT_CHUNKS_DIR = data_chunks(DEFAULT_DATA_ROOT)
+DEFAULT_VECTORS_DIR = data_vectors(DEFAULT_DATA_ROOT)
 
 # Make sure every lib (Transformers / HF Hub / Sentence-Transformers) honors this cache.
 os.environ.setdefault("HF_HOME", str(HF_HOME))
@@ -352,17 +360,22 @@ def qwen_embed(cfg: QwenCfg, texts: List[str]) -> List[List[float]]:
 
 # ---- Main driver ----
 def main():
-    """CLI entrypoint for chunk UUID cleanup and embedding generation.
+    """CLI entrypoint for chunk UUID cleanup and embedding generation."""
 
-    Args:
-        None
+    logger = get_logger(__name__)
 
-    Returns:
-        None
-    """
     ap = argparse.ArgumentParser()
-    ap.add_argument("--chunks-dir", type=Path, default=CHUNKS_DIR)
-    ap.add_argument("--out-dir", type=Path, default=VECTORS_DIR)
+    ap.add_argument(
+        "--data-root",
+        type=Path,
+        default=None,
+        help=(
+            "Override DocsToKG Data directory. Defaults to auto-detection or "
+            "$DOCSTOKG_DATA_ROOT."
+        ),
+    )
+    ap.add_argument("--chunks-dir", type=Path, default=DEFAULT_CHUNKS_DIR)
+    ap.add_argument("--out-dir", type=Path, default=DEFAULT_VECTORS_DIR)
     # BM25 knobs
     ap.add_argument("--bm25-k1", type=float, default=1.5)
     ap.add_argument("--bm25-b", type=float, default=0.75)
@@ -383,17 +396,47 @@ def main():
     ap.add_argument("--tp", type=int, default=1)
     args = ap.parse_args()
 
-    out_dir = args.out_dir
+    data_root_override = args.data_root
+    resolved_root = (
+        detect_data_root(data_root_override)
+        if data_root_override is not None
+        else DEFAULT_DATA_ROOT
+    )
+
+    if args.chunks_dir == DEFAULT_CHUNKS_DIR and data_root_override is not None:
+        chunks_dir = data_chunks(resolved_root)
+    else:
+        chunks_dir = args.chunks_dir.resolve()
+
+    if args.out_dir == DEFAULT_VECTORS_DIR and data_root_override is not None:
+        out_dir = data_vectors(resolved_root)
+    else:
+        out_dir = args.out_dir.resolve()
+
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    files = iter_chunk_files(args.chunks_dir)
+    logger.info(
+        "Embedding configuration",
+        extra={
+            "extra_fields": {
+                "data_root": str(resolved_root),
+                "chunks_dir": str(chunks_dir),
+                "vectors_dir": str(out_dir),
+            }
+        },
+    )
+
+    files = iter_chunk_files(chunks_dir)
     if not files:
-        print(f"[WARN] No *.chunks.jsonl in {args.chunks_dir}")
+        logger.warning(
+            "No chunk files found",
+            extra={"extra_fields": {"chunks_dir": str(chunks_dir)}},
+        )
         return
 
     # ---- Pass 1: ensure UUIDs + assemble for global BM25 stats
     all_chunks: List[Chunk] = []
-    print("[1/4] Ensuring UUIDs + global BM25 stats...")
+    logger.info("[1/4] Ensuring UUIDs + global BM25 stats...")
     for f in tqdm(files, ncols=98):
         rows = load_rows(f)
         ensure_uuid(rows)
@@ -401,12 +444,20 @@ def main():
         for r in rows:
             all_chunks.append(Chunk(uuid=r["uuid"], text=r["text"]))
     stats = build_bm25_stats(all_chunks)
-    print(f"    BM25: N={stats.N} avgdl={stats.avgdl:.2f}")
+    logger.info(
+        "BM25 statistics computed",
+        extra={
+            "extra_fields": {
+                "chunks": stats.N,
+                "avgdl": round(stats.avgdl, 4),
+            }
+        },
+    )
 
     texts = [c.text for c in all_chunks]
 
     # ---- Pass 2: SPLADE on GPU
-    print("[2/4] SPLADE-v3 encoding...")
+    logger.info("[2/4] SPLADE-v3 encoding...")
     attn_impl = None if args.splade_attn == "auto" else args.splade_attn
     spl_cfg = SpladeCfg(
         batch_size=args.splade_batch,
@@ -416,7 +467,7 @@ def main():
     spl_tokens, spl_weights = splade_encode(spl_cfg, texts)
 
     # ---- Pass 3: Qwen3-Embedding-4B via vLLM (MRL 2048d)
-    print("[3/4] Qwen3-Embedding-4B encoding...")
+    logger.info("[3/4] Qwen3-Embedding-4B encoding...")
     qcfg = QwenCfg(
         dtype=args.qwen_dtype,
         tp=int(args.tp),
@@ -428,7 +479,7 @@ def main():
     assert len(all_chunks) == len(spl_tokens) == len(qvecs)
 
     # ---- Pass 4: write vectors per source file
-    print("[4/4] Writing vectors JSONL...")
+    logger.info("[4/4] Writing vectors JSONL...")
     uuid2idx = {c.uuid: i for i, c in enumerate(all_chunks)}
     for f in tqdm(files, ncols=98):
         rows = load_rows(f)  # now with UUIDs
@@ -457,10 +508,29 @@ def main():
                     "Qwen3-4B": {
                         "model_id": "Qwen/Qwen3-Embedding-4B",
                         "vector": qvecs[i],
+                        "dtype": args.qwen_dtype,
                     },
                 }
                 vf.write(json.dumps(obj, ensure_ascii=False) + "\n")
-        print(f"[OK] {out_path.name}")
+        logger.info(
+            "Vectors written",
+            extra={
+                "extra_fields": {
+                    "output_file": out_path.name,
+                    "rows": len(rows),
+                }
+            },
+        )
+
+    logger.info(
+        "[DONE] Saved vectors",
+        extra={
+            "extra_fields": {
+                "vectors_dir": str(out_dir),
+                "files": len(files),
+            }
+        },
+    )
 
 
 if __name__ == "__main__":
