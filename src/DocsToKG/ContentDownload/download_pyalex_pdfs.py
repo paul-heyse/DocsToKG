@@ -11,13 +11,14 @@ custom resolver configuration, dry-run execution, and manifest resume logic.
 
 Key Features:
 - Threaded resolver pipeline with conditional request caching.
-- Structured JSONL/CSV logging including manifest entries and attempt metrics.
-- Content sniffing utilities that differentiate PDF, HTML, and corrupt payloads.
+- Thread-safe JSONL/CSV logging including manifest entries and attempt metrics.
+- Streaming content hashing with corruption detection heuristics for PDFs.
+- Centralised retry handling and polite header management for resolver requests.
 - CLI flags for controlling topic selection, time ranges, resolver order, and
   polite crawling identifiers.
 
 Dependencies:
-- `requests`, `urllib3`: HTTP communication and retry adapters.
+- `requests`: HTTP communication and connection pooling adapters.
 - `pyalex`: Query construction for OpenAlex works and topics.
 - `DocsToKG.ContentDownload` submodules: Resolver pipeline orchestration,
   conditional caching, and shared utilities.
@@ -38,6 +39,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -45,12 +47,12 @@ from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from urllib.parse import unquote, urlsplit
 
 import requests
 from pyalex import Topics, Works
 from pyalex import config as oa_config
 from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 from DocsToKG.ContentDownload.conditional import (
     CachedResult,
@@ -136,7 +138,10 @@ def ensure_dir(path: Path) -> None:
 
 
 def _make_session(headers: Dict[str, str]) -> requests.Session:
-    """Create a retry-enabled :class:`requests.Session` configured for polite crawling.
+    """Create a :class:`requests.Session` configured for polite crawling.
+
+    Adapter-level retries remain disabled so :func:`request_with_retries` fully
+    controls backoff, ensuring deterministic retry counts across the pipeline.
 
     Args:
         headers: Header dictionary returned by :func:`load_resolver_config`. The mapping
@@ -145,9 +150,9 @@ def _make_session(headers: Dict[str, str]) -> requests.Session:
             reuse mutable dictionaries without side effects.
 
     Returns:
-        requests.Session: Session with exponential backoff retry behaviour suitable
-            for resolver traffic. Both ``http`` and ``https`` transports share the
-            same :class:`urllib3.util.retry.Retry` configuration.
+        requests.Session: Session with connection pooling enabled and retries
+            disabled at the adapter level so the application layer governs
+            backoff behaviour.
 
     Notes:
         Each worker should call this helper to obtain an isolated session instance.
@@ -156,8 +161,8 @@ def _make_session(headers: Dict[str, str]) -> requests.Session:
             >>> _make_session({\"User-Agent\": \"DocsToKGDownloader/1.0\", \"mailto\": \"ops@example.org\"})  # doctest: +ELLIPSIS
             <requests.sessions.Session object at ...>
 
-        The returned session is safe for concurrent ``GET`` and ``HEAD`` requests
-        because :class:`requests.adapters.HTTPAdapter` manages a thread-safe connection
+        The returned session is safe for concurrent HTTP requests because
+        :class:`requests.adapters.HTTPAdapter` manages a thread-safe connection
         pool. Avoid mutating shared session state (for example ``session.headers.update``)
         once the session is handed to worker threads.
     """
@@ -165,13 +170,7 @@ def _make_session(headers: Dict[str, str]) -> requests.Session:
     session = requests.Session()
     if hasattr(session, "headers") and isinstance(session.headers, dict):
         session.headers.update(headers)
-    retry = Retry(
-        total=5,
-        backoff_factor=0.5,
-        status_forcelist=[429, 502, 503, 504],
-        respect_retry_after_header=True,
-    )
-    adapter = HTTPAdapter(max_retries=retry)
+    adapter = HTTPAdapter(max_retries=0)
     if hasattr(session, "mount"):
         session.mount("http://", adapter)
         session.mount("https://", adapter)
@@ -247,6 +246,11 @@ class JsonlLogger:
         >>> logger = JsonlLogger(Path("logs/attempts.jsonl"))
         >>> logger.log_summary({"processed": 10})
         >>> logger.close()
+    
+    The logger serialises records outside a thread lock and performs atomic
+    writes under the lock, ensuring well-formed output even when multiple
+    threads share the instance. It also implements the context manager protocol
+    for deterministic resource cleanup.
     """
 
     def __init__(self, path: Path) -> None:
@@ -261,6 +265,7 @@ class JsonlLogger:
         self._path = path
         ensure_dir(path.parent)
         self._file = path.open("a", encoding="utf-8")
+        self._lock = threading.Lock()
 
     def _write(self, payload: Dict[str, Any]) -> None:
         """Append a JSON record to the log file ensuring timestamps are present.
@@ -272,8 +277,10 @@ class JsonlLogger:
             None
         """
         payload.setdefault("timestamp", _utc_timestamp())
-        self._file.write(json.dumps(payload, sort_keys=True) + "\n")
-        self._file.flush()
+        line = json.dumps(payload, sort_keys=True) + "\n"
+        with self._lock:
+            self._file.write(line)
+            self._file.flush()
 
     def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
         """Record a resolver attempt entry.
@@ -375,7 +382,19 @@ class JsonlLogger:
         Returns:
             None
         """
-        self._file.close()
+        with self._lock:
+            if not self._file.closed:
+                self._file.close()
+
+    def __enter__(self) -> "JsonlLogger":
+        """Return ``self`` when used as a context manager."""
+
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        """Close the file handle on context manager exit."""
+
+        self.close()
 
 
 class CsvAttemptLoggerAdapter:
@@ -392,6 +411,9 @@ class CsvAttemptLoggerAdapter:
         ...                                   url="https://example", status="pdf", http_status=200,
         ...                                   content_type="application/pdf", elapsed_ms=120.0))
         >>> adapter.close()
+    
+    CSV writes are protected by a lock to ensure rows remain well formed when
+    multiple worker threads log through the same adapter instance.
     """
 
     HEADER = [
@@ -431,6 +453,7 @@ class CsvAttemptLoggerAdapter:
         exists = path.exists()
         self._file = path.open("a", newline="", encoding="utf-8")
         self._writer = csv.DictWriter(self._file, fieldnames=self.HEADER)
+        self._lock = threading.Lock()
         if not exists:
             self._writer.writeheader()
 
@@ -445,26 +468,26 @@ class CsvAttemptLoggerAdapter:
         """
         ts = _utc_timestamp()
         self._logger.log_attempt(record, timestamp=ts)
-        self._writer.writerow(
-            {
-                "timestamp": ts,
-                "work_id": record.work_id,
-                "resolver_name": record.resolver_name,
-                "resolver_order": record.resolver_order,
-                "url": record.url,
-                "status": record.status,
-                "http_status": record.http_status,
-                "content_type": record.content_type,
-                "elapsed_ms": record.elapsed_ms,
-                "resolver_wall_time_ms": record.resolver_wall_time_ms,
-                "reason": record.reason,
-                "sha256": record.sha256,
-                "content_length": record.content_length,
-                "dry_run": record.dry_run,
-                "metadata": json.dumps(record.metadata, sort_keys=True) if record.metadata else "",
-            }
-        )
-        self._file.flush()
+        row = {
+            "timestamp": ts,
+            "work_id": record.work_id,
+            "resolver_name": record.resolver_name,
+            "resolver_order": record.resolver_order,
+            "url": record.url,
+            "status": record.status,
+            "http_status": record.http_status,
+            "content_type": record.content_type,
+            "elapsed_ms": record.elapsed_ms,
+            "resolver_wall_time_ms": record.resolver_wall_time_ms,
+            "reason": record.reason,
+            "sha256": record.sha256,
+            "content_length": record.content_length,
+            "dry_run": record.dry_run,
+            "metadata": json.dumps(record.metadata, sort_keys=True) if record.metadata else "",
+        }
+        with self._lock:
+            self._writer.writerow(row)
+            self._file.flush()
 
     def log_manifest(self, entry: ManifestEntry) -> None:
         """Forward manifest entries to the JSONL logger.
@@ -509,7 +532,19 @@ class CsvAttemptLoggerAdapter:
             None
         """
         self._logger.close()
-        self._file.close()
+
+    def __enter__(self) -> "CsvAttemptLoggerAdapter":
+        """Return ``self`` when used as a context manager."""
+
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        """Close the CSV file handle on context manager exit."""
+
+        self.close()
+        with self._lock:
+            if not self._file.closed:
+                self._file.close()
 
 
 def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
@@ -642,6 +677,81 @@ def classify_payload(head_bytes: bytes, content_type: str, url: str) -> Optional
     return None
 
 
+def _extract_filename_from_disposition(disposition: Optional[str]) -> Optional[str]:
+    """Return the filename component from a Content-Disposition header."""
+
+    if not disposition:
+        return None
+    parts = [segment.strip() for segment in disposition.split(";") if segment.strip()]
+    for part in parts:
+        lower = part.lower()
+        if lower.startswith("filename*="):
+            try:
+                value = part.split("=", 1)[1].strip()
+            except IndexError:
+                continue
+            _, _, encoded = value.partition("''")
+            candidate = unquote(encoded or value)
+            candidate = candidate.strip('"')
+            if candidate:
+                return candidate
+        if lower.startswith("filename="):
+            try:
+                candidate = part.split("=", 1)[1].strip()
+            except IndexError:
+                continue
+            candidate = candidate.strip('"')
+            if candidate:
+                return candidate
+    return None
+
+
+def _infer_suffix(
+    url: str,
+    content_type: Optional[str],
+    disposition: Optional[str],
+    classification: str,
+    default_suffix: str,
+) -> str:
+    """Infer a file suffix using headers and URL hints."""
+
+    filename = _extract_filename_from_disposition(disposition)
+    if filename:
+        suffix = Path(filename).suffix
+        if suffix:
+            return suffix.lower()
+
+    ctype = (content_type or "").split(";")[0].strip().lower()
+    if ctype == "application/pdf" or (ctype.endswith("pdf") and classification.startswith("pdf")):
+        return ".pdf"
+    if ctype in {"text/html", "application/xhtml+xml"} or "html" in ctype:
+        return ".html"
+
+    if classification.startswith("pdf"):
+        path_suffix = Path(urlsplit(url).path).suffix.lower()
+        if path_suffix:
+            return path_suffix
+        return default_suffix
+
+    if classification == "html":
+        path_suffix = Path(urlsplit(url).path).suffix.lower()
+        if path_suffix:
+            return path_suffix
+        return default_suffix
+
+    return default_suffix
+
+
+def _update_tail_buffer(buffer: bytearray, chunk: bytes, *, limit: int = 1024) -> None:
+    """Maintain the trailing ``limit`` bytes of a streamed download."""
+
+    if not chunk:
+        return
+    buffer.extend(chunk)
+    if len(buffer) > limit:
+        del buffer[:-limit]
+
+
 @dataclass
 class WorkArtifact:
     """Normalized artifact describing an OpenAlex work to process.
@@ -742,6 +852,7 @@ def _build_download_outcome(
     etag: Optional[str],
     last_modified: Optional[str],
     extracted_text_path: Optional[str],
+    tail_bytes: Optional[bytes],
     dry_run: bool,
 ) -> DownloadOutcome:
     """Create a :class:`DownloadOutcome` applying PDF validation rules.
@@ -762,6 +873,8 @@ def _build_download_outcome(
         etag: ETag header value supplied by the origin.
         last_modified: Last-Modified header value supplied by the origin.
         extracted_text_path: Optional path to extracted HTML text artefacts.
+        tail_bytes: Trailing bytes captured from the streamed download for
+            corruption detection heuristics.
         dry_run: Indicates whether this execution runs in dry-run mode.
 
     Returns:
@@ -775,6 +888,40 @@ def _build_download_outcome(
     path_str = str(dest_path) if dest_path else None
 
     if normalized in {"pdf", "pdf_unknown"} and not dry_run and dest_path is not None:
+        if content_length is not None and content_length < 1024:
+            with contextlib.suppress(OSError):
+                dest_path.unlink()
+            return DownloadOutcome(
+                classification="pdf_corrupt",
+                path=None,
+                http_status=response.status_code,
+                content_type=response.headers.get("Content-Type"),
+                elapsed_ms=elapsed_ms,
+                error=None,
+                sha256=None,
+                content_length=None,
+                etag=etag,
+                last_modified=last_modified,
+                extracted_text_path=extracted_text_path,
+            )
+
+        if tail_bytes and b"</html" in tail_bytes.lower():
+            with contextlib.suppress(OSError):
+                dest_path.unlink()
+            return DownloadOutcome(
+                classification="pdf_corrupt",
+                path=None,
+                http_status=response.status_code,
+                content_type=response.headers.get("Content-Type"),
+                elapsed_ms=elapsed_ms,
+                error=None,
+                sha256=None,
+                content_length=None,
+                etag=etag,
+                last_modified=last_modified,
+                extracted_text_path=extracted_text_path,
+            )
+
         if not _has_pdf_eof(dest_path):
             with contextlib.suppress(OSError):
                 dest_path.unlink()
@@ -1012,7 +1159,8 @@ def download_candidate(
     """Download a single candidate URL and classify the payload.
 
     Args:
-        session: HTTP session providing ``head`` and ``get`` methods.
+        session: HTTP session capable of issuing retried requests via the
+            centralised :func:`request_with_retries` helper.
         artifact: Work metadata and output directory handles for the current record.
         url: Candidate download URL discovered by a resolver.
         referer: Optional referer header override provided by the resolver.
@@ -1021,7 +1169,8 @@ def download_candidate(
             and ``previous`` manifest lookup data.
 
     Returns:
-        DownloadOutcome describing the result of the download attempt.
+        DownloadOutcome describing the result of the download attempt including
+        streaming hash metadata when available.
 
     Raises:
         OSError: If writing the downloaded payload to disk fails.
@@ -1054,26 +1203,6 @@ def download_candidate(
     start = time.monotonic()
     content_type_hint = ""
     try:
-        head_headers = dict(headers)
-        head_headers.pop("If-None-Match", None)
-        head_headers.pop("If-Modified-Since", None)
-        try:
-            head = request_with_retries(
-                session,
-                "HEAD",
-                url,
-                max_retries=1,
-                allow_redirects=True,
-                timeout=timeout,
-                headers=head_headers,
-            )
-        except requests.RequestException:
-            head = None
-        else:
-            if head.status_code < 400:
-                content_type_hint = head.headers.get("Content-Type", "") or ""
-            head.close()
-
         with request_with_retries(
             session,
             "GET",
@@ -1120,6 +1249,7 @@ def download_candidate(
             modified_result: ModifiedResult = cond_helper.interpret_response(response)
 
             content_type = response.headers.get("Content-Type") or content_type_hint
+            disposition = response.headers.get("Content-Disposition")
             sniff_buffer = bytearray()
             detected: Optional[str] = None
             flagged_unknown = False
@@ -1127,6 +1257,9 @@ def download_candidate(
             part_path: Optional[Path] = None
             handle = None
             state = DownloadState.PENDING
+            hasher = hashlib.sha256() if not dry_run else None
+            byte_count = 0
+            tail_buffer = bytearray()
 
             try:
                 for chunk in response.iter_content(chunk_size=1 << 15):
@@ -1142,19 +1275,29 @@ def download_candidate(
                         if detected is not None:
                             if dry_run:
                                 break
-                            if detected == "html":
-                                dest_path = artifact.html_dir / f"{artifact.base_stem}.html"
-                            else:
-                                dest_path = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
+                            default_suffix = ".html" if detected == "html" else ".pdf"
+                            suffix = _infer_suffix(url, content_type, disposition, detected, default_suffix)
+                            dest_dir = artifact.html_dir if detected == "html" else artifact.pdf_dir
+                            dest_path = dest_dir / f"{artifact.base_stem}{suffix}"
                             ensure_dir(dest_path.parent)
                             part_path = dest_path.with_suffix(dest_path.suffix + ".part")
                             handle = part_path.open("wb")
-                            handle.write(sniff_buffer)
+                            initial_bytes = bytes(sniff_buffer)
+                            if initial_bytes:
+                                handle.write(initial_bytes)
+                                if hasher:
+                                    hasher.update(initial_bytes)
+                                byte_count += len(initial_bytes)
+                                _update_tail_buffer(tail_buffer, initial_bytes)
                             sniff_buffer.clear()
                             state = DownloadState.WRITING
                             continue
                     elif handle is not None:
                         handle.write(chunk)
+                        if hasher:
+                            hasher.update(chunk)
+                        byte_count += len(chunk)
+                        _update_tail_buffer(tail_buffer, chunk)
 
                 if detected is None:
                     return DownloadOutcome(
@@ -1182,25 +1325,20 @@ def download_candidate(
                     last_modified=modified_result.last_modified,
                     extracted_text_path=None,
                     dry_run=True,
+                    tail_bytes=None,
                 )
 
             sha256: Optional[str] = None
             content_length: Optional[int] = None
+            if dest_path and hasher is not None:
+                sha256 = hasher.hexdigest()
+                content_length = byte_count
             if part_path and dest_path:
-                sha = hashlib.sha256()
-                try:
-                    with part_path.open("rb") as tmp:
-                        for chunk in iter(lambda: tmp.read(1 << 20), b""):
-                            if not chunk:
-                                break
-                            sha.update(chunk)
-                    sha256 = sha.hexdigest()
-                    content_length = part_path.stat().st_size
-                    os.replace(part_path, dest_path)
-                finally:
-                    with contextlib.suppress(FileNotFoundError):
-                        if part_path.exists() and dest_path.exists():
-                            part_path.unlink()
+                os.replace(part_path, dest_path)
+            if part_path:
+                with contextlib.suppress(FileNotFoundError):
+                    part_path.unlink()
+            tail_snapshot: Optional[bytes] = bytes(tail_buffer) if tail_buffer else None
 
             extracted_text_path: Optional[str] = None
             if dest_path and detected == "html" and extract_html_text:
@@ -1236,6 +1374,7 @@ def download_candidate(
                 last_modified=modified_result.last_modified,
                 extracted_text_path=extracted_text_path,
                 dry_run=False,
+                tail_bytes=tail_snapshot,
             )
     except requests.RequestException as exc:
         elapsed_ms = (time.monotonic() - start) * 1000.0
@@ -1378,6 +1517,8 @@ def load_resolver_config(
         config.max_attempts_per_work = args.max_resolver_attempts
     if args.resolver_timeout:
         config.timeout = args.resolver_timeout
+    if args.concurrent_resolvers is not None:
+        config.max_concurrent_resolvers = args.concurrent_resolvers
 
     if resolver_order_override:
         ordered = []
@@ -1412,7 +1553,12 @@ def load_resolver_config(
         headers.pop("mailto", None)
         user_agent = base_agent
     headers["User-Agent"] = user_agent
+    if args.accept:
+        headers["Accept"] = args.accept
     config.polite_headers = headers
+
+    if args.head_precheck is not None:
+        config.enable_head_precheck = args.head_precheck
 
     # Apply resolver rate defaults (Unpaywall recommends 1 request per second)
     config.resolver_min_interval_s.setdefault("unpaywall", 1.0)
@@ -1706,6 +1852,12 @@ def main() -> None:
         help="Default timeout (seconds) for resolver HTTP requests.",
     )
     parser.add_argument(
+        "--concurrent-resolvers",
+        type=int,
+        default=None,
+        help="Maximum resolver threads per work item (default: 1).",
+    )
+    parser.add_argument(
         "--log-path",
         dest="log_jsonl",
         type=Path,
@@ -1718,6 +1870,25 @@ def main() -> None:
         default=None,
         help="Optional CSV attempts log output path.",
     )
+    parser.add_argument(
+        "--head-precheck",
+        dest="head_precheck",
+        action="store_true",
+        help="Enable resolver HEAD preflight filtering (default).",
+    )
+    parser.add_argument(
+        "--no-head-precheck",
+        dest="head_precheck",
+        action="store_false",
+        help="Disable resolver HEAD preflight filtering.",
+    )
+    parser.add_argument(
+        "--accept",
+        type=str,
+        default=None,
+        help="Override the Accept header sent with resolver HTTP requests.",
+    )
+    parser.set_defaults(head_precheck=True)
     parser.add_argument(
         "--log-format",
         choices=["jsonl", "csv"],
@@ -1751,6 +1922,8 @@ def main() -> None:
 
     if args.workers < 1:
         parser.error("--workers must be >= 1")
+    if args.concurrent_resolvers is not None and args.concurrent_resolvers < 1:
+        parser.error("--concurrent-resolvers must be >= 1")
     if not args.topic and not args.topic_id:
         parser.error("Provide --topic or --topic-id.")
 
@@ -1801,31 +1974,6 @@ def main() -> None:
     manifest_path = args.manifest or args.log_jsonl or (pdf_dir / "manifest.jsonl")
     if manifest_path.suffix != ".jsonl":
         manifest_path = manifest_path.with_suffix(".jsonl")
-    base_logger = JsonlLogger(manifest_path)
-    attempt_logger: Any = base_logger
-    csv_path = args.log_csv
-    if args.log_format == "csv":
-        csv_path = csv_path or manifest_path.with_suffix(".csv")
-    if csv_path:
-        attempt_logger = CsvAttemptLoggerAdapter(base_logger, csv_path)
-
-    resume_lookup, resume_completed = load_previous_manifest(args.resume_from)
-    if args.resume_from:
-        clear_resolver_caches()
-
-    metrics = ResolverMetrics()
-    pipeline = ResolverPipeline(
-        resolvers=resolver_instances,
-        config=config,
-        download_func=download_candidate,
-        logger=attempt_logger,
-        metrics=metrics,
-    )
-
-    def _session_factory() -> requests.Session:
-        """Build a fresh requests session configured with polite headers."""
-
-        return _make_session(config.polite_headers)
 
     processed = 0
     saved = 0
@@ -1844,73 +1992,125 @@ def main() -> None:
         if res.get("skipped"):
             skipped += 1
 
-    summary: Dict[str, Any] = {}
-    try:
-        if args.workers == 1:
-            session = _session_factory()
-            try:
-                for work in iterate_openalex(query, per_page=args.per_page, max_results=args.max):
-                    result = process_one_work(
-                        work,
-                        session,
-                        pdf_dir,
-                        html_dir,
-                        pipeline,
-                        attempt_logger,
-                        metrics,
-                        dry_run=args.dry_run,
-                        extract_html_text=args.extract_html_text,
-                        previous_lookup=resume_lookup,
-                        resume_completed=resume_completed,
-                    )
-                    _record_result(result)
-                    if args.sleep > 0:
-                        time.sleep(args.sleep)
-            finally:
-                if hasattr(session, "close"):
-                    session.close()
+    summary_record: Dict[str, Any] = {}
+
+    with contextlib.ExitStack() as stack:
+        base_logger = stack.enter_context(JsonlLogger(manifest_path))
+        attempt_logger: Any = base_logger
+        csv_path = args.log_csv
+        if args.log_format == "csv":
+            csv_path = csv_path or manifest_path.with_suffix(".csv")
+        if csv_path:
+            attempt_logger = stack.enter_context(CsvAttemptLoggerAdapter(base_logger, csv_path))
+
+        resume_lookup, resume_completed = load_previous_manifest(args.resume_from)
+        if args.resume_from:
+            clear_resolver_caches()
+
+        metrics = ResolverMetrics()
+        pipeline = ResolverPipeline(
+            resolvers=resolver_instances,
+            config=config,
+            download_func=download_candidate,
+            logger=attempt_logger,
+            metrics=metrics,
+        )
+
+        def _session_factory() -> requests.Session:
+            """Build a fresh requests session configured with polite headers."""
+
+            return _make_session(config.polite_headers)
+
+        try:
+            if args.workers == 1:
+                session = _session_factory()
+                try:
+                    for work in iterate_openalex(
+                        query, per_page=args.per_page, max_results=args.max
+                    ):
+                        result = process_one_work(
+                            work,
+                            session,
+                            pdf_dir,
+                            html_dir,
+                            pipeline,
+                            attempt_logger,
+                            metrics,
+                            dry_run=args.dry_run,
+                            extract_html_text=args.extract_html_text,
+                            previous_lookup=resume_lookup,
+                            resume_completed=resume_completed,
+                        )
+                        _record_result(result)
+                        if args.sleep > 0:
+                            time.sleep(args.sleep)
+                finally:
+                    if hasattr(session, "close"):
+                        session.close()
+            else:
+                with ThreadPoolExecutor(max_workers=args.workers) as executor:
+                    futures = []
+
+                    def _submit_work(work_item: Dict[str, Any]) -> None:
+                        """Submit a work item to the executor for asynchronous processing."""
+
+                        def _runner() -> Dict[str, Any]:
+                            """Process a single work item within a worker-managed session."""
+
+                            session = _session_factory()
+                            try:
+                                return process_one_work(
+                                    work_item,
+                                    session,
+                                    pdf_dir,
+                                    html_dir,
+                                    pipeline,
+                                    attempt_logger,
+                                    metrics,
+                                    dry_run=args.dry_run,
+                                    extract_html_text=args.extract_html_text,
+                                    previous_lookup=resume_lookup,
+                                    resume_completed=resume_completed,
+                                )
+                            finally:
+                                if hasattr(session, "close"):
+                                    session.close()
+
+                        futures.append(executor.submit(_runner))
+
+                    for work in iterate_openalex(
+                        query, per_page=args.per_page, max_results=args.max
+                    ):
+                        _submit_work(work)
+
+                    for future in as_completed(futures):
+                        _record_result(future.result())
+        except Exception:
+            raise
         else:
-            with ThreadPoolExecutor(max_workers=args.workers) as executor:
-                futures = []
-
-                def _submit_work(work_item: Dict[str, Any]) -> None:
-                    """Submit a work item to the executor for asynchronous processing."""
-
-                    def _runner() -> Dict[str, Any]:
-                        """Process a single work item within a worker-managed session."""
-
-                        session = _session_factory()
-                        try:
-                            return process_one_work(
-                                work_item,
-                                session,
-                                pdf_dir,
-                                html_dir,
-                                pipeline,
-                                attempt_logger,
-                                metrics,
-                                dry_run=args.dry_run,
-                                extract_html_text=args.extract_html_text,
-                                previous_lookup=resume_lookup,
-                                resume_completed=resume_completed,
-                            )
-                        finally:
-                            if hasattr(session, "close"):
-                                session.close()
-
-                    futures.append(executor.submit(_runner))
-
-                for work in iterate_openalex(query, per_page=args.per_page, max_results=args.max):
-                    _submit_work(work)
-
-                for future in as_completed(futures):
-                    _record_result(future.result())
-    except Exception:
-        attempt_logger.close()
-        raise
-    else:
-        summary = metrics.summary()
-        attempt_logger.close()
+            summary = metrics.summary()
+            summary_record = {
+                "processed": processed,
+                "saved": saved,
+                "html_only": html_only,
+                "skipped": skipped,
+                "resolvers": summary,
+            }
+            try:
+                attempt_logger.log_summary(summary_record)
+            except Exception:  # pragma: no cover - defensive logging safeguard
+                LOGGER.warning("Failed to log summary record", exc_info=True)
+            metrics_path = manifest_path.with_suffix(".metrics.json")
+            try:
+                ensure_dir(metrics_path.parent)
+                metrics_path.write_text(
+                    json.dumps(summary_record, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+            except Exception:
+                LOGGER.warning(
+                    "Failed to write metrics sidecar %s", metrics_path, exc_info=True
+                )
 
     print(
         f"\nDone. Processed {processed} works, saved {saved} PDFs, HTML-only {html_only}, skipped {skipped}."
@@ -1921,19 +2121,15 @@ def main() -> None:
     for key, values in summary.items():
         print(f"  {key}: {values}")
 
-    LOGGER.info(
-        "resolver_run_summary %s",
-        json.dumps(
-            {
-                "processed": processed,
-                "saved": saved,
-                "html_only": html_only,
-                "skipped": skipped,
-                "summary": summary,
-            },
-            sort_keys=True,
-        ),
-    )
+    if not summary_record:
+        summary_record = {
+            "processed": processed,
+            "saved": saved,
+            "html_only": html_only,
+            "skipped": skipped,
+            "resolvers": summary,
+        }
+    LOGGER.info("resolver_run_summary %s", json.dumps(summary_record, sort_keys=True))
 
 
 if __name__ == "__main__":
