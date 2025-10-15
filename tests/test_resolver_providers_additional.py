@@ -572,6 +572,62 @@ def test_crossref_resolver_session_json_error(monkeypatch, tmp_path) -> None:
     assert result.event_reason == "json-error"
 
 
+def test_crossref_resolver_uses_central_retry_logic(monkeypatch, tmp_path) -> None:
+    artifact = _artifact(tmp_path)
+    config = ResolverConfig()
+
+    class _Response:
+        def __init__(self, status_code: int, headers=None, payload=None):
+            self.status_code = status_code
+            self.headers = headers or {}
+            self._payload = payload
+
+        def json(self):
+            if isinstance(self._payload, Exception):
+                raise self._payload
+            return self._payload or {"message": {"link": []}}
+
+        def close(self):
+            return None
+
+        @property
+        def text(self):
+            return ""
+
+    responses = [
+        _Response(429, headers={"Retry-After": "1"}),
+        _Response(429, headers={}),
+        _Response(200, payload={"message": {"link": []}}),
+    ]
+
+    class _Session:
+        def __init__(self) -> None:
+            self.calls: list[int] = []
+
+        def request(self, method: str, url: str, **kwargs):
+            if not responses:
+                raise AssertionError("unexpected extra request")
+            response = responses.pop(0)
+            self.calls.append(response.status_code)
+            return response
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.http.random.random", lambda: 0.0
+    )
+    sleep_calls: list[float] = []
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.http.time.sleep", lambda delay: sleep_calls.append(delay)
+    )
+
+    session = _Session()
+    results = list(CrossrefResolver().iter_urls(session, config, artifact))
+
+    assert results == []
+    assert session.calls == [429, 429, 200]
+    assert sleep_calls[0] == pytest.approx(1.0, abs=0.05)
+    assert sleep_calls[1] == pytest.approx(1.5, abs=0.05)
+
+
 # --- DoajResolver ------------------------------------------------------------------------
 
 

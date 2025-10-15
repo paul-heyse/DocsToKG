@@ -27,8 +27,8 @@ import requests
 
 from DocsToKG.ContentDownload.utils import normalize_doi
 
+from ..headers import headers_cache_key
 from ..types import ResolverConfig, ResolverResult
-from .unpaywall import _headers_cache_key
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
@@ -122,12 +122,12 @@ class SemanticScholarResolver:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
             return
         try:
-            data = _fetch_semantic_scholar_data(
-                doi,
-                config.semantic_scholar_api_key,
-                config.get_timeout(self.name),
-                _headers_cache_key(config.polite_headers),
-            )
+                data = _fetch_semantic_scholar_data(
+                    doi,
+                    config.semantic_scholar_api_key,
+                    config.get_timeout(self.name),
+                    headers_cache_key(config.polite_headers),
+                )
         except requests.HTTPError as exc:
             status = getattr(exc.response, "status_code", None)
             detail = status if status is not None else "unknown"

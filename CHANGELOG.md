@@ -9,11 +9,23 @@ All notable changes to DocsToKG are documented in this file.
 - Bounded intra-work concurrency controls and HEAD pre-check filtering options documented in the README and resolver guides.
 - Migration and developer guides covering resolver import paths, configuration, and extensibility patterns.
 - Architecture diagram illustrating the resolver pipeline, conditional request helper, and logging flow.
+- Content download CLI now exposes `--concurrent-resolvers`, `--head-precheck/--no-head-precheck`,
+  and `--accept` flags for resolver coordination and header customisation.
+- Download runs emit JSONL summary records and `.metrics.json` sidecar files capturing aggregate metrics.
+- Optional global URL deduplication and domain-level throttling controls, including
+  `--global-url-dedup` and `--domain-min-interval` CLI flags for ad-hoc runs.
 
 ### Changed
 - Centralised HTTP retry helper now logs timeout/connection issues separately and emits warnings when retries are exhausted.
 - Conditional request helper surfaces detailed error messages when cache metadata is incomplete.
 - All resolver providers emit structured error events for HTTP, timeout, connection, and JSON failures.
+- Adapter-level retries were removed from content download sessions to eliminate compounded retry behaviour.
+- Per-download HEAD requests were retired in favour of streaming hash computation with corruption heuristics.
+- JSONL and CSV attempt loggers now guard writes with locks and implement context managers for safe reuse.
+- Crossref resolver performs HTTP calls through the shared retry helper while reusing the standard header cache key utility.
+- Resolver namespace documents the deprecation timeline for the legacy ``time`` and ``requests`` aliases ahead of their removal.
+- Resolver pipeline enforces optional domain rate limits and skips repeat URLs across works when
+  global deduplication is enabled.
 
 ### Fixed
 - Tests cover HEAD pre-check redirects, resolver concurrency error isolation, and configuration validation edge cases.
