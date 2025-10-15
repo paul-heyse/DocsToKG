@@ -44,9 +44,12 @@ class _SequencedHandler(BaseHTTPRequestHandler):
     statuses: list[int] = []
     retry_after: int | None = None
     calls: list[int] = []
-    content: bytes = b"%PDF-1.4\n%%EOF"
+    head_calls: int = 0
+    request_times: list[float] = []
+    content: bytes = b"%PDF-1.4\n" + (b"0" * 2048) + b"\n%%EOF"
 
     def do_HEAD(self) -> None:  # noqa: D401 - HTTP handler signature
+        self.__class__.head_calls += 1
         self.send_response(200)
         self.send_header("Content-Type", "application/pdf")
         self.end_headers()
@@ -57,6 +60,7 @@ class _SequencedHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         status = self.__class__.statuses.pop(0)
+        self.__class__.request_times.append(time.monotonic())
         self.__class__.calls.append(status)
         self.send_response(status)
         if status == 429 and self.__class__.retry_after is not None:
@@ -77,6 +81,11 @@ def http_server():
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
+        handler.calls = []
+        handler.statuses = []
+        handler.retry_after = None
+        handler.head_calls = 0
+        handler.request_times = []
         yield handler, server
     finally:
         server.shutdown()
@@ -172,7 +181,6 @@ def test_non_retryable_errors_do_not_retry(http_server, tmp_path):
     handler, server = http_server
     handler.statuses = [404]
     handler.retry_after = None
-    handler.calls = []
     url = f"http://127.0.0.1:{server.server_address[1]}/test.pdf"
 
     artifact = _make_artifact(tmp_path)
@@ -191,3 +199,50 @@ def test_non_retryable_errors_do_not_retry(http_server, tmp_path):
         session.close()
     assert outcome.classification == "http_error"
     assert handler.calls == [404]
+
+
+def test_download_candidate_avoids_per_request_head(http_server, tmp_path):
+    """Ensure download path relies solely on GET without redundant HEAD calls."""
+
+    handler, server = http_server
+    handler.statuses = [200]
+    handler.content = b"%PDF-1.4\n" + (b"1" * 4096) + b"\n%%EOF"
+    url = f"http://127.0.0.1:{server.server_address[1]}/asset.pdf"
+
+    _, session, _, outcome = _download(url, tmp_path)
+    try:
+        assert outcome.classification == "pdf"
+        assert handler.head_calls == 0
+        assert handler.calls == [200]
+    finally:
+        session.close()
+
+
+def test_retry_determinism_matches_request_with_retries(monkeypatch, http_server, tmp_path):
+    """Verify retry budget and timing are governed exclusively by the helper."""
+
+    handler, server = http_server
+    handler.statuses = [429, 429, 200]
+    url = f"http://127.0.0.1:{server.server_address[1]}/rate-limited.pdf"
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.http.random.random", lambda: 0.0
+    )
+
+    sleep_durations: list[float] = []
+
+    def _capture_sleep(delay: float) -> None:
+        sleep_durations.append(delay)
+
+    monkeypatch.setattr("DocsToKG.ContentDownload.http.time.sleep", _capture_sleep)
+
+    _, session, _, outcome = _download(url, tmp_path)
+    try:
+        assert outcome.classification == "pdf"
+        assert handler.calls == [429, 429, 200]
+        assert handler.head_calls == 0
+        # Ensure exactly max_retries + 1 attempts were issued (default helper budget)
+        assert len(handler.request_times) == 3
+        assert sleep_durations == [0.75, 1.5]
+    finally:
+        session.close()

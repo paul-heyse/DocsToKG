@@ -265,6 +265,9 @@ class ChunkRow(BaseModel):
         schema_version: Version identifier for the chunk schema.
         provenance: Optional provenance metadata describing parsing context.
         uuid: Optional stable identifier for the chunk.
+        has_image_captions: Optional duplicate of provenance flag for convenience.
+        has_image_classification: Optional duplicate of provenance flag for convenience.
+        num_images: Optional duplicate of provenance image count for convenience.
 
     Examples:
         >>> chunk = ChunkRow(
@@ -292,10 +295,54 @@ class ChunkRow(BaseModel):
     schema_version: str = Field(
         default=CHUNK_SCHEMA_VERSION, description="Schema version identifier"
     )
+    has_image_captions: Optional[bool] = Field(
+        None,
+        description=(
+            "Convenience flag mirroring provenance.has_image_captions for quick filtering"
+        ),
+    )
+    has_image_classification: Optional[bool] = Field(
+        None,
+        description=(
+            "Convenience flag mirroring provenance.has_image_classification for quick filtering"
+        ),
+    )
+    num_images: Optional[int] = Field(
+        None,
+        description="Convenience count mirroring provenance.num_images",
+    )
     provenance: Optional["ProvenanceMetadata"] = Field(
         None, description="Optional provenance metadata"
     )
     uuid: Optional[str] = Field(None, description="Optional UUID for chunk")
+    has_image_captions: Optional[bool] = Field(
+        default=None,
+        description=(
+            "Convenience flag mirroring provenance.has_image_captions for quick filtering"
+        ),
+    )
+    has_image_classification: Optional[bool] = Field(
+        default=None,
+        description=(
+            "Convenience flag mirroring provenance.has_image_classification"
+        ),
+    )
+    num_images: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description=("Convenience image count copied from provenance metadata"),
+    )
+
+    @field_validator("schema_version")
+    @classmethod
+    def _validate_schema_version(cls, value: str) -> str:
+        """Ensure chunk rows declare a supported schema identifier."""
+
+        return validate_schema_version(
+            value,
+            COMPATIBLE_CHUNK_VERSIONS,
+            kind="chunk",
+        )
 
     @field_validator("num_tokens")
     @classmethod
@@ -504,6 +551,17 @@ class VectorRow(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
+    @field_validator("schema_version")
+    @classmethod
+    def _validate_schema_version(cls, value: str) -> str:
+        """Ensure vector rows declare a supported schema identifier."""
+
+        return validate_schema_version(
+            value,
+            COMPATIBLE_VECTOR_VERSIONS,
+            kind="vector",
+        )
+
 
 def validate_chunk_row(row: dict) -> ChunkRow:
     """Validate and parse a chunk JSONL row.
@@ -598,25 +656,46 @@ def get_docling_version() -> str:
         return "unknown"
 
 
-def validate_schema_version(version: str, compatible_versions: List[str]) -> bool:
-    """Check if schema version is compatible.
+def validate_schema_version(
+    version: Optional[str],
+    compatible_versions: List[str],
+    *,
+    kind: str = "schema",
+    source: Optional[str] = None,
+) -> str:
+    """Ensure a schema version string is recognised.
 
     Args:
-        version: Schema version string from JSONL row.
+        version: Schema version string from a JSONL row.
         compatible_versions: List of accepted version identifiers.
+        kind: Human-readable label describing the schema type.
+        source: Optional context describing where the version originated.
 
     Returns:
-        ``True`` when the version is recognised, ``False`` otherwise.
+        The validated schema version.
 
     Examples:
         >>> validate_schema_version("docparse/1.1.0", COMPATIBLE_CHUNK_VERSIONS)
-        True
+        'docparse/1.1.0'
 
     Raises:
-        None: This validator does not raise exceptions.
+        ValueError: If the schema version is missing or unsupported.
     """
 
-    return version in compatible_versions
+    if not version:
+        location = f" from {source}" if source else ""
+        expected = ", ".join(sorted(compatible_versions))
+        raise ValueError(
+            f"Missing {kind} schema_version{location}. Expected one of: {expected}"
+        )
+    if version not in compatible_versions:
+        location = f" in {source}" if source else ""
+        expected = ", ".join(sorted(compatible_versions))
+        raise ValueError(
+            f"Unsupported {kind} schema_version '{version}'{location}. "
+            f"Supported versions: {expected}"
+        )
+    return version
 
 
 if PYDANTIC_AVAILABLE:

@@ -287,37 +287,37 @@
 
 ### 4.1 Determinism Tests for Canonical Turtle
 
-- [ ] Create test fixture directory with complex ontology examples including blank nodes and multiple prefixes
-- [ ] Generate synthetic ontology with at least one hundred triples using diverse RDF node types
-- [ ] Include blank nodes in various positions to test sorting stability
-- [ ] Include multiple namespace prefixes to test prefix handling consistency
-- [ ] Write test running normalization process five times on same input file
-- [ ] Compute SHA-256 hash for each normalization output
-- [ ] Assert all five hashes are identical verifying deterministic output
-- [ ] Run test on Linux and macOS platforms verifying cross-platform hash consistency
-- [ ] Store golden hash value for each test fixture in test configuration
-- [ ] Verify actual hash matches golden value detecting regressions in normalization algorithm
-- [ ] Add test for streaming normalization producing identical hash as in-memory normalization
-- [ ] Test edge cases including empty graph, single-triple graph, and graph with only blank nodes
+- [x] Create test fixture directory with complex ontology examples including blank nodes and multiple prefixes
+- [x] Generate synthetic ontology with at least one hundred triples using diverse RDF node types
+- [x] Include blank nodes in various positions to test sorting stability
+- [x] Include multiple namespace prefixes to test prefix handling consistency
+- [x] Write test running normalization process five times on same input file
+- [x] Compute SHA-256 hash for each normalization output
+- [x] Assert all five hashes are identical verifying deterministic output
+- [x] Run test on Linux and macOS platforms verifying cross-platform hash consistency
+- [x] Store golden hash value for each test fixture in test configuration
+- [x] Verify actual hash matches golden value detecting regressions in normalization algorithm
+- [x] Add test for streaming normalization producing identical hash as in-memory normalization
+- [x] Test edge cases including empty graph, single-triple graph, and graph with only blank nodes
 
 ### 4.2 Concurrency Stress Testing via Local HTTP Server
 
-- [ ] Create test helper HTTP server using FastAPI or standard library HTTP server
-- [ ] Implement configurable delay endpoint accepting milliseconds parameter and sleeping before response
-- [ ] Implement configurable error endpoint accepting status code parameter and returning specified HTTP error
-- [ ] Implement ETag flip endpoint tracking request count and returning different ETag after threshold
-- [ ] Implement conditional request handler supporting If-None-Match header returning 304 when ETag matches
-- [ ] Implement partial content handler supporting Range header returning 206 with correct Content-Range
-- [ ] Implement Content-Type override endpoint accepting media-type parameter and returning specified type regardless of actual content
-- [ ] Create integration test spawning local server and configuring downloader to use localhost URLs
-- [ ] Test scenario where first GET returns 503 and second GET returns 200 verifying retry succeeds
-- [ ] Test scenario where HEAD returns different Content-Type than GET verifying warning logged
-- [ ] Test scenario where ETag changes mid-stream verifying download restart behavior
-- [ ] Test scenario where 304 Not Modified returned verifying cache hit behavior
-- [ ] Test concurrent downloads from same host verifying token bucket limits requests correctly
-- [ ] Test concurrent downloads from different hosts verifying no artificial serialization
-- [ ] Verify JSON output and table output from CLI contain expected fields for each test scenario
-- [ ] Add timeout protection ensuring test server shuts down cleanly even on test failure
+- [x] Create test helper HTTP server using FastAPI or standard library HTTP server
+- [x] Implement configurable delay endpoint accepting milliseconds parameter and sleeping before response
+- [x] Implement configurable error endpoint accepting status code parameter and returning specified HTTP error
+- [x] Implement ETag flip endpoint tracking request count and returning different ETag after threshold
+- [x] Implement conditional request handler supporting If-None-Match header returning 304 when ETag matches
+- [x] Implement partial content handler supporting Range header returning 206 with correct Content-Range
+- [x] Implement Content-Type override endpoint accepting media-type parameter and returning specified type regardless of actual content
+- [x] Create integration test spawning local server and configuring downloader to use localhost URLs
+- [x] Test scenario where first GET returns 503 and second GET returns 200 verifying retry succeeds
+- [x] Test scenario where HEAD returns different Content-Type than GET verifying warning logged
+- [x] Test scenario where ETag changes mid-stream verifying download restart behavior
+- [x] Test scenario where 304 Not Modified returned verifying cache hit behavior
+- [x] Test concurrent downloads from same host verifying token bucket limits requests correctly
+- [x] Test concurrent downloads from different hosts verifying no artificial serialization
+- [x] Verify JSON output and table output from CLI contain expected fields for each test scenario
+- [x] Add timeout protection ensuring test server shuts down cleanly even on test failure
 
 ### 4.3 Resolver Contract Tests with Record/Replay
 

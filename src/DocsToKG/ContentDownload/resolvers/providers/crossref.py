@@ -2,8 +2,9 @@
 Crossref Resolver Provider
 
 This module integrates with the Crossref metadata API to surface direct and
-publisher-hosted PDF links for scholarly works. It uses polite rate limiting
-and caching strategies to comply with Crossref service guidelines.
+publisher-hosted PDF links for scholarly works. It uses polite rate limiting,
+centralised retry handling, and caching strategies to comply with Crossref
+service guidelines.
 
 Key Features:
 - Cached metadata retrieval with header normalisation for polite access.
@@ -26,10 +27,11 @@ from urllib.parse import quote
 
 import requests
 
+from DocsToKG.ContentDownload.http import request_with_retries
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi
 
+from ..headers import headers_cache_key as _headers_cache_key
 from ..types import ResolverConfig, ResolverResult
-from .unpaywall import _headers_cache_key
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
@@ -129,13 +131,18 @@ class CrossrefResolver:
         endpoint = f"https://api.crossref.org/works/{quote(doi)}"
         params = {"mailto": email} if email else None
         headers = dict(config.polite_headers)
+        data: Optional[Dict[str, Any]] = None
         if hasattr(session, "get"):
+            response: Optional[requests.Response] = None
             try:
-                response = session.get(
+                response = request_with_retries(
+                    session,
+                    "GET",
                     endpoint,
                     params=params,
                     timeout=config.get_timeout(self.name),
                     headers=headers,
+                    allow_redirects=True,
                 )
             except requests.Timeout as exc:
                 yield ResolverResult(
@@ -171,8 +178,9 @@ class CrossrefResolver:
                 )
                 return
 
-            status = getattr(response, "status_code", 200)
-            if status != 200:
+            status = response.status_code if response is not None else 200
+            if response is not None and status != 200:
+                response.close()
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -183,18 +191,22 @@ class CrossrefResolver:
                 return
 
             try:
-                data = response.json()
+                if response is not None:
+                    data = response.json()
             except ValueError as json_err:
+                preview = response.text[:200] if response is not None and hasattr(response, "text") else ""
+                if response is not None:
+                    response.close()
                 yield ResolverResult(
                     url=None,
                     event="error",
                     event_reason="json-error",
-                    metadata={
-                        "error_detail": str(json_err),
-                        "content_preview": response.text[:200] if hasattr(response, "text") else "",
-                    },
+                    metadata={"error_detail": str(json_err), "content_preview": preview},
                 )
                 return
+            finally:
+                if response is not None:
+                    response.close()
         else:
             try:
                 data = _fetch_crossref_data(

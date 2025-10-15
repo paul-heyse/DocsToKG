@@ -16,6 +16,7 @@ from email.utils import parsedate_to_datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Protocol, Sequence, Tuple
 from urllib.parse import urlparse
@@ -583,6 +584,52 @@ def _validate_manifest(manifest: Manifest) -> None:
         raise ConfigurationError("Manifest fingerprint must be a string when provided")
 
 
+def _parse_last_modified(value: Optional[str]) -> Optional[datetime]:
+    """Return a timezone-aware datetime parsed from HTTP date headers."""
+
+    if not value:
+        return None
+    try:
+        parsed = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _fetch_last_modified(plan: FetchPlan, config: ResolvedConfig, logger: logging.Logger) -> Optional[str]:
+    """Probe the upstream plan URL for a Last-Modified header."""
+
+    timeout = max(1, getattr(config.defaults.http, "timeout_sec", 30) or 30)
+    headers = dict(plan.headers or {})
+    try:
+        response = requests.head(
+            plan.url,
+            headers=headers,
+            timeout=timeout,
+            allow_redirects=True,
+        )
+        if response.status_code == 405:
+            response.close()
+            response = requests.get(
+                plan.url,
+                headers=headers,
+                timeout=timeout,
+                allow_redirects=True,
+                stream=True,
+            )
+        header = response.headers.get("Last-Modified")
+        response.close()
+        return header
+    except requests.RequestException as exc:  # pragma: no cover - depends on network
+        logger.warning(
+            "last-modified probe failed",
+            extra={"stage": "plan", "resolver": plan.service or plan.url, "error": str(exc)},
+        )
+        return None
+
+
 def _write_manifest(manifest_path: Path, manifest: Manifest) -> None:
     """Persist a validated manifest to disk as JSON.
 
@@ -774,7 +821,11 @@ def fetch_one(
     ensure_python_version()
     active_config = config or ResolvedConfig.from_defaults()
     logging_config = active_config.defaults.logging
-    log = logger or setup_logging(logging_config)
+    log = logger or setup_logging(
+        level=logging_config.level,
+        retention_days=logging_config.retention_days,
+        max_log_size_mb=logging_config.max_log_size_mb,
+    )
     correlation = correlation_id or generate_correlation_id()
     adapter = logging.LoggerAdapter(
         log, extra={"correlation_id": correlation, "ontology_id": spec.id}
@@ -1093,7 +1144,11 @@ def plan_one(
     ensure_python_version()
     active_config = config or ResolvedConfig.from_defaults()
     logging_config = active_config.defaults.logging
-    log = logger or setup_logging(logging_config)
+    log = logger or setup_logging(
+        level=logging_config.level,
+        retention_days=logging_config.retention_days,
+        max_log_size_mb=logging_config.max_log_size_mb,
+    )
     correlation = correlation_id or generate_correlation_id()
     adapter = logging.LoggerAdapter(
         log, extra={"correlation_id": correlation, "ontology_id": spec.id}
@@ -1109,6 +1164,7 @@ def plan_one(
     )
     _ensure_license_allowed(primary.plan, active_config, effective_spec)
     planned = PlannedFetch(
+    return PlannedFetch(
         spec=effective_spec,
         resolver=primary.resolver,
         plan=primary.plan,
@@ -1132,6 +1188,7 @@ def plan_all(
         specs: Iterable of fetch specifications to resolve.
         config: Optional resolved configuration reused across plans.
         logger: Logger instance used for annotation-aware logging.
+        since: Optional cutoff date; plans older than this timestamp are filtered out.
 
     Returns:
         List of PlannedFetch entries describing each ontology plan.
@@ -1144,7 +1201,11 @@ def plan_all(
     ensure_python_version()
     active_config = config or ResolvedConfig.from_defaults()
     logging_config = active_config.defaults.logging
-    log = logger or setup_logging(logging_config)
+    log = logger or setup_logging(
+        level=logging_config.level,
+        retention_days=logging_config.retention_days,
+        max_log_size_mb=logging_config.max_log_size_mb,
+    )
     correlation = generate_correlation_id()
     adapter = logging.LoggerAdapter(log, extra={"correlation_id": correlation})
 
@@ -1218,6 +1279,31 @@ def plan_all(
             continue
         filtered.append(plan)
     return filtered
+                last_known = planned.last_modified or planned.plan.last_modified
+                last_dt = _parse_last_modified(last_known)
+                if since is not None and last_dt is None:
+                    header = _fetch_last_modified(planned.plan, active_config, log)
+                    if header:
+                        planned.plan.last_modified = header
+                        planned.last_modified = header
+                        last_dt = _parse_last_modified(header)
+                if since is not None and last_dt is not None and last_dt < since:
+                    adapter.info(
+                        "plan filtered by cutoff",
+                        extra={
+                            "stage": "plan",
+                            "ontology_id": planned.spec.id,
+                            "last_modified": planned.last_modified or planned.plan.last_modified,
+                            "since": since.isoformat(),
+                        },
+                    )
+                    continue
+                if planned.last_modified is None and planned.plan.last_modified is not None:
+                    planned.last_modified = planned.plan.last_modified
+                results[index] = planned
+
+    ordered_indices = sorted(results)
+    return [results[i] for i in ordered_indices]
 
 
 def fetch_all(
@@ -1253,7 +1339,11 @@ def fetch_all(
             log = candidate
         else:
             logging_config = active_config.defaults.logging
-            log = setup_logging(logging_config)
+            log = setup_logging(
+                level=logging_config.level,
+                retention_days=logging_config.retention_days,
+                max_log_size_mb=logging_config.max_log_size_mb,
+            )
     correlation = generate_correlation_id()
     adapter = logging.LoggerAdapter(log, extra={"correlation_id": correlation})
 
