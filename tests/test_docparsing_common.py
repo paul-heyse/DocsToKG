@@ -160,6 +160,25 @@ def test_manifest_append(tmp_path: Path) -> None:
     record = json.loads(content)
     assert record["doc_id"] == "doc-1"
     assert record["status"] == "success"
+    assert record["stage"] == "chunks"
+
+
+def test_manifest_append_records_hash_algorithm(monkeypatch: pytest.MonkeyPatch) -> None:
+    manifest = _common.data_manifests() / "docparse.chunks.manifest.jsonl"
+    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha256")
+    _common.manifest_append(
+        "chunks",
+        "doc-1",
+        "success",
+        input_hash="abc",
+        hash_alg=_common.resolve_hash_algorithm(),
+        duration_s=0.5,
+    )
+
+    content = manifest.read_text(encoding="utf-8").strip()
+    record = json.loads(content)
+    assert record["input_hash"] == "abc"
+    assert record["hash_alg"] == "sha256"
 
 
 def test_manifest_append_invalid_status() -> None:
@@ -167,11 +186,38 @@ def test_manifest_append_invalid_status() -> None:
         _common.manifest_append("chunk", "doc-1", "bad")
 
 
-def test_compute_content_hash(tmp_path: Path) -> None:
+def test_compute_content_hash_defaults_to_sha1(tmp_path: Path) -> None:
     target = tmp_path / "hash.txt"
     target.write_text("hello", encoding="utf-8")
     digest = _common.compute_content_hash(target)
     assert digest == hashlib.sha1(b"hello").hexdigest()
+
+
+def test_compute_content_hash_respects_env_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "hash.txt"
+    target.write_text("hello", encoding="utf-8")
+    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha256")
+    digest = _common.compute_content_hash(target)
+    assert digest == hashlib.sha256(b"hello").hexdigest()
+
+
+def test_compute_content_hash_explicit_algorithm(tmp_path: Path) -> None:
+    target = tmp_path / "hash.txt"
+    target.write_text("hello", encoding="utf-8")
+    digest = _common.compute_content_hash(target, algorithm="sha256")
+    assert digest == hashlib.sha256(b"hello").hexdigest()
+
+
+def test_compute_content_hash_env_overrides_argument(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "hash.txt"
+    target.write_text("hello", encoding="utf-8")
+    monkeypatch.setenv("DOCSTOKG_HASH_ALG", "sha512")
+    digest = _common.compute_content_hash(target, algorithm="sha256")
+    assert digest == hashlib.sha512(b"hello").hexdigest()
 
 
 def test_acquire_lock_success(tmp_path: Path) -> None:
