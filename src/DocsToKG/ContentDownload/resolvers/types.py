@@ -20,6 +20,7 @@ DEFAULT_RESOLVER_ORDER: List[str] = [
     "pmc",
     "europe_pmc",
     "core",
+    "zenodo",
     "doaj",
     "semantic_scholar",
     "openaire",

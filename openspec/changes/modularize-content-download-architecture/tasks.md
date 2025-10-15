@@ -869,7 +869,7 @@
 
 ## 8. Zenodo Resolver
 
-- [ ] 8.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/zenodo.py`
+- [x] 8.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/zenodo.py`
 
   ```python
   """Zenodo repository resolver for DOI-indexed research outputs."""
@@ -953,14 +953,14 @@
                           )
   ```
 
-- [ ] 8.2 Add Zenodo to resolver registry
+- [x] 8.2 Add Zenodo to resolver registry
   - Import `ZenodoResolver` in `resolvers/providers/__init__.py`
   - Insert in `default_resolvers()` after `CoreResolver`, before `DoajResolver`
 
-- [ ] 8.3 Update `DEFAULT_RESOLVER_ORDER` constant
+- [x] 8.3 Update `DEFAULT_RESOLVER_ORDER` constant
   - Insert `"zenodo"` after `"core"` in list
 
-- [ ] 8.4 Add Zenodo resolver tests in `tests/test_zenodo_resolver.py`
+- [x] 8.4 Add Zenodo resolver tests in `tests/test_zenodo_resolver.py`
   - Test DOI query with successful response containing PDF file
   - Test DOI query with multiple files, filter to PDF only
   - Test DOI query with no matches (empty hits)
@@ -969,7 +969,7 @@
   - Test DOI query with network error
   - Use `responses` library for mock HTTP fixtures
 
-- [ ] 8.5 Add test fixture for Zenodo API response
+- [x] 8.5 Add test fixture for Zenodo API response
 
   ```python
   # Create tests/data/zenodo_response_sample.json
