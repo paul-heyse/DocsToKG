@@ -16,13 +16,15 @@ import os
 import re
 import shutil
 import socket
+import tarfile
 import threading
 import time
+import unicodedata
 import zipfile
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Dict, List, Optional
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import ParseResult, urlparse, urlunparse
 
 import pooch
 import psutil
@@ -144,17 +146,67 @@ def sanitize_filename(filename: str) -> str:
     return safe
 
 
-def validate_url_security(url: str) -> str:
-    """Validate URLs to avoid SSRF and insecure schemes.
+def _enforce_idn_safety(host: str) -> None:
+    """Raise ``ConfigError`` when hostname contains suspicious IDN patterns."""
+
+    if all(ord(char) < 128 for char in host):
+        return
+
+    scripts = set()
+    for char in host:
+        if ord(char) < 128:
+            continue
+
+        category = unicodedata.category(char)
+        if category in {"Mn", "Me", "Cf"}:
+            raise ConfigError("Internationalized host contains invisible characters")
+
+        try:
+            name = unicodedata.name(char)
+        except ValueError as exc:
+            raise ConfigError("Internationalized host contains unknown characters") from exc
+
+        for script in ("LATIN", "CYRILLIC", "GREEK"):
+            if script in name:
+                scripts.add(script)
+                break
+
+    if len(scripts) > 1:
+        raise ConfigError("Internationalized host mixes multiple scripts")
+
+
+def _rebuild_netloc(parsed: ParseResult, ascii_host: str) -> str:
+    """Reconstruct URL netloc with normalized hostname."""
+
+    auth = ""
+    if parsed.username:
+        auth = parsed.username
+        if parsed.password:
+            auth = f"{auth}:{parsed.password}"
+        auth = f"{auth}@"
+
+    host_component = ascii_host
+    if ":" in host_component and not host_component.startswith("["):
+        host_component = f"[{host_component}]"
+
+    port = f":{parsed.port}" if parsed.port else ""
+    return f"{auth}{host_component}{port}"
+
+
+def validate_url_security(
+    url: str, http_config: Optional[DownloadConfiguration] = None
+) -> str:
+    """Validate URLs to avoid SSRF, enforce HTTPS, and honor host allowlists.
 
     Args:
         url: URL returned by a resolver for ontology download.
+        http_config: Download configuration providing optional host allowlist.
 
     Returns:
         HTTPS URL safe for downstream download operations.
 
     Raises:
-        ConfigError: If the URL uses an insecure scheme or resolves to private addresses.
+        ConfigError: If the URL violates security requirements or allowlists.
     """
 
     parsed = urlparse(url)
@@ -167,32 +219,63 @@ def validate_url_security(url: str) -> str:
         parsed = parsed._replace(scheme="https")
     if parsed.scheme != "https":
         raise ConfigError("Only HTTPS URLs are allowed for ontology downloads")
+
     host = parsed.hostname
     if not host:
         raise ConfigError("URL must include hostname")
+
     try:
         ipaddress.ip_address(host)
         is_ip = True
     except ValueError:
         is_ip = False
-    if is_ip:
-        address = ipaddress.ip_address(host)
-        if address.is_private or address.is_loopback or address.is_reserved or address.is_multicast:
-            raise ConfigError(f"Refusing to download from private address {host}")
-    else:
+
+    ascii_host = host.lower()
+    if not is_ip:
+        _enforce_idn_safety(host)
         try:
-            infos = socket.getaddrinfo(host, None)
-        except socket.gaierror as exc:
-            raise ConfigError(f"Unable to resolve hostname {host}") from exc
-        for info in infos:
-            candidate_ip = ipaddress.ip_address(info[4][0])
-            if (
-                candidate_ip.is_private
-                or candidate_ip.is_loopback
-                or candidate_ip.is_reserved
-                or candidate_ip.is_multicast
-            ):
-                raise ConfigError(f"Refusing to download from private address resolved for {host}")
+            ascii_host = host.encode("idna").decode("ascii").lower()
+        except UnicodeError as exc:
+            raise ConfigError(f"Invalid internationalized hostname: {host}") from exc
+
+    parsed = parsed._replace(netloc=_rebuild_netloc(parsed, ascii_host))
+
+    allowed = http_config.normalized_allowed_hosts() if http_config else None
+    if allowed:
+        exact, suffixes = allowed
+        if ascii_host not in exact and not any(
+            ascii_host == suffix or ascii_host.endswith(f".{suffix}") for suffix in suffixes
+        ):
+            raise ConfigError(f"Host {host} not in allowlist")
+
+    if is_ip:
+        address = ipaddress.ip_address(ascii_host)
+        if (
+            address.is_private
+            or address.is_loopback
+            or address.is_reserved
+            or address.is_multicast
+        ):
+            raise ConfigError(f"Refusing to download from private address {host}")
+        return urlunparse(parsed)
+
+    try:
+        infos = socket.getaddrinfo(ascii_host, None)
+    except socket.gaierror as exc:
+        raise ConfigError(f"Unable to resolve hostname {host}") from exc
+
+    for info in infos:
+        candidate_ip = ipaddress.ip_address(info[4][0])
+        if (
+            candidate_ip.is_private
+            or candidate_ip.is_loopback
+            or candidate_ip.is_reserved
+            or candidate_ip.is_multicast
+        ):
+            raise ConfigError(
+                f"Refusing to download from private address resolved for {host}"
+            )
+
     return urlunparse(parsed)
 
 
@@ -212,10 +295,80 @@ def sha256_file(path: Path) -> str:
     return hasher.hexdigest()
 
 
+_MAX_COMPRESSION_RATIO = 10.0
+
+
+def _validate_member_path(member_name: str) -> Path:
+    """Validate archive member paths to prevent traversal attacks.
+
+    Args:
+        member_name: Path declared within the archive.
+
+    Returns:
+        Sanitised relative path safe for extraction on the local filesystem.
+
+    Raises:
+        ConfigError: If the member path is absolute or contains traversal segments.
+    """
+
+    normalized = member_name.replace("\\", "/")
+    relative = PurePosixPath(normalized)
+    if relative.is_absolute():
+        raise ConfigError(f"Unsafe absolute path detected in archive: {member_name}")
+    if not relative.parts:
+        raise ConfigError(f"Empty path detected in archive: {member_name}")
+    if any(part in {"", ".", ".."} for part in relative.parts):
+        raise ConfigError(f"Unsafe path detected in archive: {member_name}")
+    return Path(*relative.parts)
+
+
+def _check_compression_ratio(
+    *,
+    total_uncompressed: int,
+    compressed_size: int,
+    archive: Path,
+    logger: Optional[logging.Logger],
+    archive_type: str,
+) -> None:
+    """Ensure compressed archives do not expand beyond the permitted ratio.
+
+    Args:
+        total_uncompressed: Sum of file sizes within the archive.
+        compressed_size: Archive file size on disk (or sum of compressed entries).
+        archive: Path to the archive on disk.
+        logger: Optional logger for emitting diagnostic messages.
+        archive_type: Human readable label for error messages (ZIP/TAR).
+
+    Raises:
+        ConfigError: If the archive exceeds the allowed expansion ratio.
+    """
+
+    if compressed_size <= 0:
+        return
+    ratio = total_uncompressed / float(compressed_size)
+    if ratio > _MAX_COMPRESSION_RATIO:
+        if logger:
+            logger.error(
+                "archive compression ratio too high",
+                extra={
+                    "stage": "extract",
+                    "archive": str(archive),
+                    "ratio": round(ratio, 2),
+                    "compressed_bytes": compressed_size,
+                    "uncompressed_bytes": total_uncompressed,
+                    "limit": _MAX_COMPRESSION_RATIO,
+                },
+            )
+        raise ConfigError(
+            f"{archive_type} archive {archive} expands to {total_uncompressed} bytes, "
+            f"exceeding {_MAX_COMPRESSION_RATIO}:1 compression ratio"
+        )
+
+
 def extract_zip_safe(
     zip_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None
 ) -> List[Path]:
-    """Extract a ZIP archive while preventing path traversal.
+    """Extract a ZIP archive while preventing traversal and compression bombs.
 
     Args:
         zip_path: Path to the ZIP file to extract.
@@ -226,7 +379,7 @@ def extract_zip_safe(
         List of extracted file paths.
 
     Raises:
-        ConfigError: If the archive contains unsafe paths or is missing.
+        ConfigError: If the archive contains unsafe paths, compression bombs, or is missing.
     """
 
     if not zip_path.exists():
@@ -234,14 +387,33 @@ def extract_zip_safe(
     destination.mkdir(parents=True, exist_ok=True)
     extracted: List[Path] = []
     with zipfile.ZipFile(zip_path) as archive:
-        for member in archive.infolist():
-            member_path = Path(member.filename)
-            if member_path.is_absolute() or ".." in member_path.parts:
-                raise ConfigError(f"Unsafe path detected in archive: {member.filename}")
-            target_path = destination / member_path
-            target_path.parent.mkdir(parents=True, exist_ok=True)
+        members = archive.infolist()
+        safe_members: List[tuple[zipfile.ZipInfo, Path]] = []
+        total_uncompressed = 0
+        for member in members:
+            member_path = _validate_member_path(member.filename)
             if member.is_dir():
+                safe_members.append((member, member_path))
                 continue
+            total_uncompressed += int(member.file_size)
+            safe_members.append((member, member_path))
+        compressed_size = max(
+            zip_path.stat().st_size,
+            sum(int(member.compress_size) for member in members) or 0,
+        )
+        _check_compression_ratio(
+            total_uncompressed=total_uncompressed,
+            compressed_size=compressed_size,
+            archive=zip_path,
+            logger=logger,
+            archive_type="ZIP",
+        )
+        for member, member_path in safe_members:
+            target_path = destination / member_path
+            if member.is_dir():
+                target_path.mkdir(parents=True, exist_ok=True)
+                continue
+            target_path.parent.mkdir(parents=True, exist_ok=True)
             with archive.open(member, "r") as source, target_path.open("wb") as target:
                 shutil.copyfileobj(source, target)
             extracted.append(target_path)
@@ -249,6 +421,79 @@ def extract_zip_safe(
         logger.info(
             "extracted zip archive",
             extra={"stage": "extract", "archive": str(zip_path), "files": len(extracted)},
+        )
+    return extracted
+
+
+def extract_tar_safe(
+    tar_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None
+) -> List[Path]:
+    """Safely extract tar archives with traversal and compression checks.
+
+    Args:
+        tar_path: Path to the tar archive (tar, tar.gz, tar.xz).
+        destination: Directory where extracted files should be stored.
+        logger: Optional logger for emitting extraction telemetry.
+
+    Returns:
+        List of extracted file paths.
+
+    Raises:
+        ConfigError: If the archive is missing, unsafe, or exceeds compression limits.
+    """
+
+    if not tar_path.exists():
+        raise ConfigError(f"TAR archive not found: {tar_path}")
+    destination.mkdir(parents=True, exist_ok=True)
+    extracted: List[Path] = []
+    try:
+        with tarfile.open(tar_path, mode="r:*") as archive:
+            members = archive.getmembers()
+            safe_members: List[tuple[tarfile.TarInfo, Path]] = []
+            total_uncompressed = 0
+            for member in members:
+                member_path = _validate_member_path(member.name)
+                if member.isdir():
+                    safe_members.append((member, member_path))
+                    continue
+                if member.islnk() or member.issym():
+                    raise ConfigError(f"Unsafe link detected in archive: {member.name}")
+                if member.isdev():
+                    raise ConfigError(
+                        f"Unsupported special file detected in archive: {member.name}"
+                    )
+                if not member.isfile():
+                    raise ConfigError(
+                        f"Unsupported tar member type encountered: {member.name}"
+                    )
+                total_uncompressed += int(member.size)
+                safe_members.append((member, member_path))
+            compressed_size = tar_path.stat().st_size
+            _check_compression_ratio(
+                total_uncompressed=total_uncompressed,
+                compressed_size=compressed_size,
+                archive=tar_path,
+                logger=logger,
+                archive_type="TAR",
+            )
+            for member, member_path in safe_members:
+                if member.isdir():
+                    (destination / member_path).mkdir(parents=True, exist_ok=True)
+                    continue
+                target_path = destination / member_path
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                extracted_file = archive.extractfile(member)
+                if extracted_file is None:
+                    raise ConfigError(f"Failed to extract member: {member.name}")
+                with extracted_file as source, target_path.open("wb") as target:
+                    shutil.copyfileobj(source, target)
+                extracted.append(target_path)
+    except tarfile.TarError as exc:
+        raise ConfigError(f"Failed to extract tar archive {tar_path}: {exc}") from exc
+    if logger:
+        logger.info(
+            "extracted tar archive",
+            extra={"stage": "extract", "archive": str(tar_path), "files": len(extracted)},
         )
     return extracted
 
@@ -647,7 +892,7 @@ def download_stream(
     Raises:
         ConfigError: If validation fails, limits are exceeded, or HTTP errors occur.
     """
-    secure_url = validate_url_security(url)
+    secure_url = validate_url_security(url, http_config)
     parsed = urlparse(secure_url)
     bucket = _get_bucket(parsed.hostname or "default", http_config, service)
     bucket.consume()

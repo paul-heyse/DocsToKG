@@ -55,6 +55,8 @@ from DocsToKG.DocParsing.schemas import (
 
 SOFT_BARRIER_MARGIN = 64
 
+SOFT_BARRIER_MARGIN = 64
+
 # ---------- Defaults ----------
 DEFAULT_DATA_ROOT = detect_data_root()
 DEFAULT_IN_DIR = data_doctags(DEFAULT_DATA_ROOT)
@@ -210,6 +212,37 @@ def merge_rec(a: Rec, b: Rec, tokenizer: HuggingFaceTokenizer) -> Rec:
         has_image_classification=a.has_image_classification or b.has_image_classification,
         num_images=a.num_images + b.num_images,
     )
+
+
+# ---------- Topic-aware boundary detection ----------
+def is_structural_boundary(rec: Rec) -> bool:
+    """Detect whether a chunk begins with a structural heading or caption marker.
+
+    Args:
+        rec: Chunk record to inspect.
+
+    Returns:
+        ``True`` when ``rec.text`` starts with a heading indicator (``#``) or a
+        recognised caption prefix, otherwise ``False``.
+
+    Examples:
+        >>> is_structural_boundary(Rec(text="# Introduction", n_tok=2, src_idxs=[], refs=[], pages=[]))
+        True
+        >>> is_structural_boundary(Rec(text="Regular paragraph", n_tok=2, src_idxs=[], refs=[], pages=[]))
+        False
+    """
+
+    text = rec.text.lstrip()
+    if text.startswith("#"):
+        return True
+
+    caption_markers = (
+        "Figure caption:",
+        "Table:",
+        "Picture description:",
+        "<!-- image -->",
+    )
+    return any(text.startswith(marker) for marker in caption_markers)
 
 
 # ---------- Topic-aware boundary detection ----------

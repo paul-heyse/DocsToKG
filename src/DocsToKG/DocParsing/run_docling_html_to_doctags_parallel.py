@@ -275,6 +275,11 @@ def main(args: argparse.Namespace | None = None) -> int:
     elif args.resume:
         _LOGGER.info("Resume mode enabled: unchanged outputs will be skipped")
 
+    if args.force:
+        print("Force mode: reprocessing all documents")
+    elif args.resume:
+        print("Resume mode enabled: unchanged outputs will be skipped")
+
     files = list_htmls(input_dir)
     if not files:
         _LOGGER.warning(
