@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/europe_pmc.py
+# hypothesis_version: 6.141.0
+
+[200, 'EuropePmcResolver', 'WorkArtifact', 'content_preview', 'documentStyle', 'error', 'error_detail', 'error_type', 'europe_pmc', 'format', 'fullTextUrl', 'fullTextUrlList', 'get', 'json', 'json-error', 'no-doi', 'pageSize', 'pdf', 'query', 'request-error', 'result', 'resultList', 'skipped', 'source', 'text', 'timeout', 'unexpected-error', 'url']

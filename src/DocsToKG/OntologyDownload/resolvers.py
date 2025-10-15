@@ -142,6 +142,8 @@ class FetchPlan:
     license: Optional[str]
     media_type: Optional[str]
     service: Optional[str] = None
+    last_modified: Optional[str] = None
+    content_length: Optional[int] = None
 
 
 class BaseResolver:
@@ -297,6 +299,8 @@ class BaseResolver:
         license: Optional[str] = None,
         media_type: Optional[str] = None,
         service: Optional[str] = None,
+        last_modified: Optional[str] = None,
+        content_length: Optional[int] = None,
     ) -> FetchPlan:
         """Construct a ``FetchPlan`` from resolver components.
 
@@ -321,6 +325,8 @@ class BaseResolver:
             license=normalized_license,
             media_type=media_type,
             service=service,
+            last_modified=last_modified,
+            content_length=content_length,
         )
 
 

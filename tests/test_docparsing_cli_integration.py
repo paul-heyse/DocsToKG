@@ -92,13 +92,22 @@ def test_chunk_and_embed_cli_with_dependency_stubs(
         for row in vector_rows:
             schemas.validate_vector_row(row)
 
-    manifest_path = data_root / "Manifests" / "docparse.manifest.jsonl"
-    assert manifest_path.exists(), "Pipeline did not emit a manifest"
-    with manifest_path.open("r", encoding="utf-8") as handle:
-        manifest_rows = [json.loads(line) for line in handle]
+    manifest_dir = data_root / "Manifests"
+    chunk_manifest = manifest_dir / "docparse.chunks.manifest.jsonl"
+    embed_manifest = manifest_dir / "docparse.embeddings.manifest.jsonl"
+    assert chunk_manifest.exists(), "Chunk stage manifest missing"
+    assert embed_manifest.exists(), "Embedding stage manifest missing"
+    with chunk_manifest.open("r", encoding="utf-8") as handle:
+        chunk_rows = [json.loads(line) for line in handle]
+    with embed_manifest.open("r", encoding="utf-8") as handle:
+        embed_rows = [json.loads(line) for line in handle]
 
-    assert any(row["stage"] == "chunks" and row["status"] == "success" for row in manifest_rows)
-    assert any(row["stage"] == "embeddings" and row["status"] == "success" for row in manifest_rows)
+    assert any(row["stage"] == "chunks" and row["status"] == "success" for row in chunk_rows)
+    assert any(row["stage"] == "embeddings" and row["status"] == "success" for row in embed_rows)
+    for rows in (chunk_rows, embed_rows):
+        for row in rows:
+            if "input_hash" in row:
+                assert row["hash_alg"] == "sha1"
 
 
 def test_embedding_dependency_guard_message(monkeypatch: pytest.MonkeyPatch) -> None:

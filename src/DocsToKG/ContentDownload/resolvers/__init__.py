@@ -64,6 +64,13 @@ from .types import (
 
 DEFAULT_RESOLVER_ORDER = _DEFAULT_RESOLVER_ORDER
 
+# Legacy convenience exports retained temporarily for backward compatibility.
+#
+# Downstream consumers historically imported ``time`` and ``requests`` via the
+# resolver package. These aliases will be removed in the next minor release
+# (after 0.x) to encourage direct imports from the standard library and PyPI.
+# The deprecation warnings emitted by :func:`__getattr__` provide advance notice
+# so integrations can migrate before the removal occurs.
 _LEGACY_EXPORTS = {
     "time": _time,
     "requests": _requests,

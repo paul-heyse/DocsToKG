@@ -90,6 +90,9 @@ class StorageBackend(Protocol):
             Sorted list of version strings available to the backend.
         """
 
+    def available_ontologies(self) -> List[str]:
+        """Return sorted ontology identifiers managed by the backend."""
+
     def finalize_version(self, ontology_id: str, version: str, local_dir: Path) -> None:
         """Persist local version directory to remote storage when applicable.
 
@@ -113,6 +116,10 @@ class StorageBackend(Protocol):
 
     def set_latest_version(self, ontology_id: str, version: str) -> None:
         """Update latest version marker for an ontology."""
+        """Return sorted ontology identifiers known to the backend."""
+
+    def delete_version(self, ontology_id: str, version: str) -> None:
+        """Remove an ontology version from all backing stores."""
 
 
 def _safe_identifiers(ontology_id: str, version: str) -> Tuple[str, str]:
@@ -202,6 +209,13 @@ class LocalStorageBackend:
         versions = [entry.name for entry in base.iterdir() if entry.is_dir()]
         return sorted(versions)
 
+    def available_ontologies(self) -> List[str]:
+        """Return ontology identifiers discovered under the storage root."""
+
+        if not self.root.exists():
+            return []
+        return sorted([entry.name for entry in self.root.iterdir() if entry.is_dir()])
+
     def finalize_version(self, ontology_id: str, version: str, local_dir: Path) -> None:
         """Finalize a local version directory (no-op for purely local storage).
 
@@ -275,6 +289,27 @@ def _directory_size(path: Path) -> int:
         if stat.S_ISREG(info.st_mode):
             total += info.st_size
     return total
+    def delete_version(self, ontology_id: str, version: str) -> int:
+        """Remove a stored ontology version and return reclaimed bytes."""
+
+        base = self._version_dir(ontology_id, version)
+        if not base.exists():
+            return 0
+        reclaimed = 0
+        for path in base.rglob('*'):
+            if path.is_file():
+                reclaimed += path.stat().st_size
+        shutil.rmtree(base, ignore_errors=False)
+        return reclaimed
+    def available_ontologies(self) -> List[str]:
+        if not self.root.exists():
+            return []
+        return sorted([entry.name for entry in self.root.iterdir() if entry.is_dir()])
+
+    def delete_version(self, ontology_id: str, version: str) -> None:
+        base = self._version_dir(ontology_id, version)
+        if base.exists():
+            shutil.rmtree(base)
 
 
 class FsspecStorageBackend(LocalStorageBackend):
@@ -341,6 +376,27 @@ class FsspecStorageBackend(LocalStorageBackend):
         merged = sorted({*local_versions, *remote_versions})
         return merged
 
+    def available_ontologies(self) -> List[str]:
+        """Return ontology identifiers available locally or remotely."""
+
+        local_ids = super().available_ontologies()
+        try:
+            entries = self.fs.ls(str(self.base_path), detail=False)
+        except FileNotFoundError:
+            entries = []
+        remote_ids = [
+            PurePosixPath(entry).name
+            for entry in entries
+            if entry and not entry.endswith(".tmp")
+        ]
+        return sorted({*local_ids, *remote_ids})
+
+    def delete_version(self, ontology_id: str, version: str) -> None:
+        super().delete_version(ontology_id, version)
+        remote_dir = self._remote_version_path(ontology_id, version)
+        if self.fs.exists(str(remote_dir)):
+            self.fs.rm(str(remote_dir), recursive=True)
+
     def ensure_local_version(self, ontology_id: str, version: str) -> Path:
         """Mirror a remote ontology version into the local cache if necessary.
 
@@ -400,6 +456,24 @@ class FsspecStorageBackend(LocalStorageBackend):
             self.fs.rm(str(remote_dir), recursive=True)
         except FileNotFoundError:
             pass
+        """Remove local and remote artifacts for a stored version."""
+
+        reclaimed = super().delete_version(ontology_id, version)
+        remote_dir = self._remote_version_path(ontology_id, version)
+        if self.fs.exists(str(remote_dir)):
+            try:
+                remote_files = self.fs.find(str(remote_dir))
+            except FileNotFoundError:
+                remote_files = []
+            for remote_file in remote_files:
+                try:
+                    info = self.fs.info(remote_file)
+                except FileNotFoundError:
+                    continue
+                size = info.get('size') if isinstance(info, dict) else None
+                if isinstance(size, (int, float)):
+                    reclaimed += int(size)
+            self.fs.rm(str(remote_dir), recursive=True)
         return reclaimed
 
 

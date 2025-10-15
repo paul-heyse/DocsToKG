@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/openaire.py
+# hypothesis_version: 6.141.0
+
+[200, '.pdf', 'OpenAireResolver', 'WorkArtifact', 'connection-error', 'content_preview', 'doi', 'error', 'error_detail', 'error_type', 'get', 'http', 'http-error', 'json-error', 'no-doi', 'openaire', 'request-error', 'skipped', 'source', 'text', 'timeout', 'unexpected-error']

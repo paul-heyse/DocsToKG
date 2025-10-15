@@ -20,16 +20,20 @@ Usage:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Sequence, Tuple
+from typing import Any, Dict, Sequence, Tuple, TYPE_CHECKING
 
-if TYPE_CHECKING:  # pragma: no cover - imported for type checking only
+if TYPE_CHECKING:  # pragma: no cover - type hints only
     from .core import FetchResult, PlannedFetch
 
 __all__ = [
+    "format_plan_rows",
+    "format_results_table",
     "format_table",
     "format_plan_rows",
     "format_results_table",
     "format_validation_summary",
+    "format_plan_rows",
+    "format_results_table",
 ]
 
 
@@ -118,6 +122,44 @@ def format_plan_rows(plans: Sequence["PlannedFetch"]) -> Sequence[Sequence[str]]
     """
 
     rows = []
+def format_plan_rows(plans: Iterable[PlannedFetch]) -> List[Tuple[str, str, str, str, str]]:
+    """Return plan metadata rows for human-readable tabular output.
+
+    Args:
+        plans: Sequence of planned fetch objects describing resolver outcomes.
+
+    Returns:
+        List of tuples containing ontology identifier, resolver, service,
+        media type, and URL for table rendering.
+    """
+
+    rows: List[Tuple[str, str, str, str, str]] = []
+    for plan in plans:
+        media_type = plan.plan.media_type or ""
+        service = plan.plan.service or plan.resolver
+        rows.append((plan.spec.id, plan.resolver, service or "", media_type, plan.plan.url))
+    return rows
+
+
+def format_results_table(results: Iterable[FetchResult]) -> str:
+    """Render fetch results as an ASCII table."""
+
+    rows: List[Tuple[str, str, str, str, str]] = []
+    for result in results:
+        rows.append(
+            (
+                result.spec.id,
+                result.spec.resolver,
+                result.status,
+                result.sha256 or "",
+                str(result.local_path),
+            )
+        )
+    return format_table(("id", "resolver", "status", "sha256", "path"), rows)
+def format_plan_rows(plans: Sequence["PlannedFetch"]) -> Sequence[Tuple[str, str, str, str, str]]:
+    """Return rows summarizing planned fetches for table rendering."""
+
+    rows: list[Tuple[str, str, str, str, str]] = []
     for plan in plans:
         rows.append(
             (

@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/doaj.py
+# hypothesis_version: 6.141.0
+
+[200, '.pdf', 'DoajResolver', 'WorkArtifact', 'X-API-KEY', 'bibjson', 'connection-error', 'content_preview', 'doaj', 'error', 'error_detail', 'error_type', 'get', 'http-error', 'json-error', 'link', 'no-doi', 'pageSize', 'q', 'request-error', 'results', 'skipped', 'source', 'text', 'timeout', 'unexpected-error', 'url']

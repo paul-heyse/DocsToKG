@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/HybridSearch/operations.py
+# hypothesis_version: 6.141.0
+
+[0.2, 'ascii', 'chunks', 'faiss', 'opensearch', 'registry', 'vector_ids']

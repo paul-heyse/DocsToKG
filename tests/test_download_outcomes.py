@@ -79,11 +79,10 @@ def stub_requests(
 def test_successful_pdf_download_populates_metadata(tmp_path, monkeypatch):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/paper.pdf"
-    pdf_bytes = b"%PDF-1.4\n1 0 obj<<>>\nendobj\n%%EOF"
+    pdf_bytes = b"%PDF-1.4\n" + (b"x" * 2048) + b"\n%%EOF"
     expected_sha = hashlib.sha256(pdf_bytes).hexdigest()
 
     mapping = {
-        ("HEAD", url): FakeResponse(200, headers={"Content-Type": "application/pdf"}),
         ("GET", url): lambda: FakeResponse(
             200,
             headers={
@@ -109,6 +108,8 @@ def test_successful_pdf_download_populates_metadata(tmp_path, monkeypatch):
     assert outcome.last_modified == "Mon, 01 Jan 2024 00:00:00 GMT"
     assert outcome.error is None
     assert outcome.extracted_text_path is None
+    rehashed = hashlib.sha256(stored.read_bytes()).hexdigest()
+    assert rehashed == expected_sha
 
 
 def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
@@ -128,7 +129,6 @@ def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
     }
 
     mapping = {
-        ("HEAD", url): FakeResponse(200, headers={"Content-Type": "application/pdf"}),
         ("GET", url): lambda: FakeResponse(
             304,
             headers={"Content-Type": "application/pdf"},
@@ -155,7 +155,6 @@ def test_http_error_sets_metadata_to_none(tmp_path, monkeypatch):
     url = "https://example.org/paper.pdf"
 
     mapping = {
-        ("HEAD", url): FakeResponse(200, headers={"Content-Type": "application/pdf"}),
         ("GET", url): lambda: FakeResponse(404, headers={"Content-Type": "text/html"}),
     }
     stub_requests(monkeypatch, mapping)
@@ -181,7 +180,6 @@ def test_html_download_with_text_extraction(tmp_path, monkeypatch):
     monkeypatch.setitem(sys.modules, "trafilatura", html_extractor)
 
     mapping = {
-        ("HEAD", url): FakeResponse(200, headers={"Content-Type": "text/html"}),
         ("GET", url): lambda: FakeResponse(
             200,
             headers={
@@ -218,10 +216,9 @@ def test_html_download_with_text_extraction(tmp_path, monkeypatch):
 def test_dry_run_preserves_metadata_without_files(tmp_path, monkeypatch):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/paper.pdf"
-    pdf_bytes = b"%PDF-1.4\n1 0 obj<<>>\nendobj\n%%EOF"
+    pdf_bytes = b"%PDF-1.4\n" + (b"y" * 2048) + b"\n%%EOF"
 
     mapping = {
-        ("HEAD", url): FakeResponse(200, headers={"Content-Type": "application/pdf"}),
         ("GET", url): lambda: FakeResponse(
             200,
             headers={
@@ -251,6 +248,50 @@ def test_dry_run_preserves_metadata_without_files(tmp_path, monkeypatch):
     assert outcome.extracted_text_path is None
     assert outcome.etag == '"etag-dry"'
     assert outcome.last_modified == "Thu, 04 Jan 2024 00:00:00 GMT"
+
+
+def test_small_pdf_detected_as_corrupt(tmp_path, monkeypatch):
+    artifact = make_artifact(tmp_path)
+    url = "https://example.org/tiny.pdf"
+    tiny_pdf = b"%PDF-1.4\n1 0 obj<<>>\nendobj\n%%EOF"
+
+    mapping = {
+        ("GET", url): lambda: FakeResponse(
+            200,
+            headers={"Content-Type": "application/pdf"},
+            chunks=[tiny_pdf],
+        )
+    }
+    stub_requests(monkeypatch, mapping)
+
+    session = requests.Session()
+    outcome = downloader.download_candidate(session, artifact, url, None, timeout=10.0)
+
+    assert outcome.classification == "pdf_corrupt"
+    assert outcome.path is None
+    assert not any(artifact.pdf_dir.glob("*.pdf"))
+
+
+def test_html_tail_in_pdf_marks_corruption(tmp_path, monkeypatch):
+    artifact = make_artifact(tmp_path)
+    url = "https://example.org/error.pdf"
+    payload = b"%PDF-1.4\nstream\n<html>Error page</html>"
+
+    mapping = {
+        ("GET", url): lambda: FakeResponse(
+            200,
+            headers={"Content-Type": "application/pdf"},
+            chunks=[payload],
+        )
+    }
+    stub_requests(monkeypatch, mapping)
+
+    session = requests.Session()
+    outcome = downloader.download_candidate(session, artifact, url, None, timeout=10.0)
+
+    assert outcome.classification == "pdf_corrupt"
+    assert outcome.path is None
+    assert not any(artifact.pdf_dir.glob("*.pdf"))
 
 
 def test_build_manifest_entry_includes_download_metadata(tmp_path):
@@ -284,3 +325,53 @@ def test_build_manifest_entry_includes_download_metadata(tmp_path):
     assert entry.etag == '"etag-manifest"'
     assert entry.last_modified == "Fri, 05 Jan 2024 00:00:00 GMT"
     assert entry.extracted_text_path == str(artifact.html_dir / "saved.txt")
+
+
+def test_rfc5987_filename_suffix(tmp_path, monkeypatch):
+    artifact = make_artifact(tmp_path)
+    url = "https://example.org/no-extension"
+    pdf_bytes = b"%PDF-1.4\n" + (b"z" * 2048) + b"\n%%EOF"
+
+    mapping = {
+        ("GET", url): lambda: FakeResponse(
+            200,
+            headers={
+                "Content-Type": "application/octet-stream",
+                "Content-Disposition": "attachment; filename*=UTF-8''paper%E2%82%AC.PDF",
+            },
+            chunks=[pdf_bytes],
+        )
+    }
+    stub_requests(monkeypatch, mapping)
+
+    session = requests.Session()
+    outcome = downloader.download_candidate(session, artifact, url, None, timeout=10.0)
+
+    assert outcome.classification == "pdf"
+    assert outcome.path is not None
+    assert outcome.path.endswith(".pdf")
+
+
+def test_html_filename_suffix_from_disposition(tmp_path, monkeypatch):
+    artifact = make_artifact(tmp_path)
+    url = "https://example.org/content"
+    html_bytes = b"<html><body>Hi</body></html>"
+
+    mapping = {
+        ("GET", url): lambda: FakeResponse(
+            200,
+            headers={
+                "Content-Type": "application/xhtml+xml",
+                "Content-Disposition": "inline; filename=landing.xhtml",
+            },
+            chunks=[html_bytes],
+        )
+    }
+    stub_requests(monkeypatch, mapping)
+
+    session = requests.Session()
+    outcome = downloader.download_candidate(session, artifact, url, None, timeout=10.0)
+
+    assert outcome.classification == "html"
+    assert outcome.path is not None
+    assert outcome.path.endswith(".xhtml")

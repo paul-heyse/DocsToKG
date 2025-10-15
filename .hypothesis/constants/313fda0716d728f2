@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/__init__.py
+# hypothesis_version: 6.141.0
+
+['ArxivResolver', 'AttemptLogger', 'AttemptRecord', 'CoreResolver', 'CrossrefResolver', 'DoajResolver', 'DownloadFunc', 'DownloadOutcome', 'EuropePmcResolver', 'HalResolver', 'LandingPageResolver', 'OpenAireResolver', 'OpenAlexResolver', 'OsfResolver', 'PipelineResult', 'PmcResolver', 'Resolver', 'ResolverConfig', 'ResolverMetrics', 'ResolverPipeline', 'ResolverResult', 'UnpaywallResolver', 'WaybackResolver', 'ZenodoResolver', 'default_resolvers', 'requests', 'time']

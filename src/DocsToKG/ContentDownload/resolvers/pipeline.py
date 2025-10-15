@@ -8,8 +8,8 @@ for logging and metrics collection.
 
 Key Features:
 - Sequential and concurrent resolver scheduling with configurable concurrency.
-- Rate-limiting enforcement and optional HEAD preflight checks.
-- State tracking for seen URLs, HTML fallbacks, and failure metrics.
+- Rate-limiting enforcement, optional domain-level throttling, and HEAD preflight checks.
+- State tracking for seen URLs, global deduplication, HTML fallbacks, and failure metrics.
 
 Usage:
     from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
@@ -31,6 +31,7 @@ import time
 from collections import defaultdict
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
+from urllib.parse import urlsplit
 
 import requests
 
@@ -205,6 +206,10 @@ class ResolverPipeline:
         self.metrics = metrics or ResolverMetrics()
         self._last_invocation: Dict[str, float] = defaultdict(lambda: 0.0)
         self._lock = threading.Lock()
+        self._global_seen_urls: set[str] = set()
+        self._global_lock = threading.Lock()
+        self._last_host_hit: defaultdict[str, float] = defaultdict(float)
+        self._host_lock = threading.Lock()
         self._download_accepts_context = _callable_accepts_argument(download_func, "context")
 
     def _respect_rate_limit(self, resolver_name: str) -> None:
@@ -236,6 +241,34 @@ class ResolverPipeline:
             self._last_invocation[resolver_name] = now + wait
         if wait > 0:
             time.sleep(wait)
+
+    def _respect_domain_limit(self, url: str) -> None:
+        """Enforce per-domain throttling when configured."""
+
+        if not url or not self.config.domain_min_interval_s:
+            return
+        host = urlsplit(url).netloc.lower()
+        if not host:
+            return
+        interval = self.config.domain_min_interval_s.get(host)
+        if not interval:
+            return
+        now = time.monotonic()
+        wait = 0.0
+        with self._host_lock:
+            last = self._last_host_hit[host]
+            if last <= 0.0:
+                self._last_host_hit[host] = now if now > 0.0 else 1e-9
+                return
+            elapsed = now - last
+            if elapsed >= interval:
+                self._last_host_hit[host] = now
+                return
+            wait = interval - elapsed
+        if wait > 0:
+            time.sleep(wait)
+            with self._host_lock:
+                self._last_host_hit[host] = time.monotonic()
 
     def _jitter_sleep(self) -> None:
         """Introduce a small delay to avoid stampeding downstream services.
@@ -652,6 +685,30 @@ class ResolverPipeline:
         url = result.url
         if not url:
             return None
+        if self.config.enable_global_url_dedup:
+            with self._global_lock:
+                duplicate = url in self._global_seen_urls
+                if not duplicate:
+                    self._global_seen_urls.add(url)
+            if duplicate:
+                self.logger.log(
+                    AttemptRecord(
+                        work_id=artifact.work_id,
+                        resolver_name=resolver_name,
+                        resolver_order=order_index,
+                        url=url,
+                        status="skipped",
+                        http_status=None,
+                        content_type=None,
+                        elapsed_ms=None,
+                        reason="duplicate-url-global",
+                        metadata=result.metadata,
+                        dry_run=state.dry_run,
+                        resolver_wall_time_ms=resolver_wall_time_ms,
+                    )
+                )
+                self.metrics.record_skip(resolver_name, "duplicate-url-global")
+                return None
         if url in state.seen_urls:
             self.logger.log(
                 AttemptRecord(
@@ -695,10 +752,11 @@ class ResolverPipeline:
                         resolver_wall_time_ms=resolver_wall_time_ms,
                     )
                 )
-                self.metrics.record_skip(resolver_name, "head-precheck-failed")
-                return None
+            self.metrics.record_skip(resolver_name, "head-precheck-failed")
+            return None
 
         state.attempt_counter += 1
+        self._respect_domain_limit(url)
         if self._download_accepts_context:
             outcome = self.download_func(
                 session,

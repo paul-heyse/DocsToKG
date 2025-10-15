@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/osf.py
+# hypothesis_version: 6.141.0
+
+[200, 'OsfResolver', 'WorkArtifact', 'attributes', 'connection-error', 'content_preview', 'data', 'download', 'error', 'error_detail', 'error_type', 'filter[doi]', 'get', 'http-error', 'json-error', 'links', 'no-doi', 'osf', 'primary_file', 'request-error', 'skipped', 'source', 'text', 'timeout', 'unexpected-error']

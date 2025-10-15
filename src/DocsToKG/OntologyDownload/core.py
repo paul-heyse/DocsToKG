@@ -12,12 +12,16 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from email.utils import parsedate_to_datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Protocol, Sequence, Tuple
 from urllib.parse import urlparse
+
+import requests
 
 from .config import ConfigError, ResolvedConfig, ensure_python_version
 from .download import (
@@ -363,6 +367,161 @@ class PlannedFetch:
     plan: FetchPlan
     candidates: Sequence[ResolverCandidate]
     metadata: Dict[str, object] = field(default_factory=dict)
+    last_modified: Optional[str] = None
+    last_modified_at: Optional[datetime] = None
+    size: Optional[int] = None
+
+
+def _coerce_datetime(value: Optional[str]) -> Optional[datetime]:
+    """Return timezone-aware datetime parsed from HTTP or ISO timestamp."""
+
+    if not value:
+        return None
+    try:
+        parsed = parsedate_to_datetime(value)
+    except (TypeError, ValueError, IndexError):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    else:
+        parsed = parsed.astimezone(timezone.utc)
+    return parsed
+
+
+def _normalize_timestamp(value: Optional[str]) -> Optional[str]:
+    """Return canonical ISO8601 string for HTTP timestamp headers."""
+
+    parsed = _coerce_datetime(value)
+    if parsed is None:
+        return value
+    return parsed.isoformat().replace("+00:00", "Z")
+
+
+def _populate_plan_metadata(
+    planned: PlannedFetch,
+    config: ResolvedConfig,
+    adapter: logging.LoggerAdapter,
+) -> PlannedFetch:
+    """Augment planned fetch with HTTP metadata when available."""
+
+    if planned.plan.content_length is not None and planned.size is None:
+        planned.size = planned.plan.content_length
+    if planned.plan.last_modified and not planned.last_modified:
+        normalized = _normalize_timestamp(planned.plan.last_modified)
+        planned.last_modified = normalized
+        planned.last_modified_at = _coerce_datetime(normalized)
+        planned.plan.last_modified = normalized
+    elif planned.last_modified:
+        normalized = _normalize_timestamp(planned.last_modified)
+        planned.last_modified = normalized
+        planned.last_modified_at = _coerce_datetime(normalized)
+        if normalized:
+            planned.plan.last_modified = normalized
+
+    needs_size = planned.size is None
+    needs_last_modified = planned.last_modified is None
+    if not (needs_size or needs_last_modified):
+        return planned
+
+    try:
+        validate_url_security(planned.plan.url, config.defaults.http.allowed_hosts)
+    except ConfigError as exc:
+        adapter.warning(
+            "metadata probe skipped",
+            extra={
+                "stage": "plan",
+                "ontology_id": planned.spec.id,
+                "error": str(exc),
+            },
+        )
+        return planned
+
+    timeout = getattr(config.defaults.http, "timeout_sec", 30)
+    headers = dict(planned.plan.headers or {})
+
+    try:
+        head_response = requests.head(
+            planned.plan.url,
+            headers=headers,
+            allow_redirects=True,
+            timeout=timeout,
+        )
+    except requests.RequestException as exc:
+        adapter.warning(
+            "metadata probe failed",
+            extra={
+                "stage": "plan",
+                "ontology_id": planned.spec.id,
+                "url": planned.plan.url,
+                "error": str(exc),
+            },
+        )
+        return planned
+
+    headers_map = head_response.headers
+    status = head_response.status_code
+    ok = head_response.ok
+    head_response.close()
+
+    if status == 405:
+        try:
+            get_response = requests.get(
+                planned.plan.url,
+                headers=headers,
+                allow_redirects=True,
+                timeout=timeout,
+                stream=True,
+            )
+        except requests.RequestException as exc:
+            adapter.warning(
+                "metadata probe failed",
+                extra={
+                    "stage": "plan",
+                    "ontology_id": planned.spec.id,
+                    "url": planned.plan.url,
+                    "error": str(exc),
+                },
+            )
+            return planned
+        headers_map = get_response.headers
+        ok = get_response.ok
+        status = get_response.status_code
+        get_response.close()
+
+    if not ok:
+        adapter.warning(
+            "metadata probe rejected",
+            extra={
+                "stage": "plan",
+                "ontology_id": planned.spec.id,
+                "url": planned.plan.url,
+                "status": status,
+            },
+        )
+        return planned
+
+    last_modified_value = headers_map.get("Last-Modified") or headers_map.get("last-modified")
+    if last_modified_value:
+        normalized = _normalize_timestamp(last_modified_value)
+        planned.last_modified = normalized or last_modified_value
+        planned.last_modified_at = _coerce_datetime(normalized or last_modified_value)
+        planned.plan.last_modified = normalized or last_modified_value
+
+    if planned.size is None:
+        content_length_value = headers_map.get("Content-Length") or headers_map.get("content-length")
+        if content_length_value:
+            try:
+                parsed_length = int(content_length_value)
+            except ValueError:
+                parsed_length = None
+            if parsed_length is not None:
+                planned.size = parsed_length
+                planned.plan.content_length = parsed_length
+
+    return planned
 
 
 def _read_manifest(manifest_path: Path) -> Optional[dict]:
@@ -424,6 +583,52 @@ def _validate_manifest(manifest: Manifest) -> None:
         raise ConfigurationError("Manifest normalized_sha256 must be a string when provided")
     if manifest.fingerprint is not None and not isinstance(manifest.fingerprint, str):
         raise ConfigurationError("Manifest fingerprint must be a string when provided")
+
+
+def _parse_last_modified(value: Optional[str]) -> Optional[datetime]:
+    """Return a timezone-aware datetime parsed from HTTP date headers."""
+
+    if not value:
+        return None
+    try:
+        parsed = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _fetch_last_modified(plan: FetchPlan, config: ResolvedConfig, logger: logging.Logger) -> Optional[str]:
+    """Probe the upstream plan URL for a Last-Modified header."""
+
+    timeout = max(1, getattr(config.defaults.http, "timeout_sec", 30) or 30)
+    headers = dict(plan.headers or {})
+    try:
+        response = requests.head(
+            plan.url,
+            headers=headers,
+            timeout=timeout,
+            allow_redirects=True,
+        )
+        if response.status_code == 405:
+            response.close()
+            response = requests.get(
+                plan.url,
+                headers=headers,
+                timeout=timeout,
+                allow_redirects=True,
+                stream=True,
+            )
+        header = response.headers.get("Last-Modified")
+        response.close()
+        return header
+    except requests.RequestException as exc:  # pragma: no cover - depends on network
+        logger.warning(
+            "last-modified probe failed",
+            extra={"stage": "plan", "resolver": plan.service or plan.url, "error": str(exc)},
+        )
+        return None
 
 
 def _write_manifest(manifest_path: Path, manifest: Manifest) -> None:
@@ -959,12 +1164,16 @@ def plan_one(
         target_formats=spec.target_formats,
     )
     _ensure_license_allowed(primary.plan, active_config, effective_spec)
+    planned = PlannedFetch(
     return PlannedFetch(
         spec=effective_spec,
         resolver=primary.resolver,
         plan=primary.plan,
         candidates=tuple(candidates),
+        last_modified=primary.plan.last_modified,
+        size=primary.plan.content_length,
     )
+    return _populate_plan_metadata(planned, active_config, adapter)
 
 
 def plan_all(
@@ -972,6 +1181,7 @@ def plan_all(
     *,
     config: Optional[ResolvedConfig] = None,
     logger: Optional[logging.Logger] = None,
+    since: Optional[datetime] = None,
 ) -> List[PlannedFetch]:
     """Return resolver plans for a collection of ontologies.
 
@@ -979,6 +1189,7 @@ def plan_all(
         specs: Iterable of fetch specifications to resolve.
         config: Optional resolved configuration reused across plans.
         logger: Logger instance used for annotation-aware logging.
+        since: Optional cutoff date; plans older than this timestamp are filtered out.
 
     Returns:
         List of PlannedFetch entries describing each ontology plan.
@@ -1045,6 +1256,51 @@ def plan_all(
                         pending.cancel()
                     raise
             else:
+                results[index] = planned
+
+    ordered_indices = sorted(results)
+    ordered_plans = [results[i] for i in ordered_indices]
+
+    if since is None:
+        return ordered_plans
+
+    filtered: List[PlannedFetch] = []
+    for plan in ordered_plans:
+        last_modified = plan.last_modified_at or _coerce_datetime(plan.last_modified)
+        if last_modified and last_modified < since:
+            adapter.info(
+                "plan filtered by since",
+                extra={
+                    "stage": "plan",
+                    "ontology_id": plan.spec.id,
+                    "last_modified": plan.last_modified,
+                    "since": since.isoformat().replace("+00:00", "Z"),
+                },
+            )
+            continue
+        filtered.append(plan)
+    return filtered
+                last_known = planned.last_modified or planned.plan.last_modified
+                last_dt = _parse_last_modified(last_known)
+                if since is not None and last_dt is None:
+                    header = _fetch_last_modified(planned.plan, active_config, log)
+                    if header:
+                        planned.plan.last_modified = header
+                        planned.last_modified = header
+                        last_dt = _parse_last_modified(header)
+                if since is not None and last_dt is not None and last_dt < since:
+                    adapter.info(
+                        "plan filtered by cutoff",
+                        extra={
+                            "stage": "plan",
+                            "ontology_id": planned.spec.id,
+                            "last_modified": planned.last_modified or planned.plan.last_modified,
+                            "since": since.isoformat(),
+                        },
+                    )
+                    continue
+                if planned.last_modified is None and planned.plan.last_modified is not None:
+                    planned.last_modified = planned.plan.last_modified
                 results[index] = planned
 
     ordered_indices = sorted(results)

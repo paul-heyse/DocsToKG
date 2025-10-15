@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/pipeline.py
+# hypothesis_version: 6.141.0
+
+[0.0, 1e-09, 0.1, 5.0, 1000.0, 200, 302, 304, '0', 'Content-Length', 'Content-Type', 'HEAD', 'ResolverPipeline', 'WorkArtifact', 'attempt_counter', 'context', 'disabled', 'dry_run', 'duplicate-url', 'duplicate-url-global', 'error', 'event', 'failed_urls', 'head-precheck-failed', 'html', 'html_paths', 'max-attempts-reached', 'message', 'missing', 'not-applicable', 'resolver-disabled', 'resolver-exception', 'resolver-missing', 'seen_urls', 'skipped', 'text/html']

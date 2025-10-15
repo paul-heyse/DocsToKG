@@ -31,6 +31,7 @@ import json
 import logging
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -257,6 +258,11 @@ def normalize_streaming(
                 if writer is not None:
                     writer.write(chunk)
         return hasher.hexdigest()
+def _term_to_string(term, namespace_manager) -> str:
+    formatter = getattr(term, "n3", None)
+    if callable(formatter):
+        return formatter(namespace_manager)
+    return str(term)
 
 
 def _canonicalize_turtle(graph) -> str:
@@ -286,23 +292,20 @@ def _canonicalize_turtle(graph) -> str:
     except Exception as exc:  # pragma: no cover - stub graphs are not iterable
         raise AttributeError("graph is not iterable") from exc
 
-    def _term_to_string(term) -> str:
-        formatter = getattr(term, "n3", None)
-        if callable(formatter):
-            return formatter(namespace_manager)
-        return str(term)
-
     triple_lines = [
-        f"{_term_to_string(subject)} {_term_to_string(predicate)} {_term_to_string(obj)} ."
+        f"{_term_to_string(subject, namespace_manager)} {_term_to_string(predicate, namespace_manager)} {_term_to_string(obj, namespace_manager)} ."
         for subject, predicate, obj in sorted(
             ((s, p, o) for s, p, o in triples),
             key=lambda item: (
-                _term_to_string(item[0]),
-                _term_to_string(item[1]),
-                _term_to_string(item[2]),
+                _term_to_string(item[0], namespace_manager),
+                _term_to_string(item[1], namespace_manager),
+                _term_to_string(item[2], namespace_manager),
             ),
         )
     ]
+
+    bnode_map: Dict[str, str] = {}
+    triple_lines = [_canonicalize_blank_nodes_line(line, bnode_map) for line in triple_lines]
 
     prefix_lines = []
     for key in sorted(prefix_map):
@@ -315,6 +318,126 @@ def _canonicalize_turtle(graph) -> str:
         lines.append("")
     lines.extend(triple_lines)
     return "\n".join(lines) + ("\n" if lines else "")
+
+
+_BNODE_PATTERN = re.compile(r"_:[A-Za-z0-9]+")
+
+
+def _canonicalize_blank_nodes_line(line: str, mapping: Dict[str, str]) -> str:
+    """Replace blank node identifiers with deterministic sequential labels."""
+
+    def _replace(match: re.Match[str]) -> str:
+        key = match.group(0)
+        mapped = mapping.get(key)
+        if mapped is None:
+            mapped = f"_:b{len(mapping)}"
+            mapping[key] = mapped
+        return mapped
+
+    return _BNODE_PATTERN.sub(_replace, line)
+
+
+def _sort_triple_file(source: Path, destination: Path) -> None:
+    """Sort serialized triple lines using platform sort when available."""
+
+    sort_binary = shutil.which("sort")
+    if sort_binary:
+        try:
+            with destination.open("w", encoding="utf-8", newline="\n") as handle:
+                subprocess.run(  # noqa: PLW1510 - intentional check handling
+                    [sort_binary, source.as_posix()],
+                    check=True,
+                    stdout=handle,
+                    text=True,
+                )
+            return
+        except (subprocess.SubprocessError, OSError):
+            # Fall back to pure Python sorting when the external command fails.
+            pass
+
+    with source.open("r", encoding="utf-8") as handle:
+        lines = handle.readlines()
+    lines.sort()
+    destination.write_text("".join(lines), encoding="utf-8")
+
+
+def normalize_streaming(
+    source: Path,
+    *,
+    output_path: Optional[Path] = None,
+    graph=None,
+) -> str:
+    """Normalize ontologies using external sort to ensure deterministic output.
+
+    The streaming path serializes triples to a temporary file, leverages the
+    platform ``sort`` utility (when available) to order the triples
+    lexicographically, and streams the sorted output while computing the
+    canonical SHA-256 hash. Callers may supply an ``output_path`` to persist the
+    normalized Turtle document without storing the entire content in memory.
+    """
+
+    graph_obj = graph if graph is not None else rdflib.Graph()
+    if graph is None:
+        graph_obj.parse(source.as_posix())
+
+    namespace_manager = getattr(graph_obj, "namespace_manager", None)
+    prefix_map: Dict[str, str] = {}
+    if namespace_manager and hasattr(namespace_manager, "namespaces"):
+        for prefix, namespace in namespace_manager.namespaces():
+            key = prefix or ""
+            prefix_map[key] = str(namespace)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        unsorted_path = Path(temp_dir) / "triples.nt"
+        with unsorted_path.open("w", encoding="utf-8", newline="\n") as handle:
+            for subject, predicate, obj in graph_obj:
+                line = (
+                    f"{_term_to_string(subject, namespace_manager)} "
+                    f"{_term_to_string(predicate, namespace_manager)} "
+                    f"{_term_to_string(obj, namespace_manager)} .\n"
+                )
+                handle.write(line)
+
+        sorted_path = Path(temp_dir) / "triples.sorted"
+        _sort_triple_file(unsorted_path, sorted_path)
+
+        writer = None
+        if output_path is not None:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            writer = output_path.open("wb")
+
+        sha256 = hashlib.sha256()
+
+        def _write(data: bytes) -> None:
+            if not data:
+                return
+            sha256.update(data)
+            if writer:
+                writer.write(data)
+
+        bnode_map: Dict[str, str] = {}
+
+        try:
+            for key in sorted(prefix_map):
+                prefix_line = f"@prefix {key + ':' if key else ':'} <{prefix_map[key]}> .\n"
+                _write(prefix_line.encode("utf-8"))
+
+            with sorted_path.open("r", encoding="utf-8") as handle:
+                first_line = handle.readline()
+                has_triples = bool(first_line)
+                if prefix_map and has_triples:
+                    _write(b"\n")
+                if has_triples:
+                    canonical_first = _canonicalize_blank_nodes_line(first_line.rstrip("\n"), bnode_map)
+                    _write(canonical_first.encode("utf-8") + b"\n")
+                    for raw_line in handle:
+                        canonical_line = _canonicalize_blank_nodes_line(raw_line.rstrip("\n"), bnode_map)
+                        _write(canonical_line.encode("utf-8") + b"\n")
+        finally:
+            if writer:
+                writer.close()
+
+    return sha256.hexdigest()
 
 
 class ValidatorSubprocessError(RuntimeError):
@@ -565,6 +688,41 @@ def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> Valid
                 else:
                     normalized_path.write_text(canonical_ttl, encoding="utf-8")
                 normalized_sha = hashlib.sha256(canonical_ttl.encode("utf-8")).hexdigest()
+        normalized_sha: Optional[str] = None
+        if "ttl" in request.config.defaults.normalize_to:
+            request.normalized_dir.mkdir(parents=True, exist_ok=True)
+            normalized_path = request.normalized_dir / (request.file_path.stem + ".ttl")
+            threshold_mb = (
+                request.config.defaults.validation.streaming_normalization_threshold_mb
+            )
+            file_size = request.file_path.stat().st_size
+            use_streaming = file_size >= threshold_mb * (1024**2)
+            if use_streaming:
+                try:
+                    normalized_sha = normalize_streaming(
+                        request.file_path,
+                        output_path=normalized_path,
+                        graph=graph,
+                    )
+                    normalization_mode = "streaming"
+                except Exception as exc:  # pylint: disable=broad-except
+                    logger.warning(
+                        "streaming normalization failed, falling back to in-memory",
+                        extra={
+                            "stage": "validate",
+                            "validator": "rdflib",
+                            "error": str(exc),
+                        },
+                    )
+            if normalized_sha is None:
+                try:
+                    canonical_ttl = _canonicalize_turtle(graph)
+                    normalized_path.write_text(canonical_ttl, encoding="utf-8")
+                    normalized_sha = hashlib.sha256(canonical_ttl.encode("utf-8")).hexdigest()
+                except AttributeError:
+                    graph.serialize(destination=normalized_path, format="turtle")
+                    canonical_ttl = normalized_path.read_text(encoding="utf-8")
+                    normalized_sha = hashlib.sha256(canonical_ttl.encode("utf-8")).hexdigest()
             payload["normalized_sha256"] = normalized_sha
             payload["normalization_mode"] = normalization_mode
             output_files.append(str(normalized_path))
@@ -857,6 +1015,7 @@ __all__ = [
     "ValidationRequest",
     "ValidationResult",
     "run_validators",
+    "normalize_streaming",
     "validate_rdflib",
     "validate_pronto",
     "validate_owlready2",

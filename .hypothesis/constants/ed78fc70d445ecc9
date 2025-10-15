@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/HybridSearch/api.py
+# hypothesis_version: 6.141.0
+
+['bm25', 'chunk_id', 'cursor', 'dense', 'diagnostics', 'diversification', 'doc_id', 'error', 'filters', 'fused_rank', 'highlights', 'limit', 'metadata', 'namespace', 'next_cursor', 'page_size', 'provenance_offsets', 'query', 'results', 'score', 'splade', 'text', 'timings_ms', 'total_candidates']

@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/OntologyDownload/storage.py
+# hypothesis_version: 6.141.0
+
+['*', '.tmp', '/', '\\', 'cache', 'configs', 'logs', 'manifest.json', 'normalized', 'ontologies', 'ontology-fetcher', 'original', 'unused', 'validation']

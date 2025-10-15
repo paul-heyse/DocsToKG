@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/core.py
+# hypothesis_version: 6.141.0
+
+[200, '.pdf', 'Authorization', 'CoreResolver', 'WorkArtifact', 'connection-error', 'content_preview', 'core', 'downloadUrl', 'error', 'error_detail', 'error_type', 'fullTextLinks', 'get', 'http-error', 'json-error', 'link', 'no-doi', 'page', 'pageSize', 'pdfDownloadLink', 'q', 'request-error', 'results', 'skipped', 'source', 'text', 'timeout', 'unexpected-error', 'url']

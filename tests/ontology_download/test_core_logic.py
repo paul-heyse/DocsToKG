@@ -20,6 +20,26 @@ from DocsToKG.OntologyDownload.resolvers import FetchPlan
 from DocsToKG.OntologyDownload.validators import ValidationResult
 
 
+@pytest.fixture(autouse=True)
+def stub_requests_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Avoid real HTTP calls when planning augments metadata."""
+
+    class _Response:
+        def __init__(self) -> None:
+            self.status_code = 200
+            self.ok = True
+            self.headers = {
+                "Last-Modified": "Wed, 01 Jan 2024 00:00:00 GMT",
+                "Content-Length": "256",
+            }
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(core.requests, "head", lambda *args, **kwargs: _Response(), raising=False)
+    monkeypatch.setattr(core.requests, "get", lambda *args, **kwargs: _Response(), raising=False)
+
+
 def _make_plan() -> FetchPlan:
     return FetchPlan(
         url="https://example.org/hp.owl",

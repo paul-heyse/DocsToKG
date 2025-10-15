@@ -27,26 +27,16 @@ import requests
 
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi
 
+from ..headers import headers_cache_key
 from ..types import ResolverConfig, ResolverResult
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
 
+_headers_cache_key = headers_cache_key
+
 LOGGER = logging.getLogger(__name__)
-
-
-def _headers_cache_key(headers: Dict[str, str]) -> Tuple[Tuple[str, str], ...]:
-    """Create a hashable cache key for polite header dictionaries.
-
-    Args:
-        headers: Mapping of header names to values used in Unpaywall requests.
-
-    Returns:
-        Tuple of key/value pairs sorted to ensure deterministic hashing.
-    """
-
-    return tuple(sorted((headers or {}).items()))
 
 
 @lru_cache(maxsize=1000)
@@ -210,7 +200,7 @@ class UnpaywallResolver:
                     doi,
                     config.unpaywall_email,
                     config.get_timeout(self.name),
-                    _headers_cache_key(config.polite_headers),
+                    headers_cache_key(config.polite_headers),
                 )
             except requests.HTTPError as exc:
                 status = exc.response.status_code if exc.response else None
@@ -288,5 +278,6 @@ class UnpaywallResolver:
 __all__ = [
     "UnpaywallResolver",
     "_fetch_unpaywall_data",
+    "headers_cache_key",
     "_headers_cache_key",
 ]

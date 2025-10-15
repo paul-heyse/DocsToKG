@@ -115,11 +115,13 @@ class ResolverConfig:
         doaj_api_key: API key for DOAJ resolver.
         resolver_timeouts: Resolver-specific timeout overrides.
         resolver_min_interval_s: Minimum interval between resolver requests.
+        domain_min_interval_s: Optional per-domain rate limits overriding resolver settings.
         resolver_rate_limits: Deprecated rate limit configuration retained for compat.
         enable_head_precheck: Toggle applying HEAD filtering before downloads.
         resolver_head_precheck: Per-resolver overrides for HEAD filtering behaviour.
         mailto: Contact email appended to polite headers and user agent string.
         max_concurrent_resolvers: Upper bound on concurrent resolver threads per work.
+        enable_global_url_dedup: Enable global URL deduplication across works when True.
 
     Notes:
         ``enable_head_precheck`` toggles inexpensive HEAD lookups before downloads
@@ -148,11 +150,13 @@ class ResolverConfig:
     doaj_api_key: Optional[str] = None
     resolver_timeouts: Dict[str, float] = field(default_factory=dict)
     resolver_min_interval_s: Dict[str, float] = field(default_factory=dict)
+    domain_min_interval_s: Dict[str, float] = field(default_factory=dict)
     resolver_rate_limits: Dict[str, float] = field(default_factory=dict)
     enable_head_precheck: bool = True
     resolver_head_precheck: Dict[str, bool] = field(default_factory=dict)
     mailto: Optional[str] = None
     max_concurrent_resolvers: int = 1
+    enable_global_url_dedup: bool = False
 
     def get_timeout(self, resolver_name: str) -> float:
         """Return the timeout to use for a resolver, falling back to defaults.
@@ -224,6 +228,18 @@ class ResolverConfig:
         if self.resolver_rate_limits:
             for name, value in self.resolver_rate_limits.items():
                 self.resolver_min_interval_s.setdefault(name, value)
+
+        normalized_domain_limits: Dict[str, float] = {}
+        for host, interval in self.domain_min_interval_s.items():
+            if interval < 0:
+                raise ValueError(
+                    ("domain_min_interval_s['{name}'] must be non-negative, got {value}").format(
+                        name=host, value=interval
+                    )
+                )
+            normalized_domain_limits[host.lower()] = interval
+        if normalized_domain_limits:
+            self.domain_min_interval_s = normalized_domain_limits
 
         if self.max_attempts_per_work < 1:
             raise ValueError(

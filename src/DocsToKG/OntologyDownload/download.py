@@ -828,6 +828,10 @@ class StreamingDownloader(pooch.HTTPDownloader):
             manifest_headers["If-Modified-Since"] = self.previous_manifest["last_modified"]
         request_headers = {**self.custom_headers, **manifest_headers}
         part_path = Path(output_file + ".part")
+        destination_part_path = Path(str(self.destination) + ".part")
+        if not part_path.exists() and destination_part_path.exists():
+            part_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(destination_part_path, part_path)
         resume_position = part_path.stat().st_size if part_path.exists() else 0
         if resume_position:
             request_headers["Range"] = f"bytes={resume_position}-"
@@ -967,6 +971,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                 )
                 time.sleep(sleep_time)
         part_path.replace(Path(output_file))
+        destination_part_path.unlink(missing_ok=True)
 
 
 def _get_bucket(

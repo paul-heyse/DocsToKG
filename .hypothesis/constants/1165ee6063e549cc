@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/DocParsing/serializers.py
+# hypothesis_version: 6.141.0
+
+['<!-- image -->', '_docstokg_flags', 'has_image_captions', 'predicted_classes']

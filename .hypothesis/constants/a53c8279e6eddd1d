@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/http.py
+# hypothesis_version: 6.141.0
+
+[0.0, 0.1, 0.75, 429, 500, 502, 503, 504, 'Retry-After', 'request', 'request_with_retries']

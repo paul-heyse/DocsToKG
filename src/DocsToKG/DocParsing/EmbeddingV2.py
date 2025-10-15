@@ -13,6 +13,7 @@ Key Features:
 - Stream SPLADE sparse encoding and Qwen dense embeddings from local caches
 - Validate vector schemas, norms, and dimensions before writing outputs
 - Record manifest metadata for observability and auditing
+- Explain SPLADE attention backend fallbacks (auto→FlashAttention2→SDPA→eager)
 
 Usage:
     python -m DocsToKG.DocParsing.EmbeddingV2 --resume
@@ -37,7 +38,8 @@ import uuid
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from types import SimpleNamespace
+from typing import Dict, List, Optional, Sequence, Tuple
 
 # Third-party imports
 from tqdm import tqdm
@@ -55,8 +57,16 @@ from DocsToKG.DocParsing._common import (
     jsonl_save,
     load_manifest_index,
     manifest_append,
+    resolve_hash_algorithm,
 )
-from DocsToKG.DocParsing.schemas import BM25Vector, DenseVector, SPLADEVector, VectorRow
+from DocsToKG.DocParsing.schemas import (
+    BM25Vector,
+    COMPATIBLE_CHUNK_VERSIONS,
+    DenseVector,
+    SPLADEVector,
+    VectorRow,
+    validate_schema_version,
+)
 
 try:  # Optional dependency used for SPLADE sparse embeddings
     from sentence_transformers import (
@@ -80,22 +90,108 @@ except Exception as exc:  # pragma: no cover - exercised via tests with stubs
     PoolingParams = None  # type: ignore[assignment]
     _VLLM_IMPORT_ERROR = exc
 
+# ---- Cache / model path resolution ----
+
+
+def _resolve_hf_home() -> Path:
+    """Return the HuggingFace cache directory honoring environment settings."""
+
+    env_override = os.getenv("HF_HOME")
+    if env_override:
+        return Path(env_override).expanduser().resolve()
+    xdg_cache = os.getenv("XDG_CACHE_HOME")
+    if xdg_cache:
+        return (Path(xdg_cache).expanduser() / "huggingface").resolve()
+    return (Path.home() / ".cache" / "huggingface").resolve()
+
+
+def _resolve_with_env(env_var: str, default: Path) -> Path:
+    """Resolve ``env_var`` to a path when provided, otherwise return ``default``."""
+
+    override = os.getenv(env_var)
+    if override:
+        return Path(override).expanduser().resolve()
+    return default
+
+
+def _resolve_cli_path(value: Optional[Path], default: Path) -> Path:
+    """Resolve CLI-provided ``value`` to an absolute path with ``default`` fallback."""
+
+    if value is not None:
+        return Path(value).expanduser().resolve()
+    return default
+
+
+HF_HOME = _resolve_hf_home()
+MODEL_ROOT = _resolve_with_env("DOCSTOKG_MODEL_ROOT", HF_HOME)
+QWEN_DIR = _resolve_with_env(
+    "DOCSTOKG_QWEN_DIR", MODEL_ROOT / "Qwen" / "Qwen3-Embedding-4B"
+)
+SPLADE_DIR = _resolve_with_env("DOCSTOKG_SPLADE_DIR", MODEL_ROOT / "naver" / "splade-v3")
 # ---- Fixed locations ----
-HF_HOME = Path("/home/paul/hf-cache")
-MODEL_ROOT = HF_HOME
-QWEN_DIR = MODEL_ROOT / "Qwen" / "Qwen3-Embedding-4B"
-SPLADE_DIR = MODEL_ROOT / "naver" / "splade-v3"
+
+
+def _expand_path(path: str | Path) -> Path:
+    """Return ``path`` expanded to an absolute :class:`Path`."""
+
+    return Path(path).expanduser().resolve()
+
+
+def _resolve_hf_home() -> Path:
+    """Determine the HuggingFace cache directory respecting ``HF_HOME``."""
+
+    env = os.getenv("HF_HOME")
+    if env:
+        return _expand_path(env)
+    return Path.home().expanduser() / ".cache" / "huggingface"
+
+
+def _resolve_model_root(hf_home: Path) -> Path:
+    """Resolve DocsToKG model root with ``DOCSTOKG_MODEL_ROOT`` override."""
+
+    env = os.getenv("DOCSTOKG_MODEL_ROOT")
+    return _expand_path(env) if env else hf_home
+
+
+def _resolve_qwen_dir(model_root: Path) -> Path:
+    """Resolve Qwen model directory with ``DOCSTOKG_QWEN_DIR`` override."""
+
+    env = os.getenv("DOCSTOKG_QWEN_DIR")
+    return _expand_path(env) if env else model_root / "Qwen" / "Qwen3-Embedding-4B"
+
+
+def _resolve_splade_dir(model_root: Path) -> Path:
+    """Resolve SPLADE model directory with ``DOCSTOKG_SPLADE_DIR`` override."""
+
+    env = os.getenv("DOCSTOKG_SPLADE_DIR")
+    return _expand_path(env) if env else model_root / "naver" / "splade-v3"
+
+
+HF_HOME = _resolve_hf_home()
+MODEL_ROOT = _resolve_model_root(HF_HOME)
+QWEN_DIR = _expand_path(_resolve_qwen_dir(MODEL_ROOT))
+SPLADE_DIR = _expand_path(_resolve_splade_dir(MODEL_ROOT))
+
+
+def _expand_optional(path: Optional[Path]) -> Optional[Path]:
+    """Expand optional :class:`Path` values to absolutes when provided."""
+
+    if path is None:
+        return None
+    return path.expanduser().resolve()
 
 DEFAULT_DATA_ROOT = detect_data_root()
 DEFAULT_CHUNKS_DIR = data_chunks(DEFAULT_DATA_ROOT)
 DEFAULT_VECTORS_DIR = data_vectors(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "embeddings"
+SPLADE_SPARSITY_WARN_THRESHOLD_PCT = 1.0
 
 # Make sure every lib (Transformers / HF Hub / Sentence-Transformers) honors this cache.
 os.environ.setdefault("HF_HOME", str(HF_HOME))
 os.environ.setdefault("HF_HUB_CACHE", str(HF_HOME / "hub"))
 os.environ.setdefault("TRANSFORMERS_CACHE", str(HF_HOME / "transformers"))
 os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", str(MODEL_ROOT))
+os.environ.setdefault("DOCSTOKG_MODEL_ROOT", str(MODEL_ROOT))
 
 
 def _missing_splade_dependency_message() -> str:
@@ -139,26 +235,6 @@ def _ensure_qwen_dependencies() -> None:
 TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)?")
 
 
-@dataclass
-class Chunk:
-    """Minimal representation of a DocTags chunk stored on disk.
-
-    Attributes:
-        uuid: Stable identifier for the chunk.
-        text: Textual content extracted from the DocTags document.
-        doc_id: Identifier of the source document for manifest reporting.
-
-    Examples:
-        >>> chunk = Chunk(uuid="chunk-1", text="Hybrid search is powerful.", doc_id="doc")
-        >>> chunk.uuid
-        'chunk-1'
-    """
-
-    uuid: str
-    text: str
-    doc_id: str
-
-
 def iter_chunk_files(d: Path) -> List[Path]:
     """Enumerate chunked DocTags JSONL files in a directory.
 
@@ -187,6 +263,18 @@ def ensure_uuid(rows: List[dict]) -> bool:
             row["uuid"] = str(uuid.uuid4())
             updated = True
     return updated
+
+
+def ensure_chunk_schema(rows: Sequence[dict], source: Path) -> None:
+    """Assert that chunk rows declare a compatible schema version."""
+
+    for index, row in enumerate(rows, start=1):
+        validate_schema_version(
+            row.get("schema_version"),
+            COMPATIBLE_CHUNK_VERSIONS,
+            kind="chunk",
+            source=f"{source}:{index}",
+        )
 
 
 def tokens(text: str) -> List[str]:
@@ -220,21 +308,6 @@ class BM25Stats:
     N: int
     avgdl: float
     df: Dict[str, int]
-
-
-def build_bm25_stats(chunks: Iterable[Chunk]) -> BM25Stats:
-    """Compute corpus statistics required for BM25 weighting.
-
-    Args:
-        chunks: Iterable of text chunks with identifiers.
-
-    Returns:
-        BM25Stats containing document frequency counts and average length.
-    """
-    accumulator = BM25StatsAccumulator()
-    for chunk in chunks:
-        accumulator.add_document(chunk.text)
-    return accumulator.finalize()
 
 
 class BM25StatsAccumulator:
@@ -404,6 +477,31 @@ def splade_encode(
 
 
 _SPLADE_ENCODER_CACHE: Dict[Tuple[str, str, Optional[str], Optional[int]], SparseEncoder] = {}
+_SPLADE_ENCODER_BACKENDS: Dict[Tuple[str, str, Optional[str], Optional[int]], str] = {}
+
+
+def _detect_splade_backend(encoder: SparseEncoder, requested: str | None) -> str:
+    """Best-effort detection of the attention backend used by SPLADE."""
+
+    candidates = (
+        ("model", "model", "config", "attn_implementation"),
+        ("model", "config", "attn_implementation"),
+        ("config", "attn_implementation"),
+        ("model", "model", "attn_implementation"),
+    )
+    for path in candidates:
+        value = encoder
+        for attr in path:
+            value = getattr(value, attr, None)
+            if value is None:
+                break
+        else:
+            if isinstance(value, str) and value:
+                return value
+
+    if requested in {"sdpa", "eager", "flash_attention_2"}:
+        return requested
+    return "auto" if requested is None else requested
 
 
 def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
@@ -424,6 +522,8 @@ def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
 
     key = (str(cfg.model_dir), cfg.device, cfg.attn_impl, cfg.max_active_dims)
     if key in _SPLADE_ENCODER_CACHE:
+        if key not in _SPLADE_ENCODER_BACKENDS:
+            _SPLADE_ENCODER_BACKENDS[key] = cfg.attn_impl or "auto"
         return _SPLADE_ENCODER_CACHE[key]
 
     model_kwargs: Dict[str, object] = {}
@@ -432,6 +532,7 @@ def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
     if cfg.max_active_dims is not None:
         model_kwargs["max_active_dims"] = cfg.max_active_dims
 
+    backend_used: str | None = cfg.attn_impl
     try:
         encoder = SparseEncoder(
             str(cfg.model_dir),
@@ -440,6 +541,7 @@ def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
             model_kwargs=model_kwargs,
             local_files_only=True,
         )
+        backend_used = _detect_splade_backend(encoder, backend_used)
     except (ValueError, ImportError) as exc:
         if cfg.attn_impl == "flash_attention_2" and "Flash Attention 2" in str(exc):
             print("[SPLADE] FlashAttention 2 unavailable; retrying with standard attention.")
@@ -452,11 +554,25 @@ def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
                 model_kwargs=fallback_kwargs,
                 local_files_only=True,
             )
+            backend_used = _detect_splade_backend(encoder, "sdpa")
         else:
             raise
 
     _SPLADE_ENCODER_CACHE[key] = encoder
+    _SPLADE_ENCODER_BACKENDS[key] = backend_used or "auto"
     return encoder
+
+
+def _get_splade_backend_used(cfg: SpladeCfg) -> str:
+    """Return the backend string recorded for a given SPLADE configuration."""
+
+    key = (str(cfg.model_dir), cfg.device, cfg.attn_impl, cfg.max_active_dims)
+    backend = _SPLADE_ENCODER_BACKENDS.get(key)
+    if backend:
+        return backend
+    if cfg.attn_impl:
+        return cfg.attn_impl
+    return "auto"
 
 
 class SPLADEValidator:
@@ -595,7 +711,7 @@ def qwen_embed(
     return out
 
 
-def process_pass_a(files: Sequence[Path], logger) -> Tuple[Dict[str, Chunk], BM25Stats]:
+def process_pass_a(files: Sequence[Path], logger) -> BM25Stats:
     """Assign UUIDs and build BM25 statistics for a corpus of chunk files.
 
     Args:
@@ -603,26 +719,23 @@ def process_pass_a(files: Sequence[Path], logger) -> Tuple[Dict[str, Chunk], BM2
         logger: Logger used for structured progress output.
 
     Returns:
-        Tuple containing the UUID→Chunk index and aggregated BM25 statistics.
+        Aggregated BM25 statistics for the supplied chunk corpus.
 
     Raises:
         ValueError: Propagated when chunk rows are missing required fields.
     """
 
-    uuid_to_chunk: Dict[str, Chunk] = {}
     accumulator = BM25StatsAccumulator()
 
     for chunk_file in tqdm(files, desc="Pass A: UUID + BM25 stats", unit="file"):
         rows = jsonl_load(chunk_file)
         if not rows:
             continue
+        ensure_chunk_schema(rows, chunk_file)
         if ensure_uuid(rows):
             jsonl_save(chunk_file, rows)
         for row in rows:
             text = row.get("text", "")
-            uuid_value = row["uuid"]
-            doc_id = row.get("doc_id", "unknown")
-            uuid_to_chunk[uuid_value] = Chunk(uuid=uuid_value, text=text, doc_id=doc_id)
             accumulator.add_document(text)
 
     stats = accumulator.finalize()
@@ -637,12 +750,11 @@ def process_pass_a(files: Sequence[Path], logger) -> Tuple[Dict[str, Chunk], BM2
             }
         },
     )
-    return uuid_to_chunk, stats
+    return stats
 
 
 def process_chunk_file_vectors(
     chunk_file: Path,
-    uuid_to_chunk: Dict[str, Chunk],
     stats: BM25Stats,
     args: argparse.Namespace,
     validator: SPLADEValidator,
@@ -652,7 +764,6 @@ def process_chunk_file_vectors(
 
     Args:
         chunk_file: Chunk JSONL file to process.
-        uuid_to_chunk: Mapping of chunk UUIDs to chunk metadata.
         stats: Precomputed BM25 statistics.
         args: Parsed CLI arguments with runtime configuration.
         validator: SPLADE validator for sparsity metrics.
@@ -669,9 +780,18 @@ def process_chunk_file_vectors(
     if not rows:
         logger.warning("Chunk file empty", extra={"extra_fields": {"chunk_file": str(chunk_file)}})
         return 0, [], []
+    ensure_chunk_schema(rows, chunk_file)
 
     uuids = [row["uuid"] for row in rows]
-    texts = [uuid_to_chunk[uuid].text for uuid in uuids]
+    texts = [row.get("text", "") for row in rows]
+    uuids: List[str] = []
+    texts: List[str] = []
+    for row in rows:
+        uuid_value = row.get("uuid")
+        if not uuid_value:
+            raise ValueError(f"Chunk row missing UUID in {chunk_file}")
+        uuids.append(uuid_value)
+        texts.append(str(row.get("text", "")))
     splade_results: List[Tuple[Sequence[str], Sequence[float]]] = []
     for batch in Batcher(texts, args.batch_size_splade):
         tokens_batch, weights_batch = splade_encode(
@@ -880,14 +1000,39 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--batch-size-qwen", type=int, default=64)
     parser.add_argument("--splade-max-active-dims", type=int, default=None)
     parser.add_argument(
+        "--splade-model-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Override SPLADE model directory (CLI > $DOCSTOKG_SPLADE_DIR > "
+            f"{SPLADE_DIR})."
+            "model root/naver/splade-v3)."
+        ),
+    )
+    parser.add_argument(
         "--splade-attn",
         type=str,
         default="auto",
         choices=["auto", "sdpa", "eager", "flash_attention_2"],
-        help="Attention backend for SPLADE transformer (default: auto/SDPA).",
+        help=(
+            "Attention backend for SPLADE. 'auto' tries FlashAttention 2, then "
+            "SDPA, then eager. 'flash_attention_2' requires the Flash Attention "
+            "2 package. 'sdpa' forces PyTorch scaled dot-product attention. "
+            "'eager' uses the standard attention implementation."
+        ),
     )
     parser.add_argument("--qwen-dtype", type=str, default="bfloat16")
     parser.add_argument("--qwen-quant", type=str, default=None)
+    parser.add_argument(
+        "--qwen-model-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Override Qwen model directory (CLI > $DOCSTOKG_QWEN_DIR > "
+            f"{QWEN_DIR})."
+            "model root/Qwen/Qwen3-Embedding-4B)."
+        ),
+    )
     parser.add_argument("--tp", type=int, default=1)
     parser.add_argument(
         "--resume",
@@ -898,6 +1043,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--force",
         action="store_true",
         help="Force reprocessing even when resume criteria are satisfied",
+    )
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help=(
+            "Disable network access by setting TRANSFORMERS_OFFLINE=1. "
+            "All models must already exist in local caches."
+        ),
     )
     return parser
 
@@ -935,17 +1088,74 @@ def main(args: argparse.Namespace | None = None) -> int:
     logger = get_logger(__name__)
 
     parser = build_parser()
-    defaults = parser.parse_args([])
-    provided = parse_args() if args is None else args
-    for key, value in vars(provided).items():
-        if value is not None:
-            setattr(defaults, key, value)
-    args = defaults
+    args = (
+        args
+        if isinstance(args, (argparse.Namespace, SimpleNamespace))
+        else parser.parse_args(args)
+    )
+    offline_mode = bool(getattr(args, "offline", False))
+
+    hf_home = _resolve_hf_home()
+    model_root = _resolve_model_root(hf_home)
+    default_splade_dir = _expand_path(_resolve_splade_dir(model_root))
+    default_qwen_dir = _expand_path(_resolve_qwen_dir(model_root))
+    cli_splade = _expand_optional(getattr(args, "splade_model_dir", None))
+    cli_qwen = _expand_optional(getattr(args, "qwen_model_dir", None))
+    splade_model_dir = cli_splade or default_splade_dir
+    qwen_model_dir = cli_qwen or default_qwen_dir
+
+    global HF_HOME, MODEL_ROOT, QWEN_DIR, SPLADE_DIR
+    HF_HOME = hf_home
+    MODEL_ROOT = model_root
+    QWEN_DIR = default_qwen_dir
+    SPLADE_DIR = default_splade_dir
+
+    os.environ["HF_HOME"] = str(hf_home)
+    os.environ["HF_HUB_CACHE"] = str(hf_home / "hub")
+    os.environ["TRANSFORMERS_CACHE"] = str(hf_home / "transformers")
+    os.environ["SENTENCE_TRANSFORMERS_HOME"] = str(model_root)
+
+    if offline_mode:
+        os.environ["TRANSFORMERS_OFFLINE"] = "1"
+        missing_paths = []
+        if not splade_model_dir.exists():
+            missing_paths.append(
+                f"SPLADE model directory missing: {splade_model_dir}"
+            )
+        if not qwen_model_dir.exists():
+            missing_paths.append(
+                "Qwen model directory not found: "
+                f"{qwen_model_dir}. Pre-download the model before rerunning."
+            )
+        if missing_paths:
+            raise FileNotFoundError("; ".join(missing_paths))
+
+    args.offline = offline_mode
+    args.splade_model_dir = splade_model_dir
+    args.qwen_model_dir = qwen_model_dir
+
+    splade_model_dir = _resolve_cli_path(args.splade_model_dir, SPLADE_DIR)
+    qwen_model_dir = _resolve_cli_path(args.qwen_model_dir, QWEN_DIR)
 
     if args.batch_size_splade < 1 or args.batch_size_qwen < 1:
         raise ValueError("Batch sizes must be >= 1")
 
     overall_start = time.perf_counter()
+
+    if args.offline:
+        os.environ["TRANSFORMERS_OFFLINE"] = "1"
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
+        logger.info("Offline mode enabled: expecting local caches only")
+        missing_models = [
+            (label, path)
+            for label, path in (("SPLADE", splade_model_dir), ("Qwen", qwen_model_dir))
+            if not path.exists() or not path.is_dir()
+        ]
+        if missing_models:
+            missing_desc = ", ".join(f"{label} model at {path}" for label, path in missing_models)
+            raise FileNotFoundError(
+                "Offline mode requires local model directories. Missing: " + missing_desc
+            )
 
     try:
         _ensure_splade_dependencies()
@@ -986,6 +1196,10 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "data_root": str(resolved_root),
                 "chunks_dir": str(chunks_dir),
                 "vectors_dir": str(out_dir),
+                "splade_model_dir": str(splade_model_dir),
+                "qwen_model_dir": str(qwen_model_dir),
+                "offline": args.offline,
+                "offline": offline_mode,
             }
         },
     )
@@ -1005,19 +1219,22 @@ def main(args: argparse.Namespace | None = None) -> int:
 
     attn_impl = None if args.splade_attn == "auto" else args.splade_attn
     args.splade_cfg = SpladeCfg(
+        model_dir=splade_model_dir,
+        cache_folder=model_root,
         batch_size=args.batch_size_splade,
         max_active_dims=args.splade_max_active_dims,
         attn_impl=attn_impl,
     )
     args.qwen_cfg = QwenCfg(
+        model_dir=qwen_model_dir,
         dtype=args.qwen_dtype,
         tp=int(args.tp),
         batch_size=int(args.batch_size_qwen),
         quantization=args.qwen_quant,
     )
 
-    uuid_to_chunk, stats = process_pass_a(files, logger)
-    if not uuid_to_chunk:
+    stats = process_pass_a(files, logger)
+    if not stats.N:
         logger.warning("No chunks found after Pass A")
         return 0
 
@@ -1052,6 +1269,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 schema_version="embeddings/1.0.0",
                 input_path=str(chunk_file),
                 input_hash=input_hash,
+                hash_alg=resolve_hash_algorithm(),
                 output_path=str(out_path),
             )
             skipped_files += 1
@@ -1064,7 +1282,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         start = time.perf_counter()
         try:
             count, nnz, norms = process_chunk_file_vectors(
-                chunk_file, uuid_to_chunk, stats, args, validator, logger
+                chunk_file, stats, args, validator, logger
             )
         except Exception as exc:
             duration = time.perf_counter() - start
@@ -1076,6 +1294,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 schema_version="embeddings/1.0.0",
                 input_path=str(chunk_file),
                 input_hash=input_hash,
+                hash_alg=resolve_hash_algorithm(),
                 output_path=str(out_path),
                 error=str(exc),
             )
@@ -1093,6 +1312,7 @@ def main(args: argparse.Namespace | None = None) -> int:
             schema_version="embeddings/1.0.0",
             input_path=str(chunk_file),
             input_hash=input_hash,
+            hash_alg=resolve_hash_algorithm(),
             output_path=str(out_path),
             vector_count=count,
         )
@@ -1111,6 +1331,8 @@ def main(args: argparse.Namespace | None = None) -> int:
     avg_norm = statistics.mean(qwen_norms_all) if qwen_norms_all else 0.0
     std_norm = statistics.pstdev(qwen_norms_all) if len(qwen_norms_all) > 1 else 0.0
 
+    backend_used = _get_splade_backend_used(args.splade_cfg)
+
     logger.info(
         "Embedding summary",
         extra={
@@ -1123,6 +1345,8 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "qwen_std_norm": round(std_norm, 4),
                 "pass_b_seconds": round(elapsed_b, 3),
                 "skipped_files": skipped_files,
+                "splade_attn_backend_used": backend_used,
+                "sparsity_warn_threshold_pct": SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
             }
         },
     )
@@ -1143,6 +1367,8 @@ def main(args: argparse.Namespace | None = None) -> int:
         qwen_std_norm=std_norm,
         peak_memory_gb=peak / 1024**3,
         skipped_files=skipped_files,
+        splade_attn_backend_used=backend_used,
+        sparsity_warn_threshold_pct=SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
     )
 
     logger.info(

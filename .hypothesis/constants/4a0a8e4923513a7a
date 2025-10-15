@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/HybridSearch/results.py
+# hypothesis_version: 6.141.0
+
+[200, 256, 'bm25', 'dense', 'splade']
