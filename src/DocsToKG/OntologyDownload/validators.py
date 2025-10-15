@@ -13,7 +13,6 @@ import logging
 import platform
 import shutil
 import subprocess
-import sys
 import tempfile
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -24,142 +23,11 @@ from typing import Dict, Iterable, List, MutableMapping, Optional, cast
 
 import psutil
 
-try:  # pragma: no cover - optional dependency
-    import rdflib  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover - lightweight stub for tests
+from .optdeps import get_owlready2, get_pronto, get_rdflib
 
-    class _StubGraph:
-        def __init__(self) -> None:
-            self._source: Optional[Path] = None
-
-        def parse(self, path: str) -> None:
-            """Record the source path so downstream operations can inspect it.
-
-            Args:
-                path: Filesystem path passed to the stub parser.
-
-            Returns:
-                None
-
-            Raises:
-                None
-            """
-            self._source = Path(path)
-
-        def __len__(self) -> int:
-            return 1
-
-        def serialize(
-            self, destination: Path, format: str = "turtle"
-        ) -> None:  # pragma: no cover - simple stub
-            """Write the previously parsed payload to the destination path.
-
-            Args:
-                destination: Output path where serialized content will be written.
-                format: Serialization format requested by the caller.
-
-            Returns:
-                None
-            """
-            destination_path = Path(destination)
-            destination_path.parent.mkdir(parents=True, exist_ok=True)
-            if self._source and self._source.exists():
-                destination_path.write_bytes(self._source.read_bytes())
-            else:
-                destination_path.write_text("")
-
-    class _StubRDFLib:
-        Graph = _StubGraph
-
-    rdflib = _StubRDFLib()  # type: ignore
-    sys.modules.setdefault("rdflib", rdflib)  # type: ignore[arg-type]
-
-try:  # pragma: no cover - optional dependency
-    import pronto  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover - lightweight stub for tests
-
-    class _StubOntology:
-        def __init__(self, path: str) -> None:
-            self._path = Path(path)
-
-        def terms(self):  # pragma: no cover - simple generator
-            """Yield placeholder ontology terms for test environments.
-
-            Args:
-                None
-
-            Returns:
-                List[str]: Static list of representative term identifiers.
-            """
-            return ["term1", "term2"]
-
-        def dump(self, destination: str, format: str = "obojson") -> None:
-            """Write a minimal ontology representation to disk.
-
-            Args:
-                destination: Path where the serialized ontology should be stored.
-                format: Requested output format (ignored by the stub).
-
-            Returns:
-                None
-            """
-            Path(destination).write_text("{}")
-
-    class _StubPronto:
-        Ontology = _StubOntology
-
-    pronto = _StubPronto()  # type: ignore
-    sys.modules.setdefault("pronto", pronto)  # type: ignore[arg-type]
-
-try:  # pragma: no cover - optional dependency
-    import owlready2  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover - lightweight stub for tests
-
-    class _StubLoadedOntology:
-        def classes(self):  # pragma: no cover - simple stub
-            """Return placeholder class identifiers for compatibility tests.
-
-            Args:
-                None
-
-            Returns:
-                list[str]: Static list of ontology class identifiers.
-            """
-            return ["Class1", "Class2"]
-
-    class _StubOntologyWrapper:
-        def __init__(self, uri: str) -> None:
-            self._uri = uri
-
-        def load(self):
-            """Simulate ontology loading and return a stub content object.
-
-            Args:
-                None
-
-            Returns:
-                _StubLoadedOntology: Placeholder ontology representation.
-
-            Raises:
-                None
-            """
-            return _StubLoadedOntology()
-
-    class _StubOwlready2:
-        @staticmethod
-        def get_ontology(uri: str):
-            """Return a stub ontology wrapper for the provided URI.
-
-            Args:
-                uri: URI identifying the ontology resource.
-
-            Returns:
-                _StubOntologyWrapper: Lightweight wrapper exposing `.load()`.
-            """
-            return _StubOntologyWrapper(uri)
-
-    owlready2 = _StubOwlready2()  # type: ignore
-    sys.modules.setdefault("owlready2", owlready2)  # type: ignore[arg-type]
+rdflib = get_rdflib()
+pronto = get_pronto()
+owlready2 = get_owlready2()
 
 from .config import ResolvedConfig
 

@@ -125,6 +125,7 @@ def maybe_clone_to_gpu(
     *,
     device: int,
     resources: faiss.StandardGpuResources,
+    indices_32_bits: bool = True,
 ) -> "faiss.Index":
     """Clone a CPU FAISS index onto a GPU with strict cloner options.
 
@@ -156,6 +157,8 @@ def maybe_clone_to_gpu(
         co.device = int(device)
         co.allowCpuCoarseQuantizer = False
         co.verbose = True
+        if indices_32_bits and hasattr(faiss, "INDICES_32_BIT"):
+            co.indicesOptions = faiss.INDICES_32_BIT
         return faiss.index_cpu_to_gpu(resources, int(device), index_cpu, co)
 
     return faiss.index_cpu_to_gpu(resources, int(device), index_cpu)
