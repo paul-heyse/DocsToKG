@@ -8,7 +8,6 @@ PDF is downloaded.
 
 from __future__ import annotations
 
-import json
 import random
 import re
 import threading
@@ -17,7 +16,19 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from functools import lru_cache
 from itertools import chain
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Protocol, Sequence, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+)
 from urllib.parse import quote, urljoin, urlparse
 
 import requests
@@ -33,6 +44,9 @@ from DocsToKG.ContentDownload.utils import (
     normalize_pmcid,
     strip_prefix,
 )
+
+if TYPE_CHECKING:  # pragma: no cover
+    from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
 
 DEFAULT_RESOLVER_ORDER: List[str] = [

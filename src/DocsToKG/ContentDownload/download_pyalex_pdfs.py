@@ -17,24 +17,22 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import requests
+from pyalex import Topics, Works
+from pyalex import config as oa_config
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-
-import pyalex
-from pyalex import Topics, Works, config as oa_config
 
 from DocsToKG.ContentDownload.resolvers import (
     AttemptRecord,
     DownloadOutcome,
-    PipelineResult,
     ResolverConfig,
     ResolverMetrics,
     ResolverPipeline,
-    default_resolvers,
     clear_resolver_caches,
+    default_resolvers,
 )
 from DocsToKG.ContentDownload.utils import (
     dedupe,
@@ -42,13 +40,6 @@ from DocsToKG.ContentDownload.utils import (
     normalize_pmcid,
     strip_prefix,
 )
-from DocsToKG.ContentDownload.utils import (
-    dedupe,
-    normalize_doi,
-    normalize_pmcid,
-    strip_prefix,
-)
-
 
 MAX_SNIFF_BYTES = 64 * 1024
 SUCCESS_STATUSES = {"pdf", "pdf_unknown"}
@@ -80,13 +71,32 @@ def ensure_dir(path: Path) -> None:
 
 
 def _make_session(headers: Dict[str, str]) -> requests.Session:
-    """Create a retry-enabled :class:`requests.Session` with polite headers.
+    """Create a retry-enabled :class:`requests.Session` configured for polite crawling.
 
-    The session mounts an :class:`urllib3.util.retry.Retry` adapter that retries
-    transient HTTP failures (429/502/503/504) up to five times with
-    exponential backoff and `Retry-After` support. Callers should pass the
-    polite header set returned by :func:`load_resolver_config` so that each
-    worker advertises the required contact information.
+    Parameters
+    ----------
+    headers:
+        Header dictionary returned by :func:`load_resolver_config`. The mapping **must**
+        already include the project user agent and mailto contact address. The factory
+        copies the mapping before applying it to the outgoing session so tests may pass
+        mutable dictionaries without worrying about side effects.
+
+    Returns
+    -------
+    requests.Session
+        A session with exponential backoff retry behaviour suitable for resolver
+        traffic. Both ``http`` and ``https`` transports share the same
+        :class:`urllib3.util.retry.Retry` configuration.
+
+    Notes
+    -----
+    Each worker should call this helper to obtain an isolated session instance. Example
+    usage::
+
+        session = _make_session({"User-Agent": "DocsToKGDownloader/1.0", "mailto": "ops@example.org"})
+
+    Subsequent resolver requests automatically include the polite headers and retry
+    policy.
     """
 
     session = requests.Session()
@@ -595,6 +605,49 @@ def download_candidate(
     timeout: float,
     context: Dict[str, Any],
 ) -> DownloadOutcome:
+    """Download a single candidate URL and classify the payload.
+
+    Parameters
+    ----------
+    session:
+        HTTP session produced by :func:`_make_session` or compatible object. The session
+        **must** provide ``head`` and ``get`` methods with the same semantics as
+        :mod:`requests`.
+    artifact:
+        Work metadata and output directory handles describing the current OpenAlex
+        record.
+    url:
+        Candidate download URL discovered by a resolver.
+    referer:
+        Optional referer header supplied by the resolver. ``None`` implies no referer
+        override.
+    timeout:
+        Per-request timeout in seconds.
+    context:
+        Execution context containing ``dry_run`` and ``extract_html_text`` flags plus a
+        ``previous`` manifest lookup for conditional requests.
+
+    Returns
+    -------
+    DownloadOutcome
+        Structured download result used for manifest logging.
+
+    Examples
+    --------
+    A minimal invocation that honours ``--dry-run``::
+
+        outcome = download_candidate(
+            session,
+            artifact,
+            "https://example.org/paper.pdf",
+            referer=None,
+            timeout=30.0,
+            context={"dry_run": True, "extract_html_text": False, "previous": {}},
+        )
+
+    The returned outcome reports ``classification='pdf'`` yet ``path`` remains ``None``
+    because files are not materialised while running in dry-run mode.
+    """
     context = context or {}
     headers: Dict[str, str] = {}
     if referer:
@@ -1007,6 +1060,37 @@ def process_one_work(
     previous_lookup: Dict[str, Dict[str, Any]],
     resume_completed: Set[str],
 ) -> Dict[str, Any]:
+    """Process a single OpenAlex work through the resolver pipeline.
+
+    Parameters
+    ----------
+    work:
+        OpenAlex work payload as returned by :func:`iterate_openalex`.
+    session:
+        Resolver HTTP session created by :func:`_make_session`.
+    pdf_dir / html_dir:
+        Output directories for primary PDF artefacts and HTML fallbacks.
+    pipeline:
+        Resolver pipeline configured for the current execution.
+    logger:
+        Structured attempt logger (``JsonlLogger`` or ``CsvAttemptLoggerAdapter``).
+    metrics:
+        Mutable resolver metrics collector.
+    dry_run:
+        When ``True`` the function records coverage metrics without writing files.
+    extract_html_text:
+        Enables HTML plaintext extraction via :mod:`trafilatura` when available.
+    previous_lookup:
+        Mapping of ``work_id``/URL pairs loaded from a manifest JSONL for resume mode.
+    resume_completed:
+        Set of work identifiers that were previously completed and should be skipped.
+
+    Returns
+    -------
+    dict
+        Summary of the processing outcome containing ``saved``, ``html_only`` and
+        ``skipped`` counters for aggregation in :func:`main`.
+    """
     artifact = create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir)
 
     result = {"work_id": artifact.work_id, "saved": False, "html_only": False, "skipped": False}
@@ -1163,280 +1247,281 @@ def process_one_work(
 
 
 
-    def main() -> None:
-        logging.basicConfig(level=logging.INFO)
-        parser = argparse.ArgumentParser(
-            description="Download OpenAlex PDFs for a topic and year range with resolvers.",
-        )
-        parser.add_argument("--topic", type=str, help="Free-text topic search.")
-        parser.add_argument(
-            "--topic-id",
-            type=str,
-            help="OpenAlex Topic ID (e.g., https://openalex.org/T12345). Overrides --topic.",
-        )
-        parser.add_argument("--year-start", type=int, required=True, help="Start year (inclusive).")
-        parser.add_argument("--year-end", type=int, required=True, help="End year (inclusive).")
-        parser.add_argument("--out", type=Path, default=Path("./pdfs"), help="Output folder for PDFs.")
-        parser.add_argument(
-            "--html-out",
-            type=Path,
-            default=None,
-            help="Folder for HTML responses (default: sibling 'HTML').",
-        )
-        parser.add_argument("--mailto", type=str, default=None, help="Email for the OpenAlex polite pool.")
-        parser.add_argument("--per-page", type=int, default=200, help="Results per page (1-200).")
-        parser.add_argument("--max", type=int, default=None, help="Maximum works to process.")
-        parser.add_argument("--oa-only", action="store_true", help="Only consider open-access works.")
-        parser.add_argument("--sleep", type=float, default=0.05, help="Sleep seconds between works (sequential mode).")
+def main() -> None:
+    logging.basicConfig(level=logging.INFO)
+    parser = argparse.ArgumentParser(
+        description="Download OpenAlex PDFs for a topic and year range with resolvers.",
+    )
+    parser.add_argument("--topic", type=str, help="Free-text topic search.")
+    parser.add_argument(
+        "--topic-id",
+        type=str,
+        help="OpenAlex Topic ID (e.g., https://openalex.org/T12345). Overrides --topic.",
+    )
+    parser.add_argument("--year-start", type=int, required=True, help="Start year (inclusive).")
+    parser.add_argument("--year-end", type=int, required=True, help="End year (inclusive).")
+    parser.add_argument("--out", type=Path, default=Path("./pdfs"), help="Output folder for PDFs.")
+    parser.add_argument(
+        "--html-out",
+        type=Path,
+        default=None,
+        help="Folder for HTML responses (default: sibling 'HTML').",
+    )
+    parser.add_argument("--mailto", type=str, default=None, help="Email for the OpenAlex polite pool.")
+    parser.add_argument("--per-page", type=int, default=200, help="Results per page (1-200).")
+    parser.add_argument("--max", type=int, default=None, help="Maximum works to process.")
+    parser.add_argument("--oa-only", action="store_true", help="Only consider open-access works.")
+    parser.add_argument("--sleep", type=float, default=0.05, help="Sleep seconds between works (sequential mode).")
 
-        # Resolver configuration
-        parser.add_argument("--resolver-config", type=str, default=None, help="Path to resolver config (YAML/JSON).")
-        parser.add_argument(
-            "--resolver-order",
-            type=str,
-            default=None,
-            help="Comma-separated resolver order override (e.g., 'unpaywall,crossref').",
-        )
-        parser.add_argument("--unpaywall-email", type=str, default=None, help="Override Unpaywall email credential.")
-        parser.add_argument("--core-api-key", type=str, default=None, help="CORE API key override.")
-        parser.add_argument(
-            "--semantic-scholar-api-key",
-            type=str,
-            default=None,
-            help="Semantic Scholar Graph API key override.",
-        )
-        parser.add_argument("--doaj-api-key", type=str, default=None, help="DOAJ API key override.")
-        parser.add_argument(
-            "--disable-resolver",
-            action="append",
-            default=[],
-            help="Disable a resolver by name (can be repeated).",
-        )
-        parser.add_argument(
-            "--max-resolver-attempts",
-            type=int,
-            default=None,
-            help="Maximum resolver attempts per work.",
-        )
-        parser.add_argument(
-            "--resolver-timeout",
-            type=float,
-            default=None,
-            help="Default timeout (seconds) for resolver HTTP requests.",
-        )
-        parser.add_argument(
-            "--log-path",
-            dest="log_jsonl",
-            type=Path,
-            default=None,
-            help="Path to JSONL attempts log (default: <out>/attempts.jsonl).",
-        )
-        parser.add_argument(
-            "--log-format",
-            choices=["jsonl", "csv"],
-            default="jsonl",
-            help="Log format for attempts (default: jsonl).",
-        )
-        parser.add_argument(
-            "--workers",
-            type=int,
-            default=1,
-            help="Number of parallel workers (default: 1 for sequential).",
-        )
-        parser.add_argument(
-            "--dry-run",
-            action="store_true",
-            help="Measure resolver coverage without writing files.",
-        )
-        parser.add_argument(
-            "--resume-from",
-            type=Path,
-            default=None,
-            help="Resume from manifest JSONL log, skipping completed works.",
-        )
-        parser.add_argument(
-            "--extract-html-text",
-            action="store_true",
-            help="Extract plaintext from HTML fallbacks (requires trafilatura).",
-        )
+    # Resolver configuration
+    parser.add_argument("--resolver-config", type=str, default=None, help="Path to resolver config (YAML/JSON).")
+    parser.add_argument(
+        "--resolver-order",
+        type=str,
+        default=None,
+        help="Comma-separated resolver order override (e.g., 'unpaywall,crossref').",
+    )
+    parser.add_argument("--unpaywall-email", type=str, default=None, help="Override Unpaywall email credential.")
+    parser.add_argument("--core-api-key", type=str, default=None, help="CORE API key override.")
+    parser.add_argument(
+        "--semantic-scholar-api-key",
+        type=str,
+        default=None,
+        help="Semantic Scholar Graph API key override.",
+    )
+    parser.add_argument("--doaj-api-key", type=str, default=None, help="DOAJ API key override.")
+    parser.add_argument(
+        "--disable-resolver",
+        action="append",
+        default=[],
+        help="Disable a resolver by name (can be repeated).",
+    )
+    parser.add_argument(
+        "--max-resolver-attempts",
+        type=int,
+        default=None,
+        help="Maximum resolver attempts per work.",
+    )
+    parser.add_argument(
+        "--resolver-timeout",
+        type=float,
+        default=None,
+        help="Default timeout (seconds) for resolver HTTP requests.",
+    )
+    parser.add_argument(
+        "--log-path",
+        dest="log_jsonl",
+        type=Path,
+        default=None,
+        help="Path to JSONL attempts log (default: <out>/attempts.jsonl).",
+    )
+    parser.add_argument(
+        "--log-format",
+        choices=["jsonl", "csv"],
+        default="jsonl",
+        help="Log format for attempts (default: jsonl).",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of parallel workers (default: 1 for sequential).",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Measure resolver coverage without writing files.",
+    )
+    parser.add_argument(
+        "--resume-from",
+        type=Path,
+        default=None,
+        help="Resume from manifest JSONL log, skipping completed works.",
+    )
+    parser.add_argument(
+        "--extract-html-text",
+        action="store_true",
+        help="Extract plaintext from HTML fallbacks (requires trafilatura).",
+    )
 
-        args = parser.parse_args()
+    args = parser.parse_args()
 
-        if args.workers < 1:
-            parser.error("--workers must be >= 1")
-        if not args.topic and not args.topic_id:
-            parser.error("Provide --topic or --topic-id.")
+    if args.workers < 1:
+        parser.error("--workers must be >= 1")
+    if not args.topic and not args.topic_id:
+        parser.error("Provide --topic or --topic-id.")
 
-        if args.mailto:
-            oa_config.email = args.mailto
+    if args.mailto:
+        oa_config.email = args.mailto
 
-        topic_id = args.topic_id
-        if not topic_id and args.topic:
-            topic_id = resolve_topic_id_if_needed(args.topic)
+    topic_id = args.topic_id
+    if not topic_id and args.topic:
+        topic_id = resolve_topic_id_if_needed(args.topic)
 
-        query = build_query(
-            argparse.Namespace(
-                topic=args.topic,
-                topic_id=topic_id,
-                year_start=args.year_start,
-                year_end=args.year_end,
-                oa_only=args.oa_only,
-            )
+    query = build_query(
+        argparse.Namespace(
+            topic=args.topic,
+            topic_id=topic_id,
+            year_start=args.year_start,
+            year_end=args.year_end,
+            oa_only=args.oa_only,
         )
+    )
 
-        pdf_dir = args.out
-        html_dir = args.html_out or (pdf_dir.parent / "HTML")
-        ensure_dir(pdf_dir)
-        ensure_dir(html_dir)
+    pdf_dir = args.out
+    html_dir = args.html_out or (pdf_dir.parent / "HTML")
+    ensure_dir(pdf_dir)
+    ensure_dir(html_dir)
 
-        resolvers = default_resolvers()
-        resolver_names = [resolver.name for resolver in resolvers]
-        resolver_order_override: Optional[List[str]] = None
-        if args.resolver_order:
-            resolver_order_override = [name.strip() for name in args.resolver_order.split(",") if name.strip()]
-            if not resolver_order_override:
-                parser.error("--resolver-order requires at least one resolver name.")
-            unknown = [name for name in resolver_order_override if name not in resolver_names]
-            if unknown:
-                parser.error(f"Unknown resolver(s) in --resolver-order: {', '.join(unknown)}")
-            resolver_order_override = resolver_order_override + [
-                name for name in resolver_names if name not in resolver_order_override
-            ]
+    resolvers = default_resolvers()
+    resolver_names = [resolver.name for resolver in resolvers]
+    resolver_order_override: Optional[List[str]] = None
+    if args.resolver_order:
+        resolver_order_override = [name.strip() for name in args.resolver_order.split(",") if name.strip()]
+        if not resolver_order_override:
+            parser.error("--resolver-order requires at least one resolver name.")
+        unknown = [name for name in resolver_order_override if name not in resolver_names]
+        if unknown:
+            parser.error(f"Unknown resolver(s) in --resolver-order: {', '.join(unknown)}")
+        resolver_order_override = resolver_order_override + [
+            name for name in resolver_names if name not in resolver_order_override
+        ]
 
-        config = load_resolver_config(args, resolver_names, resolver_order_override)
+    config = load_resolver_config(args, resolver_names, resolver_order_override)
 
-        json_log_path = args.log_jsonl or (pdf_dir / "attempts.jsonl")
-        if json_log_path.suffix != ".jsonl":
-            json_log_path = json_log_path.with_suffix(".jsonl")
-        base_logger = JsonlLogger(json_log_path)
-        if args.log_format == "csv":
-            csv_path = json_log_path.with_suffix(".csv")
-            attempt_logger = CsvAttemptLoggerAdapter(base_logger, csv_path)
+    json_log_path = args.log_jsonl or (pdf_dir / "attempts.jsonl")
+    if json_log_path.suffix != ".jsonl":
+        json_log_path = json_log_path.with_suffix(".jsonl")
+    base_logger = JsonlLogger(json_log_path)
+    if args.log_format == "csv":
+        csv_path = json_log_path.with_suffix(".csv")
+        attempt_logger = CsvAttemptLoggerAdapter(base_logger, csv_path)
+    else:
+        attempt_logger = base_logger
+
+    resume_lookup, resume_completed = load_previous_manifest(args.resume_from)
+    if args.resume_from:
+        clear_resolver_caches()
+    metrics = ResolverMetrics()
+    pipeline = ResolverPipeline(
+        resolvers=resolvers,
+        config=config,
+        download_func=download_candidate,
+        logger=attempt_logger,
+        metrics=metrics,
+    )
+
+    def session_factory() -> requests.Session:
+        return _make_session_for_worker(config.polite_headers)
+
+    processed = 0
+    saved = 0
+    html_only = 0
+    skipped = 0
+
+    def record_result(res: Dict[str, Any]) -> None:
+        nonlocal processed, saved, html_only, skipped
+        processed += 1
+        if res.get("saved"):
+            saved += 1
+        if res.get("html_only"):
+            html_only += 1
+        if res.get("skipped"):
+            skipped += 1
+
+    try:
+        if args.workers == 1:
+            session = session_factory()
+            try:
+                for work in iterate_openalex(query, per_page=args.per_page, max_results=args.max):
+                    result = process_one_work(
+                        work,
+                        session,
+                        pdf_dir,
+                        html_dir,
+                        pipeline,
+                        attempt_logger,
+                        metrics,
+                        dry_run=args.dry_run,
+                        extract_html_text=args.extract_html_text,
+                        previous_lookup=resume_lookup,
+                        resume_completed=resume_completed,
+                    )
+                    record_result(result)
+                    if args.sleep > 0:
+                        time.sleep(args.sleep)
+            finally:
+                session.close()
         else:
-            attempt_logger = base_logger
+            with ThreadPoolExecutor(max_workers=args.workers) as executor:
+                futures = []
 
-        resume_lookup, resume_completed = load_previous_manifest(args.resume_from)
-        if args.resume_from:
-            clear_resolver_caches()
-        metrics = ResolverMetrics()
-        pipeline = ResolverPipeline(
-            resolvers=resolvers,
-            config=config,
-            download_func=download_candidate,
-            logger=attempt_logger,
-            metrics=metrics,
+                def submit_work(work_item: Dict[str, Any]) -> None:
+                    def runner() -> Dict[str, Any]:
+                        session = session_factory()
+                        try:
+                            return process_one_work(
+                                work_item,
+                                session,
+                                pdf_dir,
+                                html_dir,
+                                pipeline,
+                                attempt_logger,
+                                metrics,
+                                dry_run=args.dry_run,
+                                extract_html_text=args.extract_html_text,
+                                previous_lookup=resume_lookup,
+                                resume_completed=resume_completed,
+                            )
+                        finally:
+                            session.close()
+
+                    futures.append(executor.submit(runner))
+
+                for work in iterate_openalex(query, per_page=args.per_page, max_results=args.max):
+                    submit_work(work)
+
+                for future in as_completed(futures):
+                    record_result(future.result())
+    except Exception:
+        attempt_logger.close()
+        raise
+    else:
+        summary = metrics.summary()
+        attempt_logger.log_summary(
+            {
+                "total_works": processed,
+                "saved_pdfs": saved,
+                "html_only": html_only,
+                "skipped": skipped,
+                "dry_run": args.dry_run,
+                "metrics": summary,
+            }
         )
+        attempt_logger.close()
 
-        session_factory = lambda: _make_session_for_worker(config.polite_headers)
+    print(
+        f"\nDone. Processed {processed} works, saved {saved} PDFs, HTML-only {html_only}, skipped {skipped}."
+    )
+    if args.dry_run:
+        print("DRY RUN: no files written, resolver coverage only.")
+    print("Resolver summary:")
+    for key, values in summary.items():
+        print(f"  {key}: {values}")
 
-        processed = 0
-        saved = 0
-        html_only = 0
-        skipped = 0
-
-        def record_result(res: Dict[str, Any]) -> None:
-            nonlocal processed, saved, html_only, skipped
-            processed += 1
-            if res.get("saved"):
-                saved += 1
-            if res.get("html_only"):
-                html_only += 1
-            if res.get("skipped"):
-                skipped += 1
-
-        try:
-            if args.workers == 1:
-                session = session_factory()
-                try:
-                    for work in iterate_openalex(query, per_page=args.per_page, max_results=args.max):
-                        result = process_one_work(
-                            work,
-                            session,
-                            pdf_dir,
-                            html_dir,
-                            pipeline,
-                            attempt_logger,
-                            metrics,
-                            dry_run=args.dry_run,
-                            extract_html_text=args.extract_html_text,
-                            previous_lookup=resume_lookup,
-                            resume_completed=resume_completed,
-                        )
-                        record_result(result)
-                        if args.sleep > 0:
-                            time.sleep(args.sleep)
-                finally:
-                    session.close()
-            else:
-                with ThreadPoolExecutor(max_workers=args.workers) as executor:
-                    futures = []
-
-                    def submit_work(work_item: Dict[str, Any]) -> None:
-                        def runner() -> Dict[str, Any]:
-                            session = session_factory()
-                            try:
-                                return process_one_work(
-                                    work_item,
-                                    session,
-                                    pdf_dir,
-                                    html_dir,
-                                    pipeline,
-                                    attempt_logger,
-                                    metrics,
-                                    dry_run=args.dry_run,
-                                    extract_html_text=args.extract_html_text,
-                                    previous_lookup=resume_lookup,
-                                    resume_completed=resume_completed,
-                                )
-                            finally:
-                                session.close()
-
-                        futures.append(executor.submit(runner))
-
-                    for work in iterate_openalex(query, per_page=args.per_page, max_results=args.max):
-                        submit_work(work)
-
-                    for future in as_completed(futures):
-                        record_result(future.result())
-        except Exception:
-            attempt_logger.close()
-            raise
-        else:
-            summary = metrics.summary()
-            attempt_logger.log_summary(
-                {
-                    "total_works": processed,
-                    "saved_pdfs": saved,
-                    "html_only": html_only,
-                    "skipped": skipped,
-                    "dry_run": args.dry_run,
-                    "metrics": summary,
-                }
-            )
-            attempt_logger.close()
-
-        print(
-            f"\nDone. Processed {processed} works, saved {saved} PDFs, HTML-only {html_only}, skipped {skipped}."
-        )
-        if args.dry_run:
-            print("DRY RUN: no files written, resolver coverage only.")
-        print("Resolver summary:")
-        for key, values in summary.items():
-            print(f"  {key}: {values}")
-
-        LOGGER.info(
-            "resolver_run_summary %s",
-            json.dumps(
-                {
-                    "processed": processed,
-                    "saved": saved,
-                    "html_only": html_only,
-                    "skipped": skipped,
-                    "summary": summary,
-                },
-                sort_keys=True,
-            ),
-        )
+    LOGGER.info(
+        "resolver_run_summary %s",
+        json.dumps(
+            {
+                "processed": processed,
+                "saved": saved,
+                "html_only": html_only,
+                "skipped": skipped,
+                "summary": summary,
+            },
+            sort_keys=True,
+        ),
+    )
 
 
 
