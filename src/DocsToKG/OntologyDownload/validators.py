@@ -22,18 +22,21 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
+import os
 import json
 import logging
 import platform
 import shutil
 import subprocess
+import sys
 import tempfile
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, MutableMapping, cast
+from typing import Dict, Iterable, List, MutableMapping, Optional
 
 import psutil
 
@@ -169,6 +172,109 @@ def _write_validation_json(path: Path, payload: MutableMapping[str, object]) -> 
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _canonicalize_turtle(graph) -> str:
+    """Return canonical Turtle output with sorted prefixes and triples."""
+
+    namespace_manager = getattr(graph, "namespace_manager", None)
+    if namespace_manager is None or not hasattr(namespace_manager, "namespaces"):
+        raise AttributeError("graph lacks namespace manager support")
+
+    try:
+        namespace_items = list(namespace_manager.namespaces())
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        raise AttributeError("unable to iterate namespaces") from exc
+
+    prefix_map: Dict[str, str] = {}
+    for prefix, namespace in namespace_items:
+        key = prefix or ""
+        prefix_map[key] = str(namespace)
+
+    try:
+        triples = list(graph)
+    except Exception as exc:  # pragma: no cover - stub graphs are not iterable
+        raise AttributeError("graph is not iterable") from exc
+
+    def _term_to_string(term) -> str:
+        formatter = getattr(term, "n3", None)
+        if callable(formatter):
+            return formatter(namespace_manager)
+        return str(term)
+
+    triple_lines = [
+        f"{_term_to_string(subject)} {_term_to_string(predicate)} {_term_to_string(obj)} ."
+        for subject, predicate, obj in sorted(
+            ((s, p, o) for s, p, o in triples),
+            key=lambda item: (
+                _term_to_string(item[0]),
+                _term_to_string(item[1]),
+                _term_to_string(item[2]),
+            ),
+        )
+    ]
+
+    prefix_lines = []
+    for key in sorted(prefix_map):
+        label = f"{key}:" if key else ":"
+        prefix_lines.append(f"@prefix {label} <{prefix_map[key]}> .")
+
+    lines: List[str] = []
+    lines.extend(prefix_lines)
+    if prefix_lines and triple_lines:
+        lines.append("")
+    lines.extend(triple_lines)
+    return "\n".join(lines) + ("\n" if lines else "")
+
+
+class ValidatorSubprocessError(RuntimeError):
+    """Raised when a validator subprocess exits unsuccessfully."""
+
+
+def _run_validator_subprocess(
+    name: str, payload: Dict[str, object], *, timeout: int
+) -> Dict[str, object]:
+    """Execute a validator worker module within a subprocess."""
+
+    worker_script = Path(__file__).resolve().with_name("validator_workers.py")
+    command = [sys.executable, str(worker_script), name]
+    env = os.environ.copy()
+    project_root = Path(__file__).resolve().parents[2]
+    existing_path = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = (
+        f"{project_root}{os.pathsep}{existing_path}" if existing_path else str(project_root)
+    )
+
+    try:
+        completed = subprocess.run(
+            command,
+            input=json.dumps(payload).encode("utf-8"),
+            capture_output=True,
+            timeout=timeout,
+            check=False,
+            env=env,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ValidationTimeout(f"{name} validator exceeded {timeout}s") from exc
+    except OSError as exc:
+        raise ValidatorSubprocessError(f"Failed to launch {name} validator: {exc}") from exc
+
+    if completed.returncode != 0:
+        stderr = completed.stderr.decode("utf-8", errors="ignore").strip()
+        message = stderr or (
+            f"{name} validator subprocess failed with code {completed.returncode}"
+        )
+        raise ValidatorSubprocessError(message)
+
+    stdout = completed.stdout.decode("utf-8", errors="ignore").strip()
+    if not stdout:
+        return {}
+    try:
+        return json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise ValidatorSubprocessError(
+            f"{name} validator returned invalid JSON output"
+        ) from exc
 
 
 def _run_with_timeout(func, timeout_sec: int) -> None:
@@ -324,7 +430,14 @@ def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> Valid
         if "ttl" in request.config.defaults.normalize_to:
             request.normalized_dir.mkdir(parents=True, exist_ok=True)
             normalized_path = request.normalized_dir / (request.file_path.stem + ".ttl")
-            graph.serialize(destination=normalized_path, format="turtle")
+            try:
+                canonical_ttl = _canonicalize_turtle(graph)
+                normalized_path.write_text(canonical_ttl, encoding="utf-8")
+            except AttributeError:
+                graph.serialize(destination=normalized_path, format="turtle")
+                canonical_ttl = normalized_path.read_text(encoding="utf-8")
+            normalized_sha = hashlib.sha256(canonical_ttl.encode("utf-8")).hexdigest()
+            payload["normalized_sha256"] = normalized_sha
             output_files.append(str(normalized_path))
         _write_validation_json(request.validation_dir / "rdflib_parse.json", payload)
         return ValidationResult(ok=True, details=payload, output_files=output_files)
@@ -361,46 +474,32 @@ def validate_pronto(request: ValidationRequest, logger: logging.Logger) -> Valid
         ValidationTimeout: Propagated when Pronto takes longer than allowed.
     """
 
-    def _load() -> pronto.Ontology:
-        """Load the ontology into memory using Pronto."""
-        return pronto.Ontology(request.file_path.as_posix())
-
     try:
         timeout = request.config.defaults.validation.parser_timeout_sec
-        container: Dict[str, object] = {}
-
-        def _execute() -> None:
-            """Load the ontology and capture term statistics."""
-            ontology_obj = _load()
-            container["terms"] = len(list(ontology_obj.terms()))
-            container["ontology"] = ontology_obj
-
-        _log_memory(logger, "pronto", "before")
-        _run_with_timeout(_execute, timeout)
-        _log_memory(logger, "pronto", "after")
-        ontology = container.get("ontology")
-        if ontology is None:
-            raise RuntimeError("Pronto failed to return ontology")
-        ontology = cast(pronto.Ontology, ontology)
-        payload = {"ok": True, "terms": container["terms"]}
-        output_files: List[str] = []
+        payload: Dict[str, object] = {"file_path": str(request.file_path)}
+        normalized_path: Optional[Path] = None
         if "obographs" in request.config.defaults.normalize_to:
             request.normalized_dir.mkdir(parents=True, exist_ok=True)
             normalized_path = request.normalized_dir / (request.file_path.stem + ".json")
-            ontology.dump(normalized_path.as_posix(), format="obojson")
+            payload["normalized_path"] = str(normalized_path)
+
+        _log_memory(logger, "pronto", "before")
+        result_payload = _run_validator_subprocess("pronto", payload, timeout=timeout)
+        _log_memory(logger, "pronto", "after")
+        result_payload.setdefault("ok", True)
+        output_files: List[str] = []
+        if normalized_path and result_payload.get("normalized_written"):
             output_files.append(str(normalized_path))
-        _write_validation_json(request.validation_dir / "pronto_parse.json", payload)
-        return ValidationResult(ok=True, details=payload, output_files=output_files)
+        _write_validation_json(request.validation_dir / "pronto_parse.json", result_payload)
+        return ValidationResult(
+            ok=bool(result_payload.get("ok")),
+            details=result_payload,
+            output_files=output_files,
+        )
     except ValidationTimeout:
         message = f"Parser timeout after {timeout}s"
         payload = {"ok": False, "error": message}
-    except MemoryError as exc:
-        payload = {"ok": False, "error": "pronto memory limit exceeded"}
-        logger.warning(
-            "pronto memory error",
-            extra={"stage": "validate", "validator": "pronto", "error": str(exc)},
-        )
-    except Exception as exc:  # pylint: disable=broad-except
+    except ValidatorSubprocessError as exc:
         payload = {"ok": False, "error": str(exc)}
     _write_validation_json(request.validation_dir / "pronto_parse.json", payload)
     logger.warning(
@@ -432,39 +531,28 @@ def validate_owlready2(request: ValidationRequest, logger: logging.Logger) -> Va
             _write_validation_json(request.validation_dir / "owlready2_parse.json", payload)
             logger.info(
                 "owlready2 reasoning skipped",
-                extra={
-                    "stage": "validate",
-                    "validator": "owlready2",
-                    "file_size_mb": round(size_mb, 2),
-                    "limit_mb": limit,
-                },
+                extra={"stage": "validate", "validator": "owlready2", "file_size_mb": round(size_mb, 2), "limit_mb": limit},
             )
             return ValidationResult(ok=True, details=payload, output_files=[])
+        timeout = request.config.defaults.validation.parser_timeout_sec
+        payload = {"file_path": str(request.file_path)}
         _log_memory(logger, "owlready2", "before")
-        ontology = owlready2.get_ontology(request.file_path.resolve().as_uri()).load()
+        result_payload = _run_validator_subprocess("owlready2", payload, timeout=timeout)
         _log_memory(logger, "owlready2", "after")
-        payload = {"ok": True, "entities": len(list(ontology.classes()))}
-        _write_validation_json(request.validation_dir / "owlready2_parse.json", payload)
-        return ValidationResult(ok=True, details=payload, output_files=[])
-    except MemoryError as exc:
-        payload = {
-            "ok": False,
-            "error": f"Memory limit exceeded parsing {request.file_path.name}. Consider skipping reasoning",
-        }
-        _write_validation_json(request.validation_dir / "owlready2_parse.json", payload)
-        logger.warning(
-            "owlready2 memory error",
-            extra={"stage": "validate", "validator": "owlready2", "error": str(exc)},
-        )
-        return ValidationResult(ok=False, details=payload, output_files=[])
-    except Exception as exc:  # pylint: disable=broad-except
+        result_payload.setdefault("ok", True)
+        _write_validation_json(request.validation_dir / "owlready2_parse.json", result_payload)
+        return ValidationResult(ok=bool(result_payload.get("ok")), details=result_payload, output_files=[])
+    except ValidationTimeout:
+        message = f"Parser timeout after {request.config.defaults.validation.parser_timeout_sec}s"
+        payload = {"ok": False, "error": message}
+    except ValidatorSubprocessError as exc:
         payload = {"ok": False, "error": str(exc)}
-        _write_validation_json(request.validation_dir / "owlready2_parse.json", payload)
-        logger.warning(
-            "owlready2 validation failed",
-            extra={"stage": "validate", "validator": "owlready2", "error": payload.get("error")},
-        )
-        return ValidationResult(ok=False, details=payload, output_files=[])
+    _write_validation_json(request.validation_dir / "owlready2_parse.json", payload)
+    logger.warning(
+        "owlready2 validation failed",
+        extra={"stage": "validate", "validator": "owlready2", "error": payload.get("error")},
+    )
+    return ValidationResult(ok=False, details=payload, output_files=[])
 
 
 def validate_robot(request: ValidationRequest, logger: logging.Logger) -> ValidationResult:
