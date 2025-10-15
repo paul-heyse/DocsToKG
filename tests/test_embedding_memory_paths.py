@@ -202,7 +202,7 @@ def test_cli_path_overrides_take_precedence(tmp_path: Path, monkeypatch: pytest.
     monkeypatch.setattr(embed_module, "load_manifest_index", lambda *args, **kwargs: {})
     monkeypatch.setattr(embed_module, "compute_content_hash", lambda *_: "hash")
 
-    exit_code = embed_module.main(
+    args = embed_module.parse_args(
         [
             "--chunks-dir",
             str(tmp_path),
@@ -214,6 +214,8 @@ def test_cli_path_overrides_take_precedence(tmp_path: Path, monkeypatch: pytest.
             str(cli_qwen),
         ]
     )
+
+    exit_code = embed_module.main(args)
 
     assert exit_code == 0
     assert captured["splade"] == cli_splade.resolve()
@@ -228,20 +230,22 @@ def test_offline_mode_requires_local_models(tmp_path: Path, monkeypatch: pytest.
 
     missing = tmp_path / "missing"
 
+    args = embed_module.parse_args(
+        [
+            "--chunks-dir",
+            str(tmp_path),
+            "--out-dir",
+            str(tmp_path),
+            "--splade-model-dir",
+            str(missing / "splade"),
+            "--qwen-model-dir",
+            str(missing / "qwen"),
+            "--offline",
+        ]
+    )
+
     with pytest.raises(FileNotFoundError) as exc:
-        embed_module.main(
-            [
-                "--chunks-dir",
-                str(tmp_path),
-                "--out-dir",
-                str(tmp_path),
-                "--splade-model-dir",
-                str(missing / "splade"),
-                "--qwen-model-dir",
-                str(missing / "qwen"),
-                "--offline",
-            ]
-        )
+        embed_module.main(args)
 
     message = str(exc.value)
     assert "SPLADE model directory missing" in message

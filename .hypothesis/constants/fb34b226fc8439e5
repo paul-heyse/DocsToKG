@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/DocParsing/run_docling_parallel_with_vllm_debug.py
+# hypothesis_version: 6.141.0
+
+['--mode', '=', '__main__', 'pdf']

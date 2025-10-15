@@ -14,6 +14,8 @@ Key Features:
 - Thread-safe JSONL/CSV logging including manifest entries and attempt metrics.
 - Streaming content hashing with corruption detection heuristics for PDFs.
 - Centralised retry handling and polite header management for resolver requests.
+- Single-request download path (no redundant HEAD probes) with classification via
+  streamed sniff buffers.
 - CLI flags for controlling topic selection, time ranges, resolver order, and
   polite crawling identifiers.
 - Optional global URL deduplication and domain-level throttling controls for
@@ -749,7 +751,24 @@ def _infer_suffix(
     classification: str,
     default_suffix: str,
 ) -> str:
-    """Infer a file suffix using headers and URL hints."""
+    """Infer a destination suffix from HTTP hints and classification heuristics.
+
+    Args:
+        url: Candidate download URL emitted by a resolver.
+        content_type: Content-Type header returned by the response (if any).
+        disposition: Raw Content-Disposition header for RFC 6266 parsing.
+        classification: Downloader classification such as ``"pdf"`` or ``"html"``.
+        default_suffix: Fallback extension to use when no signals are present.
+
+    Returns:
+        Lowercase file suffix (including leading dot) chosen from the strongest
+        available signal. Preference order is:
+
+        1. ``filename*`` / ``filename`` parameters in Content-Disposition.
+        2. Content-Type heuristics (PDF/HTML).
+        3. URL path suffix derived from :func:`urllib.parse.urlsplit`.
+        4. Provided ``default_suffix``.
+    """
 
     filename = _extract_filename_from_disposition(disposition)
     if filename:

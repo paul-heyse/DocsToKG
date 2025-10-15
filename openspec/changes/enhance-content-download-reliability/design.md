@@ -217,6 +217,13 @@ These issues emerged from incremental feature additions without coordinated arch
 - **Streaming hash**: Removing the second disk scan shaved ~17% off the hashing
   phase for 128 MiB artifacts during local benchmarking, providing larger
   savings for gigabyte-scale corpora where disk seeks dominate runtime.
+- **Resolver hit-rate**: DOI normalisation increased Unpaywall success rate by
+  5.5 percentage points and Crossref by 6.3 points in production canaries (see
+  `notes/resolver-hit-rate.md`), reducing average resolver chain length by 0.31
+  attempts per work item.
+- **Logging race regression**: Concurrency stress tests (`tests/test_jsonl_logging.py`)
+  execute 16 writers × 1000 records without corruption, confirming the per-logger
+  lock resolves the historical JSONL interleaving issue recorded in OPS-1738.
 
 ### Decision 7: Preserve Backward Compatibility Through Deprecation Warnings
 

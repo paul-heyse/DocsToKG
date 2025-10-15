@@ -1033,12 +1033,7 @@ def main(args: argparse.Namespace | None = None) -> int:
     )
 
     parser = build_parser()
-    defaults = parser.parse_args([])
-    provided = parse_args() if args is None else args
-    for key, value in vars(provided).items():
-        if value is not None:
-            setattr(defaults, key, value)
-    args = defaults
+    args = args if isinstance(args, argparse.Namespace) else parser.parse_args(args)
 
     served_model_names = _normalize_served_model_names(args.served_model_names)
     inference_model = served_model_names[0]

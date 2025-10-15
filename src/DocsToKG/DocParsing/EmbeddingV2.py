@@ -1088,18 +1088,11 @@ def main(args: argparse.Namespace | None = None) -> int:
     logger = get_logger(__name__)
 
     parser = build_parser()
-    if args is None:
-        parsed_args = parser.parse_args()
-    elif isinstance(args, (argparse.Namespace, SimpleNamespace)):
-        defaults = parser.parse_args([])
-        for key, value in vars(args).items():
-            setattr(defaults, key, value)
-        parsed_args = defaults
-    elif isinstance(args, list):
-        parsed_args = parser.parse_args(args)
-    else:
-        parsed_args = parser.parse_args(list(args))
-    args = parsed_args
+    args = (
+        args
+        if isinstance(args, (argparse.Namespace, SimpleNamespace))
+        else parser.parse_args(args)
+    )
     offline_mode = bool(getattr(args, "offline", False))
 
     hf_home = _resolve_hf_home()
@@ -1231,7 +1224,6 @@ def main(args: argparse.Namespace | None = None) -> int:
         batch_size=args.batch_size_splade,
         max_active_dims=args.splade_max_active_dims,
         attn_impl=attn_impl,
-        cache_folder=MODEL_ROOT,
     )
     args.qwen_cfg = QwenCfg(
         model_dir=qwen_model_dir,
@@ -1242,7 +1234,6 @@ def main(args: argparse.Namespace | None = None) -> int:
     )
 
     stats = process_pass_a(files, logger)
-    if stats.N == 0:
     if not stats.N:
         logger.warning("No chunks found after Pass A")
         return 0

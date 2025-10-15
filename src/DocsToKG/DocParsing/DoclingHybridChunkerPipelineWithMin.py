@@ -510,12 +510,7 @@ def main(args: argparse.Namespace | None = None) -> int:
     logger = get_logger(__name__)
 
     parser = build_parser()
-    defaults = parser.parse_args([])
-    provided = parse_args() if args is None else args
-    for key, value in vars(provided).items():
-        if value is not None:
-            setattr(defaults, key, value)
-    args = defaults
+    args = args if isinstance(args, argparse.Namespace) else parser.parse_args(args)
 
     data_root_override = args.data_root
     resolved_data_root = (

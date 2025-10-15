@@ -109,20 +109,18 @@ def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
 def format_plan_rows(plans: Sequence["PlannedFetch"]) -> Sequence[Tuple[str, str, str, str, str]]:
     """Return rows summarizing planned fetches for table rendering."""
 
-    formatted: list[Tuple[str, str, str, str, str]] = []
+    rows: list[Tuple[str, str, str, str, str]] = []
     for plan in plans:
-        service = plan.plan.service or ""
-        media_type = plan.plan.media_type or ""
-        formatted.append(
+        rows.append(
             (
                 plan.spec.id,
                 plan.resolver,
-                service,
-                media_type,
+                plan.plan.service or "",
+                plan.plan.media_type or "",
                 plan.plan.url,
             )
         )
-    return formatted
+    return rows
 
 
 def format_results_table(results: Sequence["FetchResult"]) -> str:
@@ -131,11 +129,11 @@ def format_results_table(results: Sequence["FetchResult"]) -> str:
     rows = [
         (
             result.spec.id,
-            result.status,
             result.spec.resolver,
-            result.sha256,
+            result.status,
             str(result.local_path),
+            result.sha256,
         )
         for result in results
     ]
-    return format_table(("id", "status", "resolver", "sha256", "path"), rows)
+    return format_table(("id", "resolver", "status", "file", "sha256"), rows)

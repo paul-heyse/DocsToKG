@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/__init__.py
+# hypothesis_version: 6.141.0
+
+['default_resolvers']

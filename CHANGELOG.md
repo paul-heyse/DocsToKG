@@ -4,6 +4,9 @@ All notable changes to DocsToKG are documented in this file.
 
 ## [Unreleased]
 
+### Breaking Changes
+- None.
+
 ### Added
 - Zenodo and Figshare resolvers integrated into the modular content download pipeline with defensive error handling and metadata-rich events.
 - Bounded intra-work concurrency controls and HEAD pre-check filtering options documented in the README and resolver guides.
@@ -26,6 +29,12 @@ All notable changes to DocsToKG are documented in this file.
 - Resolver namespace documents the deprecation timeline for the legacy ``time`` and ``requests`` aliases ahead of their removal.
 - Resolver pipeline enforces optional domain rate limits and skips repeat URLs across works when
   global deduplication is enabled.
+
+### Deprecated
+- Convenience re-exports of ``time`` and ``requests`` from
+  ``DocsToKG.ContentDownload.resolvers`` emit deprecation warnings. Removal is
+  scheduled for the 2025.12 minor release (see
+  `openspec/changes/enhance-content-download-reliability/notes/deprecation-removal-plan.md`).
 
 ### Fixed
 - Tests cover HEAD pre-check redirects, resolver concurrency error isolation, and configuration validation edge cases.
