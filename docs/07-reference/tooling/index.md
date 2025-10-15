@@ -1,8 +1,8 @@
-# Tool Configuration
+# 1. Tool Configuration
 
 DocsToKG ships helper scripts and third-party tooling to maintain documentation quality and developer workflows. Configure them as follows.
 
-## Documentation Automation
+## 2. Documentation Automation
 
 | Script | Location | Purpose | Usage |
 |--------|----------|---------|-------|
@@ -18,7 +18,7 @@ Install Sphinx dependencies via:
 pip install -r docs/build/sphinx/requirements.txt
 ```
 
-## Code Quality
+## 3. Code Quality
 
 Recommended formatting and linting stack:
 
@@ -35,7 +35,7 @@ pre-commit install
 
 Suggested `.pre-commit-config.yaml` snippets are maintained in the development guide.
 
-## Vale (Optional)
+## 4. Vale (Optional)
 
 Use [Vale](https://vale.sh/) for prose linting:
 
@@ -46,7 +46,7 @@ vale docs/
 
 Rules can be extended by dropping configurations into `docs/.vale/` (see Style Guide for conventions).
 
-## Environment Variables
+## 5. Environment Variables
 
 | Variable | Purpose | Default |
 |----------|---------|---------|

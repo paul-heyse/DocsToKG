@@ -250,6 +250,11 @@ class ResolverConfig:
         resolver_min_interval_s: Minimum interval between resolver requests.
         resolver_rate_limits: Deprecated rate limit configuration retained for compat.
         mailto: Contact email appended to polite headers and user agent string.
+
+    Examples:
+        >>> config = ResolverConfig()
+        >>> config.max_attempts_per_work
+        25
     """
     resolver_order: List[str] = field(default_factory=lambda: list(DEFAULT_RESOLVER_ORDER))
     resolver_toggles: Dict[str, bool] = field(
@@ -354,6 +359,9 @@ class AttemptLogger(Protocol):
         >>> collector = Collector()
         >>> isinstance(collector, AttemptLogger)
         True
+    
+    Attributes:
+        None
     """
 
     def log(self, record: AttemptRecord) -> None:
@@ -437,7 +445,15 @@ class PipelineResult:
 
 
 class Resolver(Protocol):
-    """Protocol that resolver implementations must follow."""
+    """Protocol that resolver implementations must follow.
+
+    Attributes:
+        name: Resolver identifier used within configuration.
+
+    Examples:
+        Concrete implementations are provided in classes such as
+        :class:`UnpaywallResolver` and :class:`CrossrefResolver` below.
+    """
 
     name: str
 
@@ -484,7 +500,20 @@ class Resolver(Protocol):
 
 @dataclass
 class ResolverMetrics:
-    """Lightweight metrics collector for resolver execution."""
+    """Lightweight metrics collector for resolver execution.
+
+    Attributes:
+        attempts: Counter of attempts per resolver.
+        successes: Counter of successful PDF downloads per resolver.
+        html: Counter of HTML-only results per resolver.
+        skips: Counter of skip events keyed by resolver and reason.
+
+    Examples:
+        >>> metrics = ResolverMetrics()
+        >>> metrics.record_attempt("unpaywall", DownloadOutcome("pdf", None, 200, None, 10.0))
+        >>> metrics.summary()["attempts"]["unpaywall"]
+        1
+    """
     attempts: Counter = field(default_factory=Counter)
     successes: Counter = field(default_factory=Counter)
     html: Counter = field(default_factory=Counter)
@@ -527,6 +556,12 @@ class ResolverMetrics:
 
         Returns:
             Dict[str, Any]: Snapshot of attempts, successes, HTML hits, and skips.
+
+        Examples:
+            >>> metrics = ResolverMetrics()
+            >>> metrics.record_attempt("unpaywall", DownloadOutcome("pdf", None, 200, None, 10.0))
+            >>> metrics.summary()["attempts"]["unpaywall"]
+            1
         """
         return {
             "attempts": dict(self.attempts),
@@ -557,7 +592,24 @@ def _callable_accepts_argument(func: Callable[..., Any], name: str) -> bool:
 
 
 class ResolverPipeline:
-    """Executes resolvers in priority order until a PDF download succeeds."""
+    """Executes resolvers in priority order until a PDF download succeeds.
+
+    Attributes:
+        config: Resolver configuration shared across executions.
+        download_func: Callable used to download candidate URLs.
+        logger: Attempt logger receiving structured records.
+        metrics: Metrics collector tracking resolver performance.
+
+    Examples:
+        >>> pipeline = ResolverPipeline(
+        ...     [UnpaywallResolver()],
+        ...     ResolverConfig(),
+        ...     download_candidate,
+        ...     JsonlLogger(Path('attempts.jsonl')),
+        ... )
+        >>> isinstance(pipeline, ResolverPipeline)
+        True
+    """
 
     def __init__(
         self,
@@ -797,7 +849,16 @@ def _absolute_url(base: str, href: str) -> str:
 
 
 class UnpaywallResolver:
-    """Resolve PDFs via the Unpaywall API."""
+    """Resolve PDFs via the Unpaywall API.
+
+    Attributes:
+        name: Resolver identifier used in configuration.
+
+    Examples:
+        >>> resolver = UnpaywallResolver()
+        >>> resolver.name
+        'unpaywall'
+    """
     name = "unpaywall"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
@@ -927,7 +988,16 @@ class UnpaywallResolver:
 
 
 class CrossrefResolver:
-    """Resolve candidate URLs from the Crossref metadata API."""
+    """Resolve candidate URLs from the Crossref metadata API.
+
+    Attributes:
+        name: Resolver identifier used in configuration.
+
+    Examples:
+        >>> resolver = CrossrefResolver()
+        >>> resolver.name
+        'crossref'
+    """
 
     name = "crossref"
 
@@ -1076,7 +1146,16 @@ class CrossrefResolver:
 
 
 class LandingPageResolver:
-    """Attempt to scrape landing pages when explicit PDFs are unavailable."""
+    """Attempt to scrape landing pages when explicit PDFs are unavailable.
+
+    Attributes:
+        name: Resolver identifier used in configuration.
+
+    Examples:
+        >>> resolver = LandingPageResolver()
+        >>> resolver.name
+        'landing_page'
+    """
 
     name = "landing_page"
 
@@ -1177,7 +1256,16 @@ class LandingPageResolver:
 
 
 class ArxivResolver:
-    """Resolve arXiv preprints using arXiv identifier lookups."""
+    """Resolve arXiv preprints using arXiv identifier lookups.
+
+    Attributes:
+        name: Resolver identifier used in configuration.
+
+    Examples:
+        >>> resolver = ArxivResolver()
+        >>> resolver.name
+        'arxiv'
+    """
 
     name = "arxiv"
 
@@ -1222,7 +1310,16 @@ class ArxivResolver:
 
 
 class PmcResolver:
-    """Resolve PubMed Central articles via identifiers and lookups."""
+    """Resolve PubMed Central articles via identifiers and lookups.
+
+    Attributes:
+        name: Resolver identifier used in configuration.
+
+    Examples:
+        >>> resolver = PmcResolver()
+        >>> resolver.name
+        'pmc'
+    """
 
     name = "pmc"
 
@@ -1337,7 +1434,16 @@ class PmcResolver:
 
 
 class EuropePmcResolver:
-    """Resolve Open Access links via the Europe PMC REST API."""
+    """Resolve Open Access links via the Europe PMC REST API.
+
+    Attributes:
+        name: Resolver identifier used in configuration.
+
+    Examples:
+        >>> resolver = EuropePmcResolver()
+        >>> resolver.name
+        'europe_pmc'
+    """
 
     name = "europe_pmc"
 
@@ -1399,7 +1505,16 @@ class EuropePmcResolver:
 
 
 class CoreResolver:
-    """Resolve PDFs using the CORE API."""
+    """Resolve PDFs using the CORE API.
+
+    Attributes:
+        name: Resolver identifier used in configuration.
+
+    Examples:
+        >>> resolver = CoreResolver()
+        >>> resolver.name
+        'core'
+    """
 
     name = "core"
 
@@ -1467,7 +1582,16 @@ class CoreResolver:
 
 
 class DoajResolver:
-    """Resolve Open Access links using the DOAJ API."""
+    """Resolve Open Access links using the DOAJ API.
+
+    Attributes:
+        name: Resolver identifier used in configuration.
+
+    Examples:
+        >>> resolver = DoajResolver()
+        >>> resolver.name
+        'doaj'
+    """
 
     name = "doaj"
 
@@ -1535,7 +1659,16 @@ class DoajResolver:
 
 
 class SemanticScholarResolver:
-    """Resolve PDFs using the Semantic Scholar Graph API."""
+    """Resolve PDFs using the Semantic Scholar Graph API.
+
+    Attributes:
+        name: Resolver identifier used in configuration.
+
+    Examples:
+        >>> resolver = SemanticScholarResolver()
+        >>> resolver.name
+        'semantic_scholar'
+    """
 
     name = "semantic_scholar"
 
@@ -1589,7 +1722,16 @@ class SemanticScholarResolver:
 
 
 class OpenAireResolver:
-    """Resolve URLs using the OpenAIRE API."""
+    """Resolve URLs using the OpenAIRE API.
+
+    Attributes:
+        name: Resolver identifier used in configuration.
+
+    Examples:
+        >>> resolver = OpenAireResolver()
+        >>> resolver.name
+        'openaire'
+    """
 
     name = "openaire"
 
@@ -1652,7 +1794,16 @@ class OpenAireResolver:
 
 
 class HalResolver:
-    """Resolve publications from the HAL open archive."""
+    """Resolve publications from the HAL open archive.
+
+    Attributes:
+        name: Resolver identifier used in configuration.
+
+    Examples:
+        >>> resolver = HalResolver()
+        >>> resolver.name
+        'hal'
+    """
 
     name = "hal"
 
@@ -1723,7 +1874,16 @@ class HalResolver:
 
 
 class OsfResolver:
-    """Resolve artefacts hosted on the Open Science Framework."""
+    """Resolve artefacts hosted on the Open Science Framework.
+
+    Attributes:
+        name: Resolver identifier used in configuration.
+
+    Examples:
+        >>> resolver = OsfResolver()
+        >>> resolver.name
+        'osf'
+    """
 
     name = "osf"
 
@@ -1795,7 +1955,16 @@ class OsfResolver:
 
 
 class WaybackResolver:
-    """Fallback resolver that queries the Internet Archive Wayback Machine."""
+    """Fallback resolver that queries the Internet Archive Wayback Machine.
+
+    Attributes:
+        name: Resolver identifier used in configuration.
+
+    Examples:
+        >>> resolver = WaybackResolver()
+        >>> resolver.name
+        'wayback'
+    """
 
     name = "wayback"
 

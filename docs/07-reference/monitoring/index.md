@@ -1,8 +1,8 @@
-# Monitoring & Observability
+# 1. Monitoring & Observability
 
 Proactive monitoring keeps ingestion pipelines, ontology downloaders, and hybrid search responsive.
 
-## Key Metrics
+## 2. Key Metrics
 
 | Metric | Source | Description |
 |--------|--------|-------------|
@@ -13,19 +13,19 @@ Proactive monitoring keeps ingestion pipelines, ontology downloaders, and hybrid
 | `ontology.download_success_rate` | Ontology CLI logs | Successful fetch percentage |
 | `ingestion.documents_processed` | Content pipeline logs | Document throughput |
 
-## Dashboards
+## 3. Dashboards
 
 - Create Grafana dashboards grouping latency, recall, and ingestion throughput.
 - Highlight SLO targets (e.g., 95th percentile latency < 300 ms, self-hit accuracy ≥ 0.95).
 - Include alerting thresholds that page operators when metrics exceed bounds.
 
-## Logging
+## 4. Logging
 
 - Configure structured logging for ingestion jobs and hybrid search API.
 - Persist ontology download manifests and validation reports under `~/.data/ontology-fetcher`.
 - Send logs to centralised platforms (ELK, OpenSearch) with namespaces tags for filtering.
 
-## Alerting
+## 5. Alerting
 
 - **Latency**: Alert when 95th percentile exceeds SLO for 5 minutes.
 - **Accuracy**: Alert when validation harness reports <0.9 self-hit accuracy.

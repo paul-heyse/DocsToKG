@@ -1,15 +1,15 @@
-# Setup Guide
+# 1. Setup Guide
 
 Follow this guide to configure DocsToKG on a local workstation or development server.
 
-## Overview
+## 2. Overview
 
 - Provision a Python 3.12+ environment with optional CUDA support.
 - Install project dependencies (core, GPU, documentation tooling).
 - Configure environment variables and working directories.
 - Run smoke checks to confirm the installation.
 
-## Prerequisites
+## 3. Prerequisites
 
 - **Operating system**: Linux or macOS preferred (Windows users should use WSL2).
 - **Python**: 3.12 or newer (see `pyproject.toml`).
@@ -19,7 +19,7 @@ Follow this guide to configure DocsToKG on a local workstation or development se
 
 > ℹ️  Direnv is supported via `.envrc`, but optional. Install with `brew install direnv` or follow instructions at [direnv.net](https://direnv.net).
 
-## Installation
+## 4. Installation
 
 ### 1. Clone the Repository
 
@@ -108,7 +108,7 @@ python docs/scripts/build_docs.py --format html
 open docs/build/_build/html/index.html  # macOS
 ```
 
-## Next Steps
+## 5. Next Steps
 
 - Ingest sample documents using the content downloaders (`DocsToKG.ContentDownload`).
 - Convert assets into chunked DocTags and embeddings (`DocsToKG.DocParsing`).

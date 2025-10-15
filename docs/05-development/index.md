@@ -1,8 +1,8 @@
-# Development Guide
+# 1. Development Guide
 
 Welcome to the DocsToKG development community! This guide will help you contribute to the project effectively.
 
-## Getting Started as a Contributor
+## 2. Getting Started as a Contributor
 
 ### 1. Set Up Development Environment
 
@@ -21,9 +21,9 @@ Follow the [Setup Guide](../02-setup/) to get your local environment running.
 - **Bug Fixes**: Start with straightforward bug reports
 - **Feature Requests**: Pick features that align with your interests
 
-## Development Workflow
+## 3. Development Workflow
 
-### Branch Strategy
+### 3.1 Branch Strategy
 
 We keep the branching model lightweight:
 
@@ -36,7 +36,7 @@ main                         # Default branch
 - Rebase or merge `main` regularly when working on longer efforts.
 - Delete feature branches after merging to keep the repository tidy.
 
-### Documentation-First Development
+### 3.2 Documentation-First Development
 
 DocsToKG follows a **documentation-first development** approach:
 
@@ -45,7 +45,7 @@ DocsToKG follows a **documentation-first development** approach:
 3. **Create usage examples** alongside code
 4. **Update documentation** as features evolve
 
-### Documentation Integration
+### 3.3 Documentation Integration
 
 #### Pre-Development Phase
 
@@ -74,7 +74,7 @@ DocsToKG follows a **documentation-first development** approach:
 - [ ] Run `python docs/scripts/validate_docs.py` for content validation
 - [ ] Review changes using documentation checklist
 
-### Commit Conventions
+## 4. Commit Conventions
 
 Follow conventional commit format:
 
@@ -106,7 +106,7 @@ docs(api): add comprehensive search endpoint documentation
 docs(architecture): update component diagram for new service
 ```
 
-### Pull Request Process
+## 5. Pull Request Process
 
 1. **Create a branch** from `main` with descriptive name (e.g., `feature/hybrid-metrics`)
 2. **Make your changes** following coding standards
@@ -116,7 +116,7 @@ docs(architecture): update component diagram for new service
 6. **Run tests locally** to ensure everything works
 7. **Submit PR** with clear description and link to related issues
 
-#### Documentation Requirements for PRs
+### 5.1 Documentation Requirements for PRs
 
 **For all code changes:**
 
@@ -139,16 +139,16 @@ docs(architecture): update component diagram for new service
 - [ ] Add test cases for the fix
 - [ ] Document workaround if applicable
 
-### Code Review Process
+### 5.2 Code Review Process
 
 - **Reviewers**: At least one maintainer review required
 - **CI Checks**: All automated checks must pass
 - **Testing**: New features need test coverage
 - **Documentation**: Update docs for user-facing changes
 
-## Coding Standards
+## 6. Coding Standards
 
-### Python Standards
+### 6.1 Python Standards
 
 **Formatting**:
 
@@ -194,7 +194,7 @@ def process_document(
     """
 ```
 
-### Testing Standards
+### 6.2 Testing Standards
 
 **Test Structure**:
 
@@ -222,14 +222,14 @@ def test_hybrid_search_returns_results(hybrid_service, seeded_chunk_fixture):
 
 ## Documentation Contributions
 
-### Improving Existing Documentation
+### 6.3 Improving Existing Documentation
 
 1. **Identify gaps**: Look for unclear explanations or missing information
 2. **Check style**: Follow the [Style Guide](../STYLE_GUIDE.md)
 3. **Test examples**: Verify code examples work correctly
 4. **Update cross-references**: Ensure links between documents work
 
-### Adding New Documentation
+### 6.4 Adding New Documentation
 
 1. **Use templates**: Check `docs/templates/` for appropriate templates
 2. **Follow structure**: Maintain consistent organization
@@ -238,7 +238,7 @@ def test_hybrid_search_returns_results(hybrid_service, seeded_chunk_fixture):
 
 ## Release Process
 
-### Version Management
+### 6.5 Version Management
 
 We follow [Semantic Versioning](https://semver.org/):
 
@@ -246,7 +246,7 @@ We follow [Semantic Versioning](https://semver.org/):
 - **Minor** (x.y.0): New features, backward compatible
 - **Patch** (x.y.z): Bug fixes, no new features
 
-### Release Checklist
+### 6.6 Release Checklist
 
 - [ ] All tests pass (`pytest -q`, plus optional markers)
 - [ ] Documentation regenerated and validated
@@ -256,19 +256,19 @@ We follow [Semantic Versioning](https://semver.org/):
 
 ## Communication
 
-### Development Discussions
+### 6.7 Development Discussions
 
 - **GitHub Issues**: For bug reports and feature requests
 - **GitHub Discussions**: For questions and community discussions
 
-### Getting Help
+### 6.8 Getting Help
 
 1. **Search existing issues** and discussions first
 2. **Check documentation** - your question might already be answered
 3. **Create a new issue** with clear description and reproduction steps
 4. **Ask in discussions** for general questions
 
-### Contributing to This Guide
+### 6.9 Contributing to This Guide
 
 This development guide itself can be improved! If you find:
 

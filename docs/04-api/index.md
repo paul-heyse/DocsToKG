@@ -1,17 +1,19 @@
-# API Reference
+# 1. API Reference
 
-DocsToKG exposes a single HTTP-style interface for hybrid search through the `HybridSearchAPI` class in `DocsToKG.HybridSearch.api`. This reference describes the request/response schema and shows how to integrate the API into a web service.
+DocsToKG exposes a single HTTP-style interface for hybrid search through the
+`HybridSearchAPI` class in `DocsToKG.HybridSearch.api`. This reference describes the
+request/response schema and shows how to integrate the API into a web service.
 
 > ℹ️  DocsToKG does not ship a standalone web server. Use the snippets below to wrap `HybridSearchAPI` with your preferred framework (FastAPI, Flask, etc.).
 
-## Base Endpoint
+## 2. Base Endpoint
 
 ```
 POST /v1/hybrid-search
 Content-Type: application/json
 ```
 
-### Request Body
+### 2.1 Request Body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -38,7 +40,7 @@ Example request:
 }
 ```
 
-### Response Body
+### 2.2 Response Body
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -72,7 +74,7 @@ Each result contains:
 }
 ```
 
-### Error Responses
+### 2.3 Error Responses
 
 | Status | Body | When it occurs |
 |--------|------|----------------|
@@ -81,7 +83,7 @@ Each result contains:
 
 Validation failures raise `RequestValidationError` inside the service; the API layer converts them into `400` responses.
 
-## Pagination
+## 3. Pagination
 
 The API returns at most `page_size` results per call. When additional results are available, `next_cursor` is populated. Supply this value in the next request to continue pagination.
 
@@ -94,11 +96,11 @@ The API returns at most `page_size` results per call. When additional results ar
 
 Cursor chains are stable across requests unless the underlying index changes significantly. Use `DocsToKG.HybridSearch.operations.verify_pagination` during integration tests to ensure continuity.
 
-## Diagnostics
+## 4. Diagnostics
 
 `timings_ms` contains latency measurements for each stage (BM25, SPLADE, FAISS, fusion) when observability is enabled. Per-result `diagnostics` expose individual signal scores, useful for ranking audits.
 
-## Integrating with FastAPI
+## 5. Integrating with FastAPI
 
 ```python
 from pathlib import Path
@@ -134,7 +136,7 @@ curl -X POST http://localhost:8000/v1/hybrid-search \
   -d '{"query": "knowledge graph embeddings", "page_size": 5}'
 ```
 
-## Local Service Usage (No HTTP)
+## 6. Local Service Usage (No HTTP)
 
 When embedding DocsToKG directly inside Python code, call the service layer once you have constructed it (see `docs/06-operations/index.md` for a full build walkthrough):
 
@@ -148,7 +150,7 @@ response = service.search(request)
 
 Working examples of service assembly live in `tests/conftest.py` and `tests/test_hybrid_search.py`.
 
-## Related Resources
+## 7. Related Resources
 
 - `docs/06-operations/index.md` – Day-two operations and maintenance routines.
 - `docs/07-reference/api-integrations/index.md` – Integration best practices and CLI helpers.

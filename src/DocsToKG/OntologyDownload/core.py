@@ -31,6 +31,14 @@ except ModuleNotFoundError:  # pragma: no cover - provides lightweight fallback 
             self._root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
 
         def join(self, *segments: str) -> Path:
+            """Build a path relative to the fallback pystow root directory.
+
+            Args:
+                *segments: Path segments appended to the root directory.
+
+            Returns:
+                Path object pointing to the requested cache location.
+            """
             return self._root.joinpath(*segments)
 
     pystow = _PystowFallback()  # type: ignore
@@ -48,19 +56,59 @@ from .validators import ValidationRequest, ValidationResult, run_validators
 
 
 class OntologyDownloadError(RuntimeError):
-    """Base exception for ontology download failures."""
+    """Base exception for ontology download failures.
+
+    Args:
+        message: Description of the failure encountered.
+
+    Examples:
+        >>> raise OntologyDownloadError("unexpected error")
+        Traceback (most recent call last):
+        ...
+        OntologyDownloadError: unexpected error
+    """
 
 
 class ResolverError(OntologyDownloadError):
-    """Raised when resolver planning fails."""
+    """Raised when resolver planning fails.
+
+    Args:
+        message: Description of the resolver failure.
+
+    Examples:
+        >>> raise ResolverError("resolver unavailable")
+        Traceback (most recent call last):
+        ...
+        ResolverError: resolver unavailable
+    """
 
 
 class ValidationError(OntologyDownloadError):
-    """Raised when validation encounters unrecoverable issues."""
+    """Raised when validation encounters unrecoverable issues.
+
+    Args:
+        message: Human-readable description of the validation failure.
+
+    Examples:
+        >>> raise ValidationError("robot validator crashed")
+        Traceback (most recent call last):
+        ...
+        ValidationError: robot validator crashed
+    """
 
 
 class ConfigurationError(OntologyDownloadError):
-    """Raised when configuration or manifest validation fails."""
+    """Raised when configuration or manifest validation fails.
+
+    Args:
+        message: Details about the configuration inconsistency.
+
+    Examples:
+        >>> raise ConfigurationError("manifest missing sha256")
+        Traceback (most recent call last):
+        ...
+        ConfigurationError: manifest missing sha256
+    """
 
 
 @dataclass(slots=True)
@@ -72,6 +120,11 @@ class FetchSpec:
         resolver: Name of the resolver strategy used to locate resources.
         extras: Resolver-specific configuration overrides.
         target_formats: Normalized ontology formats that should be produced.
+
+    Examples:
+        >>> spec = FetchSpec(id="CHEBI", resolver="obo", extras={}, target_formats=("owl",))
+        >>> spec.resolver
+        'obo'
     """
 
     id: str
@@ -91,6 +144,20 @@ class FetchResult:
         sha256: SHA-256 digest of the downloaded file.
         manifest_path: Path to the generated manifest JSON file.
         artifacts: Ancillary files produced during extraction or validation.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> spec = FetchSpec(id="CHEBI", resolver="obo", extras={}, target_formats=("owl",))
+        >>> result = FetchResult(
+        ...     spec=spec,
+        ...     local_path=Path("CHEBI.owl"),
+        ...     status="success",
+        ...     sha256="deadbeef",
+        ...     manifest_path=Path("manifest.json"),
+        ...     artifacts=(),
+        ... )
+        >>> result.status
+        'success'
     """
 
     spec: FetchSpec
@@ -120,6 +187,26 @@ class Manifest:
         target_formats: Desired conversion targets for normalization.
         validation: Mapping of validator names to their results.
         artifacts: Additional file paths generated during processing.
+
+    Examples:
+        >>> manifest = Manifest(
+        ...     id="CHEBI",
+        ...     resolver="obo",
+        ...     url="https://example.org/chebi.owl",
+        ...     filename="chebi.owl",
+        ...     version=None,
+        ...     license="CC-BY",
+        ...     status="success",
+        ...     sha256="deadbeef",
+        ...     etag=None,
+        ...     last_modified=None,
+        ...     downloaded_at="2024-01-01T00:00:00Z",
+        ...     target_formats=("owl",),
+        ...     validation={},
+        ...     artifacts=(),
+        ... )
+        >>> manifest.resolver
+        'obo'
     """
 
     id: str
@@ -166,7 +253,26 @@ class Manifest:
 
 
 class Resolver(Protocol):
-    """Protocol describing resolver planning behaviour."""
+    """Protocol describing resolver planning behaviour.
+
+    Examples:
+        >>> import logging
+        >>> spec = FetchSpec(id="CHEBI", resolver="dummy", extras={}, target_formats=("owl",))
+        >>> class DummyResolver:
+        ...     def plan(self, spec, config, logger):
+        ...         return FetchPlan(
+        ...             url="https://example.org/chebi.owl",
+        ...             headers={},
+        ...             filename_hint="chebi.owl",
+        ...             version="v1",
+        ...             license="CC-BY",
+        ...             media_type="application/rdf+xml",
+        ...         )
+        ...
+        >>> plan = DummyResolver().plan(spec, ResolvedConfig.from_defaults(), logging.getLogger("test"))
+        >>> plan.url
+        'https://example.org/chebi.owl'
+    """
 
     def plan(self, spec: FetchSpec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
         """Return a FetchPlan describing how to obtain the ontology.

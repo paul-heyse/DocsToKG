@@ -1,8 +1,8 @@
-# Technical Reference
+# 1. Technical Reference
 
 This section contains technical references, external dependencies, and detailed implementation guides for the DocsToKG system.
 
-## Reference Materials
+## 2. Reference Materials
 
 ### 🔗 [FAISS Integration](./faiss/)
 
@@ -16,7 +16,7 @@ Documentation for external libraries, APIs, and services used by DocsToKG.
 
 Definitions of key terms, concepts, and domain-specific terminology used throughout the documentation.
 
-## Integration Guides
+## 3. Integration Guides
 
 ### 🔌 [API Integrations](./api-integrations/)
 
@@ -26,7 +26,7 @@ How to integrate DocsToKG with external systems and services.
 
 Configuration guides for development tools, testing frameworks, and deployment systems.
 
-## Advanced Topics
+## 4. Advanced Topics
 
 ### 🚀 [Performance Optimization](./performance/)
 
@@ -40,7 +40,7 @@ Security best practices, authentication, authorization, and data protection.
 
 Comprehensive testing approaches, frameworks, and quality assurance procedures.
 
-## Maintenance and Operations
+## 5. Maintenance and Operations
 
 ### 🔄 [Deployment Guide](./deployment/)
 

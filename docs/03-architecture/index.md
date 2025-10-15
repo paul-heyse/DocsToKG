@@ -1,6 +1,9 @@
-# Architecture Guide
+# 1. Architecture Guide
 
-DocsToKG converts raw documents into searchable knowledge graph material using a pipeline of ingestion utilities, document parsers, ontology tooling, and a hybrid search engine. This guide explains the major subsystems, their responsibilities, and the data flow between them.
+DocsToKG converts raw documents into searchable knowledge graph material using a pipeline
+of ingestion utilities, document parsers, ontology tooling, and a hybrid search engine.
+This guide explains the major subsystems, their responsibilities, and the data flow
+between them.
 
 ```mermaid
 graph TD
@@ -13,7 +16,7 @@ graph TD
     H[OntologyDownload] -->|Ontology metadata| D
 ```
 
-## Subsystem Overview
+## 2. Subsystem Overview
 
 ### 1. Content Acquisition (`DocsToKG.ContentDownload`)
 
@@ -53,7 +56,7 @@ Dense vectors are stored in FAISS (GPU-capable via the scaffold in `docs/07-refe
 - The `VectorOperations/` package is reserved for future expansion of graph materialisation tasks.
 - Hybrid search currently operates over chunked text; graph exports can be layered on top as ontology assets mature.
 
-## Data Flow
+## 3. Data Flow
 
 1. **Acquisition**: Download raw documents and metadata (`ContentDownload` CLI or scheduled jobs).
 2. **Parsing**: Use Docling pipelines to convert assets into DocTags, chunked Markdown, and embeddings (`DocParsing` scripts).
@@ -62,7 +65,7 @@ Dense vectors are stored in FAISS (GPU-capable via the scaffold in `docs/07-refe
 5. **Maintenance**: Run ontology downloads and validation periodically to keep terminologies synchronised with search metadata.
 6. **Monitoring**: Capture metrics from `HybridSearch.observability` and validation harnesses to detect drift.
 
-## Key Integration Points
+## 4. Key Integration Points
 
 - **Config Files**: `config/hybrid_config.json` (runtime toggles), ontology `sources.yaml`, environment variables documented in `docs/02-setup/index.md`.
 - **Artifacts**: FAISS snapshots, chunk registries, ontology manifests stored under configurable data roots.

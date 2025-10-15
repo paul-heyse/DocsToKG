@@ -1,14 +1,16 @@
-# Dependency Reference
+# 1. Dependency Reference
 
-DocsToKG targets modern Python runtimes and relies on a focussed set of libraries for ontology management, hybrid search, and document processing. Use this reference when auditing environments or troubleshooting dependency conflicts.
+DocsToKG targets modern Python runtimes and relies on a focussed set of libraries for
+ontology management, hybrid search, and document processing. Use this reference when
+auditing environments or troubleshooting dependency conflicts.
 
-## Runtime Requirements
+## 2. Runtime Requirements
 
 - **Python**: 3.12 or newer (see `pyproject.toml`)
 - **pip**: 23.0+ recommended for editable installs
 - **Optional GPU stack**: CUDA 12.9 for the pinned FAISS and Torch wheels in `requirements.in`
 
-## Core Python Dependencies
+## 3. Core Python Dependencies
 
 | Package | Purpose | Notes |
 |---------|---------|-------|
@@ -19,7 +21,7 @@ DocsToKG targets modern Python runtimes and relies on a focussed set of librarie
 | `requests`, `pooch`, `pystow` | HTTP fetching, asset caching, storage paths | Shared across downloader and content ingestion |
 | `pyyaml` | Configuration loading for pipelines | Used by both ingestion and ontology tooling |
 
-## GPU and Numerical Stack
+## 4. GPU and Numerical Stack
 
 The project keeps GPU builds separate to shorten cold installs:
 
@@ -29,7 +31,7 @@ The project keeps GPU builds separate to shorten cold installs:
 
 Install these with `pip install -r requirements.in` after activating your environment.
 
-## Optional Tooling
+## 5. Optional Tooling
 
 | Tool | Why | Install |
 |------|-----|---------|
@@ -37,7 +39,7 @@ Install these with `pip install -r requirements.in` after activating your enviro
 | `mkdocs-material` | Alternative static site builds (experimental) | `pip install mkdocs-material` |
 | `sphinx-rtd-theme` | HTML theme for Sphinx builds | Provided in `docs/build/sphinx/requirements.txt` |
 
-## External Services
+## 6. External Services
 
 - **Pyalex API** – Source for publication metadata (`DocsToKG.ContentDownload`).
 - **BioPortal / OBO / OLS endpoints** – Ontology fetch targets configured via `sources.yaml`.

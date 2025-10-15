@@ -1,8 +1,8 @@
-# Code Annotation Standards for Auto-Generation
+# 1. Code Annotation Standards for Auto-Generation
 
 This document establishes standards for code annotations (comments and docstrings) that enable automated documentation generation. Following these standards ensures that the `generate_api_docs.py` script and Sphinx autodoc can extract meaningful, consistent documentation from your code.
 
-## Philosophy
+## 2. Philosophy
 
 **Code annotations should:**
 
@@ -11,7 +11,7 @@ This document establishes standards for code annotations (comments and docstring
 - **Provide clear context** for human developers and reviewers
 - **Follow consistent patterns** across the entire codebase
 
-## General Principles
+## 3. General Principles
 
 ### 1. Every Public Interface Needs Documentation
 
@@ -57,7 +57,7 @@ Use consistent terminology across all annotations:
 - Use "search" for retrieval operations
 - Use "index" for vector storage structures
 
-## Module-Level Documentation
+## 4. Module-Level Documentation
 
 Every Python module must start with a comprehensive docstring:
 
@@ -93,7 +93,7 @@ Usage:
 """
 ```
 
-## Class Documentation
+## 5. Class Documentation
 
 Classes must document their purpose, responsibilities, and key methods:
 
@@ -134,7 +134,7 @@ class DocumentProcessor:
         self.vector_index = None     # Lazy initialization
 ```
 
-## Function and Method Documentation
+## 6. Function and Method Documentation
 
 Functions must document parameters, return values, and behavior:
 
@@ -171,7 +171,7 @@ def extract_entities(
     """
 ```
 
-## Parameter Documentation
+## 7. Parameter Documentation
 
 Document all parameters with their types, purposes, and constraints:
 
@@ -197,7 +197,7 @@ def search_similar_documents(
     """
 ```
 
-## Complex Type Documentation
+## 8. Complex Type Documentation
 
 For complex types, provide detailed explanations:
 
@@ -222,7 +222,7 @@ def build_knowledge_graph(
     """
 ```
 
-## Exception Documentation
+## 9. Exception Documentation
 
 Document all exceptions that can be raised:
 
@@ -237,7 +237,7 @@ def authenticate_user(credentials: UserCredentials) -> UserSession:
     """
 ```
 
-## Class Method Documentation
+## 10. Class Method Documentation
 
 Document all public methods, especially those that change object state:
 
@@ -274,7 +274,7 @@ class VectorIndex:
         """
 ```
 
-## Property Documentation
+## 11. Property Documentation
 
 Document properties that expose important state:
 
@@ -300,7 +300,7 @@ class DocumentProcessor:
         return self._supported_formats
 ```
 
-## Magic Method Documentation
+## 12. Magic Method Documentation
 
 Document important magic methods:
 
@@ -321,7 +321,7 @@ def __repr__(self) -> str:
     """
 ```
 
-## Inline Comments
+## 13. Inline Comments
 
 Use inline comments sparingly for complex logic:
 
@@ -353,7 +353,7 @@ def process_documents_batch(self, documents: List[Document]) -> BatchResult:
     return BatchResult.combine(results)
 ```
 
-## Constants and Configuration Documentation
+## 14. Constants and Configuration Documentation
 
 Document important constants and configuration values:
 
@@ -375,7 +375,7 @@ SUPPORTED_FORMATS = {
 }
 ```
 
-## Error Handling Documentation
+## 15. Error Handling Documentation
 
 Document error handling strategies:
 
@@ -400,7 +400,7 @@ def safe_document_processing(document_id: str) -> Optional[ProcessingResult]:
     """
 ```
 
-## Integration with Auto-Generation
+## 16. Integration with Auto-Generation
 
 These annotation standards are designed to work seamlessly with:
 
@@ -422,7 +422,7 @@ These annotation standards are designed to work seamlessly with:
 - Enables requirement extraction from docstrings
 - Supports automated testing and validation
 
-## Validation
+## 17. Validation
 
 All new code must pass documentation validation:
 
@@ -437,6 +437,6 @@ python docs/scripts/generate_api_docs.py
 python docs/scripts/build_docs.py --format html
 ```
 
-## Examples
+## 18. Examples
 
 See the `docs/examples/` directory for complete code examples showing proper annotation patterns for different scenarios.

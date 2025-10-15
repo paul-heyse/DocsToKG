@@ -1,8 +1,8 @@
-# Documentation Style Guide
+# 1. Documentation Style Guide
 
 This style guide establishes standards for DocsToKG documentation to ensure consistency, clarity, and accessibility for both human readers and AI agents.
 
-## Writing Principles
+## 2. Writing Principles
 
 ### 1. Audience-First Approach
 
@@ -22,7 +22,7 @@ This style guide establishes standards for DocsToKG documentation to ensure cons
 - **Voice**: Use active voice and present tense where possible
 - **Formatting**: Follow consistent Markdown patterns
 
-## Content Structure
+## 3. Content Structure
 
 ### Headings
 
@@ -61,7 +61,7 @@ def example_function(param: str) -> bool:
 - Create anchors for internal links: `## Section Title {#section-title}`
 - Reference requirements by ID when possible
 
-## Documentation Types
+## 4. Documentation Types
 
 ### API Documentation
 
@@ -157,7 +157,7 @@ pytest -q
 
 ```
 
-## Language and Tone
+## 5. Language and Tone
 
 ### Word Choice
 - Use **must/shall** for requirements (not should/may)
@@ -190,7 +190,7 @@ Key Features:
 """
 ```
 
-## Visual Elements
+## 6. Visual Elements
 
 ### Diagrams
 
@@ -210,7 +210,7 @@ Key Features:
 - Include clear headers
 - Keep tables narrow (avoid horizontal scrolling)
 
-## Maintenance Guidelines
+## 7. Maintenance Guidelines
 
 ### Regular Updates
 
@@ -230,7 +230,7 @@ Key Features:
 - Style guide enforcement via linting tools
 - Auto-generation of API documentation from code
 
-## Tools and Workflow
+## 8. Tools and Workflow
 
 ### Required Tools
 
@@ -247,7 +247,7 @@ Key Features:
 4. Submit for review via pull request
 5. Merge after approval
 
-## Examples
+## 9. Examples
 
 See the `/templates/` directory for complete examples of each documentation type.
 

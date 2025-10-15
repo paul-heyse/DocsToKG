@@ -1,8 +1,9 @@
-# API Integrations
+# 1. API Integrations
 
-This section summarises the primary interfaces DocsToKG exposes and how to integrate them with downstream systems.
+This section summarises the primary interfaces DocsToKG exposes and how to integrate
+them with downstream systems.
 
-## Hybrid Search REST API
+## 2. Hybrid Search REST API
 
 - **Endpoint**: `POST /v1/hybrid-search`
 - **Implementation**: `DocsToKG.HybridSearch.api.HybridSearchAPI`
@@ -14,13 +15,16 @@ This section summarises the primary interfaces DocsToKG exposes and how to integ
   - `cursor` (string, optional pagination token)
   - `diversification` (bool) for MMR
   - `diagnostics` (bool) to include per-signal scores
-- **Response**: Ranked list containing document metadata, highlight spans, fused score diagnostics, and pagination cursor.
+- **Response**: Ranked list containing document metadata, highlight spans, fused score
+  diagnostics, and pagination cursor.
 
 Use the generated documentation in `docs/04-api/DocsToKG.HybridSearch.api.md` and `docs/04-api/DocsToKG.HybridSearch.retrieval.md` for attribute-level detail.
 
-## Python Service Layer
+## 3. Python Service Layer
 
-`HybridSearchService` in `DocsToKG.HybridSearch.retrieval` exposes a `search` method returning strongly-typed response models (`HybridSearchResponse`, `HybridSearchResult`). Use this interface when embedding DocsToKG within other Python services.
+`HybridSearchService` in `DocsToKG.HybridSearch.retrieval` exposes a `search` method
+returning strongly-typed response models (`HybridSearchResponse`, `HybridSearchResult`).
+Use this interface when embedding DocsToKG within other Python services.
 
 ```python
 from DocsToKG.HybridSearch.retrieval import HybridSearchRequest
@@ -33,7 +37,7 @@ for hit in response.results:
     print(hit.doc_id, hit.score, hit.highlights)
 ```
 
-## CLI Utilities
+## 4. CLI Utilities
 
 - `python -m DocsToKG.ContentDownload.download_pyalex_pdfs` – Batch download scholarly PDFs from the Pyalex API.
 - `python -m DocsToKG.DocParsing.run_docling_html_to_doctags_parallel` – Parallel HTML parsing into DocTags structures.
@@ -41,9 +45,10 @@ for hit in response.results:
 
 Each CLI supports `--help` for flags and is documented in `docs/06-operations/index.md`.
 
-## Event and Stream Hand-offs
+## 5. Event and Stream Hand-offs
 
-DocsToKG does not yet ship a streaming ingestion layer. When integrating with external systems:
+DocsToKG does not yet ship a streaming ingestion layer. When integrating with external
+systems:
 
 1. Schedule ingestion jobs that populate the document registry and trigger chunk embedding.
 2. Publish HybridSearch responses to your messaging infrastructure if latency budgets require asynchronous processing.

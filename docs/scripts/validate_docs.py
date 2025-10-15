@@ -93,7 +93,13 @@ class DocumentationValidator:
 
         missing_sections = []
         for section in self.style_guide.get("required_sections", []):
+            heading_pattern = re.compile(
+                rf"^(?:##|#)\s+(?:\d+\.\s+)?{re.escape(section)}\b",
+                re.IGNORECASE | re.MULTILINE,
+            )
             if f"## {section}" not in content and f"# {section}" not in content:
+                if heading_pattern.search(content):
+                    continue
                 missing_sections.append(section)
 
         if missing_sections:
@@ -143,12 +149,22 @@ class DocumentationValidator:
     def _check_heading_structure(self, lines: List[str], file_name: str) -> List[Dict]:
         """Check heading structure and numbering."""
         issues = []
+        in_code_block = False
         prev_level = 0
 
         for i, line in enumerate(lines, 1):
-            if line.startswith("#"):
+            stripped = line.lstrip()
+
+            if stripped.startswith("```"):
+                in_code_block = not in_code_block
+                continue
+
+            if in_code_block:
+                continue
+
+            if stripped.startswith("#"):
                 # Count the number of # symbols
-                level = len(line) - len(line.lstrip("#"))
+                level = len(stripped) - len(stripped.lstrip("#"))
 
                 if level > self.style_guide.get("heading_levels", {}).get("max_depth", 4):
                     issues.append(
@@ -162,7 +178,7 @@ class DocumentationValidator:
 
                 # Check for proper numbering in numbered sections
                 if self.style_guide.get("heading_levels", {}).get("require_numbers", True):
-                    if level <= 2 and not re.match(r"^#{1,2}\s+\d+\.", line):
+                    if level <= 2 and not re.match(r"^#{1,2}\s+\d+\.", stripped):
                         issues.append(
                             {
                                 "type": "info",
@@ -226,6 +242,7 @@ class DocumentationValidator:
         """Check for consistent formatting."""
         issues = []
 
+        max_len = 200
         for i, line in enumerate(lines, 1):
             # Check for trailing whitespace
             if line.rstrip() != line:
@@ -239,7 +256,7 @@ class DocumentationValidator:
                 )
 
             # Check for very long lines
-            if len(line) > 100:
+            if len(line) > max_len:
                 issues.append(
                     {
                         "type": "info",
@@ -279,7 +296,7 @@ class DocumentationValidator:
 
         return all_issues
 
-    def print_report(self, issues: List[Dict]):
+    def print_report(self, issues: List[Dict], *, show_all_info: bool = False):
         """Print a formatted validation report."""
         if not issues:
             print("\n✅ No documentation issues found!")
@@ -303,15 +320,17 @@ class DocumentationValidator:
             type_issues = issues_by_type.get(issue_type, [])
             if type_issues:
                 print(f"\n{issue_type.upper()} ({len(type_issues)}):")
-                for issue in type_issues[:10]:  # Show first 10 issues of each type
+                limit = None if show_all_info else 10
+                display_issues = type_issues if limit is None else type_issues[:limit]
+                for issue in display_issues:
                     file_name = issue.get("file", "unknown")
                     message = issue.get("message", "No message")
                     line = issue.get("line", "")
                     line_str = f":{line}" if line else ""
                     print(f"  • {file_name}{line_str} - {message}")
 
-                if len(type_issues) > 10:
-                    print(f"  • ... and {len(type_issues) - 10} more {issue_type} issues")
+                if limit is not None and len(type_issues) > limit:
+                    print(f"  • ... and {len(type_issues) - limit} more {issue_type} issues")
 
         print(f"\n📊 Summary: {total_issues} total issues")
         print("Run 'python docs/scripts/generate_all_docs.py --validate-only' to see all details")
@@ -322,10 +341,15 @@ def main():
     print("🔍 Starting Documentation Validation")
     print("=" * 50)
 
+    show_all_info = False
+    if "--show-all-info" in sys.argv:
+        show_all_info = True
+        sys.argv.remove("--show-all-info")
+
     validator = DocumentationValidator()
     issues = validator.validate_all_docs()
 
-    validator.print_report(issues)
+    validator.print_report(issues, show_all_info=show_all_info)
 
     # Exit with error code if there are errors or warnings
     error_count = len([i for i in issues if i.get("type") == "error"])

@@ -1,11 +1,11 @@
-# DocsToKG
+# 1. DocsToKG
 
 DocsToKG turns raw documents into searchable knowledge artefacts by combining document acquisition, Docling-based parsing, ontology downloads, and a FAISS-backed hybrid search engine.
 
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-## Overview
+## 2. Overview
 
 - **Content acquisition**: Fetch PDFs and metadata from external services such as Pyalex.
 - **Doc parsing & chunking**: Convert documents into DocTags, chunked Markdown, and embeddings using Docling pipelines.
@@ -15,7 +15,7 @@ DocsToKG turns raw documents into searchable knowledge artefacts by combining do
 
 See `docs/01-overview/` for a high-level introduction and `docs/03-architecture/` for subsystem details.
 
-## Quick Start
+## 3. Quick Start
 
 ```bash
 git clone https://github.com/paul-heyse/DocsToKG.git
@@ -48,7 +48,7 @@ python docs/scripts/generate_api_docs.py
 python docs/scripts/validate_docs.py
 ```
 
-## Example Usage
+## 4. Example Usage
 
 ### Hybrid Search Service
 
@@ -70,7 +70,7 @@ python -m DocsToKG.OntologyDownload.cli pull --spec configs/sources.yaml --force
 python -m DocsToKG.OntologyDownload.cli validate hp latest
 ```
 
-## Parallel Execution
+## 5. Parallel Execution
 
 Use the ``--workers`` flag to enable bounded parallelism when downloading content via
 the OpenAlex pipeline:

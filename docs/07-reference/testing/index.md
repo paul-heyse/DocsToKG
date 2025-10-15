@@ -1,8 +1,8 @@
-# Testing Strategies
+# 1. Testing Strategies
 
 Testing spans ingestion utilities, ontology download workflows, and hybrid search correctness.
 
-## Test Suites
+## 2. Test Suites
 
 - `tests/test_hybrid_search.py` – Core unit coverage for HybridSearch service contracts.
 - `tests/test_hybrid_search_real_vectors.py` – Optional vector-backed tests (enable with `--real-vectors` marker).
@@ -16,7 +16,7 @@ pytest -q
 pytest -m real_vectors --real-vectors  # requires fixture data
 ```
 
-## Documentation Validation
+## 3. Documentation Validation
 
 Integrate documentation checks into CI:
 
@@ -28,14 +28,14 @@ python docs/scripts/generate_api_docs.py
 
 Warnings should gate merges for documentation changes.
 
-## Benchmark Datasets
+## 4. Benchmark Datasets
 
 - `tests/data/hybrid_dataset.jsonl` – Reference dataset for recall/latency validation.
 - `tests/data/ontology/` – Fixture ontologies for deterministic download/validation tests.
 
 Keep these datasets updated when schemas evolve, and document changes in `docs/05-development/index.md`.
 
-## Continuous Integration
+## 5. Continuous Integration
 
 Recommended steps for CI pipelines:
 

@@ -1,8 +1,8 @@
-# Documentation Framework Training Guide
+# 1. Documentation Framework Training Guide
 
 This training guide introduces team members to DocsToKG's comprehensive documentation framework, including automated tools, standards, and processes.
 
-## 🎯 Training Objectives
+## 2. Training Objectives 🎯
 
 After completing this training, you will be able to:
 
@@ -12,7 +12,7 @@ After completing this training, you will be able to:
 - **Integrate documentation** into your development workflow
 - **Contribute effectively** to the documentation ecosystem
 
-## 📚 Session 1: Documentation Framework Overview
+## 3. Session 1: Documentation Framework Overview 📚
 
 ### What is the Documentation Framework?
 
@@ -47,14 +47,14 @@ docs/
 - **check_links.py** - Validate internal and external links
 - **build_docs.py** - Generate HTML documentation with Sphinx
 
-### 🎯 Key Benefits
+### Key Benefits
 
 - **Faster onboarding** for new team members and AI agents
 - **Reduced maintenance burden** through automation
 - **Higher quality** through consistent standards and validation
 - **Better user experience** with clear, comprehensive documentation
 
-## 🛠️ Session 2: Using Automation Tools
+## 4. Session 2: Using Automation Tools 🛠️
 
 ### Basic Tool Usage
 
@@ -107,7 +107,7 @@ The framework automatically:
 - Deploys HTML documentation to GitHub Pages
 - Reports issues and status in PR comments
 
-## 📝 Session 3: Documentation Standards
+## 5. Session 3: Documentation Standards 📝
 
 ### Writing Standards
 
@@ -168,7 +168,7 @@ Use [templates/architecture-component.md](./templates/architecture-component.md)
 - Performance characteristics
 - Deployment considerations
 
-## 🔄 Session 4: Development Workflow Integration
+## 6. Session 4: Development Workflow Integration 🔄
 
 ### Documentation-First Development
 
@@ -205,7 +205,7 @@ From [DOCUMENTATION_REVIEW_PROCESS.md](./DOCUMENTATION_REVIEW_PROCESS.md):
 - [ ] **Consistency** - Terminology and style are consistent
 - [ ] **AI Compatibility** - Content supports automated understanding
 
-## 📊 Session 5: Maintenance and Quality Assurance
+## 7. Session 5: Maintenance and Quality Assurance 📊
 
 ### Regular Maintenance Tasks
 
@@ -237,7 +237,7 @@ From [DOCUMENTATION_REVIEW_PROCESS.md](./DOCUMENTATION_REVIEW_PROCESS.md):
 - **User engagement** metrics
 - **Maintenance task completion** rates
 
-## 🎯 Hands-On Exercises
+## 8. Hands-On Exercises 🎯
 
 ### Exercise 1: Navigate Documentation
 
@@ -275,7 +275,7 @@ From [DOCUMENTATION_REVIEW_PROCESS.md](./DOCUMENTATION_REVIEW_PROCESS.md):
 3. Provide constructive feedback
 4. Suggest improvements
 
-## 📋 Assessment
+## 9. Assessment 📋
 
 ### Knowledge Check
 
@@ -296,7 +296,7 @@ Complete these tasks to demonstrate proficiency:
 3. **Write** a properly formatted docstring for a function
 4. **Validate** documentation and fix any issues found
 
-## 🚀 Next Steps
+## 10. Next Steps 🚀
 
 ### Immediate Actions
 
@@ -312,7 +312,7 @@ Complete these tasks to demonstrate proficiency:
 3. **Mentoring** new team members on documentation practices
 4. **Feedback contribution** to improve the framework
 
-## 📞 Support and Resources
+## 11. Support and Resources 📞
 
 ### Getting Help
 

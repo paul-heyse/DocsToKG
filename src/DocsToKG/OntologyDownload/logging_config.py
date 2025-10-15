@@ -34,6 +34,10 @@ def mask_sensitive_data(payload: Dict[str, object]) -> Dict[str, object]:
     Returns:
         Copy of the payload where common secret fields are replaced with
         `***masked***`.
+
+    Examples:
+        >>> mask_sensitive_data({"token": "secret", "status": "ok"})
+        {'token': '***masked***', 'status': 'ok'}
     """
     sensitive_keys = {"authorization", "api_key", "apikey", "token", "secret", "password"}
     masked: Dict[str, object] = {}
@@ -57,12 +61,23 @@ def generate_correlation_id() -> str:
     Returns:
         Twelve character hexadecimal identifier suitable for correlating log
         events across the ontology download pipeline.
+
+    Examples:
+        >>> cid = generate_correlation_id()
+        >>> len(cid)
+        12
     """
     return uuid.uuid4().hex[:12]
 
 
 class JSONFormatter(logging.Formatter):
-    """Formatter emitting JSON structured logs."""
+    """Formatter emitting JSON structured logs.
+
+    Examples:
+        >>> formatter = JSONFormatter()
+        >>> isinstance(formatter.format(logging.makeLogRecord({'msg': 'test'})), str)
+        True
+    """
 
     def format(self, record: logging.LogRecord) -> str:
         """Serialize a logging record into a JSON line.
@@ -121,6 +136,20 @@ def _cleanup_logs(log_dir: Path, retention_days: int) -> None:
 
 
 def setup_logging(config: LoggingConfig, log_dir: Optional[Path] = None) -> logging.Logger:
+    """Configure structured logging handlers for ontology downloads.
+
+    Args:
+        config: Logging configuration containing level, size, and retention.
+        log_dir: Optional directory override for log file placement.
+
+    Returns:
+        Configured logger instance scoped to the ontology downloader.
+
+    Examples:
+        >>> logger = setup_logging(LoggingConfig(level="INFO", max_log_size_mb=1, retention_days=1))
+        >>> logger.name
+        'DocsToKG.OntologyDownload'
+    """
     log_dir = log_dir or Path(os.environ.get("ONTOFETCH_LOG_DIR", ""))
     if not log_dir:
         from .core import LOG_DIR  # Local import to avoid circular dependency

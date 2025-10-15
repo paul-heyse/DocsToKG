@@ -125,6 +125,17 @@ except ModuleNotFoundError:  # pragma: no cover - lightweight YAML fallback for 
 
         @staticmethod
         def safe_load(text: str):
+            """Parse a YAML string using the lightweight fallback implementation.
+
+            Args:
+                text: Raw YAML content to be parsed into Python structures.
+
+            Returns:
+                Parsed Python object mirroring the YAML structure.
+
+            Raises:
+                _YAMLError: If the payload contains unsupported YAML constructs.
+            """
             return _safe_load(text)
 
     yaml = _FallbackYAML()  # type: ignore
@@ -134,7 +145,17 @@ if TYPE_CHECKING:  # pragma: no cover - type checking only
 
 
 class ConfigError(RuntimeError):
-    """Raised when ontology configuration files are invalid or inconsistent."""
+    """Raised when ontology configuration files are invalid or inconsistent.
+
+    Args:
+        message: Description of the configuration error encountered.
+
+    Examples:
+        >>> raise ConfigError("Missing ontology id")
+        Traceback (most recent call last):
+        ...
+        ConfigError: Missing ontology id
+    """
 
 
 PYTHON_MIN_VERSION = (3, 9)
@@ -167,6 +188,11 @@ class LoggingConfiguration:
         level: Logging level name (e.g., `INFO`, `DEBUG`).
         max_log_size_mb: Maximum individual log file size before rotation.
         retention_days: Number of days to keep logs prior to compression.
+
+    Examples:
+        >>> logging_config = LoggingConfiguration(level="DEBUG", retention_days=7)
+        >>> logging_config.level
+        'DEBUG'
     """
 
     level: str = "INFO"
@@ -176,7 +202,18 @@ class LoggingConfiguration:
 
 @dataclass(slots=True)
 class ValidationConfig:
-    """Validation limits governing parser execution."""
+    """Validation limits governing parser execution.
+
+    Attributes:
+        parser_timeout_sec: Maximum runtime allowed per validator in seconds.
+        max_memory_mb: Memory ceiling in megabytes for validation processes.
+        skip_reasoning_if_size_mb: Threshold size that disables reasoning steps.
+
+    Examples:
+        >>> validation = ValidationConfig(parser_timeout_sec=120, max_memory_mb=1024)
+        >>> validation.max_memory_mb
+        1024
+    """
 
     parser_timeout_sec: int = 60
     max_memory_mb: int = 2048
@@ -194,6 +231,12 @@ class DownloadConfiguration:
         backoff_factor: Backoff multiplier used between retry attempts.
         per_host_rate_limit: Token bucket rate limit definition per host.
         max_download_size_gb: Maximum allowed ontology archive size.
+        concurrent_downloads: Maximum concurrent download workers to run.
+
+    Examples:
+        >>> dl_config = DownloadConfiguration(max_retries=3, per_host_rate_limit="2/second")
+        >>> dl_config.max_retries
+        3
     """
 
     max_retries: int = 5
@@ -242,6 +285,11 @@ class DefaultsConfig:
         logging: Logging configuration applied to the downloader runtime.
         continue_on_error: Whether to proceed after non-fatal download errors.
         concurrent_downloads: Maximum concurrent download workers to run.
+
+    Examples:
+        >>> defaults = DefaultsConfig(prefer_source=["obo", "direct"])
+        >>> list(defaults.prefer_source)
+        ['obo', 'direct']
     """
 
     accept_licenses: Sequence[str] = field(
@@ -267,6 +315,11 @@ class ResolvedConfig:
     Attributes:
         defaults: Finalized default settings applied to fetch specs.
         specs: Sequence of ontology fetch specifications to execute.
+
+    Examples:
+        >>> resolved = ResolvedConfig.from_defaults()
+        >>> resolved.specs
+        ()
     """
 
     defaults: DefaultsConfig
@@ -274,6 +327,14 @@ class ResolvedConfig:
 
     @classmethod
     def from_defaults(cls) -> "ResolvedConfig":
+        """Create an empty resolved configuration using library defaults.
+
+        Args:
+            None
+
+        Returns:
+            ResolvedConfig populated with default download parameters and no specs.
+        """
         return cls(defaults=DefaultsConfig(), specs=())
 
 
@@ -429,6 +490,18 @@ def _apply_env_overrides(defaults: DefaultsConfig) -> None:
 
 
 def merge_defaults(ontology_spec: Mapping[str, object], defaults: Optional[DefaultsConfig] = None):
+    """Merge an ontology specification with resolved default settings.
+
+    Args:
+        ontology_spec: Raw ontology specification loaded from configuration.
+        defaults: Default configuration block to apply (optional).
+
+    Returns:
+        Fetch specification populated with normalized resolver settings.
+
+    Raises:
+        ConfigError: If required fields are missing or extras have invalid types.
+    """
     if defaults is None:
         return build_resolved_config(ontology_spec)
     ontology_id = str(ontology_spec.get("id", "")).strip()
@@ -445,6 +518,17 @@ def merge_defaults(ontology_spec: Mapping[str, object], defaults: Optional[Defau
 
 
 def build_resolved_config(raw_config: Mapping[str, object]) -> ResolvedConfig:
+    """Construct a fully-resolved configuration from raw YAML contents.
+
+    Args:
+        raw_config: Mapping produced by YAML parsing containing defaults and ontologies.
+
+    Returns:
+        ResolvedConfig containing merged defaults and instantiated fetch specs.
+
+    Raises:
+        ConfigError: If the raw configuration violates schema expectations.
+    """
     defaults_section = raw_config.get("defaults")
     if defaults_section and not isinstance(defaults_section, Mapping):
         raise ConfigError("'defaults' section must be a mapping")
@@ -638,6 +722,9 @@ def load_config(config_path: Path) -> ResolvedConfig:
 
     Returns:
         Resolved configuration with defaults merged and fetch specs created.
+
+    Raises:
+        ConfigError: If the configuration contains invalid structures or values.
     """
     raw = load_raw_yaml(config_path)
     return build_resolved_config(raw)

@@ -1,10 +1,13 @@
-# Overview
+# 1. Overview
 
-## What is DocsToKG?
+## 2. What is DocsToKG?
 
-DocsToKG is a Python toolkit for turning raw documents into searchable, richly annotated knowledge artefacts. It combines document acquisition, Docling-based parsing, ontology enrichment, and a FAISS-backed hybrid search engine to surface relevant context for downstream applications.
+DocsToKG is a Python toolkit for turning raw documents into searchable, richly annotated
+knowledge artefacts. It combines document acquisition, Docling-based parsing, ontology
+enrichment, and a FAISS-backed hybrid search engine to surface relevant context for
+downstream applications.
 
-## Core Capabilities
+## 3. Core Capabilities
 
 ### Content Acquisition & Parsing
 
@@ -24,7 +27,7 @@ DocsToKG is a Python toolkit for turning raw documents into searchable, richly a
 - Enrich document metadata using controlled vocabularies and reusable resolver logic.
 - Keep terminologies current with automated validation and manifests.
 
-## Architecture Overview
+## 4. Architecture Overview
 
 ```mermaid
 graph LR
@@ -36,7 +39,7 @@ graph LR
     G[OntologyDownload] --> E
 ```
 
-## Key Components
+## 5. Key Components
 
 - **ContentDownload** – Resolvers and utilities for fetching PDFs and metadata (e.g., Pyalex support).
 - **DocParsing** – Docling pipelines that chunk documents, extract captions, and generate embeddings.
@@ -44,7 +47,7 @@ graph LR
 - **OntologyDownload** – CLI-driven ontology fetcher with validation pipelines and manifest management.
 - **Documentation Tooling** – Scripts under `docs/scripts/` to generate API docs, run validations, and build Sphinx sites.
 
-## Use Cases
+## 6. Use Cases
 
 ### Research & Academia
 
@@ -64,7 +67,7 @@ graph LR
 - Recommendation and summarisation pipelines
 - Dataset curation with ontology alignment
 
-## Technology Stack
+## 7. Technology Stack
 
 - **Language & Runtime**: Python ≥3.12, type hints enforced via `mypy --strict`
 - **Parsing & NLP**: Docling, Hugging Face Transformers, vLLM for accelerated inference
@@ -73,7 +76,7 @@ graph LR
 - **Tooling**: Sphinx, Vale (optional), pytest, ruff, black
 - **Automation Scripts**: `docs/scripts/` orchestration, `tests/` for quality gates
 
-## Getting Started
+## 8. Getting Started
 
 Ready to explore DocsToKG? Here's your path:
 
@@ -82,7 +85,7 @@ Ready to explore DocsToKG? Here's your path:
 3. **[Architecture Deep Dive](../03-architecture/)** - Understand the internals
 4. **[Development Guide](../05-development/)** - Contribute to the project
 
-## Project Status
+## 9. Project Status
 
 - **Current Version**: 0.1.0
 - **Development Phase**: Active development

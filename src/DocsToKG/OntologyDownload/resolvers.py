@@ -31,6 +31,14 @@ except ModuleNotFoundError:  # pragma: no cover - provides lightweight fallback 
             self._root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
 
         def join(self, *segments: str) -> Path:
+            """Join path segments relative to the fallback cache root.
+
+            Args:
+                *segments: Individual path components to append.
+
+            Returns:
+                Path rooted under the fallback pystow directory.
+            """
             return self._root.joinpath(*segments)
 
     pystow = _PystowFallback()  # type: ignore
@@ -51,6 +59,18 @@ class FetchPlan:
         version: Version identifier derived from resolver metadata.
         license: License reported for the ontology.
         media_type: MIME type of the artifact when known.
+
+    Examples:
+        >>> plan = FetchPlan(
+        ...     url="https://example.org/ontology.owl",
+        ...     headers={"Accept": "application/rdf+xml"},
+        ...     filename_hint="ontology.owl",
+        ...     version="2024-01-01",
+        ...     license="CC-BY",
+        ...     media_type="application/rdf+xml",
+        ... )
+        >>> plan.version
+        '2024-01-01'
     """
 
     url: str
@@ -62,7 +82,17 @@ class FetchPlan:
 
 
 class BaseResolver:
-    """Shared helpers for resolver implementations."""
+    """Shared helpers for resolver implementations.
+
+    Examples:
+        >>> class DemoResolver(BaseResolver):
+        ...     def plan(self, spec, config, logger):
+        ...         return self._build_plan(url="https://example.org/demo.owl")
+        ...
+        >>> demo = DemoResolver()
+        >>> isinstance(demo._build_plan(url="https://example.org").url, str)
+        True
+    """
 
     def _execute_with_retry(
         self, func, *, config: ResolvedConfig, logger: logging.Logger, name: str
@@ -116,7 +146,13 @@ class BaseResolver:
 
 
 class OBOResolver(BaseResolver):
-    """Resolve ontologies hosted on the OBO Library using Bioregistry helpers."""
+    """Resolve ontologies hosted on the OBO Library using Bioregistry helpers.
+
+    Examples:
+        >>> resolver = OBOResolver()
+        >>> callable(getattr(resolver, "plan"))
+        True
+    """
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
         """Resolve download URLs using Bioregistry-provided endpoints.
@@ -156,7 +192,13 @@ class OBOResolver(BaseResolver):
 
 
 class OLSResolver(BaseResolver):
-    """Resolve ontologies from the Ontology Lookup Service (OLS4)."""
+    """Resolve ontologies from the Ontology Lookup Service (OLS4).
+
+    Examples:
+        >>> resolver = OLSResolver()
+        >>> resolver.credentials_path.name.endswith(".txt")
+        True
+    """
 
     def __init__(self) -> None:
         self.client = OlsClient()
@@ -237,7 +279,13 @@ class OLSResolver(BaseResolver):
 
 
 class BioPortalResolver(BaseResolver):
-    """Resolve ontologies using the BioPortal (OntoPortal) API."""
+    """Resolve ontologies using the BioPortal (OntoPortal) API.
+
+    Examples:
+        >>> resolver = BioPortalResolver()
+        >>> resolver.api_key_path.suffix
+        '.txt'
+    """
 
     def __init__(self) -> None:
         self.client = BioPortalClient()
@@ -323,7 +371,13 @@ class BioPortalResolver(BaseResolver):
 
 
 class SKOSResolver(BaseResolver):
-    """Resolver for direct SKOS/RDF URLs."""
+    """Resolver for direct SKOS/RDF URLs.
+
+    Examples:
+        >>> resolver = SKOSResolver()
+        >>> callable(getattr(resolver, "plan"))
+        True
+    """
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
         """Return a fetch plan for explicitly provided SKOS URLs.
@@ -350,7 +404,13 @@ class SKOSResolver(BaseResolver):
 
 
 class XBRLResolver(BaseResolver):
-    """Resolver for XBRL taxonomy packages."""
+    """Resolver for XBRL taxonomy packages.
+
+    Examples:
+        >>> resolver = XBRLResolver()
+        >>> callable(getattr(resolver, "plan"))
+        True
+    """
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
         """Return a fetch plan for XBRL ZIP archives provided via extras.

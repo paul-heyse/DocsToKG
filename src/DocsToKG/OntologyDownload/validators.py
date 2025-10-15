@@ -33,6 +33,17 @@ except ModuleNotFoundError:  # pragma: no cover - lightweight stub for tests
             self._source: Optional[Path] = None
 
         def parse(self, path: str) -> None:
+            """Record the source path so downstream operations can inspect it.
+
+            Args:
+                path: Filesystem path passed to the stub parser.
+
+            Returns:
+                None
+
+            Raises:
+                None
+            """
             self._source = Path(path)
 
         def __len__(self) -> int:
@@ -41,6 +52,15 @@ except ModuleNotFoundError:  # pragma: no cover - lightweight stub for tests
         def serialize(
             self, destination: Path, format: str = "turtle"
         ) -> None:  # pragma: no cover - simple stub
+            """Write the previously parsed payload to the destination path.
+
+            Args:
+                destination: Output path where serialized content will be written.
+                format: Serialization format requested by the caller.
+
+            Returns:
+                None
+            """
             destination_path = Path(destination)
             destination_path.parent.mkdir(parents=True, exist_ok=True)
             if self._source and self._source.exists():
@@ -63,9 +83,26 @@ except ModuleNotFoundError:  # pragma: no cover - lightweight stub for tests
             self._path = Path(path)
 
         def terms(self):  # pragma: no cover - simple generator
+            """Yield placeholder ontology terms for test environments.
+
+            Args:
+                None
+
+            Returns:
+                List[str]: Static list of representative term identifiers.
+            """
             return ["term1", "term2"]
 
         def dump(self, destination: str, format: str = "obojson") -> None:
+            """Write a minimal ontology representation to disk.
+
+            Args:
+                destination: Path where the serialized ontology should be stored.
+                format: Requested output format (ignored by the stub).
+
+            Returns:
+                None
+            """
             Path(destination).write_text("{}")
 
     class _StubPronto:
@@ -80,6 +117,14 @@ except ModuleNotFoundError:  # pragma: no cover - lightweight stub for tests
 
     class _StubLoadedOntology:
         def classes(self):  # pragma: no cover - simple stub
+            """Return placeholder class identifiers for compatibility tests.
+
+            Args:
+                None
+
+            Returns:
+                list[str]: Static list of ontology class identifiers.
+            """
             return ["Class1", "Class2"]
 
     class _StubOntologyWrapper:
@@ -87,11 +132,30 @@ except ModuleNotFoundError:  # pragma: no cover - lightweight stub for tests
             self._uri = uri
 
         def load(self):
+            """Simulate ontology loading and return a stub content object.
+
+            Args:
+                None
+
+            Returns:
+                _StubLoadedOntology: Placeholder ontology representation.
+
+            Raises:
+                None
+            """
             return _StubLoadedOntology()
 
     class _StubOwlready2:
         @staticmethod
         def get_ontology(uri: str):
+            """Return a stub ontology wrapper for the provided URI.
+
+            Args:
+                uri: URI identifying the ontology resource.
+
+            Returns:
+                _StubOntologyWrapper: Lightweight wrapper exposing `.load()`.
+            """
             return _StubOntologyWrapper(uri)
 
     owlready2 = _StubOwlready2()  # type: ignore
@@ -110,6 +174,19 @@ class ValidationRequest:
         normalized_dir: Directory used to write normalized artifacts.
         validation_dir: Directory for validator reports and logs.
         config: Resolved configuration that supplies timeout thresholds.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> from DocsToKG.OntologyDownload.config import ResolvedConfig
+        >>> req = ValidationRequest(
+        ...     name="rdflib",
+        ...     file_path=Path("ontology.owl"),
+        ...     normalized_dir=Path("normalized"),
+        ...     validation_dir=Path("validation"),
+        ...     config=ResolvedConfig.from_defaults(),
+        ... )
+        >>> req.name
+        'rdflib'
     """
 
     name: str
@@ -127,6 +204,11 @@ class ValidationResult:
         ok: Indicates whether the validator succeeded.
         details: Arbitrary metadata describing validator output.
         output_files: Generated files for downstream processing.
+
+    Examples:
+        >>> result = ValidationResult(ok=True, details={"triples": 10}, output_files=["ontology.ttl"])
+        >>> result.ok
+        True
     """
 
     ok: bool
@@ -150,7 +232,17 @@ class ValidationResult:
 
 
 class ValidationTimeout(Exception):
-    """Raised when a validation task exceeds the configured timeout."""
+    """Raised when a validation task exceeds the configured timeout.
+
+    Args:
+        message: Optional description of the timeout condition.
+
+    Examples:
+        >>> raise ValidationTimeout("rdflib exceeded 60s")
+        Traceback (most recent call last):
+        ...
+        ValidationTimeout: rdflib exceeded 60s
+    """
 
 
 def _log_memory(logger: logging.Logger, validator: str, event: str) -> None:
@@ -381,6 +473,9 @@ def validate_owlready2(request: ValidationRequest, logger: logging.Logger) -> Va
 
     Returns:
         ValidationResult summarizing entity counts or failure details.
+
+    Raises:
+        None
     """
     try:
         size_mb = request.file_path.stat().st_size / (1024**2)
@@ -431,10 +526,13 @@ def validate_robot(request: ValidationRequest, logger: logging.Logger) -> Valida
 
     Args:
         request: Validation request detailing ontology paths and output locations.
-        logger: Logger adapter for reporting warnings and CLI errors.
+       logger: Logger adapter for reporting warnings and CLI errors.
 
     Returns:
         ValidationResult describing generated outputs or encountered issues.
+
+    Raises:
+        None
     """
     robot_path = shutil.which("robot")
     result_payload: Dict[str, object]
@@ -499,6 +597,9 @@ def validate_arelle(request: ValidationRequest, logger: logging.Logger) -> Valid
     Returns:
         ValidationResult indicating whether the validation completed and
         referencing any produced log files.
+
+    Raises:
+        None
     """
     try:
         from arelle import Cntlr  # type: ignore

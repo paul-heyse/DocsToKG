@@ -49,7 +49,10 @@ class DenseIndexConfig:
         nprobe: Number of cells to search for IVF indexes (8 default)
         pq_m: Number of sub-quantizers for PQ indexes (16 default)
         pq_bits: Bits per sub-quantizer for PQ indexes (8 default)
-        oversample: Oversampling factor for PQ search (2 default)
+        oversample: Oversampling factor for IVF training samples (2 default)
+        device: GPU device ordinal for FAISS operations (0 default)
+        ivfpq_use_precomputed: Use precomputed IVFPQ lookup tables (True default)
+        ivfpq_float16_lut: Use float16 IVFPQ lookup tables when available (True default)
 
     Examples:
         >>> config = DenseIndexConfig(
@@ -67,6 +70,9 @@ class DenseIndexConfig:
     pq_m: int = 16
     pq_bits: int = 8
     oversample: int = 2
+    device: int = 0
+    ivfpq_use_precomputed: bool = True
+    ivfpq_float16_lut: bool = True
 
 
 @dataclass(frozen=True)

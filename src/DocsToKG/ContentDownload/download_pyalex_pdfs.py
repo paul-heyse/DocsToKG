@@ -184,6 +184,21 @@ class ManifestEntry:
         last_modified: HTTP Last-Modified timestamp.
         extracted_text_path: Optional path to extracted text content.
         dry_run: Flag indicating whether the download was simulated.
+
+    Examples:
+        >>> ManifestEntry(
+        ...     timestamp="2024-01-01T00:00:00Z",
+        ...     work_id="W123",
+        ...     title="Sample Work",
+        ...     publication_year=2024,
+        ...     resolver="unpaywall",
+        ...     url="https://example.org/sample.pdf",
+        ...     path="pdfs/sample.pdf",
+        ...     classification="pdf",
+        ...     content_type="application/pdf",
+        ...     reason=None,
+        ...     dry_run=False,
+        ... )
     """
 
     timestamp: str
@@ -206,7 +221,17 @@ class ManifestEntry:
 
 
 class JsonlLogger:
-    """Structured logger that emits attempt, manifest, and summary JSONL records."""
+    """Structured logger that emits attempt, manifest, and summary JSONL records.
+
+    Attributes:
+        _path: Destination JSONL log path.
+        _file: Underlying file handle used for writes.
+
+    Examples:
+        >>> logger = JsonlLogger(Path("logs/attempts.jsonl"))
+        >>> logger.log_summary({"processed": 10})
+        >>> logger.close()
+    """
 
     def __init__(self, path: Path) -> None:
         """Create a logger backing to the given JSONL file path.
@@ -337,7 +362,20 @@ class JsonlLogger:
 
 
 class CsvAttemptLoggerAdapter:
-    """Adapter that mirrors attempt records to CSV for backward compatibility."""
+    """Adapter that mirrors attempt records to CSV for backward compatibility.
+
+    Attributes:
+        _logger: Underlying :class:`JsonlLogger` instance.
+        _file: CSV file handle used for writing.
+        _writer: ``csv.DictWriter`` writing to :attr:`_file`.
+
+    Examples:
+        >>> adapter = CsvAttemptLoggerAdapter(JsonlLogger(Path("attempts.jsonl")), Path("attempts.csv"))
+        >>> adapter.log_attempt(AttemptRecord(work_id="W1", resolver_name="unpaywall", resolver_order=1,
+        ...                                   url="https://example", status="pdf", http_status=200,
+        ...                                   content_type="application/pdf", elapsed_ms=120.0))
+        >>> adapter.close()
+    """
 
     HEADER = [
         "timestamp",
@@ -546,6 +584,10 @@ def classify_payload(head_bytes: bytes, content_type: str, url: str) -> Optional
     Raises:
         UnicodeDecodeError: If payload sniffing encounters invalid encoding when
             decoding the tail of the file (rare; captured by fallback logic).
+        requests.RequestException: Propagated if header or GET requests fail
+            before protective guards are applied.
+        OSError: If filesystem writes fail while persisting the payload.
+        ValueError: If payload metadata cannot be interpreted while classifying.
     """
 
     ctype = (content_type or "").lower()
@@ -890,6 +932,13 @@ def download_candidate(
 
     Returns:
         DownloadOutcome describing the result of the download attempt.
+
+    Raises:
+        requests.RequestException: If HTTP requests fail unexpectedly outside
+            guarded sections.
+        OSError: If writing the downloaded payload to disk fails.
+        ValueError: If response payloads cannot be interpreted during
+            classification.
     """
     context = context or {}
     headers: Dict[str, str] = {}
@@ -1184,6 +1233,10 @@ def load_resolver_config(
 
     Returns:
         Populated ResolverConfig instance.
+
+    Raises:
+        FileNotFoundError: If the resolver configuration file does not exist.
+        RuntimeError: If YAML parsing is requested but PyYAML is unavailable.
     """
     config = ResolverConfig()
     if args.resolver_config:
@@ -1380,6 +1433,11 @@ def process_one_work(
 
     Returns:
         Dictionary summarizing the outcome (saved/html_only/skipped flags).
+
+    Raises:
+        requests.RequestException: Propagated if resolver HTTP requests fail
+            unexpectedly outside guarded sections.
+        Exception: Bubbling from resolver pipeline internals when not handled.
     """
     artifact = create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir)
 

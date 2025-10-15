@@ -5,12 +5,14 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import os
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Sequence
 
 import numpy as np
 
 from .config import DenseIndexConfig
+from .faiss_gpu import GPUOpts, gpu_index_factory, maybe_clone_to_gpu
 from .ids import vector_uuid_to_faiss_int
 
 logger = logging.getLogger(__name__)
@@ -57,6 +59,12 @@ class FaissIndexManager:
 
         self._dim = dim
         self._config = config
+        self._device = self._resolve_device(config)
+        self._gpu_opts = GPUOpts(
+            device=self._device,
+            ivfpq_use_precomputed=bool(getattr(config, "ivfpq_use_precomputed", True)),
+            ivfpq_float16_lut=bool(getattr(config, "ivfpq_float16_lut", True)),
+        )
         self._gpu_resources = self._init_gpu_resources()
         self._index = self._create_index()
         self._vectors: Dict[str, np.ndarray] = {}
@@ -120,7 +128,10 @@ class FaissIndexManager:
             raise ValueError("Training vectors required for IVF indexes")
         matrix = np.stack([self._ensure_dim(vec) for vec in vectors]).astype(np.float32)
         faiss.normalize_L2(matrix)
-        self._index.train(matrix)
+        nlist = int(getattr(self._config, "nlist", 1024))
+        oversample = max(1, int(getattr(self._config, "oversample", 2)))
+        ntrain = min(matrix.shape[0], nlist * oversample)
+        self._index.train(matrix[:ntrain])
 
     def needs_training(self) -> bool:
         """Return True when the underlying index still requires training.
@@ -157,8 +168,15 @@ class FaissIndexManager:
                 self._vectors.pop(vector_id, None)
             ids = np.array([vector_uuid_to_faiss_int(vid) for vid in existing_ids], dtype=np.int64)
             self._remove_ids(ids)
-        matrix = np.stack([self._ensure_dim(vec) for vec in vectors]).astype(np.float32)
+        matrix = np.ascontiguousarray(
+            np.stack([self._ensure_dim(vec) for vec in vectors]), dtype=np.float32
+        )
         faiss.normalize_L2(matrix)
+        if hasattr(self._index, "is_trained") and not getattr(self._index, "is_trained"):
+            nlist = int(getattr(self._config, "nlist", 1024))
+            oversample = max(1, int(getattr(self._config, "oversample", 2)))
+            ntrain = min(matrix.shape[0], nlist * oversample)
+            self._index.train(matrix[:ntrain])
         ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
         self._index.add_with_ids(matrix, ids)
         for row, vector_id in zip(matrix, vector_ids):
@@ -275,12 +293,7 @@ class FaissIndexManager:
         Returns:
             Dictionary containing index configuration and diagnostics.
         """
-        device: Optional[int] = None
-        if hasattr(self._index, "getDevice"):
-            try:
-                device = int(self._index.getDevice())
-            except Exception:  # pragma: no cover - defensive logging guard
-                device = None
+        device = self._detect_device(self._index)
         return {
             "ntotal": float(self.ntotal),
             "index_type": self._config.index_type,
@@ -290,37 +303,31 @@ class FaissIndexManager:
         }
 
     def _create_index(self) -> "faiss.Index":
-        metric = faiss.METRIC_INNER_PRODUCT
-        index_type = self._config.index_type
-
-        if index_type == "flat":
-            if self._gpu_resources is None:
-                raise RuntimeError("GPU resources must be initialised before index creation")
-            base = faiss.GpuIndexFlatIP(self._gpu_resources, self._dim)
-            return faiss.IndexIDMap2(base)
-
-        spec_map = {
-            "flat": "Flat",
-            "ivf_flat": f"IVF{self._config.nlist},Flat",
-            "ivf_pq": f"IVF{self._config.nlist},PQ{self._config.pq_m}x{self._config.pq_bits}",
-        }
         try:
-            spec = spec_map[index_type]
-        except KeyError as exc:
-            raise ValueError(f"Unsupported FAISS index type: {index_type}") from exc
-
-        cpu = faiss.index_factory(self._dim, spec, metric)
-        mapped = faiss.IndexIDMap2(cpu)
-        return self._maybe_to_gpu(mapped)
+            return gpu_index_factory(
+                self._dim,
+                index_type=self._config.index_type,
+                nlist=int(self._config.nlist),
+                nprobe=int(self._config.nprobe),
+                pq_m=int(self._config.pq_m),
+                pq_bits=int(self._config.pq_bits),
+                resources=self._gpu_resources,
+                opts=self._gpu_opts,
+            )
+        except ValueError as exc:
+            raise ValueError(f"Unsupported FAISS index type: {self._config.index_type}") from exc
 
     def _maybe_to_gpu(self, index: "faiss.Index") -> "faiss.Index":
         if self._gpu_resources is None:
             raise RuntimeError("GPU resources are not initialised")
         try:
-            gpu_index = faiss.index_cpu_to_gpu(self._gpu_resources, 0, index)
+            gpu_index = maybe_clone_to_gpu(
+                index, device=self._device, resources=self._gpu_resources
+            )
         except Exception as exc:  # pragma: no cover - hardware specific failure
             raise RuntimeError(
-                f"Failed to promote FAISS index to GPU (index type={type(index).__name__}): {exc}"
+                "Failed to promote FAISS index to GPU "
+                f"(index type={type(index).__name__}, device={self._device}): {exc}"
             ) from exc
         logger.info("FAISS index promoted to GPU")
         return gpu_index
@@ -343,6 +350,14 @@ class FaissIndexManager:
 
         if self._config.index_type.startswith("ivf"):
             nprobe = int(self._config.nprobe)
+            base = index.index if hasattr(index, "index") else index
+            if hasattr(base, "nprobe"):
+                try:
+                    base.nprobe = nprobe
+                    self._log_index_configuration(index)
+                    return
+                except Exception:  # pragma: no cover - parameter guard
+                    logger.debug("Unable to set nprobe directly on FAISS index", exc_info=True)
             handled = False
             if hasattr(faiss, "GpuParameterSpace"):
                 try:
@@ -370,12 +385,7 @@ class FaissIndexManager:
     def _log_index_configuration(self, index: "faiss.Index") -> None:
         if index is None:
             return
-        device: Optional[int] = None
-        if hasattr(index, "getDevice"):
-            try:
-                device = int(index.getDevice())
-            except Exception:  # pragma: no cover - defensive logging guard
-                device = None
+        device = self._detect_device(index)
         event = {
             "index_type": self._config.index_type,
             "nlist": int(self._config.nlist),
@@ -395,11 +405,49 @@ class FaissIndexManager:
             logger.debug("id-resolver failure", exc_info=True)
             return None
 
+    def _detect_device(self, index: "faiss.Index") -> Optional[int]:
+        base = index.index if hasattr(index, "index") else index
+        candidate = base
+        if hasattr(faiss, "downcast_index"):
+            try:
+                candidate = faiss.downcast_index(base)
+            except Exception:  # pragma: no cover - best-effort downcast
+                candidate = base
+        if hasattr(candidate, "getDevice"):
+            try:
+                return int(candidate.getDevice())
+            except Exception:  # pragma: no cover - defensive guard
+                return None
+        return None
+
+    def _resolve_device(self, config: DenseIndexConfig) -> int:
+        """Determine the target GPU device, honouring runtime overrides."""
+
+        env_value = os.getenv("HYBRIDSEARCH_FAISS_DEVICE")
+        if env_value is not None:
+            try:
+                return int(env_value)
+            except ValueError:
+                logger.warning(
+                    "Invalid HYBRIDSEARCH_FAISS_DEVICE value '%s'; falling back to config",
+                    env_value,
+                )
+        return int(getattr(config, "device", 0))
+
     def _init_gpu_resources(self) -> "faiss.StandardGpuResources":
         if not hasattr(faiss, "StandardGpuResources"):
             raise RuntimeError(
                 "FAISS GPU resources are unavailable; ensure faiss-gpu is installed with CUDA support."
             )
+        if hasattr(faiss, "get_num_gpus"):
+            try:
+                num_gpus = int(faiss.get_num_gpus())
+            except Exception as exc:  # pragma: no cover - hardware query failure
+                raise RuntimeError("Unable to enumerate FAISS GPUs") from exc
+            if num_gpus <= self._device:
+                raise RuntimeError(
+                    f"Requested GPU device {self._device} but only {num_gpus} device(s) visible"
+                )
         try:
             resources = faiss.StandardGpuResources()
         except Exception as exc:  # pragma: no cover - hardware specific failure
@@ -440,6 +488,9 @@ class FaissIndexManager:
         matrix = np.stack([item[1] for item in vector_items]).astype(np.float32, copy=False)
         faiss.normalize_L2(matrix)
         if hasattr(self._index, "is_trained") and not getattr(self._index, "is_trained"):
-            self._index.train(matrix)
+            nlist = int(getattr(self._config, "nlist", 1024))
+            oversample = max(1, int(getattr(self._config, "oversample", 2)))
+            ntrain = min(matrix.shape[0], nlist * oversample)
+            self._index.train(matrix[:ntrain])
         ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
         self._index.add_with_ids(matrix, ids)

@@ -1,17 +1,17 @@
-# Operations Guide
+# 1. Operations Guide
 
 This guide covers day-two operations for DocsToKG, including ingestion jobs, search service management, ontology workflows, and scheduled maintenance.
 
-## Daily Workflow
+## 2. Daily Workflow
 
 1. **Monitor Dashboards** – Review hybrid search latency, self-hit accuracy, and ingestion throughput (see `docs/07-reference/monitoring/index.md`).
 2. **Process Ingestion Queue** – Run content downloaders and DocParsing pipelines for new corpora.
 3. **Validate Search Quality** – Execute the hybrid search validation harness and inspect diagnostics.
 4. **Review Alerts** – Respond to documentation validation issues, ontology download failures, and hardware health warnings.
 
-## Running Core Pipelines
+## 3. Running Core Pipelines
 
-### Content Acquisition
+### 3.1 Content Acquisition
 
 ```bash
 python -m DocsToKG.ContentDownload.download_pyalex_pdfs \
@@ -23,7 +23,7 @@ python -m DocsToKG.ContentDownload.download_pyalex_pdfs \
 - Configure API keys via environment variables or `.env`.
 - Resolving behaviour is customisable through modules in `DocsToKG.ContentDownload.resolvers`.
 
-### Document Parsing & Embedding
+### 3.2 Document Parsing & Embedding
 
 ```bash
 # Convert DocTags into chunked Markdown and metadata
@@ -42,7 +42,7 @@ python src/DocsToKG/DocParsing/EmbeddingV2.py \
 - Adjust default input/output paths via CLI flags; see script headers for environment defaults.
 - Use the `--batch-size` option when processing large corpora on GPU hardware.
 
-### Hybrid Search Indexing
+### 3.3 Hybrid Search Indexing
 
 ```python
 import json
@@ -86,7 +86,7 @@ snapshot_path.write_text(json.dumps(snapshot))
 - This pipeline loads pre-computed chunk payloads, updates sparse stores, and rebuilds FAISS indexes when thresholds are met.
 - Reuse the same registry instance between runs to support deletions and incremental updates.
 
-### Ontology Downloads
+### 3.4 Ontology Downloads
 
 ```bash
 python -m DocsToKG.OntologyDownload.cli pull \
@@ -98,7 +98,7 @@ python -m DocsToKG.OntologyDownload.cli pull \
 - Validate downloads with `python -m DocsToKG.OntologyDownload.cli validate <id>`.
 - Maintain configuration under version control and rotate API credentials securely.
 
-## Operating the Hybrid Search API
+## 4. Operating the Hybrid Search API
 
 Integrate `HybridSearchAPI` into your preferred web framework. Example with FastAPI:
 
@@ -121,20 +121,20 @@ def hybrid_search(payload: dict):
 - Reload configuration dynamically using `HybridSearchConfigManager.reload`.
 - Warm caches by issuing representative queries after startup.
 
-## Scheduling & Automation
+## 5. Scheduling & Automation
 
 - **Cron / Airflow**: Schedule ingestion, embedding, and ontology jobs at off-peak hours.
 - **CI/CD**: Automate documentation validation, link checks, and unit tests before deployments.
 - **Maintenance Reminders**: Follow cadence outlined in `docs/DOCUMENTATION_MAINTENANCE_SCHEDULE.md`.
 
-## Backups & Recovery
+## 6. Backups & Recovery
 
 1. Serialize FAISS and registry state (`serialize_state`) before schema changes.
 2. Store snapshots and ontology manifests in durable object storage with ≥30-day retention.
 3. Test restores quarterly using the runbook in `docs/hybrid_search_runbook.md`.
 4. Document restore outcomes in an operational log for auditability.
 
-## Incident Response
+## 7. Incident Response
 
 - Consult `docs/hybrid_search_runbook.md` for failover plans and validation routines.
 - Escalate blocking issues through the channels defined in `CONTRIBUTING.md`.
