@@ -142,6 +142,7 @@ def test_real_network_download(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     metrics = ResolverMetrics()
     logger = MemoryLogger([])
 
+    from DocsToKG.ContentDownload.download_pyalex_pdfs import _make_session, download_candidate
     from DocsToKG.ContentDownload.download_pyalex_pdfs import download_candidate, _make_session
 
     session = _make_session({"User-Agent": "DocsToKG-Test/1.0"})

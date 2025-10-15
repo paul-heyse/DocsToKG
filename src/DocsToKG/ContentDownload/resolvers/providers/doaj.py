@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Iterable
 
 import requests
@@ -13,6 +14,9 @@ from ..types import ResolverConfig, ResolverResult
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class DoajResolver:
@@ -61,7 +65,8 @@ class DoajResolver:
 
         doi = normalize_doi(artifact.doi)
         if not doi:
-            return []
+            yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
+            return
         headers = dict(config.polite_headers)
         if config.doaj_api_key:
             headers["X-API-KEY"] = config.doaj_api_key
@@ -74,14 +79,59 @@ class DoajResolver:
                 headers=headers,
                 timeout=config.get_timeout(self.name),
             )
-        except requests.RequestException:
-            return []
+        except requests.Timeout as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="timeout",
+                metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
+            )
+            return
+        except requests.ConnectionError as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="connection-error",
+                metadata={"error": str(exc)},
+            )
+            return
+        except requests.RequestException as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="request-error",
+                metadata={"error": str(exc)},
+            )
+            return
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.exception("Unexpected error in DOAJ resolver")
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="unexpected-error",
+                metadata={"error": str(exc), "error_type": type(exc).__name__},
+            )
+            return
         if resp.status_code != 200:
-            return []
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="http-error",
+                http_status=resp.status_code,
+                metadata={"error_detail": f"DOAJ API returned {resp.status_code}"},
+            )
+            return
         try:
             data = resp.json()
-        except ValueError:
-            return []
+        except ValueError as json_err:
+            preview = resp.text[:200] if hasattr(resp, "text") else ""
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="json-error",
+                metadata={"error_detail": str(json_err), "content_preview": preview},
+            )
+            return
         candidates = []
         for result in data.get("results", []) or []:
             bibjson = (result or {}).get("bibjson", {})

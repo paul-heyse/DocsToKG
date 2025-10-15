@@ -11,10 +11,7 @@ import pytest
 pytest.importorskip("requests")
 pytest.importorskip("pyalex")
 
-from DocsToKG.ContentDownload.download_pyalex_pdfs import (
-    CsvAttemptLoggerAdapter,
-    JsonlLogger,
-)
+from DocsToKG.ContentDownload.download_pyalex_pdfs import CsvAttemptLoggerAdapter, JsonlLogger
 from DocsToKG.ContentDownload.resolvers import AttemptRecord
 
 

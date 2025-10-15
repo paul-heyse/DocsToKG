@@ -308,6 +308,13 @@ class ResolverPipeline:
             if resolver is None:
                 continue
 
+            resolver_start = time.monotonic()
+            self._respect_rate_limit(resolver_name)
+            with self._lock:
+                self._last_invocation[resolver_name] = time.monotonic()
+
+            for result in resolver.iter_urls(session, self.config, artifact):
+                wall_ms = (time.monotonic() - resolver_start) * 1000.0
             results, wall_ms = self._collect_resolver_results(
                 resolver_name,
                 resolver,

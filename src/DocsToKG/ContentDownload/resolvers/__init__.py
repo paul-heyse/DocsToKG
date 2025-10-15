@@ -24,9 +24,7 @@ from .providers import (
     ZenodoResolver,
     default_resolvers,
 )
-from .types import (
-    DEFAULT_RESOLVER_ORDER as _DEFAULT_RESOLVER_ORDER,
-)
+from .types import DEFAULT_RESOLVER_ORDER as _DEFAULT_RESOLVER_ORDER
 from .types import (
     AttemptLogger,
     AttemptRecord,
@@ -56,6 +54,17 @@ _DEPRECATION_MESSAGES = {
         "'requests' package directly. This alias will be removed in a future release."
     ),
 }
+
+warnings.warn(
+    (
+        "Importing resolver classes from DocsToKG.ContentDownload.resolvers is "
+        "deprecated and will be removed in a future release. Import from the "
+        "explicit submodules (e.g. DocsToKG.ContentDownload.resolvers.pipeline) "
+        "instead."
+    ),
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 def clear_resolver_caches() -> None:

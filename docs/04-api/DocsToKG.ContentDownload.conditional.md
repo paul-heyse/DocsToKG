@@ -27,7 +27,8 @@ Returns:
 `CachedResult` when the origin reports HTTP 304, otherwise `ModifiedResult`.
 
 Raises:
-ValueError: If a 304 response arrives without complete prior metadata.
+ValueError: If a 304 response arrives without complete prior metadata. The
+exception lists missing fields to simplify debugging manifest issues.
 
 ## 2. Classes
 

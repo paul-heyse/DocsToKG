@@ -18,6 +18,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 LOGGER = logging.getLogger(__name__)
 
+
 class ZenodoResolver:
     """Resolve Zenodo records into downloadable open-access PDF URLs.
 
@@ -83,12 +84,40 @@ class ZenodoResolver:
                 timeout=config.get_timeout(self.name),
                 headers=config.polite_headers,
             )
+        except requests.Timeout as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="timeout",
+                metadata={
+                    "timeout": config.get_timeout(self.name),
+                    "error": str(exc),
+                },
+            )
+            return
+        except requests.ConnectionError as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="connection-error",
+                metadata={"error": str(exc)},
+            )
+            return
         except requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
                 event_reason="request-error",
-                metadata={"message": str(exc)},
+                metadata={"error": str(exc)},
+            )
+            return
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.exception("Unexpected error contacting Zenodo API")
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="unexpected-error",
+                metadata={"error": str(exc), "error_type": type(exc).__name__},
             )
             return
 
@@ -98,26 +127,31 @@ class ZenodoResolver:
                 event="error",
                 event_reason="http-error",
                 http_status=response.status_code,
+                metadata={
+                    "error_detail": f"Zenodo API returned {response.status_code}",
+                },
             )
             return
 
         try:
             data = response.json()
-        except ValueError:
-            yield ResolverResult(url=None, event="error", event_reason="json-error")
+        except ValueError as json_err:
+            preview = response.text[:200] if hasattr(response, "text") else ""
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="json-error",
+                metadata={"error_detail": str(json_err), "content_preview": preview},
+            )
             return
 
         hits = data.get("hits", {})
         if not isinstance(hits, dict):
-            LOGGER.warning(
-                "Zenodo API returned malformed hits payload: %s", type(hits).__name__
-            )
+            LOGGER.warning("Zenodo API returned malformed hits payload: %s", type(hits).__name__)
             return
         hits_list = hits.get("hits", [])
         if not isinstance(hits_list, list):
-            LOGGER.warning(
-                "Zenodo API returned malformed hits list: %s", type(hits_list).__name__
-            )
+            LOGGER.warning("Zenodo API returned malformed hits list: %s", type(hits_list).__name__)
             return
         for record in hits_list or []:
             if not isinstance(record, dict):

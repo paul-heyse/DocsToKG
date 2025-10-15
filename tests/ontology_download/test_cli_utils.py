@@ -7,10 +7,7 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload.cli_utils import (
-    format_table,
-    format_validation_summary,
-)
+from DocsToKG.OntologyDownload.cli_utils import format_table, format_validation_summary
 
 
 def test_format_table_basic() -> None:

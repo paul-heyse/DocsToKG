@@ -40,12 +40,7 @@ from DocsToKG.ContentDownload.resolvers import (
     clear_resolver_caches,
     default_resolvers,
 )
-from DocsToKG.ContentDownload.utils import (
-    dedupe,
-    normalize_doi,
-    normalize_pmcid,
-    strip_prefix,
-)
+from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
 
 MAX_SNIFF_BYTES = 64 * 1024
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")

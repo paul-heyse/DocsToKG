@@ -14,6 +14,12 @@ The module also exposes ``ResolverPipeline``/``ResolverConfig`` convenience
 aliases for callers that have not yet migrated to the modular
 ``pipeline``/``types`` submodules.
 
+.. note::
+   Importing from this facade now emits ``DeprecationWarning``. Prefer importing
+   from explicit submodules such as
+   ``DocsToKG.ContentDownload.resolvers.pipeline`` or
+   ``DocsToKG.ContentDownload.resolvers.types``.
+
 ## 1. Functions
 
 ### `clear_resolver_caches()`

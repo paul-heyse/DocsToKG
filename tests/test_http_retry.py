@@ -1,14 +1,22 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from unittest.mock import Mock, call, patch
 
 import pytest
-import requests
 
-from DocsToKG.ContentDownload.http import (
-    parse_retry_after_header,
-    request_with_retries,
-)
+try:  # pragma: no cover - dependency optional in CI
+    import requests  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - skip if requests missing
+    requests = pytest.importorskip("requests")  # type: ignore
+
+hypothesis = pytest.importorskip("hypothesis")
+from hypothesis import strategies as st  # type: ignore
+
+given = hypothesis.given
+
+from DocsToKG.ContentDownload.http import parse_retry_after_header, request_with_retries
 
 
 def _mock_response(status: int, headers: Optional[Dict[str, str]] = None) -> Mock:
@@ -113,6 +121,37 @@ def test_request_exception_raises_after_retries(mock_sleep: Mock) -> None:
     assert session.request.call_count == 2
 
 
+@patch("DocsToKG.ContentDownload.http.time.sleep")
+def test_timeout_retry_handling(mock_sleep: Mock) -> None:
+    session = Mock(spec=requests.Session)
+    session.request.side_effect = [requests.Timeout("slow"), _mock_response(200)]
+
+    result = request_with_retries(session, "GET", "https://example.org/timeout", max_retries=1)
+
+    assert result.status_code == 200
+    assert mock_sleep.call_count == 1
+
+
+@patch("DocsToKG.ContentDownload.http.time.sleep")
+def test_connection_error_retry_handling(mock_sleep: Mock) -> None:
+    session = Mock(spec=requests.Session)
+    session.request.side_effect = [requests.ConnectionError("down"), _mock_response(200)]
+
+    result = request_with_retries(session, "GET", "https://example.org/conn", max_retries=1)
+
+    assert result.status_code == 200
+    assert mock_sleep.call_count == 1
+
+
+@given(st.text())
+def test_parse_retry_after_header_property(value: str) -> None:
+    response = requests.Response()
+    response.headers = {"Retry-After": value}
+
+    result = parse_retry_after_header(response)
+
+    if result is not None:
+        assert result >= 0.0
 def test_request_with_custom_retry_statuses() -> None:
     session = Mock(spec=requests.Session)
     failing = _mock_response(404)

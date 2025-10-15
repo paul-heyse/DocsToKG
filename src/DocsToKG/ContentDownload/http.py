@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import random
 import time
 from datetime import datetime, timezone
@@ -9,6 +10,8 @@ from email.utils import parsedate_to_datetime
 from typing import Any, Optional, Set
 
 import requests
+
+LOGGER = logging.getLogger("DocsToKG.ContentDownload.http")
 
 
 def parse_retry_after_header(response: requests.Response) -> Optional[float]:
@@ -162,6 +165,13 @@ def request_with_retries(
                 return response
 
             if attempt >= max_retries:
+                LOGGER.warning(
+                    "Received status %s for %s %s after %s attempts; returning response",
+                    response.status_code,
+                    method,
+                    url,
+                    attempt + 1,
+                )
                 return response
 
             base_delay = backoff_factor * (2**attempt)
@@ -173,11 +183,70 @@ def request_with_retries(
                 if retry_after_delay is not None and retry_after_delay > delay:
                     delay = retry_after_delay
 
+            LOGGER.debug(
+                "Retrying %s %s after HTTP %s (attempt %s/%s, delay %.2fs)",
+                method,
+                url,
+                response.status_code,
+                attempt + 1,
+                max_retries + 1,
+                delay,
+            )
+            time.sleep(delay)
+
+        except requests.Timeout as exc:
+            last_exception = exc
+            LOGGER.debug(
+                "Request %s %s timed out (attempt %s/%s): %s",
+                method,
+                url,
+                attempt + 1,
+                max_retries + 1,
+                exc,
+            )
+            if attempt >= max_retries:
+                LOGGER.warning(
+                    "Exhausted %s retries for %s %s due to timeouts", max_retries, method, url
+                )
+                raise
+
+            delay = backoff_factor * (2**attempt) + random.random() * 0.1
+            time.sleep(delay)
+
+        except requests.ConnectionError as exc:
+            last_exception = exc
+            LOGGER.debug(
+                "Request %s %s encountered connection error (attempt %s/%s): %s",
+                method,
+                url,
+                attempt + 1,
+                max_retries + 1,
+                exc,
+            )
+            if attempt >= max_retries:
+                LOGGER.warning(
+                    "Exhausted %s retries for %s %s due to connection errors",
+                    max_retries,
+                    method,
+                    url,
+                )
+                raise
+
+            delay = backoff_factor * (2**attempt) + random.random() * 0.1
             time.sleep(delay)
 
         except requests.RequestException as exc:
             last_exception = exc
+            LOGGER.debug(
+                "Request %s %s failed (attempt %s/%s): %s",
+                method,
+                url,
+                attempt + 1,
+                max_retries + 1,
+                exc,
+            )
             if attempt >= max_retries:
+                LOGGER.warning("Exhausted %s retries for %s %s: %s", max_retries, method, url, exc)
                 raise
 
             delay = backoff_factor * (2**attempt) + random.random() * 0.1

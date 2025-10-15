@@ -37,7 +37,9 @@ class SlowResolver:
     def is_enabled(self, config: ResolverConfig, artifact: DummyArtifact) -> bool:
         return True
 
-    def iter_urls(self, session, config: ResolverConfig, artifact: DummyArtifact) -> Iterable[ResolverResult]:
+    def iter_urls(
+        self, session, config: ResolverConfig, artifact: DummyArtifact
+    ) -> Iterable[ResolverResult]:
         time.sleep(self.delay)
         yield ResolverResult(url=f"https://{self.name}.example/pdf")
 
@@ -71,8 +73,12 @@ def test_sequential_vs_concurrent_execution() -> None:
     def download_func(*args, **kwargs):
         return _html_outcome()
 
-    sequential = ResolverPipeline(resolvers, _make_config([r.name for r in resolvers], 1), download_func, logger, metrics)
-    concurrent = ResolverPipeline(resolvers, _make_config([r.name for r in resolvers], 3), download_func, logger, metrics)
+    sequential = ResolverPipeline(
+        resolvers, _make_config([r.name for r in resolvers], 1), download_func, logger, metrics
+    )
+    concurrent = ResolverPipeline(
+        resolvers, _make_config([r.name for r in resolvers], 3), download_func, logger, metrics
+    )
 
     start_seq = time.perf_counter()
     sequential.run(object(), artifact)
@@ -125,7 +131,9 @@ def test_retry_backoff_timing(monkeypatch: pytest.MonkeyPatch) -> None:
             return FakeResponse(200)
 
     session = FakeSession()
-    response = request_with_retries(session, "GET", "https://example.org/test", max_retries=3, backoff_factor=1.0)
+    response = request_with_retries(
+        session, "GET", "https://example.org/test", max_retries=3, backoff_factor=1.0
+    )
     assert response.status_code == 200
     assert pytest.approx(sum(sleeps), rel=0.05) == 7.0
 
