@@ -112,6 +112,48 @@ print(f"Extracted {len(result.entities)} entities")
 similar_docs = processor.search_similar("machine learning algorithms", k=10)
 ```
 
+## Parallel Execution
+
+Use the ``--workers`` flag to enable bounded parallelism when downloading content via
+the OpenAlex pipeline:
+
+```bash
+# Sequential (default, safest)
+python -m DocsToKG.ContentDownload.download_pyalex_pdfs --workers 1 --topic "oncology" --year-start 2020 --year-end 2024
+
+# Parallel (2-5x throughput)
+python -m DocsToKG.ContentDownload.download_pyalex_pdfs --workers 3 --topic "oncology" --year-start 2020 --year-end 2024
+```
+
+**Recommendations:**
+
+- Start with ``--workers=3`` for production workloads.
+- Monitor rate limit compliance with resolver APIs while scaling.
+- Higher values (>5) may overwhelm resolver providers despite per-resolver rate limiting.
+- Each worker maintains its own HTTP session with retry logic.
+
+### Additional CLI Flags
+
+- ``--dry-run``: compute resolver coverage without writing files.
+- ``--resume-from <manifest.jsonl>``: skip works already recorded as successful.
+- ``--extract-html-text``: save plaintext alongside HTML fallbacks (requires ``trafilatura``).
+- ``--enable-resolver openaire`` (and ``hal``/``osf``): opt into additional EU/preprint resolvers.
+
+### Troubleshooting Content Downloads
+
+- **Partial files remain (``*.part``)** – rerun with fewer workers or check network
+  stability before retrying.
+- **Resolver rate limit warnings** – lower ``--workers`` or increase per-resolver
+  ``resolver_min_interval_s``.
+- **High memory usage** – reduce ``--workers`` to limit in-flight downloads.
+
+### Logging and Exports
+
+- Attempts log to JSONL by default. Convert to CSV with
+  ``python scripts/export_attempts_csv.py attempts.jsonl attempts.csv``.
+- Alternatively, use ``jq``:
+  ``jq -r '[.timestamp,.work_id,.status,.url] | @csv' attempts.jsonl > attempts.csv``.
+
 ## 🔧 Development
 
 ### Setting Up Development Environment

@@ -37,3 +37,9 @@ markers = [
     "scale_vectors: tests that require the large real-vector fixture (enable with --scale-vectors)",
 ]
 testpaths = ["tests"]
+
+[tool.poetry.group.extract]
+optional = true
+
+[tool.poetry.group.extract.dependencies]
+trafilatura = "^1.6.0"
