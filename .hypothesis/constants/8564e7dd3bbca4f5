@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/DocParsing/run_docling_parallel_with_vllm_debug.py
+# hypothesis_version: 6.141.0
+
+[0.9, 8000, '*.pdf', '--mode', '=', '__main__', 'convert_one', 'data_root', 'force', 'input', 'mode', 'model', 'output', 'overwrite', 'pdf', 'port', 'resume', 'served_model_names', 'spawn', 'vllm-default', 'workers']

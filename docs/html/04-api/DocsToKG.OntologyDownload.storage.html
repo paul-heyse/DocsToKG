@@ -98,6 +98,10 @@ reports remain consistent with the openspec storage management requirements.</p>
 <section id="get-storage-backend">
 <h3><code class="docutils literal notranslate"><span class="pre">get_storage_backend()</span></code><a class="headerlink" href="#get-storage-backend" title="Link to this heading"></a></h3>
 <p>Instantiate the storage backend based on environment configuration.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Storage backend instance selected according to <code class="docutils literal notranslate"><span class="pre">ONTOFETCH_STORAGE_URL</span></code>.</p>
 </section>
 <section id="prepare-version-self-ontology-id-version">
 <h3><code class="docutils literal notranslate"><span class="pre">prepare_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#prepare-version-self-ontology-id-version" title="Link to this heading"></a></h3>
@@ -128,6 +132,8 @@ Sorted list of version strings recognised by the backend.</p>
 <section id="available-ontologies-self">
 <h3><code class="docutils literal notranslate"><span class="pre">available_ontologies(self)</span></code><a class="headerlink" href="#available-ontologies-self" title="Link to this heading"></a></h3>
 <p>Return sorted ontology identifiers known to the backend.</p>
+<p>Args:
+None</p>
 <p>Returns:
 Alphabetically sorted list of ontology identifiers the backend can
 service.</p>
@@ -159,6 +165,8 @@ ontology_id: Identifier whose version should be removed.
 version: Version string targeted for deletion.</p>
 <p>Returns:
 Number of bytes reclaimed by removing the stored version.</p>
+<p>Raises:
+OSError: If the underlying storage provider fails to delete data.</p>
 </section>
 <section id="set-latest-version-self-ontology-id-version">
 <h3><code class="docutils literal notranslate"><span class="pre">set_latest_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#set-latest-version-self-ontology-id-version" title="Link to this heading"></a></h3>
@@ -203,6 +211,8 @@ Sorted list of version strings found under the storage root.</p>
 <section id="id4">
 <h3><code class="docutils literal notranslate"><span class="pre">available_ontologies(self)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
 <p>Return ontology identifiers discovered under <code class="docutils literal notranslate"><span class="pre">root</span></code>.</p>
+<p>Args:
+None</p>
 <p>Returns:
 Sorted list of ontology identifiers available locally.</p>
 </section>
@@ -252,22 +262,48 @@ None.</p>
 <section id="id9">
 <h3><code class="docutils literal notranslate"><span class="pre">available_versions(self,</span> <span class="pre">ontology_id)</span></code><a class="headerlink" href="#id9" title="Link to this heading"></a></h3>
 <p>Return versions aggregated from local cache and remote storage.</p>
+<p>Args:
+ontology_id: Identifier whose version catalogue is required.</p>
+<p>Returns:
+Sorted list combining local and remote version identifiers.</p>
 </section>
 <section id="id10">
 <h3><code class="docutils literal notranslate"><span class="pre">available_ontologies(self)</span></code><a class="headerlink" href="#id10" title="Link to this heading"></a></h3>
 <p>Return ontology identifiers available locally or remotely.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Sorted set union of local and remote ontology identifiers.</p>
 </section>
 <section id="id11">
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_local_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id11" title="Link to this heading"></a></h3>
 <p>Mirror a remote ontology version into the local cache when absent.</p>
+<p>Args:
+ontology_id: Identifier whose version should exist locally.
+version: Version string to ensure within the local cache.</p>
+<p>Returns:
+Path to the local directory containing the requested version.</p>
 </section>
 <section id="id12">
 <h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#id12" title="Link to this heading"></a></h3>
 <p>Upload the finalized local directory to the remote store.</p>
+<p>Args:
+ontology_id: Identifier of the ontology that has completed processing.
+version: Version string associated with the finalised ontology.
+local_dir: Directory containing the validated ontology payload.</p>
+<p>Returns:
+None.</p>
 </section>
 <section id="id13">
 <h3><code class="docutils literal notranslate"><span class="pre">delete_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id13" title="Link to this heading"></a></h3>
 <p>Delete both local and remote copies of a stored version.</p>
+<p>Args:
+ontology_id: Identifier whose stored version should be deleted.
+version: Version string targeted for deletion.</p>
+<p>Returns:
+Total bytes reclaimed across local and remote storage.</p>
+<p>Raises:
+OSError: Propagated if remote deletion fails irrecoverably.</p>
 </section>
 </section>
 <section id="classes">
@@ -310,6 +346,19 @@ backend.available_ontologies()
 <section id="fsspecstoragebackend">
 <h3><code class="docutils literal notranslate"><span class="pre">FsspecStorageBackend</span></code><a class="headerlink" href="#fsspecstoragebackend" title="Link to this heading"></a></h3>
 <p>Hybrid storage backend that mirrors artifacts to an fsspec location.</p>
+<p>Attributes:
+fs: <code class="docutils literal notranslate"><span class="pre">fsspec</span></code> filesystem instance used for remote operations.
+base_path: Root path within the remote filesystem where artefacts live.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>backend = FsspecStorageBackend(“memory://ontologies”)  # doctest: +SKIP
+backend.available_ontologies()  # doctest: +SKIP
+[]</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 </section>
 </section>

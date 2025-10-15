@@ -63,19 +63,21 @@ log_dir: Directory containing daily log files.
 retention_days: Number of days to keep uncompressed or compressed logs
 before deleting them.
 
-### `setup_logging(config, log_dir)`
+### `setup_logging()`
 
 Configure structured logging handlers for ontology downloads.
 
 Args:
-config: Logging configuration containing level, size, and retention.
+level: Logging level string (e.g., ``INFO`` or ``DEBUG``).
+retention_days: Number of days to retain log files before compression/removal.
+max_log_size_mb: Maximum size of individual log files before rotation.
 log_dir: Optional directory override for log file placement.
 
 Returns:
 Configured logger instance scoped to the ontology downloader.
 
 Examples:
->>> logger = setup_logging(LoggingConfig(level="INFO", max_log_size_mb=1, retention_days=1))
+>>> logger = setup_logging(level="INFO", max_log_size_mb=1, retention_days=1)
 >>> logger.name
 'DocsToKG.OntologyDownload'
 

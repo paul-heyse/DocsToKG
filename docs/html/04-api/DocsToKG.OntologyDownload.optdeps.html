@@ -93,15 +93,15 @@ and filesystem abstractions work even in minimal test environments.</p>
 ‘…/ontology-fetcher/cache’</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="create-stub-module-name-attrs">
+<h3><code class="docutils literal notranslate"><span class="pre">_create_stub_module(name,</span> <span class="pre">attrs)</span></code><a class="headerlink" href="#create-stub-module-name-attrs" title="Link to this heading"></a></h3>
+<p>Return a :class:<code class="docutils literal notranslate"><span class="pre">ModuleType</span></code> populated with <em>attrs</em>.</p>
+</section>
 <section id="import-module-name">
 <h3><code class="docutils literal notranslate"><span class="pre">_import_module(name)</span></code><a class="headerlink" href="#import-module-name" title="Link to this heading"></a></h3>
 <p>Import a module by name using :mod:<code class="docutils literal notranslate"><span class="pre">importlib</span></code>.</p>
 <p>The indirection makes it trivial to monkeypatch the import logic in unit
 tests without modifying global interpreter state.</p>
-<p>Args:
-name: Fully qualified module name to import.</p>
-<p>Returns:
-Imported module object.</p>
 </section>
 <section id="get-pystow">
 <h3><code class="docutils literal notranslate"><span class="pre">get_pystow()</span></code><a class="headerlink" href="#get-pystow" title="Link to this heading"></a></h3>

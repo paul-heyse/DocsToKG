@@ -22,27 +22,25 @@ except ModuleNotFoundError:  # pragma: no cover
 pytest.importorskip("bs4")
 
 from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
-from DocsToKG.ContentDownload.resolvers.providers import landing_page as landing_page_module
-from DocsToKG.ContentDownload.resolvers.providers.arxiv import ArxivResolver
-from DocsToKG.ContentDownload.resolvers.providers.core import CoreResolver
-from DocsToKG.ContentDownload.resolvers.providers.crossref import (
+from DocsToKG.ContentDownload.resolvers import providers as providers_module
+from DocsToKG.ContentDownload.resolvers.providers import (
+    ArxivResolver,
+    CoreResolver,
     CrossrefResolver,
+    DoajResolver,
+    EuropePmcResolver,
+    HalResolver,
+    LandingPageResolver,
+    OpenAireResolver,
+    OpenAlexResolver,
+    OsfResolver,
+    PmcResolver,
+    SemanticScholarResolver,
+    UnpaywallResolver,
+    WaybackResolver,
+    ZenodoResolver,
     _fetch_crossref_data,
 )
-from DocsToKG.ContentDownload.resolvers.providers.doaj import DoajResolver
-from DocsToKG.ContentDownload.resolvers.providers.europe_pmc import EuropePmcResolver
-from DocsToKG.ContentDownload.resolvers.providers.hal import HalResolver
-from DocsToKG.ContentDownload.resolvers.providers.landing_page import LandingPageResolver
-from DocsToKG.ContentDownload.resolvers.providers.openaire import OpenAireResolver
-from DocsToKG.ContentDownload.resolvers.providers.openalex import OpenAlexResolver
-from DocsToKG.ContentDownload.resolvers.providers.osf import OsfResolver
-from DocsToKG.ContentDownload.resolvers.providers.pmc import PmcResolver
-from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import (
-    SemanticScholarResolver,
-)
-from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver
-from DocsToKG.ContentDownload.resolvers.providers.wayback import WaybackResolver
-from DocsToKG.ContentDownload.resolvers.providers.zenodo import ZenodoResolver
 from DocsToKG.ContentDownload.resolvers.types import ResolverConfig
 
 
@@ -146,7 +144,7 @@ def test_landing_page_resolver_meta_pattern(monkeypatch, tmp_path) -> None:
     """
 
     monkeypatch.setattr(
-        landing_page_module,
+        providers_module,
         "request_with_retries",
         lambda *args, **kwargs: _StubResponse(text=html),
     )
@@ -169,7 +167,7 @@ def test_landing_page_resolver_link_pattern(monkeypatch, tmp_path) -> None:
     """
 
     monkeypatch.setattr(
-        landing_page_module,
+        providers_module,
         "request_with_retries",
         lambda *args, **kwargs: _StubResponse(text=html),
     )
@@ -191,7 +189,7 @@ def test_landing_page_resolver_anchor_pattern(monkeypatch, tmp_path) -> None:
     """
 
     monkeypatch.setattr(
-        landing_page_module,
+        providers_module,
         "request_with_retries",
         lambda *args, **kwargs: _StubResponse(text=html),
     )
@@ -207,7 +205,7 @@ def test_landing_page_resolver_http_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        landing_page_module,
+        providers_module,
         "request_with_retries",
         lambda *args, **kwargs: _StubResponse(status_code=500),
     )
@@ -231,7 +229,7 @@ def test_landing_page_resolver_request_errors(monkeypatch, tmp_path, exception, 
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        landing_page_module,
+        providers_module,
         "request_with_retries",
         Mock(side_effect=exception),
     )
@@ -250,7 +248,7 @@ def test_core_resolver_http_error(monkeypatch, tmp_path) -> None:
     config.core_api_key = "token"
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.core.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(status_code=503),
     )
 
@@ -266,7 +264,7 @@ def test_core_resolver_json_error(monkeypatch, tmp_path) -> None:
     config.core_api_key = "token"
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.core.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=ValueError("bad json"), text="oops"),
     )
 
@@ -293,7 +291,7 @@ def test_core_resolver_emits_results(monkeypatch, tmp_path) -> None:
     }
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.core.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=core_payload),
     )
 
@@ -317,7 +315,7 @@ def test_core_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> 
     config.core_api_key = "token"
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.core.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         Mock(side_effect=exception),
     )
 
@@ -352,7 +350,7 @@ def test_core_resolver_ignores_non_dict_hits(monkeypatch, tmp_path) -> None:
     payload = {"results": ["not-dict", {"downloadUrl": None, "fullTextLinks": ["oops"]}]}
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.core.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=payload),
     )
 
@@ -372,7 +370,7 @@ def test_crossref_resolver_cached_http_error(monkeypatch, tmp_path) -> None:
     http_error.response = Mock(status_code=429)
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.crossref._fetch_crossref_data",
+        "DocsToKG.ContentDownload.resolvers.providers._fetch_crossref_data",
         Mock(side_effect=http_error),
     )
 
@@ -400,7 +398,7 @@ def test_crossref_resolver_cached_success(monkeypatch, tmp_path) -> None:
     }
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.crossref._fetch_crossref_data",
+        "DocsToKG.ContentDownload.resolvers.providers._fetch_crossref_data",
         Mock(return_value=payload),
     )
 
@@ -421,7 +419,7 @@ def test_crossref_resolver_link_not_list(monkeypatch, tmp_path) -> None:
     payload = {"message": {"link": "not-a-list"}}
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.crossref._fetch_crossref_data",
+        "DocsToKG.ContentDownload.resolvers.providers._fetch_crossref_data",
         Mock(return_value=payload),
     )
 
@@ -476,7 +474,7 @@ def test_crossref_resolver_session_success(monkeypatch, tmp_path) -> None:
     )
     mock_request = Mock(return_value=response)
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.crossref.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         mock_request,
     )
     session = Mock()
@@ -497,7 +495,7 @@ def test_crossref_resolver_cached_request_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.crossref._fetch_crossref_data",
+        "DocsToKG.ContentDownload.resolvers.providers._fetch_crossref_data",
         Mock(side_effect=requests.RequestException("boom")),
     )
 
@@ -519,7 +517,7 @@ def test_fetch_crossref_data_http_error(monkeypatch) -> None:
             raise requests.HTTPError("boom", response=Mock(status_code=502))
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.crossref.requests.get",
+        "DocsToKG.ContentDownload.resolvers.providers.requests.get",
         lambda *args, **kwargs: _Resp(),
     )
 
@@ -537,7 +535,7 @@ def test_fetch_crossref_data_success(monkeypatch) -> None:
             return {"message": "ok"}
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.crossref.requests.get",
+        "DocsToKG.ContentDownload.resolvers.providers.requests.get",
         lambda *args, **kwargs: _Resp(),
     )
 
@@ -560,7 +558,7 @@ def test_crossref_resolver_session_errors(monkeypatch, tmp_path, exception, reas
 
     mock_request = Mock(side_effect=exception)
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.crossref.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         mock_request,
     )
     session = Mock()
@@ -579,7 +577,7 @@ def test_crossref_resolver_session_http_error(monkeypatch, tmp_path) -> None:
     response = _StubResponse(status_code=504)
     mock_request = Mock(return_value=response)
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.crossref.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         mock_request,
     )
     session = Mock()
@@ -598,7 +596,7 @@ def test_crossref_resolver_session_json_error(monkeypatch, tmp_path) -> None:
     response = _StubResponse(json_data=ValueError("bad json"), text="oops")
     mock_request = Mock(return_value=response)
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.crossref.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         mock_request,
     )
     session = Mock()
@@ -673,7 +671,7 @@ def test_doaj_resolver_http_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.doaj.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(status_code=502),
     )
 
@@ -701,7 +699,7 @@ def test_doaj_resolver_emits_candidate(monkeypatch, tmp_path) -> None:
     }
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.doaj.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=payload),
     )
 
@@ -715,7 +713,7 @@ def test_doaj_resolver_json_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.doaj.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=ValueError("broken"), text="oops"),
     )
 
@@ -737,7 +735,7 @@ def test_doaj_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> 
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.doaj.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         Mock(side_effect=exception),
     )
 
@@ -759,7 +757,7 @@ def test_doaj_resolver_includes_api_key(monkeypatch, tmp_path) -> None:
         return _StubResponse(json_data={"results": []})
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.doaj.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         _fake_request,
     )
 
@@ -782,7 +780,7 @@ def test_europe_pmc_resolver_http_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.europe_pmc.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(status_code=502),
     )
 
@@ -796,7 +794,7 @@ def test_europe_pmc_resolver_json_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.europe_pmc.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=ValueError("oops"), text="bad"),
     )
 
@@ -825,7 +823,7 @@ def test_europe_pmc_resolver_emits_pdf(monkeypatch, tmp_path) -> None:
     }
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.europe_pmc.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=payload),
     )
 
@@ -843,7 +841,7 @@ def test_europe_pmc_resolver_error_paths(monkeypatch, tmp_path, exception) -> No
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.europe_pmc.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         Mock(side_effect=exception),
     )
 
@@ -871,7 +869,7 @@ def test_hal_resolver_emits_urls(monkeypatch, tmp_path) -> None:
     }
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.hal.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=payload),
     )
 
@@ -885,7 +883,7 @@ def test_hal_resolver_json_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.hal.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=ValueError("bad"), text="oops"),
     )
 
@@ -907,7 +905,7 @@ def test_hal_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> N
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.hal.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         Mock(side_effect=exception),
     )
 
@@ -956,7 +954,7 @@ def test_openaire_resolver_emits_pdf(monkeypatch, tmp_path) -> None:
     }
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.openaire.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=complex_payload),
     )
 
@@ -970,7 +968,7 @@ def test_openaire_resolver_json_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.openaire.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(text="{", json_data=ValueError("bad")),
     )
 
@@ -1000,7 +998,7 @@ def test_openaire_resolver_fallback_json_load(monkeypatch, tmp_path) -> None:
     }
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.openaire.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(
             json_data=ValueError("bad"), text=json.dumps(payload)
         ),
@@ -1024,7 +1022,7 @@ def test_openaire_resolver_error_paths(monkeypatch, tmp_path, exception, reason)
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.openaire.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         Mock(side_effect=exception),
     )
 
@@ -1049,7 +1047,7 @@ def test_osf_resolver_emits_urls(monkeypatch, tmp_path) -> None:
     }
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.osf.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=payload),
     )
 
@@ -1066,7 +1064,7 @@ def test_osf_resolver_json_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.osf.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=ValueError("bad"), text="oops"),
     )
 
@@ -1088,7 +1086,7 @@ def test_osf_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> N
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.osf.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         Mock(side_effect=exception),
     )
 
@@ -1117,7 +1115,7 @@ def test_unpaywall_resolver_cached_http_error(monkeypatch, tmp_path) -> None:
     http_error = requests.HTTPError("boom")
     http_error.response = Mock(status_code=404)
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.unpaywall._fetch_unpaywall_data",
+        "DocsToKG.ContentDownload.resolvers.providers._fetch_unpaywall_data",
         Mock(side_effect=http_error),
     )
 
@@ -1145,7 +1143,7 @@ def test_unpaywall_resolver_cached_success(monkeypatch, tmp_path) -> None:
     }
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.unpaywall._fetch_unpaywall_data",
+        "DocsToKG.ContentDownload.resolvers.providers._fetch_unpaywall_data",
         Mock(return_value=payload),
     )
 
@@ -1232,7 +1230,7 @@ def test_semantic_scholar_resolver_http_error(monkeypatch, tmp_path) -> None:
     http_error = requests.HTTPError("boom")
     http_error.response = Mock(status_code=503)
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.semantic_scholar._fetch_semantic_scholar_data",
+        "DocsToKG.ContentDownload.resolvers.providers._fetch_semantic_scholar_data",
         Mock(side_effect=http_error),
     )
 
@@ -1258,7 +1256,7 @@ def test_semantic_scholar_resolver_errors(monkeypatch, tmp_path, exception, reas
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.semantic_scholar._fetch_semantic_scholar_data",
+        "DocsToKG.ContentDownload.resolvers.providers._fetch_semantic_scholar_data",
         Mock(side_effect=exception),
     )
 
@@ -1275,7 +1273,7 @@ def test_semantic_scholar_resolver_json_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.semantic_scholar._fetch_semantic_scholar_data",
+        "DocsToKG.ContentDownload.resolvers.providers._fetch_semantic_scholar_data",
         Mock(side_effect=ValueError("bad")),
     )
 
@@ -1292,7 +1290,7 @@ def test_semantic_scholar_resolver_no_open_access(monkeypatch, tmp_path) -> None
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.semantic_scholar._fetch_semantic_scholar_data",
+        "DocsToKG.ContentDownload.resolvers.providers._fetch_semantic_scholar_data",
         Mock(return_value={"openAccessPdf": {}}),
     )
 
@@ -1322,7 +1320,7 @@ def test_pmc_resolver_timeout_fallback(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.pmc.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         Mock(side_effect=requests.Timeout("slow")),
     )
 
@@ -1344,7 +1342,7 @@ def test_pmc_resolver_other_errors(monkeypatch, tmp_path, exception, reason) -> 
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.pmc.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         Mock(side_effect=[exception, _StubResponse(text="")]),
     )
 
@@ -1360,7 +1358,7 @@ def test_pmc_resolver_success(monkeypatch, tmp_path) -> None:
     # OA response containing relative hrefs should resolve to absolute URLs
     oa_html = '<a href="/pmc/articles/PMC123456/pdf/123.pdf">Download</a>'
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.pmc.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         Mock(return_value=_StubResponse(text=oa_html)),
     )
 
@@ -1383,7 +1381,7 @@ def test_pmc_lookup_pmcids_success(monkeypatch, tmp_path) -> None:
     }
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.pmc.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=payload),
     )
 
@@ -1397,7 +1395,7 @@ def test_pmc_lookup_pmcids_handles_json_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.pmc.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=ValueError("bad"), text="oops"),
     )
 
@@ -1415,7 +1413,7 @@ def test_wayback_resolver_handles_http_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.wayback.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(status_code=500),
     )
 
@@ -1440,7 +1438,7 @@ def test_wayback_resolver_returns_archive(monkeypatch, tmp_path) -> None:
     }
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.wayback.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=payload),
     )
 
@@ -1456,7 +1454,7 @@ def test_wayback_resolver_json_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.wayback.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=ValueError("bad"), text="oops"),
     )
 
@@ -1479,7 +1477,7 @@ def test_wayback_resolver_error_paths(monkeypatch, tmp_path, exception, reason) 
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.wayback.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         Mock(side_effect=exception),
     )
 
@@ -1496,7 +1494,7 @@ def test_wayback_resolver_no_snapshot(monkeypatch, tmp_path) -> None:
     payload = {"archived_snapshots": {}}
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.wayback.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=payload),
     )
 
@@ -1527,7 +1525,7 @@ def test_zenodo_resolver_errors(monkeypatch, tmp_path, exception, reason) -> Non
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.zenodo.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         Mock(side_effect=exception),
     )
 
@@ -1541,7 +1539,7 @@ def test_zenodo_resolver_http_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.zenodo.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(status_code=502),
     )
 
@@ -1555,7 +1553,7 @@ def test_zenodo_resolver_json_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.zenodo.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=ValueError("bad"), text="oops"),
     )
 
@@ -1591,7 +1589,7 @@ def test_zenodo_resolver_emits_urls(monkeypatch, tmp_path) -> None:
     }
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.zenodo.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data=payload),
     )
 
@@ -1614,7 +1612,7 @@ def test_zenodo_resolver_malformed_hits(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.providers.zenodo.request_with_retries",
+        "DocsToKG.ContentDownload.resolvers.providers.request_with_retries",
         lambda *args, **kwargs: _StubResponse(json_data={"hits": "unexpected"}),
     )
 

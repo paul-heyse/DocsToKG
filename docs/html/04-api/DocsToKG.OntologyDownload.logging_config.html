@@ -141,11 +141,13 @@ log_dir: Directory containing daily log files.
 retention_days: Number of days to keep uncompressed or compressed logs
 before deleting them.</p>
 </section>
-<section id="setup-logging-config-log-dir">
-<h3><code class="docutils literal notranslate"><span class="pre">setup_logging(config,</span> <span class="pre">log_dir)</span></code><a class="headerlink" href="#setup-logging-config-log-dir" title="Link to this heading"></a></h3>
+<section id="setup-logging">
+<h3><code class="docutils literal notranslate"><span class="pre">setup_logging()</span></code><a class="headerlink" href="#setup-logging" title="Link to this heading"></a></h3>
 <p>Configure structured logging handlers for ontology downloads.</p>
 <p>Args:
-config: Logging configuration containing level, size, and retention.
+level: Logging level string (e.g., <code class="docutils literal notranslate"><span class="pre">INFO</span></code> or <code class="docutils literal notranslate"><span class="pre">DEBUG</span></code>).
+retention_days: Number of days to retain log files before compression/removal.
+max_log_size_mb: Maximum size of individual log files before rotation.
 log_dir: Optional directory override for log file placement.</p>
 <p>Returns:
 Configured logger instance scoped to the ontology downloader.</p>
@@ -153,7 +155,7 @@ Configured logger instance scoped to the ontology downloader.</p>
 <blockquote>
 <div><blockquote>
 <div><blockquote>
-<div><p>logger = setup_logging(LoggingConfig(level=”INFO”, max_log_size_mb=1, retention_days=1))
+<div><p>logger = setup_logging(level=”INFO”, max_log_size_mb=1, retention_days=1)
 logger.name
 ‘DocsToKG.OntologyDownload’</p>
 </div></blockquote>

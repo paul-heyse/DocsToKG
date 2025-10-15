@@ -151,6 +151,17 @@ ConfigError: If the archive is missing, unsafe, or exceeds compression limits.
 
 Extract archives by dispatching to the appropriate safe handler.
 
+Args:
+archive_path: Path to the archive on disk.
+destination: Directory where files should be extracted.
+logger: Optional logger receiving structured extraction telemetry.
+
+Returns:
+List of paths extracted from the archive in the order processed.
+
+Raises:
+ConfigError: If the archive format is unsupported or extraction fails.
+
 ### `_get_bucket(host, http_config, service)`
 
 Return a token bucket keyed by host and optional service name.
@@ -272,6 +283,11 @@ Raised when an HTTP download attempt fails.
 Attributes:
 status_code: Optional HTTP status code returned by the upstream service.
 retryable: Whether the failure is safe to retry with an alternate resolver.
+
+Examples:
+>>> raise DownloadFailure("Unavailable", status_code=503, retryable=True)
+Traceback (most recent call last):
+DownloadFailure: Unavailable
 
 ### `TokenBucket`
 

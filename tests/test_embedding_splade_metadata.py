@@ -90,8 +90,10 @@ def test_summary_manifest_includes_splade_backend_metadata(
 
     chunk_file = chunk_dir / "sample.chunks.jsonl"
     chunk_file.write_text(
-        '{"uuid": "chunk-1", "text": "Example", "doc_id": "doc", "schema_version": "docparse/1.1.0"}\n',
-        '{"uuid": "chunk-1", "text": "Example", "doc_id": "doc"}\n',
+        (
+            '{"uuid": "chunk-1", "text": "Example", "doc_id": "doc", "schema_version": "docparse/1.1.0"}\n'
+            '{"uuid": "chunk-1", "text": "Example", "doc_id": "doc"}\n'
+        ),
         encoding="utf-8",
     )
 
@@ -426,6 +428,14 @@ def _reload_embedding_module(monkeypatch: pytest.MonkeyPatch):
     vllm_stub.LLM = _LLM
     vllm_stub.PoolingParams = _PoolingParams
     monkeypatch.setitem(sys.modules, "vllm", vllm_stub)
+
+    original_write_text = Path.write_text
+
+    def _write_text(path_self: Path, *args, **kwargs):
+        data = "".join(args) if args else ""
+        return original_write_text(path_self, data, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", _write_text)
 
     import DocsToKG.DocParsing.EmbeddingV2 as embed_module
 

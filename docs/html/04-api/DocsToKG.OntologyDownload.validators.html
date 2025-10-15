@@ -110,14 +110,6 @@ None</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_python_merge_sort(source,</span> <span class="pre">destination)</span></code><a class="headerlink" href="#python-merge-sort-source-destination" title="Link to this heading"></a></h3>
 <p>Sort an N-Triples file using a disk-backed merge strategy.</p>
 </section>
-<section id="sort-nt-source-destination">
-<h3><code class="docutils literal notranslate"><span class="pre">_sort_nt(source,</span> <span class="pre">destination)</span></code><a class="headerlink" href="#sort-nt-source-destination" title="Link to this heading"></a></h3>
-<p>Sort N-Triples using platform sort when available with Python fallback.</p>
-</section>
-<section id="normalize-streaming-source-path-output-path">
-<h3><code class="docutils literal notranslate"><span class="pre">normalize_streaming(source_path,</span> <span class="pre">output_path)</span></code><a class="headerlink" href="#normalize-streaming-source-path-output-path" title="Link to this heading"></a></h3>
-<p>Normalize an ontology file using streaming disk-backed sorting.</p>
-</section>
 <section id="term-to-string-term-namespace-manager">
 <h3><code class="docutils literal notranslate"><span class="pre">_term_to_string(term,</span> <span class="pre">namespace_manager)</span></code><a class="headerlink" href="#term-to-string-term-namespace-manager" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
@@ -137,14 +129,21 @@ predicate, and object so downstream hashing yields deterministic values.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_sort_triple_file(source,</span> <span class="pre">destination)</span></code><a class="headerlink" href="#sort-triple-file-source-destination" title="Link to this heading"></a></h3>
 <p>Sort serialized triple lines using platform sort when available.</p>
 </section>
-<section id="normalize-streaming-source">
-<h3><code class="docutils literal notranslate"><span class="pre">normalize_streaming(source)</span></code><a class="headerlink" href="#normalize-streaming-source" title="Link to this heading"></a></h3>
-<p>Normalize ontologies using external sort to ensure deterministic output.</p>
+<section id="normalize-streaming-source-output-path">
+<h3><code class="docutils literal notranslate"><span class="pre">normalize_streaming(source,</span> <span class="pre">output_path)</span></code><a class="headerlink" href="#normalize-streaming-source-output-path" title="Link to this heading"></a></h3>
+<p>Normalize ontologies using streaming canonical Turtle serialization.</p>
 <p>The streaming path serializes triples to a temporary file, leverages the
-platform <code class="docutils literal notranslate"><span class="pre">sort</span></code> utility (when available) to order the triples
-lexicographically, and streams the sorted output while computing the
-canonical SHA-256 hash. Callers may supply an <code class="docutils literal notranslate"><span class="pre">output_path</span></code> to persist the
-normalized Turtle document without storing the entire content in memory.</p>
+platform <code class="docutils literal notranslate"><span class="pre">sort</span></code> command (when available) to order triples lexicographically,
+and streams the canonical Turtle output while computing a SHA-256 digest.
+When <code class="docutils literal notranslate"><span class="pre">output_path</span></code> is provided the canonical form is persisted without
+retaining the entire content in memory.</p>
+<p>Args:
+source: Path to the ontology document providing triples.
+output_path: Optional destination for the normalized Turtle document.
+graph: Optional pre-loaded RDF graph re-used instead of reparsing.
+chunk_bytes: Threshold controlling how frequently buffered bytes are flushed.</p>
+<p>Returns:
+SHA-256 hex digest of the canonical Turtle content.</p>
 </section>
 <section id="run-validator-subprocess-name-payload">
 <h3><code class="docutils literal notranslate"><span class="pre">_run_validator_subprocess(name,</span> <span class="pre">payload)</span></code><a class="headerlink" href="#run-validator-subprocess-name-payload" title="Link to this heading"></a></h3>
@@ -254,13 +253,17 @@ Dictionary with boolean status, detail payload, and output paths.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_replace(match)</span></code><a class="headerlink" href="#replace-match" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
+<section id="iter-canonical-lines">
+<h3><code class="docutils literal notranslate"><span class="pre">_iter_canonical_lines()</span></code><a class="headerlink" href="#iter-canonical-lines" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="flush-writer">
+<h3><code class="docutils literal notranslate"><span class="pre">_flush(writer)</span></code><a class="headerlink" href="#flush-writer" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="parse">
 <h3><code class="docutils literal notranslate"><span class="pre">_parse()</span></code><a class="headerlink" href="#parse" title="Link to this heading"></a></h3>
 <p>Parse the ontology with rdflib to populate the graph object.</p>
-</section>
-<section id="write-data">
-<h3><code class="docutils literal notranslate"><span class="pre">_write(data)</span></code><a class="headerlink" href="#write-data" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
 </section>
 <section id="handler-signum-frame">
 <h3><code class="docutils literal notranslate"><span class="pre">_handler(signum,</span> <span class="pre">frame)</span></code><a class="headerlink" href="#handler-signum-frame" title="Link to this heading"></a></h3>

@@ -480,10 +480,20 @@ None</p>
 <section id="enter-self">
 <h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#enter-self" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">self</span></code> when used as a context manager.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Logger instance configured for context-managed usage.</p>
 </section>
 <section id="exit-self-exc-type-exc-tb">
 <h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#exit-self-exc-type-exc-tb" title="Link to this heading"></a></h3>
 <p>Close the file handle on context manager exit.</p>
+<p>Args:
+exc_type: Exception type raised within the context, if any.
+exc: Exception instance raised within the context.
+tb: Traceback associated with <code class="docutils literal notranslate"><span class="pre">exc</span></code>.</p>
+<p>Returns:
+None</p>
 </section>
 <section id="id1">
 <h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
@@ -528,10 +538,20 @@ None</p>
 <section id="id6">
 <h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">self</span></code> when used as a context manager.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Adapter instance configured for context-managed usage.</p>
 </section>
 <section id="id7">
 <h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
 <p>Close the CSV file handle on context manager exit.</p>
+<p>Args:
+exc_type: Exception type raised within the context, if any.
+exc: Exception instance raised within the context.
+tb: Traceback associated with <code class="docutils literal notranslate"><span class="pre">exc</span></code>.</p>
+<p>Returns:
+None</p>
 </section>
 <section id="post-init-self">
 <h3><code class="docutils literal notranslate"><span class="pre">__post_init__(self)</span></code><a class="headerlink" href="#post-init-self" title="Link to this heading"></a></h3>

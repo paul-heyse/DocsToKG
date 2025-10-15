@@ -212,6 +212,12 @@ ValueError: If the parser name is not recognised.</p>
 <section id="validate-schema-version-cls-value">
 <h3><code class="docutils literal notranslate"><span class="pre">_validate_schema_version(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-schema-version-cls-value" title="Link to this heading"></a></h3>
 <p>Ensure chunk rows declare a supported schema identifier.</p>
+<p>Args:
+value: Schema version string provided by the chunk payload.</p>
+<p>Returns:
+Validated schema version string.</p>
+<p>Raises:
+ValueError: If the supplied schema version is not compatible.</p>
 </section>
 <section id="validate-num-tokens-cls-value">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_num_tokens(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-num-tokens-cls-value" title="Link to this heading"></a></h3>
@@ -276,6 +282,12 @@ ValueError: If the actual length differs from <code class="docutils literal notr
 <section id="id2">
 <h3><code class="docutils literal notranslate"><span class="pre">_validate_schema_version(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
 <p>Ensure vector rows declare a supported schema identifier.</p>
+<p>Args:
+value: Schema version string provided by the vector payload.</p>
+<p>Returns:
+Validated schema version string.</p>
+<p>Raises:
+ValueError: If the supplied schema version is not compatible.</p>
 </section>
 <section id="field">
 <h3><code class="docutils literal notranslate"><span class="pre">Field()</span></code><a class="headerlink" href="#field" title="Link to this heading"></a></h3>

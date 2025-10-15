@@ -337,6 +337,12 @@ True
 
 Return the active content hash algorithm, honoring env overrides.
 
+Args:
+default: Fallback algorithm name to use when no override is present.
+
+Returns:
+Hash algorithm identifier resolved from ``DOCSTOKG_HASH_ALG`` or ``default``.
+
 ### `compute_content_hash(path, algorithm)`
 
 Compute a content hash for ``path`` using the requested algorithm.

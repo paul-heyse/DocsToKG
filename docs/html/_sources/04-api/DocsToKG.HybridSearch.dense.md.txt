@@ -226,12 +226,31 @@ RuntimeError: If GPU resources have not been initialised before invocation.
 
 Replicate a FAISS index across every visible GPU device.
 
+Args:
+index: Optional FAISS index to replicate. Defaults to the manager's active index.
+
+Returns:
+GPU-backed FAISS index replicated across all configured devices.
+
+Raises:
+RuntimeError: If multi-GPU replication is unavailable in the FAISS build.
+
 ### `distribute_to_all_gpus(self, index)`
 
 Replicate or shard a FAISS index across all GPUs depending on ``shard``.
 
 When ``shard`` is ``True`` each GPU owns a disjoint partition. Otherwise the full index
 is replicated across every GPU.
+
+Args:
+index: Optional FAISS index to distribute. Defaults to the manager's active index.
+shard: When ``True`` distribute shards; when ``False`` replicate the full index.
+
+Returns:
+GPU-backed FAISS index configured according to ``shard``.
+
+Raises:
+RuntimeError: If the FAISS build lacks the required multi-GPU features.
 
 ### `_maybe_to_gpu(self, index)`
 

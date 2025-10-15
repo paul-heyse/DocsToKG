@@ -78,6 +78,14 @@ def _install_minimal_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
     vllm_stub.PoolingParams = _PoolingParams
     monkeypatch.setitem(sys.modules, "vllm", vllm_stub)
 
+    original_write_text = Path.write_text
+
+    def _write_text(path_self: Path, *args, **kwargs):
+        data = "".join(args) if args else ""
+        return original_write_text(path_self, data, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", _write_text)
+
 
 def test_process_pass_a_returns_stats_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """`process_pass_a` should return BM25 statistics without chunk caches."""

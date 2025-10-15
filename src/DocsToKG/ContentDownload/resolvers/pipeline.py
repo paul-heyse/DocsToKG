@@ -211,6 +211,9 @@ class ResolverPipeline:
         self._last_host_hit: defaultdict[str, float] = defaultdict(float)
         self._host_lock = threading.Lock()
         self._download_accepts_context = _callable_accepts_argument(download_func, "context")
+        self._download_accepts_head_flag = _callable_accepts_argument(
+            download_func, "head_precheck_passed"
+        )
 
     def _respect_rate_limit(self, resolver_name: str) -> None:
         """Sleep as required to respect per-resolver rate limiting policies.
@@ -737,12 +740,15 @@ class ResolverPipeline:
             return None
 
         state.seen_urls.add(url)
+        download_context = dict(context_data)
+        head_precheck_passed = False
         if self._should_attempt_head_check(resolver_name):
-            if not self._head_precheck_url(
+            head_precheck_passed = self._head_precheck_url(
                 session,
                 url,
                 self.config.get_timeout(resolver_name),
-            ):
+            )
+            if not head_precheck_passed:
                 self.logger.log(
                     AttemptRecord(
                         work_id=artifact.work_id,
@@ -759,11 +765,16 @@ class ResolverPipeline:
                         resolver_wall_time_ms=resolver_wall_time_ms,
                     )
                 )
-            self.metrics.record_skip(resolver_name, "head-precheck-failed")
-            return None
+                self.metrics.record_skip(resolver_name, "head-precheck-failed")
+                return None
+            head_precheck_passed = True
 
         state.attempt_counter += 1
         self._respect_domain_limit(url)
+        kwargs: Dict[str, Any] = {}
+        if self._download_accepts_head_flag:
+            kwargs["head_precheck_passed"] = head_precheck_passed
+
         if self._download_accepts_context:
             outcome = self.download_func(
                 session,
@@ -771,7 +782,8 @@ class ResolverPipeline:
                 url,
                 result.referer,
                 self.config.get_timeout(resolver_name),
-                context_data,
+                download_context,
+                **kwargs,
             )
         else:
             outcome = self.download_func(
@@ -780,6 +792,7 @@ class ResolverPipeline:
                 url,
                 result.referer,
                 self.config.get_timeout(resolver_name),
+                **kwargs,
             )
 
         self.logger.log(

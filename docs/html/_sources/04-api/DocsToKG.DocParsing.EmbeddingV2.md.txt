@@ -27,41 +27,76 @@ Dependencies:
 
 ## 1. Functions
 
-### `_resolve_hf_home()`
-
-Return the HuggingFace cache directory honoring environment settings.
-
-### `_resolve_with_env(env_var, default)`
-
-Resolve ``env_var`` to a path when provided, otherwise return ``default``.
-
-### `_resolve_cli_path(value, default)`
-
-Resolve CLI-provided ``value`` to an absolute path with ``default`` fallback.
-
 ### `_expand_path(path)`
 
 Return ``path`` expanded to an absolute :class:`Path`.
+
+Args:
+path: Candidate filesystem path supplied as string or :class:`Path`.
+
+Returns:
+Absolute path with user home and environment variables resolved.
 
 ### `_resolve_hf_home()`
 
 Determine the HuggingFace cache directory respecting ``HF_HOME``.
 
+Args:
+None
+
+Returns:
+Absolute path to the HuggingFace cache directory.
+
 ### `_resolve_model_root(hf_home)`
 
 Resolve DocsToKG model root with ``DOCSTOKG_MODEL_ROOT`` override.
+
+Args:
+hf_home: Base HuggingFace cache directory.
+
+Returns:
+Absolute path representing the DocsToKG model root.
 
 ### `_resolve_qwen_dir(model_root)`
 
 Resolve Qwen model directory with ``DOCSTOKG_QWEN_DIR`` override.
 
+Args:
+model_root: Base directory housing DocsToKG models.
+
+Returns:
+Absolute path to the Qwen embedding model directory.
+
 ### `_resolve_splade_dir(model_root)`
 
 Resolve SPLADE model directory with ``DOCSTOKG_SPLADE_DIR`` override.
 
+Args:
+model_root: Base directory housing DocsToKG models.
+
+Returns:
+Absolute path to the SPLADE model directory.
+
 ### `_expand_optional(path)`
 
 Expand optional :class:`Path` values to absolutes when provided.
+
+Args:
+path: Optional path reference supplied by the caller.
+
+Returns:
+``None`` when ``path`` is ``None``; otherwise the expanded absolute path.
+
+### `_resolve_cli_path(value, default)`
+
+Resolve a CLI-provided path, falling back to ``default`` when omitted.
+
+Args:
+value: Optional user-supplied path.
+default: Fallback path used when ``value`` is absent.
+
+Returns:
+Absolute path derived from ``value`` or ``default``.
 
 ### `_missing_splade_dependency_message()`
 
@@ -102,6 +137,16 @@ True when at least one UUID was newly assigned; otherwise False.
 ### `ensure_chunk_schema(rows, source)`
 
 Assert that chunk rows declare a compatible schema version.
+
+Args:
+rows: Iterable of chunk dictionaries to validate.
+source: Path to the originating chunk file, used for error context.
+
+Returns:
+None
+
+Raises:
+ValueError: Propagated when an incompatible schema version is detected.
 
 ### `tokens(text)`
 

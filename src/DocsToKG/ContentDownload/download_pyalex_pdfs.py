@@ -937,6 +937,7 @@ def _build_download_outcome(
     extracted_text_path: Optional[str],
     tail_bytes: Optional[bytes],
     dry_run: bool,
+    head_precheck_passed: bool = False,
 ) -> DownloadOutcome:
     """Create a :class:`DownloadOutcome` applying PDF validation rules.
 
@@ -975,7 +976,7 @@ def _build_download_outcome(
         if size_hint is None:
             with contextlib.suppress(OSError):
                 size_hint = dest_path.stat().st_size
-        if size_hint is not None and size_hint < 1024:
+        if size_hint is not None and size_hint < 1024 and not head_precheck_passed:
             # PDFs smaller than 1 KiB are overwhelmingly HTML error stubs or
             # truncated responses observed in production crawls.
             with contextlib.suppress(OSError):
@@ -1244,6 +1245,7 @@ def download_candidate(
     referer: Optional[str],
     timeout: float,
     context: Optional[Dict[str, Any]] = None,
+    head_precheck_passed: bool = False,
 ) -> DownloadOutcome:
     """Download a single candidate URL and classify the payload.
 
@@ -1271,6 +1273,7 @@ def download_candidate(
         headers["Referer"] = referer
 
     dry_run = bool(context.get("dry_run", False))
+    head_precheck_passed = head_precheck_passed or bool(context.get("head_precheck_passed", False))
     extract_html_text = bool(context.get("extract_html_text", False))
     previous_map: Dict[str, Dict[str, Any]] = context.get("previous", {})
     previous = previous_map.get(url, {})
@@ -1417,6 +1420,7 @@ def download_candidate(
                     extracted_text_path=None,
                     dry_run=True,
                     tail_bytes=None,
+                    head_precheck_passed=head_precheck_passed,
                 )
 
             sha256: Optional[str] = None
@@ -1466,6 +1470,7 @@ def download_candidate(
                 extracted_text_path=extracted_text_path,
                 dry_run=False,
                 tail_bytes=tail_snapshot,
+                head_precheck_passed=head_precheck_passed,
             )
     except requests.RequestException as exc:
         elapsed_ms = (time.monotonic() - start) * 1000.0
@@ -1604,11 +1609,11 @@ def load_resolver_config(
     config.doaj_api_key = args.doaj_api_key or config.doaj_api_key or os.getenv("DOAJ_API_KEY")
     config.mailto = args.mailto or config.mailto
 
-    if args.max_resolver_attempts:
+    if getattr(args, "max_resolver_attempts", None):
         config.max_attempts_per_work = args.max_resolver_attempts
-    if args.resolver_timeout:
+    if getattr(args, "resolver_timeout", None):
         config.timeout = args.resolver_timeout
-    if args.concurrent_resolvers is not None:
+    if hasattr(args, "concurrent_resolvers") and args.concurrent_resolvers is not None:
         config.max_concurrent_resolvers = args.concurrent_resolvers
 
     if resolver_order_override:
@@ -1625,16 +1630,16 @@ def load_resolver_config(
         default_enabled = name not in {"openaire", "hal", "osf"}
         config.resolver_toggles.setdefault(name, default_enabled)
 
-    for disabled in args.disable_resolver or []:
+    for disabled in getattr(args, "disable_resolver", []) or []:
         config.resolver_toggles[disabled] = False
 
     for enabled in getattr(args, "enable_resolver", []) or []:
         config.resolver_toggles[enabled] = True
 
-    if args.global_url_dedup is not None:
+    if hasattr(args, "global_url_dedup") and args.global_url_dedup is not None:
         config.enable_global_url_dedup = args.global_url_dedup
 
-    if args.domain_min_interval:
+    if getattr(args, "domain_min_interval", None):
         domain_limits = dict(config.domain_min_interval_s)
         for domain, interval in args.domain_min_interval:
             domain_limits[domain] = interval
@@ -1653,11 +1658,11 @@ def load_resolver_config(
         headers.pop("mailto", None)
         user_agent = base_agent
     headers["User-Agent"] = user_agent
-    if args.accept:
+    if getattr(args, "accept", None):
         headers["Accept"] = args.accept
     config.polite_headers = headers
 
-    if args.head_precheck is not None:
+    if hasattr(args, "head_precheck") and args.head_precheck is not None:
         config.enable_head_precheck = args.head_precheck
 
     # Apply resolver rate defaults (Unpaywall recommends 1 request per second)

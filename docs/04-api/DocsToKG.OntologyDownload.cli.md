@@ -17,12 +17,6 @@ rich ASCII tables summarise resolver fallback chains and validator results.
 
 Configure the top-level CLI parser and subcommands.
 
-Returns:
-Parser instance with sub-commands for pull, show, validate, init, and config.
-
-Raises:
-None
-
 ### `_parse_target_formats(value)`
 
 Normalize comma-separated target format strings.
@@ -43,7 +37,7 @@ Split comma-delimited host allowlist argument into unique entries.
 
 ### `_normalize_plan_args(args)`
 
-Insert default ``run`` subcommand for ``plan`` invocations when omitted.
+Ensure ``plan`` command defaults to the ``run`` subcommand when omitted.
 
 ### `_parse_since_arg(value)`
 
@@ -51,11 +45,7 @@ Argparse hook parsing YYYY-MM-DD strings into timezone-aware datetimes.
 
 ### `_parse_since(value)`
 
-Parse optional YYYY-MM-DD strings into timezone-aware datetimes.
-
-### `_parse_iso_datetime(value)`
-
-Parse ISO-8601 string into timezone-aware datetime.
+Parse optional date input into timezone-aware datetimes.
 
 ### `_format_bytes(num)`
 
@@ -68,10 +58,6 @@ Return the cumulative size of files under ``path``.
 ### `_parse_version_timestamp(value)`
 
 Parse version or manifest timestamps into UTC datetimes.
-
-### `_parse_allowed_hosts(value)`
-
-Split comma-delimited host allowlist argument into unique entries.
 
 ### `_apply_cli_overrides(config, args)`
 
@@ -138,18 +124,6 @@ Attempt to derive a datetime from a version string.
 
 Return path, timestamp, and size metadata for a stored version.
 
-### `_diff_plans(current, baseline)`
-
-Return structured diff between current and baseline plan payloads.
-
-### `_print_plan_diff(diff)`
-
-Render human-readable plan diff results.
-
-### `_handle_plan_diff(args, base_config)`
-
-Generate plan diff between current run and baseline file.
-
 ### `_ensure_manifest_path(ontology_id, version)`
 
 Return the manifest path for a given ontology and version.
@@ -212,10 +186,6 @@ Compare current plan output against a baseline plan file.
 ### `_handle_prune(args, logger)`
 
 Delete surplus ontology versions based on ``--keep`` parameter.
-
-### `_print_plan_diff(diff)`
-
-Render a human-readable diff report for resolver plans.
 
 ### `_doctor_report()`
 
@@ -290,7 +260,7 @@ Dictionary describing validation status, ontology count, and file path.
 
 ### `_normalize_argv(argv)`
 
-Rewrite legacy composite commands to explicit subcommands.
+Rewrite legacy aliases to the canonical subcommand syntax.
 
 ### `main(argv)`
 
@@ -305,7 +275,3 @@ Process exit code indicating success (`0`) or failure.
 Raises:
 ConfigError: If configuration files are invalid or unsafe to overwrite.
 OntologyDownloadError: If download or validation operations fail.
-
-### `_normalize(entries)`
-
-*No documentation available.*

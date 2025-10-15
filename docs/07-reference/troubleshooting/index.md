@@ -16,7 +16,7 @@ Common issues and recovery steps when operating DocsToKG.
 ## 3. Document Parsing
 
 - **Parsing fails on specific PDFs** – Run
-  `python -m DocsToKG.DocParsing.run_docling_html_to_doctags_parallel --debug` to
+  `python -m DocsToKG.DocParsing.html_pipeline --debug` to
   capture detailed failure logs. Consider upgrading Docling or adjusting chunking
   parameters.
 - **Embedding throughput low** – Ensure GPU drivers align with `requirements.in`

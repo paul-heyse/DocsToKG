@@ -21,21 +21,16 @@ import sys
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import requests
 import yaml
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
-from .cli_utils import (
-    format_plan_rows,
-    format_results_table,
-    format_table,
-    format_validation_summary,
-)
-from .config import ConfigError, ResolvedConfig, load_config, validate_config
-from .core import (
+from .foundation import sanitize_filename
+from .infrastructure import CACHE_DIR, CONFIG_DIR, LOCAL_ONTOLOGY_DIR, LOG_DIR, STORAGE
+from .pipeline import (
     FetchResult,
     FetchSpec,
     MANIFEST_SCHEMA_VERSION,
@@ -47,10 +42,8 @@ from .core import (
     ConfigurationError,
     validate_manifest_dict,
 )
-from .download import sanitize_filename
-from .logging_config import setup_logging
-from .storage import CACHE_DIR, CONFIG_DIR, LOCAL_ONTOLOGY_DIR, LOG_DIR, STORAGE
-from .validators import ValidationRequest, run_validators
+from .settings import ConfigError, ResolvedConfig, load_config, setup_logging, validate_config
+from .validation import ValidationRequest, run_validators
 
 ONTOLOGY_DIR = LOCAL_ONTOLOGY_DIR
 
@@ -65,6 +58,73 @@ PLAN_DIFF_FIELDS = (
     "last_modified",
     "content_length",
 )
+
+
+def format_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
+    """Render a padded ASCII table."""
+
+    column_widths = [len(header) for header in headers]
+    for row in rows:
+        for index, cell in enumerate(row):
+            column_widths[index] = max(column_widths[index], len(cell))
+
+    def _format_row(values: Sequence[str]) -> str:
+        return " | ".join(value.ljust(column_widths[index]) for index, value in enumerate(values))
+
+    separator = "-+-".join("-" * width for width in column_widths)
+    lines = [_format_row(headers), separator]
+    lines.extend(_format_row(row) for row in rows)
+    return "\n".join(lines)
+
+
+def format_plan_rows(plans: Iterable[PlannedFetch]) -> List[Tuple[str, str, str, str, str]]:
+    """Convert planner output into rows for table rendering."""
+
+    rows: List[Tuple[str, str, str, str, str]] = []
+    for plan in plans:
+        rows.append(
+            (
+                plan.spec.id,
+                plan.resolver,
+                plan.plan.service or "",
+                plan.plan.media_type or "",
+                plan.plan.url,
+            )
+        )
+    return rows
+
+
+def format_results_table(results: Iterable[FetchResult]) -> str:
+    """Render download results as a table summarizing status and file paths."""
+
+    rows = [
+        (
+            result.spec.id,
+            result.spec.resolver,
+            result.status,
+            result.sha256,
+            str(result.local_path),
+        )
+        for result in results
+    ]
+    return format_table(("id", "resolver", "status", "sha256", "file"), rows)
+
+
+def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
+    """Summarise validator outcomes in a compact status table."""
+
+    formatted: List[Tuple[str, str, str]] = []
+    for name, payload in results.items():
+        status = "ok" if payload.get("ok") else "error"
+        details = payload.get("details", {})
+        message = ""
+        if isinstance(details, dict):
+            if "error" in details:
+                message = str(details["error"])
+            elif details:
+                message = ", ".join(f"{key}={value}" for key, value in details.items())
+        formatted.append((name, status, message))
+    return format_table(("validator", "status", "details"), formatted)
 
 
 def _build_parser() -> argparse.ArgumentParser:

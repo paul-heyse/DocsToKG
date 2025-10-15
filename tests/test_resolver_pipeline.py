@@ -33,8 +33,10 @@ import requests
 from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact, classify_payload, ensure_dir
 from DocsToKG.ContentDownload.resolvers import pipeline as pipeline_module
 from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
-from DocsToKG.ContentDownload.resolvers.providers.landing_page import LandingPageResolver
-from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver
+from DocsToKG.ContentDownload.resolvers.providers import (
+    LandingPageResolver,
+    UnpaywallResolver,
+)
 from DocsToKG.ContentDownload.resolvers.types import (
     AttemptRecord,
     DownloadOutcome,

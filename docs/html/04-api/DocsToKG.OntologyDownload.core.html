@@ -88,6 +88,25 @@ chains, honoring CLI concurrency overrides, and supporting batch operations for
 planning and pull commands.</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="get-manifest-schema">
+<h3><code class="docutils literal notranslate"><span class="pre">get_manifest_schema()</span></code><a class="headerlink" href="#get-manifest-schema" title="Link to this heading"></a></h3>
+<p>Return a deep copy of the manifest JSON Schema definition.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Dictionary describing the manifest JSON Schema.</p>
+</section>
+<section id="validate-manifest-dict-payload">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_manifest_dict(payload)</span></code><a class="headerlink" href="#validate-manifest-dict-payload" title="Link to this heading"></a></h3>
+<p>Validate manifest payload against the JSON Schema definition.</p>
+<p>Args:
+payload: Manifest dictionary loaded from JSON.
+source: Optional filesystem path for contextual error reporting.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+ConfigurationError: If validation fails.</p>
+</section>
 <section id="coerce-datetime-value">
 <h3><code class="docutils literal notranslate"><span class="pre">_coerce_datetime(value)</span></code><a class="headerlink" href="#coerce-datetime-value" title="Link to this heading"></a></h3>
 <p>Return timezone-aware datetime parsed from HTTP or ISO timestamp.</p>
@@ -216,6 +235,14 @@ List of FetchResult entries corresponding to completed downloads.</p>
 <p>Raises:
 OntologyDownloadError: Propagated when downloads fail and the pipeline
 is configured to stop on error.</p>
+</section>
+<section id="to-dict-self">
+<h3><code class="docutils literal notranslate"><span class="pre">to_dict(self)</span></code><a class="headerlink" href="#to-dict-self" title="Link to this heading"></a></h3>
+<p>Return a JSON-serializable dictionary for the manifest.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Dictionary representing the manifest payload.</p>
 </section>
 <section id="to-json-self">
 <h3><code class="docutils literal notranslate"><span class="pre">to_json(self)</span></code><a class="headerlink" href="#to-json-self" title="Link to this heading"></a></h3>

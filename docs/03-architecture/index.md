@@ -27,7 +27,7 @@ graph TD
 ### 2. Document Parsing (`DocsToKG.DocParsing`)
 
 - Converts PDFs/HTML into DocTags and chunked Markdown using Docling.
-- Pipelines such as `DoclingHybridChunkerPipelineWithMin.py` and `run_docling_html_to_doctags_parallel.py` normalise layout, extract captions, and produce chunk boundaries.
+- Pipelines such as `DoclingHybridChunkerPipelineWithMin.py` and `html_pipeline.py` normalise layout, extract captions, and produce chunk boundaries.
 - Embedding scripts (`EmbeddingV2.py`) generate dense representations consumed by the hybrid search ingest layer.
 - Chunk metadata includes provenance (pages, figure refs) used for highlights and diagnostics.
 

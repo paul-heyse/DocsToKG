@@ -91,10 +91,6 @@ rich ASCII tables summarise resolver fallback chains and validator results.</p>
 <section id="build-parser">
 <h3><code class="docutils literal notranslate"><span class="pre">_build_parser()</span></code><a class="headerlink" href="#build-parser" title="Link to this heading"></a></h3>
 <p>Configure the top-level CLI parser and subcommands.</p>
-<p>Returns:
-Parser instance with sub-commands for pull, show, validate, init, and config.</p>
-<p>Raises:
-None</p>
 </section>
 <section id="parse-target-formats-value">
 <h3><code class="docutils literal notranslate"><span class="pre">_parse_target_formats(value)</span></code><a class="headerlink" href="#parse-target-formats-value" title="Link to this heading"></a></h3>
@@ -114,7 +110,7 @@ List of stripped format identifiers, or an empty list when no formats are suppli
 </section>
 <section id="normalize-plan-args-args">
 <h3><code class="docutils literal notranslate"><span class="pre">_normalize_plan_args(args)</span></code><a class="headerlink" href="#normalize-plan-args-args" title="Link to this heading"></a></h3>
-<p>Insert default <code class="docutils literal notranslate"><span class="pre">run</span></code> subcommand for <code class="docutils literal notranslate"><span class="pre">plan</span></code> invocations when omitted.</p>
+<p>Ensure <code class="docutils literal notranslate"><span class="pre">plan</span></code> command defaults to the <code class="docutils literal notranslate"><span class="pre">run</span></code> subcommand when omitted.</p>
 </section>
 <section id="parse-since-arg-value">
 <h3><code class="docutils literal notranslate"><span class="pre">_parse_since_arg(value)</span></code><a class="headerlink" href="#parse-since-arg-value" title="Link to this heading"></a></h3>
@@ -122,11 +118,7 @@ List of stripped format identifiers, or an empty list when no formats are suppli
 </section>
 <section id="parse-since-value">
 <h3><code class="docutils literal notranslate"><span class="pre">_parse_since(value)</span></code><a class="headerlink" href="#parse-since-value" title="Link to this heading"></a></h3>
-<p>Parse optional YYYY-MM-DD strings into timezone-aware datetimes.</p>
-</section>
-<section id="parse-iso-datetime-value">
-<h3><code class="docutils literal notranslate"><span class="pre">_parse_iso_datetime(value)</span></code><a class="headerlink" href="#parse-iso-datetime-value" title="Link to this heading"></a></h3>
-<p>Parse ISO-8601 string into timezone-aware datetime.</p>
+<p>Parse optional date input into timezone-aware datetimes.</p>
 </section>
 <section id="format-bytes-num">
 <h3><code class="docutils literal notranslate"><span class="pre">_format_bytes(num)</span></code><a class="headerlink" href="#format-bytes-num" title="Link to this heading"></a></h3>
@@ -139,10 +131,6 @@ List of stripped format identifiers, or an empty list when no formats are suppli
 <section id="parse-version-timestamp-value">
 <h3><code class="docutils literal notranslate"><span class="pre">_parse_version_timestamp(value)</span></code><a class="headerlink" href="#parse-version-timestamp-value" title="Link to this heading"></a></h3>
 <p>Parse version or manifest timestamps into UTC datetimes.</p>
-</section>
-<section id="id1">
-<h3><code class="docutils literal notranslate"><span class="pre">_parse_allowed_hosts(value)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
-<p>Split comma-delimited host allowlist argument into unique entries.</p>
 </section>
 <section id="apply-cli-overrides-config-args">
 <h3><code class="docutils literal notranslate"><span class="pre">_apply_cli_overrides(config,</span> <span class="pre">args)</span></code><a class="headerlink" href="#apply-cli-overrides-config-args" title="Link to this heading"></a></h3>
@@ -177,8 +165,8 @@ plan: Planned fetch data produced by :func:<code class="docutils literal notrans
 Mapping containing resolver metadata and planned download details suitable
 for serialization.</p>
 </section>
-<section id="id2">
-<h3><code class="docutils literal notranslate"><span class="pre">_parse_iso_datetime(value)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<section id="parse-iso-datetime-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_parse_iso_datetime(value)</span></code><a class="headerlink" href="#parse-iso-datetime-value" title="Link to this heading"></a></h3>
 <p>Parse ISO formatted date strings into timezone-aware datetimes.</p>
 </section>
 <section id="parse-http-datetime-value">
@@ -204,18 +192,6 @@ for serialization.</p>
 <section id="resolve-version-metadata-ontology-id-version">
 <h3><code class="docutils literal notranslate"><span class="pre">_resolve_version_metadata(ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#resolve-version-metadata-ontology-id-version" title="Link to this heading"></a></h3>
 <p>Return path, timestamp, and size metadata for a stored version.</p>
-</section>
-<section id="diff-plans-current-baseline">
-<h3><code class="docutils literal notranslate"><span class="pre">_diff_plans(current,</span> <span class="pre">baseline)</span></code><a class="headerlink" href="#diff-plans-current-baseline" title="Link to this heading"></a></h3>
-<p>Return structured diff between current and baseline plan payloads.</p>
-</section>
-<section id="print-plan-diff-diff">
-<h3><code class="docutils literal notranslate"><span class="pre">_print_plan_diff(diff)</span></code><a class="headerlink" href="#print-plan-diff-diff" title="Link to this heading"></a></h3>
-<p>Render human-readable plan diff results.</p>
-</section>
-<section id="handle-plan-diff-args-base-config">
-<h3><code class="docutils literal notranslate"><span class="pre">_handle_plan_diff(args,</span> <span class="pre">base_config)</span></code><a class="headerlink" href="#handle-plan-diff-args-base-config" title="Link to this heading"></a></h3>
-<p>Generate plan diff between current run and baseline file.</p>
 </section>
 <section id="ensure-manifest-path-ontology-id-version">
 <h3><code class="docutils literal notranslate"><span class="pre">_ensure_manifest_path(ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#ensure-manifest-path-ontology-id-version" title="Link to this heading"></a></h3>
@@ -264,17 +240,13 @@ ConfigError: If neither explicit IDs nor a configuration file are provided.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_handle_plan(args,</span> <span class="pre">base_config)</span></code><a class="headerlink" href="#handle-plan-args-base-config" title="Link to this heading"></a></h3>
 <p>Resolve plans without executing downloads.</p>
 </section>
-<section id="id3">
-<h3><code class="docutils literal notranslate"><span class="pre">_handle_plan_diff(args,</span> <span class="pre">base_config)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<section id="handle-plan-diff-args-base-config">
+<h3><code class="docutils literal notranslate"><span class="pre">_handle_plan_diff(args,</span> <span class="pre">base_config)</span></code><a class="headerlink" href="#handle-plan-diff-args-base-config" title="Link to this heading"></a></h3>
 <p>Compare current plan output against a baseline plan file.</p>
 </section>
 <section id="handle-prune-args-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">_handle_prune(args,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#handle-prune-args-logger" title="Link to this heading"></a></h3>
 <p>Delete surplus ontology versions based on <code class="docutils literal notranslate"><span class="pre">--keep</span></code> parameter.</p>
-</section>
-<section id="id4">
-<h3><code class="docutils literal notranslate"><span class="pre">_print_plan_diff(diff)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
-<p>Render a human-readable diff report for resolver plans.</p>
 </section>
 <section id="doctor-report">
 <h3><code class="docutils literal notranslate"><span class="pre">_doctor_report()</span></code><a class="headerlink" href="#doctor-report" title="Link to this heading"></a></h3>
@@ -285,10 +257,6 @@ ConfigError: If neither explicit IDs nor a configuration file are provided.</p>
 <p>Render human-readable diagnostics from :func:<code class="docutils literal notranslate"><span class="pre">_doctor_report</span></code>.</p>
 <p>Args:
 report: Diagnostics mapping generated by :func:<code class="docutils literal notranslate"><span class="pre">_doctor_report</span></code>.</p>
-</section>
-<section id="handle-prune-args">
-<h3><code class="docutils literal notranslate"><span class="pre">_handle_prune(args)</span></code><a class="headerlink" href="#handle-prune-args" title="Link to this heading"></a></h3>
-<p>Delete surplus ontology versions while retaining the newest entries.</p>
 </section>
 <section id="handle-show-args">
 <h3><code class="docutils literal notranslate"><span class="pre">_handle_show(args)</span></code><a class="headerlink" href="#handle-show-args" title="Link to this heading"></a></h3>
@@ -339,7 +307,7 @@ Dictionary describing validation status, ontology count, and file path.</p>
 </section>
 <section id="normalize-argv-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">_normalize_argv(argv)</span></code><a class="headerlink" href="#normalize-argv-argv" title="Link to this heading"></a></h3>
-<p>Rewrite legacy composite commands to explicit subcommands.</p>
+<p>Rewrite legacy aliases to the canonical subcommand syntax.</p>
 </section>
 <section id="main-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">main(argv)</span></code><a class="headerlink" href="#main-argv" title="Link to this heading"></a></h3>
@@ -351,10 +319,6 @@ Process exit code indicating success (<code class="docutils literal notranslate"
 <p>Raises:
 ConfigError: If configuration files are invalid or unsafe to overwrite.
 OntologyDownloadError: If download or validation operations fail.</p>
-</section>
-<section id="normalize-entries">
-<h3><code class="docutils literal notranslate"><span class="pre">_normalize(entries)</span></code><a class="headerlink" href="#normalize-entries" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
 </section>
 </section>
 </section>

@@ -19,18 +19,16 @@ Examples:
 
 ## 1. Functions
 
+### `_create_stub_module(name, attrs)`
+
+Return a :class:`ModuleType` populated with *attrs*.
+
 ### `_import_module(name)`
 
 Import a module by name using :mod:`importlib`.
 
 The indirection makes it trivial to monkeypatch the import logic in unit
 tests without modifying global interpreter state.
-
-Args:
-name: Fully qualified module name to import.
-
-Returns:
-Imported module object.
 
 ### `get_pystow()`
 

@@ -456,6 +456,10 @@ True</p>
 <section id="resolve-hash-algorithm-default">
 <h3><code class="docutils literal notranslate"><span class="pre">resolve_hash_algorithm(default)</span></code><a class="headerlink" href="#resolve-hash-algorithm-default" title="Link to this heading"></a></h3>
 <p>Return the active content hash algorithm, honoring env overrides.</p>
+<p>Args:
+default: Fallback algorithm name to use when no override is present.</p>
+<p>Returns:
+Hash algorithm identifier resolved from <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_HASH_ALG</span></code> or <code class="docutils literal notranslate"><span class="pre">default</span></code>.</p>
 </section>
 <section id="compute-content-hash-path-algorithm">
 <h3><code class="docutils literal notranslate"><span class="pre">compute_content_hash(path,</span> <span class="pre">algorithm)</span></code><a class="headerlink" href="#compute-content-hash-path-algorithm" title="Link to this heading"></a></h3>

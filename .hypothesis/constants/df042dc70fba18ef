@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/DocParsing/legacy/run_docling_html_to_doctags_parallel.py
+# hypothesis_version: 6.141.0
+
+[0.0, '*', '--data-root', '--force', '--input', '--output', '--overwrite', '--resume', '--workers', '.doctags', '.htm', '.html', '.normalized.html', '.xhtml', '1', 'CUDA_VISIBLE_DEVICES', 'DOCSTOKG_DATA_ROOT', 'DocumentConverter', 'HTML → DocTags', 'MKL_NUM_THREADS', 'No HTML files found', 'OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'Parallel workers', '__main__', 'conversion failed', 'data_root', 'doc_id', 'docling-html', 'docparse/1.1.0', 'doctags-html', 'empty-document', 'error', 'extra_fields', 'fail', 'failure', 'file', 'input_dir', 'input_hash', 'ok', 'output_dir', 'output_path', 'skip', 'spawn', 'store_true', 'success', 'workers']

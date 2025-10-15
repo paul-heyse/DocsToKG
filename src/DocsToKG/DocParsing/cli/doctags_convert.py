@@ -29,8 +29,8 @@ from DocsToKG.DocParsing._common import (
     detect_data_root,
     get_logger,
 )
-from DocsToKG.DocParsing.legacy import run_docling_html_to_doctags_parallel as html_backend
-from DocsToKG.DocParsing.legacy import run_docling_parallel_with_vllm_debug as pdf_backend
+from DocsToKG.DocParsing import html_pipeline as html_backend
+from DocsToKG.DocParsing import pdf_pipeline as pdf_backend
 
 _EXAMPLES = """Examples:
   # Auto-detect mode from input directory contents

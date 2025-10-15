@@ -300,8 +300,15 @@ def ensure_chunk_schema(rows: Sequence[dict], source: Path) -> None:
     """
 
     for index, row in enumerate(rows, start=1):
+        version = row.get("schema_version")
+        if not version:
+            # Older chunk artifacts omitted explicit schema versions. Default
+            # them to the newest compatible revision so downstream validators
+            # continue to operate without forcing regeneration.
+            row["schema_version"] = COMPATIBLE_CHUNK_VERSIONS[-1]
+            continue
         validate_schema_version(
-            row.get("schema_version"),
+            version,
             COMPATIBLE_CHUNK_VERSIONS,
             kind="chunk",
             source=f"{source}:{index}",
@@ -1163,7 +1170,10 @@ def main(args: argparse.Namespace | None = None) -> int:
                 f"{qwen_model_dir}. Pre-download the model before rerunning."
             )
         if missing_paths:
-            raise FileNotFoundError("; ".join(missing_paths))
+            detail = "; ".join(missing_paths)
+            raise FileNotFoundError(
+                "Offline mode requires local model directories. " + detail
+            )
 
     args.offline = offline_mode
     args.splade_model_dir = splade_model_dir

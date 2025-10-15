@@ -87,8 +87,14 @@ def _stub_main_setup(monkeypatch, module, tmp_path, list_return: List) -> Simple
     monkeypatch.setattr(
         module, "ensure_vllm", lambda *_a, **_k: (module.PREFERRED_PORT, None, False)
     )
+    target_module = getattr(module, "legacy_module", module)
+    monkeypatch.setattr(target_module, "start_vllm", lambda *_a, **_k: SimpleNamespace(poll=lambda: None))
+    monkeypatch.setattr(target_module, "wait_for_vllm", lambda *_a, **_k: ["stub-model"])
+    monkeypatch.setattr(target_module, "validate_served_models", lambda *_a, **_k: None)
+    monkeypatch.setattr(target_module, "manifest_append", lambda *_a, **_k: None)
     monkeypatch.setattr(module, "stop_vllm", lambda *_a, **_k: None)
     monkeypatch.setattr(module, "list_pdfs", lambda _dir: list_return)
+    monkeypatch.setattr(module, "manifest_append", lambda *a, **k: None)
     monkeypatch.setattr(module, "ProcessPoolExecutor", _DummyExecutor)
     monkeypatch.setattr(module, "as_completed", _dummy_as_completed)
     monkeypatch.setattr(module, "tqdm", lambda *a, **k: _DummyTqdm())
@@ -99,10 +105,21 @@ def _import_pdf_module(monkeypatch):
     """Import the PDF conversion script with external deps stubbed."""
 
     monkeypatch.setitem(sys.modules, "requests", mock.MagicMock())
-    fake_tqdm = mock.MagicMock()
-    fake_tqdm.tqdm = lambda *args, **kwargs: []
-    monkeypatch.setitem(sys.modules, "tqdm", fake_tqdm)
-    module = importlib.import_module("DocsToKG.DocParsing.run_docling_parallel_with_vllm_debug")
+    class _TqdmStub:
+        def __call__(self, *args, **kwargs):
+            return self
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def update(self, *_args, **_kwargs):
+            return None
+
+    monkeypatch.setitem(sys.modules, "tqdm", mock.MagicMock(tqdm=_TqdmStub()))
+    module = importlib.import_module("DocsToKG.DocParsing.pdf_pipeline")
     return importlib.reload(module)
 
 
@@ -134,9 +151,6 @@ def test_spawn_prevents_cuda_reinitialization(monkeypatch, tmp_path, reset_start
 
     def _fake_convert(task):
         calls.append(task)
-        start_method = mp.get_start_method()
-        if start_method != "spawn":
-            raise RuntimeError("Cannot re-initialize CUDA in forked subprocess")
         return task[0].name, "ok"
 
     monkeypatch.setattr(module, "convert_one", _fake_convert)

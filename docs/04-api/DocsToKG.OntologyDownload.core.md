@@ -13,6 +13,30 @@ planning and pull commands.
 
 ## 1. Functions
 
+### `get_manifest_schema()`
+
+Return a deep copy of the manifest JSON Schema definition.
+
+Args:
+None
+
+Returns:
+Dictionary describing the manifest JSON Schema.
+
+### `validate_manifest_dict(payload)`
+
+Validate manifest payload against the JSON Schema definition.
+
+Args:
+payload: Manifest dictionary loaded from JSON.
+source: Optional filesystem path for contextual error reporting.
+
+Returns:
+None
+
+Raises:
+ConfigurationError: If validation fails.
+
 ### `_coerce_datetime(value)`
 
 Return timezone-aware datetime parsed from HTTP or ISO timestamp.
@@ -162,6 +186,16 @@ List of FetchResult entries corresponding to completed downloads.
 Raises:
 OntologyDownloadError: Propagated when downloads fail and the pipeline
 is configured to stop on error.
+
+### `to_dict(self)`
+
+Return a JSON-serializable dictionary for the manifest.
+
+Args:
+None
+
+Returns:
+Dictionary representing the manifest payload.
 
 ### `to_json(self)`
 

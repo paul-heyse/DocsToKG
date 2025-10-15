@@ -14,9 +14,11 @@ Usage:
 
 from __future__ import annotations
 
-from .providers.crossref import _fetch_crossref_data
-from .providers.semantic_scholar import _fetch_semantic_scholar_data
-from .providers.unpaywall import _fetch_unpaywall_data
+from .providers import (
+    _fetch_crossref_data,
+    _fetch_semantic_scholar_data,
+    _fetch_unpaywall_data,
+)
 
 
 def clear_resolver_caches() -> None:

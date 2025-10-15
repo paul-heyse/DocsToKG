@@ -24,6 +24,12 @@ Return the total size in bytes for all regular files under ``path``.
 
 Instantiate the storage backend based on environment configuration.
 
+Args:
+None
+
+Returns:
+Storage backend instance selected according to ``ONTOFETCH_STORAGE_URL``.
+
 ### `prepare_version(self, ontology_id, version)`
 
 Return a working directory prepared for the given ontology version.
@@ -59,6 +65,9 @@ Sorted list of version strings recognised by the backend.
 ### `available_ontologies(self)`
 
 Return sorted ontology identifiers known to the backend.
+
+Args:
+None
 
 Returns:
 Alphabetically sorted list of ontology identifiers the backend can
@@ -97,6 +106,9 @@ version: Version string targeted for deletion.
 
 Returns:
 Number of bytes reclaimed by removing the stored version.
+
+Raises:
+OSError: If the underlying storage provider fails to delete data.
 
 ### `set_latest_version(self, ontology_id, version)`
 
@@ -149,6 +161,9 @@ Sorted list of version strings found under the storage root.
 ### `available_ontologies(self)`
 
 Return ontology identifiers discovered under ``root``.
+
+Args:
+None
 
 Returns:
 Sorted list of ontology identifiers available locally.
@@ -218,6 +233,9 @@ Sorted list combining local and remote version identifiers.
 ### `available_ontologies(self)`
 
 Return ontology identifiers available locally or remotely.
+
+Args:
+None
 
 Returns:
 Sorted set union of local and remote ontology identifiers.

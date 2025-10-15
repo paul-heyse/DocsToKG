@@ -76,6 +76,12 @@ None
 
 Enforce per-domain throttling when configured.
 
+Args:
+url: Resolver URL whose host may be subject to throttling.
+
+Returns:
+None
+
 ### `_jitter_sleep(self)`
 
 Introduce a small delay to avoid stampeding downstream services.

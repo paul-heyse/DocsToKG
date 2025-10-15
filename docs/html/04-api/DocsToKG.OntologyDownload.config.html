@@ -262,13 +262,13 @@ Mapping of header names to polite values complying with provider guidelines.</p>
 </section>
 <section id="validate-prefer-source-cls-value">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_prefer_source(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-prefer-source-cls-value" title="Link to this heading"></a></h3>
-<p>Ensure resolver names are recognized.</p>
+<p>Allow custom resolver identifiers while warning about unknown entries.</p>
 <p>Args:
-value: Ordered list of resolver names provided in configuration.</p>
+value: Ordered list of resolver identifiers supplied by configuration.</p>
 <p>Returns:
-Validated list containing only supported resolver identifiers.</p>
+Sanitised resolver list preserving the original order.</p>
 <p>Raises:
-ValueError: If any resolver name is not part of the supported set.</p>
+ValueError: If any resolver name is not recognized.</p>
 </section>
 <section id="from-defaults-cls">
 <h3><code class="docutils literal notranslate"><span class="pre">from_defaults(cls)</span></code><a class="headerlink" href="#from-defaults-cls" title="Link to this heading"></a></h3>

@@ -13,8 +13,8 @@ pytest.importorskip("transformers")
 
 SCRIPTS = [
     Path("src/DocsToKG/DocParsing/DoclingHybridChunkerPipelineWithMin.py"),
-    Path("src/DocsToKG/DocParsing/run_docling_html_to_doctags_parallel.py"),
-    Path("src/DocsToKG/DocParsing/run_docling_parallel_with_vllm_debug.py"),
+    Path("src/DocsToKG/DocParsing/html_pipeline.py"),
+    Path("src/DocsToKG/DocParsing/pdf_pipeline.py"),
     Path("src/DocsToKG/DocParsing/EmbeddingV2.py"),
 ]
 

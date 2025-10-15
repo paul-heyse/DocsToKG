@@ -234,16 +234,16 @@ Mapping of header names to polite values complying with provider guidelines.
 
 ### `validate_prefer_source(cls, value)`
 
-Ensure resolver names are recognized.
+Allow custom resolver identifiers while warning about unknown entries.
 
 Args:
-value: Ordered list of resolver names provided in configuration.
+value: Ordered list of resolver identifiers supplied by configuration.
 
 Returns:
-Validated list containing only supported resolver identifiers.
+Sanitised resolver list preserving the original order.
 
 Raises:
-ValueError: If any resolver name is not part of the supported set.
+ValueError: If any resolver name is not recognized.
 
 ### `from_defaults(cls)`
 

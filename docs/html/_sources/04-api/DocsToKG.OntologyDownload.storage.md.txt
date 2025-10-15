@@ -24,6 +24,12 @@ Return the total size in bytes for all regular files under ``path``.
 
 Instantiate the storage backend based on environment configuration.
 
+Args:
+None
+
+Returns:
+Storage backend instance selected according to ``ONTOFETCH_STORAGE_URL``.
+
 ### `prepare_version(self, ontology_id, version)`
 
 Return a working directory prepared for the given ontology version.
@@ -59,6 +65,9 @@ Sorted list of version strings recognised by the backend.
 ### `available_ontologies(self)`
 
 Return sorted ontology identifiers known to the backend.
+
+Args:
+None
 
 Returns:
 Alphabetically sorted list of ontology identifiers the backend can
@@ -97,6 +106,9 @@ version: Version string targeted for deletion.
 
 Returns:
 Number of bytes reclaimed by removing the stored version.
+
+Raises:
+OSError: If the underlying storage provider fails to delete data.
 
 ### `set_latest_version(self, ontology_id, version)`
 
@@ -149,6 +161,9 @@ Sorted list of version strings found under the storage root.
 ### `available_ontologies(self)`
 
 Return ontology identifiers discovered under ``root``.
+
+Args:
+None
 
 Returns:
 Sorted list of ontology identifiers available locally.
@@ -209,21 +224,58 @@ None.
 
 Return versions aggregated from local cache and remote storage.
 
+Args:
+ontology_id: Identifier whose version catalogue is required.
+
+Returns:
+Sorted list combining local and remote version identifiers.
+
 ### `available_ontologies(self)`
 
 Return ontology identifiers available locally or remotely.
+
+Args:
+None
+
+Returns:
+Sorted set union of local and remote ontology identifiers.
 
 ### `ensure_local_version(self, ontology_id, version)`
 
 Mirror a remote ontology version into the local cache when absent.
 
+Args:
+ontology_id: Identifier whose version should exist locally.
+version: Version string to ensure within the local cache.
+
+Returns:
+Path to the local directory containing the requested version.
+
 ### `finalize_version(self, ontology_id, version, local_dir)`
 
 Upload the finalized local directory to the remote store.
 
+Args:
+ontology_id: Identifier of the ontology that has completed processing.
+version: Version string associated with the finalised ontology.
+local_dir: Directory containing the validated ontology payload.
+
+Returns:
+None.
+
 ### `delete_version(self, ontology_id, version)`
 
 Delete both local and remote copies of a stored version.
+
+Args:
+ontology_id: Identifier whose stored version should be deleted.
+version: Version string targeted for deletion.
+
+Returns:
+Total bytes reclaimed across local and remote storage.
+
+Raises:
+OSError: Propagated if remote deletion fails irrecoverably.
 
 ## 2. Classes
 
@@ -257,3 +309,12 @@ Examples:
 ### `FsspecStorageBackend`
 
 Hybrid storage backend that mirrors artifacts to an fsspec location.
+
+Attributes:
+fs: ``fsspec`` filesystem instance used for remote operations.
+base_path: Root path within the remote filesystem where artefacts live.
+
+Examples:
+>>> backend = FsspecStorageBackend("memory://ontologies")  # doctest: +SKIP
+>>> backend.available_ontologies()  # doctest: +SKIP
+[]

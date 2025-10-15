@@ -28,7 +28,7 @@ pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
 from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
-from DocsToKG.ContentDownload.resolvers.providers.openalex import OpenAlexResolver
+from DocsToKG.ContentDownload.resolvers.providers import OpenAlexResolver
 from DocsToKG.ContentDownload.resolvers.types import (
     AttemptRecord,
     DownloadOutcome,

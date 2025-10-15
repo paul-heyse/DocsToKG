@@ -27,18 +27,20 @@ import pytest
 pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload.resolvers.providers.core import CoreResolver
-from DocsToKG.ContentDownload.resolvers.providers.crossref import CrossrefResolver
-from DocsToKG.ContentDownload.resolvers.providers.doaj import DoajResolver
-from DocsToKG.ContentDownload.resolvers.providers.europe_pmc import EuropePmcResolver
-from DocsToKG.ContentDownload.resolvers.providers.hal import HalResolver
-from DocsToKG.ContentDownload.resolvers.providers.landing_page import LandingPageResolver
-from DocsToKG.ContentDownload.resolvers.providers.openaire import OpenAireResolver
-from DocsToKG.ContentDownload.resolvers.providers.osf import OsfResolver
-from DocsToKG.ContentDownload.resolvers.providers.pmc import PmcResolver
-from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import SemanticScholarResolver
-from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver
-from DocsToKG.ContentDownload.resolvers.providers.wayback import WaybackResolver
+from DocsToKG.ContentDownload.resolvers.providers import (
+    CoreResolver,
+    CrossrefResolver,
+    DoajResolver,
+    EuropePmcResolver,
+    HalResolver,
+    LandingPageResolver,
+    OpenAireResolver,
+    OsfResolver,
+    PmcResolver,
+    SemanticScholarResolver,
+    UnpaywallResolver,
+    WaybackResolver,
+)
 from DocsToKG.ContentDownload.resolvers.types import ResolverConfig
 
 requests = pytest.importorskip("requests")

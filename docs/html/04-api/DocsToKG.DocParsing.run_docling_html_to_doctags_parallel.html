@@ -88,15 +88,33 @@ and will be removed in a future release.</p>
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="build-parser">
 <h3><code class="docutils literal notranslate"><span class="pre">build_parser()</span></code><a class="headerlink" href="#build-parser" title="Link to this heading"></a></h3>
-<p>Build argument parser (deprecated, forwards to unified CLI).</p>
+<p>Build the deprecated argument parser and forward to the unified CLI.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Parser instance sourced from the unified CLI implementation.</p>
+<p>Raises:
+ImportError: If the unified CLI module cannot be imported.</p>
 </section>
 <section id="parse-args-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">parse_args(argv)</span></code><a class="headerlink" href="#parse-args-argv" title="Link to this heading"></a></h3>
-<p>Parse command-line arguments (deprecated).</p>
+<p>Parse command-line arguments using the forwarded parser.</p>
+<p>Args:
+argv: Optional list of CLI arguments to parse instead of :data:<code class="docutils literal notranslate"><span class="pre">sys.argv</span></code>.</p>
+<p>Returns:
+Namespace containing CLI arguments supported by the unified command.</p>
+<p>Raises:
+SystemExit: Propagated when parsing fails.</p>
 </section>
 <section id="main-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">main(argv)</span></code><a class="headerlink" href="#main-argv" title="Link to this heading"></a></h3>
-<p>Forward to unified CLI with HTML mode forced.</p>
+<p>Forward to the unified CLI with HTML mode forced.</p>
+<p>Args:
+argv: Optional CLI argument list excluding the executable.</p>
+<p>Returns:
+Exit status returned by the unified CLI entry point.</p>
+<p>Raises:
+SystemExit: Propagated if the invoked CLI terminates.</p>
 </section>
 </section>
 </section>

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import io
+import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any
@@ -24,6 +25,8 @@ def _reset_caches() -> None:
     optdeps._rdflib = None  # type: ignore[attr-defined]
     optdeps._pronto = None  # type: ignore[attr-defined]
     optdeps._owlready2 = None  # type: ignore[attr-defined]
+    for module_name in ("pystow", "rdflib", "pronto", "owlready2"):
+        sys.modules.pop(module_name, None)
 
 
 def _fake_import(module_name: str, module: Any):

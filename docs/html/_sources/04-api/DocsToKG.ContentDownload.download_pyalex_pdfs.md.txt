@@ -471,9 +471,23 @@ None
 
 Return ``self`` when used as a context manager.
 
+Args:
+None
+
+Returns:
+Logger instance configured for context-managed usage.
+
 ### `__exit__(self, exc_type, exc, tb)`
 
 Close the file handle on context manager exit.
+
+Args:
+exc_type: Exception type raised within the context, if any.
+exc: Exception instance raised within the context.
+tb: Traceback associated with ``exc``.
+
+Returns:
+None
 
 ### `log_attempt(self, record)`
 
@@ -529,9 +543,23 @@ None
 
 Return ``self`` when used as a context manager.
 
+Args:
+None
+
+Returns:
+Adapter instance configured for context-managed usage.
+
 ### `__exit__(self, exc_type, exc, tb)`
 
 Close the CSV file handle on context manager exit.
+
+Args:
+exc_type: Exception type raised within the context, if any.
+exc: Exception instance raised within the context.
+tb: Traceback associated with ``exc``.
+
+Returns:
+None
 
 ### `__post_init__(self)`
 

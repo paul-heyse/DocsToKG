@@ -27,13 +27,13 @@ except ImportError:  # pragma: no cover - optional dependency
     pytest.skip("hypothesis is required for these tests", allow_module_level=True)
 
 from DocsToKG.ContentDownload.resolvers.headers import headers_cache_key
-from DocsToKG.ContentDownload.resolvers.providers.crossref import (
-    _headers_cache_key as crossref_headers_cache_key,
-)
-from DocsToKG.ContentDownload.resolvers.providers.unpaywall import (
-    _headers_cache_key as unpaywall_headers_cache_key,
+from DocsToKG.ContentDownload.resolvers.providers import (
+    _headers_cache_key as resolver_headers_cache_key,
 )
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
+
+crossref_headers_cache_key = resolver_headers_cache_key
+unpaywall_headers_cache_key = resolver_headers_cache_key
 
 given = hypothesis.given
 

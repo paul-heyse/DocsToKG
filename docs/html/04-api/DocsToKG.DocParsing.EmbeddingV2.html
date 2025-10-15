@@ -103,41 +103,62 @@ python -m DocsToKG.DocParsing.EmbeddingV2 –resume</p>
 </ul>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="resolve-hf-home">
-<h3><code class="docutils literal notranslate"><span class="pre">_resolve_hf_home()</span></code><a class="headerlink" href="#resolve-hf-home" title="Link to this heading"></a></h3>
-<p>Return the HuggingFace cache directory honoring environment settings.</p>
-</section>
-<section id="resolve-with-env-env-var-default">
-<h3><code class="docutils literal notranslate"><span class="pre">_resolve_with_env(env_var,</span> <span class="pre">default)</span></code><a class="headerlink" href="#resolve-with-env-env-var-default" title="Link to this heading"></a></h3>
-<p>Resolve <code class="docutils literal notranslate"><span class="pre">env_var</span></code> to a path when provided, otherwise return <code class="docutils literal notranslate"><span class="pre">default</span></code>.</p>
-</section>
-<section id="resolve-cli-path-value-default">
-<h3><code class="docutils literal notranslate"><span class="pre">_resolve_cli_path(value,</span> <span class="pre">default)</span></code><a class="headerlink" href="#resolve-cli-path-value-default" title="Link to this heading"></a></h3>
-<p>Resolve CLI-provided <code class="docutils literal notranslate"><span class="pre">value</span></code> to an absolute path with <code class="docutils literal notranslate"><span class="pre">default</span></code> fallback.</p>
-</section>
 <section id="expand-path-path">
 <h3><code class="docutils literal notranslate"><span class="pre">_expand_path(path)</span></code><a class="headerlink" href="#expand-path-path" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">path</span></code> expanded to an absolute :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code>.</p>
+<p>Args:
+path: Candidate filesystem path supplied as string or :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code>.</p>
+<p>Returns:
+Absolute path with user home and environment variables resolved.</p>
 </section>
-<section id="id1">
-<h3><code class="docutils literal notranslate"><span class="pre">_resolve_hf_home()</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<section id="resolve-hf-home">
+<h3><code class="docutils literal notranslate"><span class="pre">_resolve_hf_home()</span></code><a class="headerlink" href="#resolve-hf-home" title="Link to this heading"></a></h3>
 <p>Determine the HuggingFace cache directory respecting <code class="docutils literal notranslate"><span class="pre">HF_HOME</span></code>.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Absolute path to the HuggingFace cache directory.</p>
 </section>
 <section id="resolve-model-root-hf-home">
 <h3><code class="docutils literal notranslate"><span class="pre">_resolve_model_root(hf_home)</span></code><a class="headerlink" href="#resolve-model-root-hf-home" title="Link to this heading"></a></h3>
 <p>Resolve DocsToKG model root with <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_MODEL_ROOT</span></code> override.</p>
+<p>Args:
+hf_home: Base HuggingFace cache directory.</p>
+<p>Returns:
+Absolute path representing the DocsToKG model root.</p>
 </section>
 <section id="resolve-qwen-dir-model-root">
 <h3><code class="docutils literal notranslate"><span class="pre">_resolve_qwen_dir(model_root)</span></code><a class="headerlink" href="#resolve-qwen-dir-model-root" title="Link to this heading"></a></h3>
 <p>Resolve Qwen model directory with <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_QWEN_DIR</span></code> override.</p>
+<p>Args:
+model_root: Base directory housing DocsToKG models.</p>
+<p>Returns:
+Absolute path to the Qwen embedding model directory.</p>
 </section>
 <section id="resolve-splade-dir-model-root">
 <h3><code class="docutils literal notranslate"><span class="pre">_resolve_splade_dir(model_root)</span></code><a class="headerlink" href="#resolve-splade-dir-model-root" title="Link to this heading"></a></h3>
 <p>Resolve SPLADE model directory with <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_SPLADE_DIR</span></code> override.</p>
+<p>Args:
+model_root: Base directory housing DocsToKG models.</p>
+<p>Returns:
+Absolute path to the SPLADE model directory.</p>
 </section>
 <section id="expand-optional-path">
 <h3><code class="docutils literal notranslate"><span class="pre">_expand_optional(path)</span></code><a class="headerlink" href="#expand-optional-path" title="Link to this heading"></a></h3>
 <p>Expand optional :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code> values to absolutes when provided.</p>
+<p>Args:
+path: Optional path reference supplied by the caller.</p>
+<p>Returns:
+<code class="docutils literal notranslate"><span class="pre">None</span></code> when <code class="docutils literal notranslate"><span class="pre">path</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code>; otherwise the expanded absolute path.</p>
+</section>
+<section id="resolve-cli-path-value-default">
+<h3><code class="docutils literal notranslate"><span class="pre">_resolve_cli_path(value,</span> <span class="pre">default)</span></code><a class="headerlink" href="#resolve-cli-path-value-default" title="Link to this heading"></a></h3>
+<p>Resolve a CLI-provided path, falling back to <code class="docutils literal notranslate"><span class="pre">default</span></code> when omitted.</p>
+<p>Args:
+value: Optional user-supplied path.
+default: Fallback path used when <code class="docutils literal notranslate"><span class="pre">value</span></code> is absent.</p>
+<p>Returns:
+Absolute path derived from <code class="docutils literal notranslate"><span class="pre">value</span></code> or <code class="docutils literal notranslate"><span class="pre">default</span></code>.</p>
 </section>
 <section id="missing-splade-dependency-message">
 <h3><code class="docutils literal notranslate"><span class="pre">_missing_splade_dependency_message()</span></code><a class="headerlink" href="#missing-splade-dependency-message" title="Link to this heading"></a></h3>
@@ -174,6 +195,13 @@ True when at least one UUID was newly assigned; otherwise False.</p>
 <section id="ensure-chunk-schema-rows-source">
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_chunk_schema(rows,</span> <span class="pre">source)</span></code><a class="headerlink" href="#ensure-chunk-schema-rows-source" title="Link to this heading"></a></h3>
 <p>Assert that chunk rows declare a compatible schema version.</p>
+<p>Args:
+rows: Iterable of chunk dictionaries to validate.
+source: Path to the originating chunk file, used for error context.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+ValueError: Propagated when an incompatible schema version is detected.</p>
 </section>
 <section id="tokens-text">
 <h3><code class="docutils literal notranslate"><span class="pre">tokens(text)</span></code><a class="headerlink" href="#tokens-text" title="Link to this heading"></a></h3>

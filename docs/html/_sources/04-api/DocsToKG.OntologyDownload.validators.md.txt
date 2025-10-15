@@ -39,14 +39,6 @@ None
 
 Sort an N-Triples file using a disk-backed merge strategy.
 
-### `_sort_nt(source, destination)`
-
-Sort N-Triples using platform sort when available with Python fallback.
-
-### `normalize_streaming(source_path, output_path)`
-
-Normalize an ontology file using streaming disk-backed sorting.
-
 ### `_term_to_string(term, namespace_manager)`
 
 *No documentation available.*
@@ -67,15 +59,24 @@ Replace blank node identifiers with deterministic sequential labels.
 
 Sort serialized triple lines using platform sort when available.
 
-### `normalize_streaming(source)`
+### `normalize_streaming(source, output_path)`
 
-Normalize ontologies using external sort to ensure deterministic output.
+Normalize ontologies using streaming canonical Turtle serialization.
 
 The streaming path serializes triples to a temporary file, leverages the
-platform ``sort`` utility (when available) to order the triples
-lexicographically, and streams the sorted output while computing the
-canonical SHA-256 hash. Callers may supply an ``output_path`` to persist the
-normalized Turtle document without storing the entire content in memory.
+platform ``sort`` command (when available) to order triples lexicographically,
+and streams the canonical Turtle output while computing a SHA-256 digest.
+When ``output_path`` is provided the canonical form is persisted without
+retaining the entire content in memory.
+
+Args:
+source: Path to the ontology document providing triples.
+output_path: Optional destination for the normalized Turtle document.
+graph: Optional pre-loaded RDF graph re-used instead of reparsing.
+chunk_bytes: Threshold controlling how frequently buffered bytes are flushed.
+
+Returns:
+SHA-256 hex digest of the canonical Turtle content.
 
 ### `_run_validator_subprocess(name, payload)`
 
@@ -211,13 +212,17 @@ Dictionary with boolean status, detail payload, and output paths.
 
 *No documentation available.*
 
+### `_iter_canonical_lines()`
+
+*No documentation available.*
+
+### `_flush(writer)`
+
+*No documentation available.*
+
 ### `_parse()`
 
 Parse the ontology with rdflib to populate the graph object.
-
-### `_write(data)`
-
-*No documentation available.*
 
 ### `_handler(signum, frame)`
 
