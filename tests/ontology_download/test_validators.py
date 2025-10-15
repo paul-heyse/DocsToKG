@@ -35,6 +35,7 @@ from DocsToKG.OntologyDownload.config import DefaultsConfig, ResolvedConfig
 from DocsToKG.OntologyDownload.validators import (
     ValidationRequest,
     ValidatorSubprocessError,
+    normalize_streaming,
     validate_arelle,
     validate_owlready2,
     validate_pronto,
@@ -101,6 +102,81 @@ def test_validate_rdflib_success(ttl_file, tmp_path, config):
     assert data["normalized_sha256"] == expected_hash
     assert result.details["normalized_sha256"] == expected_hash
 
+
+def test_normalize_streaming_deterministic(tmp_path):
+    source = Path("tests/ontology_download/fixtures/normalization/complex.ttl")
+    golden = (
+        Path("tests/ontology_download/fixtures/normalization/complex.sha256")
+        .read_text()
+        .strip()
+    )
+    digests = []
+    outputs = []
+    for attempt in range(5):
+        output_path = tmp_path / f"normalized-{attempt}.nt"
+        digest = normalize_streaming(source, output_path)
+        digests.append(digest)
+        outputs.append(output_path.read_bytes())
+    assert len(set(digests)) == 1
+    assert digests[0] == golden
+    assert all(blob == outputs[0] for blob in outputs)
+
+
+def test_streaming_matches_in_memory(tmp_path, config):
+    source = Path("tests/ontology_download/fixtures/normalization/complex.ttl")
+    # Baseline in-memory normalization (threshold high enough to avoid streaming)
+    baseline_request = make_request(source, tmp_path / "baseline", config)
+    baseline_result = validate_rdflib(baseline_request, _noop_logger())
+    assert baseline_result.details["normalization_mode"] == "in-memory"
+
+    streaming_config = config.model_copy(deep=True)
+    streaming_config.defaults.validation.streaming_normalization_threshold_mb = 1
+    streaming_request = make_request(source, tmp_path / "stream", streaming_config)
+    streaming_result = validate_rdflib(streaming_request, _noop_logger())
+    assert streaming_result.details["normalization_mode"] == "streaming"
+    assert (
+        streaming_result.details["normalized_sha256"]
+        == baseline_result.details["normalized_sha256"]
+    )
+
+    normalized_file = streaming_request.normalized_dir / "complex.nt"
+    assert normalized_file.exists()
+
+
+def test_normalize_streaming_edge_cases(tmp_path, config):
+    rdflib = pytest.importorskip("rdflib")
+    try:
+        from rdflib import BNode, Graph, Literal, Namespace
+    except ImportError:
+        pytest.skip("rdflib optional dependency not available")
+
+    ns = Namespace("http://example.org/")
+    cases = {}
+
+    empty_graph = Graph()
+    empty_path = tmp_path / "empty.ttl"
+    empty_graph.serialize(destination=empty_path, format="turtle")
+    cases[empty_path] = empty_graph
+
+    single_graph = Graph()
+    single_graph.add((URIRef(ns["subject"]), URIRef(ns["predicate"]), Literal("value")))
+    single_path = tmp_path / "single.ttl"
+    single_graph.serialize(destination=single_path, format="turtle")
+    cases[single_path] = single_graph
+
+    blank_graph = Graph()
+    node = BNode()
+    blank_graph.add((node, ns["p"], Literal("blank")))
+    blank_graph.add((node, ns["p2"], ns["o"]))
+    blank_path = tmp_path / "blank.ttl"
+    blank_graph.serialize(destination=blank_path, format="turtle")
+    cases[blank_path] = blank_graph
+
+    for path, graph in cases.items():
+        digest_stream = normalize_streaming(path, tmp_path / f"{path.stem}.nt", graph=graph)
+        request = make_request(path, tmp_path / f"{path.stem}-mem", config)
+        result = validate_rdflib(request, _noop_logger())
+        assert result.details["normalized_sha256"] == digest_stream
 
 def test_validate_pronto_success(obo_file, tmp_path, config):
     request = ValidationRequest("pronto", obo_file, tmp_path / "norm", tmp_path / "val", config)

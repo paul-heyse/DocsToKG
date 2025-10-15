@@ -37,8 +37,9 @@ import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import requests
 import yaml
@@ -129,11 +130,20 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Comma-separated list of additional hosts permitted for this run",
     )
 
-    plan_cmd = subparsers.add_parser("plan", help="Preview resolver plans without downloading")
-    plan_cmd.add_argument("ids", nargs="*", help="Ontology identifiers to plan")
-    plan_cmd.add_argument(
+    plan_cmd = subparsers.add_parser(
+        "plan", help="Preview resolver plans without downloading", description="Plan resolver actions"
+    )
+    plan_sub = plan_cmd.add_subparsers(dest="plan_command")
+    plan_sub.required = False
+
+    plan_parent = argparse.ArgumentParser(add_help=False)
+    plan_parent.add_argument("ids", nargs="*", help="Ontology identifiers to plan")
+    plan_parent.add_argument(
         "--spec", type=Path, help="Path to sources.yaml (default: configs/sources.yaml)"
     )
+    plan_parent.add_argument("--resolver", help="Resolver type for single ontology")
+    plan_parent.add_argument("--target-formats", help="Comma-separated formats (e.g., owl,obo)")
+    plan_parent.add_argument(
     plan_cmd.add_argument("--resolver", help="Resolver type for single ontology")
     plan_cmd.add_argument("--target-formats", help="Comma-separated formats (e.g., owl,obo)")
     plan_cmd.add_argument(
@@ -152,6 +162,20 @@ def _build_parser() -> argparse.ArgumentParser:
         type=_parse_positive_int,
         help="Override concurrent downloads when using --dry-run",
     )
+    plan_parent.add_argument(
+        "--allowed-hosts",
+        help="Comma-separated list of additional hosts permitted for this run",
+    )
+
+    plan_run = plan_sub.add_parser(
+        "run",
+        parents=[plan_parent],
+        add_help=False,
+        help="Preview resolver plans without downloading",
+        description="Preview resolver plans without downloading",
+    )
+    plan_run.add_argument("--json", action="store_true", help="Emit plan details as JSON")
+    plan_run.add_argument(
     plan_cmd.add_argument(
         "--allowed-hosts",
         help="Comma-separated list of additional hosts permitted for this run",
@@ -161,6 +185,20 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Only include ontologies modified on or after YYYY-MM-DD",
     )
 
+    plan_diff = plan_sub.add_parser(
+        "diff",
+        parents=[plan_parent],
+        add_help=False,
+        help="Compare current plan with baseline",
+        description="Compare current plan with baseline",
+    )
+    plan_diff.add_argument(
+        "--baseline",
+        type=Path,
+        default=(CONFIG_DIR / "plans" / "baseline.json"),
+        help="Path to baseline plan JSON file (default: ~/.data/ontology-fetcher/configs/plans/baseline.json)",
+    )
+    plan_diff.add_argument("--json", action="store_true", help="Emit diff results as JSON")
     plan_diff_cmd = subparsers.add_parser(
         "plan-diff",
         help="Compare current plan output to a previous baseline",
@@ -282,6 +320,16 @@ def _build_parser() -> argparse.ArgumentParser:
     doctor = subparsers.add_parser("doctor", help="Diagnose environment issues")
     doctor.add_argument("--json", action="store_true", help="Output diagnostics as JSON")
 
+    prune = subparsers.add_parser("prune", help="Manage stored ontology versions")
+    prune.add_argument(
+        "--keep",
+        type=_parse_positive_int,
+        required=True,
+        help="Number of most recent versions to retain",
+    )
+    prune.add_argument("--ids", nargs="+", help="Specific ontology identifiers to prune")
+    prune.add_argument("--dry-run", action="store_true", help="Preview deletions without removing files")
+    prune.add_argument("--json", action="store_true", help="Emit prune summary as JSON")
     prune = subparsers.add_parser("prune", help="Prune stored ontology versions")
     prune.add_argument("--keep", type=_parse_positive_int, required=True, help="Number of versions to retain per ontology")
     prune.add_argument(
@@ -378,6 +426,21 @@ def _parse_allowed_hosts(value: Optional[str]) -> List[str]:
     return entries
 
 
+_PLAN_SUBCOMMANDS = {"run", "diff"}
+
+
+def _normalize_plan_args(args: List[str]) -> List[str]:
+    """Insert default ``run`` subcommand for ``plan`` invocations when omitted."""
+
+    if not args or args[0] != "plan":
+        return args
+    if len(args) == 1:
+        return ["plan", "run"]
+    if args[1] in _PLAN_SUBCOMMANDS:
+        return args
+    if args[1].startswith("-"):
+        return [args[0], "run", *args[1:]]
+    return [args[0], "run", *args[1:]]
 def _parse_since(value: Optional[str]) -> Optional[datetime]:
     """Parse --since argument into timezone-aware datetime."""
 
@@ -610,6 +673,7 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
         for candidate in getattr(plan, "candidates", ())
     ]
 
+    payload = {
     return {
         "id": plan.spec.id,
         "resolver": plan.resolver,
@@ -619,10 +683,380 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
         "media_type": plan.plan.media_type,
         "service": plan.plan.service,
         "headers": plan.plan.headers,
+        "candidates": candidates,
+    }
+
+    metadata = getattr(plan, "metadata", {}) or {}
+    last_modified = metadata.get("last_modified")
+    if last_modified:
+        payload["last_modified"] = last_modified
+    if metadata.get("content_length") is not None:
+        payload["content_length"] = metadata["content_length"]
+    if metadata.get("etag"):
+        payload["etag"] = metadata["etag"]
+    return payload
+
+
+def _parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
+    """Parse ISO formatted date strings into timezone-aware datetimes."""
+
+    if not value:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    else:
+        parsed = parsed.astimezone(timezone.utc)
+    return parsed
+
+
+def _parse_http_datetime(value: Optional[str]) -> Optional[datetime]:
+    """Parse HTTP header datetime strings into timezone-aware datetimes."""
+
+    if not value:
+        return None
+    try:
+        parsed = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    else:
+        parsed = parsed.astimezone(timezone.utc)
+    return parsed
+
+
+def _extract_response_metadata(response: requests.Response) -> Dict[str, object]:
+    """Return structured metadata from an HTTP response."""
+
+    metadata: Dict[str, object] = {}
+    last_modified = response.headers.get("Last-Modified")
+    parsed_last_modified = _parse_http_datetime(last_modified)
+    if parsed_last_modified:
+        metadata["last_modified"] = parsed_last_modified.isoformat()
+    etag = response.headers.get("ETag")
+    if etag:
+        metadata["etag"] = etag
+    content_length = response.headers.get("Content-Length")
+    if content_length:
+        try:
+            metadata["content_length"] = int(content_length)
+        except ValueError:
+            pass
+    return metadata
+
+
+def _collect_plan_metadata(plans: Sequence[PlannedFetch], config: ResolvedConfig) -> None:
+    """Augment planned fetches with remote metadata via HEAD requests."""
+
+    if not plans:
+        return
+
+    headers = config.defaults.http.polite_http_headers()
+    timeout = max(1, config.defaults.http.timeout_sec)
+
+    for plan in plans:
+        metadata: Dict[str, object] = {}
+        response: Optional[requests.Response] = None
+        try:
+            response = requests.head(
+                plan.plan.url,
+                headers=headers,
+                timeout=timeout,
+                allow_redirects=True,
+            )
+            if response.status_code == 405:
+                response.close()
+                response = requests.get(
+                    plan.plan.url,
+                    headers=headers,
+                    timeout=timeout,
+                    allow_redirects=True,
+                    stream=True,
+                )
+            metadata.update(_extract_response_metadata(response))
+        except requests.RequestException as exc:  # pragma: no cover - network variability
+            metadata.setdefault("metadata_error", str(exc))
+        finally:
+            if response is not None:
+                response.close()
+        if metadata:
+            plan.metadata.update(metadata)
+
+
+def _directory_size_bytes(path: Path) -> int:
+    """Return the cumulative size of files within ``path``."""
+
+    total = 0
+    for entry in path.rglob("*"):
+        try:
+            if entry.is_file():
+                total += entry.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def _format_size(num_bytes: int) -> str:
+    """Format byte counts using human-readable units."""
+
+    units = ["B", "KB", "MB", "GB", "TB"]
+    size = float(num_bytes)
+    for unit in units:
+        if size < 1024 or unit == units[-1]:
+            return f"{size:.2f} {unit}"
+        size /= 1024
+    return f"{num_bytes} B"
+
+
+def _infer_version_timestamp(version: str) -> Optional[datetime]:
+    """Attempt to derive a datetime from a version string."""
+
+    candidates = [version, version.replace("_", "-"), version.replace("/", "-")]
+    formats = [
+        "%Y-%m-%d",
+        "%Y%m%d",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y%m%dT%H%M%S",
+        "%Y-%m-%d-%H-%M-%S",
+    ]
+    for candidate in candidates:
+        for fmt in formats:
+            try:
+                parsed = datetime.strptime(candidate, fmt)
+            except ValueError:
+                continue
+            return parsed.replace(tzinfo=timezone.utc)
+    return None
+
+
+def _resolve_version_metadata(ontology_id: str, version: str) -> Tuple[Path, Optional[datetime], int]:
+    """Return path, timestamp, and size metadata for a stored version."""
+
+    path = STORAGE.version_path(ontology_id, version)
+    manifest_path = path / "manifest.json"
+    timestamp: Optional[datetime] = None
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text())
+        except json.JSONDecodeError:
+            manifest = {}
+        else:
+            timestamp = _parse_iso_datetime(manifest.get("downloaded_at"))
+    if timestamp is None:
+        timestamp = _infer_version_timestamp(version)
+    if timestamp is None:
+        try:
+            timestamp = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+        except OSError:
+            timestamp = None
+    size = _directory_size_bytes(path)
+    return path, timestamp, size
+
+
+def _diff_plans(
+    current: Sequence[dict], baseline: Sequence[dict]
+) -> Dict[str, List[dict]]:
+    """Return structured diff between current and baseline plan payloads."""
+
+    def _normalize(entries: Sequence[dict]) -> Dict[str, dict]:
+        mapping: Dict[str, dict] = {}
+        for entry in entries:
+            identifier = str(entry.get("id"))
+            mapping[identifier] = dict(entry)
+        return mapping
+
+    current_map = _normalize(current)
+    baseline_map = _normalize(baseline)
+
+    added: List[dict] = []
+    removed: List[dict] = []
+    modified: List[dict] = []
+
+    for oid in sorted(set(current_map) | set(baseline_map)):
+        if oid not in baseline_map:
+            added.append(current_map[oid])
+            continue
+        if oid not in current_map:
+            removed.append(baseline_map[oid])
+            continue
+        before = baseline_map[oid]
+        after = current_map[oid]
+        changes: Dict[str, Dict[str, object]] = {}
+        for field in ("url", "version", "license", "media_type", "content_length"):
+            if before.get(field) != after.get(field):
+                changes[field] = {
+                    "previous": before.get(field),
+                    "current": after.get(field),
+                }
+        if before.get("last_modified") != after.get("last_modified"):
+            changes["last_modified"] = {
+                "previous": before.get("last_modified"),
+                "current": after.get("last_modified"),
+            }
+        if changes:
+            modified.append({"id": oid, "changes": changes})
+
+    return {"added": added, "removed": removed, "modified": modified}
+
+
+def _print_plan_diff(diff: Dict[str, List[dict]]) -> None:
+    """Render human-readable plan diff results."""
+
+    if not diff["added"] and not diff["removed"] and not diff["modified"]:
+        print("No plan differences detected.")
+        return
+
+    for entry in diff["added"]:
+        version = entry.get("version") or "unknown"
+        print(f"+ {entry['id']} {version} -> {entry.get('url', '')}")
+    for entry in diff["removed"]:
+        version = entry.get("version") or "unknown"
+        print(f"- {entry['id']} {version} -> {entry.get('url', '')}")
+    for entry in diff["modified"]:
+        changes = ", ".join(
+            f"{field}: {change['previous']} -> {change['current']}"
+            for field, change in entry["changes"].items()
+        )
+        print(f"~ {entry['id']} {changes}")
+
+    total_added = len(diff["added"])
+    total_removed = len(diff["removed"])
+    total_modified = len(diff["modified"])
+    print(
+        f"Summary: +{total_added} added, -{total_removed} removed, ~{total_modified} modified"
+    )
+
+
+def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, List[dict]]:
+    """Generate plan diff between current run and baseline file."""
+
+    config, specs = _resolve_specs_from_args(args, base_config)
+    plans = plan_all(specs, config=config)
+    _collect_plan_metadata(plans, config)
+    current_payload = [_plan_to_dict(plan) for plan in plans]
+
+    baseline_path: Path = args.baseline
+    if not baseline_path.exists():
+        raise ConfigError(f"Baseline plan not found at {baseline_path}")
+    try:
+        baseline_payload = json.loads(baseline_path.read_text()) or []
+    except json.JSONDecodeError as exc:
+        raise ConfigError(f"Failed to parse baseline plan at {baseline_path}: {exc}") from exc
+
+    if not isinstance(baseline_payload, list):
+        raise ConfigError("Baseline plan must be a JSON array of plan objects")
+
+    return _diff_plans(current_payload, baseline_payload)
+
+
+def _handle_prune(args) -> Dict[str, object]:
+    """Delete surplus ontology versions according to CLI arguments."""
+
+    keep = args.keep
+    if keep <= 0:
+        raise ConfigError("--keep must be a positive integer")
+
+    ontology_ids = args.ids or STORAGE.available_ontologies()
+    ontology_ids = sorted(dict.fromkeys(ontology_ids))
+
+    summary: Dict[str, object] = {
+        "deleted_versions": 0,
+        "freed_bytes": 0,
+        "potential_bytes": 0,
+        "ontologies": {},
+        "dry_run": bool(args.dry_run),
         "last_modified": plan.last_modified or plan.plan.last_modified,
         "size_bytes": plan.size or plan.plan.content_length,
         "candidates": candidates,
     }
+
+    if not ontology_ids:
+        return summary
+
+    for ontology_id in ontology_ids:
+        versions = STORAGE.available_versions(ontology_id)
+        if not versions:
+            continue
+        metadata = []
+        for version in versions:
+            path, timestamp, size = _resolve_version_metadata(ontology_id, version)
+            metadata.append(
+                {
+                    "version": version,
+                    "timestamp": timestamp,
+                    "timestamp_iso": timestamp.isoformat() if timestamp else None,
+                    "size": size,
+                    "path": path,
+                }
+            )
+
+        metadata.sort(
+            key=lambda item: (
+                item["timestamp"] or datetime(1970, 1, 1, tzinfo=timezone.utc),
+                item["version"],
+            )
+        )
+
+        survivors = metadata[-keep:] if keep < len(metadata) else metadata
+        to_delete = metadata[:-keep] if keep < len(metadata) else []
+        summary["ontologies"][ontology_id] = {
+            "kept": [entry["version"] for entry in survivors],
+            "deleted": [entry["version"] for entry in to_delete],
+            "total_versions": len(metadata),
+        }
+
+        if args.dry_run:
+            for entry in to_delete:
+                summary["potential_bytes"] += entry["size"]
+                size_label = _format_size(entry["size"])
+                timestamp_label = entry["timestamp_iso"] or "unknown"
+                print(
+                    f"DRY RUN: {ontology_id} would delete {entry['version']}"
+                    f" ({size_label}) [timestamp {timestamp_label}]"
+                )
+            continue
+
+        for entry in to_delete:
+            reclaimed = STORAGE.delete_version(ontology_id, entry["version"])
+            reclaimed = reclaimed or entry["size"]
+            summary["freed_bytes"] += reclaimed
+            summary["deleted_versions"] += 1
+            print(
+                f"Deleted {ontology_id} {entry['version']} ({_format_size(reclaimed)})"
+            )
+
+        if survivors:
+            newest = max(
+                survivors,
+                key=lambda item: (
+                    item["timestamp"] or datetime(1970, 1, 1, tzinfo=timezone.utc),
+                    item["version"],
+                ),
+            )
+            STORAGE.set_latest_version(ontology_id, newest["version"])
+
+    if args.dry_run:
+        print(
+            "Dry run complete. Would free"
+            f" {_format_size(summary['potential_bytes'])} across"
+            f" {sum(len(info['deleted']) for info in summary['ontologies'].values())} versions"
+        )
+    else:
+        print(
+            f"Freed {_format_size(summary['freed_bytes'])} across"
+            f" {summary['deleted_versions']} deleted versions"
+        )
+
+    return summary
 
 
 def _ensure_manifest_path(ontology_id: str, version: Optional[str]) -> Path:
@@ -808,6 +1242,27 @@ def _handle_plan(args, base_config: Optional[ResolvedConfig]) -> List[PlannedFet
 
     since = _parse_since(getattr(args, "since", None))
     config, specs = _resolve_specs_from_args(args, base_config)
+    plans = plan_all(specs, config=config)
+    _collect_plan_metadata(plans, config)
+
+    since_value = getattr(args, "since", None)
+    if since_value:
+        since_dt = _parse_iso_datetime(f"{since_value}T00:00:00+00:00")
+        if since_dt is None:
+            try:
+                parsed = datetime.strptime(since_value, "%Y-%m-%d")
+            except ValueError as exc:
+                raise ConfigError("--since must be formatted as YYYY-MM-DD") from exc
+            since_dt = parsed.replace(tzinfo=timezone.utc)
+        filtered: List[PlannedFetch] = []
+        for plan in plans:
+            metadata_time = _parse_iso_datetime(plan.metadata.get("last_modified"))
+            if metadata_time is None or metadata_time >= since_dt:
+                filtered.append(plan)
+        plans = filtered
+    return plans
+
+
     return plan_all(specs, config=config, since=since)
 
 
@@ -1451,7 +1906,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     raw_args = list(argv or sys.argv[1:])
     normalized_args = _normalize_argv(raw_args)
     parser = _build_parser()
-    args = parser.parse_args(normalized_args)
+    if argv is None:
+        arg_list = list(sys.argv[1:])
+    else:
+        arg_list = list(argv)
+    arg_list = _normalize_plan_args(arg_list)
+    args = parser.parse_args(arg_list)
     try:
         base_config = ResolvedConfig.from_defaults()
         base_config.defaults.logging.level = args.log_level
@@ -1500,7 +1960,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         },
                     )
         elif args.command == "plan":
-            if getattr(args, "plan_command", None) == "diff":
+            if getattr(args, "plan_command", "run") == "diff":
                 diff = _handle_plan_diff(args, base_config)
                 if args.json:
                     json.dump(diff, sys.stdout, indent=2)
@@ -1508,6 +1968,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 else:
                     _print_plan_diff(diff)
             else:
+                plans = _handle_plan(args, base_config)
+                if args.json:
+                    json.dump([_plan_to_dict(plan) for plan in plans], sys.stdout, indent=2)
+                    sys.stdout.write("\n")
+                else:
                 if plans:
                     rows = format_plan_rows(plans)
                     print(

@@ -29,6 +29,8 @@ __all__ = [
     "format_plan_rows",
     "format_results_table",
     "format_table",
+    "format_plan_rows",
+    "format_results_table",
     "format_validation_summary",
     "format_plan_rows",
     "format_results_table",
@@ -108,6 +110,18 @@ def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
     return format_table(("validator", "status", "details"), formatted_rows)
 
 
+def format_plan_rows(plans: Sequence["PlannedFetch"]) -> Sequence[Sequence[str]]:
+    """Return formatted table rows for planned fetches.
+
+    Args:
+        plans: Iterable of planned fetch objects produced by the planner.
+
+    Returns:
+        Sequence of tuples containing ``id``, ``resolver``, ``service``,
+        ``media_type``, and ``url`` suitable for :func:`format_table`.
+    """
+
+    rows = []
 def format_plan_rows(plans: Iterable[PlannedFetch]) -> List[Tuple[str, str, str, str, str]]:
     """Return plan metadata rows for human-readable tabular output.
 
@@ -160,16 +174,25 @@ def format_plan_rows(plans: Sequence["PlannedFetch"]) -> Sequence[Tuple[str, str
 
 
 def format_results_table(results: Sequence["FetchResult"]) -> str:
-    """Format fetch results as a CLI table showing key metadata."""
+    """Render fetch results as a human-readable table.
 
-    rows = [
-        (
-            result.spec.id,
-            result.spec.resolver,
-            result.status,
-            str(result.local_path),
-            result.sha256,
+    Args:
+        results: Sequence of :class:`~DocsToKG.OntologyDownload.core.FetchResult`
+            objects returned by the download workflow.
+
+    Returns:
+        ASCII table summarising resolver id, status, checksum, and file path.
+    """
+
+    rows = []
+    for result in results:
+        rows.append(
+            (
+                result.spec.id,
+                result.spec.resolver,
+                result.status,
+                result.sha256,
+                str(result.local_path),
+            )
         )
-        for result in results
-    ]
-    return format_table(("id", "resolver", "status", "file", "sha256"), rows)
+    return format_table(("id", "resolver", "status", "sha256", "file"), rows)
