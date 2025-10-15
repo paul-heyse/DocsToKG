@@ -32,7 +32,6 @@ pytest.importorskip("pyalex")
 from DocsToKG.ContentDownload.download_pyalex_pdfs import (
     JsonlLogger,
     WorkArtifact,
-    attempt_openalex_candidates,
     download_candidate,
     process_one_work,
 )
@@ -44,6 +43,7 @@ from DocsToKG.ContentDownload.resolvers import (
     ResolverResult,
     WaybackResolver,
 )
+from DocsToKG.ContentDownload.resolvers.providers.openalex import OpenAlexResolver
 
 requests = pytest.importorskip("requests")
 responses = pytest.importorskip("responses")
@@ -198,7 +198,6 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
     assert Path(manifests[0]["path"]).exists()
 
 
-@responses.activate
 def test_openalex_attempts_use_session_headers(tmp_path: Path) -> None:
     artifact = _make_artifact(tmp_path)
     logger_path = tmp_path / "attempts.jsonl"
@@ -206,21 +205,34 @@ def test_openalex_attempts_use_session_headers(tmp_path: Path) -> None:
     metrics = ResolverMetrics()
     session = requests.Session()
     session.headers.update({"User-Agent": "EdgeTester/1.0"})
-    url = artifact.pdf_urls[0]
-    responses.add(responses.HEAD, url, status=200, headers={"Content-Type": "application/pdf"})
-    responses.add(responses.GET, url, status=503)
+    observed: List[str] = []
 
-    attempt_openalex_candidates(
-        session,
-        artifact,
+    def fake_download(session_obj, art, url, referer, timeout, context=None):
+        observed.append(session_obj.headers.get("User-Agent"))
+        return DownloadOutcome(
+            classification="request_error",
+            path=None,
+            http_status=None,
+            content_type=None,
+            elapsed_ms=1.0,
+            error="failed",
+        )
+
+    config = ResolverConfig(
+        resolver_order=["openalex"],
+        resolver_toggles={"openalex": True},
+    )
+    pipeline = ResolverPipeline(
+        [OpenAlexResolver()],
+        config,
+        fake_download,
         logger,
         metrics,
-        {"dry_run": True, "extract_html_text": False, "previous": {}},
     )
 
-    assert any(
-        call.request.headers.get("User-Agent") == "EdgeTester/1.0" for call in responses.calls
-    )
+    pipeline.run(session, artifact)
+
+    assert observed == ["EdgeTester/1.0"]
     logger.close()
 
 

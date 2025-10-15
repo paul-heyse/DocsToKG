@@ -620,14 +620,14 @@
   ]
   ```
 
-- [ ] 4.16 Verify all existing imports still work
+- [x] 4.16 Verify all existing imports still work
   - Run: `python -c "from DocsToKG.ContentDownload.resolvers import ResolverPipeline, default_resolvers, ResolverConfig"`
   - Run: `python -c "from DocsToKG.ContentDownload.resolvers import AttemptRecord, DownloadOutcome"`
   - Verify no ImportError exceptions
 
 ## 5. OpenAlex Virtual Resolver
 
-- [ ] 5.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/openalex.py`
+- [x] 5.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/openalex.py`
 
   ```python
   """OpenAlex direct URL resolver (position 0 in pipeline)."""
@@ -659,32 +659,32 @@
                   )
   ```
 
-- [ ] 5.2 Register `OpenAlexResolver` in providers registry
+- [x] 5.2 Register `OpenAlexResolver` in providers registry
   - Update `resolvers/providers/__init__.py` to import `OpenAlexResolver`
   - Insert at **position 0** in `default_resolvers()` return list (before Unpaywall)
 
-- [ ] 5.3 Update `DEFAULT_RESOLVER_ORDER` in `resolvers/__init__.py`
+- [x] 5.3 Update `DEFAULT_RESOLVER_ORDER` in `resolvers/__init__.py`
   - Prepend `"openalex"` to list: `["openalex", "unpaywall", "crossref", ...]`
 
-- [ ] 5.4 Remove `attempt_openalex_candidates()` function from `download_pyalex_pdfs.py`
+- [x] 5.4 Remove `attempt_openalex_candidates()` function from `download_pyalex_pdfs.py`
   - Delete function definition (lines ~1332-1402)
   - Remove all calls to `attempt_openalex_candidates()` in `process_one_work()` (lines ~1509-1530)
 
-- [ ] 5.5 Simplify `process_one_work()` to single pipeline execution
+- [x] 5.5 Simplify `process_one_work()` to single pipeline execution
   - Remove `openalex_result` variable and conditional return (lines ~1509-1530)
   - Keep only `pipeline_result = pipeline.run(...)` logic
   - Remove `openalex_html_paths` aggregation logic (now handled by pipeline)
   - Remove `html_paths_total = list(artifact.metadata.get("openalex_html_paths", []))` (line ~1532)
   - Update `html_paths` to come solely from `pipeline_result.html_paths`
 
-- [ ] 5.6 Update tests to reflect OpenAlexResolver integration
+- [x] 5.6 Update tests to reflect OpenAlexResolver integration
   - In `tests/test_pipeline_behaviour.py`, add test verifying OpenAlex resolver executes first
   - Verify rate limiting applies to OpenAlex URLs
   - Verify metrics track OpenAlex attempts correctly
 
 ## 6. HEAD-Based Content Filtering
 
-- [ ] 6.1 Add `enable_head_precheck` field to `ResolverConfig` dataclass
+- [x] 6.1 Add `enable_head_precheck` field to `ResolverConfig` dataclass
 
   ```python
   # In resolvers/types.py, ResolverConfig class
@@ -692,7 +692,7 @@
   resolver_head_precheck: Dict[str, bool] = field(default_factory=dict)
   ```
 
-- [ ] 6.2 Implement HEAD pre-check helper in `resolvers/pipeline.py`
+- [x] 6.2 Implement HEAD pre-check helper in `resolvers/pipeline.py`
 
   ```python
   def _should_attempt_head_check(
@@ -733,7 +733,7 @@
           return True
   ```
 
-- [ ] 6.3 Integrate HEAD pre-check into pipeline URL iteration (in `ResolverPipeline.run()`)
+- [x] 6.3 Integrate HEAD pre-check into pipeline URL iteration (in `ResolverPipeline.run()`)
   - After `result.url` extraction (line ~756), add:
 
   ```python
@@ -750,7 +750,7 @@
           continue
   ```
 
-- [ ] 6.4 Add HEAD pre-check tests in `tests/test_resolver_pipeline.py`
+- [x] 6.4 Add HEAD pre-check tests in `tests/test_resolver_pipeline.py`
   - Test HEAD returning HTML content-type skips GET
   - Test HEAD returning zero content-length skips GET
   - Test HEAD returning 404 skips GET
@@ -761,18 +761,18 @@
 
 ## 7. Bounded Intra-Work Concurrency
 
-- [ ] 7.1 Add concurrency fields to `ResolverConfig` dataclass
+- [x] 7.1 Add concurrency fields to `ResolverConfig` dataclass
 
   ```python
   # In resolvers/types.py
   max_concurrent_resolvers: int = 1  # Sequential by default
   ```
 
-- [ ] 7.2 Add thread-safe rate limit tracking in `ResolverPipeline.__init__()`
+- [x] 7.2 Add thread-safe rate limit tracking in `ResolverPipeline.__init__()`
   - Ensure `_last_invocation` dict and `_lock` are used for thread safety
   - Already present in current implementation; verify thread-safety annotations
 
-- [ ] 7.3 Implement concurrent resolver execution in `ResolverPipeline.run()`
+- [x] 7.3 Implement concurrent resolver execution in `ResolverPipeline.run()`
   - At start of method, check `if self.config.max_concurrent_resolvers == 1:` to use existing sequential path
   - For concurrent mode (`> 1`), implement:
 
@@ -804,11 +804,11 @@
                   return PipelineResult(success=True, ...)
   ```
 
-- [ ] 7.4 Ensure thread-safe metrics recording
+- [x] 7.4 Ensure thread-safe metrics recording
   - Verify `ResolverMetrics` uses `Counter` which is thread-safe
   - Verify `self.logger.log()` calls are thread-safe (they are, since file writes use OS-level locks)
 
-- [ ] 7.5 Add configuration validation
+- [x] 7.5 Add configuration validation
 
   ```python
   # In resolvers/types.py, add to ResolverConfig class
@@ -859,7 +859,7 @@
           )
   ```
 
-- [ ] 7.6 Add concurrent execution tests in `tests/test_bounded_concurrency.py`
+- [x] 7.6 Add concurrent execution tests in `tests/test_bounded_concurrency.py`
   - Test `max_concurrent_resolvers=1` uses sequential path
   - Test `max_concurrent_resolvers=3` executes up to 3 resolvers concurrently
   - Test rate limits are enforced despite concurrency
@@ -869,7 +869,7 @@
 
 ## 8. Zenodo Resolver
 
-- [ ] 8.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/zenodo.py`
+- [x] 8.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/zenodo.py`
 
   ```python
   """Zenodo repository resolver for DOI-indexed research outputs."""
@@ -953,14 +953,14 @@
                           )
   ```
 
-- [ ] 8.2 Add Zenodo to resolver registry
+- [x] 8.2 Add Zenodo to resolver registry
   - Import `ZenodoResolver` in `resolvers/providers/__init__.py`
   - Insert in `default_resolvers()` after `CoreResolver`, before `DoajResolver`
 
-- [ ] 8.3 Update `DEFAULT_RESOLVER_ORDER` constant
+- [x] 8.3 Update `DEFAULT_RESOLVER_ORDER` constant
   - Insert `"zenodo"` after `"core"` in list
 
-- [ ] 8.4 Add Zenodo resolver tests in `tests/test_zenodo_resolver.py`
+- [x] 8.4 Add Zenodo resolver tests in `tests/test_zenodo_resolver.py`
   - Test DOI query with successful response containing PDF file
   - Test DOI query with multiple files, filter to PDF only
   - Test DOI query with no matches (empty hits)
@@ -969,7 +969,7 @@
   - Test DOI query with network error
   - Use `responses` library for mock HTTP fixtures
 
-- [ ] 8.5 Add test fixture for Zenodo API response
+- [x] 8.5 Add test fixture for Zenodo API response
 
   ```python
   # Create tests/data/zenodo_response_sample.json

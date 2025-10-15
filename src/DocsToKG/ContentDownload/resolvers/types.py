@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
+import warnings
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Protocol
 
 import requests
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
 DEFAULT_RESOLVER_ORDER: List[str] = [
+    "openalex",
     "unpaywall",
     "crossref",
     "landing_page",
@@ -19,6 +21,7 @@ DEFAULT_RESOLVER_ORDER: List[str] = [
     "pmc",
     "europe_pmc",
     "core",
+    "zenodo",
     "doaj",
     "semantic_scholar",
     "openaire",
@@ -87,6 +90,8 @@ class ResolverConfig:
         resolver_timeouts: Resolver-specific timeout overrides.
         resolver_min_interval_s: Minimum interval between resolver requests.
         resolver_rate_limits: Deprecated rate limit configuration retained for compat.
+        enable_head_precheck: Toggle applying HEAD filtering before downloads.
+        resolver_head_precheck: Per-resolver overrides for HEAD filtering behaviour.
         mailto: Contact email appended to polite headers and user agent string.
 
     Examples:
@@ -110,7 +115,10 @@ class ResolverConfig:
     resolver_timeouts: Dict[str, float] = field(default_factory=dict)
     resolver_min_interval_s: Dict[str, float] = field(default_factory=dict)
     resolver_rate_limits: Dict[str, float] = field(default_factory=dict)
+    enable_head_precheck: bool = True
+    resolver_head_precheck: Dict[str, bool] = field(default_factory=dict)
     mailto: Optional[str] = None
+    max_concurrent_resolvers: int = 1
 
     def get_timeout(self, resolver_name: str) -> float:
         """Return the timeout to use for a resolver, falling back to defaults.
@@ -137,9 +145,49 @@ class ResolverConfig:
         return self.resolver_toggles.get(resolver_name, True)
 
     def __post_init__(self) -> None:
+        """Validate configuration fields and apply defaults."""
+
+        if self.max_concurrent_resolvers < 1:
+            raise ValueError(
+                f"max_concurrent_resolvers must be >= 1, got {self.max_concurrent_resolvers}"
+            )
+        if self.max_concurrent_resolvers > 10:
+            warnings.warn(
+                (
+                    "max_concurrent_resolvers="
+                    f"{self.max_concurrent_resolvers} > 10 may violate rate limits. "
+                    "Ensure resolver_min_interval_s is configured appropriately for all resolvers."
+                ),
+                UserWarning,
+                stacklevel=2,
+            )
+
+        if self.timeout <= 0:
+            raise ValueError(f"timeout must be positive, got {self.timeout}")
+        for resolver_name, timeout_val in self.resolver_timeouts.items():
+            if timeout_val <= 0:
+                raise ValueError(
+                    (
+                        "resolver_timeouts['{name}'] must be positive, got {value}"
+                    ).format(name=resolver_name, value=timeout_val)
+                )
+
+        for resolver_name, interval in self.resolver_min_interval_s.items():
+            if interval < 0:
+                raise ValueError(
+                    (
+                        "resolver_min_interval_s['{name}'] must be non-negative, got {value}"
+                    ).format(name=resolver_name, value=interval)
+                )
+
         if self.resolver_rate_limits:
             for name, value in self.resolver_rate_limits.items():
                 self.resolver_min_interval_s.setdefault(name, value)
+
+        if self.max_attempts_per_work < 1:
+            raise ValueError(
+                f"max_attempts_per_work must be >= 1, got {self.max_attempts_per_work}"
+            )
 
 
 @dataclass
@@ -275,6 +323,7 @@ class PipelineResult:
         url: URL that was ultimately fetched.
         outcome: Download outcome associated with the result.
         html_paths: Collected HTML artefacts from the pipeline.
+        failed_urls: Candidate URLs that failed during this run.
         reason: Optional reason string explaining failures.
 
     Examples:
@@ -286,6 +335,7 @@ class PipelineResult:
     url: Optional[str] = None
     outcome: Optional[DownloadOutcome] = None
     html_paths: List[str] = field(default_factory=list)
+    failed_urls: List[str] = field(default_factory=list)
     reason: Optional[str] = None
 
 

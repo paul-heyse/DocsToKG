@@ -7,7 +7,6 @@ import argparse
 import contextlib
 import csv
 import hashlib
-import inspect
 import json
 import logging
 import os
@@ -18,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import requests
 from pyalex import Topics, Works
@@ -49,8 +48,6 @@ from DocsToKG.ContentDownload.utils import (
 )
 
 MAX_SNIFF_BYTES = 64 * 1024
-SUCCESS_STATUSES = {"pdf", "pdf_unknown"}
-
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
 
 
@@ -58,23 +55,6 @@ def _utc_timestamp() -> str:
     """Return an ISO 8601 UTC timestamp with a trailing 'Z' suffix."""
 
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
-
-
-def _accepts_argument(func: Callable[..., Any], name: str) -> bool:
-    try:
-        signature = inspect.signature(func)
-    except (TypeError, ValueError):
-        return True
-
-    for parameter in signature.parameters.values():
-        if parameter.kind in (
-            inspect.Parameter.VAR_POSITIONAL,
-            inspect.Parameter.VAR_KEYWORD,
-        ):
-            return True
-        if parameter.name == name:
-            return True
-    return False
 
 
 def _has_pdf_eof(path: Path) -> bool:
@@ -1352,79 +1332,6 @@ def iterate_openalex(
                 return
 
 
-def attempt_openalex_candidates(
-    session: requests.Session,
-    artifact: WorkArtifact,
-    logger: JsonlLogger,
-    metrics: ResolverMetrics,
-    context: Optional[Dict[str, Any]] = None,
-) -> Optional[Tuple[DownloadOutcome, str]]:
-    """Attempt downloads for all candidate URLs associated with an artifact.
-
-    Args:
-        session: Requests session configured for resolver usage.
-        artifact: Work artifact containing candidate URLs.
-        logger: Attempt logger receiving structured records.
-        metrics: Resolver metrics collector.
-        context: Optional context dict (dry-run flags, previous entries).
-
-    Returns:
-        Pair of (DownloadOutcome, URL) on success, otherwise None.
-    """
-    candidates = list(artifact.pdf_urls)
-    if artifact.open_access_url:
-        candidates.append(artifact.open_access_url)
-
-    call_context = context or {}
-    accepts_context = _accepts_argument(download_candidate, "context")
-    seen = set()
-    html_paths: List[str] = []
-    for url in candidates:
-        if not url or url in seen:
-            continue
-        seen.add(url)
-        call_kwargs = {"context": call_context} if accepts_context else {}
-        outcome = download_candidate(
-            session,
-            artifact,
-            url,
-            referer=None,
-            timeout=30.0,
-            **call_kwargs,
-        )
-        logger.log(
-            AttemptRecord(
-                work_id=artifact.work_id,
-                resolver_name="openalex",
-                resolver_order=0,
-                url=url,
-                status=outcome.classification,
-                http_status=outcome.http_status,
-                content_type=outcome.content_type,
-                elapsed_ms=outcome.elapsed_ms,
-                reason=outcome.error,
-                metadata={"source": "openalex"},
-                sha256=outcome.sha256,
-                content_length=outcome.content_length,
-                dry_run=bool(call_context.get("dry_run", False)),
-            )
-        )
-        metrics.record_attempt("openalex", outcome)
-        if outcome.classification == "html" and outcome.path:
-            html_paths.append(outcome.path)
-        if outcome.is_pdf:
-            if html_paths:
-                artifact.metadata.setdefault("openalex_html_paths", []).extend(html_paths)
-            return outcome, url
-        if outcome.classification not in SUCCESS_STATUSES and url:
-            artifact.failed_pdf_urls.append(url)
-    if not seen:
-        metrics.record_skip("openalex", "no-candidates")
-    if html_paths:
-        artifact.metadata.setdefault("openalex_html_paths", []).extend(html_paths)
-    return None
-
-
 def process_one_work(
     work: Dict[str, Any],
     session: requests.Session,
@@ -1529,33 +1436,8 @@ def process_one_work(
         result["skipped"] = True
         return result
 
-    openalex_result = attempt_openalex_candidates(
-        session,
-        artifact,
-        logger,
-        metrics,
-        download_context,
-    )
-
-    if openalex_result and openalex_result[0].is_pdf:
-        outcome, url = openalex_result
-        html_paths = artifact.metadata.get("openalex_html_paths", [])
-        entry = build_manifest_entry(
-            artifact,
-            resolver="openalex",
-            url=url,
-            outcome=outcome,
-            html_paths=html_paths,
-            dry_run=dry_run,
-        )
-        logger.log_manifest(entry)
-        result["saved"] = True
-        return result
-
-    html_paths_total = list(artifact.metadata.get("openalex_html_paths", []))
-
     pipeline_result = pipeline.run(session, artifact, context=download_context)
-    html_paths_total.extend(pipeline_result.html_paths)
+    html_paths_total = list(pipeline_result.html_paths)
 
     if pipeline_result.success and pipeline_result.outcome:
         entry = build_manifest_entry(
