@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 from unittest.mock import Mock, call, patch
 
 import pytest
@@ -80,6 +80,13 @@ def test_parse_retry_after_header_http_date() -> None:
     assert 0.0 <= wait <= 30.0
 
 
+def test_parse_retry_after_header_invalid_date() -> None:
+    response = requests.Response()
+    response.headers = {"Retry-After": "Thu, 32 Foo 2024 00:00:00 GMT"}
+
+    assert parse_retry_after_header(response) is None
+
+
 @patch("DocsToKG.ContentDownload.http.random.random", return_value=0.0)
 @patch("DocsToKG.ContentDownload.http.time.sleep")
 def test_retry_after_header_overrides_backoff(mock_sleep: Mock, _: Mock) -> None:
@@ -145,3 +152,119 @@ def test_parse_retry_after_header_property(value: str) -> None:
 
     if result is not None:
         assert result >= 0.0
+def test_request_with_custom_retry_statuses() -> None:
+    session = Mock(spec=requests.Session)
+    failing = _mock_response(404)
+    success = _mock_response(200)
+    session.request.side_effect = [failing, success]
+
+    result = request_with_retries(
+        session,
+        "GET",
+        "https://example.org/test",
+        retry_statuses={404},
+        max_retries=1,
+    )
+
+    assert result is success
+    assert session.request.call_count == 2
+
+
+def test_request_returns_after_exhausting_single_attempt() -> None:
+    session = Mock(spec=requests.Session)
+    retry_response = _mock_response(503)
+    session.request.return_value = retry_response
+
+    result = request_with_retries(
+        session,
+        "GET",
+        "https://example.org/test",
+        max_retries=0,
+    )
+
+    assert result is retry_response
+
+
+def test_request_with_retries_rejects_negative_retries() -> None:
+    session = Mock(spec=requests.Session)
+
+    with pytest.raises(ValueError):
+        request_with_retries(session, "GET", "https://example.org/test", max_retries=-1)
+
+
+def test_request_with_retries_rejects_negative_backoff() -> None:
+    session = Mock(spec=requests.Session)
+
+    with pytest.raises(ValueError):
+        request_with_retries(session, "GET", "https://example.org/test", backoff_factor=-0.1)
+
+
+def test_request_with_retries_requires_method_and_url() -> None:
+    session = Mock(spec=requests.Session)
+
+    with pytest.raises(ValueError):
+        request_with_retries(session, "", "https://example.org/test")
+
+    with pytest.raises(ValueError):
+        request_with_retries(session, "GET", "")
+
+
+def test_request_with_retries_uses_method_fallback() -> None:
+    class _MinimalSession:
+        def __init__(self) -> None:
+            self.calls: List[str] = []
+
+        def get(self, url: str, **kwargs: Any):  # noqa: D401
+            self.calls.append(url)
+            response = Mock(spec=requests.Response)
+            response.status_code = 200
+            response.headers = {}
+            return response
+
+    session = _MinimalSession()
+
+    response = request_with_retries(session, "GET", "https://example.org/fallback")
+
+    assert response.status_code == 200
+    assert session.calls == ["https://example.org/fallback"]
+
+
+def test_request_with_retries_errors_when_no_callable_available() -> None:
+    class _MinimalSession:
+        pass
+
+    with pytest.raises(AttributeError):
+        request_with_retries(_MinimalSession(), "GET", "https://example.org/fail")
+
+
+def test_parse_retry_after_header_naive_datetime() -> None:
+    response = requests.Response()
+    response.headers = {"Retry-After": "Mon, 01 Jan 2024 00:00:00"}
+
+    wait = parse_retry_after_header(response)
+    assert wait is not None
+    assert wait >= 0.0
+
+
+def test_parse_retry_after_header_handles_parse_errors(monkeypatch) -> None:
+    response = requests.Response()
+    response.headers = {"Retry-After": "Mon, 01 Jan 2024 00:00:00 GMT"}
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.http.parsedate_to_datetime",
+        Mock(side_effect=TypeError("boom")),
+    )
+
+    assert parse_retry_after_header(response) is None
+
+
+def test_parse_retry_after_header_returns_none_when_parser_returns_none(monkeypatch) -> None:
+    response = requests.Response()
+    response.headers = {"Retry-After": "Mon, 01 Jan 2024 00:00:00 GMT"}
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.http.parsedate_to_datetime",
+        Mock(return_value=None),
+    )
+
+    assert parse_retry_after_header(response) is None

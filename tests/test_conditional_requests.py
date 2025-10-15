@@ -319,3 +319,13 @@ def test_interpret_response_cached_property(path: str, sha: str, size: int) -> N
     assert result.path == path
     assert result.sha256 == sha
     assert result.content_length == size
+def test_conditional_helper_rejects_negative_length() -> None:
+    with pytest.raises(ValueError):
+        ConditionalRequestHelper(prior_content_length=-1)
+
+
+def test_interpret_response_requires_response_shape() -> None:
+    helper = ConditionalRequestHelper()
+
+    with pytest.raises(TypeError):
+        helper.interpret_response(object())  # type: ignore[arg-type]

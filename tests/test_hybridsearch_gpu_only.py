@@ -5,6 +5,8 @@ from typing import Callable
 import numpy as np
 import pytest
 
+faiss = pytest.importorskip("faiss")  # type: ignore
+
 from DocsToKG.HybridSearch.config import DenseIndexConfig, FusionConfig
 from DocsToKG.HybridSearch.dense import FaissIndexManager
 from DocsToKG.HybridSearch.ids import vector_uuid_to_faiss_int
@@ -12,8 +14,6 @@ from DocsToKG.HybridSearch.results import ResultShaper
 from DocsToKG.HybridSearch.similarity import cosine_against_corpus_gpu
 from DocsToKG.HybridSearch.storage import OpenSearchSimulator
 from DocsToKG.HybridSearch.types import ChunkFeatures, ChunkPayload, HybridSearchRequest
-
-faiss = pytest.importorskip("faiss")  # type: ignore
 
 if not hasattr(faiss, "get_num_gpus"):
     pytestmark = pytest.mark.skip(reason="FAISS GPU utilities not available in this build")

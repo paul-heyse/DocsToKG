@@ -146,12 +146,6 @@ def _make_session(headers: Dict[str, str]) -> requests.Session:
     return session
 
 
-def _make_session_for_worker(headers: Dict[str, str]) -> requests.Session:
-    """Factory helper for per-worker sessions."""
-
-    return _make_session(headers)
-
-
 @dataclass
 class ManifestEntry:
     """Structured record capturing the outcome of a resolver attempt.
@@ -1745,7 +1739,7 @@ def main() -> None:
     def _session_factory() -> requests.Session:
         """Build a fresh requests session configured with polite headers."""
 
-        return _make_session_for_worker(config.polite_headers)
+        return _make_session(config.polite_headers)
 
     processed = 0
     saved = 0

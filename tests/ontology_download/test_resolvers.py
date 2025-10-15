@@ -25,6 +25,7 @@ import pytest
 import requests
 
 pytest.importorskip("pydantic")
+pytest.importorskip("pydantic_settings")
 
 from DocsToKG.OntologyDownload import resolvers
 from DocsToKG.OntologyDownload.config import DefaultsConfiguration, ResolvedConfig
@@ -148,3 +149,10 @@ def test_ols_resolver_timeout_retry(monkeypatch, resolved_config):
     plan = resolver.plan(spec, resolved_config, logging.getLogger(__name__))
     assert plan.url == "https://example.org/bfo.owl"
     assert attempts["count"] == 2
+
+
+def test_normalize_license_to_spdx_variants():
+    assert resolvers.normalize_license_to_spdx("CC BY 4.0") == "CC-BY-4.0"
+    assert resolvers.normalize_license_to_spdx("public domain") == "CC0-1.0"
+    assert resolvers.normalize_license_to_spdx("Apache License 2.0") == "Apache-2.0"
+    assert resolvers.normalize_license_to_spdx("Custom License") == "Custom License"

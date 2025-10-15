@@ -94,6 +94,8 @@ def request_with_retries(
         responsible for closing the response when streaming content.
 
     Raises:
+        ValueError: If ``max_retries`` or ``backoff_factor`` are invalid or
+            ``url``/``method`` are empty.
         requests.RequestException: If all retry attempts fail due to network
             errors or the session raises an exception.
 
@@ -117,8 +119,19 @@ def request_with_retries(
         pooling adapters.
     """
 
+    if max_retries < 0:
+        raise ValueError(f"max_retries must be non-negative, got {max_retries}")
+    if backoff_factor < 0:
+        raise ValueError(f"backoff_factor must be non-negative, got {backoff_factor}")
+    if not method:
+        raise ValueError("method must be a non-empty string")
+    if not isinstance(url, str) or not url:
+        raise ValueError("url must be a non-empty string")
+
     if retry_statuses is None:
         retry_statuses = {429, 500, 502, 503, 504}
+    else:
+        retry_statuses = set(retry_statuses)
 
     request_func = getattr(session, "request", None)
     if not callable(request_func):
@@ -239,10 +252,12 @@ def request_with_retries(
             delay = backoff_factor * (2**attempt) + random.random() * 0.1
             time.sleep(delay)
 
-    if last_exception is not None:
+    if last_exception is not None:  # pragma: no cover - defensive safety net
         raise last_exception
 
-    raise requests.RequestException(f"Exhausted {max_retries} retries for {method} {url}")
+    raise requests.RequestException(  # pragma: no cover - defensive safety net
+        f"Exhausted {max_retries} retries for {method} {url}"
+    )
 
 
 __all__ = ["parse_retry_after_header", "request_with_retries"]

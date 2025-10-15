@@ -1,9 +1,4 @@
-"""Resolver pipeline and provider implementations.
-
-This module maintains backward compatibility by re-exporting legacy entry points
-so existing integrations and tests can continue to monkeypatch ``requests`` or
-``time`` on the resolver namespace.
-"""
+"""Resolver pipeline and provider implementations with compatibility shims."""
 
 import time as _time
 import warnings
@@ -43,8 +38,22 @@ from .types import (
 )
 
 DEFAULT_RESOLVER_ORDER = _DEFAULT_RESOLVER_ORDER
-time = _time
-requests = _requests
+
+_LEGACY_EXPORTS = {
+    "time": _time,
+    "requests": _requests,
+}
+
+_DEPRECATION_MESSAGES = {
+    "time": (
+        "DocsToKG.ContentDownload.resolvers.time is deprecated; import 'time' "
+        "directly. This alias will be removed in a future release."
+    ),
+    "requests": (
+        "DocsToKG.ContentDownload.resolvers.requests is deprecated; import the "
+        "'requests' package directly. This alias will be removed in a future release."
+    ),
+}
 
 warnings.warn(
     (
@@ -109,3 +118,19 @@ __all__ = [
     "time",
     "requests",
 ]
+
+
+def __getattr__(name: str):
+    """Return legacy exports while emitting :class:`DeprecationWarning`."""
+
+    if name in _LEGACY_EXPORTS:
+        warnings.warn(
+            _DEPRECATION_MESSAGES.get(
+                name,
+                f"DocsToKG.ContentDownload.resolvers.{name} is deprecated",
+            ),
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return _LEGACY_EXPORTS[name]
+    raise AttributeError(name)

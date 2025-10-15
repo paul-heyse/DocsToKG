@@ -2,6 +2,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("transformers")
+
 from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (
     Rec,
     coalesce_small_runs,

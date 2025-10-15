@@ -23,6 +23,7 @@ import json
 import pytest
 
 pytest.importorskip("pydantic")
+pytest.importorskip("pydantic_settings")
 
 from DocsToKG.OntologyDownload import cli
 from DocsToKG.OntologyDownload.config import DefaultsConfiguration, ResolvedConfig
@@ -107,6 +108,8 @@ def test_cli_validate_json_output(monkeypatch, stub_logger, tmp_path, capsys):
         "license": "CC-BY",
         "status": "fresh",
         "sha256": "abc",
+        "normalized_sha256": "def",
+        "fingerprint": "f" * 64,
         "etag": "tag",
         "last_modified": "today",
         "downloaded_at": "now",

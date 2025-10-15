@@ -82,6 +82,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Worker processes to launch; backend defaults used when omitted",
     )
     parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Override vLLM model path or identifier for PDF conversion",
+    )
+    parser.add_argument(
+        "--served-model-name",
+        dest="served_model_names",
+        action="append",
+        nargs="+",
+        default=None,
+        help="Model alias to expose from vLLM (repeatable)",
+    )
+    parser.add_argument(
+        "--gpu-memory-utilization",
+        type=float,
+        default=None,
+        help="Fraction of GPU memory allocated to the vLLM server",
+    )
+    parser.add_argument(
         "--resume",
         action="store_true",
         help="Skip documents whose outputs already exist with matching content hash",
@@ -194,6 +214,9 @@ def main(argv: list[str] | None = None) -> int:
                 "resume": args.resume,
                 "force": args.force,
                 "overwrite": args.overwrite,
+                "model": args.model,
+                "served_model_names": args.served_model_names,
+                "gpu_memory_utilization": args.gpu_memory_utilization,
             }
         },
     )
@@ -218,6 +241,9 @@ def main(argv: list[str] | None = None) -> int:
         "workers": args.workers,
         "resume": args.resume,
         "force": args.force,
+        "model": args.model,
+        "served_model_names": args.served_model_names,
+        "gpu_memory_utilization": args.gpu_memory_utilization,
     }
     pdf_args = _merge_args(pdf_backend.build_parser(), overrides)
     return pdf_backend.main(pdf_args)

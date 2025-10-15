@@ -208,7 +208,7 @@ def test_pipeline_collects_html_paths(tmp_path):
 
 def test_pipeline_rate_limit_enforced(monkeypatch, tmp_path):
     artifact = make_artifact(tmp_path)
-    timeline = [0.0, 0.2, 0.2, 1.2]
+    timeline = [0.0, 0.2, 0.2, 1.2, 2.0, 2.8]
 
     def fake_monotonic():
         return timeline.pop(0)
@@ -241,8 +241,10 @@ def test_pipeline_rate_limit_enforced(monkeypatch, tmp_path):
     pipeline.run(session, artifact)
     pipeline.run(session, artifact)
     assert len(sleeps) == 2
-    for delay in sleeps:
-        assert pytest.approx(delay, rel=0.01) == 1.0
+    assert pytest.approx(sleeps[0], rel=0.01) == 1.0
+    # The second invocation occurs 0.2s after the first due to the simulated
+    # timeline, so the sleep duration reflects the remaining 0.8s window.
+    assert pytest.approx(sleeps[1], rel=0.01) == 0.8
 
 
 def test_openalex_resolver_executes_first(tmp_path):
@@ -289,7 +291,7 @@ def test_openalex_respects_rate_limit(monkeypatch, tmp_path):
     artifact = make_artifact(tmp_path)
     artifact.pdf_urls = ["https://openalex.org/pdf-one"]
 
-    timeline = [0.0, 0.4, 0.4, 1.2]
+    timeline = [0.0, 0.4, 0.4, 1.2, 2.0, 2.8]
 
     def fake_monotonic():
         return timeline.pop(0)
