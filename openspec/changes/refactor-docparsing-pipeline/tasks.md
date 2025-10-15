@@ -2,12 +2,12 @@
 
 ## 1. Shared Utilities Infrastructure
 
-- [ ] 1.1 Create `src/DocsToKG/DocParsing/_common.py` module
+- [x] 1.1 Create `src/DocsToKG/DocParsing/_common.py` module
   - Add module-level docstring: "Shared utilities for DocParsing pipeline stages (path resolution, I/O, logging, batching)"
   - Import statements needed: `os`, `pathlib.Path`, `logging`, `json`, `socket`, `typing`, `contextlib`, `hashlib`, `datetime`, `time`
   - Define `__all__` list: `["detect_data_root", "data_doctags", "data_chunks", "data_vectors", "data_manifests", "find_free_port", "atomic_write", "iter_doctags", "iter_chunks", "jsonl_load", "jsonl_save", "get_logger", "Batcher", "manifest_append", "compute_content_hash", "acquire_lock"]`
 
-- [ ] 1.2 Implement `detect_data_root(start: Path) -> Path` function with env var support
+- [x] 1.2 Implement `detect_data_root(start: Path) -> Path` function with env var support
   - **Full Signature**: `def detect_data_root(start: Optional[Path] = None) -> Path`
   - **Implementation Steps**:
     1. Check environment variable: `env_root = os.getenv("DOCSTOKG_DATA_ROOT")`
@@ -21,7 +21,7 @@
   - **Error Handling**: If env var points to non-existent path, raise `FileNotFoundError(f"DOCSTOKG_DATA_ROOT points to non-existent directory: {env_root}")`
   - **Docstring**: Must include Args, Returns, Raises, Examples sections
 
-- [ ] 1.3 Implement typed path getters: `data_doctags()`, `data_chunks()`, `data_vectors()`, `data_manifests()`
+- [x] 1.3 Implement typed path getters: `data_doctags()`, `data_chunks()`, `data_vectors()`, `data_manifests()`
   - **Signature for each**: `def data_<name>(root: Optional[Path] = None) -> Path`
   - **Implementation Template**:
 
@@ -41,7 +41,7 @@
     - `data_html()` → `"HTML"`
   - Each function MUST create the directory if it doesn't exist
 
-- [ ] 1.4 Implement `find_free_port(start: int, span: int) -> int` function
+- [x] 1.4 Implement `find_free_port(start: int, span: int) -> int` function
   - **Signature**: `def find_free_port(start: int = 8000, span: int = 32) -> int`
   - **Implementation**:
 
@@ -59,7 +59,7 @@
         return s.getsockname()[1]
     ```
 
-- [ ] 1.5 Implement `atomic_write(path: Path)` context manager
+- [x] 1.5 Implement `atomic_write(path: Path)` context manager
   - **Signature**: `@contextlib.contextmanager def atomic_write(path: Path) -> Iterator[TextIO]`
   - **Implementation**:
 
@@ -78,7 +78,7 @@
 
   - **Usage Example**: `with atomic_write(output_path) as f: json.dump(data, f)`
 
-- [ ] 1.6 Implement `iter_doctags(directory: Path) -> Iterator[Path]` generator
+- [x] 1.6 Implement `iter_doctags(directory: Path) -> Iterator[Path]` generator
   - **Signature**: `def iter_doctags(directory: Path) -> Iterator[Path]`
   - **Implementation**:
 
@@ -92,12 +92,12 @@
     yield from sorted(found)
     ```
 
-- [ ] 1.7 Implement `iter_chunks(directory: Path) -> Iterator[Path]` generator
+- [x] 1.7 Implement `iter_chunks(directory: Path) -> Iterator[Path]` generator
   - **Signature**: `def iter_chunks(directory: Path) -> Iterator[Path]`
   - **Implementation**: `yield from sorted(p for p in directory.glob("*.chunks.jsonl") if p.is_file())`
   - NOTE: Use `glob` not `rglob` - chunks are in flat directory structure
 
-- [ ] 1.8 Implement `jsonl_load(path: Path) -> List[dict]` function
+- [x] 1.8 Implement `jsonl_load(path: Path) -> List[dict]` function
   - **Signature**: `def jsonl_load(path: Path, skip_invalid: bool = False, max_errors: int = 10) -> List[dict]`
   - **Implementation**:
 
@@ -125,7 +125,7 @@
     return rows
     ```
 
-- [ ] 1.9 Implement `jsonl_save(path: Path, rows: List[dict])` with atomic writes
+- [x] 1.9 Implement `jsonl_save(path: Path, rows: List[dict])` with atomic writes
   - **Signature**: `def jsonl_save(path: Path, rows: List[dict], validate: Optional[Callable[[dict], None]] = None) -> None`
   - **Implementation**:
 
@@ -148,7 +148,7 @@
         raise
     ```
 
-- [ ] 1.10 Implement `get_logger(name: str) -> logging.Logger` with JSON formatting
+- [x] 1.10 Implement `get_logger(name: str) -> logging.Logger` with JSON formatting
   - **Signature**: `def get_logger(name: str, level: str = "INFO") -> logging.Logger`
   - **Implementation**:
 
@@ -178,7 +178,7 @@
 
   - **Usage**: `logger.info("Processing", extra={"extra_fields": {"doc_id": "abc", "stage": "chunking"}})`
 
-- [ ] 1.11 Implement `Batcher` class for streaming batch processing
+- [x] 1.11 Implement `Batcher` class for streaming batch processing
   - **Full Implementation**:
 
     ```python
@@ -217,7 +217,7 @@
                 yield batch
     ```
 
-- [ ] 1.12 Implement `manifest_append(stage, doc_id, status, **metadata)` function
+- [x] 1.12 Implement `manifest_append(stage, doc_id, status, **metadata)` function
   - **Signature**: `def manifest_append(stage: str, doc_id: str, status: str, duration_s: float = 0.0, warnings: Optional[List[str]] = None, error: Optional[str] = None, schema_version: str = "", **metadata) -> None`
   - **Implementation**:
 
@@ -245,7 +245,7 @@
 
   - **Validation**: `status` must be in `["success", "failure", "skip"]` - raise ValueError otherwise
 
-- [ ] 1.13 Add `compute_content_hash(path: Path) -> str` function
+- [x] 1.13 Add `compute_content_hash(path: Path) -> str` function
   - **Signature**: `def compute_content_hash(path: Path, algorithm: str = "sha1") -> str`
   - **Implementation**:
 
@@ -259,7 +259,7 @@
     return hasher.hexdigest()
     ```
 
-- [ ] 1.14 Add `acquire_lock(path: Path, timeout: float) -> ContextManager[bool]` function
+- [x] 1.14 Add `acquire_lock(path: Path, timeout: float) -> ContextManager[bool]` function
   - **Signature**: `@contextlib.contextmanager def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]`
   - **Implementation**:
 
@@ -282,7 +282,7 @@
         lock_path.unlink(missing_ok=True)
     ```
 
-- [ ] 1.15 Add comprehensive docstrings following Google style
+- [x] 1.15 Add comprehensive docstrings following Google style
   - Each function requires: Summary line, blank line, Args section, Returns section, Raises section (if applicable), Examples section
   - Example template:
 
@@ -317,7 +317,7 @@
 
   - Run `pydocstyle _common.py --convention=google` to validate
 
-- [ ] 1.16 Add unit tests for all utilities in `tests/test_docparsing_common.py`
+- [x] 1.16 Add unit tests for all utilities in `tests/test_docparsing_common.py`
   - Test `detect_data_root`: with env var, without env var, from different starting points
   - Test `find_free_port`: basic case, all ports busy scenario
   - Test `atomic_write`: successful write, write with exception (ensure cleanup)
@@ -330,12 +330,12 @@
 
 ## 2. Schema Validation Layer
 
-- [ ] 2.1 Create `src/DocsToKG/DocParsing/schemas.py` module
+- [x] 2.1 Create `src/DocsToKG/DocParsing/schemas.py` module
   - Import: `from pydantic import BaseModel, Field, validator, root_validator`
   - Import: `from typing import List, Optional, Dict, Any`
   - Add module docstring: "Pydantic schemas for DocParsing JSONL outputs with validation"
 
-- [ ] 2.2 Define `ChunkRow` Pydantic model
+- [x] 2.2 Define `ChunkRow` Pydantic model
   - **Full Implementation**:
 
     ```python
@@ -371,7 +371,7 @@
             extra = "forbid"  # Reject unknown fields
     ```
 
-- [ ] 2.3 Define `VectorRow` Pydantic model
+- [x] 2.3 Define `VectorRow` Pydantic model
   - **Full Implementation**:
 
     ```python
@@ -390,7 +390,7 @@
             extra = "forbid"
     ```
 
-- [ ] 2.4 Define `BM25Vector` nested model
+- [x] 2.4 Define `BM25Vector` nested model
   - **Full Implementation**:
 
     ```python
@@ -412,7 +412,7 @@
             return values
     ```
 
-- [ ] 2.5 Define `SPLADEVector` nested model
+- [x] 2.5 Define `SPLADEVector` nested model
   - **Full Implementation**:
 
     ```python
@@ -433,7 +433,7 @@
             return values
     ```
 
-- [ ] 2.6 Define `DenseVector` nested model
+- [x] 2.6 Define `DenseVector` nested model
   - **Full Implementation**:
 
     ```python
@@ -453,7 +453,7 @@
             return v
     ```
 
-- [ ] 2.7 Define `ProvenanceMetadata` model
+- [x] 2.7 Define `ProvenanceMetadata` model
   - **Full Implementation**:
 
     ```python
@@ -472,7 +472,7 @@
             return v
     ```
 
-- [ ] 2.8 Add schema version constants
+- [x] 2.8 Add schema version constants
   - **Implementation**:
 
     ```python
@@ -485,7 +485,7 @@
     COMPATIBLE_VECTOR_VERSIONS = ["embeddings/1.0.0"]
     ```
 
-- [ ] 2.9 Implement validation helper: `validate_chunk_row(row: dict) -> ChunkRow`
+- [x] 2.9 Implement validation helper: `validate_chunk_row(row: dict) -> ChunkRow`
   - **Implementation**:
 
     ```python
@@ -513,11 +513,11 @@
             raise ValueError(f"Chunk row validation failed for doc_id={row.get('doc_id', 'unknown')}: {e}") from e
     ```
 
-- [ ] 2.10 Implement validation helper: `validate_vector_row(row: dict) -> VectorRow`
+- [x] 2.10 Implement validation helper: `validate_vector_row(row: dict) -> VectorRow`
   - **Implementation**: Similar to validate_chunk_row but for VectorRow
   - Add special handling for UUID-based error messages
 
-- [ ] 2.11 Add `get_docling_version() -> str` utility function
+- [x] 2.11 Add `get_docling_version() -> str` utility function
   - **Implementation**:
 
     ```python
@@ -530,7 +530,7 @@
             return "unknown"
     ```
 
-- [ ] 2.12 Add backward compatibility validator
+- [x] 2.12 Add backward compatibility validator
   - **Implementation**:
 
     ```python
@@ -551,7 +551,7 @@
         return version in compatible_versions
     ```
 
-- [ ] 2.13 Add unit tests in `tests/test_docparsing_schemas.py`
+- [x] 2.13 Add unit tests in `tests/test_docparsing_schemas.py`
   - Test ChunkRow: valid row, missing required field, invalid num_tokens (negative, zero, excessive)
   - Test VectorRow: valid row, mismatched term/weight lengths
   - Test ProvenanceMetadata: valid engines, invalid engine string
@@ -563,20 +563,20 @@
 
 ## 3. Serializers Extraction
 
-- [ ] 3.1 Create `src/DocsToKG/DocParsing/serializers.py` module
+- [x] 3.1 Create `src/DocsToKG/DocParsing/serializers.py` module
   - Import required classes from docling-core
   - Add module docstring describing purpose
 
-- [ ] 3.2 Move `CaptionPlusAnnotationPictureSerializer` to serializers module
+- [x] 3.2 Move `CaptionPlusAnnotationPictureSerializer` to serializers module
   - **Implementation**: Copy exactly from `DoclingHybridChunkerPipelineWithMin.py` lines 53-99
   - Preserve all imports needed: `PictureItem`, `PictureDescriptionData`, etc.
   - Add comprehensive docstring with example usage
 
-- [ ] 3.3 Move `RichSerializerProvider` to serializers module
+- [x] 3.3 Move `RichSerializerProvider` to serializers module
   - **Implementation**: Copy from chunker script lines 102-128
   - Add docstring explaining when to use this provider vs default
 
-- [ ] 3.4 Add example usage in module docstring
+- [x] 3.4 Add example usage in module docstring
   - **Documentation**:
 
     ```python
@@ -595,7 +595,7 @@
     """
     ```
 
-- [ ] 3.5 Update imports in `DoclingHybridChunkerPipelineWithMin.py`
+- [x] 3.5 Update imports in `DoclingHybridChunkerPipelineWithMin.py`
   - Replace local class definitions with: `from DocsToKG.DocParsing.serializers import CaptionPlusAnnotationPictureSerializer, RichSerializerProvider`
   - Remove original class definitions (lines 53-128)
   - Verify script still runs with `python DoclingHybridChunkerPipelineWithMin.py --help`

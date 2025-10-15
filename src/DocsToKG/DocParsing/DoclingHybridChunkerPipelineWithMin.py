@@ -17,133 +17,15 @@ from typing import Any, List, Tuple
 
 # Third-party imports
 from docling_core.transforms.chunker.base import BaseChunk
-from docling_core.transforms.chunker.hierarchical_chunker import (
-    ChunkingDocSerializer,
-    ChunkingSerializerProvider,
-)
 from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
-from docling_core.transforms.serializer.base import BaseDocSerializer, SerializationResult
-from docling_core.transforms.serializer.common import create_ser_result
-from docling_core.transforms.serializer.markdown import (
-    MarkdownParams,
-    MarkdownPictureSerializer,
-    MarkdownTableSerializer,
-)
-from docling_core.types.doc.document import (
-    DoclingDocument,
-    DocTagsDocument,
-    PictureClassificationData,
-    PictureDescriptionData,
-    PictureItem,
-    PictureMoleculeData,
-)
-from docling_core.types.doc.document import (
-    DoclingDocument as _Doc,
-)
+from docling_core.types.doc.document import DoclingDocument, DocTagsDocument
 from transformers import AutoTokenizer
-from typing_extensions import override
 
-# ---------- I/O ----------
-DEFAULT_IN_DIR = Path("/home/paul/DocsToKG/Data/DocTagsFiles")
-DEFAULT_OUT_DIR = Path("/home/paul/DocsToKG/Data/ChunkedDocTagFiles")
-
-
-# ---------- Picture serializer: inject CAPTIONS (+ optional annotations) ----------
-class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
-    """Serialize picture items with captions and rich annotation metadata.
-
-    Attributes:
-        None
-
-    Examples:
-        >>> serializer = CaptionPlusAnnotationPictureSerializer()
-        >>> isinstance(serializer, MarkdownPictureSerializer)
-        True
-    """
-
-    @override
-    def serialize(
-        self, *, item: PictureItem, doc_serializer: BaseDocSerializer, doc: _Doc, **_: Any
-    ) -> SerializationResult:
-        """Render picture metadata into Markdown-friendly text.
-
-        Args:
-            item: Picture element emitted by Docling.
-            doc_serializer: Parent serializer responsible for post-processing.
-            doc: Full Docling document containing the picture context.
-
-        Returns:
-            SerializationResult capturing the rendered string and provenance.
-        """
-        parts: List[str] = []
-        try:
-            cap = (item.caption_text(doc) or "").strip()
-            if cap:
-                parts.append(f"Figure caption: {cap}")
-        except Exception:
-            pass
-        try:
-            for ann in item.annotations or []:
-                if isinstance(ann, PictureDescriptionData) and ann.text:
-                    parts.append(f"Picture description: {ann.text}")
-                elif isinstance(ann, PictureClassificationData) and ann.predicted_classes:
-                    parts.append(f"Picture type: {ann.predicted_classes[0].class_name}")
-                elif isinstance(ann, PictureMoleculeData) and ann.smi:
-                    parts.append(f"SMILES: {ann.smi}")
-        except Exception:
-            pass
-        if not parts:
-            parts.append("<!-- image -->")
-        text = doc_serializer.post_process(text="\n".join(parts))
-        return create_ser_result(text=text, span_source=item)
-
-
-class RichSerializerProvider(ChunkingSerializerProvider):
-    """Provide a serializer that augments tables and pictures with Markdown.
-
-    Attributes:
-        None
-
-    Examples:
-        >>> provider = RichSerializerProvider()
-        >>> isinstance(provider, ChunkingSerializerProvider)
-        True
-    """
-
-    def get_serializer(self, doc: DoclingDocument) -> ChunkingDocSerializer:
-        """Construct a ChunkingDocSerializer tailored for DocTags documents.
-
-        Args:
-            doc: Docling document that will be serialized into chunk text.
-
-        Returns:
-            Configured ChunkingDocSerializer instance.
-        """
-        return ChunkingDocSerializer(
-            doc=doc,
-            table_serializer=MarkdownTableSerializer(),  # tables -> Markdown
-            picture_serializer=CaptionPlusAnnotationPictureSerializer(),  # pictures -> caption/annots
-            params=MarkdownParams(image_placeholder="<!-- image -->"),
-        )
-
+from DocsToKG.DocParsing._common import data_chunks, data_doctags, iter_doctags
+from DocsToKG.DocParsing.serializers import RichSerializerProvider
 
 # ---------- Helpers ----------
-def find_doctags_files(in_dir: Path) -> List[Path]:
-    """Discover `.doctags` artifacts within a directory.
-
-    Args:
-        in_dir: Directory containing DocTags outputs.
-
-    Returns:
-        Sorted list of unique DocTags file paths.
-    """
-    files = []
-    for pat in ("*.doctags", "*.doctag"):
-        files.extend(in_dir.glob(pat))
-    return sorted({p.resolve() for p in files})
-
-
 def read_utf8(p: Path) -> str:
     """Load text from disk using UTF-8 with replacement for invalid bytes.
 
@@ -368,8 +250,8 @@ def main():
         None
     """
     ap = argparse.ArgumentParser()
-    ap.add_argument("--in-dir", type=Path, default=DEFAULT_IN_DIR)
-    ap.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
+    ap.add_argument("--in-dir", type=Path, default=data_doctags())
+    ap.add_argument("--out-dir", type=Path, default=data_chunks())
     ap.add_argument("--min-tokens", type=int, default=256)
     ap.add_argument("--max-tokens", type=int, default=512)
     args = ap.parse_args()
@@ -377,7 +259,7 @@ def main():
     in_dir, out_dir = args.in_dir, args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    files = find_doctags_files(in_dir)
+    files = list(iter_doctags(in_dir))
     if not files:
         print(f"[WARN] No *.doctags files found in {in_dir}")
         return
