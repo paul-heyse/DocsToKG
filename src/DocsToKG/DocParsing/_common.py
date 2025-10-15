@@ -62,6 +62,7 @@ __all__ = [
     "Batcher",
     "manifest_append",
     "compute_content_hash",
+    "resolve_hash_algorithm",
     "load_manifest_index",
     "acquire_lock",
 ]
@@ -273,6 +274,8 @@ def get_logger(name: str, level: str = "INFO") -> logging.Logger:
                 >>> hasattr(formatter, "format")
                 True
             """
+
+            converter = time.gmtime
 
             def format(self, record: logging.LogRecord) -> str:
                 """Render a log record as a JSON string.
@@ -572,6 +575,16 @@ class Batcher(Iterable[List[T]]):
             yield batch
 
 
+def _manifest_filename(stage: str) -> str:
+    """Return manifest filename for a given stage."""
+
+    safe = stage.strip() or "all"
+    safe = "".join(
+        c if c.isalnum() or c in {"-", "_", "."} else "-" for c in safe
+    )
+    return f"docparse.{safe}.manifest.jsonl"
+
+
 def manifest_append(
     stage: str,
     doc_id: str,
@@ -611,7 +624,7 @@ def manifest_append(
     if status not in allowed_status:
         raise ValueError(f"status must be one of {sorted(allowed_status)}")
 
-    manifest_path = data_manifests() / "docparse.manifest.jsonl"
+    manifest_path = data_manifests() / _manifest_filename(stage)
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "stage": stage,
@@ -629,12 +642,23 @@ def manifest_append(
         handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
+def resolve_hash_algorithm(default: str = "sha1") -> str:
+    """Return the active content hash algorithm, honoring env overrides."""
+
+    env_override = os.getenv("DOCSTOKG_HASH_ALG")
+    return env_override.strip() if env_override else default
+
+
 def compute_content_hash(path: Path, algorithm: str = "sha1") -> str:
     """Compute a content hash for ``path`` using the requested algorithm.
 
     Args:
         path: File whose contents should be hashed.
         algorithm: Hash algorithm name supported by :mod:`hashlib`.
+
+    Notes:
+        The ``DOCSTOKG_HASH_ALG`` environment variable overrides ``algorithm``
+        when set, enabling fleet-wide hash changes without code edits.
 
     Returns:
         Hex digest string.
@@ -646,7 +670,8 @@ def compute_content_hash(path: Path, algorithm: str = "sha1") -> str:
         True
     """
 
-    hasher = hashlib.new(algorithm)
+    selected_algorithm = resolve_hash_algorithm(algorithm)
+    hasher = hashlib.new(selected_algorithm)
     with path.open("rb") as handle:
         while True:
             chunk = handle.read(65536)
@@ -676,26 +701,34 @@ def load_manifest_index(stage: str, root: Optional[Path] = None) -> Dict[str, di
     """
 
     manifest_dir = data_manifests(root)
-    manifest_path = manifest_dir / "docparse.manifest.jsonl"
+    stage_path = manifest_dir / _manifest_filename(stage)
+    legacy_path = manifest_dir / "docparse.manifest.jsonl"
     index: Dict[str, dict] = {}
-    if not manifest_path.exists():
+    if stage_path.exists():
+        candidates = [stage_path]
+    elif legacy_path.exists():
+        candidates = [legacy_path]
+    else:
         return index
 
-    with manifest_path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if entry.get("stage") != stage:
-                continue
-            doc_id = entry.get("doc_id")
-            if not doc_id:
-                continue
-            index[doc_id] = entry
+    for manifest_path in candidates:
+        with manifest_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if entry.get("stage") != stage:
+                    if manifest_path is stage_path:
+                        continue
+                    continue
+                doc_id = entry.get("doc_id")
+                if not doc_id:
+                    continue
+                index[doc_id] = entry
     return index
 
 

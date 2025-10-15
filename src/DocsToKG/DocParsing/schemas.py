@@ -292,6 +292,22 @@ class ChunkRow(BaseModel):
     schema_version: str = Field(
         default=CHUNK_SCHEMA_VERSION, description="Schema version identifier"
     )
+    has_image_captions: Optional[bool] = Field(
+        None,
+        description=(
+            "Convenience flag mirroring provenance.has_image_captions for quick filtering"
+        ),
+    )
+    has_image_classification: Optional[bool] = Field(
+        None,
+        description=(
+            "Convenience flag mirroring provenance.has_image_classification for quick filtering"
+        ),
+    )
+    num_images: Optional[int] = Field(
+        None,
+        description="Convenience count mirroring provenance.num_images",
+    )
     provenance: Optional["ProvenanceMetadata"] = Field(
         None, description="Optional provenance metadata"
     )

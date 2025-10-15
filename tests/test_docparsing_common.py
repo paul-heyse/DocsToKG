@@ -154,8 +154,8 @@ def test_batcher() -> None:
 
 
 def test_manifest_append(tmp_path: Path) -> None:
-    manifest = _common.data_manifests() / "docparse.manifest.jsonl"
-    _common.manifest_append("chunk", "doc-1", "success", duration_s=1.23)
+    manifest = _common.data_manifests() / "docparse.chunks.manifest.jsonl"
+    _common.manifest_append("chunks", "doc-1", "success", duration_s=1.23)
     content = manifest.read_text(encoding="utf-8").strip()
     record = json.loads(content)
     assert record["doc_id"] == "doc-1"
