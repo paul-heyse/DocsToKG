@@ -365,7 +365,7 @@ chmod +x src/DocsToKG/DocParsing/run_docling_parallel_with_vllm_debug.py
 ---
 
 ### Task 1.4: Create comprehensive unit tests for shims
-- [ ] Task 1.4: Create comprehensive unit tests for shims
+- [x] Task 1.4: Create comprehensive unit tests for shims
 
 **What**: Add test suite verifying shim behavior
 
@@ -567,7 +567,7 @@ tests/test_docparsing_legacy_shims.py::TestLegacyModuleAccess::test_legacy_packa
 ---
 
 ### Task 1.5: Update imports in tests that reference moved scripts
-- [ ] Task 1.5: Update imports in tests that reference moved scripts
+- [x] Task 1.5: Update imports in tests that reference moved scripts
 
 **What**: Fix any existing tests that import the moved scripts
 
@@ -637,7 +637,7 @@ pytest tests/ -k "docparsing or docling" -v
 ---
 
 ### Task 1.6: Phase 1 completion checklist
-- [ ] Task 1.6: Phase 1 completion checklist
+- [x] Task 1.6: Phase 1 completion checklist
 
 **Run all validations**:
 
@@ -725,7 +725,7 @@ chmod +x scripts/validate_phase1.sh
 **Goal**: Remove test-only code from production modules
 
 ### Task 2.1: Remove `_promote_simple_namespace_modules()` from chunker
-- [ ] Task 2.1: Remove `_promote_simple_namespace_modules()` from chunker
+- [x] Task 2.1: Remove `_promote_simple_namespace_modules()` from chunker
 
 **What**: Delete Hypothesis test helper from production code
 
@@ -814,7 +814,7 @@ python -c "from DocsToKG.DocParsing import DoclingHybridChunkerPipelineWithMin; 
 ---
 
 ### Task 2.2: Move promotion helper to test utilities
-- [ ] Task 2.2: Move promotion helper to test utilities
+- [x] Task 2.2: Move promotion helper to test utilities
 
 **What**: Extract function to test-only module for Hypothesis compatibility
 
@@ -1045,7 +1045,7 @@ pytest tests/test_stubs.py -q && echo "✓ Tests pass" || exit 1
 ---
 
 ### Task 2.3: Delete duplicate `SOFT_BARRIER_MARGIN` constant
-- [ ] Task 2.3: Delete duplicate `SOFT_BARRIER_MARGIN` constant
+- [x] Task 2.3: Delete duplicate `SOFT_BARRIER_MARGIN` constant
 
 **What**: Remove second declaration of `SOFT_BARRIER_MARGIN` (line 80)
 
@@ -1112,7 +1112,7 @@ python -m py_compile src/DocsToKG/DocParsing/DoclingHybridChunkerPipelineWithMin
 ---
 
 ### Task 2.4: Smoke test chunker functionality
-- [ ] Task 2.4: Smoke test chunker functionality
+- [x] Task 2.4: Smoke test chunker functionality
 
 **What**: Verify chunker still works after modifications
 
@@ -1157,7 +1157,7 @@ print('✓ SOFT_BARRIER_MARGIN = 64')
 ---
 
 ### Task 2.5: Phase 2 completion checklist
-- [ ] Task 2.5: Phase 2 completion checklist
+- [x] Task 2.5: Phase 2 completion checklist
 
 ```bash
 #!/bin/bash

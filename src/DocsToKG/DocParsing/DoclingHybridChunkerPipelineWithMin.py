@@ -22,11 +22,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
 from typing import List, Tuple
 
 # Third-party imports
@@ -56,29 +54,6 @@ from DocsToKG.DocParsing.schemas import (
     get_docling_version,
 )
 from DocsToKG.DocParsing.serializers import RichSerializerProvider
-
-
-def _promote_simple_namespace_modules() -> None:
-    """Convert any SimpleNamespace placeholders in sys.modules to real modules.
-
-    Some tests install lightweight SimpleNamespace stubs into sys.modules for
-    optional dependencies (for example ``trafilatura``). Hypothesis' internal
-    providers assume module objects are hashable, which SimpleNamespace is not.
-    Promoting the stubs to ModuleType instances preserves their attributes while
-    restoring hashability, preventing spurious test failures.
-    """
-
-    for name, module in list(sys.modules.items()):
-        if isinstance(module, SimpleNamespace):
-            promoted = ModuleType(name)
-            promoted.__dict__.update(vars(module))
-            sys.modules[name] = promoted
-
-
-_promote_simple_namespace_modules()
-
-SOFT_BARRIER_MARGIN = 64
-
 SOFT_BARRIER_MARGIN = 64
 
 # ---------- Defaults ----------
