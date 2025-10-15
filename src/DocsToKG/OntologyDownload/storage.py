@@ -89,6 +89,9 @@ class StorageBackend(Protocol):
             Sorted list of version strings available to the backend.
         """
 
+    def available_ontologies(self) -> List[str]:
+        """Return sorted ontology identifiers managed by the backend."""
+
     def finalize_version(self, ontology_id: str, version: str, local_dir: Path) -> None:
         """Persist local version directory to remote storage when applicable.
 
@@ -195,6 +198,13 @@ class LocalStorageBackend:
         versions = [entry.name for entry in base.iterdir() if entry.is_dir()]
         return sorted(versions)
 
+    def available_ontologies(self) -> List[str]:
+        """Return ontology identifiers discovered under the storage root."""
+
+        if not self.root.exists():
+            return []
+        return sorted([entry.name for entry in self.root.iterdir() if entry.is_dir()])
+
     def finalize_version(self, ontology_id: str, version: str, local_dir: Path) -> None:
         """Finalize a local version directory (no-op for purely local storage).
 
@@ -210,6 +220,18 @@ class LocalStorageBackend:
         # Local backend already operates in-place; nothing further needed.
         _ = (ontology_id, version, local_dir)  # pragma: no cover - intentional no-op
 
+    def delete_version(self, ontology_id: str, version: str) -> int:
+        """Remove a stored ontology version and return reclaimed bytes."""
+
+        base = self._version_dir(ontology_id, version)
+        if not base.exists():
+            return 0
+        reclaimed = 0
+        for path in base.rglob('*'):
+            if path.is_file():
+                reclaimed += path.stat().st_size
+        shutil.rmtree(base, ignore_errors=False)
+        return reclaimed
     def available_ontologies(self) -> List[str]:
         if not self.root.exists():
             return []
@@ -286,6 +308,8 @@ class FsspecStorageBackend(LocalStorageBackend):
         return merged
 
     def available_ontologies(self) -> List[str]:
+        """Return ontology identifiers available locally or remotely."""
+
         local_ids = super().available_ontologies()
         try:
             entries = self.fs.ls(str(self.base_path), detail=False)
@@ -353,6 +377,27 @@ class FsspecStorageBackend(LocalStorageBackend):
             remote_path = remote_dir / PurePosixPath(str(relative).replace("\\", "/"))
             self.fs.makedirs(str(remote_path.parent), exist_ok=True)
             self.fs.put_file(str(path), str(remote_path))
+
+    def delete_version(self, ontology_id: str, version: str) -> int:
+        """Remove local and remote artifacts for a stored version."""
+
+        reclaimed = super().delete_version(ontology_id, version)
+        remote_dir = self._remote_version_path(ontology_id, version)
+        if self.fs.exists(str(remote_dir)):
+            try:
+                remote_files = self.fs.find(str(remote_dir))
+            except FileNotFoundError:
+                remote_files = []
+            for remote_file in remote_files:
+                try:
+                    info = self.fs.info(remote_file)
+                except FileNotFoundError:
+                    continue
+                size = info.get('size') if isinstance(info, dict) else None
+                if isinstance(size, (int, float)):
+                    reclaimed += int(size)
+            self.fs.rm(str(remote_dir), recursive=True)
+        return reclaimed
 
 
 def get_storage_backend() -> StorageBackend:
