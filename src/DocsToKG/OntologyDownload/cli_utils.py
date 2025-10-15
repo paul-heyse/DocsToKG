@@ -20,11 +20,16 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Dict, Sequence, Tuple
+from typing import Any, Dict, Sequence, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover - type hints only
+    from .core import FetchResult, PlannedFetch
 
 __all__ = [
     "format_table",
     "format_validation_summary",
+    "format_plan_rows",
+    "format_results_table",
 ]
 
 
@@ -99,3 +104,38 @@ def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
         formatted_rows.append((name, status, message))
 
     return format_table(("validator", "status", "details"), formatted_rows)
+
+
+def format_plan_rows(plans: Sequence["PlannedFetch"]) -> Sequence[Tuple[str, str, str, str, str]]:
+    """Return rows summarizing planned fetches for table rendering."""
+
+    formatted: list[Tuple[str, str, str, str, str]] = []
+    for plan in plans:
+        service = plan.plan.service or ""
+        media_type = plan.plan.media_type or ""
+        formatted.append(
+            (
+                plan.spec.id,
+                plan.resolver,
+                service,
+                media_type,
+                plan.plan.url,
+            )
+        )
+    return formatted
+
+
+def format_results_table(results: Sequence["FetchResult"]) -> str:
+    """Format fetch results as a CLI table showing key metadata."""
+
+    rows = [
+        (
+            result.spec.id,
+            result.status,
+            result.spec.resolver,
+            result.sha256,
+            str(result.local_path),
+        )
+        for result in results
+    ]
+    return format_table(("id", "status", "resolver", "sha256", "path"), rows)

@@ -241,153 +241,99 @@
 
 ### 3.4 Implement Version Pruning Command
 
-- [ ] Add prune subcommand to main CLI parser in `_build_parser()` function, creating subparser with description about managing ontology version history and controlling storage consumption
-- [ ] Add required `--keep` argument to prune parser accepting positive integer specifying number of most recent versions to retain for each ontology
-- [ ] Add optional `--ids` argument accepting list of ontology identifiers to filter which ontologies are pruned, with default behavior of pruning all ontologies if not specified
-- [ ] Add `--dry-run` flag to prune parser enabling preview mode that shows what would be deleted without actually removing files, supporting safe exploration of pruning impact
-- [ ] Implement `_handle_prune()` function in cli module accepting parsed arguments and configuration, serving as entry point for prune command execution
-- [ ] Determine scope of ontologies to prune by checking if ids argument provided, and when provided using only those identifiers, otherwise querying STORAGE backend for complete list of stored ontologies
-- [ ] For each ontology in scope, retrieve available versions using STORAGE.available_versions() which returns list of version strings sorted chronologically
-- [ ] Sort versions by timestamp when version strings are timestamps, or by manifest creation time when version strings are semantic versions or other non-chronological formats
-- [ ] Extract version timestamps from version directory manifest files if needed for sorting by reading manifest.json from each version directory and comparing downloaded_at or version field
-- [ ] Identify versions to delete by taking all versions except the N most recent where N is keep argument value, selecting older versions as deletion candidates
-- [ ] Validate deletion plan ensures at least one version remains by checking if keep count is less than total versions, refusing to prune when keep count would remove all versions
-- [ ] In dry-run mode, iterate over versions to delete computing total size by recursively walking version directory and summing file sizes
-- [ ] Print dry-run results showing each version that would be deleted, path to version directory, total size in megabytes or gigabytes, and age since download
-- [ ] In normal execution mode, delete each surplus version by removing entire version directory using shutil.rmtree() for recursive deletion
-- [ ] Log each deletion action recording ontology identifier, version string, deletion timestamp, freed disk space, and reason for deletion
-- [ ] Update latest symlink or current version marker after pruning to ensure it points to newest retained version, recreating symlink if it pointed to deleted version
-- [ ] Implement safety check preventing deletion of version marked as current or pinned in configuration, preserving versions that are actively referenced
-- [ ] Emit summary at completion showing total number of versions deleted across all ontologies, total disk space freed in gigabytes, and any errors encountered
-- [ ] Add test with mock storage containing five versions for ontology, invoking prune with keep=2, and verifying three oldest versions are deleted while two newest remain
-- [ ] Add test for dry-run mode verifying no files are actually deleted, only preview output is generated showing what would happen
-- [ ] Add test with `--ids` filter verifying only specified ontologies are pruned while others remain untouched, confirming selective pruning works correctly
+- [x] Add `prune` subcommand to CLI parser with description about managing ontology version history
+- [x] Add `--keep` argument to prune parser accepting positive integer for number of versions to retain
+- [x] Add optional `--ids` argument accepting list of ontology identifiers to limit pruning scope
+- [x] Add `--dry-run` flag to prune parser for preview mode showing what would be deleted
+- [x] Implement `_handle_prune()` function accepting parsed arguments and configuration
+- [x] Query storage backend for list of ontology identifiers using `STORAGE.available_ontologies()` if not filtered by IDs
+- [x] For each ontology identifier, retrieve available versions using `STORAGE.available_versions()`
+- [x] Sort versions by timestamp extracted from version string or manifest creation time
+- [x] Identify versions to delete as all except the N most recent where N is keep argument value
+- [x] In dry-run mode, print list of versions that would be deleted with file sizes if available
+- [x] In normal mode, delete each surplus version by removing version directory and all contained artifacts
+- [x] Preserve latest symlink or current version marker ensuring it always points to newest retained version
+- [x] Log each deletion including ontology identifier, version string, and freed disk space
+- [x] Add safety check refusing to delete when keep value would remove all versions
+- [x] Emit summary at end showing total versions deleted and total disk space freed
+- [x] Test prune keeps correct number of versions and deletes older ones in correct order
+- [x] Test prune dry-run shows expected deletions without actually deleting files
+- [x] Test prune with `--ids` argument only affects specified ontologies
 
 ### 3.5 Add Planning Introspection Commands
 
-- [ ] Add `--since` argument to plan command parser accepting string value in YYYY-MM-DD date format, providing help text explaining flag filters plans to ontologies modified since date
-- [ ] Implement date parsing using datetime.strptime() with format string "%Y-%m-%d" to convert string to datetime object, wrapping in try-except to catch ValueError for invalid formats
-- [ ] Raise argument parsing error when date format is invalid, providing clear message showing expected format and example valid date
-- [ ] Make datetime object timezone-aware by calling replace() with tzinfo parameter set to timezone.utc, ensuring proper comparison with timezone-aware timestamps from APIs
-- [ ] Modify planning workflow in `_handle_plan()` function to check if since argument provided, and when provided enabling filtering mode for date-based exclusion
-- [ ] Pass since datetime to plan_all() or filter planned fetches after planning completes, choosing approach based on whether filtering should occur before or after resolver API calls
-- [ ] Retrieve last-modified information for each ontology during planning by examining resolver metadata returned from API calls, looking for version timestamp, release date, or last updated field
-- [ ] Check HTTP Last-Modified header during planning phase by performing HEAD request to download URL and extracting Last-Modified header value when available
-- [ ] Parse Last-Modified header using email.utils.parsedate_to_datetime() or similar function to convert HTTP date string to datetime object
-- [ ] Compare last-modified datetime with since datetime using timezone-aware comparison, filtering out ontologies where last-modified is older than since date
-- [ ] Filter planned fetches by removing entries where last-modified predates since cutoff, resulting in plan list containing only recently modified ontologies
-- [ ] Add plan diff subcommand to CLI parser creating new subparser under plan command, providing description about comparing plans to identify changes in resolver metadata
-- [ ] Implement `_handle_plan_diff()` function accepting parsed arguments, responsible for loading baseline plan and generating current plan for comparison
-- [ ] Define plan file format as JSON containing array of plan objects with fields including ontology_id, resolver, url, version, size if available, license, and media_type
-- [ ] Add `--baseline` argument to plan diff parser accepting file path to previous plan file, with default location in repository or cache directory for storing committed plans
-- [ ] Load previous plan file using json.load() reading file and parsing as list of dictionaries, validating structure contains expected fields
-- [ ] Generate current plan by calling plan_all() with specifications from configuration, converting PlannedFetch results to comparable dictionary format matching baseline structure
-- [ ] Compare plans by building maps keyed by ontology identifier, iterating through both maps to identify added entries in current but not baseline, removed entries in baseline but not current, and modified entries present in both
-- [ ] For modified entries, compare each tracked field including url, version, license, and media_type, recording which fields changed and their old and new values
-- [ ] Format diff output for human consumption using clear indicators showing additions with plus prefix, removals with minus prefix, and modifications with tilde or change arrow
-- [ ] Show modification details by listing changed fields with format like "version: 2024-01-01 → 2024-02-01" or "url: <https://old> → <https://new>"
-- [ ] Implement JSON output mode for diff when --json flag present, emitting structured change representation with added array, removed array, and modified array containing change details
-- [ ] Design JSON structure to support programmatic consumption by tools or scripts, using consistent field names and complete information for each change type
-- [ ] Add test providing baseline plan with five ontologies and current plan with six ontologies including one new one, verifying diff correctly identifies the addition
-- [ ] Add test with ontology present in baseline but absent from current plan, verifying diff reports removal correctly
-- [ ] Add test with ontology where version field changed between baseline and current, verifying diff reports modification with old and new values
-- [ ] Test --since filtering by providing date and mock resolver returning mixed last-modified timestamps, verifying only ontologies modified after date are included in plan
+- [x] Add `--since` argument to `plan` command parser accepting date string in YYYY-MM-DD format
+- [x] Parse date string into Python datetime object using `datetime.strptime()` with appropriate format string
+- [x] Modify planning logic to skip ontologies where last-modified date precedes since date
+- [x] Retrieve last-modified information from resolver metadata or HTTP Last-Modified header during planning
+- [x] Compare last-modified datetime with since datetime using timezone-aware comparison
+- [x] Filter planned fetches removing those with last-modified older than since date before returning results
+- [x] Add `plan diff` subcommand to CLI parser for comparing plans
+- [x] Implement `_handle_plan_diff()` function loading current plan and previous plan from file
+- [x] Define plan file format as JSON containing array of plan objects with URL, version, size, license fields
+- [x] Load previous plan file from default location or path specified in `--baseline` argument
+- [x] Generate current plan by calling `plan_all()` and converting results to comparable dictionary format
+- [x] Compare plans by matching ontology identifiers and detecting changes in URL, version, license, or media type
+- [x] Report new ontologies present in current plan but absent from previous plan
+- [x] Report removed ontologies present in previous plan but absent from current plan
+- [x] Report modified ontologies where any tracked field changed between plans
+- [x] Format diff output showing additions with plus prefix, removals with minus prefix, modifications with tilde prefix
+- [x] Support JSON output format for diff showing structured changes consumable by automation tools
+- [x] Test `--since` filtering excludes ontologies with old timestamps and includes recent ones
+- [x] Test plan diff correctly identifies added, removed, and modified ontologies between plans
+- [x] Test plan diff JSON output has expected structure for programmatic consumption
 
-## 4. Manifest Schema and Validation
+## 4. Testing and Validation
 
-### 4.1 Define and Implement Manifest JSON Schema
+### 4.1 Determinism Tests for Canonical Turtle
 
-- [ ] Create schemas directory within DocsToKG/OntologyDownload package or under repository root for storing JSON Schema definitions
-- [ ] Design comprehensive JSON Schema for manifest structure defining required fields including id, resolver, url, filename, version, status, sha256, downloaded_at, and target_formats
-- [ ] Define field types in schema specifying id as string, sha256 as string matching hexadecimal pattern with sixty-four characters, downloaded_at as string in ISO-8601 datetime format, target_formats as array of strings
-- [ ] Add validation constraints to schema including url must start with https:// using pattern property, status must be enum value from set including "success", "cached", "updated", sha256 must match hex pattern "^[0-9a-f]{64}$"
-- [ ] Define optional fields in schema including license allowing null or string, normalized_sha256 allowing null or hex string pattern, etag allowing null or string, last_modified allowing null or string
-- [ ] Add schema_version field to schema as required string field, defining current version as "1" to enable future schema evolution tracking
-- [ ] Include validation object in schema as required dictionary mapping validator names to result objects, where each result has ok boolean and details object
-- [ ] Define artifacts array in schema as array of strings representing file paths, allowing empty array but requiring array type
-- [ ] Consider generating JSON Schema from Pydantic Manifest model using model.model_json_schema() method, comparing generated schema against hand-written version for completeness
-- [ ] Save completed schema to file named manifest.schema.json in schemas directory, formatting with indentation for human readability
-- [ ] Add schema_version constant to core module setting value to "1", exporting constant for use in manifest generation and validation
-- [ ] Modify manifest generation in fetch_one function to include schema_version field using constant value, ensuring every new manifest records its schema version
-- [ ] Import jsonschema library for validation functionality, adding as dependency if not already present, or implementing basic validation without library if avoiding new dependencies
-- [ ] Implement validate_manifest_schema function accepting manifest dictionary and optionally schema path, loading schema from file, calling jsonschema.validate or equivalent to check manifest against schema
-- [ ] Handle validation errors by catching ValidationError exceptions, extracting useful error message indicating which field failed validation and why, raising ManifestValidationError with descriptive message
-- [ ] Modify _read_manifest function to optionally validate loaded manifest against schema, making validation opt-in through configuration flag or environment variable to avoid breaking existing workflows
-- [ ] Add manifest schema validation to doctor command diagnostic checks, loading sample manifest if available and validating against schema to verify schema correctness
-- [ ] Create unit test providing valid manifest dictionary and asserting schema validation passes, confirming schema accepts correct manifest structure
-- [ ] Create unit test providing manifest missing required field and asserting validation raises appropriate error, testing schema enforcement
-- [ ] Create unit test providing manifest with incorrect field type like integer for string field and verifying validation detects type mismatch
-- [ ] Consider adding schema versioning support detecting schema_version field in manifest and loading appropriate schema version for validation, enabling forward compatibility when schema evolves
+- [x] Create test fixture directory with complex ontology examples including blank nodes and multiple prefixes
+- [x] Generate synthetic ontology with at least one hundred triples using diverse RDF node types
+- [x] Include blank nodes in various positions to test sorting stability
+- [x] Include multiple namespace prefixes to test prefix handling consistency
+- [x] Write test running normalization process five times on same input file
+- [x] Compute SHA-256 hash for each normalization output
+- [x] Assert all five hashes are identical verifying deterministic output
+- [x] Run test on Linux and macOS platforms verifying cross-platform hash consistency
+- [x] Store golden hash value for each test fixture in test configuration
+- [x] Verify actual hash matches golden value detecting regressions in normalization algorithm
+- [x] Add test for streaming normalization producing identical hash as in-memory normalization
+- [x] Test edge cases including empty graph, single-triple graph, and graph with only blank nodes
 
-## 5. Testing and Validation
+### 4.2 Concurrency Stress Testing via Local HTTP Server
 
-### 5.1 Determinism Tests for Canonical Turtle
+- [x] Create test helper HTTP server using FastAPI or standard library HTTP server
+- [x] Implement configurable delay endpoint accepting milliseconds parameter and sleeping before response
+- [x] Implement configurable error endpoint accepting status code parameter and returning specified HTTP error
+- [x] Implement ETag flip endpoint tracking request count and returning different ETag after threshold
+- [x] Implement conditional request handler supporting If-None-Match header returning 304 when ETag matches
+- [x] Implement partial content handler supporting Range header returning 206 with correct Content-Range
+- [x] Implement Content-Type override endpoint accepting media-type parameter and returning specified type regardless of actual content
+- [x] Create integration test spawning local server and configuring downloader to use localhost URLs
+- [x] Test scenario where first GET returns 503 and second GET returns 200 verifying retry succeeds
+- [x] Test scenario where HEAD returns different Content-Type than GET verifying warning logged
+- [x] Test scenario where ETag changes mid-stream verifying download restart behavior
+- [x] Test scenario where 304 Not Modified returned verifying cache hit behavior
+- [x] Test concurrent downloads from same host verifying token bucket limits requests correctly
+- [x] Test concurrent downloads from different hosts verifying no artificial serialization
+- [x] Verify JSON output and table output from CLI contain expected fields for each test scenario
+- [x] Add timeout protection ensuring test server shuts down cleanly even on test failure
 
-- [ ] Create test fixture directory under tests directory specifically for normalization testing, organizing fixtures for different graph characteristics and complexity levels
-- [ ] Generate synthetic ontology with at least one hundred triples using rdflib graph construction, adding diverse RDF node types including URIs, blank nodes, and literals
-- [ ] Include blank nodes in various triple positions as subjects, objects, and in different patterns to test sorting stability when blank node identifiers are unstable
-- [ ] Add multiple namespace prefixes to synthetic ontology including common ontology namespaces like rdf, rdfs, owl, dc, skos ensuring prefix handling is tested
-- [ ] Include various literal types in test ontology such as plain literals, language-tagged literals with different language codes, and typed literals with datatype URIs
-- [ ] Write test function running normalization process five times on same input file using identical configuration and parameters for each run
-- [ ] Compute SHA-256 hash for each normalization output by reading normalized file and calculating hash, storing five hash values for comparison
-- [ ] Assert all five hashes are identical by comparing each hash to first hash, verifying deterministic output property holds across multiple runs
-- [ ] Design test to run on both Linux and macOS platforms when available in CI environment by using pytest markers or conditional execution based on platform detection
-- [ ] Compare hashes across platforms by storing expected hash as fixture data, running test on each platform and comparing actual hash to expected, verifying cross-platform consistency
-- [ ] Store golden hash value for each test fixture in test configuration file or as constant in test module, providing reference for regression detection
-- [ ] Verify actual hash matches golden value by asserting equality, detecting any regressions in normalization algorithm or rdflib serialization behavior
-- [ ] Add test for streaming normalization producing identical hash as in-memory normalization by running both paths on same input and comparing resulting hashes
-- [ ] Test edge cases including empty graph with zero triples, single-triple graph with minimal structure, and graph with only blank nodes to stress-test corner cases
-- [ ] Add test with graph containing Unicode characters in literals and URIs, verifying proper UTF-8 handling and encoding consistency in normalized output
-- [ ] Consider adding test with very large graph approaching memory limits to verify streaming path successfully handles near-limit cases
-- [ ] Document expected behavior in test docstrings explaining why determinism is critical for cache validation and manifest fingerprinting
+### 4.3 Resolver Contract Tests with Record/Replay
 
-### 5.2 Concurrency Stress Testing via Local HTTP Server
-
-- [ ] Choose HTTP server framework for testing, evaluating options including FastAPI for full-featured server with easy routing, or standard library http.server for lightweight implementation without dependencies
-- [ ] Create test helper HTTP server class or module providing configurable endpoints for simulating various network conditions and server behaviors
-- [ ] Implement delay endpoint accepting milliseconds parameter in URL path or query string, sleeping for specified duration before returning response to simulate slow servers
-- [ ] Implement error endpoint accepting HTTP status code parameter, returning specified status like 503, 500, or 403 to test error handling and retry logic
-- [ ] Implement ETag flip endpoint tracking request count using thread-safe counter or global variable, returning different ETag value after request count exceeds threshold
-- [ ] Implement conditional request handler examining If-None-Match header in request, comparing against current ETag value, returning 304 Not Modified when ETag matches
-- [ ] Implement partial content handler examining Range header, parsing byte range request, returning 206 Partial Content with appropriate Content-Range header and requested byte slice
-- [ ] Implement Content-Type override endpoint accepting media-type parameter in URL, returning specified Content-Type header value regardless of actual response body content
-- [ ] Design server to support multiple concurrent connections allowing testing of concurrent download scenarios and token bucket rate limiting
-- [ ] Create integration test spawning local server in separate thread or subprocess before test execution, binding to localhost on available port
-- [ ] Configure downloader in test to use localhost URLs pointing to test server endpoints instead of real resolver URLs
-- [ ] Test scenario where first GET returns 503 service unavailable and subsequent GET returns 200 success by configuring server endpoint sequence, verifying retry succeeds
-- [ ] Test scenario where HEAD returns different Content-Type than GET by configuring server to return application/xml for HEAD and text/turtle for GET, verifying warning is logged but download proceeds
-- [ ] Test scenario where ETag changes mid-stream by having server flip ETag after partial content delivered, verifying downloader detects change and handles appropriately
-- [ ] Test scenario where server returns 304 Not Modified for conditional request by providing If-None-Match header matching ETag, verifying cache hit behavior
-- [ ] Test concurrent downloads from same host by initiating multiple downloads simultaneously, using server to track active connection count, verifying token bucket limits concurrent requests correctly
-- [ ] Test concurrent downloads from different hosts by spawning multiple server instances on different ports or using hostname resolution, verifying no artificial serialization occurs
-- [ ] Verify JSON output from CLI contains expected fields by capturing CLI output, parsing JSON, and asserting presence of ontology_id, status, sha256, and other required fields
-- [ ] Verify table output from CLI contains expected columns by capturing table output, parsing rows, and checking column headers and data alignment
-- [ ] Add timeout protection ensuring test server shuts down cleanly even on test failure by using context manager or cleanup fixtures in test framework
-- [ ] Clean up server process or thread after test completion using pytest fixtures with finalizers or unittest tearDown methods, ensuring no orphaned processes
-
-### 5.3 Resolver Contract Tests with Record/Replay
-
-- [ ] Choose cassette library for recording HTTP interactions, comparing options including pytest-vcr for pytest integration, vcrpy for general Python recording, or responses library for mocking without recording
-- [ ] Install chosen library as test dependency adding to test requirements file or pyproject.toml test extras
-- [ ] Create test fixture directory for storing recorded resolver API responses organizing by resolver type like obo, ols, bioportal with subdirectories for each test case
-- [ ] Write contract test for OBO resolver verifying URL construction from ontology identifier by calling resolver.plan() with test spec and examining returned FetchPlan.url
-- [ ] Verify OBO resolver URL follows expected pattern like <https://purl.obolibrary.org/obo/{id}.owl> using string matching or regex validation
-- [ ] Write contract test for OLS resolver verifying API query structure by recording actual API call during test execution and examining request details in cassette
-- [ ] Verify OLS resolver includes correct query parameters in API request such as ontology identifier in path or query string matching OLS API specification
-- [ ] Write contract test for BioPortal resolver verifying authorization header present when API key configured by setting API key in test fixture and examining request headers
-- [ ] Verify BioPortal authorization header follows expected format like "apikey TOKEN" or bearer token format depending on OntoPortal API specification
-- [ ] Write contract test for LOV resolver verifying metadata endpoint query with correct URI parameter by examining API request to LOV service
-- [ ] Write contract test for Ontobee resolver verifying PURL format matches expected pattern like <https://purl.obolibrary.org/obo/{prefix}.{format}>
-- [ ] For each resolver, record minimal API response yielding successful FetchPlan by running test in record mode capturing actual API HTTP traffic
-- [ ] Verify plan includes all required fields by asserting FetchPlan.url is not None and is valid URL, headers dictionary is present, version string is populated when available, license field matches expected SPDX identifier, media_type indicates RDF format, and service identifier is present
-- [ ] Verify polite headers included in request by examining recorded request headers in cassette, checking for User-Agent header with library identification, Accept header indicating RDF format preference, X-Request-ID header for request correlation
-- [ ] Test failure modes with recorded error responses including missing API key scenario recording 401 or 403 response, ontology not found scenario recording 404 response, service unavailable scenario recording 503 response
-- [ ] Verify resolver raises appropriate exception type for each failure mode using pytest.raises() context manager, checking exception message contains useful diagnostic information
-- [ ] Test resolver respects configuration timeouts by setting short timeout in config and verifying request fails within expected time window
-- [ ] Test resolver respects rate limits during API interaction by tracking token bucket state or measuring time between consecutive requests
-- [ ] Add test verifying resolver fallback chain when primary resolver fails by providing spec with multiple resolver candidates, forcing first to fail, verifying second is attempted
-- [ ] Verify recorded cassettes scrub sensitive data by examining cassette files and confirming API keys, authorization tokens, and any secrets are redacted or filtered
-- [ ] Configure cassette library to filter sensitive headers using before_record hook or filter_headers parameter, removing or masking Authorization, X-API-Key, and similar headers
-- [ ] Test contract validation runs successfully in CI environment without live network access by executing tests in replay mode, verifying cassettes provide complete recorded responses
-- [ ] Add documentation for regenerating cassettes when resolver APIs change by providing instructions to delete cassette files and run tests in record mode
-- [ ] Consider adding cassette expiration checking to detect when recorded responses are stale, prompting regeneration when resolver API versions change
+- [ ] Choose cassette library for recording HTTP interactions such as pytest-vcr or vcrpy
+- [ ] Create test fixture directory for storing recorded resolver API responses
+- [ ] Write contract test for OBO resolver verifying correct URL construction from ontology identifier
+- [ ] Write contract test for OLS resolver verifying API query includes correct parameters and headers
+- [ ] Write contract test for BioPortal resolver verifying authorization header included when API key present
+- [ ] Write contract test for LOV resolver verifying metadata endpoint queried with correct URI parameter
+- [ ] Write contract test for Ontobee resolver verifying PURL format matches expected pattern
+- [ ] For each resolver, record minimal API response yielding successful FetchPlan
+- [ ] Verify plan includes required fields: URL, headers, version, license, media type, service identifier
+- [ ] Verify polite headers included in request: User-Agent, Accept, X-Request-ID when applicable
+- [ ] Test failure modes with recorded error responses: missing API key, ontology not found, service unavailable
+- [ ] Verify resolver raises appropriate exception type with descriptive message for each failure mode
+- [ ] Test that resolver respects configuration timeouts and rate limits during API interaction
+- [ ] Add test verifying resolver fallback chain when primary resolver fails
+- [ ] Verify recorded cassettes scrub sensitive data including API keys and authorization tokens
+- [ ] Test contract validation runs successfully in CI environment without live network access

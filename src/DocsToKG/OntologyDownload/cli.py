@@ -36,6 +36,7 @@ import re
 import shutil
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
@@ -57,6 +58,7 @@ from .core import (
     fetch_all,
     plan_all,
 )
+from .download import sanitize_filename
 from .logging_config import setup_logging
 from .storage import CACHE_DIR, CONFIG_DIR, LOCAL_ONTOLOGY_DIR, LOG_DIR, STORAGE
 from .validators import ValidationRequest, run_validators
@@ -123,6 +125,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     plan_cmd.add_argument("--resolver", help="Resolver type for single ontology")
     plan_cmd.add_argument("--target-formats", help="Comma-separated formats (e.g., owl,obo)")
+    plan_cmd.add_argument(
+        "--since",
+        type=_parse_since,
+        help="Only include ontologies modified on or after the provided YYYY-MM-DD date",
+    )
     plan_cmd.add_argument("--json", action="store_true", help="Emit plan details as JSON")
     plan_cmd.add_argument(
         "--concurrent-plans",
@@ -138,6 +145,44 @@ def _build_parser() -> argparse.ArgumentParser:
         "--allowed-hosts",
         help="Comma-separated list of additional hosts permitted for this run",
     )
+
+    plan_sub = plan_cmd.add_subparsers(dest="plan_command")
+    plan_diff = plan_sub.add_parser(
+        "diff",
+        help="Compare current resolver plans against a baseline file",
+        description="Generate a diff between the current resolver plan and a stored baseline plan",
+    )
+    plan_diff.add_argument("ids", nargs="*", help="Ontology identifiers to plan")
+    plan_diff.add_argument(
+        "--spec", type=Path, help="Path to sources.yaml (default: configs/sources.yaml)"
+    )
+    plan_diff.add_argument("--resolver", help="Resolver type for single ontology")
+    plan_diff.add_argument("--target-formats", help="Comma-separated formats (e.g., owl,obo)")
+    plan_diff.add_argument(
+        "--since",
+        type=_parse_since,
+        help="Only include ontologies modified on or after the provided YYYY-MM-DD date",
+    )
+    plan_diff.add_argument(
+        "--concurrent-plans",
+        type=_parse_positive_int,
+        help="Override maximum concurrent resolver planning workers",
+    )
+    plan_diff.add_argument(
+        "--concurrent-downloads",
+        type=_parse_positive_int,
+        help="Override concurrent downloads when using --dry-run",
+    )
+    plan_diff.add_argument(
+        "--allowed-hosts",
+        help="Comma-separated list of additional hosts permitted for this run",
+    )
+    plan_diff.add_argument(
+        "--baseline",
+        type=Path,
+        help="Path to baseline plan JSON (default: ~/.data/ontology-fetcher/configs/plans/latest.json)",
+    )
+    plan_diff.add_argument("--json", action="store_true", help="Emit plan diff as JSON")
 
     show = subparsers.add_parser("show", help="Display ontology metadata")
     show.add_argument("id", help="Ontology identifier")
@@ -172,6 +217,24 @@ def _build_parser() -> argparse.ArgumentParser:
 
     doctor = subparsers.add_parser("doctor", help="Diagnose environment issues")
     doctor.add_argument("--json", action="store_true", help="Output diagnostics as JSON")
+
+    prune = subparsers.add_parser("prune", help="Prune stored ontology versions")
+    prune.add_argument("--keep", type=_parse_positive_int, required=True, help="Number of versions to retain per ontology")
+    prune.add_argument(
+        "--ids",
+        nargs="*",
+        help="Optional ontology identifiers to limit pruning scope",
+    )
+    prune.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview deletions without removing files",
+    )
+    prune.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit pruning summary as JSON",
+    )
 
     return parser
 
@@ -236,6 +299,58 @@ def _parse_positive_int(value: str) -> int:
     if parsed <= 0:
         raise argparse.ArgumentTypeError("must be a positive integer")
     return parsed
+
+
+def _parse_since(value: str) -> datetime:
+    """Parse YYYY-MM-DD strings into timezone-aware datetimes."""
+
+    try:
+        parsed = datetime.strptime(value, "%Y-%m-%d")
+    except ValueError as exc:  # pragma: no cover - argparse handles presentation
+        raise argparse.ArgumentTypeError("must be YYYY-MM-DD") from exc
+    return parsed.replace(tzinfo=timezone.utc)
+
+
+def _directory_size(path: Path) -> int:
+    """Return the cumulative size of files under ``path``."""
+
+    if not path.exists():
+        return 0
+    total = 0
+    for entry in path.rglob("*"):
+        if entry.is_symlink() or not entry.is_file():
+            continue
+        try:
+            total += entry.stat().st_size
+        except OSError:  # pragma: no cover - filesystem race conditions
+            continue
+    return total
+
+
+def _parse_version_timestamp(value: Optional[str]) -> Optional[datetime]:
+    """Parse version or manifest timestamps into UTC datetimes."""
+
+    if not value or not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    candidates = [text, text.replace("Z", "+00:00")]
+    for candidate in candidates:
+        try:
+            parsed = datetime.fromisoformat(candidate)
+        except ValueError:
+            continue
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    for fmt in ("%Y-%m-%d", "%Y%m%d", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            parsed = datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+        return parsed.replace(tzinfo=timezone.utc)
+    return None
 
 
 def _parse_allowed_hosts(value: Optional[str]) -> List[str]:
@@ -344,6 +459,7 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
         "media_type": plan.plan.media_type,
         "service": plan.plan.service,
         "headers": plan.plan.headers,
+        "last_modified": plan.last_modified or plan.plan.last_modified,
         "candidates": candidates,
     }
 
@@ -458,7 +574,89 @@ def _handle_plan(args, base_config: Optional[ResolvedConfig]) -> List[PlannedFet
     """Resolve plans without executing downloads."""
 
     config, specs = _resolve_specs_from_args(args, base_config)
-    return plan_all(specs, config=config)
+    since = getattr(args, "since", None)
+    return plan_all(specs, config=config, since=since)
+
+
+def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, object]:
+    """Generate a diff between the current resolver plan and a baseline."""
+
+    baseline_path = args.baseline or (CONFIG_DIR / "plans" / "latest.json")
+    if not baseline_path.exists():
+        raise ConfigError(f"Baseline plan not found at {baseline_path}")
+    try:
+        baseline_data = json.loads(baseline_path.read_text())
+    except json.JSONDecodeError as exc:
+        raise ConfigError(f"Baseline plan at {baseline_path} is not valid JSON") from exc
+    if not isinstance(baseline_data, list):
+        raise ConfigError("Baseline plan must be a JSON array of plan entries")
+
+    baseline_map = {
+        entry.get("id"): entry
+        for entry in baseline_data
+        if isinstance(entry, dict) and entry.get("id")
+    }
+
+    config, specs = _resolve_specs_from_args(args, base_config)
+    since = getattr(args, "since", None)
+    current_plans = plan_all(specs, config=config, since=since)
+    current_map = {plan.spec.id: _plan_to_dict(plan) for plan in current_plans}
+
+    added_ids = sorted(set(current_map) - set(baseline_map))
+    removed_ids = sorted(set(baseline_map) - set(current_map))
+    shared_ids = sorted(set(current_map) & set(baseline_map))
+
+    added = [current_map[oid] for oid in added_ids]
+    removed = [baseline_map[oid] for oid in removed_ids]
+    modified = []
+
+    for oid in shared_ids:
+        current = current_map[oid]
+        previous = baseline_map[oid]
+        changes: Dict[str, Dict[str, Optional[str]]] = {}
+        for field in ("url", "version", "license", "media_type", "last_modified"):
+            if current.get(field) != previous.get(field):
+                changes[field] = {
+                    "previous": previous.get(field),
+                    "current": current.get(field),
+                }
+        if changes:
+            modified.append({"id": oid, "changes": changes, "previous": previous, "current": current})
+
+    return {"added": added, "removed": removed, "modified": modified, "baseline": str(baseline_path)}
+
+
+def _print_plan_diff(diff: Dict[str, object]) -> None:
+    """Render a human-readable diff report for resolver plans."""
+
+    added = diff.get("added", []) or []
+    removed = diff.get("removed", []) or []
+    modified = diff.get("modified", []) or []
+
+    if not added and not removed and not modified:
+        print("No plan differences found")
+        return
+
+    for entry in added:
+        version = entry.get("version") or "unknown"
+        url = entry.get("url") or "unknown"
+        print(f"+ {entry.get('id')}: {url} (version {version})")
+
+    for entry in removed:
+        version = entry.get("version") or "unknown"
+        url = entry.get("url") or "unknown"
+        print(f"- {entry.get('id')}: {url} (version {version})")
+
+    for entry in modified:
+        oid = entry.get("id")
+        changes = entry.get("changes", {}) or {}
+        parts = []
+        for field, change in changes.items():
+            previous = change.get("previous") or "unknown"
+            current = change.get("current") or "unknown"
+            parts.append(f"{field}: {previous} -> {current}")
+        if parts:
+            print(f"~ {oid}: {'; '.join(parts)}")
 
 
 def _doctor_report() -> Dict[str, object]:
@@ -680,6 +878,109 @@ def _print_doctor_report(report: Dict[str, object]) -> None:
     print(f"Storage backend: {backend_desc}")
 
 
+def _handle_prune(args) -> Dict[str, object]:
+    """Delete surplus ontology versions while retaining the newest entries."""
+
+    keep = args.keep
+    requested_ids = list(dict.fromkeys(args.ids or []))
+    ontology_ids = requested_ids or STORAGE.available_ontologies()
+    total_deleted = 0
+    total_bytes = 0
+    details: List[Dict[str, object]] = []
+
+    for ontology_id in sorted(ontology_ids):
+        safe_id = sanitize_filename(ontology_id)
+        ontology_dir = LOCAL_ONTOLOGY_DIR / safe_id
+        if not ontology_dir.exists():
+            continue
+        versions = STORAGE.available_versions(ontology_id)
+        if len(versions) <= keep:
+            continue
+
+        metadata = []
+        for version in versions:
+            safe_version = sanitize_filename(version)
+            version_dir = ontology_dir / safe_version
+            manifest_path = version_dir / "manifest.json"
+            timestamp = None
+            if manifest_path.exists():
+                try:
+                    manifest_data = json.loads(manifest_path.read_text())
+                except json.JSONDecodeError:
+                    manifest_data = {}
+                timestamp = _parse_version_timestamp(
+                    manifest_data.get("downloaded_at")
+                    or manifest_data.get("created_at")
+                    or manifest_data.get("last_modified")
+                    or manifest_data.get("version")
+                )
+            if timestamp is None and manifest_path.exists():
+                timestamp = datetime.fromtimestamp(manifest_path.stat().st_mtime, timezone.utc)
+            if timestamp is None and version_dir.exists():
+                timestamp = datetime.fromtimestamp(version_dir.stat().st_mtime, timezone.utc)
+            size_bytes = _directory_size(version_dir)
+            metadata.append(
+                {
+                    "version": version,
+                    "path": version_dir,
+                    "timestamp": timestamp,
+                    "size_bytes": size_bytes,
+                }
+            )
+
+        metadata.sort(
+            key=lambda item: (
+                item["timestamp"] or datetime.min.replace(tzinfo=timezone.utc),
+                item["version"],
+            ),
+            reverse=True,
+        )
+
+        to_keep = metadata[:keep]
+        to_delete = metadata[keep:]
+        if not to_delete:
+            continue
+
+        newest_path = to_keep[0]["path"] if to_keep else None
+
+        for entry in to_delete:
+            details.append(
+                {
+                    "id": ontology_id,
+                    "version": entry["version"],
+                    "path": str(entry["path"]),
+                    "size_bytes": entry["size_bytes"],
+                }
+            )
+            total_deleted += 1
+            total_bytes += entry["size_bytes"]
+            if not args.dry_run:
+                STORAGE.delete_version(ontology_id, entry["version"])
+
+        if not args.dry_run and newest_path is not None:
+            latest_link = ontology_dir / "latest"
+            if latest_link.exists() or latest_link.is_symlink():
+                try:
+                    latest_link.unlink()
+                except OSError:
+                    pass
+                try:
+                    latest_link.symlink_to(newest_path)
+                except OSError:
+                    try:
+                        latest_link.write_text(str(newest_path))
+                    except OSError:
+                        pass
+
+    return {
+        "deleted_versions": total_deleted,
+        "freed_bytes": total_bytes,
+        "details": details,
+        "dry_run": bool(args.dry_run),
+        "keep": keep,
+    }
+
+
 def _handle_show(args) -> None:
     """Display ontology manifest information for the ``show`` command.
 
@@ -863,21 +1164,29 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         },
                     )
         elif args.command == "plan":
-            plans = _handle_plan(args, base_config)
-            if args.json:
-                json.dump([_plan_to_dict(plan) for plan in plans], sys.stdout, indent=2)
-                sys.stdout.write("\n")
-            else:
-                if plans:
-                    rows = format_plan_rows(plans)
-                    print(
-                        format_table(
-                            ("id", "resolver", "service", "media_type", "url"),
-                            rows,
-                        )
-                    )
+            if getattr(args, "plan_command", None) == "diff":
+                diff = _handle_plan_diff(args, base_config)
+                if args.json:
+                    json.dump(diff, sys.stdout, indent=2)
+                    sys.stdout.write("\n")
                 else:
-                    print("No ontologies to process")
+                    _print_plan_diff(diff)
+            else:
+                plans = _handle_plan(args, base_config)
+                if args.json:
+                    json.dump([_plan_to_dict(plan) for plan in plans], sys.stdout, indent=2)
+                    sys.stdout.write("\n")
+                else:
+                    if plans:
+                        rows = format_plan_rows(plans)
+                        print(
+                            format_table(
+                                ("id", "resolver", "service", "media_type", "url"),
+                                rows,
+                            )
+                        )
+                    else:
+                        print("No ontologies to process")
         elif args.command == "show":
             _handle_show(args)
         elif args.command == "validate":
@@ -906,6 +1215,24 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 sys.stdout.write("\n")
             else:
                 _print_doctor_report(report)
+        elif args.command == "prune":
+            summary = _handle_prune(args)
+            if args.json:
+                json.dump(summary, sys.stdout, indent=2)
+                sys.stdout.write("\n")
+            else:
+                deleted = summary["deleted_versions"]
+                freed_gb = summary["freed_bytes"] / 1_000_000_000 if summary["freed_bytes"] else 0
+                if deleted == 0:
+                    print("No versions eligible for pruning")
+                else:
+                    mode = "Dry-run" if summary["dry_run"] else "Pruned"
+                    print(f"{mode}: removed {deleted} versions (~{freed_gb:.2f} GB)")
+                    for entry in summary["details"]:
+                        size_mb = entry["size_bytes"] / 1_000_000 if entry["size_bytes"] else 0
+                        print(
+                            f"  - {entry['id']} {entry['version']} (~{size_mb:.2f} MB) -> {entry['path']}"
+                        )
         return 0
     except ConfigError as exc:
         print(f"Error: {exc}", file=sys.stderr)

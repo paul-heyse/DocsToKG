@@ -19,6 +19,7 @@ Usage:
 """
 
 import json
+import shutil
 from importlib.machinery import ModuleSpec
 from pathlib import Path
 from types import SimpleNamespace
@@ -69,6 +70,16 @@ class _StubStorage:
         path = self.root / ontology_id / version
         path.mkdir(parents=True, exist_ok=True)
         return path
+
+    def available_ontologies(self):
+        if not self.root.exists():
+            return []
+        return sorted([entry.name for entry in self.root.iterdir() if entry.is_dir()])
+
+    def delete_version(self, ontology_id: str, version: str) -> None:
+        path = self.root / ontology_id / version
+        if path.exists():
+            shutil.rmtree(path)
 
 
 def test_cli_pull_json_output(monkeypatch, stub_logger, tmp_path, capsys):
@@ -240,6 +251,25 @@ def test_cli_plan_applies_concurrency_overrides(monkeypatch, stub_logger):
     assert captured["plans"] == 4
     assert captured["downloads"] == 2
     assert captured["hosts"] == ["mirror.example.org"]
+
+
+def test_cli_plan_since_argument(monkeypatch, stub_logger):
+    captured = {}
+
+    def _fake_plan_all(specs, config, since=None):
+        captured["since"] = since
+        return []
+
+    monkeypatch.setattr(cli, "plan_all", _fake_plan_all)
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    monkeypatch.setattr(
+        cli.ResolvedConfig,
+        "from_defaults",
+        classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfig(), specs=())),
+    )
+
+    assert cli.main(["plan", "hp", "--since", "2024-02-01"]) == 0
+    assert captured["since"].isoformat().startswith("2024-02-01")
 
 
 def test_cli_validate_json_output(monkeypatch, stub_logger, tmp_path, capsys):
@@ -522,3 +552,146 @@ def test_doctor_reports_invalid_rate_limit(monkeypatch, tmp_path):
     report = cli._doctor_report()
     assert "invalid" in report["rate_limits"]
     assert report["rate_limits"]["invalid"]["ols"] == "invalid"
+
+
+def test_cli_plan_diff_output(monkeypatch, stub_logger, tmp_path, capsys):
+    plans_dir = tmp_path / "plans"
+    plans_dir.mkdir(parents=True)
+    baseline = plans_dir / "latest.json"
+    baseline.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "hp",
+                    "url": "https://old.example.org/hp.owl",
+                    "version": "2023-01-01",
+                    "license": "CC-BY",
+                    "media_type": "application/rdf+xml",
+                }
+            ]
+        )
+    )
+
+    plan = FetchPlan(
+        url="https://new.example.org/hp.owl",
+        headers={},
+        filename_hint=None,
+        version="2024-02-01",
+        license="CC0",
+        media_type="application/rdf+xml",
+        service="obo",
+    )
+    planned = PlannedFetch(
+        spec=FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"]),
+        resolver="obo",
+        plan=plan,
+        candidates=(ResolverCandidate(resolver="obo", plan=plan),),
+        last_modified="Wed, 01 Feb 2024 12:00:00 GMT",
+    )
+
+    monkeypatch.setattr(cli, "plan_all", lambda specs, config, since=None: [planned])
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    monkeypatch.setattr(cli, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(
+        cli.ResolvedConfig,
+        "from_defaults",
+        classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfig(), specs=())),
+    )
+
+    assert cli.main(["plan", "diff", "hp"]) == 0
+    output = capsys.readouterr().out
+    assert "~ hp" in output
+    assert "https://new.example.org" in output
+
+
+def test_cli_plan_diff_json(monkeypatch, stub_logger, tmp_path, capsys):
+    baseline = tmp_path / "plans" / "latest.json"
+    baseline.parent.mkdir(parents=True)
+    baseline.write_text(json.dumps([]))
+
+    plan = FetchPlan(
+        url="https://example.org/efo.owl",
+        headers={},
+        filename_hint=None,
+        version="2024-03-01",
+        license="CC-BY",
+        media_type="application/rdf+xml",
+        service="ols",
+    )
+    planned = PlannedFetch(
+        spec=FetchSpec(id="efo", resolver="ols", extras={}, target_formats=["owl"]),
+        resolver="ols",
+        plan=plan,
+        candidates=(ResolverCandidate(resolver="ols", plan=plan),),
+        last_modified=None,
+    )
+
+    monkeypatch.setattr(cli, "plan_all", lambda specs, config, since=None: [planned])
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    monkeypatch.setattr(cli, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(
+        cli.ResolvedConfig,
+        "from_defaults",
+        classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfig(), specs=())),
+    )
+
+    assert cli.main(["plan", "diff", "efo", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["added"][0]["id"] == "efo"
+
+
+def _write_version(base: Path, ontology: str, version: str, timestamp: str, size: int = 1024) -> None:
+    version_dir = base / ontology / version
+    (version_dir / "original").mkdir(parents=True, exist_ok=True)
+    payload = {"downloaded_at": timestamp, "id": ontology, "version": version}
+    (version_dir / "manifest.json").write_text(json.dumps(payload))
+    data_file = version_dir / "original" / f"{ontology}.owl"
+    data_file.write_bytes(b"x" * size)
+
+
+def test_cli_prune_dry_run(monkeypatch, tmp_path, capsys):
+    storage = _StubStorage(tmp_path)
+    _write_version(tmp_path, "hp", "2024-01-01", "2024-01-01T00:00:00Z")
+    _write_version(tmp_path, "hp", "2023-01-01", "2023-01-01T00:00:00Z")
+
+    monkeypatch.setattr(cli, "STORAGE", storage)
+    monkeypatch.setattr(cli, "LOCAL_ONTOLOGY_DIR", tmp_path)
+
+    assert cli.main(["prune", "--keep", "1", "--dry-run"]) == 0
+    output = capsys.readouterr().out
+    assert "Dry-run" in output
+    assert (tmp_path / "hp" / "2023-01-01").exists()
+
+
+def test_cli_prune_executes(monkeypatch, tmp_path, capsys):
+    storage = _StubStorage(tmp_path)
+    _write_version(tmp_path, "hp", "2024-01-01", "2024-01-01T00:00:00Z", size=2048)
+    _write_version(tmp_path, "hp", "2023-01-01", "2023-01-01T00:00:00Z", size=1024)
+    latest_link = tmp_path / "hp" / "latest"
+    latest_link.parent.mkdir(parents=True, exist_ok=True)
+    latest_link.symlink_to(tmp_path / "hp" / "2023-01-01")
+
+    monkeypatch.setattr(cli, "STORAGE", storage)
+    monkeypatch.setattr(cli, "LOCAL_ONTOLOGY_DIR", tmp_path)
+
+    assert cli.main(["prune", "--keep", "1"]) == 0
+    output = capsys.readouterr().out
+    assert "Pruned" in output
+    assert not (tmp_path / "hp" / "2023-01-01").exists()
+    assert latest_link.readlink() == tmp_path / "hp" / "2024-01-01"
+
+
+def test_cli_prune_ids_filter(monkeypatch, tmp_path, capsys):
+    storage = _StubStorage(tmp_path)
+    _write_version(tmp_path, "hp", "2024-01-01", "2024-01-01T00:00:00Z")
+    _write_version(tmp_path, "hp", "2023-01-01", "2023-01-01T00:00:00Z")
+    _write_version(tmp_path, "chebi", "2024-01-01", "2024-01-01T00:00:00Z")
+    _write_version(tmp_path, "chebi", "2023-01-01", "2023-01-01T00:00:00Z")
+
+    monkeypatch.setattr(cli, "STORAGE", storage)
+    monkeypatch.setattr(cli, "LOCAL_ONTOLOGY_DIR", tmp_path)
+
+    assert cli.main(["prune", "--keep", "1", "--ids", "hp"]) == 0
+    capsys.readouterr()
+    assert not (tmp_path / "hp" / "2023-01-01").exists()
+    assert (tmp_path / "chebi" / "2023-01-01").exists()
