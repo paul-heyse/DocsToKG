@@ -20,6 +20,7 @@ Usage:
 
 import io
 import logging
+import tarfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -419,6 +420,86 @@ def test_extract_zip_rejects_absolute(tmp_path):
         download.extract_zip_safe(archive, tmp_path / "out")
 
 
+def test_extract_zip_detects_compression_bomb(tmp_path):
+    archive = tmp_path / "bomb.zip"
+    with download.zipfile.ZipFile(
+        archive, "w", compression=download.zipfile.ZIP_DEFLATED
+    ) as zf:
+        zf.writestr("large.txt", b"0" * (11 * 1024 * 1024))
+
+    with pytest.raises(download.ConfigError) as exc_info:
+        download.extract_zip_safe(archive, tmp_path / "zip_out")
+
+    assert "compression ratio" in str(exc_info.value)
+
+
+def _make_tarfile(path: Path, entries: list[tuple[tarfile.TarInfo, bytes | None]]) -> None:
+    with tarfile.open(path, "w:gz") as tf:
+        for member, data in entries:
+            fileobj = io.BytesIO(data) if data is not None else None
+            tf.addfile(member, fileobj)
+
+
+def test_extract_tar_safe(tmp_path):
+    archive = tmp_path / "archive.tar.gz"
+    info = tarfile.TarInfo("folder/file.txt")
+    data = b"payload"
+    info.size = len(data)
+    _make_tarfile(archive, [(info, data)])
+
+    extracted = download.extract_tar_safe(archive, tmp_path / "tar_out")
+
+    assert (tmp_path / "tar_out" / "folder" / "file.txt").read_bytes() == data
+    assert extracted
+
+
+def test_extract_tar_rejects_traversal(tmp_path):
+    archive = tmp_path / "bad_traversal.tar.gz"
+    info = tarfile.TarInfo("../evil.txt")
+    payload = b"evil"
+    info.size = len(payload)
+    _make_tarfile(archive, [(info, payload)])
+
+    with pytest.raises(download.ConfigError):
+        download.extract_tar_safe(archive, tmp_path / "out")
+
+
+def test_extract_tar_rejects_absolute(tmp_path):
+    archive = tmp_path / "bad_absolute.tar.gz"
+    info = tarfile.TarInfo("/abs/path.txt")
+    data = b"absolute"
+    info.size = len(data)
+    _make_tarfile(archive, [(info, data)])
+
+    with pytest.raises(download.ConfigError):
+        download.extract_tar_safe(archive, tmp_path / "out")
+
+
+def test_extract_tar_rejects_symlink(tmp_path):
+    archive = tmp_path / "bad_symlink.tar.gz"
+    info = tarfile.TarInfo("link")
+    info.type = tarfile.SYMTYPE
+    info.linkname = "target"
+    info.size = 0
+    _make_tarfile(archive, [(info, None)])
+
+    with pytest.raises(download.ConfigError):
+        download.extract_tar_safe(archive, tmp_path / "out")
+
+
+def test_extract_tar_detects_compression_bomb(tmp_path):
+    archive = tmp_path / "bomb.tar.gz"
+    info = tarfile.TarInfo("large.bin")
+    payload = b"0" * (11 * 1024 * 1024)
+    info.size = len(payload)
+    _make_tarfile(archive, [(info, payload)])
+
+    with pytest.raises(download.ConfigError) as exc_info:
+        download.extract_tar_safe(archive, tmp_path / "out")
+
+    assert "compression ratio" in str(exc_info.value)
+
+
 def test_download_stream_http_error(monkeypatch, tmp_path):
     response = DummyResponse(500, b"", {}, raise_error=True)
     make_session(monkeypatch, [response])
@@ -488,6 +569,68 @@ def test_validate_url_security_upgrades_http(monkeypatch):
     )
     secure_url = download.validate_url_security("http://example.org/ontology.owl")
     assert secure_url.startswith("https://example.org")
+
+
+def test_validate_url_security_respects_allowlist(monkeypatch):
+    looked_up = {}
+
+    def fake_getaddrinfo(host, *_args, **_kwargs):
+        looked_up["host"] = host
+        return [(None, None, None, None, ("93.184.216.34", 0))]
+
+    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
+    config = DownloadConfiguration(allowed_hosts=["example.org", "purl.obolibrary.org"])
+
+    secure_url = download.validate_url_security(
+        "https://purl.obolibrary.org/ontology.owl", config
+    )
+
+    assert looked_up["host"] == "purl.obolibrary.org"
+    assert secure_url.startswith("https://purl.obolibrary.org")
+
+
+def test_validate_url_security_blocks_disallowed_host():
+    config = DownloadConfiguration(allowed_hosts=["example.org"])
+
+    with pytest.raises(ConfigError):
+        download.validate_url_security("https://malicious.com/evil.owl", config)
+
+
+def test_validate_url_security_normalizes_idn(monkeypatch):
+    looked_up = {}
+
+    def fake_getaddrinfo(host, *_args, **_kwargs):
+        looked_up["host"] = host
+        return [(None, None, None, None, ("93.184.216.34", 0))]
+
+    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
+
+    config = DownloadConfiguration()
+    secure_url = download.validate_url_security(
+        "https://münchen.example.org/ontology.owl", config
+    )
+
+    assert looked_up["host"] == "xn--mnchen-3ya.example.org"
+    assert secure_url.startswith("https://xn--mnchen-3ya.example.org")
+
+
+def test_validate_url_security_rejects_mixed_script_idn():
+    with pytest.raises(ConfigError):
+        download.validate_url_security("https://раураl.com/ontology.owl")
+
+
+def test_validate_url_security_respects_wildcard_allowlist(monkeypatch):
+    def fake_getaddrinfo(host, *_args, **_kwargs):
+        return [(None, None, None, None, ("93.184.216.34", 0))]
+
+    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
+    config = DownloadConfiguration(allowed_hosts=["*.example.org"])
+
+    secure_url = download.validate_url_security(
+        "https://sub.example.org/ontology.owl", config
+    )
+
+    assert secure_url.startswith("https://sub.example.org")
 
 
 def test_sanitize_filename_removes_traversal():
