@@ -1093,11 +1093,26 @@ def main(args: argparse.Namespace | None = None) -> int:
     elif args.resume:
         logger.info("Resume mode enabled: unchanged outputs will be skipped")
 
+    preflight_start = time.perf_counter()
     port, proc, owns = ensure_vllm(
         PREFERRED_PORT,
         model_path,
         served_model_names,
         gpu_memory_utilization,
+    )
+    metrics_healthy, metrics_status = probe_metrics(port)
+    manifest_append(
+        stage=MANIFEST_STAGE,
+        doc_id="__service__",
+        status="success",
+        duration_s=round(time.perf_counter() - preflight_start, 3),
+        schema_version="docparse/1.1.0",
+        served_models=list(served_model_names),
+        vllm_version=vllm_version,
+        port=port,
+        owns_process=owns,
+        metrics_healthy=metrics_healthy,
+        metrics_status_code=metrics_status,
     )
     logger.info(
         "vLLM server ready",

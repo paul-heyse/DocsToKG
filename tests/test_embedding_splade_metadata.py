@@ -101,14 +101,11 @@ def test_summary_manifest_includes_splade_backend_metadata(
     monkeypatch.setattr(
         embed_module,
         "process_pass_a",
-        lambda files, logger: (
-            {"chunk-1": embed_module.Chunk(uuid="chunk-1", text="Example", doc_id="doc")},
-            embed_module.BM25Stats(N=1, avgdl=1.0, df={}),
-        ),
+        lambda files, logger: embed_module.BM25Stats(N=1, avgdl=1.0, df={}),
     )
 
     def fake_process_chunk_file_vectors(
-        chunk_file, uuid_to_chunk, stats, args, validator, logger
+        chunk_file, stats, args, validator, logger
     ) -> tuple[int, list[int], list[float]]:
         validator.validate("chunk-1", ["tok"], [1.0])
         return 1, [1], [1.0]

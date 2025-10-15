@@ -575,6 +575,16 @@ class Batcher(Iterable[List[T]]):
             yield batch
 
 
+def _manifest_filename(stage: str) -> str:
+    """Return manifest filename for a given stage."""
+
+    safe = stage.strip() or "all"
+    safe = "".join(
+        c if c.isalnum() or c in {"-", "_", "."} else "-" for c in safe
+    )
+    return f"docparse.{safe}.manifest.jsonl"
+
+
 def manifest_append(
     stage: str,
     doc_id: str,
@@ -614,7 +624,7 @@ def manifest_append(
     if status not in allowed_status:
         raise ValueError(f"status must be one of {sorted(allowed_status)}")
 
-    manifest_path = data_manifests() / "docparse.manifest.jsonl"
+    manifest_path = data_manifests() / _manifest_filename(stage)
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "stage": stage,
@@ -691,26 +701,34 @@ def load_manifest_index(stage: str, root: Optional[Path] = None) -> Dict[str, di
     """
 
     manifest_dir = data_manifests(root)
-    manifest_path = manifest_dir / "docparse.manifest.jsonl"
+    stage_path = manifest_dir / _manifest_filename(stage)
+    legacy_path = manifest_dir / "docparse.manifest.jsonl"
     index: Dict[str, dict] = {}
-    if not manifest_path.exists():
+    if stage_path.exists():
+        candidates = [stage_path]
+    elif legacy_path.exists():
+        candidates = [legacy_path]
+    else:
         return index
 
-    with manifest_path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if entry.get("stage") != stage:
-                continue
-            doc_id = entry.get("doc_id")
-            if not doc_id:
-                continue
-            index[doc_id] = entry
+    for manifest_path in candidates:
+        with manifest_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if entry.get("stage") != stage:
+                    if manifest_path is stage_path:
+                        continue
+                    continue
+                doc_id = entry.get("doc_id")
+                if not doc_id:
+                    continue
+                index[doc_id] = entry
     return index
 
 

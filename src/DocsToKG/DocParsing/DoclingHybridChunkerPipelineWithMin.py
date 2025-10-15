@@ -699,6 +699,9 @@ def main(args: argparse.Namespace | None = None) -> int:
                         doc_items_refs=r.refs,
                         page_nos=r.pages,
                         schema_version=CHUNK_SCHEMA_VERSION,
+                        has_image_captions=r.has_image_captions,
+                        has_image_classification=r.has_image_classification,
+                        num_images=r.num_images,
                         provenance=provenance,
                     )
                     payload = row.model_dump(mode="json", exclude_none=True)
