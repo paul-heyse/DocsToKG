@@ -37,6 +37,7 @@ from docling_core.types.doc.document import DoclingDocument, DocTagsDocument
 from transformers import AutoTokenizer
 
 from DocsToKG.DocParsing._common import (
+    atomic_write,
     compute_content_hash,
     data_chunks,
     data_doctags,
@@ -46,6 +47,7 @@ from DocsToKG.DocParsing._common import (
     iter_doctags,
     load_manifest_index,
     manifest_append,
+    resolve_hash_algorithm,
 )
 from DocsToKG.DocParsing.schemas import (
     CHUNK_SCHEMA_VERSION,
@@ -660,6 +662,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 schema_version=CHUNK_SCHEMA_VERSION,
                 input_path=str(path),
                 input_hash=input_hash,
+                hash_alg=resolve_hash_algorithm(),
                 output_path=str(out_path),
                 parse_engine=parse_engine,
             )
@@ -702,7 +705,7 @@ def main(args: argparse.Namespace | None = None) -> int:
             )
 
             # Stage 4: write JSONL with schema validation
-            with out_path.open("w", encoding="utf-8") as handle:
+            with atomic_write(out_path) as handle:
                 for cid, r in enumerate(final_recs):
                     provenance = ProvenanceMetadata(
                         parse_engine=parse_engine,
@@ -745,6 +748,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 schema_version=CHUNK_SCHEMA_VERSION,
                 input_path=str(path),
                 input_hash=input_hash,
+                hash_alg=resolve_hash_algorithm(),
                 output_path=str(out_path),
                 chunk_count=len(final_recs),
                 parse_engine=parse_engine,
@@ -759,6 +763,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 schema_version=CHUNK_SCHEMA_VERSION,
                 input_path=str(path),
                 input_hash=input_hash,
+                hash_alg=resolve_hash_algorithm(),
                 output_path=str(out_path),
                 error=str(exc),
                 parse_engine=parse_engine,

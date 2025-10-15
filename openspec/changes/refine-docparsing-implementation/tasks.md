@@ -39,7 +39,7 @@ git checkout -b refine-docparsing-phase-1
 **Goal**: Move deprecated scripts to `legacy/` with backward-compatible shims
 
 ### Task 1.1: Create legacy directory structure
-- [ ] Task 1.1: Create legacy directory structure
+- [x] Task 1.1: Create legacy directory structure
 
 **What**: Create dedicated `legacy/` subdirectory for deprecated scripts
 
@@ -88,7 +88,7 @@ python -c "from DocsToKG.DocParsing import legacy; print('✓ Package importable
 ---
 
 ### Task 1.2: Move HTML converter to legacy with comprehensive shim
-- [ ] Task 1.2: Move HTML converter to legacy with comprehensive shim
+- [x] Task 1.2: Move HTML converter to legacy with comprehensive shim
 
 **What**: Relocate HTML converter to `legacy/` and create forwarding shim
 
@@ -242,7 +242,7 @@ python -c "from DocsToKG.DocParsing.legacy import run_docling_html_to_doctags_pa
 ---
 
 ### Task 1.3: Move PDF converter to legacy with comprehensive shim
-- [ ] Task 1.3: Move PDF converter to legacy with comprehensive shim
+- [x] Task 1.3: Move PDF converter to legacy with comprehensive shim
 
 **What**: Relocate PDF converter to `legacy/` and create forwarding shim
 
@@ -1193,7 +1193,7 @@ echo "Next: Phase 3 - Atomic writes"
 **Goal**: Replace direct file writes with atomic write operations to prevent partial file corruption during crashes or interruptions.
 
 ### Task 3.1: Replace chunker direct write with atomic write operation
-- [ ] Task 3.1: Replace chunker direct write with atomic write operation
+- [x] Task 3.1: Replace chunker direct write with atomic write operation
 
 **Functional Requirements**:
 
@@ -1342,7 +1342,7 @@ After creating the test suite:
 **Goal**: Fix the JSON log formatter to emit true UTC timestamps rather than local time with UTC labels
 
 ### Task 4.1: Correct JSONFormatter timestamp behavior in common utilities
-- [ ] Task 4.1: Correct JSONFormatter timestamp behavior in common utilities
+- [x] Task 4.1: Correct JSONFormatter timestamp behavior in common utilities
 
 **Functional Requirements**:
 
@@ -1407,7 +1407,7 @@ After implementation, you must verify that:
 **Goal**: Enable SHA-256 migration path while maintaining backward compatibility with existing SHA-1 hashes
 
 ### Task 5.1: Add environment variable override to content hash computation
-- [ ] Task 5.1: Add environment variable override to content hash computation
+- [x] Task 5.1: Add environment variable override to content hash computation
 
 **Functional Requirements**:
 
@@ -1468,7 +1468,7 @@ After implementation:
 ---
 
 ### Task 5.2: Add hash algorithm tag to chunker manifest entries
-- [ ] Task 5.2: Add hash algorithm tag to chunker manifest entries
+- [x] Task 5.2: Add hash algorithm tag to chunker manifest entries
 
 **Functional Requirements**:
 
