@@ -179,6 +179,7 @@ class ValidationConfig(BaseModel):
         parser_timeout_sec: Maximum runtime allowed for ontology parsing.
         max_memory_mb: Memory ceiling allocated to validation routines.
         skip_reasoning_if_size_mb: Threshold above which reasoning is skipped.
+        streaming_normalization_threshold_mb: File size threshold for streaming normalization.
 
     Examples:
         >>> ValidationConfig(parser_timeout_sec=120).parser_timeout_sec
@@ -200,6 +201,11 @@ class ValidationConfig(BaseModel):
         default=500,
         gt=0,
         description="Disable reasoning when ontology exceeds this size in MB",
+    )
+    streaming_normalization_threshold_mb: int = Field(
+        default=200,
+        ge=1,
+        description="Normalize using streaming pipeline when ontology exceeds this size in MB",
     )
 
     model_config = {
@@ -244,8 +250,20 @@ class DownloadConfiguration(BaseModel):
     )
     max_download_size_gb: float = Field(default=5.0, gt=0, le=100.0)
     concurrent_downloads: int = Field(default=1, ge=1, le=10)
+    concurrent_plans: int = Field(
+        default=8,
+        ge=1,
+        le=32,
+        description="Maximum concurrent resolver planning requests",
+    )
     validate_media_type: bool = Field(default=True)
-    rate_limits: Dict[str, str] = Field(default_factory=dict)
+    rate_limits: Dict[str, str] = Field(
+        default_factory=lambda: {
+            "ols": "4/second",
+            "bioportal": "2/second",
+            "lov": "1/second",
+        }
+    )
     allowed_hosts: Optional[List[str]] = Field(default=None)
     polite_headers: Dict[str, str] = Field(
         default_factory=lambda: {

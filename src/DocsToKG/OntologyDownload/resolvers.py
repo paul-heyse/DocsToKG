@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import logging
 import re
-import time
+import threading
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional
 
@@ -33,9 +33,15 @@ from ols_client import OlsClient
 from ontoportal_client import BioPortalClient
 
 from .config import ConfigError, ResolvedConfig
+from .download import TokenBucket
 from .optdeps import get_pystow
+from .utils import retry_with_backoff
 
 pystow = get_pystow()
+
+
+_SERVICE_BUCKETS: Dict[str, TokenBucket] = {}
+_SERVICE_BUCKET_LOCK = threading.Lock()
 
 
 def normalize_license_to_spdx(value: Optional[str]) -> Optional[str]:
@@ -87,6 +93,21 @@ def normalize_license_to_spdx(value: Optional[str]) -> Optional[str]:
     return cleaned
 
 
+def _get_service_bucket(service: str, config: ResolvedConfig) -> TokenBucket:
+    """Return a token bucket for resolver API requests respecting rate limits."""
+
+    http_config = config.defaults.http
+    rate = http_config.parse_service_rate_limit(service) or http_config.rate_limit_per_second()
+    rate = max(rate, 0.1)
+    capacity = max(rate, 1.0)
+    with _SERVICE_BUCKET_LOCK:
+        bucket = _SERVICE_BUCKETS.get(service)
+        if bucket is None or bucket.rate != rate or bucket.capacity != capacity:
+            bucket = TokenBucket(rate_per_sec=rate, capacity=capacity)
+            _SERVICE_BUCKETS[service] = bucket
+        return bucket
+
+
 @dataclass(slots=True)
 class FetchPlan:
     """Concrete plan output from a resolver.
@@ -121,6 +142,7 @@ class FetchPlan:
     license: Optional[str]
     media_type: Optional[str]
     service: Optional[str] = None
+    last_modified: Optional[str] = None
 
 
 class BaseResolver:
@@ -143,7 +165,13 @@ class BaseResolver:
     """
 
     def _execute_with_retry(
-        self, func, *, config: ResolvedConfig, logger: logging.Logger, name: str
+        self,
+        func,
+        *,
+        config: ResolvedConfig,
+        logger: logging.Logger,
+        name: str,
+        service: Optional[str] = None,
     ):
         """Run a callable with retry semantics tailored for resolver APIs.
 
@@ -159,33 +187,50 @@ class BaseResolver:
         Raises:
             ConfigError: When retry limits are exceeded or HTTP errors occur.
         """
-        attempts = 0
         max_attempts = max(1, config.defaults.http.max_retries)
-        while True:
-            attempts += 1
-            try:
-                return func()
-            except requests.Timeout as exc:
-                if attempts >= max_attempts:
-                    raise ConfigError(
-                        f"{name} API timeout after {config.defaults.http.timeout_sec}s"
-                    ) from exc
-                sleep_time = config.defaults.http.backoff_factor * (2 ** (attempts - 1))
-                logger.warning(
-                    "resolver timeout",
-                    extra={
-                        "stage": "plan",
-                        "resolver": name,
-                        "attempt": attempts,
-                        "sleep_sec": sleep_time,
-                    },
-                )
-                time.sleep(sleep_time)
-            except requests.HTTPError as exc:
-                status = exc.response.status_code if exc.response is not None else None
-                if status in {401, 403}:
-                    raise
-                raise ConfigError(f"{name} API error {status}: {exc}") from exc
+        backoff_base = config.defaults.http.backoff_factor
+
+        def _retryable(exc: Exception) -> bool:
+            return isinstance(exc, (requests.Timeout, requests.ConnectionError))
+
+        def _on_retry(attempt: int, exc: Exception, sleep_time: float) -> None:
+            logger.warning(
+                "resolver timeout",
+                extra={
+                    "stage": "plan",
+                    "resolver": name,
+                    "attempt": attempt,
+                    "sleep_sec": sleep_time,
+                },
+            )
+
+        bucket = _get_service_bucket(service, config) if service else None
+
+        def _invoke():
+            if bucket is not None:
+                bucket.consume()
+            return func()
+
+        try:
+            return retry_with_backoff(
+                _invoke,
+                retryable=_retryable,
+                max_attempts=max_attempts,
+                backoff_base=backoff_base,
+                jitter=backoff_base,
+                callback=_on_retry,
+            )
+        except requests.Timeout as exc:
+            raise ConfigError(
+                f"{name} API timeout after {config.defaults.http.timeout_sec}s"
+            ) from exc
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            if status in {401, 403}:
+                raise
+            raise ConfigError(f"{name} API error {status}: {exc}") from exc
+        except requests.ConnectionError as exc:
+            raise ConfigError(f"{name} API connection error: {exc}") from exc
 
     def _extract_correlation_id(self, logger: logging.Logger) -> Optional[str]:
         """Return the correlation id from a logger adapter when available.
@@ -253,6 +298,7 @@ class BaseResolver:
         license: Optional[str] = None,
         media_type: Optional[str] = None,
         service: Optional[str] = None,
+        last_modified: Optional[str] = None,
     ) -> FetchPlan:
         """Construct a ``FetchPlan`` from resolver components.
 
@@ -277,6 +323,7 @@ class BaseResolver:
             license=normalized_license,
             media_type=media_type,
             service=service,
+            last_modified=last_modified,
         )
 
 
@@ -328,7 +375,7 @@ class OBOResolver(BaseResolver):
                 return self._build_plan(
                     url=url,
                     media_type="application/rdf+xml",
-                    service=spec.resolver,
+                    service="obo",
                 )
         raise ConfigError(f"No download link found via Bioregistry for {spec.id}")
 
@@ -374,6 +421,7 @@ class OLSResolver(BaseResolver):
                 config=config,
                 logger=logger,
                 name="ols",
+                service="ols",
             )
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else None
@@ -406,6 +454,7 @@ class OLSResolver(BaseResolver):
                 config=config,
                 logger=logger,
                 name="ols",
+                service="ols",
             )
             for submission in submissions:
                 candidate = submission.get("downloadLocation") or submission.get("links", {}).get(
@@ -427,7 +476,7 @@ class OLSResolver(BaseResolver):
             filename_hint=filename,
             version=version,
             license=license_value,
-            service=spec.resolver,
+            service="ols",
         )
 
 
@@ -486,6 +535,7 @@ class BioPortalResolver(BaseResolver):
                 config=config,
                 logger=logger,
                 name="bioportal",
+                service="bioportal",
             )
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else None
@@ -503,6 +553,7 @@ class BioPortalResolver(BaseResolver):
             config=config,
             logger=logger,
             name="bioportal",
+            service="bioportal",
         )
         if isinstance(latest_submission, dict):
             download_url = (
@@ -538,7 +589,7 @@ class BioPortalResolver(BaseResolver):
             headers=headers,
             version=version,
             license=license_value,
-            service=spec.resolver,
+            service="bioportal",
         )
 
 
@@ -610,6 +661,7 @@ class LOVResolver(BaseResolver):
             config=config,
             logger=logger,
             name="lov",
+            service="lov",
         )
 
         download_url: Optional[str] = None
@@ -670,7 +722,7 @@ class LOVResolver(BaseResolver):
             license=license_value,
             version=version,
             media_type=media_type or "text/turtle",
-            service=spec.resolver,
+            service="lov",
         )
 
 
@@ -710,7 +762,7 @@ class SKOSResolver(BaseResolver):
         return self._build_plan(
             url=url,
             media_type="text/turtle",
-            service=spec.resolver,
+            service="skos",
         )
 
 
@@ -750,7 +802,7 @@ class XBRLResolver(BaseResolver):
         return self._build_plan(
             url=url,
             media_type="application/zip",
-            service=spec.resolver,
+            service="xbrl",
         )
 
 
@@ -815,7 +867,7 @@ class OntobeeResolver(BaseResolver):
                 return self._build_plan(
                     url=url,
                     media_type=media_type,
-                    service=spec.resolver,
+                    service="ontobee",
                 )
 
         # Fall back to OWL representation if no preferred format matched.
@@ -829,7 +881,7 @@ class OntobeeResolver(BaseResolver):
                 "url": url,
             },
         )
-        return self._build_plan(url=url, media_type="application/rdf+xml", service=spec.resolver)
+        return self._build_plan(url=url, media_type="application/rdf+xml", service="ontobee")
 
 
 RESOLVERS = {

@@ -12,6 +12,7 @@ streaming and validation.
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path, PurePosixPath
 from typing import Iterable, List, Protocol, Tuple
 
@@ -99,6 +100,12 @@ class StorageBackend(Protocol):
         Returns:
             None
         """
+
+    def available_ontologies(self) -> List[str]:
+        """Return sorted ontology identifiers known to the backend."""
+
+    def delete_version(self, ontology_id: str, version: str) -> None:
+        """Remove an ontology version from all backing stores."""
 
 
 def _safe_identifiers(ontology_id: str, version: str) -> Tuple[str, str]:
@@ -203,6 +210,16 @@ class LocalStorageBackend:
         # Local backend already operates in-place; nothing further needed.
         _ = (ontology_id, version, local_dir)  # pragma: no cover - intentional no-op
 
+    def available_ontologies(self) -> List[str]:
+        if not self.root.exists():
+            return []
+        return sorted([entry.name for entry in self.root.iterdir() if entry.is_dir()])
+
+    def delete_version(self, ontology_id: str, version: str) -> None:
+        base = self._version_dir(ontology_id, version)
+        if base.exists():
+            shutil.rmtree(base)
+
 
 class FsspecStorageBackend(LocalStorageBackend):
     """Storage backend that mirrors ontology artifacts to a remote location via fsspec.
@@ -267,6 +284,25 @@ class FsspecStorageBackend(LocalStorageBackend):
         ]
         merged = sorted({*local_versions, *remote_versions})
         return merged
+
+    def available_ontologies(self) -> List[str]:
+        local_ids = super().available_ontologies()
+        try:
+            entries = self.fs.ls(str(self.base_path), detail=False)
+        except FileNotFoundError:
+            entries = []
+        remote_ids = [
+            PurePosixPath(entry).name
+            for entry in entries
+            if entry and not entry.endswith(".tmp")
+        ]
+        return sorted({*local_ids, *remote_ids})
+
+    def delete_version(self, ontology_id: str, version: str) -> None:
+        super().delete_version(ontology_id, version)
+        remote_dir = self._remote_version_path(ontology_id, version)
+        if self.fs.exists(str(remote_dir)):
+            self.fs.rm(str(remote_dir), recursive=True)
 
     def ensure_local_version(self, ontology_id: str, version: str) -> Path:
         """Mirror a remote ontology version into the local cache if necessary.

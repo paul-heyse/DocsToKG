@@ -25,7 +25,7 @@ import unicodedata
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 from urllib.parse import ParseResult, urlparse, urlunparse
 
 import pooch
@@ -84,6 +84,26 @@ class DownloadResult:
     last_modified: Optional[str]
 
 
+class DownloadFailure(ConfigError):
+    """Raised when an HTTP download attempt fails.
+
+    Attributes:
+        status_code: Optional HTTP status code returned by the upstream service.
+        retryable: Whether the failure is safe to retry with an alternate resolver.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: Optional[int] = None,
+        retryable: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.retryable = retryable
+
+
 class TokenBucket:
     """Token bucket used to enforce per-host and per-service rate limits.
 
@@ -137,6 +157,38 @@ class TokenBucket:
 _TOKEN_BUCKETS: Dict[str, TokenBucket] = {}
 
 
+_RETRYABLE_HTTP_STATUSES = {403, 408, 425, 429, 500, 502, 503, 504}
+
+
+def _is_retryable_status(status_code: Optional[int]) -> bool:
+    if status_code is None:
+        return True
+    if status_code >= 500:
+        return True
+    return status_code in _RETRYABLE_HTTP_STATUSES
+
+
+_RDF_FORMAT_LABELS = {
+    "application/rdf+xml": "RDF/XML",
+    "text/turtle": "Turtle",
+    "application/n-triples": "N-Triples",
+    "application/trig": "TriG",
+    "application/ld+json": "JSON-LD",
+}
+_RDF_ALIAS_GROUPS = {
+    "application/rdf+xml": {"application/rdf+xml", "application/xml", "text/xml"},
+    "text/turtle": {"text/turtle", "application/x-turtle"},
+    "application/n-triples": {"application/n-triples", "text/plain"},
+    "application/trig": {"application/trig"},
+    "application/ld+json": {"application/ld+json"},
+}
+RDF_MIME_ALIASES: Set[str] = set()
+RDF_MIME_FORMAT_LABELS: Dict[str, str] = {}
+for canonical, aliases in _RDF_ALIAS_GROUPS.items():
+    label = _RDF_FORMAT_LABELS[canonical]
+    for alias in aliases:
+        RDF_MIME_ALIASES.add(alias)
+        RDF_MIME_FORMAT_LABELS[alias] = label
 def sanitize_filename(filename: str) -> str:
     """Sanitize filenames to prevent directory traversal and unsafe characters.
 
@@ -524,6 +576,22 @@ def extract_tar_safe(
     return extracted
 
 
+_TAR_SUFFIXES = (".tar", ".tar.gz", ".tgz", ".tar.xz", ".txz", ".tar.bz2", ".tbz2")
+
+
+def extract_archive_safe(
+    archive_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None
+) -> List[Path]:
+    """Extract archives by dispatching to the appropriate safe handler."""
+
+    lower_name = archive_path.name.lower()
+    if lower_name.endswith(".zip"):
+        return extract_zip_safe(archive_path, destination, logger=logger)
+    if any(lower_name.endswith(suffix) for suffix in _TAR_SUFFIXES):
+        return extract_tar_safe(archive_path, destination, logger=logger)
+    raise ConfigError(f"Unsupported archive format: {archive_path}")
+
+
 class StreamingDownloader(pooch.HTTPDownloader):
     """Custom downloader supporting HEAD validation, conditional requests, resume, and caching.
 
@@ -692,20 +760,36 @@ class StreamingDownloader(pooch.HTTPDownloader):
         if actual_mime == expected_mime:
             return
 
-        acceptable_variations = {
-            "application/rdf+xml": {"application/xml", "text/xml"},
-            "text/turtle": {"text/plain", "application/x-turtle"},
-            "application/owl+xml": {"application/xml", "text/xml"},
-        }
-        acceptable = acceptable_variations.get(expected_mime, set())
-        if actual_mime in acceptable:
-            self.logger.info(
-                "acceptable media type variation",
+        expected_label = RDF_MIME_FORMAT_LABELS.get(expected_mime)
+        actual_label = RDF_MIME_FORMAT_LABELS.get(actual_mime)
+        if expected_label and actual_label:
+            if expected_label == actual_label:
+                if actual_mime != expected_mime:
+                    self.logger.info(
+                        "acceptable media type variation",
+                        extra={
+                            "stage": "download",
+                            "expected": expected_mime,
+                            "actual": actual_mime,
+                            "label": expected_label,
+                            "url": url,
+                        },
+                    )
+                return
+            variation_hint = {
+                "stage": "download",
+                "expected_media_type": expected_mime,
+                "expected_label": expected_label,
+                "actual_media_type": actual_mime,
+                "actual_label": actual_label,
+                "url": url,
+            }
+            self.logger.warning(
+                "media type mismatch detected",
                 extra={
-                    "stage": "download",
-                    "expected": expected_mime,
-                    "actual": actual_mime,
-                    "url": url,
+                    **variation_hint,
+                    "action": "proceeding with download",
+                    "override_hint": "Set defaults.http.validate_media_type: false to disable validation",
                 },
             )
             return
@@ -744,6 +828,10 @@ class StreamingDownloader(pooch.HTTPDownloader):
             manifest_headers["If-Modified-Since"] = self.previous_manifest["last_modified"]
         request_headers = {**self.custom_headers, **manifest_headers}
         part_path = Path(output_file + ".part")
+        destination_part_path = Path(str(self.destination) + ".part")
+        if not part_path.exists() and destination_part_path.exists():
+            part_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(destination_part_path, part_path)
         resume_position = part_path.stat().st_size if part_path.exists() else 0
         if resume_position:
             request_headers["Range"] = f"bytes={resume_position}-"
@@ -883,6 +971,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                 )
                 time.sleep(sleep_time)
         part_path.replace(Path(output_file))
+        destination_part_path.unlink(missing_ok=True)
 
 
 def _get_bucket(
@@ -971,17 +1060,34 @@ def download_stream(
                 progressbar=False,
             )
         )
+    except requests.HTTPError as exc:
+        status_code = getattr(getattr(exc, "response", None), "status_code", None)
+        message = f"HTTP error while downloading {secure_url}: {exc}"
+        retryable = _is_retryable_status(status_code)
+        logger.error(
+            "download request failed",
+            extra={
+                "stage": "download",
+                "url": secure_url,
+                "error": str(exc),
+                "status_code": status_code,
+            },
+        )
+        raise DownloadFailure(
+            message, status_code=status_code, retryable=retryable
+        ) from exc
     except (
         requests.ConnectionError,
         requests.Timeout,
-        requests.HTTPError,
         requests.exceptions.SSLError,
     ) as exc:
         logger.error(
             "download request failed",
             extra={"stage": "download", "url": secure_url, "error": str(exc)},
         )
-        raise ConfigError(f"HTTP error while downloading {secure_url}: {exc}") from exc
+        raise DownloadFailure(
+            f"HTTP error while downloading {secure_url}: {exc}", retryable=True
+        ) from exc
     except Exception as exc:  # pragma: no cover - defensive catch for pooch errors
         logger.error(
             "pooch download error",
@@ -1055,7 +1161,11 @@ def download_stream(
 
 
 __all__ = [
+    "DownloadFailure",
     "DownloadResult",
+    "RDF_MIME_ALIASES",
+    "RDF_MIME_FORMAT_LABELS",
+    "extract_archive_safe",
     "extract_zip_safe",
     "download_stream",
     "sanitize_filename",
