@@ -1,10 +1,10 @@
 ## 1. HTTP Retry Infrastructure
 
-- [ ] 1.1 Create `src/DocsToKG/ContentDownload/http.py` module skeleton
+- [x] 1.1 Create `src/DocsToKG/ContentDownload/http.py` module skeleton
   - Import `requests`, `time`, `random`, `Optional`, `Set`, `Any` from typing
   - Add module docstring: "Unified HTTP request utilities with retry and backoff support."
 
-- [ ] 1.2 Implement `parse_retry_after_header(response: requests.Response) -> Optional[float]` function
+- [x] 1.2 Implement `parse_retry_after_header(response: requests.Response) -> Optional[float]` function
 
   ```python
   from email.utils import parsedate_to_datetime
@@ -48,7 +48,7 @@
           return None
   ```
 
-- [ ] 1.3 Implement `request_with_retries()` function with signature:
+- [x] 1.3 Implement `request_with_retries()` function with signature:
 
   ```python
   def request_with_retries(
@@ -64,7 +64,7 @@
   ) -> requests.Response:
   ```
 
-- [ ] 1.4 Implement retry loop logic in `request_with_retries()`
+- [x] 1.4 Implement retry loop logic in `request_with_retries()`
 
   ```python
   def request_with_retries(
@@ -146,24 +146,24 @@
       raise requests.RequestException(f"Exhausted {max_retries} retries for {method} {url}")
   ```
 
-- [ ] 1.5 Add comprehensive docstring to `request_with_retries()`
+- [x] 1.5 Add comprehensive docstring to `request_with_retries()`
   - Document all parameters with types and defaults
   - Document return type and exceptions raised
   - Add usage example for HEAD and GET requests
   - Note thread-safety guarantees (session must be thread-safe)
 
-- [ ] 1.6 Update `src/DocsToKG/ContentDownload/download_pyalex_pdfs.py` imports
+- [x] 1.6 Update `src/DocsToKG/ContentDownload/download_pyalex_pdfs.py` imports
   - Add: `from DocsToKG.ContentDownload.http import request_with_retries`
   - Replace `session.head(url, ...)` call at line ~970 with `request_with_retries(session, "HEAD", url, max_retries=1, ...)`
   - Replace `session.get(url, stream=True, ...)` call at line ~980 with `request_with_retries(session, "GET", url, ...)`
   - Remove HEAD error suppression `contextlib.suppress` since retries handle transients
 
-- [ ] 1.7 Update `src/DocsToKG/ContentDownload/resolvers/__init__.py` to use new utility
+- [x] 1.7 Update `src/DocsToKG/ContentDownload/resolvers/__init__.py` to use new utility
   - Replace `_request_with_retries()` calls (lines ~1199, 1344, 1404, 1482, etc.) with `from DocsToKG.ContentDownload.http import request_with_retries`
   - Remove local `_request_with_retries()` definition (lines ~158-196)
   - Update `_sleep_backoff()` references to use backoff logic from `http.request_with_retries()`
 
-- [ ] 1.8 Add unit tests in `tests/test_http_retry.py`
+- [x] 1.8 Add unit tests in `tests/test_http_retry.py`
 
   ```python
   import time
@@ -325,11 +325,11 @@
 
 ## 2. Conditional Request Helper
 
-- [ ] 2.1 Create `src/DocsToKG/ContentDownload/conditional.py` module skeleton
+- [x] 2.1 Create `src/DocsToKG/ContentDownload/conditional.py` module skeleton
   - Import `dataclass`, `Optional`, `Dict`, `requests`
   - Add module docstring: "Conditional HTTP request helpers for ETag and Last-Modified caching."
 
-- [ ] 2.2 Define `CachedResult` dataclass
+- [x] 2.2 Define `CachedResult` dataclass
 
   ```python
   @dataclass
@@ -342,7 +342,7 @@
       last_modified: Optional[str]
   ```
 
-- [ ] 2.3 Define `ModifiedResult` dataclass
+- [x] 2.3 Define `ModifiedResult` dataclass
 
   ```python
   @dataclass
@@ -352,7 +352,7 @@
       last_modified: Optional[str]
   ```
 
-- [ ] 2.4 Implement `ConditionalRequestHelper` class initialization
+- [x] 2.4 Implement `ConditionalRequestHelper` class initialization
 
   ```python
   class ConditionalRequestHelper:
@@ -371,7 +371,7 @@
           self.prior_path = prior_path
   ```
 
-- [ ] 2.5 Implement `build_headers()` method
+- [x] 2.5 Implement `build_headers()` method
 
   ```python
   def build_headers(self) -> Dict[str, str]:
@@ -384,7 +384,7 @@
       return headers
   ```
 
-- [ ] 2.6 Implement `interpret_response()` method
+- [x] 2.6 Implement `interpret_response()` method
 
   ```python
   def interpret_response(
@@ -407,13 +407,13 @@
       )
   ```
 
-- [ ] 2.7 Update `download_candidate()` in `download_pyalex_pdfs.py` to use helper
+- [x] 2.7 Update `download_candidate()` in `download_pyalex_pdfs.py` to use helper
   - Import `ConditionalRequestHelper`, `CachedResult`, `ModifiedResult`
   - At line ~950, create helper instance: `cond_helper = ConditionalRequestHelper(prior_etag=previous_etag, ...)`
   - Replace manual header building (lines ~958-961) with `headers.update(cond_helper.build_headers())`
   - Replace 304 handling block (lines ~988-999) with: `result = cond_helper.interpret_response(response); if isinstance(result, CachedResult): return DownloadOutcome(...)`
 
-- [ ] 2.8 Add unit tests in `tests/test_conditional_requests.py`
+- [x] 2.8 Add unit tests in `tests/test_conditional_requests.py`
   - Test `build_headers()` with no prior data (empty dict)
   - Test `build_headers()` with ETag only
   - Test `build_headers()` with Last-Modified only
