@@ -105,6 +105,13 @@ class _RunState:
 class ResolverPipeline:
     """Executes resolvers in priority order until a PDF download succeeds.
 
+    The pipeline is safe to reuse across worker threads when
+    :attr:`ResolverConfig.max_concurrent_resolvers` is greater than one. All
+    mutable shared state is protected by :class:`threading.Lock` instances and
+    only read concurrently without mutation. HTTP ``requests.Session`` objects
+    are treated as read-only; callers must avoid mutating shared sessions after
+    handing them to the pipeline.
+
     Attributes:
         config: Resolver configuration containing ordering and rate limits.
         download_func: Callable responsible for downloading resolved URLs.
@@ -149,6 +156,10 @@ class ResolverPipeline:
 
     def _respect_rate_limit(self, resolver_name: str) -> None:
         """Sleep as required to respect per-resolver rate limiting policies.
+
+        The method performs an atomic read-modify-write on
+        :attr:`_last_invocation` guarded by :attr:`_lock` to ensure that
+        concurrent threads honour resolver spacing requirements.
 
         Args:
             resolver_name: Name of the resolver to rate limit.
@@ -297,11 +308,14 @@ class ResolverPipeline:
             if resolver is None:
                 continue
 
-            self._respect_rate_limit(resolver_name)
-            with self._lock:
-                self._last_invocation[resolver_name] = time.monotonic()
+            results, wall_ms = self._collect_resolver_results(
+                resolver_name,
+                resolver,
+                session,
+                artifact,
+            )
 
-            for result in resolver.iter_urls(session, self.config, artifact):
+            for result in results:
                 pipeline_result = self._process_result(
                     session,
                     artifact,
@@ -310,6 +324,7 @@ class ResolverPipeline:
                     result,
                     context_data,
                     state,
+                    resolver_wall_time_ms=wall_ms,
                 )
                 if pipeline_result is not None:
                     return pipeline_result
@@ -340,7 +355,7 @@ class ResolverPipeline:
         """
 
         max_workers = self.config.max_concurrent_resolvers
-        active_futures: Dict[Future[List[ResolverResult]], Tuple[str, int]] = {}
+        active_futures: Dict[Future[Tuple[List[ResolverResult], float]], Tuple[str, int]] = {}
 
         def submit_next(
             executor: ThreadPoolExecutor,
@@ -382,7 +397,7 @@ class ResolverPipeline:
                 for future in done:
                     resolver_name, order_index = active_futures.pop(future)
                     try:
-                        results = future.result()
+                        results, wall_ms = future.result()
                     except Exception as exc:  # pragma: no cover - defensive
                         results = [
                             ResolverResult(
@@ -392,6 +407,7 @@ class ResolverPipeline:
                                 metadata={"message": str(exc)},
                             )
                         ]
+                        wall_ms = 0.0
 
                     for result in results:
                         pipeline_result = self._process_result(
@@ -402,6 +418,7 @@ class ResolverPipeline:
                             result,
                             context_data,
                             state,
+                            resolver_wall_time_ms=wall_ms,
                         )
                         if pipeline_result is not None:
                             executor.shutdown(wait=False, cancel_futures=True)
@@ -448,6 +465,7 @@ class ResolverPipeline:
                     elapsed_ms=None,
                     reason="resolver-missing",
                     dry_run=state.dry_run,
+                    resolver_wall_time_ms=0.0,
                 )
             )
             self.metrics.record_skip(resolver_name, "missing")
@@ -466,6 +484,7 @@ class ResolverPipeline:
                     elapsed_ms=None,
                     reason="resolver-disabled",
                     dry_run=state.dry_run,
+                    resolver_wall_time_ms=0.0,
                 )
             )
             self.metrics.record_skip(resolver_name, "disabled")
@@ -484,6 +503,7 @@ class ResolverPipeline:
                     elapsed_ms=None,
                     reason="resolver-not-applicable",
                     dry_run=state.dry_run,
+                    resolver_wall_time_ms=0.0,
                 )
             )
             self.metrics.record_skip(resolver_name, "not-applicable")
@@ -497,7 +517,7 @@ class ResolverPipeline:
         resolver: Resolver,
         session: requests.Session,
         artifact: "WorkArtifact",
-    ) -> List[ResolverResult]:
+    ) -> Tuple[List[ResolverResult], float]:
         """Collect resolver results while applying rate limits and error handling.
 
         Args:
@@ -507,17 +527,17 @@ class ResolverPipeline:
             artifact: Work artifact describing the current document.
 
         Returns:
-            List of :class:`ResolverResult` entries produced by the resolver.
+            Tuple of resolver results and the resolver wall time (ms).
         """
 
         results: List[ResolverResult] = []
+        self._respect_rate_limit(resolver_name)
+        start = time.monotonic()
         try:
-            self._respect_rate_limit(resolver_name)
-            with self._lock:
-                self._last_invocation[resolver_name] = time.monotonic()
             for result in resolver.iter_urls(session, self.config, artifact):
                 results.append(result)
         except Exception as exc:
+            self.metrics.record_failure(resolver_name)
             results.append(
                 ResolverResult(
                     url=None,
@@ -526,7 +546,8 @@ class ResolverPipeline:
                     metadata={"message": str(exc)},
                 )
             )
-        return results
+        wall_ms = (time.monotonic() - start) * 1000.0
+        return results, wall_ms
 
     def _process_result(
         self,
@@ -537,6 +558,8 @@ class ResolverPipeline:
         result: ResolverResult,
         context_data: Dict[str, Any],
         state: _RunState,
+        *,
+        resolver_wall_time_ms: Optional[float] = None,
     ) -> Optional[PipelineResult]:
         """Process a single resolver result and return a terminal pipeline outcome.
 
@@ -548,6 +571,7 @@ class ResolverPipeline:
             result: Resolver result containing either a URL or event metadata.
             context_data: Execution context dictionary.
             state: Mutable run state tracking attempts and duplicates.
+            resolver_wall_time_ms: Wall-clock time spent in the resolver.
 
         Returns:
             PipelineResult when resolution succeeds, otherwise ``None``.
@@ -567,6 +591,7 @@ class ResolverPipeline:
                     reason=result.event_reason,
                     metadata=result.metadata,
                     dry_run=state.dry_run,
+                    resolver_wall_time_ms=resolver_wall_time_ms,
                 )
             )
             if result.event_reason:
@@ -590,6 +615,7 @@ class ResolverPipeline:
                     reason="duplicate-url",
                     metadata=result.metadata,
                     dry_run=state.dry_run,
+                    resolver_wall_time_ms=resolver_wall_time_ms,
                 )
             )
             self.metrics.record_skip(resolver_name, "duplicate-url")
@@ -615,6 +641,7 @@ class ResolverPipeline:
                         reason="head-precheck-failed",
                         metadata=result.metadata,
                         dry_run=state.dry_run,
+                        resolver_wall_time_ms=resolver_wall_time_ms,
                     )
                 )
                 self.metrics.record_skip(resolver_name, "head-precheck-failed")
@@ -654,6 +681,7 @@ class ResolverPipeline:
                 sha256=outcome.sha256,
                 content_length=outcome.content_length,
                 dry_run=state.dry_run,
+                resolver_wall_time_ms=resolver_wall_time_ms,
             )
         )
         self.metrics.record_attempt(resolver_name, outcome)

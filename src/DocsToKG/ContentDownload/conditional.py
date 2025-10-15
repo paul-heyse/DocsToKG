@@ -76,6 +76,10 @@ class ConditionalRequestHelper:
         prior_content_length: Optional[int] = None,
         prior_path: Optional[str] = None,
     ) -> None:
+        if prior_content_length is not None and prior_content_length < 0:
+            raise ValueError(
+                f"prior_content_length must be non-negative, got {prior_content_length}"
+            )
         self.prior_etag = prior_etag
         self.prior_last_modified = prior_last_modified
         self.prior_sha256 = prior_sha256
@@ -113,6 +117,9 @@ class ConditionalRequestHelper:
         Raises:
             ValueError: If a 304 response arrives without complete prior metadata.
         """
+
+        if not hasattr(response, "status_code") or not hasattr(response, "headers"):
+            raise TypeError("response must expose 'status_code' and 'headers' attributes")
 
         if response.status_code == 304:
             if (

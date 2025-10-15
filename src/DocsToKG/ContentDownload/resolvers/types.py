@@ -94,6 +94,14 @@ class ResolverConfig:
         enable_head_precheck: Toggle applying HEAD filtering before downloads.
         resolver_head_precheck: Per-resolver overrides for HEAD filtering behaviour.
         mailto: Contact email appended to polite headers and user agent string.
+        max_concurrent_resolvers: Upper bound on concurrent resolver threads per work.
+
+    Notes:
+        ``enable_head_precheck`` toggles inexpensive HEAD lookups before downloads
+        to filter obvious HTML responses. ``resolver_head_precheck`` allows
+        per-resolver overrides when specific providers reject HEAD requests.
+        ``max_concurrent_resolvers`` bounds the number of resolver threads used
+        per work while still respecting configured rate limits.
 
     Examples:
         >>> config = ResolverConfig()
@@ -211,6 +219,8 @@ class AttemptRecord:
         http_status: HTTP status code (when available).
         content_type: Response content type.
         elapsed_ms: Approximate elapsed time for the attempt in milliseconds.
+        resolver_wall_time_ms: Wall-clock time spent inside the resolver including
+            rate limiting, measured in milliseconds.
         reason: Optional descriptive reason for failures or skips.
         metadata: Arbitrary metadata supplied by the resolver.
         sha256: SHA-256 digest of downloaded content, when available.
@@ -243,6 +253,7 @@ class AttemptRecord:
     sha256: Optional[str] = None
     content_length: Optional[int] = None
     dry_run: bool = False
+    resolver_wall_time_ms: Optional[float] = None
 
 
 class AttemptLogger(Protocol):
@@ -410,6 +421,7 @@ class ResolverMetrics:
     successes: Counter = field(default_factory=Counter)
     html: Counter = field(default_factory=Counter)
     skips: Counter = field(default_factory=Counter)
+    failures: Counter = field(default_factory=Counter)
 
     def record_attempt(self, resolver_name: str, outcome: DownloadOutcome) -> None:
         """Record a resolver attempt and update success/html counters.
@@ -442,6 +454,18 @@ class ResolverMetrics:
         key = f"{resolver_name}:{reason}"
         self.skips[key] += 1
 
+    def record_failure(self, resolver_name: str) -> None:
+        """Record a resolver failure occurrence.
+
+        Args:
+            resolver_name: Resolver that raised an exception during execution.
+
+        Returns:
+            None
+        """
+
+        self.failures[resolver_name] += 1
+
     def summary(self) -> Dict[str, Any]:
         """Return aggregated metrics summarizing resolver behaviour.
 
@@ -463,6 +487,7 @@ class ResolverMetrics:
             "successes": dict(self.successes),
             "html": dict(self.html),
             "skips": dict(self.skips),
+            "failures": dict(self.failures),
         }
 
 

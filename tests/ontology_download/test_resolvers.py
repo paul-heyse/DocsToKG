@@ -25,6 +25,7 @@ import pytest
 import requests
 
 pytest.importorskip("pydantic")
+pytest.importorskip("pydantic_settings")
 
 from DocsToKG.OntologyDownload import resolvers
 from DocsToKG.OntologyDownload.config import DefaultsConfiguration, ResolvedConfig

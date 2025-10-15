@@ -26,6 +26,7 @@ from pathlib import Path
 import pytest
 
 pytest.importorskip("pydantic")
+pytest.importorskip("pydantic_settings")
 
 from DocsToKG.OntologyDownload import core, download, resolvers, validators
 from DocsToKG.OntologyDownload.config import DefaultsConfiguration, ResolvedConfig

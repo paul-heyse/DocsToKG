@@ -26,6 +26,8 @@ from typing import Callable, Mapping, Sequence
 
 import pytest
 
+pytest.importorskip("faiss")
+
 from DocsToKG.HybridSearch import (
     ChunkIngestionPipeline,
     FeatureGenerator,

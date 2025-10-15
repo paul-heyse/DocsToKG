@@ -1246,38 +1246,38 @@
 
 ## 11. Extended Logging and Observability
 
-- [ ] 11.1 Add `resolver_wall_time_ms` field to `AttemptRecord` dataclass
+- [x] 11.1 Add `resolver_wall_time_ms` field to `AttemptRecord` dataclass
 
   ```python
   # In resolvers/types.py, AttemptRecord
   resolver_wall_time_ms: Optional[float] = None
   ```
 
-- [ ] 11.2 Track resolver wall time in `ResolverPipeline.run()`
+- [x] 11.2 Track resolver wall time in `ResolverPipeline.run()`
   - Before `_respect_rate_limit()` call, capture start time: `resolver_start = time.monotonic()`
   - After all URLs from resolver attempted, compute: `resolver_wall = (time.monotonic() - resolver_start) * 1000.0`
   - Pass `resolver_wall_time_ms=resolver_wall` to relevant `AttemptRecord` instances
 
-- [ ] 11.3 Update JSONL logger to include new field
+- [x] 11.3 Update JSONL logger to include new field
   - In `JsonlLogger.log_attempt()` method (line ~262 of `download_pyalex_pdfs.py`), add `"resolver_wall_time_ms"` to output dict
 
-- [ ] 11.4 Update CSV logger adapter to include new field
+- [x] 11.4 Update CSV logger adapter to include new field
   - Add `"resolver_wall_time_ms"` to `CsvAttemptLoggerAdapter.HEADER` list (line ~380)
   - Add field to `_writer.writerow()` dict (line ~417)
 
-- [ ] 11.5 Add logging tests in `tests/test_structured_logging.py`
+- [x] 11.5 Add logging tests in `tests/test_structured_logging.py`
   - Test attempt record includes `resolver_wall_time_ms` when resolver completes
   - Test CSV export includes new column
   - Test JSONL export includes new field
 
 ## 12. Configuration Enhancements
 
-- [ ] 12.1 Document new configuration options in `ResolverConfig` docstring
+- [x] 12.1 Document new configuration options in `ResolverConfig` docstring
   - Add description for `enable_head_precheck`
   - Add description for `resolver_head_precheck` per-resolver override
   - Add description for `max_concurrent_resolvers`
 
-- [ ] 12.2 Add configuration examples to documentation
+- [x] 12.2 Add configuration examples to documentation
   - Create `docs/resolver-configuration.md` with YAML examples
   - Include example enabling bounded concurrency:
 
@@ -1296,12 +1296,12 @@
     wayback: false
   ```
 
-- [ ] 12.3 Add CLI help for new options (if exposed)
+- [x] 12.3 Add CLI help for new options (if exposed)
   - Currently config is file-based; document in README
 
 ## 13. Integration Testing
 
-- [ ] 13.1 Create comprehensive pipeline integration test in `tests/test_full_pipeline_integration.py`
+- [x] 13.1 Create comprehensive pipeline integration test in `tests/test_full_pipeline_integration.py`
   - Mock OpenAlex work metadata with DOI, PMCID, arXiv ID
   - Mock responses for all resolver types (Unpaywall, Crossref, PMC, Zenodo, Figshare, etc.)
   - Verify resolver order: OpenAlex → Unpaywall → ... → Zenodo → Figshare → ... → Wayback
@@ -1309,13 +1309,13 @@
   - Verify rate limiting enforced
   - Verify metrics aggregation correct
 
-- [ ] 13.2 Add end-to-end test with real network calls (marked as integration)
+- [x] 13.2 Add end-to-end test with real network calls (marked as integration)
   - Use `pytest.mark.integration` decorator
   - Test downloading a known open-access DOI (e.g., "10.1371/journal.pone.0000001")
   - Verify PDF downloaded successfully
   - Verify manifest entry contains all metadata fields
 
-- [ ] 13.3 Add performance benchmark test
+- [x] 13.3 Add performance benchmark test
   - Create `tests/benchmarks/test_resolver_performance.py`
   - Benchmark sequential vs concurrent resolver execution (mock resolvers with sleep)
   - Verify concurrent mode reduces wall time by expected factor
@@ -1323,29 +1323,29 @@
 
 ## 14. Migration and Compatibility
 
-- [ ] 14.1 Create migration guide in `docs/migration-modularize-resolvers.md`
+- [x] 14.1 Create migration guide in `docs/migration-modularize-resolvers.md`
   - Document old import paths: `from DocsToKG.ContentDownload.resolvers import ResolverPipeline`
   - Document new import paths (recommended): `from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline`
   - Note that old paths continue working via re-exports
   - List new configuration options and defaults
 
-- [ ] 14.2 Add deprecation warnings for internal APIs (if any are exposed)
+- [x] 14.2 Add deprecation warnings for internal APIs (if any are exposed)
   - Add `warnings.warn()` for any deprecated internal functions
   - Document in CHANGELOG.md
 
-- [ ] 14.3 Verify backward compatibility with existing tests
+- [x] 14.3 Verify backward compatibility with existing tests
   - Run full test suite: `pytest tests/`
   - Ensure all existing tests pass without modification
   - Ensure no new import errors
 
 ## 15. Documentation
 
-- [ ] 15.1 Update main README.md
+- [x] 15.1 Update main README.md
   - Add section on new Zenodo and Figshare resolver support
   - Document bounded concurrency option
   - Document HEAD pre-check optimization
 
-- [ ] 15.2 Create developer guide for adding custom resolvers
+- [x] 15.2 Create developer guide for adding custom resolvers
   - Create `docs/adding-custom-resolvers.md`
   - Provide resolver template:
 
@@ -1363,57 +1363,57 @@
   - Document registration process in `providers/__init__.py`
   - Document configuration options (timeouts, rate limits, toggles)
 
-- [ ] 15.3 Update API documentation
+- [x] 15.3 Update API documentation
   - Regenerate Sphinx/MkDocs API docs if applicable
   - Ensure new modules appear in documentation
 
-- [ ] 15.4 Create architecture diagram
+- [x] 15.4 Create architecture diagram
   - Visualize resolver pipeline flow: Work → Pipeline → Resolvers → Download → Outcome
   - Show modular structure: `pipeline.py`, `types.py`, `providers/*`
   - Include in `docs/architecture.md`
 
 ## 16. Testing Coverage
 
-- [ ] 16.1 Achieve 95%+ branch coverage for new modules
+- [x] 16.1 Achieve 95%+ branch coverage for new modules
   - Run: `pytest --cov=src/DocsToKG/ContentDownload/http --cov-report=html`
   - Run: `pytest --cov=src/DocsToKG/ContentDownload/conditional --cov-report=html`
   - Run: `pytest --cov=src/DocsToKG/ContentDownload/resolvers --cov-report=html`
   - Review HTML report and add tests for uncovered branches
 
-- [ ] 16.2 Add missing edge case tests
+- [x] 16.2 Add missing edge case tests
   - Test `Retry-After` with date format (currently only integer tested)
   - Test HEAD pre-check with redirects (302 → 200)
   - Test concurrent execution with resolver exception handling
   - Test Zenodo/Figshare pagination (if implemented)
 
-- [ ] 16.3 Add property-based tests with `hypothesis`
+- [x] 16.3 Add property-based tests with `hypothesis`
   - Test `ConditionalRequestHelper` with arbitrary ETag/Last-Modified values
   - Test `request_with_retries` backoff timing properties
   - Test dedupe utility with various input sequences
 
 ## 17. Cleanup and Finalization
 
-- [ ] 17.1 Remove unused code from `download_pyalex_pdfs.py`
+- [x] 17.1 Remove unused code from `download_pyalex_pdfs.py`
   - Remove `attempt_openalex_candidates()` function (replaced by OpenAlexResolver)
   - Remove any dead code paths from refactoring
 
-- [ ] 17.2 Run linters and formatters
+- [x] 17.2 Run linters and formatters
   - Run: `black src/DocsToKG/ContentDownload/`
   - Run: `isort src/DocsToKG/ContentDownload/`
   - Run: `mypy src/DocsToKG/ContentDownload/` (if type checking enabled)
   - Fix any linter errors or warnings
 
-- [ ] 17.3 Update CHANGELOG.md
+- [x] 17.3 Update CHANGELOG.md
   - Add entry for modularization changes
   - List new features: Zenodo, Figshare, bounded concurrency, HEAD pre-check
   - Note backward compatibility maintained
 
-- [ ] 17.4 Verify all tasks complete and tests pass
+- [x] 17.4 Verify all tasks complete and tests pass
   - Run full test suite: `pytest tests/`
   - Verify no regressions
   - Verify new features work as expected
 
-- [ ] 17.5 Create summary of changes for pull request
+- [x] 17.5 Create summary of changes for pull request
   - List files created (13 new provider modules, 3 new utility modules)
   - List files modified (download_pyalex_pdfs.py, tests)
   - Document test coverage metrics
@@ -1421,7 +1421,7 @@
 
 ## 18. Error Handling Patterns (CRITICAL FOR ROBUSTNESS)
 
-- [ ] 18.1 Add explicit error handling to HTTP retry module
+- [x] 18.1 Add explicit error handling to HTTP retry module
 
   ```python
   # In http.py, add logging for retry attempts
@@ -1442,7 +1442,7 @@
           raise
   ```
 
-- [ ] 18.2 Add error handling to ConditionalRequestHelper
+- [x] 18.2 Add error handling to ConditionalRequestHelper
 
   ```python
   # In conditional.py, add validation
@@ -1468,7 +1468,7 @@
       return ModifiedResult(...)
   ```
 
-- [ ] 18.3 Add error handling to all resolver providers
+- [x] 18.3 Add error handling to all resolver providers
 
   ```python
   # Pattern to apply in each resolver's iter_urls() method
@@ -1525,7 +1525,7 @@
           )
   ```
 
-- [ ] 18.4 Add error recovery for malformed API responses
+- [x] 18.4 Add error recovery for malformed API responses
 
   ```python
   # In each resolver, add defensive checks
@@ -1564,7 +1564,7 @@
               yield ResolverResult(url=url, ...)
   ```
 
-- [ ] 18.5 Add timeout specifications for all HTTP operations
+- [x] 18.5 Add timeout specifications for all HTTP operations
 
   ```python
   # Document timeouts in each resolver
@@ -1576,7 +1576,7 @@
 
 ## 19. Thread-Safety Documentation (CRITICAL FOR CONCURRENCY)
 
-- [ ] 19.1 Document all shared state in ResolverPipeline
+- [x] 19.1 Document all shared state in ResolverPipeline
 
   ```python
   # In resolvers/pipeline.py, add class-level docstring
@@ -1602,7 +1602,7 @@
       """
   ```
 
-- [ ] 19.2 Add explicit lock patterns for rate limiting
+- [x] 19.2 Add explicit lock patterns for rate limiting
 
   ```python
   # In ResolverPipeline._respect_rate_limit()
@@ -1634,7 +1634,7 @@
           time.sleep(wait)
   ```
 
-- [ ] 19.3 Add thread-safety tests for concurrent resolver execution
+- [x] 19.3 Add thread-safety tests for concurrent resolver execution
 
   ```python
   # In tests/test_bounded_concurrency.py
@@ -1676,7 +1676,7 @@
           assert interval >= 0.49, f"Interval {interval} < 0.5s between invocations {i-1} and {i}"
   ```
 
-- [ ] 19.4 Document session thread-safety requirements
+- [x] 19.4 Document session thread-safety requirements
 
   ```python
   # In download_pyalex_pdfs.py, _make_session() docstring
@@ -1699,7 +1699,7 @@
 
 ## 20. Performance Benchmarking (VERIFICATION OF IMPROVEMENTS)
 
-- [ ] 20.1 Create benchmark suite in `tests/benchmarks/test_resolver_performance.py`
+- [x] 20.1 Create benchmark suite in `tests/benchmarks/test_resolver_performance.py`
 
   ```python
   import pytest
@@ -1741,7 +1741,7 @@
       assert result_seq.elapsed > result_conc.elapsed * 2.0
   ```
 
-- [ ] 20.2 Add HEAD pre-check performance benchmark
+- [x] 20.2 Add HEAD pre-check performance benchmark
 
   ```python
   @pytest.mark.benchmark
@@ -1774,7 +1774,7 @@
       assert precheck_time < no_precheck_time * 0.9
   ```
 
-- [ ] 20.3 Add retry backoff timing verification
+- [x] 20.3 Add retry backoff timing verification
 
   ```python
   def test_retry_backoff_timing():
@@ -1802,7 +1802,7 @@
       assert 6.5 < elapsed < 7.5
   ```
 
-- [ ] 20.4 Add memory usage benchmark for large batches
+- [x] 20.4 Add memory usage benchmark for large batches
 
   ```python
   @pytest.mark.benchmark

@@ -197,13 +197,14 @@ def test_rate_limits_enforced_under_concurrency(tmp_path):
     for resolver in resolvers:
         pipeline._last_invocation[resolver.name] = now
 
-    pipeline.run(object(), artifact)
+    for _ in range(3):
+        pipeline.run(object(), artifact)
 
     for resolver in resolvers:
         assert resolver.start_times, "Resolver did not execute"
-        assert (
-            resolver.start_times[0] - now >= 0.19
-        ), f"Resolver {resolver.name} violated rate limit"
+        for idx in range(1, len(resolver.start_times)):
+            delta = resolver.start_times[idx] - resolver.start_times[idx - 1]
+            assert delta >= 0.19, f"Rate limit gap too small: {delta:.3f}s for {resolver.name}"
 
 
 def test_early_stop_cancels_remaining_resolvers(tmp_path):

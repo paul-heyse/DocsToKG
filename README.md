@@ -70,10 +70,28 @@ python -m DocsToKG.OntologyDownload.cli pull --spec configs/sources.yaml --force
 python -m DocsToKG.OntologyDownload.cli validate hp latest
 ```
 
-## 5. Parallel Execution
+## 5. Content Download Enhancements
 
-Use the ``--workers`` flag to enable bounded parallelism when downloading content via
-the OpenAlex pipeline:
+### 5.1 Additional Open Access Resolvers
+
+The default resolver registry now includes Zenodo and Figshare, expanding open
+access coverage without additional configuration. Both providers honour
+``ResolverConfig`` timeouts, polite headers, and conditional request metadata.
+
+To opt out, disable them via ``resolver_toggles`` in your configuration file:
+
+```yaml
+resolver_toggles:
+  zenodo: false
+  figshare: false
+```
+
+### 5.2 Bounded Concurrency
+
+Use the ``--workers`` flag to enable bounded parallelism when downloading
+content via the OpenAlex pipeline. Each worker drives an isolated
+``ResolverPipeline`` that honours per-resolver rate limits and maintains
+independent HTTP sessions with retry support.
 
 ```bash
 # Sequential (default, safest)
@@ -83,21 +101,39 @@ python -m DocsToKG.ContentDownload.download_pyalex_pdfs --workers 1 --topic "onc
 python -m DocsToKG.ContentDownload.download_pyalex_pdfs --workers 3 --topic "oncology" --year-start 2020 --year-end 2024
 ```
 
-**Recommendations:**
+**Concurrency recommendations:**
 
 - Start with ``--workers=3`` for production workloads.
 - Monitor rate limit compliance with resolver APIs while scaling.
-- Higher values (>5) may overwhelm resolver providers despite per-resolver rate limiting.
-- Each worker maintains its own HTTP session with retry logic.
+- Higher values (>5) may overwhelm downstream services despite per-resolver
+  throttling.
 
-### Additional CLI Flags
+### 5.3 HEAD Pre-check Filtering
+
+HEAD preflight checks remove obvious HTML landing pages and zero-byte
+responses before performing costly ``GET`` downloads. The feature is enabled by
+default and can be tuned per resolver:
+
+```yaml
+enable_head_precheck: true
+resolver_head_precheck:
+  wayback: false  # opt-out for resolvers that reject HEAD
+```
+
+When a HEAD request fails (timeout or 5xx), the pipeline automatically falls
+back to the original ``GET`` attempt to avoid false negatives.
+
+### 5.4 Additional CLI Flags
 
 - ``--dry-run``: compute resolver coverage without writing files.
 - ``--resume-from <manifest.jsonl>``: skip works already recorded as successful.
 - ``--extract-html-text``: save plaintext alongside HTML fallbacks (requires ``trafilatura``).
 - ``--enable-resolver openaire`` (and ``hal``/``osf``): opt into additional EU/preprint resolvers.
+- ``--resolver-config config.yaml``: load advanced options such as
+  ``max_concurrent_resolvers`` and ``resolver_head_precheck`` (see
+  ``docs/resolver-configuration.md``).
 
-### Troubleshooting Content Downloads
+### 5.5 Troubleshooting Content Downloads
 
 - **Partial files remain (``*.part``)** – rerun with fewer workers or check network
   stability before retrying.
@@ -105,7 +141,7 @@ python -m DocsToKG.ContentDownload.download_pyalex_pdfs --workers 3 --topic "onc
   ``resolver_min_interval_s``.
 - **High memory usage** – reduce ``--workers`` to limit in-flight downloads.
 
-### Logging and Exports
+### 5.6 Logging and Exports
 
 - Attempts log to JSONL by default. Convert to CSV with
   ``python scripts/export_attempts_csv.py attempts.jsonl attempts.csv``.

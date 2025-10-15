@@ -23,6 +23,7 @@ import json
 import pytest
 
 pytest.importorskip("pydantic")
+pytest.importorskip("pydantic_settings")
 
 from DocsToKG.OntologyDownload import cli
 from DocsToKG.OntologyDownload.config import DefaultsConfiguration, ResolvedConfig

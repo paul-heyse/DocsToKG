@@ -31,6 +31,8 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 import numpy as np
 import pytest
 
+pytest.importorskip("faiss")
+
 from DocsToKG.HybridSearch import (
     ChunkIngestionPipeline,
     DocumentInput,
