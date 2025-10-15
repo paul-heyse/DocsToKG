@@ -143,6 +143,7 @@ class FetchPlan:
     media_type: Optional[str]
     service: Optional[str] = None
     last_modified: Optional[str] = None
+    content_length: Optional[int] = None
 
 
 class BaseResolver:
@@ -299,6 +300,7 @@ class BaseResolver:
         media_type: Optional[str] = None,
         service: Optional[str] = None,
         last_modified: Optional[str] = None,
+        content_length: Optional[int] = None,
     ) -> FetchPlan:
         """Construct a ``FetchPlan`` from resolver components.
 
@@ -324,6 +326,7 @@ class BaseResolver:
             media_type=media_type,
             service=service,
             last_modified=last_modified,
+            content_length=content_length,
         )
 
 
