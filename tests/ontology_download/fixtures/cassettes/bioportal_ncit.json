@@ -1,0 +1,10 @@
+{
+  "ontology": {
+    "license": "CC BY 4.0"
+  },
+  "submission": {
+    "download": "https://example.org/ncit.owl",
+    "version": "2024-06-01"
+  },
+  "api_key": "API_KEY_REDACTED"
+}

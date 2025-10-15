@@ -14,7 +14,7 @@ import json
 import logging
 from email.utils import parsedate_to_datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -366,6 +366,7 @@ class PlannedFetch:
     resolver: str
     plan: FetchPlan
     candidates: Sequence[ResolverCandidate]
+    metadata: Dict[str, object] = field(default_factory=dict)
     last_modified: Optional[str] = None
     last_modified_at: Optional[datetime] = None
     size: Optional[int] = None

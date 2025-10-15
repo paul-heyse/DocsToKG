@@ -321,19 +321,19 @@
 
 ### 4.3 Resolver Contract Tests with Record/Replay
 
-- [ ] Choose cassette library for recording HTTP interactions such as pytest-vcr or vcrpy
-- [ ] Create test fixture directory for storing recorded resolver API responses
-- [ ] Write contract test for OBO resolver verifying correct URL construction from ontology identifier
-- [ ] Write contract test for OLS resolver verifying API query includes correct parameters and headers
-- [ ] Write contract test for BioPortal resolver verifying authorization header included when API key present
-- [ ] Write contract test for LOV resolver verifying metadata endpoint queried with correct URI parameter
-- [ ] Write contract test for Ontobee resolver verifying PURL format matches expected pattern
-- [ ] For each resolver, record minimal API response yielding successful FetchPlan
-- [ ] Verify plan includes required fields: URL, headers, version, license, media type, service identifier
-- [ ] Verify polite headers included in request: User-Agent, Accept, X-Request-ID when applicable
-- [ ] Test failure modes with recorded error responses: missing API key, ontology not found, service unavailable
-- [ ] Verify resolver raises appropriate exception type with descriptive message for each failure mode
-- [ ] Test that resolver respects configuration timeouts and rate limits during API interaction
-- [ ] Add test verifying resolver fallback chain when primary resolver fails
-- [ ] Verify recorded cassettes scrub sensitive data including API keys and authorization tokens
-- [ ] Test contract validation runs successfully in CI environment without live network access
+- [x] Choose cassette library for recording HTTP interactions such as pytest-vcr or vcrpy
+- [x] Create test fixture directory for storing recorded resolver API responses
+- [x] Write contract test for OBO resolver verifying correct URL construction from ontology identifier
+- [x] Write contract test for OLS resolver verifying API query includes correct parameters and headers
+- [x] Write contract test for BioPortal resolver verifying authorization header included when API key present
+- [x] Write contract test for LOV resolver verifying metadata endpoint queried with correct URI parameter
+- [x] Write contract test for Ontobee resolver verifying PURL format matches expected pattern
+- [x] For each resolver, record minimal API response yielding successful FetchPlan
+- [x] Verify plan includes required fields: URL, headers, version, license, media type, service identifier
+- [x] Verify polite headers included in request: User-Agent, Accept, X-Request-ID when applicable
+- [x] Test failure modes with recorded error responses: missing API key, ontology not found, service unavailable
+- [x] Verify resolver raises appropriate exception type with descriptive message for each failure mode
+- [x] Test that resolver respects configuration timeouts and rate limits during API interaction
+- [x] Add test verifying resolver fallback chain when primary resolver fails
+- [x] Verify recorded cassettes scrub sensitive data including API keys and authorization tokens
+- [x] Test contract validation runs successfully in CI environment without live network access
