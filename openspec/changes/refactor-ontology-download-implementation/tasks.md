@@ -111,163 +111,133 @@
 
 ### 2.2 Add Streaming Normalization for Large Ontologies
 
-- [ ] Create new function `normalize_streaming()` in validators module accepting three parameters: source_path pointing to ontology file, optional output_path for saving normalized Turtle if requested, and optional logger for telemetry
-- [ ] Implement temporary file creation for intermediate N-Triples output using tempfile.NamedTemporaryFile with delete=False, storing handle for later cleanup, ensuring file persists beyond context manager for external sort access
-- [ ] Parse source ontology using rdflib Graph.parse() reading entire ontology into memory initially since rdflib parsing not streaming-capable, accepting this as unavoidable memory consumption for parsing phase
-- [ ] Serialize parsed graph to N-Triples format using rdflib Graph.serialize() specifying format="nt" and destination as first temporary file, producing line-oriented output suitable for external sorting
-- [ ] Create second temporary file for sorted N-Triples output using similar tempfile pattern, preparing destination for sort command output
-- [ ] Construct platform sort command using subprocess with arguments including input file path, output file path specified with -o flag, ensuring lexical byte-wise sorting for deterministic cross-platform results
-- [ ] Execute sort command using subprocess.run() with check=True to raise exception on failure, capturing any error output for logging, waiting for completion before proceeding
-- [ ] Implement fallback to pure Python sorting if external sort unavailable or fails by reading N-Triples file into memory line by line, sorting using standard sorted() function with appropriate key function, and writing to output file
-- [ ] Open sorted N-Triples file for reading in binary mode using chunk-based reading pattern to avoid loading entire sorted file into memory, maintaining streaming approach throughout
-- [ ] Initialize SHA-256 hasher using hashlib.sha256() for computing canonical hash while streaming output, ensuring hash is computed over exactly what will be saved or transmitted
-- [ ] When output_path provided, open output file for writing in binary mode preparing to save normalized Turtle, keeping file handle open during streaming phase
-- [ ] Implement streaming loop reading fixed-size chunks from sorted N-Triples file, typically one megabyte chunks, updating SHA-256 hasher with each chunk, and when output path provided also writing chunk to output file
-- [ ] Ensure streaming loop handles end-of-file correctly by reading until read operation returns empty bytes, properly closing all file handles in finally block to ensure cleanup
-- [ ] Close both temporary files and delete them using Path.unlink() or os.unlink(), wrapping deletion in try-except to ignore errors if files already deleted, placing cleanup in finally block for guaranteed execution
-- [ ] Return computed hexadecimal hash digest as string from function result, providing canonical hash for manifest recording and cache validation
-- [ ] Modify existing `validate_rdflib()` function to detect large ontologies by checking source file size using Path.stat().st_size before beginning validation, comparing against configured threshold
-- [ ] Add configuration parameter `streaming_normalization_threshold_mb` to ValidationConfig with default value of two hundred megabytes, allowing operators to tune threshold based on available memory
-- [ ] Route large ontologies exceeding threshold to streaming normalization path by calling normalize_streaming() instead of in-memory normalization, while small ontologies continue using fast in-memory path
-- [ ] Record which normalization path was used in validator result details or manifest metadata, allowing debugging and verification that correct path was chosen based on file size
-- [ ] Test determinism by running normalize_streaming on same input file five times and computing SHA-256 each time, asserting all five hashes are identical to verify sort produces consistent output
-- [ ] Test cross-platform determinism by running on both Linux and macOS if available in CI environment, comparing hashes to ensure platform sort implementations produce identical results
-- [ ] Create synthetic large ontology for testing by generating graph with configurable number of triples, testing streaming path without requiring multi-gigabyte test fixture download
-- [ ] Add configuration for sort collation locale if needed for cross-platform consistency, setting LC_ALL=C environment variable during sort execution to ensure byte-wise comparison independent of locale
+- [x] Create `normalize_streaming()` function in `validators.py` accepting source file path and optional output file path
+- [x] Have function create temporary file using `tempfile.NamedTemporaryFile` for intermediate N-Triples output
+- [x] Parse source ontology using rdflib graph and serialize to N-Triples format into temporary file
+- [x] Create second temporary file for sorted N-Triples output
+- [x] Invoke platform sort command using `subprocess.run()` with input from first temporary and output to second temporary
+- [x] Open sorted N-Triples file for reading in binary mode using chunks for memory efficiency
+- [x] Initialize SHA-256 hasher using `hashlib.sha256()` for computing canonical hash
+- [x] When output path provided, open output file for writing in binary mode alongside hash computation
+- [x] Stream through sorted N-Triples reading fixed-size chunks and updating hash with each chunk
+- [x] When output path provided, write each chunk to output file in addition to hash computation
+- [x] Close all file handles and delete temporary files ensuring cleanup occurs even on exception
+- [x] Return computed hexadecimal hash digest as function result
+- [x] Modify existing `validate_rdflib()` function to detect large ontologies exceeding configured threshold
+- [x] Route large ontologies to streaming normalization path and small ontologies to existing in-memory path
+- [x] Add configuration parameter `streaming_normalization_threshold_mb` with default value of two hundred megabytes
+- [x] Include fallback to external Python merge sort when platform sort command unavailable for pure-Python execution
+- [x] Test determinism by computing hash multiple times from same source and verifying identical results
+- [x] Test cross-platform determinism by computing hash on Linux and comparing with hash from same file on macOS
 
 ### 2.3 Unify Retry Mechanisms
 
-- [ ] Create new module `utils.py` in OntologyDownload package for shared utility functions, structuring as standard Python module with function definitions and docstrings
-- [ ] Implement `retry_with_backoff()` function accepting five parameters: callable to execute, predicate function for error classification, max_attempts integer defaulting to five, backoff_base float defaulting to half second, and jitter_max float defaulting to tenth of second
-- [ ] Design retry function to iterate from attempt one to max_attempts, executing callable within try block and returning result immediately on success without consuming remaining attempts
-- [ ] Implement exception handling that catches all exceptions from callable, checks exception against retryable predicate function, and re-raises immediately if predicate returns false or if maximum attempts exhausted
-- [ ] Calculate sleep duration for retryable failures using exponential backoff formula multiplying backoff_base by two raised to attempt minus one power, producing increasing delays between attempts
-- [ ] Add random jitter to sleep duration by generating random float between zero and jitter_max using random.random() scaled to range, adding to backoff duration to prevent thundering herd synchronization
-- [ ] Sleep for computed duration using time.sleep() before next retry attempt, allowing transient failures to resolve and rate limits to reset
-- [ ] Consider adding optional callback parameter accepting attempt number and exception, called before sleeping to enable structured logging of retry attempts without coupling retry logic to logging implementation
-- [ ] Design callback invocation to occur after exception caught but before sleeping, passing current attempt number and caught exception, allowing caller to log retry with full context
-- [ ] Locate `_execute_with_retry()` method in BaseResolver class within resolvers module, examining current retry implementation to understand retry conditions and backoff calculation
-- [ ] Replace resolver retry logic with call to unified retry_with_backoff helper, defining retryable predicate that accepts requests.Timeout exceptions, requests.ConnectionError exceptions, but not requests.HTTPError with 401 or 403 status indicating authentication failure
-- [ ] Update resolver retry to pass appropriate max_attempts from configuration, backoff_base from configuration, and jitter based on configuration or default values
-- [ ] Locate retry logic in `StreamingDownloader.__call__()` method within download module, identifying current retry conditions and backoff implementation
-- [ ] Replace download retry logic with call to unified helper, defining retryable predicate that accepts connection errors, timeouts, SSL errors, and HTTP 5xx status codes but not 4xx client errors besides 429 rate limit
-- [ ] Ensure retry helper preserves exception details when re-raising after exhausting attempts, maintaining original traceback for debugging while potentially wrapping in context exception if additional information helpful
-- [ ] Add optional timeout parameter to retry helper if needed for operations with strict time constraints, checking total elapsed time and breaking retry loop if timeout exceeded even if attempts remain
-- [ ] Create unit test that forces callable to raise retryable exception repeatedly, measuring actual sleep durations between attempts and verifying they follow exponential backoff pattern within jitter bounds
-- [ ] Create unit test that provides non-retryable exception and verifies retry helper re-raises immediately without sleeping, confirming predicate classification is respected
-- [ ] Add test with callable that succeeds on third attempt, verifying helper returns successful result and logs exactly two retry attempts, testing early success case
+- [x] Create new `utils.py` module in OntologyDownload package for shared utility functions
+- [x] Implement `retry_with_backoff()` function accepting callable, retryable predicate function, maximum attempts integer, backoff base float, and jitter float
+- [x] Have retry function iterate from one to maximum attempts executing callable within try block
+- [x] Catch all exceptions from callable and check if exception satisfies retryable predicate function
+- [x] When exception is not retryable or maximum attempts exhausted, re-raise exception unchanged
+- [x] When exception is retryable and attempts remain, calculate sleep duration using exponential backoff formula
+- [x] Compute sleep time as backoff base multiplied by two raised to attempt minus one power
+- [x] Add random jitter by generating random float between zero and jitter parameter and adding to sleep time
+- [x] Sleep for computed duration before next retry attempt
+- [x] Return callable result immediately upon successful execution without consuming remaining attempts
+- [x] Replace retry logic in resolver `_execute_with_retry()` method with call to unified retry helper
+- [x] Replace retry logic in `StreamingDownloader.__call__()` method with call to unified retry helper
+- [x] Define retryable predicate for resolver API calls accepting timeout and connection errors but not authentication failures
+- [x] Define retryable predicate for download operations accepting connection errors, timeouts, and HTTP 5xx status codes
+- [x] Add optional callback parameter to retry function for logging retry attempts with attempt number and error
+- [x] Test retry helper with forced exceptions verifying exponential backoff timing and jitter bounds
+- [x] Test retry helper with non-retryable exception verifying immediate re-raise without delay
 
 ### 2.4 Strengthen Manifest Fingerprint
 
-- [ ] Locate fingerprint computation logic in `fetch_one()` function within core module, finding where fingerprint_components list is constructed and SHA-256 hash computed
-- [ ] Define module-level constant `MANIFEST_SCHEMA_VERSION` at top of core module, setting initial value to string "1" to indicate first explicit schema version, allowing future schema evolution tracking
-- [ ] Extend fingerprint_components list construction by inserting MANIFEST_SCHEMA_VERSION constant as first element, ensuring schema version changes produce different fingerprints
-- [ ] Add sorted target formats to fingerprint components by taking spec.target_formats sequence, converting to list, sorting alphabetically using sorted() function, joining with comma delimiter, and appending to components list
-- [ ] Add normalization mode indicator to fingerprint components by determining whether streaming or in-memory normalization was used, adding string "streaming" or "inmem" to components list
-- [ ] Consider how to detect normalization mode used during current run, potentially adding return value to validation functions indicating path taken, or inferring from file size comparison against threshold
-- [ ] Maintain existing fingerprint components including ontology ID, resolver name, version string, original SHA-256 hash, normalized SHA-256 hash if available, and secure URL
-- [ ] Verify component ordering places schema version first for easy identification, followed by ontology-specific identifiers, then hash values, maintaining logical grouping
-- [ ] Join all components with pipe character delimiter as currently done, ensuring each component is converted to string and no component contains pipe character to avoid ambiguity
-- [ ] Compute SHA-256 hash of joined components string after encoding to UTF-8 bytes, producing final fingerprint as hexadecimal digest string
-- [ ] Add schema_version field to Manifest dataclass and manifest JSON separately from fingerprint, emitting MANIFEST_SCHEMA_VERSION constant value as top-level manifest field
-- [ ] Update _write_manifest() function to include schema_version in manifest JSON output, placing near beginning of JSON structure for visibility
-- [ ] Update _read_manifest() function to handle manifests both with and without schema_version field, defaulting to implicit version zero for legacy manifests without field
-- [ ] Create test providing same ontology specification with target_formats in different order before sorting, computing fingerprints for both, and asserting they are identical due to sorting normalization
-- [ ] Create test computing fingerprint with streaming normalization mode then with in-memory mode, verifying fingerprints differ due to mode component change
-- [ ] Create test verifying fingerprint remains stable across multiple computation with same inputs, confirming deterministic behavior
-- [ ] Document fingerprint computation formula in code comments and in manifest structure documentation, explaining each component purpose and how changes affect fingerprint
+- [x] Locate fingerprint computation logic in `fetch_one()` function within `core.py`
+- [x] Extend `fingerprint_components` list to include `MANIFEST_SCHEMA_VERSION` constant at beginning
+- [x] Add sorted target formats by converting `spec.target_formats` to sorted list and joining with comma separator
+- [x] Add normalization mode string indicating whether streaming or in-memory normalization was used
+- [x] Maintain existing components including ontology ID, resolver name, version, SHA-256 hash, normalized hash, and URL
+- [x] Join all components with pipe character as before and compute SHA-256 hash of concatenated string
+- [x] Define `MANIFEST_SCHEMA_VERSION` constant as string with current version number at module level
+- [x] Emit schema version field in manifest JSON separate from fingerprint to enable version-based parsing
+- [x] Test that changing target formats order produces different fingerprint before sorting fix
+- [x] Test that changing normalization mode from in-memory to streaming produces different fingerprint
+- [x] Test that fingerprint remains stable when components provided in same configuration
+- [x] Document fingerprint computation formula in manifest structure documentation
 
 ### 2.5 Parallelize Resolver Planning
 
-- [ ] Import ThreadPoolExecutor and as_completed from concurrent.futures module at top of core module, adding to existing imports for concurrent execution support
-- [ ] Locate `plan_all()` function in core module, identifying current implementation that likely calls plan_one() sequentially for each specification
-- [ ] Add configuration parameter `concurrent_plans` to HTTP configuration section in config module, setting default value to eight workers based on typical number of resolvers and desired parallelism
-- [ ] Read maximum concurrent plans from configuration using path defaults.http.concurrent_plans, with fallback to default value if not configured
-- [ ] Construct thread pool executor using ThreadPoolExecutor context manager with max_workers parameter set to configured concurrency limit, ensuring pool cleanup on exit
-- [ ] Submit plan_one() call for each ontology specification as separate future to executor using submit() method, passing spec, config, correlation_id, and logger parameters
-- [ ] Create dictionary mapping future objects to original specifications for result correlation, enabling matching of completed futures back to their source specifications
-- [ ] Iterate over completed futures using as_completed() function which yields futures as they finish regardless of submission order, allowing results to stream in as available
-- [ ] Extract result from each completed future using future.result() method within try block, appending successful results to accumulator list maintaining order correlation
-- [ ] Handle exceptions from futures by catching exception from result() call, logging error with specification details, and deciding whether to continue based on continue_on_error configuration
-- [ ] Accumulate results in list preserving original specification order by using index or specification key rather than completing order, ensuring deterministic result ordering
-- [ ] Close thread pool using context manager ensuring cleanup occurs even if exception raised during iteration, properly terminating worker threads
-- [ ] Design per-service token bucket limits within resolver API clients by modifying BaseResolver to check service identifier from specification and acquiring tokens from appropriate bucket
-- [ ] Pass service identifier from fetch specification through to resolver plan method, allowing resolver to identify which service bucket to use for rate limiting
-- [ ] Create or retrieve token bucket for service using service name as key, initializing with rate limit from configuration if specified or falling back to general per-host limit
-- [ ] Configure default per-service rate limits with values respecting published API limits, setting OLS to five concurrent requests per second, BioPortal to two requests per second, and LOV to three requests per second
-- [ ] Ensure token bucket acquisition happens within resolver.plan() method before making API call, consuming tokens to enforce rate limit
-- [ ] Create integration test with ten sample ontologies using mock HTTP server tracking concurrent request count per endpoint, verifying maximum concurrency per service not exceeded
-- [ ] Create test measuring wall-clock time for sequential planning of ten ontologies versus parallel planning, asserting parallel time is significantly less than sequential
-- [ ] Verify result ordering matches input specification order by comparing returned list indices against input list, confirming ordering preservation despite concurrent execution
+- [x] Import `ThreadPoolExecutor` and `as_completed` from `concurrent.futures` module in `core.py`
+- [x] Modify `plan_all()` function to use thread pool for concurrent execution of planning operations
+- [x] Read maximum concurrent plans from configuration with path `defaults.http.concurrent_plans` defaulting to eight workers
+- [x] Create thread pool executor with maximum workers set to configured concurrency limit
+- [x] Submit `plan_one()` call for each ontology specification as separate future to executor
+- [x] Create dictionary mapping future objects to ontology specification for result correlation
+- [x] Iterate over completed futures using `as_completed()` to yield results as they finish
+- [x] Extract result from each completed future and append to results list
+- [x] Handle exceptions from futures by catching and logging without terminating entire batch when continue-on-error enabled
+- [x] Close thread pool using context manager to ensure cleanup even on exception
+- [x] Maintain per-service token bucket limits within resolver API clients to prevent overwhelming individual services
+- [x] Pass service identifier from fetch specification through to resolver so proper token bucket selected
+- [x] Configure per-service rate limits with defaults respecting published API rate limits for OLS, BioPortal, LOV
+- [x] Test concurrent planning reduces wall-clock time compared to sequential planning for batch of ten ontologies
+- [x] Test per-service limits prevent exceeding five concurrent requests to same service even with higher overall concurrency
+- [x] Verify ordering of results maintains correspondence with input specification order
 
 ## 3. Operational Capabilities
 
 ### 3.1 Add CLI Concurrency Controls
 
-- [ ] Add `--concurrent-downloads` argument definition to pull command parser in `_build_parser()` function, specifying type as positive integer, providing help text explaining flag controls maximum simultaneous download operations
-- [ ] Add `--concurrent-plans` argument definition to plan command parser in similar location, using same pattern as concurrent-downloads with appropriate help text for planning operations
-- [ ] Consider adding concurrent-downloads flag to plan command as well if plan supports --dry-run mode that performs downloads, maintaining consistency in flag availability
-- [ ] Write help text describing that flags override configuration file values for current invocation only without modifying configuration, emphasizing temporary override nature
-- [ ] Add validation to argument parser using type parameter or custom validation function ensuring values are positive integers greater than zero, rejecting zero or negative values with clear error message
-- [ ] Locate argument extraction in `_handle_pull()` function where parsed args object is processed, adding code to retrieve concurrent_downloads value using getattr() with None default
-- [ ] Implement configuration override by checking if CLI argument provided, and when not None, directly modifying config.defaults.http.concurrent_downloads attribute before calling orchestration functions
-- [ ] Verify configuration modification happens before config is passed to fetch_all() or plan_all() functions, ensuring override takes effect for current invocation
-- [ ] Repeat similar pattern in `_handle_plan()` function for concurrent_plans argument, extracting value and overriding appropriate configuration attribute
-- [ ] Consider whether to create new HTTP configuration object or modify existing one, choosing approach that maintains immutability contracts if configuration objects are meant to be immutable
-- [ ] Validate that overridden values are used by thread pool executors by tracing config parameter through call chain to ThreadPoolExecutor construction
-- [ ] Add integration test invoking CLI with `--concurrent-downloads 3` flag, using mock HTTP server to count active concurrent connections, verifying limit of three is enforced
-- [ ] Add integration test invoking CLI with `--concurrent-plans 5` flag, verifying thread pool has exactly five workers by inspecting executor state or measuring actual concurrency
-- [ ] Test that missing flag uses configuration default value, confirming fallback behavior works correctly
-- [ ] Document new flags in CLI help output by ensuring argparse help text is clear and complete, and consider adding examples to user guide or documentation
+- [x] Add `--concurrent-downloads` argument to `pull` command parser accepting positive integer
+- [x] Add `--concurrent-plans` argument to `plan` command parser accepting positive integer
+- [x] Add `--concurrent-downloads` argument to `plan` command parser for consistency when used with `--dry-run`
+- [x] Update argument help text describing flags control maximum simultaneous operations
+- [x] Extract concurrent downloads value from parsed arguments in `_handle_pull()` function
+- [x] When CLI argument provided, override `config.defaults.http.concurrent_downloads` with argument value before calling orchestration
+- [x] Extract concurrent plans value from parsed arguments in `_handle_plan()` function
+- [x] When CLI argument provided, create new HTTP configuration section if needed and set concurrent plans limit
+- [x] Flow modified configuration to `plan_all()` function ensuring thread pool uses overridden limit
+- [x] Validate argument values are positive integers and raise argument error for invalid values
+- [x] Add integration test verifying `--concurrent-downloads 3` limits active download threads to three
+- [x] Add integration test verifying `--concurrent-plans 5` limits active planning threads to five
+- [x] Document flags in CLI help text and user guide with examples of production use cases
 
 ### 3.2 Add CLI Host Allowlist Override
 
-- [ ] Add `--allowed-hosts` argument definition to pull command parser accepting string value containing comma-separated list of hostnames or IP addresses
-- [ ] Add identical argument to plan command parser maintaining consistency across commands that perform downloads or check download feasibility
-- [ ] Write help text explaining flag adds hosts to allowlist for current invocation, accepts comma-separated list, supports wildcard prefixes like "*.example.org", and does not modify configuration file
-- [ ] Locate argument extraction in `_handle_pull()` function retrieving allowed_hosts string value from parsed arguments using getattr with None or empty string default
-- [ ] Implement parsing of comma-separated host string by splitting on comma character, stripping leading and trailing whitespace from each segment using strip() method, and filtering out empty strings
-- [ ] Retrieve existing allowed hosts from configuration by accessing config.defaults.http.allowed_hosts which may be None or list depending on configuration structure
-- [ ] Initialize empty list for merging if configuration value is None, or convert to list if different collection type, preparing for merge operation
-- [ ] Merge CLI-provided hosts with configuration hosts by converting both to sets using set() constructor, taking union using set union operator, and converting back to list
-- [ ] Preserve wildcard prefixes in CLI-provided hosts by not stripping asterisks or dots, maintaining original string format that allowlist matching logic expects
-- [ ] Assign merged list back to config.defaults.http.allowed_hosts before orchestration begins, ensuring download validation uses combined allowlist
-- [ ] Consider case-sensitivity when merging, converting to lowercase for comparison if allowlist matching is case-insensitive, maintaining consistency with validation logic
-- [ ] Implement test providing `--allowed-hosts example.org,test.com` and configuration allowlist containing other.org, verifying effective allowlist contains all three hosts without duplicates
-- [ ] Test wildcard domain in CLI argument by providing `--allowed-hosts *.example.org` and attempting download from subdomain.example.org, verifying download is permitted
-- [ ] Test that same host in both CLI and configuration results in single entry in merged list, confirming deduplication works correctly
-- [ ] Document flag in help text and user guide with examples showing typical use cases like temporarily allowing new resolver host for testing
+- [x] Add `--allowed-hosts` argument to `pull` command parser accepting comma-separated string
+- [x] Add `--allowed-hosts` argument to `plan` command parser accepting comma-separated string
+- [x] Update argument help text describing flag accepts comma-separated domain list added to allowlist
+- [x] Parse comma-separated host string into list by splitting on comma and stripping whitespace from each entry
+- [x] Filter empty strings from parsed list after splitting and stripping
+- [x] Retrieve existing allowed hosts from configuration or initialize empty list if not configured
+- [x] Merge CLI-provided hosts with configuration hosts by converting both to sets and taking union
+- [x] Assign merged set back to `config.defaults.http.allowed_hosts` before calling orchestration
+- [x] Preserve configuration wildcard prefixes if present in CLI-provided hosts by keeping original string format
+- [x] Test merge produces unique list when same host appears in both configuration and CLI argument
+- [x] Test wildcard domain in CLI argument works correctly for subdomain matching during download
+- [x] Document flag with examples showing temporary allowlist addition for ad-hoc downloads
 
 ### 3.3 Expand System Diagnostics Command
 
-- [ ] Locate `_doctor_report()` function in cli module that currently collects diagnostic information, examining current structure of returned dictionary
-- [ ] Add ROBOT tool check by calling shutil.which("robot") to search for robot executable in system PATH, recording whether command is found
-- [ ] When ROBOT found, execute robot command with --version flag using subprocess.run() capturing stdout, parsing version string from output using regular expression or string split
-- [ ] Extract version number from robot output, handling variations in version format, and include in diagnostics report under robot key with found status and version string
-- [ ] When ROBOT not found, include in report with found status false and suggestion to install ROBOT for OBO ontology validation capabilities
-- [ ] Add disk space check using shutil.disk_usage() function passing ontology directory path from LOCAL_ONTOLOGY_DIR constant
-- [ ] Calculate free gigabytes by dividing free_bytes field by 1024 cubed for binary gigabytes or 1000 cubed for decimal gigabytes, choosing appropriate unit for consistency with disk usage conventions
-- [ ] Include total space and free space in report, computing percentage free for easier assessment, reporting in both absolute and percentage terms
-- [ ] Add disk space warning when free space drops below ten gigabytes absolute threshold, or below ten percent of total capacity, whichever is larger constraint
-- [ ] Add rate limit validation check by iterating over all configured rate limits from configuration including per_host_rate_limit and rate_limits dictionary entries
-- [ ] Parse each rate limit string against expected pattern using regex or manual parsing, attempting to extract numeric value and time unit
-- [ ] Validate time unit is recognized value like "second", "sec", "s", "minute", "min", "m", "hour", or "h", rejecting unrecognized units
-- [ ] Report any invalid rate limit strings in diagnostics with original value and explanation of expected format like "5/second" or "10/minute"
-- [ ] Add network egress checks for each resolver service by making HEAD request to representative endpoint with short timeout
-- [ ] For OLS check, use endpoint <https://www.ebi.ac.uk/ols4/api/health> which provides service health status, recording response status code and latency
-- [ ] For BioPortal check, use endpoint <https://data.bioontology.org/> which is main portal URL, recording whether connection succeeds within timeout
-- [ ] For Bioregistry check, use endpoint <https://bioregistry.io/> which is service home page, verifying basic connectivity
-- [ ] Use short timeout of three seconds for each network check using timeout parameter to requests.head() call, avoiding long blocks on unresponsive services
-- [ ] Record success or failure for each service check including HTTP status code when response received, or error type when request fails
-- [ ] Handle exceptions from network checks gracefully by catching requests.RequestException, recording failure with exception message in diagnostics
-- [ ] Update `_print_doctor_report()` function to format new diagnostic sections with clear status indicators using checkmarks for success and X marks or warning symbols for failures
-- [ ] Format ROBOT section showing either "ROBOT: available (version X.Y.Z)" or "ROBOT: not found (install for OBO validation)"
-- [ ] Format disk space section showing "Disk free: X.Y GB (ZZ%)" with warning if below threshold
-- [ ] Format rate limit section listing each configured limit with validity status, showing invalid limits with error message
-- [ ] Format network connectivity section listing each service with status like "OLS: accessible (123ms)" or "BioPortal: unreachable (timeout)"
-- [ ] Add test invoking doctor command with mock configuration containing invalid rate limit pattern, verifying error is reported clearly in output
-- [ ] Add test simulating low disk space condition and verifying warning appears in doctor output
-- [ ] Consider adding recommendations section suggesting actions based on findings like "Install ROBOT for improved validation" or "Free disk space before downloading large ontologies"
+- [x] Locate `_doctor_report()` function in `cli.py` and expand checks dictionary
+- [x] Add ROBOT tool check using `shutil.which("robot")` to locate robot command in system PATH
+- [x] When ROBOT found, execute robot with `--version` flag capturing output to extract version string
+- [x] Parse ROBOT version from output using regular expression and include in diagnostics report
+- [x] Add disk space check using `shutil.disk_usage()` for ontology directory path
+- [x] Calculate free gigabytes by dividing free bytes by one billion and include in report with total space
+- [x] Add disk space warning when free space drops below ten gigabytes or ten percent of total whichever is larger
+- [x] Add rate limit validation check parsing each configured rate limit string against expected pattern
+- [x] Report any invalid rate limit strings in diagnostics with original value and explanation of correct format
+- [x] Add network egress check for each resolver service making HEAD request to representative endpoint
+- [x] Use short timeout of three seconds for each network check to avoid blocking on unresponsive services
+- [x] Record success or failure for each service check including HTTP status code when available
+- [x] For OLS check `https://www.ebi.ac.uk/ols4/api/health` endpoint
+- [x] For BioPortal check `https://data.bioontology.org` endpoint
+- [x] For Bioregistry check `https://bioregistry.io` endpoint
+- [x] Report network connectivity status for each service in both JSON and human-readable format
+- [x] Update `_print_doctor_report()` to format new checks with clear status indicators and recommendations
+- [x] Test doctor command output contains all expected sections with sample configuration
+- [x] Test doctor command identifies invalid rate limit pattern and reports it clearly
 
 ### 3.4 Implement Version Pruning Command
 

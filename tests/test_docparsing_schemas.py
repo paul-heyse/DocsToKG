@@ -95,5 +95,21 @@ def test_get_docling_version(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_validate_schema_version() -> None:
-    assert schemas.validate_schema_version("docparse/1.1.0", schemas.COMPATIBLE_CHUNK_VERSIONS)
-    assert not schemas.validate_schema_version("other", schemas.COMPATIBLE_CHUNK_VERSIONS)
+    assert (
+        schemas.validate_schema_version("docparse/1.1.0", schemas.COMPATIBLE_CHUNK_VERSIONS)
+        == "docparse/1.1.0"
+    )
+    with pytest.raises(ValueError):
+        schemas.validate_schema_version("other", schemas.COMPATIBLE_CHUNK_VERSIONS)
+    with pytest.raises(ValueError):
+        schemas.validate_schema_version(None, schemas.COMPATIBLE_CHUNK_VERSIONS)
+
+
+def test_chunk_row_invalid_schema_version() -> None:
+    with pytest.raises(ValueError):
+        schemas.validate_chunk_row(make_chunk_row(schema_version="docparse/0.9.0"))
+
+
+def test_vector_row_invalid_schema_version() -> None:
+    with pytest.raises(ValueError):
+        schemas.validate_vector_row(make_vector_row(schema_version="embeddings/0.9.0"))
