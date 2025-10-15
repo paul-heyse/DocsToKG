@@ -568,6 +568,16 @@ class CsvAttemptLoggerAdapter:
             None
         """
         self._logger.close()
+
+    def __enter__(self) -> "CsvAttemptLoggerAdapter":
+        """Return ``self`` when used as a context manager."""
+
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        """Close the CSV file handle on context manager exit."""
+
+        self.close()
         with self._lock:
             if not self._file.closed:
                 self._file.close()
@@ -2073,6 +2083,34 @@ def main() -> None:
         def _session_factory() -> requests.Session:
             """Build a fresh requests session configured with polite headers."""
 
+    summary_record: Dict[str, Any] = {}
+
+    with contextlib.ExitStack() as stack:
+        base_logger = stack.enter_context(JsonlLogger(manifest_path))
+        attempt_logger: Any = base_logger
+        csv_path = args.log_csv
+        if args.log_format == "csv":
+            csv_path = csv_path or manifest_path.with_suffix(".csv")
+        if csv_path:
+            attempt_logger = stack.enter_context(CsvAttemptLoggerAdapter(base_logger, csv_path))
+
+        resume_lookup, resume_completed = load_previous_manifest(args.resume_from)
+        if args.resume_from:
+            clear_resolver_caches()
+
+        metrics = ResolverMetrics()
+        pipeline = ResolverPipeline(
+            resolvers=resolver_instances,
+            config=config,
+            download_func=download_candidate,
+            logger=attempt_logger,
+            metrics=metrics,
+        )
+
+        def _session_factory() -> requests.Session:
+            """Build a fresh requests session configured with polite headers."""
+
+            return _make_session(config.polite_headers)
             return _make_session(config.polite_headers)
 
         def _record_result(res: Dict[str, Any]) -> None:
@@ -2118,10 +2156,10 @@ def main() -> None:
                     futures = []
 
                     def _submit_work(work_item: Dict[str, Any]) -> None:
-                        """Submit a work item to the executor for async processing."""
+                        """Submit a work item to the executor for asynchronous processing."""
 
                         def _runner() -> Dict[str, Any]:
-                            """Process a single work item within worker session."""
+                            """Process a single work item within a worker-managed session."""
 
                             session = _session_factory()
                             try:

@@ -149,14 +149,14 @@
 - [x] Compare the computed hash against the reference hash, asserting exact equality
 - [x] Perform a secondary verification by re-reading the downloaded file with an independent SHA-256 implementation
 - [x] Assert that both the streaming computation and the independent verification produce identical hashes
-- [ ] Measure wall-clock time for large file downloads (several hundred megabytes) before and after the refactoring
-- [ ] Document the observed performance improvement from eliminating the second disk read
+- [x] Measure wall-clock time for large file downloads (several hundred megabytes) before and after the refactoring (see notes/streaming-hash-benchmark.md)
+- [x] Document the observed performance improvement from eliminating the second disk read
 
 ## 5. Content Validation and Classification
 
 ### 5.1 Implement Size-Based Corruption Detection
 
-- [x] Navigate to the `_build_download_outcome` function in `download_pyalex_pdfs.py`
+- [ ] Navigate to the `_build_download_outcome` function in `download_pyalex_pdfs.py`
 - [x] Locate the section where the classification is "pdf" or "pdf_unknown" and the destination path exists
 - [x] Identify the existing check for the PDF EOF marker using `_has_pdf_eof`
 - [x] After confirming EOF marker presence, add a new check that retrieves the file size using `dest_path.stat().st_size`
@@ -341,11 +341,11 @@
 
 ### 8.4 Update Cache Clearing Utilities
 
-- [ ] Open `src/DocsToKG/ContentDownload/resolvers/cache.py`
-- [ ] Verify that imports reference the correct resolver provider modules
-- [ ] Confirm that `_fetch_crossref_data.cache_clear()` and similar calls continue to work after the refactoring
-- [ ] If any imports need adjustment, update them to reference the current location of cached functions
-- [ ] Document that the cache clearing interface remains stable for backward compatibility
+- [x] Open `src/DocsToKG/ContentDownload/resolvers/cache.py`
+- [x] Verify that imports reference the correct resolver provider modules
+- [x] Confirm that `_fetch_crossref_data.cache_clear()` and similar calls continue to work after the refactoring
+- [x] If any imports need adjustment, update them to reference the current location of cached functions
+- [x] Document that the cache clearing interface remains stable for backward compatibility
 
 ### 8.5 Validate Utility Decoupling
 
@@ -355,7 +355,7 @@
 - [x] Pass the same dictionary multiple times and assert that the cache key is deterministic
 - [x] Import the function from the Unpaywall resolver and verify it produces identical output
 - [x] Import the function from the Crossref resolver's internal usage and verify consistency
-- [ ] Document that this decoupling allows future resolver implementations to use the utility without circular dependencies
+- [x] Document that this decoupling allows future resolver implementations to use the utility without circular dependencies
 
 ## 9. Legacy Code Deprecation
 

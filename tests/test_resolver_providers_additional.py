@@ -46,15 +46,25 @@ from DocsToKG.ContentDownload.resolvers.types import ResolverConfig
 
 
 class _StubResponse:
-    def __init__(self, status_code: int = 200, json_data: Any = None, text: str = "") -> None:
+    def __init__(
+        self,
+        status_code: int = 200,
+        json_data: Any = None,
+        text: str = "",
+        headers: Optional[Dict[str, str]] = None,
+    ) -> None:
         self.status_code = status_code
         self._json_data = json_data
         self.text = text
+        self.headers = headers or {}
 
     def json(self) -> Any:
         if isinstance(self._json_data, Exception):
             raise self._json_data
         return self._json_data
+
+    def close(self) -> None:
+        return None
 
 
 def _artifact(tmp_path: Any, **overrides: Any) -> WorkArtifact:
@@ -426,6 +436,7 @@ def test_crossref_resolver_skip_without_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
     config = ResolverConfig()
     session = Mock()
+    session.get = Mock()
 
     result = next(CrossrefResolver().iter_urls(session, config, artifact))
 
@@ -462,12 +473,20 @@ def test_crossref_resolver_session_success(monkeypatch, tmp_path) -> None:
             }
         }
     )
+    mock_request = Mock(return_value=response)
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.providers.crossref.request_with_retries",
+        mock_request,
+    )
     session = Mock()
-    session.get = Mock(return_value=response)
 
     results = list(CrossrefResolver().iter_urls(session, config, artifact))
 
-    session.get.assert_called_once()
+    mock_request.assert_called_once()
+    called_session, method, endpoint = mock_request.call_args[0][:3]
+    assert called_session is session
+    assert method == "GET"
+    assert endpoint.endswith("/10.1000/example")
     assert results[0].metadata["content_type"] == "application/pdf"
     assert len(results) == 1
 
@@ -538,12 +557,18 @@ def test_crossref_resolver_session_errors(monkeypatch, tmp_path, exception, reas
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
 
+    mock_request = Mock(side_effect=exception)
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.providers.crossref.request_with_retries",
+        mock_request,
+    )
     session = Mock()
-    session.get = Mock(side_effect=exception)
+    session.get = Mock()
 
     result = next(CrossrefResolver().iter_urls(session, config, artifact))
 
     assert result.event_reason == reason
+    mock_request.assert_called_once()
 
 
 def test_crossref_resolver_session_http_error(monkeypatch, tmp_path) -> None:
@@ -551,12 +576,18 @@ def test_crossref_resolver_session_http_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     response = _StubResponse(status_code=504)
+    mock_request = Mock(return_value=response)
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.providers.crossref.request_with_retries",
+        mock_request,
+    )
     session = Mock()
-    session.get = Mock(return_value=response)
+    session.get = Mock()
 
     result = next(CrossrefResolver().iter_urls(session, config, artifact))
 
     assert result.event_reason == "http-error"
+    mock_request.assert_called_once()
 
 
 def test_crossref_resolver_session_json_error(monkeypatch, tmp_path) -> None:
@@ -564,12 +595,75 @@ def test_crossref_resolver_session_json_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     response = _StubResponse(json_data=ValueError("bad json"), text="oops")
+    mock_request = Mock(return_value=response)
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.providers.crossref.request_with_retries",
+        mock_request,
+    )
     session = Mock()
-    session.get = Mock(return_value=response)
+    session.get = Mock()
 
     result = next(CrossrefResolver().iter_urls(session, config, artifact))
 
     assert result.event_reason == "json-error"
+    mock_request.assert_called_once()
+
+
+def test_crossref_resolver_uses_central_retry_logic(monkeypatch, tmp_path) -> None:
+    artifact = _artifact(tmp_path)
+    config = ResolverConfig()
+
+    class _Response:
+        def __init__(self, status_code: int, headers=None, payload=None):
+            self.status_code = status_code
+            self.headers = headers or {}
+            self._payload = payload
+
+        def json(self):
+            if isinstance(self._payload, Exception):
+                raise self._payload
+            return self._payload or {"message": {"link": []}}
+
+        def close(self):
+            return None
+
+        @property
+        def text(self):
+            return ""
+
+    responses = [
+        _Response(429, headers={"Retry-After": "1"}),
+        _Response(429, headers={}),
+        _Response(200, payload={"message": {"link": []}}),
+    ]
+
+    class _Session:
+        def __init__(self) -> None:
+            self.calls: list[int] = []
+            self.get = Mock()
+
+        def request(self, method: str, url: str, **kwargs):
+            if not responses:
+                raise AssertionError("unexpected extra request")
+            response = responses.pop(0)
+            self.calls.append(response.status_code)
+            return response
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.http.random.random", lambda: 0.0
+    )
+    sleep_calls: list[float] = []
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.http.time.sleep", lambda delay: sleep_calls.append(delay)
+    )
+
+    session = _Session()
+    results = list(CrossrefResolver().iter_urls(session, config, artifact))
+
+    assert results == []
+    assert session.calls == [429, 429, 200]
+    assert sleep_calls[0] == pytest.approx(1.0, abs=0.05)
+    assert sleep_calls[1] == pytest.approx(1.5, abs=0.05)
 
 
 def test_crossref_resolver_uses_central_retry_logic(monkeypatch, tmp_path) -> None:

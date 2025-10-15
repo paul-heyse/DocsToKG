@@ -33,6 +33,14 @@ def normalize_doi(doi: Optional[str]) -> Optional[str]:
 
     Returns:
         Canonical DOI without protocol prefixes, or None when input is empty.
+
+    Supported prefixes:
+
+    - ``https://doi.org/``
+    - ``http://doi.org/``
+    - ``https://dx.doi.org/``
+    - ``http://dx.doi.org/``
+    - ``doi:``
     """
 
     if not doi:
