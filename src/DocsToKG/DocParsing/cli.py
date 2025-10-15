@@ -18,14 +18,6 @@ import argparse
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Sequence
 
-from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (
-    build_parser as chunk_build_parser,
-)
-from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (
-    main as chunk_pipeline_main,
-)
-from DocsToKG.DocParsing.EmbeddingV2 import build_parser as embed_build_parser
-from DocsToKG.DocParsing.EmbeddingV2 import main as embed_pipeline_main
 from DocsToKG.DocParsing import pipelines as pipeline_backend
 from DocsToKG.DocParsing._common import (
     data_doctags,
@@ -34,6 +26,14 @@ from DocsToKG.DocParsing._common import (
     detect_data_root,
     get_logger,
 )
+from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (
+    build_parser as chunk_build_parser,
+)
+from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (
+    main as chunk_pipeline_main,
+)
+from DocsToKG.DocParsing.EmbeddingV2 import build_parser as embed_build_parser
+from DocsToKG.DocParsing.EmbeddingV2 import main as embed_pipeline_main
 
 CommandHandler = Callable[[Sequence[str]], int]
 
@@ -50,6 +50,7 @@ Examples:
 # --------------------------------------------------------------------------- #
 # Chunk command
 # --------------------------------------------------------------------------- #
+
 
 def _run_chunk(argv: Sequence[str]) -> int:
     """Execute the Docling chunker subcommand.
@@ -70,6 +71,7 @@ def _run_chunk(argv: Sequence[str]) -> int:
 # Embed command
 # --------------------------------------------------------------------------- #
 
+
 def _run_embed(argv: Sequence[str]) -> int:
     """Execute the embedding pipeline subcommand.
 
@@ -88,6 +90,7 @@ def _run_embed(argv: Sequence[str]) -> int:
 # --------------------------------------------------------------------------- #
 # Doctags command
 # --------------------------------------------------------------------------- #
+
 
 def _build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentParser:
     """Create an :mod:`argparse` parser configured for DocTags conversion.
@@ -260,9 +263,7 @@ def _run_doctags(argv: Sequence[str]) -> int:
             elif pdf_count > 0 and html_count == 0:
                 mode = "pdf"
             else:
-                raise ValueError(
-                    "Cannot auto-detect mode: specify --mode or --input explicitly"
-                )
+                raise ValueError("Cannot auto-detect mode: specify --mode or --input explicitly")
         input_dir = html_default_in if mode == "html" else pdf_default_in
 
     output_dir = args.output.resolve() if args.output is not None else doctags_default_out
@@ -318,8 +319,19 @@ def _run_doctags(argv: Sequence[str]) -> int:
 # Dispatcher
 # --------------------------------------------------------------------------- #
 
+
 class _Command:
-    """Callable wrapper storing handler metadata for subcommands."""
+    """Callable wrapper storing handler metadata for subcommands.
+
+    Attributes:
+        handler: Callable invoked with the subcommand argument vector.
+        help: Short help text displayed in CLI usage.
+
+    Examples:
+        >>> cmd = _Command(_run_chunk, \"Run the chunker\")
+        >>> cmd.handler([])  # doctest: +SKIP
+        0
+    """
 
     __slots__ = ("handler", "help")
 

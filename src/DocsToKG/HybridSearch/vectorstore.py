@@ -39,16 +39,56 @@ except Exception:  # pragma: no cover - dependency not present in test rig
 
 @dataclass(slots=True)
 class FaissSearchResult:
-    """Dense search hit returned by FAISS."""
+    """Dense search hit returned by FAISS.
+
+    Attributes:
+        vector_id: External identifier resolved from the FAISS internal id.
+        score: Similarity score reported by FAISS (inner product).
+
+    Examples:
+        >>> FaissSearchResult(vector_id="doc-123", score=0.82)
+        FaissSearchResult(vector_id='doc-123', score=0.82)
+    """
 
     vector_id: str
     score: float
 
 
 class FaissVectorStore:
-    """Manage lifecycle of a GPU-resident FAISS index and related utilities."""
+    """Manage a GPU-backed FAISS index for dense retrieval.
+
+    The store encapsulates FAISS initialisation, GPU resource management,
+    vector ingestion, deletion, and similarity search. It understands the
+    custom CUDA-enabled FAISS build shipped with DocsToKG (``faiss-1.12``)
+    and automatically mirrors configuration options defined in
+    :class:`DenseIndexConfig`.
+
+    Attributes:
+        _dim: Dimensionality of stored vectors.
+        _config: Active dense index configuration.
+        _index: Underlying FAISS GPU index (possibly wrapped in ``IndexIDMap2``).
+        _gpu_resources: Lazily initialised ``StandardGpuResources`` instance.
+        _device: CUDA device id derived from configuration.
+
+    Examples:
+        >>> store = FaissVectorStore(dim=1536, config=DenseIndexConfig())
+        >>> store.add([np.random.rand(1536)], ["chunk-1"])
+        >>> results = store.search(np.random.rand(1536), top_k=5)
+        >>> [hit.vector_id for hit in results]
+        ['chunk-1']
+    """
 
     def __init__(self, dim: int, config: DenseIndexConfig) -> None:
+        """Initialise the vector store and allocate GPU resources.
+
+        Args:
+            dim: Dimensionality of dense embeddings stored in the index.
+            config: Dense index configuration controlling layout and GPU flags.
+
+        Raises:
+            RuntimeError: If the CUDA-enabled FAISS build is unavailable or no
+                GPU devices are visible to the process.
+        """
         if not _FAISS_AVAILABLE:
             raise RuntimeError(
                 "FAISS GPU extensions are required for dense retrieval "
@@ -79,24 +119,42 @@ class FaissVectorStore:
 
     @property
     def ntotal(self) -> int:
+        """Number of vectors currently stored in the FAISS index."""
         return int(self._index.ntotal)
 
     @property
     def config(self) -> DenseIndexConfig:
+        """Return the resolved dense index configuration."""
         return self._config
 
     @property
     def gpu_resources(self) -> "faiss.StandardGpuResources | None":
+        """Expose the underlying FAISS GPU resource manager."""
         return self._gpu_resources
 
     @property
     def device(self) -> int:
+        """Return the CUDA device id used for the FAISS index."""
         return int(getattr(self._config, "device", self._device))
 
     def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
+        """Register a callback that maps FAISS internal ids to external ids.
+
+        Args:
+            resolver: Callable receiving the FAISS integer id and returning the
+                application-level identifier (or ``None`` when unresolved).
+        """
         self._id_resolver = resolver
 
     def train(self, vectors: Sequence[np.ndarray]) -> None:
+        """Train IVF style indexes using the provided sample vectors.
+
+        Args:
+            vectors: Sequence of dense vectors used to train IVF quantizers.
+
+        Raises:
+            ValueError: If no vectors are supplied for a trainable index type.
+        """
         if not hasattr(self._index, "is_trained"):
             return
         if getattr(self._index, "is_trained"):
@@ -111,10 +169,20 @@ class FaissVectorStore:
         self._index.train(matrix[:ntrain])
 
     def needs_training(self) -> bool:
+        """Return ``True`` when the current FAISS index still requires training."""
         is_trained = getattr(self._index, "is_trained", True)
         return not bool(is_trained)
 
     def add(self, vectors: Sequence[np.ndarray], vector_ids: Sequence[str]) -> None:
+        """Add vectors to the FAISS index, replacing existing ids if present.
+
+        Args:
+            vectors: Embeddings to insert into the index.
+            vector_ids: Application-level identifiers paired with each vector.
+
+        Raises:
+            ValueError: When the vector and id sequences differ in length.
+        """
         self._flush_pending_deletes(force=False)
         if len(vectors) != len(vector_ids):
             raise ValueError("vectors and vector_ids must align")
@@ -150,12 +218,26 @@ class FaissVectorStore:
         self._needs_rebuild = False
 
     def remove(self, vector_ids: Sequence[str]) -> None:
+        """Remove vectors from the index using application-level identifiers.
+
+        Args:
+            vector_ids: Sequence of vector ids scheduled for deletion.
+        """
         if not vector_ids:
             return
         ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
         self.remove_ids(ids, force_flush=True)
 
     def remove_ids(self, ids: np.ndarray, *, force_flush: bool = False) -> int:
+        """Remove vectors using FAISS internal ids.
+
+        Args:
+            ids: Array of FAISS integer ids to delete.
+            force_flush: Force immediate rebuild when tombstones accumulate.
+
+        Returns:
+            Number of ids scheduled for removal.
+        """
         ids64 = np.asarray(ids, dtype=np.int64)
         if ids64.size == 0:
             return 0
@@ -176,6 +258,15 @@ class FaissVectorStore:
         return current_ids[mask]
 
     def search(self, query: np.ndarray, top_k: int) -> List[FaissSearchResult]:
+        """Search the index for the ``top_k`` nearest neighbours of ``query``.
+
+        Args:
+            query: Dense query vector with dimensionality ``self._dim``.
+            top_k: Maximum number of nearest neighbours to return.
+
+        Returns:
+            Ranked list of :class:`FaissSearchResult` objects.
+        """
         self._flush_pending_deletes(force=False)
         query_matrix = np.ascontiguousarray(
             self._ensure_dim(query).reshape(1, -1), dtype=np.float32
@@ -194,6 +285,14 @@ class FaissVectorStore:
         return results
 
     def serialize(self) -> bytes:
+        """Return a CPU-serialised representation of the FAISS index.
+
+        Returns:
+            Byte payload produced by :func:`faiss.serialize_index`.
+
+        Raises:
+            RuntimeError: If the index has not been initialised.
+        """
         if self._index is None:
             raise RuntimeError("index is empty")
         cpu_index = self._to_cpu(self._index)
@@ -201,6 +300,14 @@ class FaissVectorStore:
         return bytes(blob)
 
     def save(self, path: str) -> None:
+        """Persist the FAISS index to ``path`` when persistence is enabled.
+
+        Args:
+            path: Filesystem destination for the serialised index.
+
+        Raises:
+            RuntimeError: If the index has not been initialised.
+        """
         if self._index is None:
             raise RuntimeError("index is empty")
         if getattr(self._config, "persist_mode", "cpu_bytes") == "disabled":
@@ -212,12 +319,30 @@ class FaissVectorStore:
 
     @classmethod
     def load(cls, path: str, config: DenseIndexConfig, dim: int) -> "FaissVectorStore":
+        """Restore a vector store from disk.
+
+        Args:
+            path: Filesystem path containing a previously saved index payload.
+            config: Dense index configuration to apply to the reloaded store.
+            dim: Dimensionality of vectors stored in the index.
+
+        Returns:
+            Fresh :class:`FaissVectorStore` instance initialised from ``path``.
+        """
         blob = Path(path).read_bytes()
         manager = cls(dim=dim, config=config)
         manager.restore(blob)
         return manager
 
     def restore(self, payload: bytes) -> None:
+        """Load an index from ``payload`` and promote it to the GPU.
+
+        Args:
+            payload: Bytes produced by :meth:`serialize`.
+
+        Raises:
+            ValueError: If the payload is empty.
+        """
         if not payload:
             raise ValueError("Empty FAISS payload")
         cpu_index = faiss.deserialize_index(np.frombuffer(payload, dtype=np.uint8))
@@ -228,6 +353,11 @@ class FaissVectorStore:
         self._set_nprobe()
 
     def stats(self) -> dict[str, float | str]:
+        """Return diagnostic metrics describing the active FAISS index.
+
+        Returns:
+            Mapping of human-readable metric names to values (counts or strings).
+        """
         base = getattr(self._index, "index", None) or self._index
         if hasattr(faiss, "downcast_index"):
             try:
@@ -266,6 +396,7 @@ class FaissVectorStore:
         return stats
 
     def rebuild_needed(self) -> bool:
+        """Return ``True`` when tombstones require a full FAISS rebuild."""
         if self._needs_rebuild:
             return True
         if self._rebuild_delete_threshold <= 0:
@@ -273,6 +404,12 @@ class FaissVectorStore:
         return self._dirty_deletes >= self._rebuild_delete_threshold
 
     def init_gpu(self) -> None:
+        """Initialise FAISS GPU resources for the configured CUDA device.
+
+        Raises:
+            RuntimeError: When GPU support is unavailable or the requested
+                device id is invalid.
+        """
         if self._gpu_resources is not None:
             return
         if not hasattr(faiss, "get_num_gpus"):
@@ -304,6 +441,19 @@ class FaissVectorStore:
             ) from exc
 
     def distribute_to_all_gpus(self, index: "faiss.Index", *, shard: bool = False) -> "faiss.Index":
+        """Clone ``index`` across available GPUs when the build supports it.
+
+        Args:
+            index: FAISS index to replicate or shard.
+            shard: When ``True`` attempt sharded replication if supported.
+
+        Returns:
+            FAISS index after attempting replication/sharding.
+
+        Raises:
+            RuntimeError: If sharding is requested but unsupported by the
+                linked FAISS build.
+        """
         if not hasattr(faiss, "index_cpu_to_all_gpus") or not hasattr(faiss, "index_cpu_to_gpu"):
             return index
         if shard and hasattr(faiss, "index_cpu_to_all_gpus_knn"):
@@ -442,11 +592,15 @@ class FaissVectorStore:
                     cfg.useFloat16 = bool(getattr(self._config, "flat_use_fp16", False))
                 if hasattr(cfg, "indicesOptions"):
                     cfg.indicesOptions = (
-                        faiss.INDICES_32_BIT if self._indices_32_bit and not self._force_64bit_ids else 0
+                        faiss.INDICES_32_BIT
+                        if self._indices_32_bit and not self._force_64bit_ids
+                        else 0
                     )
                 index = faiss.GpuIndexFlatIP(self._gpu_resources, self._dim, cfg)
             else:
-                index = faiss.GpuIndexFlatIP(self._gpu_resources, self._dim, faiss.METRIC_INNER_PRODUCT)
+                index = faiss.GpuIndexFlatIP(
+                    self._gpu_resources, self._dim, faiss.METRIC_INNER_PRODUCT
+                )
             self._maybe_reserve_memory(index)
             return faiss.IndexIDMap2(index)
 
@@ -601,6 +755,17 @@ class FaissVectorStore:
 
 
 def normalize_rows(matrix: np.ndarray) -> np.ndarray:
+    """L2-normalise each row of ``matrix`` in-place.
+
+    Args:
+        matrix: Contiguous float32 matrix whose rows represent vectors.
+
+    Returns:
+        Normalised matrix (same object as ``matrix``).
+
+    Raises:
+        TypeError: If ``matrix`` is not a contiguous float32 ``ndarray``.
+    """
     if matrix.dtype != np.float32 or not matrix.flags.c_contiguous:
         raise TypeError("normalize_rows expects a contiguous float32 array")
     if hasattr(faiss, "normalize_L2"):

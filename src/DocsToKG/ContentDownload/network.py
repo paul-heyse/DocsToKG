@@ -28,6 +28,15 @@ Usage:
     response = request_with_retries(session, "GET", "https://example.org/resource")
     helper = ConditionalRequestHelper(prior_etag="abc123")
     headers = helper.build_headers()
+
+Args:
+    None.
+
+Returns:
+    None.
+
+Raises:
+    None.
 """
 
 from __future__ import annotations

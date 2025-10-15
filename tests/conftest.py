@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import sys
+import warnings
 from pathlib import Path
 
 import pytest
@@ -43,6 +44,13 @@ if VENV_ROOT.exists():
         site_path = str(site_packages)
         if site_packages.exists() and site_path not in sys.path:
             sys.path.insert(0, site_path)
+
+
+warnings.filterwarnings(
+    "ignore",
+    message="builtin type SwigPy.* has no __module__ attribute",
+    category=DeprecationWarning,
+)
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

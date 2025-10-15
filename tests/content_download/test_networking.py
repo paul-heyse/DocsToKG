@@ -2,66 +2,53 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+import math
+import sys
+import threading
+import time
+import types
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from importlib.util import find_spec
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple
+from unittest.mock import Mock, call, patch
+
 import pytest
+import requests
+
+from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
+from DocsToKG.ContentDownload.download_pyalex_pdfs import (
+    JsonlLogger,
+    WorkArtifact,
+    _make_session,
+    download_candidate,
+    process_one_work,
+)
 from DocsToKG.ContentDownload.network import (
     CachedResult,
     ConditionalRequestHelper,
     ModifiedResult,
-)
-import threading
-import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Any, Dict, Tuple
-import requests
-from DocsToKG.ContentDownload.download_pyalex_pdfs import (
-    WorkArtifact,
-    _make_session,
-    download_candidate,
-)
-from DocsToKG.ContentDownload.resolvers import DownloadOutcome
-import math
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
-from unittest.mock import Mock, call, patch
-from DocsToKG.ContentDownload.network import (
     parse_retry_after_header,
     request_with_retries,
 )
-import hashlib
-import sys
-import types
-from typing import Callable, Dict, Tuple
-from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload.utils import normalize_doi, normalize_pmcid
-from typing import List
-from DocsToKG.ContentDownload.resolvers import headers_cache_key
+from DocsToKG.ContentDownload.resolvers import (
+    DownloadOutcome,
+    OpenAlexResolver,
+    ResolverConfig,
+    ResolverMetrics,
+    ResolverPipeline,
+    ResolverResult,
+    WaybackResolver,
+    headers_cache_key,
+)
 from DocsToKG.ContentDownload.resolvers import (
     _headers_cache_key as resolver_headers_cache_key,
 )
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
-import json
-from typing import Any, Dict, Iterable, Iterator, List
-from DocsToKG.ContentDownload.download_pyalex_pdfs import (
-    JsonlLogger,
-    WorkArtifact,
-    download_candidate,
-    process_one_work,
-)
-from DocsToKG.ContentDownload.resolvers import ResolverPipeline
-from DocsToKG.ContentDownload.resolvers import (
-    OpenAlexResolver,
-    WaybackResolver,
-)
-from DocsToKG.ContentDownload.resolvers import (
-    DownloadOutcome,
-    ResolverConfig,
-    ResolverMetrics,
-    ResolverResult,
-)
 
 # ---- test_conditional_requests.py -----------------------------
 try:
@@ -207,11 +194,13 @@ if HAS_REQUESTS and HAS_PYALEX:
         assert entry.etag == '"tag"'
         assert entry.last_modified == "Mon, 01 Jan 2024 00:00:00 GMT"
 
+
 # ---- test_conditional_requests.py -----------------------------
 @dataclass
 class _HelperResponse:
     status_code: int
     headers: Dict[str, str]
+
 
 # ---- test_conditional_requests.py -----------------------------
 def _make_helper_response(
@@ -219,11 +208,13 @@ def _make_helper_response(
 ) -> _HelperResponse:
     return _HelperResponse(status_code=status_code, headers=headers or {})
 
+
 # ---- test_conditional_requests.py -----------------------------
 def test_build_headers_empty_metadata() -> None:
     helper = ConditionalRequestHelper()
 
     assert helper.build_headers() == {}
+
 
 # ---- test_conditional_requests.py -----------------------------
 def test_build_headers_etag_only() -> None:
@@ -231,11 +222,13 @@ def test_build_headers_etag_only() -> None:
 
     assert helper.build_headers() == {"If-None-Match": "abc123"}
 
+
 # ---- test_conditional_requests.py -----------------------------
 def test_build_headers_last_modified_only() -> None:
     helper = ConditionalRequestHelper(prior_last_modified="Wed, 21 Oct 2015 07:28:00 GMT")
 
     assert helper.build_headers() == {"If-Modified-Since": "Wed, 21 Oct 2015 07:28:00 GMT"}
+
 
 # ---- test_conditional_requests.py -----------------------------
 def test_build_headers_with_both_headers() -> None:
@@ -248,6 +241,7 @@ def test_build_headers_with_both_headers() -> None:
         "If-None-Match": "abc123",
         "If-Modified-Since": "Wed, 21 Oct 2015 07:28:00 GMT",
     }
+
 
 # ---- test_conditional_requests.py -----------------------------
 def test_interpret_response_cached_returns_cached_result() -> None:
@@ -269,6 +263,7 @@ def test_interpret_response_cached_returns_cached_result() -> None:
     assert result.etag == "abc123"
     assert result.last_modified == "Wed, 21 Oct 2015 07:28:00 GMT"
 
+
 # ---- test_conditional_requests.py -----------------------------
 def test_interpret_response_cached_missing_metadata_raises() -> None:
     helper = ConditionalRequestHelper(prior_etag="abc123")
@@ -276,6 +271,7 @@ def test_interpret_response_cached_missing_metadata_raises() -> None:
 
     with pytest.raises(ValueError):
         helper.interpret_response(response)  # type: ignore[arg-type]
+
 
 # ---- test_conditional_requests.py -----------------------------
 def test_interpret_response_modified_returns_modified_result() -> None:
@@ -287,6 +283,7 @@ def test_interpret_response_modified_returns_modified_result() -> None:
     assert isinstance(result, ModifiedResult)
     assert result.etag is None
     assert result.last_modified is None
+
 
 # ---- test_conditional_requests.py -----------------------------
 def test_interpret_response_modified_extracts_headers() -> None:
@@ -305,6 +302,7 @@ def test_interpret_response_modified_extracts_headers() -> None:
     assert result.etag == '"xyz"'
     assert result.last_modified == "Thu, 01 Jan 1970 00:00:00 GMT"
 
+
 # ---- test_conditional_requests.py -----------------------------
 def test_interpret_response_missing_metadata_lists_fields() -> None:
     helper = ConditionalRequestHelper(prior_etag="tag-only")
@@ -317,6 +315,7 @@ def test_interpret_response_missing_metadata_lists_fields() -> None:
     assert "path" in message
     assert "sha256" in message
     assert "content_length" in message
+
 
 # ---- test_conditional_requests.py -----------------------------
 @given(
@@ -336,6 +335,7 @@ def test_build_headers_property(etag: Optional[str], last_modified: Optional[str
         assert headers["If-Modified-Since"] == last_modified
     else:
         assert "If-Modified-Since" not in headers
+
 
 # ---- test_conditional_requests.py -----------------------------
 @given(
@@ -360,10 +360,12 @@ def test_interpret_response_cached_property(path: str, sha: str, size: int) -> N
     assert result.sha256 == sha
     assert result.content_length == size
 
+
 # ---- test_conditional_requests.py -----------------------------
 def test_conditional_helper_rejects_negative_length() -> None:
     with pytest.raises(ValueError):
         ConditionalRequestHelper(prior_content_length=-1)
+
 
 # ---- test_conditional_requests.py -----------------------------
 def test_interpret_response_requires_response_shape() -> None:
@@ -372,11 +374,13 @@ def test_interpret_response_requires_response_shape() -> None:
     with pytest.raises(TypeError):
         helper.interpret_response(object())  # type: ignore[arg-type]
 
+
 # ---- test_download_retries.py -----------------------------
 pytest.importorskip("requests")
 
 # ---- test_download_retries.py -----------------------------
 pytest.importorskip("pyalex")
+
 
 # ---- test_download_retries.py -----------------------------
 class _SequencedHandler(BaseHTTPRequestHandler):
@@ -412,6 +416,7 @@ class _SequencedHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None:  # noqa: D401
         return
 
+
 # ---- test_download_retries.py -----------------------------
 @pytest.fixture
 def http_server():
@@ -430,6 +435,7 @@ def http_server():
         server.shutdown()
         server.server_close()
         thread.join(timeout=1)
+
 
 # ---- test_download_retries.py -----------------------------
 def _make_artifact(base_dir: Path) -> WorkArtifact:
@@ -454,12 +460,18 @@ def _make_artifact(base_dir: Path) -> WorkArtifact:
         html_dir=html_dir,
     )
 
+
 # ---- test_download_retries.py -----------------------------
 def _download(
     url: str, tmp_path: Path
 ) -> Tuple[WorkArtifact, requests.Session, Dict[str, Any], DownloadOutcome]:
     artifact = _make_artifact(tmp_path)
-    context = {"dry_run": False, "extract_html_text": False, "previous": {}}
+    context = {
+        "dry_run": False,
+        "extract_html_text": False,
+        "previous": {},
+        "skip_head_precheck": True,
+    }
     session = _make_session({})
     return (
         artifact,
@@ -474,6 +486,7 @@ def _download(
             context=context,
         ),
     )
+
 
 # ---- test_download_retries.py -----------------------------
 @pytest.mark.parametrize("statuses", [[503, 503, 200]])
@@ -492,6 +505,7 @@ def test_download_candidate_retries_on_transient_errors(http_server, tmp_path, s
         assert Path(outcome.path).exists()
     finally:
         session.close()
+
 
 # ---- test_download_retries.py -----------------------------
 def test_retry_after_header_respected(monkeypatch, http_server, tmp_path):
@@ -514,6 +528,7 @@ def test_retry_after_header_respected(monkeypatch, http_server, tmp_path):
         assert sleep_calls and sleep_calls[0] >= handler.retry_after
     finally:
         session.close()
+
 
 # ---- test_download_retries.py -----------------------------
 def test_non_retryable_errors_do_not_retry(http_server, tmp_path):
@@ -539,6 +554,7 @@ def test_non_retryable_errors_do_not_retry(http_server, tmp_path):
     assert outcome.classification == "http_error"
     assert handler.calls == [404]
 
+
 # ---- test_download_retries.py -----------------------------
 def test_download_candidate_avoids_per_request_head(http_server, tmp_path):
     """Ensure download path relies solely on GET without redundant HEAD calls."""
@@ -555,6 +571,7 @@ def test_download_candidate_avoids_per_request_head(http_server, tmp_path):
         assert handler.calls == [200]
     finally:
         session.close()
+
 
 # ---- test_download_retries.py -----------------------------
 def test_retry_determinism_matches_request_with_retries(monkeypatch, http_server, tmp_path):
@@ -584,6 +601,7 @@ def test_retry_determinism_matches_request_with_retries(monkeypatch, http_server
     finally:
         session.close()
 
+
 # ---- test_http_retry.py -----------------------------
 try:  # pragma: no cover - dependency optional in CI
     import requests  # type: ignore
@@ -600,12 +618,14 @@ except ImportError:  # pragma: no cover - optional dependency
 # ---- test_http_retry.py -----------------------------
 given = hypothesis.given
 
+
 # ---- test_http_retry.py -----------------------------
 def _mock_response(status: int, headers: Optional[Dict[str, str]] = None) -> Mock:
     response = Mock(spec=requests.Response)
     response.status_code = status
     response.headers = headers or {}
     return response
+
 
 # ---- test_http_retry.py -----------------------------
 def test_successful_request_no_retries():
@@ -619,6 +639,7 @@ def test_successful_request_no_retries():
 
     assert result is response
     session.request.assert_called_once_with(method="GET", url="https://example.org/test")
+
 
 # ---- test_http_retry.py -----------------------------
 @patch("DocsToKG.ContentDownload.network.random.random", return_value=0.0)
@@ -643,12 +664,14 @@ def test_transient_503_with_exponential_backoff(mock_sleep: Mock, _: Mock) -> No
     assert session.request.call_count == 3
     assert mock_sleep.call_args_list == [call(0.5), call(1.0)]
 
+
 # ---- test_http_retry.py -----------------------------
 def test_parse_retry_after_header_integer() -> None:
     response = requests.Response()
     response.headers = {"Retry-After": "5"}
 
     assert parse_retry_after_header(response) == 5.0
+
 
 # ---- test_http_retry.py -----------------------------
 def test_parse_retry_after_header_http_date() -> None:
@@ -661,12 +684,14 @@ def test_parse_retry_after_header_http_date() -> None:
     assert wait is not None
     assert 0.0 <= wait <= 30.0
 
+
 # ---- test_http_retry.py -----------------------------
 def test_parse_retry_after_header_invalid_date() -> None:
     response = requests.Response()
     response.headers = {"Retry-After": "Thu, 32 Foo 2024 00:00:00 GMT"}
 
     assert parse_retry_after_header(response) is None
+
 
 # ---- test_http_retry.py -----------------------------
 @patch("DocsToKG.ContentDownload.network.random.random", return_value=0.0)
@@ -689,6 +714,7 @@ def test_retry_after_header_overrides_backoff(mock_sleep: Mock, _: Mock) -> None
     assert result is response_success
     assert mock_sleep.call_args_list == [call(10.0)]
 
+
 # ---- test_http_retry.py -----------------------------
 @patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_request_exception_raises_after_retries(mock_sleep: Mock) -> None:
@@ -702,6 +728,7 @@ def test_request_exception_raises_after_retries(mock_sleep: Mock) -> None:
     assert mock_sleep.call_count == 1
     assert session.request.call_count == 2
 
+
 # ---- test_http_retry.py -----------------------------
 @patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_timeout_retry_handling(mock_sleep: Mock) -> None:
@@ -713,6 +740,7 @@ def test_timeout_retry_handling(mock_sleep: Mock) -> None:
     assert result.status_code == 200
     assert mock_sleep.call_count == 1
 
+
 # ---- test_http_retry.py -----------------------------
 @patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_connection_error_retry_handling(mock_sleep: Mock) -> None:
@@ -723,6 +751,7 @@ def test_connection_error_retry_handling(mock_sleep: Mock) -> None:
 
     assert result.status_code == 200
     assert mock_sleep.call_count == 1
+
 
 # ---- test_http_retry.py -----------------------------
 @patch("DocsToKG.ContentDownload.network.time.sleep")
@@ -738,6 +767,7 @@ def test_timeout_raises_after_exhaustion(mock_sleep: Mock) -> None:
     # Only the non-terminal attempt sleeps before re-raising on the final attempt.
     assert mock_sleep.call_count == 1
 
+
 # ---- test_http_retry.py -----------------------------
 @patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_connection_error_raises_after_exhaustion(mock_sleep: Mock) -> None:
@@ -751,6 +781,7 @@ def test_connection_error_raises_after_exhaustion(mock_sleep: Mock) -> None:
 
     assert mock_sleep.call_count == 1
 
+
 # ---- test_http_retry.py -----------------------------
 @given(st.text())
 def test_parse_retry_after_header_property(value: str) -> None:
@@ -761,6 +792,7 @@ def test_parse_retry_after_header_property(value: str) -> None:
 
     if result is not None:
         assert result >= 0.0 or math.isnan(result)
+
 
 # ---- test_http_retry.py -----------------------------
 def test_request_with_custom_retry_statuses() -> None:
@@ -780,6 +812,7 @@ def test_request_with_custom_retry_statuses() -> None:
     assert result is success
     assert session.request.call_count == 2
 
+
 # ---- test_http_retry.py -----------------------------
 def test_request_returns_after_exhausting_single_attempt() -> None:
     session = Mock(spec=requests.Session)
@@ -795,6 +828,7 @@ def test_request_returns_after_exhausting_single_attempt() -> None:
 
     assert result is retry_response
 
+
 # ---- test_http_retry.py -----------------------------
 def test_request_with_retries_rejects_negative_retries() -> None:
     session = Mock(spec=requests.Session)
@@ -802,12 +836,14 @@ def test_request_with_retries_rejects_negative_retries() -> None:
     with pytest.raises(ValueError):
         request_with_retries(session, "GET", "https://example.org/test", max_retries=-1)
 
+
 # ---- test_http_retry.py -----------------------------
 def test_request_with_retries_rejects_negative_backoff() -> None:
     session = Mock(spec=requests.Session)
 
     with pytest.raises(ValueError):
         request_with_retries(session, "GET", "https://example.org/test", backoff_factor=-0.1)
+
 
 # ---- test_http_retry.py -----------------------------
 def test_request_with_retries_requires_method_and_url() -> None:
@@ -818,6 +854,7 @@ def test_request_with_retries_requires_method_and_url() -> None:
 
     with pytest.raises(ValueError):
         request_with_retries(session, "GET", "")
+
 
 # ---- test_http_retry.py -----------------------------
 def test_request_with_retries_uses_method_fallback() -> None:
@@ -839,6 +876,7 @@ def test_request_with_retries_uses_method_fallback() -> None:
     assert response.status_code == 200
     assert session.calls == ["https://example.org/fallback"]
 
+
 # ---- test_http_retry.py -----------------------------
 def test_request_with_retries_errors_when_no_callable_available() -> None:
     class _MinimalSession:
@@ -846,6 +884,7 @@ def test_request_with_retries_errors_when_no_callable_available() -> None:
 
     with pytest.raises(AttributeError):
         request_with_retries(_MinimalSession(), "GET", "https://example.org/fail")
+
 
 # ---- test_http_retry.py -----------------------------
 @patch("DocsToKG.ContentDownload.network.time.sleep")
@@ -877,6 +916,7 @@ def test_retry_after_header_prefers_longer_delay(mock_sleep: Mock) -> None:
     sleep_arg = mock_sleep.call_args[0][0]
     assert pytest.approx(sleep_arg, rel=0.01) == 4.0
 
+
 # ---- test_http_retry.py -----------------------------
 @patch("DocsToKG.ContentDownload.network.time.sleep")
 @patch("DocsToKG.ContentDownload.network.parse_retry_after_header")
@@ -901,6 +941,7 @@ def test_respect_retry_after_false_skips_header(mock_parse: Mock, mock_sleep: Mo
     mock_parse.assert_not_called()
     mock_sleep.assert_called_once()
 
+
 # ---- test_http_retry.py -----------------------------
 def test_parse_retry_after_header_naive_datetime() -> None:
     response = requests.Response()
@@ -909,6 +950,7 @@ def test_parse_retry_after_header_naive_datetime() -> None:
     wait = parse_retry_after_header(response)
     assert wait is not None
     assert wait >= 0.0
+
 
 # ---- test_http_retry.py -----------------------------
 def test_parse_retry_after_header_handles_parse_errors(monkeypatch) -> None:
@@ -922,6 +964,7 @@ def test_parse_retry_after_header_handles_parse_errors(monkeypatch) -> None:
 
     assert parse_retry_after_header(response) is None
 
+
 # ---- test_http_retry.py -----------------------------
 def test_parse_retry_after_header_returns_none_when_parser_returns_none(monkeypatch) -> None:
     response = requests.Response()
@@ -934,6 +977,7 @@ def test_parse_retry_after_header_returns_none_when_parser_returns_none(monkeypa
 
     assert parse_retry_after_header(response) is None
 
+
 # ---- test_download_outcomes.py -----------------------------
 if "pyalex" not in sys.modules:
     pyalex_stub = types.ModuleType("pyalex")
@@ -944,6 +988,7 @@ if "pyalex" not in sys.modules:
     pyalex_stub.config = config_stub
     sys.modules["pyalex"] = pyalex_stub
     sys.modules["pyalex.config"] = config_stub
+
 
 # ---- test_download_outcomes.py -----------------------------
 class FakeResponse:
@@ -965,6 +1010,7 @@ class FakeResponse:
 
     def close(self):
         pass
+
 
 # ---- test_download_outcomes.py -----------------------------
 def make_artifact(tmp_path: Path) -> downloader.WorkArtifact:
@@ -988,6 +1034,7 @@ def make_artifact(tmp_path: Path) -> downloader.WorkArtifact:
     artifact.html_dir.mkdir(parents=True, exist_ok=True)
     return artifact
 
+
 # ---- test_download_outcomes.py -----------------------------
 def stub_requests(
     monkeypatch, mapping: Dict[Tuple[str, str], Callable[[], FakeResponse] | FakeResponse]
@@ -1000,6 +1047,7 @@ def stub_requests(
         return response() if callable(response) else response
 
     monkeypatch.setattr(downloader, "request_with_retries", fake_request)
+
 
 # ---- test_download_outcomes.py -----------------------------
 def test_successful_pdf_download_populates_metadata(tmp_path, monkeypatch):
@@ -1022,7 +1070,14 @@ def test_successful_pdf_download_populates_metadata(tmp_path, monkeypatch):
     stub_requests(monkeypatch, mapping)
 
     session = requests.Session()
-    outcome = downloader.download_candidate(session, artifact, url, None, timeout=10.0)
+    outcome = downloader.download_candidate(
+        session,
+        artifact,
+        url,
+        None,
+        timeout=10.0,
+        context={"skip_head_precheck": True},
+    )
 
     assert outcome.classification == "pdf"
     assert outcome.path is not None
@@ -1036,6 +1091,7 @@ def test_successful_pdf_download_populates_metadata(tmp_path, monkeypatch):
     assert outcome.extracted_text_path is None
     rehashed = hashlib.sha256(stored.read_bytes()).hexdigest()
     assert rehashed == expected_sha
+
 
 # ---- test_download_outcomes.py -----------------------------
 def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
@@ -1075,6 +1131,7 @@ def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
     assert outcome.last_modified == "Tue, 02 Jan 2024 00:00:00 GMT"
     assert outcome.error is None
 
+
 # ---- test_download_outcomes.py -----------------------------
 def test_http_error_sets_metadata_to_none(tmp_path, monkeypatch):
     artifact = make_artifact(tmp_path)
@@ -1095,6 +1152,7 @@ def test_http_error_sets_metadata_to_none(tmp_path, monkeypatch):
     assert outcome.etag is None
     assert outcome.last_modified is None
     assert outcome.error is None
+
 
 # ---- test_download_outcomes.py -----------------------------
 def test_html_download_with_text_extraction(tmp_path, monkeypatch):
@@ -1138,6 +1196,7 @@ def test_html_download_with_text_extraction(tmp_path, monkeypatch):
     assert outcome.etag == '"etag-html"'
     assert outcome.last_modified == "Wed, 03 Jan 2024 00:00:00 GMT"
 
+
 # ---- test_download_outcomes.py -----------------------------
 def test_dry_run_preserves_metadata_without_files(tmp_path, monkeypatch):
     artifact = make_artifact(tmp_path)
@@ -1175,6 +1234,7 @@ def test_dry_run_preserves_metadata_without_files(tmp_path, monkeypatch):
     assert outcome.etag == '"etag-dry"'
     assert outcome.last_modified == "Thu, 04 Jan 2024 00:00:00 GMT"
 
+
 # ---- test_download_outcomes.py -----------------------------
 def test_small_pdf_detected_as_corrupt(tmp_path, monkeypatch):
     artifact = make_artifact(tmp_path)
@@ -1191,11 +1251,19 @@ def test_small_pdf_detected_as_corrupt(tmp_path, monkeypatch):
     stub_requests(monkeypatch, mapping)
 
     session = requests.Session()
-    outcome = downloader.download_candidate(session, artifact, url, None, timeout=10.0)
+    outcome = downloader.download_candidate(
+        session,
+        artifact,
+        url,
+        None,
+        timeout=10.0,
+        context={"skip_head_precheck": True},
+    )
 
     assert outcome.classification == "pdf_corrupt"
     assert outcome.path is None
     assert not any(artifact.pdf_dir.glob("*.pdf"))
+
 
 # ---- test_download_outcomes.py -----------------------------
 def test_html_tail_in_pdf_marks_corruption(tmp_path, monkeypatch):
@@ -1218,6 +1286,7 @@ def test_html_tail_in_pdf_marks_corruption(tmp_path, monkeypatch):
     assert outcome.classification == "pdf_corrupt"
     assert outcome.path is None
     assert not any(artifact.pdf_dir.glob("*.pdf"))
+
 
 # ---- test_download_outcomes.py -----------------------------
 def test_build_manifest_entry_includes_download_metadata(tmp_path):
@@ -1252,6 +1321,7 @@ def test_build_manifest_entry_includes_download_metadata(tmp_path):
     assert entry.last_modified == "Fri, 05 Jan 2024 00:00:00 GMT"
     assert entry.extracted_text_path == str(artifact.html_dir / "saved.txt")
 
+
 # ---- test_download_outcomes.py -----------------------------
 def test_rfc5987_filename_suffix(tmp_path, monkeypatch):
     artifact = make_artifact(tmp_path)
@@ -1276,6 +1346,7 @@ def test_rfc5987_filename_suffix(tmp_path, monkeypatch):
     assert outcome.classification == "pdf"
     assert outcome.path is not None
     assert outcome.path.endswith(".pdf")
+
 
 # ---- test_download_outcomes.py -----------------------------
 def test_html_filename_suffix_from_disposition(tmp_path, monkeypatch):
@@ -1302,14 +1373,17 @@ def test_html_filename_suffix_from_disposition(tmp_path, monkeypatch):
     assert outcome.path is not None
     assert outcome.path.endswith(".xhtml")
 
+
 # ---- test_download_utils.py -----------------------------
 pytest.importorskip("pyalex")
+
 
 # ---- test_download_utils.py -----------------------------
 def test_slugify_truncates_and_normalises():
     assert downloader.slugify("Hello, World!", keep=8) == "Hello_Wo"
     assert downloader.slugify("   ", keep=10) == "untitled"
     assert downloader.slugify("Study: B-cells & growth", keep=40) == "Study_Bcells_growth"
+
 
 # ---- test_download_utils.py -----------------------------
 @pytest.mark.parametrize(
@@ -1324,6 +1398,7 @@ def test_slugify_truncates_and_normalises():
 )
 def test_classify_payload_variants(payload, ctype, url, expected):
     assert downloader.classify_payload(payload, ctype, url) == expected
+
 
 # ---- test_download_utils.py -----------------------------
 def test_collect_location_urls_dedupes_and_tracks_sources():
@@ -1359,6 +1434,7 @@ def test_collect_location_urls_dedupes_and_tracks_sources():
     ]
     assert collected["sources"] == ["Host", "Mirror"]
 
+
 # ---- test_download_utils.py -----------------------------
 @pytest.mark.parametrize(
     "value,expected",
@@ -1371,6 +1447,7 @@ def test_collect_location_urls_dedupes_and_tracks_sources():
 def test_normalize_doi(value, expected):
     assert normalize_doi(value) == expected
 
+
 # ---- test_download_utils.py -----------------------------
 @pytest.mark.parametrize(
     "value,expected",
@@ -1382,6 +1459,7 @@ def test_normalize_doi(value, expected):
 )
 def test_normalize_pmid(value, expected):
     assert downloader._normalize_pmid(value) == expected
+
 
 # ---- test_download_utils.py -----------------------------
 @pytest.mark.parametrize(
@@ -1396,6 +1474,7 @@ def test_normalize_pmid(value, expected):
 def test_normalize_pmcid(value, expected):
     assert normalize_pmcid(value) == expected
 
+
 # ---- test_download_utils.py -----------------------------
 @pytest.mark.parametrize(
     "value,expected",
@@ -1407,6 +1486,7 @@ def test_normalize_pmcid(value, expected):
 )
 def test_normalize_arxiv(value, expected):
     assert downloader._normalize_arxiv(value) == expected
+
 
 # ---- test_content_download_utils.py -----------------------------
 try:
@@ -1424,21 +1504,26 @@ unpaywall_headers_cache_key = resolver_headers_cache_key
 # ---- test_content_download_utils.py -----------------------------
 given = hypothesis.given
 
+
 # ---- test_content_download_utils.py -----------------------------
 def test_normalize_doi_with_https_prefix() -> None:
     assert normalize_doi("https://doi.org/10.1234/abc") == "10.1234/abc"
+
 
 # ---- test_content_download_utils.py -----------------------------
 def test_normalize_doi_without_prefix() -> None:
     assert normalize_doi("10.1234/abc") == "10.1234/abc"
 
+
 # ---- test_content_download_utils.py -----------------------------
 def test_normalize_doi_with_whitespace() -> None:
     assert normalize_doi("  10.1234/abc  ") == "10.1234/abc"
 
+
 # ---- test_content_download_utils.py -----------------------------
 def test_normalize_doi_none() -> None:
     assert normalize_doi(None) is None
+
 
 # ---- test_content_download_utils.py -----------------------------
 @pytest.mark.parametrize(
@@ -1456,29 +1541,36 @@ def test_normalize_doi_prefix_variants(prefix: str) -> None:
     canonical = "10.1234/Example"
     assert normalize_doi(f"{prefix}{canonical}") == canonical
 
+
 # ---- test_content_download_utils.py -----------------------------
 def test_normalize_pmcid_with_pmc_prefix() -> None:
     assert normalize_pmcid("PMC123456") == "PMC123456"
+
 
 # ---- test_content_download_utils.py -----------------------------
 def test_normalize_pmcid_without_prefix_adds_prefix() -> None:
     assert normalize_pmcid("123456") == "PMC123456"
 
+
 # ---- test_content_download_utils.py -----------------------------
 def test_normalize_pmcid_lowercase() -> None:
     assert normalize_pmcid("pmc123456") == "PMC123456"
+
 
 # ---- test_content_download_utils.py -----------------------------
 def test_strip_prefix_case_insensitive() -> None:
     assert strip_prefix("ARXIV:2301.12345", "arxiv:") == "2301.12345"
 
+
 # ---- test_content_download_utils.py -----------------------------
 def test_dedupe_preserves_order() -> None:
     assert dedupe(["b", "a", "b", "c"]) == ["b", "a", "c"]
 
+
 # ---- test_content_download_utils.py -----------------------------
 def test_dedupe_filters_falsey_values() -> None:
     assert dedupe(["a", "", None, "a"]) == ["a"]
+
 
 # ---- test_content_download_utils.py -----------------------------
 @given(st.lists(st.text()))
@@ -1492,6 +1584,7 @@ def test_dedupe_property(values: List[str]) -> None:
 
     assert dedupe(values) == expected
 
+
 # ---- test_content_download_utils.py -----------------------------
 def test_headers_cache_key_determinism() -> None:
     headers = {"User-Agent": "TestAgent", "accept": "text/html"}
@@ -1502,6 +1595,7 @@ def test_headers_cache_key_determinism() -> None:
     assert unpaywall_headers_cache_key(headers) == expected
     assert crossref_headers_cache_key(headers) == expected
 
+
 # ---- test_edge_cases.py -----------------------------
 pytest.importorskip("pyalex")
 
@@ -1510,6 +1604,7 @@ requests = pytest.importorskip("requests")
 
 # ---- test_edge_cases.py -----------------------------
 responses = pytest.importorskip("responses")
+
 
 # ---- test_edge_cases.py -----------------------------
 def _make_artifact(tmp_path: Path, **overrides: Any) -> WorkArtifact:
@@ -1532,6 +1627,7 @@ def _make_artifact(tmp_path: Path, **overrides: Any) -> WorkArtifact:
     params.update(overrides)
     return WorkArtifact(**params)
 
+
 # ---- test_edge_cases.py -----------------------------
 @responses.activate
 def test_html_classification_overrides_misleading_content_type(tmp_path: Path) -> None:
@@ -1552,6 +1648,7 @@ def test_html_classification_overrides_misleading_content_type(tmp_path: Path) -
     assert outcome.classification == "html"
     assert outcome.path and outcome.path.endswith(".html")
 
+
 # ---- test_edge_cases.py -----------------------------
 @responses.activate
 def test_wayback_resolver_skips_unavailable_archives(tmp_path: Path) -> None:
@@ -1570,6 +1667,7 @@ def test_wayback_resolver_skips_unavailable_archives(tmp_path: Path) -> None:
 
     results = list(WaybackResolver().iter_urls(session, config, artifact))
     assert results == []
+
 
 # ---- test_edge_cases.py -----------------------------
 def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
@@ -1661,6 +1759,7 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
     assert manifests[0]["path"].endswith("resolver.pdf")
     assert Path(manifests[0]["path"]).exists()
 
+
 # ---- test_edge_cases.py -----------------------------
 def test_openalex_attempts_use_session_headers(tmp_path: Path) -> None:
     artifact = _make_artifact(tmp_path)
@@ -1699,6 +1798,7 @@ def test_openalex_attempts_use_session_headers(tmp_path: Path) -> None:
 
     assert observed == ["EdgeTester/1.0"]
     logger.close()
+
 
 # ---- test_edge_cases.py -----------------------------
 def test_retry_budget_honours_max_attempts(tmp_path: Path) -> None:
@@ -1757,4 +1857,3 @@ def test_retry_budget_honours_max_attempts(tmp_path: Path) -> None:
     result = pipeline.run(requests.Session(), artifact)
     assert result.success is False
     assert len(calls) == config.max_attempts_per_work
-

@@ -57,6 +57,7 @@ import requests
 from pyalex import Topics, Works
 from pyalex import config as oa_config
 
+from DocsToKG.ContentDownload import resolvers
 from DocsToKG.ContentDownload.network import (
     CachedResult,
     ConditionalRequestHelper,
@@ -64,7 +65,6 @@ from DocsToKG.ContentDownload.network import (
     create_session,
     request_with_retries,
 )
-from DocsToKG.ContentDownload import resolvers
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
 
 ResolverPipeline = resolvers.ResolverPipeline

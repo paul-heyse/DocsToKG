@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import socket
 import sys
@@ -18,7 +17,6 @@ from DocsToKG.DocParsing.schemas import (
     validate_chunk_row,
     validate_vector_row,
 )
-
 
 # ---------------------------------------------------------------------------
 # _common utility tests

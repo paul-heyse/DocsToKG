@@ -1,15 +1,46 @@
 """Unified ontology downloader orchestrating settings, retries, and logging."""
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
+import gzip
+
 # --- Foundation utilities ---
+import importlib
+import json
 import logging
 import os
 import random
 import re
+import shutil
+import stat
+import sys
 import time
 import uuid
-from typing import Callable, Dict, Optional, TypeVar
+from concurrent.futures import as_completed
+from copy import deepcopy
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
+from logging.handlers import RotatingFileHandler
+from pathlib import Path, PurePosixPath
+from types import ModuleType
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Protocol,
+    Sequence,
+    Set,
+    Tuple,
+    TypeVar,
+)
 
 T = TypeVar("T")
 
@@ -131,31 +162,6 @@ def mask_sensitive_data(payload: Dict[str, object]) -> Dict[str, object]:
     return masked
 
 
-# --- Configuration and settings ---
-import gzip
-import json
-import logging
-import os
-import re
-import sys
-import uuid
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from logging.handlers import RotatingFileHandler
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    MutableMapping,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-)
-
 try:  # pragma: no cover - dependency check
     import yaml  # type: ignore
 except ModuleNotFoundError as exc:  # pragma: no cover - explicit guidance for users
@@ -163,12 +169,18 @@ except ModuleNotFoundError as exc:  # pragma: no cover - explicit guidance for u
         "PyYAML is required for configuration parsing. Install it with: pip install pyyaml"
     ) from exc
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+try:  # pragma: no cover - optional dependency
+    from jsonschema import Draft202012Validator
+    from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
+except ModuleNotFoundError as exc:  # pragma: no cover - provide actionable guidance
+    raise ImportError(
+        "jsonschema is required for ontology validation. Install it with: pip install jsonschema"
+    ) from exc
+
+from pydantic import BaseModel, Field, field_validator
+from pydantic import ValidationError as PydanticValidationError
 from pydantic_core import ValidationError as CoreValidationError
-
-FetchSpec = Any  # type: ignore[assignment]
-
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PYTHON_MIN_VERSION = (3, 9)
 
@@ -784,7 +796,6 @@ def _make_fetch_spec(
         Fully initialised ``FetchSpec`` object ready for execution.
     """
 
-
     fetch_spec_cls = globals().get("FetchSpec")
     if fetch_spec_cls is None:
         raise RuntimeError("FetchSpec class not initialised")
@@ -851,7 +862,7 @@ def build_resolved_config(raw_config: Mapping[str, object]) -> ResolvedConfig:
         if defaults_section and not isinstance(defaults_section, Mapping):
             raise ConfigError("'defaults' section must be a mapping")
         defaults = DefaultsConfig.model_validate(defaults_section)
-    except (ValidationError, CoreValidationError) as exc:
+    except (PydanticValidationError, CoreValidationError) as exc:
         messages = []
         for error in exc.errors():
             location = " -> ".join(str(part) for part in error["loc"])
@@ -1084,7 +1095,6 @@ def setup_logging(
         Logger instance configured with console and rotating JSON handlers.
     """
 
-
     resolved_dir = log_dir or Path(os.environ.get("ONTOFETCH_LOG_DIR", ""))
     if not resolved_dir:
         resolved_dir = LOG_DIR
@@ -1119,21 +1129,14 @@ def setup_logging(
     logger.propagate = True
 
     return logger
+
+
 DefaultsConfiguration = DefaultsConfig
 LoggingConfig = LoggingConfiguration
 ValidationConfiguration = ValidationConfig
 
 
 # --- Storage infrastructure ---
-import importlib
-import os
-import shutil
-import stat
-import sys
-from pathlib import Path, PurePosixPath
-from types import ModuleType
-from typing import Any, Dict, Iterable, List, Optional, Protocol, Tuple
-
 
 try:  # pragma: no cover - optional dependency
     import fsspec  # type: ignore
@@ -1417,7 +1420,9 @@ class _StubGraph:
         ]
         return self
 
-    def serialize(self, destination: Optional[Any] = None, format: Optional[str] = None, **_kwargs: object):
+    def serialize(
+        self, destination: Optional[Any] = None, format: Optional[str] = None, **_kwargs: object
+    ):
         """Serialize the stub graph back to Turtle text.
 
         Args:
@@ -2259,23 +2264,17 @@ STORAGE: StorageBackend = get_storage_backend()
 import hashlib
 import ipaddress
 import logging
-import os
-import shutil
 import socket
 import tarfile
 import threading
 import time
 import unicodedata
 import zipfile
-from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
-from typing import Dict, List, Optional, Set
 from urllib.parse import ParseResult, urlparse, urlunparse
 
 import pooch
 import psutil
 import requests
-
 
 
 def _log_download_memory(logger: logging.Logger, event: str) -> None:
@@ -3394,30 +3393,22 @@ def download_stream(
         etag=downloader.response_etag,
         last_modified=downloader.response_last_modified,
     )
+
+
 # --- Validation utilities ---
 import argparse
 import contextlib
-import hashlib
 import heapq
-import json
 import logging
-import os
 import platform
 import re
-import shutil
 import subprocess
-import sys
 import tempfile
-import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from itertools import islice
-from pathlib import Path
-from typing import Any, BinaryIO, Dict, Iterable, Iterator, List, MutableMapping, Optional
-
-import psutil
-
+from typing import BinaryIO, Iterator
 
 rdflib = get_rdflib()
 pronto = get_pronto()
@@ -4455,27 +4446,12 @@ def main() -> None:
 if __name__ == "__main__":  # pragma: no cover - exercised via subprocess dispatch
     main()
 # --- Download pipeline ---
-import hashlib
-import json
-import logging
-from copy import deepcopy
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Protocol, Sequence, Tuple
-from urllib.parse import urlparse
 
 from DocsToKG.OntologyDownload import resolvers as _ontology_resolvers
+
 RESOLVERS = _ontology_resolvers.RESOLVERS
 FetchPlan = _ontology_resolvers.FetchPlan
 normalize_license_to_spdx = _ontology_resolvers.normalize_license_to_spdx
-
-import requests
-from jsonschema import Draft202012Validator
-from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
-
 
 ONTOLOGY_DIR = LOCAL_ONTOLOGY_DIR
 

@@ -55,7 +55,6 @@ from .operations import (
 )
 from .ranking import ReciprocalRankFusion, apply_mmr_diversification
 from .service import HybridSearchAPI, HybridSearchService
-from .vectorstore import FaissIndexManager
 from .storage import OpenSearchIndexTemplate, OpenSearchSchemaManager
 from .types import (
     ChunkPayload,
@@ -66,6 +65,7 @@ from .types import (
     vector_uuid_to_faiss_int,
 )
 from .validation import HybridSearchValidator
+from .vectorstore import FaissIndexManager
 
 __all__ = [
     "ChunkIngestionPipeline",

@@ -9,10 +9,10 @@ from typing import Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 
-from .vectorstore import FaissIndexManager
 from .observability import Observability
 from .storage import ChunkRegistry, OpenSearchSimulator
 from .types import ChunkFeatures, ChunkPayload, DocumentInput
+from .vectorstore import FaissIndexManager
 
 
 class IngestError(RuntimeError):

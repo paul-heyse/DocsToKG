@@ -24,9 +24,27 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 
 class ReciprocalRankFusion:
-    """Combine ranked lists using Reciprocal Rank Fusion."""
+    """Combine ranked lists using Reciprocal Rank Fusion.
+
+    Attributes:
+        _k0: Smoothing constant used in the reciprocal rank formula.
+
+    Examples:
+        >>> fusion = ReciprocalRankFusion(k0=60.0)
+        >>> scores = fusion.fuse([])
+        >>> scores
+        {}
+    """
 
     def __init__(self, k0: float = 60.0) -> None:
+        """Create a new fusion helper.
+
+        Args:
+            k0: Smoothing constant added to ranks before inversion.
+
+        Raises:
+            ValueError: If ``k0`` is not strictly positive.
+        """
         if k0 <= 0:
             raise ValueError("k0 must be positive")
         self._k0 = k0

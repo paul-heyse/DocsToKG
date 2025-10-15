@@ -5,14 +5,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
-from .vectorstore import (
-    FaissIndexManager,
-    restore_state as vectorstore_restore_state,
-    serialize_state as vectorstore_serialize_state,
-)
 from .service import HybridSearchService
 from .storage import ChunkRegistry, OpenSearchSimulator
 from .types import HybridSearchRequest
+from .vectorstore import (
+    FaissIndexManager,
+)
+from .vectorstore import (
+    restore_state as vectorstore_restore_state,
+)
+from .vectorstore import (
+    serialize_state as vectorstore_serialize_state,
+)
 
 
 @dataclass(slots=True)

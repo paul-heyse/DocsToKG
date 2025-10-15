@@ -40,21 +40,22 @@ from DocsToKG.HybridSearch.types import (
     ChunkPayload,
     vector_uuid_to_faiss_int,
 )
+from DocsToKG.HybridSearch.validation import infer_embedding_dim, load_dataset
 from DocsToKG.HybridSearch.vectorstore import (
     FaissIndexManager,
     cosine_against_corpus_gpu,
 )
-from DocsToKG.HybridSearch.validation import infer_embedding_dim, load_dataset
 
 faiss = pytest.importorskip("faiss")
 if not hasattr(faiss, "get_num_gpus") or faiss.get_num_gpus() < 1:
-    pytest.skip("Hybrid search integration suite requires CUDA-enabled faiss", allow_module_level=True)
+    pytest.skip(
+        "Hybrid search integration suite requires CUDA-enabled faiss", allow_module_level=True
+    )
 
 REAL_VECTOR_MARK = pytest.mark.real_vectors
 
-GPU_MARK = pytest.mark.skipif(
-    faiss.get_num_gpus() < 1, reason="FAISS GPU device required"
-)
+GPU_MARK = pytest.mark.skipif(faiss.get_num_gpus() < 1, reason="FAISS GPU device required")
+
 
 # ---- test_hybrid_search.py -----------------------------
 def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
@@ -72,10 +73,12 @@ def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
     path.write_text(json.dumps(config_payload), encoding="utf-8")
     return HybridSearchConfigManager(path)
 
+
 # ---- test_hybrid_search.py -----------------------------
 @pytest.fixture
 def dataset() -> Sequence[Mapping[str, object]]:
     return load_dataset(Path("tests/data/hybrid_dataset.jsonl"))
+
 
 # ---- test_hybrid_search.py -----------------------------
 @pytest.fixture
@@ -131,6 +134,7 @@ def stack(
 
     return factory
 
+
 # ---- test_hybrid_search.py -----------------------------
 def _to_documents(entries: Sequence[Mapping[str, object]]) -> List[DocumentInput]:
     documents: List[DocumentInput] = []
@@ -146,6 +150,7 @@ def _to_documents(entries: Sequence[Mapping[str, object]]) -> List[DocumentInput
             )
         )
     return documents
+
 
 # ---- test_hybrid_search.py -----------------------------
 def _write_document_artifacts(
@@ -213,6 +218,7 @@ def _write_document_artifacts(
         metadata=dict(metadata),
     )
 
+
 # ---- test_hybrid_search.py -----------------------------
 def test_hybrid_retrieval_end_to_end(
     stack: Callable[
@@ -244,6 +250,7 @@ def test_hybrid_retrieval_end_to_end(
     assert response.results[0].doc_id == "doc-1"
     assert response.results[0].diagnostics.dense_score is not None
     assert response.timings_ms["total_ms"] > 0.0
+
 
 # ---- test_hybrid_search.py -----------------------------
 def test_reingest_updates_dense_and_sparse_channels(
@@ -292,6 +299,7 @@ def test_reingest_updates_dense_and_sparse_channels(
     assert second.results and "Updated" in second.results[0].text
     assert ingestion.metrics.chunks_upserted >= 2
 
+
 # ---- test_hybrid_search.py -----------------------------
 def test_validation_harness_reports(
     stack: Callable[
@@ -320,6 +328,7 @@ def test_validation_harness_reports(
     summary_file = report_dirs[0] / "summary.json"
     assert summary_file.exists()
 
+
 # ---- test_hybrid_search.py -----------------------------
 def test_schema_manager_bootstrap_and_registration() -> None:
     manager = OpenSearchSchemaManager()
@@ -332,6 +341,7 @@ def test_schema_manager_bootstrap_and_registration() -> None:
     assert stored is template
     metadata_props = template.body["mappings"]["properties"]["metadata"]["properties"]
     assert "author" in metadata_props and metadata_props["tags"]["type"] == "keyword"
+
 
 # ---- test_hybrid_search.py -----------------------------
 def test_api_post_hybrid_search_success_and_validation(
@@ -368,6 +378,7 @@ def test_api_post_hybrid_search_success_and_validation(
     assert error_status == HTTPStatus.BAD_REQUEST
     assert "error" in error_body
 
+
 # ---- test_hybrid_search.py -----------------------------
 def test_operations_snapshot_and_restore_roundtrip(
     stack: Callable[
@@ -400,6 +411,7 @@ def test_operations_snapshot_and_restore_roundtrip(
     assert should_rebuild_index(
         registry, deleted_since_snapshot=max(1, registry.count() // 2), threshold=0.25
     )
+
 
 # ---- test_hybrid_search.py -----------------------------
 def test_ingest_missing_vector_raises(
@@ -439,6 +451,7 @@ def test_ingest_missing_vector_raises(
     with pytest.raises(IngestError):
         ingestion.upsert_documents([doc])
 
+
 # ---- test_hybrid_search.py -----------------------------
 def test_faiss_index_uses_registry_bridge(tmp_path: Path) -> None:
     config = DenseIndexConfig(index_type="flat")
@@ -468,8 +481,10 @@ def test_faiss_index_uses_registry_bridge(tmp_path: Path) -> None:
     hits = manager.search(embedding, 1)
     assert hits and hits[0].vector_id == chunk.vector_id
 
+
 # ---- test_hybrid_search_real_vectors.py -----------------------------
 DATASET_PATH = Path("Data/HybridScaleFixture/dataset.jsonl")
+
 
 # ---- test_hybrid_search_real_vectors.py -----------------------------
 def _build_config(tmp_path: Path, *, oversample: int = 3) -> HybridSearchConfigManager:
@@ -487,6 +502,7 @@ def _build_config(tmp_path: Path, *, oversample: int = 3) -> HybridSearchConfigM
     config_path.write_text(json.dumps(config_payload), encoding="utf-8")
     return HybridSearchConfigManager(config_path)
 
+
 # ---- test_hybrid_search_real_vectors.py -----------------------------
 @REAL_VECTOR_MARK
 @pytest.fixture(scope="session")
@@ -494,6 +510,7 @@ def real_dataset() -> Sequence[Mapping[str, object]]:
     if not DATASET_PATH.exists():
         pytest.skip("Real vector dataset not generated")
     return load_dataset(DATASET_PATH)
+
 
 # ---- test_hybrid_search_real_vectors.py -----------------------------
 def _to_documents(entries: Sequence[Mapping[str, object]]) -> List[DocumentInput]:
@@ -511,10 +528,11 @@ def _to_documents(entries: Sequence[Mapping[str, object]]) -> List[DocumentInput
         )
     return documents
 
+
 # ---- test_hybrid_search_real_vectors.py -----------------------------
 @REAL_VECTOR_MARK
 @pytest.fixture
-def stack(tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]) -> Callable[
+def stack(tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]) -> Callable[  # noqa: F811
     [],
     tuple[
         ChunkIngestionPipeline,
@@ -565,6 +583,7 @@ def stack(tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]) -> Calla
 
     return factory
 
+
 # ---- test_hybrid_search_real_vectors.py -----------------------------
 @REAL_VECTOR_MARK
 def test_real_fixture_ingest_and_search(
@@ -601,6 +620,7 @@ def test_real_fixture_ingest_and_search(
             top_ids = [result.doc_id for result in response.results[:10]]
             assert query["expected_doc_id"] in top_ids
             assert response.results[0].diagnostics is not None
+
 
 # ---- test_hybrid_search_real_vectors.py -----------------------------
 @REAL_VECTOR_MARK
@@ -684,6 +704,7 @@ def test_real_fixture_reingest_and_reports(
 
     assert not should_rebuild_index(registry, deleted_since_snapshot=0, threshold=0.5)
 
+
 # ---- test_hybrid_search_real_vectors.py -----------------------------
 @REAL_VECTOR_MARK
 def test_real_fixture_api_roundtrip(
@@ -717,6 +738,7 @@ def test_real_fixture_api_roundtrip(
     assert body["results"], "Expected API to return results"
     assert body["results"][0]["doc_id"] == query["expected_doc_id"]
 
+
 # ---- test_hybrid_search_real_vectors.py -----------------------------
 def test_remove_ids_cpu_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     manager = FaissIndexManager(dim=8, config=DenseIndexConfig())
@@ -742,8 +764,10 @@ def test_remove_ids_cpu_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     assert rebuilds["count"] == 1
     assert manager.ntotal == 0
 
+
 # ---- test_hybrid_search_scale.py -----------------------------
 DATASET_PATH = Path("Data/HybridScaleFixture/dataset.jsonl")
+
 
 # ---- test_hybrid_search_scale.py -----------------------------
 @pytest.fixture(scope="session")
@@ -751,6 +775,7 @@ def scale_dataset() -> Sequence[Mapping[str, object]]:
     if not DATASET_PATH.exists():
         pytest.skip("Large-scale real vector fixture not generated")
     return load_dataset(DATASET_PATH)
+
 
 # ---- test_hybrid_search_scale.py -----------------------------
 def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
@@ -767,6 +792,7 @@ def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
     config_path = tmp_path / "scale_hybrid_config.json"
     config_path.write_text(json.dumps(config_payload), encoding="utf-8")
     return HybridSearchConfigManager(config_path)
+
 
 # ---- test_hybrid_search_scale.py -----------------------------
 @pytest.fixture
@@ -821,6 +847,7 @@ def scale_stack(tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]) -
 
     return factory
 
+
 # ---- test_hybrid_search_scale.py -----------------------------
 @pytest.mark.real_vectors
 @pytest.mark.scale_vectors
@@ -874,11 +901,13 @@ def test_hybrid_scale_suite(
     metrics_payload = json.loads(metrics_file.read_text(encoding="utf-8"))
     assert "scale_dense_metrics" in metrics_payload
 
+
 # ---- test_hybridsearch_gpu_only.py -----------------------------
 try:
     import faiss  # type: ignore
 except ImportError:  # pragma: no cover - optional dependency
     pytest.skip("faiss is required for these tests", allow_module_level=True)
+
 
 # ---- test_hybridsearch_gpu_only.py -----------------------------
 def _toy_data(n: int = 2048, d: int = 128) -> tuple[np.ndarray, np.ndarray]:
@@ -887,20 +916,24 @@ def _toy_data(n: int = 2048, d: int = 128) -> tuple[np.ndarray, np.ndarray]:
     xq = rng.standard_normal((64, d), dtype=np.float32)
     return xb, xq
 
+
 # ---- test_hybridsearch_gpu_only.py -----------------------------
 def _target_device() -> int:
     return int(os.getenv("HYBRIDSEARCH_FAISS_DEVICE", "0"))
+
 
 # ---- test_hybridsearch_gpu_only.py -----------------------------
 def _make_id_resolver(vector_ids: list[str]) -> Callable[[int], str | None]:
     bridge = {vector_uuid_to_faiss_int(vid): vid for vid in vector_ids}
     return bridge.get
 
+
 # ---- test_hybridsearch_gpu_only.py -----------------------------
 def _emit_vectors(xb: np.ndarray) -> tuple[list[np.ndarray], list[str]]:
     vectors = [row.copy() for row in xb]
     vector_ids = [str(uuid.uuid4()) for _ in vectors]
     return vectors, vector_ids
+
 
 # ---- test_hybridsearch_gpu_only.py -----------------------------
 def _assert_gpu_index(manager: FaissIndexManager) -> None:
@@ -920,6 +953,7 @@ def _assert_gpu_index(manager: FaissIndexManager) -> None:
     assert stats.get("gpu_base") is True
     assert float(stats.get("gpu_remove_fallbacks", 0.0)) == 0.0
 
+
 # ---- test_hybridsearch_gpu_only.py -----------------------------
 @GPU_MARK
 def test_gpu_flat_end_to_end() -> None:
@@ -933,6 +967,7 @@ def test_gpu_flat_end_to_end() -> None:
     assert len(results) == 5
     _assert_gpu_index(manager)
 
+
 # ---- test_hybridsearch_gpu_only.py -----------------------------
 @GPU_MARK
 def test_gpu_ivf_flat_build_and_search() -> None:
@@ -945,6 +980,7 @@ def test_gpu_ivf_flat_build_and_search() -> None:
     results = manager.search(xq[0], top_k=5)
     assert len(results) == 5
     _assert_gpu_index(manager)
+
 
 # ---- test_hybridsearch_gpu_only.py -----------------------------
 @GPU_MARK
@@ -966,6 +1002,7 @@ def test_gpu_ivfpq_build_and_search() -> None:
     assert len(results) == 5
     _assert_gpu_index(manager)
 
+
 # ---- test_hybridsearch_gpu_only.py -----------------------------
 @GPU_MARK
 def test_gpu_cosine_against_corpus() -> None:
@@ -984,6 +1021,7 @@ def test_gpu_cosine_against_corpus() -> None:
     )
     assert 0.98 <= self_sim <= 1.001
 
+
 # ---- test_hybridsearch_gpu_only.py -----------------------------
 def test_gpu_clone_strict_coarse_quantizer() -> None:
     cfg = DenseIndexConfig(index_type="flat", device=_target_device())
@@ -995,6 +1033,7 @@ def test_gpu_clone_strict_coarse_quantizer() -> None:
     if hasattr(faiss, "downcast_index"):
         base = faiss.downcast_index(base)
     assert "Gpu" in type(base).__name__, "Expected GPU index after strict cloning"
+
 
 # ---- test_hybridsearch_gpu_only.py -----------------------------
 def test_gpu_near_duplicate_detection_filters_duplicates() -> None:
@@ -1038,6 +1077,7 @@ def test_gpu_near_duplicate_detection_filters_duplicates() -> None:
     results = shaper.shape([chunk_a, chunk_b], fused_scores, request, channel_scores)
     assert len(results) == 1, "GPU near-duplicate detection should filter duplicates"
 
+
 # ---- test_hybridsearch_gpu_only.py -----------------------------
 def test_gpu_nprobe_applied_during_search() -> None:
     xb, xq = _toy_data(n=512, d=64)
@@ -1052,6 +1092,7 @@ def test_gpu_nprobe_applied_during_search() -> None:
         base = faiss.downcast_index(base)
     assert hasattr(base, "nprobe")
     assert int(base.nprobe) == cfg.nprobe
+
 
 # ---- test_hybridsearch_gpu_only.py -----------------------------
 def test_gpu_similarity_uses_supplied_device(monkeypatch: pytest.MonkeyPatch) -> None:

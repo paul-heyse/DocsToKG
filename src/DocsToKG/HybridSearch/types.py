@@ -18,6 +18,7 @@ Key Features:
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -25,7 +26,6 @@ from typing import Any, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
-import uuid
 
 _MASK_63_BITS = (1 << 63) - 1
 

@@ -13,10 +13,11 @@ from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 from unittest.mock import Mock, patch
 
+import pytest
+
 import DocsToKG.ContentDownload.resolvers as pipeline_module
 import DocsToKG.ContentDownload.resolvers as providers_module
 import DocsToKG.ContentDownload.resolvers as resolvers
-import pytest
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
 from DocsToKG.ContentDownload.download_pyalex_pdfs import (
     WorkArtifact,
@@ -58,12 +59,14 @@ except ModuleNotFoundError:  # pragma: no cover
 # ---- test_resolver_caching.py -----------------------------
 pytest.importorskip("requests")
 
+
 # ---- test_resolver_caching.py -----------------------------
 @pytest.fixture(autouse=True)
 def clear_cache_between_tests():
     clear_resolver_caches()
     yield
     clear_resolver_caches()
+
 
 # ---- test_resolver_caching.py -----------------------------
 def test_resolver_caches_prevent_duplicate_requests(monkeypatch):
@@ -128,11 +131,13 @@ def test_resolver_caches_prevent_duplicate_requests(monkeypatch):
     list(unpaywall.iter_urls(session, config, artifact))
     assert len(calls) == 4
 
+
 # ---- test_resolver_config.py -----------------------------
 pytest.importorskip("requests")
 
 # ---- test_resolver_config.py -----------------------------
 pytest.importorskip("pyalex")
+
 
 # ---- test_resolver_config.py -----------------------------
 def test_deprecated_resolver_rate_limits_warning(
@@ -160,6 +165,7 @@ def test_deprecated_resolver_rate_limits_warning(
     config = load_resolver_config(args, ["unpaywall"], None)
     assert config.resolver_min_interval_s["unpaywall"] == 2.0
     assert any("resolver_rate_limits deprecated" in record.message for record in caplog.records)
+
 
 # ---- test_resolver_config.py -----------------------------
 def test_user_agent_includes_mailto(tmp_path: Path) -> None:
@@ -189,8 +195,10 @@ def test_user_agent_includes_mailto(tmp_path: Path) -> None:
     assert config.polite_headers.get("mailto") == "ua-tester@example.org"
     assert config.resolver_toggles["openaire"] is True
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 pytest.importorskip("pyalex")
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 class DummySession:
@@ -207,6 +215,7 @@ class DummySession:
             raise AssertionError(f"Unexpected URL {url}") from exc
         return response
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 class DummyResponse:
     def __init__(self, status_code=200, json_data=None, text="", headers=None):
@@ -220,6 +229,7 @@ class DummyResponse:
             raise self._json_data
         return self._json_data
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 class ListLogger:
     def __init__(self):
@@ -227,6 +237,7 @@ class ListLogger:
 
     def log(self, record: AttemptRecord) -> None:
         self.records.append(record)
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 class StubResolver:
@@ -243,6 +254,7 @@ class StubResolver:
                 yield url
             else:
                 yield ResolverResult(url=url)
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def build_artifact(tmp_path: Path) -> WorkArtifact:
@@ -263,12 +275,14 @@ def build_artifact(tmp_path: Path) -> WorkArtifact:
         html_dir=tmp_path / "html",
     )
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 def test_classify_payload_detects_pdf_and_html():
     html = b"<html><body>Hello</body></html>"
     pdf = b"%PDF-sample"
     assert classify_payload(html, "text/html", "https://example.com") == "html"
     assert classify_payload(pdf, "application/pdf", "https://example.com/doc.pdf") == "pdf"
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_stops_on_first_success(tmp_path):
@@ -305,6 +319,7 @@ def test_pipeline_stops_on_first_success(tmp_path):
     assert result.resolver_name == "resolver_b"
     assert metrics.successes["resolver_b"] == 1
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_records_resolver_exception(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -336,6 +351,7 @@ def test_pipeline_records_resolver_exception(tmp_path):
     assert any(record.reason == "resolver-exception" for record in logger.records)
     assert metrics.failures["exploder"] == 1
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 def test_unpaywall_resolver_extracts_candidates(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -358,6 +374,7 @@ def test_unpaywall_resolver_extracts_candidates(tmp_path):
         "https://example.com/extra.pdf",
     ]
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 def test_landing_page_resolver_meta_parsing(tmp_path, monkeypatch):
     pytest.importorskip("bs4")
@@ -370,6 +387,7 @@ def test_landing_page_resolver_meta_parsing(tmp_path, monkeypatch):
     config = ResolverConfig()
     results = list(resolver.iter_urls(session, config, artifact))
     assert results[0].url == "https://example.com/files/paper.pdf"
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_head_precheck_allows_redirect(monkeypatch, tmp_path):
@@ -420,6 +438,7 @@ def test_head_precheck_allows_redirect(monkeypatch, tmp_path):
     )
 
     assert not pipeline._head_precheck_url(object(), "https://example.org/file.pdf", timeout=5.0)
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_cli_integration_happy_path(monkeypatch, tmp_path):
@@ -506,7 +525,7 @@ def test_cli_integration_happy_path(monkeypatch, tmp_path):
         "default_resolvers",
         lambda: [FakeResolver("openalex"), FakeResolver("unpaywall")],
     )
-    monkeypatch.setattr(module.requests, "Session", FakeSession)
+    monkeypatch.setattr(module._requests, "Session", FakeSession)
 
     log_csv = tmp_path / "attempts.csv"
     pdf_dir = tmp_path / "pdfs"
@@ -538,6 +557,7 @@ def test_cli_integration_happy_path(monkeypatch, tmp_path):
     rows = [row for row in log_csv.read_text().strip().splitlines() if row]
     assert len(rows) >= 2  # header + attempts
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 class DummyHeadResponse:
     def __init__(self, status_code: int = 200, headers: Optional[Dict[str, str]] = None):
@@ -546,6 +566,7 @@ class DummyHeadResponse:
 
     def close(self) -> None:
         return None
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_head_precheck_skips_html(monkeypatch, tmp_path):
@@ -576,6 +597,7 @@ def test_head_precheck_skips_html(monkeypatch, tmp_path):
     assert result.success is False
     assert any(record.reason == "head-precheck-failed" for record in logger.records)
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 def test_head_precheck_skips_zero_length(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
@@ -603,6 +625,7 @@ def test_head_precheck_skips_zero_length(monkeypatch, tmp_path):
     assert result.success is False
     assert any(record.reason == "head-precheck-failed" for record in logger.records)
     assert download_calls == []
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_head_precheck_skips_error_status(monkeypatch, tmp_path):
@@ -632,6 +655,7 @@ def test_head_precheck_skips_error_status(monkeypatch, tmp_path):
     assert any(record.reason == "head-precheck-failed" for record in logger.records)
     assert download_calls == []
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 def test_head_precheck_allows_pdf(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
@@ -658,6 +682,7 @@ def test_head_precheck_allows_pdf(monkeypatch, tmp_path):
 
     assert result.success is True
     assert download_calls == ["https://example.org/pdf"]
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_head_precheck_allows_redirect_to_pdf(monkeypatch, tmp_path):
@@ -689,6 +714,7 @@ def test_head_precheck_allows_redirect_to_pdf(monkeypatch, tmp_path):
     assert result.success is True
     assert download_calls == ["https://example.org/pdf"]
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 def test_head_precheck_failure_allows_download(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
@@ -715,6 +741,7 @@ def test_head_precheck_failure_allows_download(monkeypatch, tmp_path):
 
     assert result.success is True
     assert download_calls == ["https://example.org/pdf"]
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_head_precheck_respects_global_disable(monkeypatch, tmp_path):
@@ -748,6 +775,7 @@ def test_head_precheck_respects_global_disable(monkeypatch, tmp_path):
 
     assert head_calls == []
     assert download_calls == ["https://example.org/pdf"]
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_head_precheck_resolver_override(monkeypatch, tmp_path):
@@ -788,6 +816,7 @@ def test_head_precheck_resolver_override(monkeypatch, tmp_path):
 
     assert head_calls == ["https://example.org/enforce.pdf"]
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 def test_callable_accepts_argument_handles_noncallable():
     from DocsToKG.ContentDownload.resolvers import _callable_accepts_argument
@@ -795,6 +824,7 @@ def test_callable_accepts_argument_handles_noncallable():
     sentinel = object()
     # Non-callable should trigger TypeError path and default to True
     assert _callable_accepts_argument(sentinel, "context") is True
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_logs_missing_resolver(tmp_path):
@@ -810,6 +840,7 @@ def test_pipeline_logs_missing_resolver(tmp_path):
     assert result.success is False
     assert logger.records[0].reason == "resolver-missing"
     assert metrics.skips["ghost:missing"] == 1
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_skips_disabled_resolver(tmp_path):
@@ -832,6 +863,7 @@ def test_pipeline_skips_disabled_resolver(tmp_path):
     assert logger.records[0].reason == "resolver-disabled"
     assert metrics.skips["disabled:disabled"] == 1
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_skips_not_applicable_resolver(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -853,6 +885,7 @@ def test_pipeline_skips_not_applicable_resolver(tmp_path):
 
     assert logger.records[0].reason == "resolver-not-applicable"
     assert metrics.skips["inapplicable:not-applicable"] == 1
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_collect_resolver_results_handles_exception(tmp_path):
@@ -879,6 +912,7 @@ def test_collect_resolver_results_handles_exception(tmp_path):
     assert results[0].event_reason == "resolver-exception"
     assert metrics.failures["boom"] == 1
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_records_event_and_skip_reason(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -893,6 +927,7 @@ def test_pipeline_records_event_and_skip_reason(tmp_path):
 
     assert logger.records[0].status == "info"
     assert metrics.skips["stub:rate-limit"] == 1
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_skips_duplicate_urls(tmp_path):
@@ -912,6 +947,7 @@ def test_pipeline_skips_duplicate_urls(tmp_path):
     reasons = [record.reason for record in logger.records if record.reason == "duplicate-url"]
     assert reasons and metrics.skips["dup:duplicate-url"] == 1
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_head_precheck_failure_skips_attempt(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
@@ -930,6 +966,7 @@ def test_pipeline_head_precheck_failure_skips_attempt(monkeypatch, tmp_path):
     assert logger.records[0].reason == "head-precheck-failed"
     assert metrics.skips["stub:head-precheck-failed"] == 1
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_event_without_reason(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -944,6 +981,7 @@ def test_pipeline_event_without_reason(tmp_path):
 
     assert logger.records[0].status == "info"
     assert metrics.skips == {}
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_downloads_with_context_argument(tmp_path):
@@ -964,6 +1002,7 @@ def test_pipeline_downloads_with_context_argument(tmp_path):
     assert context_received["value"] == {"dry_run": False}
     assert logger.records[-1].status == "http_error"
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_respects_max_attempts(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -981,16 +1020,18 @@ def test_pipeline_respects_max_attempts(tmp_path):
     assert result.success is False
     assert result.reason == "max-attempts-reached"
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_jitter_sleep_no_delay():
     config = ResolverConfig()
     config.sleep_jitter = 0.0
     pipeline = ResolverPipeline([], config, lambda *a, **k: None, ListLogger(), ResolverMetrics())
 
-    with patch("DocsToKG.ContentDownload.resolvers.time.sleep") as mock_sleep:
+    with patch("DocsToKG.ContentDownload.resolvers._time.sleep") as mock_sleep:
         pipeline._jitter_sleep()
 
     mock_sleep.assert_not_called()
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_concurrent_skips_missing_resolver(tmp_path):
@@ -1012,6 +1053,7 @@ def test_pipeline_concurrent_skips_missing_resolver(tmp_path):
 
     assert result.success is True
     assert any(record.reason == "resolver-missing" for record in logger.records)
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_ignores_empty_url(tmp_path):
@@ -1036,6 +1078,7 @@ def test_pipeline_ignores_empty_url(tmp_path):
     result = pipeline.run(DummySession({}), artifact)
 
     assert result.success is False
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_concurrent_execution(tmp_path):
@@ -1065,6 +1108,7 @@ def test_pipeline_concurrent_execution(tmp_path):
 
     assert result.success is True
     assert result.resolver_name in {"a", "b"}
+
 
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_global_deduplication_skips_repeat_urls(tmp_path):
@@ -1114,6 +1158,7 @@ def test_pipeline_global_deduplication_skips_repeat_urls(tmp_path):
     assert any(record.reason == "duplicate-url-global" for record in logger.records)
     assert metrics.skips["static:duplicate-url-global"] == 1
 
+
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_domain_rate_limiting_enforces_interval(monkeypatch, tmp_path):
     class FakeClock:
@@ -1129,8 +1174,8 @@ def test_pipeline_domain_rate_limiting_enforces_interval(monkeypatch, tmp_path):
             self.now += duration
 
     fake = FakeClock()
-    monkeypatch.setattr(pipeline_module.time, "monotonic", fake.monotonic)
-    monkeypatch.setattr(pipeline_module.time, "sleep", fake.sleep)
+    monkeypatch.setattr(pipeline_module._time, "monotonic", fake.monotonic)
+    monkeypatch.setattr(pipeline_module._time, "sleep", fake.sleep)
 
     artifact = replace(
         build_artifact(tmp_path),
@@ -1200,6 +1245,7 @@ def test_pipeline_domain_rate_limiting_enforces_interval(monkeypatch, tmp_path):
     assert fake.sleeps[0] == pytest.approx(0.4, rel=0.05)
     assert len(fake.sleeps) == 1
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 try:  # pragma: no cover - requests is an optional dependency in the test env
     import requests  # type: ignore
@@ -1208,6 +1254,7 @@ except ModuleNotFoundError:  # pragma: no cover
 
 # ---- test_resolver_providers_additional.py -----------------------------
 pytest.importorskip("bs4")
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 class _StubResponse:
@@ -1231,6 +1278,7 @@ class _StubResponse:
     def close(self) -> None:
         return None
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def _artifact(tmp_path: Any, **overrides: Any) -> WorkArtifact:
     base_kwargs: Dict[str, Any] = dict(
@@ -1252,6 +1300,7 @@ def _artifact(tmp_path: Any, **overrides: Any) -> WorkArtifact:
     base_kwargs.update(overrides)
     return WorkArtifact(**base_kwargs)
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_arxiv_resolver_skips_missing_identifier(tmp_path) -> None:
     resolver = ArxivResolver()
@@ -1261,6 +1310,7 @@ def test_arxiv_resolver_skips_missing_identifier(tmp_path) -> None:
     results = list(resolver.iter_urls(Mock(), config, artifact))
 
     assert results[0].event_reason == "no-arxiv-id"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_arxiv_resolver_strips_prefix(tmp_path) -> None:
@@ -1272,6 +1322,7 @@ def test_arxiv_resolver_strips_prefix(tmp_path) -> None:
 
     assert result.url.endswith("/2301.12345.pdf")
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_openalex_resolver_skip(tmp_path) -> None:
     resolver = OpenAlexResolver()
@@ -1281,6 +1332,7 @@ def test_openalex_resolver_skip(tmp_path) -> None:
     result = next(resolver.iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "no-openalex-urls"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_openalex_resolver_dedupes(tmp_path) -> None:
@@ -1295,6 +1347,7 @@ def test_openalex_resolver_dedupes(tmp_path) -> None:
     urls = [result.url for result in resolver.iter_urls(Mock(), config, artifact)]
 
     assert urls == ["https://openalex.example/a.pdf", "https://openalex.example/oa.pdf"]
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_landing_page_resolver_meta_pattern(monkeypatch, tmp_path) -> None:
@@ -1316,6 +1369,7 @@ def test_landing_page_resolver_meta_pattern(monkeypatch, tmp_path) -> None:
 
     assert result.metadata["pattern"] == "meta"
     assert result.url.endswith("/files/paper.pdf")
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_landing_page_resolver_link_pattern(monkeypatch, tmp_path) -> None:
@@ -1339,6 +1393,7 @@ def test_landing_page_resolver_link_pattern(monkeypatch, tmp_path) -> None:
 
     assert result.metadata["pattern"] == "link"
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_landing_page_resolver_anchor_pattern(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -1361,6 +1416,7 @@ def test_landing_page_resolver_anchor_pattern(monkeypatch, tmp_path) -> None:
 
     assert result.metadata["pattern"] == "anchor"
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_landing_page_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -1376,6 +1432,7 @@ def test_landing_page_resolver_http_error(monkeypatch, tmp_path) -> None:
     result = next(LandingPageResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "http-error"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 @pytest.mark.parametrize(
@@ -1401,6 +1458,7 @@ def test_landing_page_resolver_request_errors(monkeypatch, tmp_path, exception, 
 
     assert result.event_reason == reason
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_core_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -1417,6 +1475,7 @@ def test_core_resolver_http_error(monkeypatch, tmp_path) -> None:
     assert results[0].event_reason == "http-error"
     assert results[0].http_status == 503
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_core_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -1431,6 +1490,7 @@ def test_core_resolver_json_error(monkeypatch, tmp_path) -> None:
     results = list(CoreResolver().iter_urls(Mock(), config, artifact))
 
     assert results[0].event_reason == "json-error"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_core_resolver_emits_results(monkeypatch, tmp_path) -> None:
@@ -1460,6 +1520,7 @@ def test_core_resolver_emits_results(monkeypatch, tmp_path) -> None:
     assert urls[0] == "https://core.example/primary.pdf"
     assert "https://core.example/alternate.pdf" in urls
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 @pytest.mark.parametrize(
     "exception,reason",
@@ -1483,6 +1544,7 @@ def test_core_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> 
 
     assert result.event_reason == reason
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_core_resolver_skips_when_no_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
@@ -1493,6 +1555,7 @@ def test_core_resolver_skips_when_no_doi(tmp_path) -> None:
 
     assert result.event_reason == "no-doi"
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_core_resolver_is_enabled_requires_key(tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -1500,6 +1563,7 @@ def test_core_resolver_is_enabled_requires_key(tmp_path) -> None:
     config.core_api_key = None
 
     assert CoreResolver().is_enabled(config, artifact) is False
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_core_resolver_ignores_non_dict_hits(monkeypatch, tmp_path) -> None:
@@ -1517,6 +1581,7 @@ def test_core_resolver_ignores_non_dict_hits(monkeypatch, tmp_path) -> None:
     urls = list(CoreResolver().iter_urls(Mock(), config, artifact))
 
     assert urls == []
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_crossref_resolver_cached_http_error(monkeypatch, tmp_path) -> None:
@@ -1538,6 +1603,7 @@ def test_crossref_resolver_cached_http_error(monkeypatch, tmp_path) -> None:
 
     assert results[0].event_reason == "http-error"
     assert results[0].http_status == 429
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_crossref_resolver_cached_success(monkeypatch, tmp_path) -> None:
@@ -1568,6 +1634,7 @@ def test_crossref_resolver_cached_success(monkeypatch, tmp_path) -> None:
     assert "https://publisher.example/paper.pdf" in urls
     assert "https://publisher.example/landing.html" in urls
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_crossref_resolver_link_not_list(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -1587,6 +1654,7 @@ def test_crossref_resolver_link_not_list(monkeypatch, tmp_path) -> None:
 
     assert results == []
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_crossref_resolver_skip_without_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
@@ -1598,6 +1666,7 @@ def test_crossref_resolver_skip_without_doi(tmp_path) -> None:
 
     assert result.event_reason == "no-doi"
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_crossref_resolver_is_enabled(tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -1606,6 +1675,7 @@ def test_crossref_resolver_is_enabled(tmp_path) -> None:
 
     assert resolver.is_enabled(config, artifact) is True
     assert resolver.is_enabled(config, _artifact(tmp_path, doi=None)) is False
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_crossref_resolver_session_success(monkeypatch, tmp_path) -> None:
@@ -1646,6 +1716,7 @@ def test_crossref_resolver_session_success(monkeypatch, tmp_path) -> None:
     assert results[0].metadata["content_type"] == "application/pdf"
     assert len(results) == 1
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_crossref_resolver_cached_request_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -1662,6 +1733,7 @@ def test_crossref_resolver_cached_request_error(monkeypatch, tmp_path) -> None:
     result = next(CrossrefResolver().iter_urls(_Session(), config, artifact))
 
     assert result.event_reason == "request-error"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_fetch_crossref_data_http_error(monkeypatch) -> None:
@@ -1681,6 +1753,7 @@ def test_fetch_crossref_data_http_error(monkeypatch) -> None:
     with pytest.raises(requests.HTTPError):
         _fetch_crossref_data("10.1000/example", "user@example.org", 5.0, ())
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_fetch_crossref_data_success(monkeypatch) -> None:
     _fetch_crossref_data.cache_clear()
@@ -1699,6 +1772,7 @@ def test_fetch_crossref_data_success(monkeypatch) -> None:
     data = _fetch_crossref_data("10.1000/example", None, 5.0, ())
 
     assert data["message"] == "ok"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 @pytest.mark.parametrize(
@@ -1726,6 +1800,7 @@ def test_crossref_resolver_session_errors(monkeypatch, tmp_path, exception, reas
     assert result.event_reason == reason
     mock_request.assert_called_once()
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_crossref_resolver_session_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -1745,6 +1820,7 @@ def test_crossref_resolver_session_http_error(monkeypatch, tmp_path) -> None:
     assert result.event_reason == "http-error"
     mock_request.assert_called_once()
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_crossref_resolver_session_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -1763,6 +1839,7 @@ def test_crossref_resolver_session_json_error(monkeypatch, tmp_path) -> None:
 
     assert result.event_reason == "json-error"
     mock_request.assert_called_once()
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_crossref_resolver_uses_central_retry_logic(monkeypatch, tmp_path) -> None:
@@ -1819,6 +1896,7 @@ def test_crossref_resolver_uses_central_retry_logic(monkeypatch, tmp_path) -> No
     assert sleep_calls[0] == pytest.approx(1.0, abs=0.05)
     assert sleep_calls[1] == pytest.approx(1.5, abs=0.05)
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_doaj_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -1832,6 +1910,7 @@ def test_doaj_resolver_http_error(monkeypatch, tmp_path) -> None:
     result = next(DoajResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "http-error"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_doaj_resolver_emits_candidate(monkeypatch, tmp_path) -> None:
@@ -1861,6 +1940,7 @@ def test_doaj_resolver_emits_candidate(monkeypatch, tmp_path) -> None:
 
     assert urls == ["https://doaj.example/file.pdf"]
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_doaj_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -1874,6 +1954,7 @@ def test_doaj_resolver_json_error(monkeypatch, tmp_path) -> None:
     result = next(DoajResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "json-error"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 @pytest.mark.parametrize(
@@ -1897,6 +1978,7 @@ def test_doaj_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> 
 
     assert result.event_reason == reason
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_doaj_resolver_includes_api_key(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -1919,6 +2001,7 @@ def test_doaj_resolver_includes_api_key(monkeypatch, tmp_path) -> None:
 
     assert captured_headers.get("X-API-KEY") == "secret"
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_doaj_resolver_skip_no_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
@@ -1927,6 +2010,7 @@ def test_doaj_resolver_skip_no_doi(tmp_path) -> None:
     result = next(DoajResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "no-doi"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_europe_pmc_resolver_http_error(monkeypatch, tmp_path) -> None:
@@ -1942,6 +2026,7 @@ def test_europe_pmc_resolver_http_error(monkeypatch, tmp_path) -> None:
 
     assert results == []
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_europe_pmc_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -1955,6 +2040,7 @@ def test_europe_pmc_resolver_json_error(monkeypatch, tmp_path) -> None:
     result = next(EuropePmcResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "json-error"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_europe_pmc_resolver_emits_pdf(monkeypatch, tmp_path) -> None:
@@ -1985,6 +2071,7 @@ def test_europe_pmc_resolver_emits_pdf(monkeypatch, tmp_path) -> None:
 
     assert urls == ["https://epmc.example/file.pdf"]
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 @pytest.mark.parametrize(
     "exception",
@@ -2002,6 +2089,7 @@ def test_europe_pmc_resolver_error_paths(monkeypatch, tmp_path, exception) -> No
     results = list(EuropePmcResolver().iter_urls(Mock(), config, artifact))
 
     assert results[0].event_reason in {"timeout", "connection-error", "request-error"}
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_hal_resolver_emits_urls(monkeypatch, tmp_path) -> None:
@@ -2031,6 +2119,7 @@ def test_hal_resolver_emits_urls(monkeypatch, tmp_path) -> None:
 
     assert urls == ["https://hal.example/main.pdf", "https://hal.example/supp.pdf"]
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_hal_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2044,6 +2133,7 @@ def test_hal_resolver_json_error(monkeypatch, tmp_path) -> None:
     result = next(HalResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "json-error"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 @pytest.mark.parametrize(
@@ -2067,6 +2157,7 @@ def test_hal_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> N
 
     assert result.event_reason == reason
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_hal_resolver_is_enabled(tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2076,6 +2167,7 @@ def test_hal_resolver_is_enabled(tmp_path) -> None:
     assert resolver.is_enabled(config, artifact) is True
     assert resolver.is_enabled(config, _artifact(tmp_path, doi=None)) is False
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_hal_resolver_skip_no_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
@@ -2084,6 +2176,7 @@ def test_hal_resolver_skip_no_doi(tmp_path) -> None:
     result = next(HalResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "no-doi"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_openaire_resolver_emits_pdf(monkeypatch, tmp_path) -> None:
@@ -2116,6 +2209,7 @@ def test_openaire_resolver_emits_pdf(monkeypatch, tmp_path) -> None:
 
     assert urls == ["https://openaire.example/paper.pdf"]
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_openaire_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2129,6 +2223,7 @@ def test_openaire_resolver_json_error(monkeypatch, tmp_path) -> None:
     result = next(OpenAireResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "json-error"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_openaire_resolver_fallback_json_load(monkeypatch, tmp_path) -> None:
@@ -2162,6 +2257,7 @@ def test_openaire_resolver_fallback_json_load(monkeypatch, tmp_path) -> None:
 
     assert urls == ["https://openaire.example/alt.pdf"]
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 @pytest.mark.parametrize(
     "exception,reason",
@@ -2183,6 +2279,7 @@ def test_openaire_resolver_error_paths(monkeypatch, tmp_path, exception, reason)
     result = next(OpenAireResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == reason
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_osf_resolver_emits_urls(monkeypatch, tmp_path) -> None:
@@ -2212,6 +2309,7 @@ def test_osf_resolver_emits_urls(monkeypatch, tmp_path) -> None:
         "https://osf.example/primary.pdf",
     ]
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_osf_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2225,6 +2323,7 @@ def test_osf_resolver_json_error(monkeypatch, tmp_path) -> None:
     result = next(OsfResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "json-error"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 @pytest.mark.parametrize(
@@ -2248,6 +2347,7 @@ def test_osf_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> N
 
     assert result.event_reason == reason
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_osf_resolver_skip_no_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
@@ -2256,6 +2356,7 @@ def test_osf_resolver_skip_no_doi(tmp_path) -> None:
     result = next(OsfResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "no-doi"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_unpaywall_resolver_cached_http_error(monkeypatch, tmp_path) -> None:
@@ -2277,6 +2378,7 @@ def test_unpaywall_resolver_cached_http_error(monkeypatch, tmp_path) -> None:
 
     assert results[0].event_reason == "http-error"
     assert results[0].http_status == 404
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_unpaywall_resolver_cached_success(monkeypatch, tmp_path) -> None:
@@ -2308,6 +2410,7 @@ def test_unpaywall_resolver_cached_success(monkeypatch, tmp_path) -> None:
         "https://unpaywall.example/extra.pdf",
     ]
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 @pytest.mark.parametrize(
     "exception,reason",
@@ -2329,6 +2432,7 @@ def test_unpaywall_resolver_session_errors(monkeypatch, tmp_path, exception, rea
 
     assert result.event_reason == reason
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_unpaywall_resolver_session_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2342,6 +2446,7 @@ def test_unpaywall_resolver_session_json_error(monkeypatch, tmp_path) -> None:
 
     assert result.event_reason == "json-error"
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_unpaywall_resolver_is_enabled(tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2353,6 +2458,7 @@ def test_unpaywall_resolver_is_enabled(tmp_path) -> None:
     assert resolver.is_enabled(config, _artifact(tmp_path, doi=None)) is False
     config.unpaywall_email = None
     assert resolver.is_enabled(config, artifact) is False
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_unpaywall_resolver_session_success(monkeypatch, tmp_path) -> None:
@@ -2373,6 +2479,7 @@ def test_unpaywall_resolver_session_success(monkeypatch, tmp_path) -> None:
     session.get.assert_called_once()
     assert results[0].url == "https://unpaywall.example/best.pdf"
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_semantic_scholar_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2392,6 +2499,7 @@ def test_semantic_scholar_resolver_http_error(monkeypatch, tmp_path) -> None:
 
     assert result.event_reason == "http-error"
     assert result.http_status == 503
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 @pytest.mark.parametrize(
@@ -2418,6 +2526,7 @@ def test_semantic_scholar_resolver_errors(monkeypatch, tmp_path, exception, reas
 
     assert result.event_reason == reason
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_semantic_scholar_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2434,6 +2543,7 @@ def test_semantic_scholar_resolver_json_error(monkeypatch, tmp_path) -> None:
     result = next(SemanticScholarResolver().iter_urls(_Session(), config, artifact))
 
     assert result.event_reason == "json-error"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_semantic_scholar_resolver_no_open_access(monkeypatch, tmp_path) -> None:
@@ -2452,6 +2562,7 @@ def test_semantic_scholar_resolver_no_open_access(monkeypatch, tmp_path) -> None
 
     assert result.event_reason == "no-openaccess-pdf"
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_pmc_resolver_no_identifiers(tmp_path) -> None:
     resolver = PmcResolver()
@@ -2461,6 +2572,7 @@ def test_pmc_resolver_no_identifiers(tmp_path) -> None:
     result = next(resolver.iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "no-pmcid"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_pmc_resolver_timeout_fallback(monkeypatch, tmp_path) -> None:
@@ -2476,6 +2588,7 @@ def test_pmc_resolver_timeout_fallback(monkeypatch, tmp_path) -> None:
 
     assert results[0].event_reason == "timeout"
     assert results[1].metadata["source"] == "pdf-fallback"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 @pytest.mark.parametrize(
@@ -2498,6 +2611,7 @@ def test_pmc_resolver_other_errors(monkeypatch, tmp_path, exception, reason) -> 
 
     assert results[0].event_reason == reason
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_pmc_resolver_success(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path, pmcid="PMC123456")
@@ -2514,6 +2628,7 @@ def test_pmc_resolver_success(monkeypatch, tmp_path) -> None:
 
     assert "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC123456/pdf/123.pdf" in urls
     assert urls[-1] == "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC123456/pdf/"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_pmc_lookup_pmcids_success(monkeypatch, tmp_path) -> None:
@@ -2537,6 +2652,7 @@ def test_pmc_lookup_pmcids_success(monkeypatch, tmp_path) -> None:
 
     assert ids == ["PMC123", "PMC456"]
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_pmc_lookup_pmcids_handles_json_error(monkeypatch, tmp_path) -> None:
     resolver = PmcResolver()
@@ -2550,6 +2666,7 @@ def test_pmc_lookup_pmcids_handles_json_error(monkeypatch, tmp_path) -> None:
     ids = resolver._lookup_pmcids(Mock(), ["10.1000/example"], config)
 
     assert ids == []
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_wayback_resolver_handles_http_error(monkeypatch, tmp_path) -> None:
@@ -2565,6 +2682,7 @@ def test_wayback_resolver_handles_http_error(monkeypatch, tmp_path) -> None:
     result = next(WaybackResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "http-error"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_wayback_resolver_returns_archive(monkeypatch, tmp_path) -> None:
@@ -2592,6 +2710,7 @@ def test_wayback_resolver_returns_archive(monkeypatch, tmp_path) -> None:
     assert results[0].url.startswith("https://web.archive.org/")
     assert results[0].metadata["timestamp"] == "20200101000000"
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_wayback_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2606,6 +2725,7 @@ def test_wayback_resolver_json_error(monkeypatch, tmp_path) -> None:
     result = next(WaybackResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "json-error"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 @pytest.mark.parametrize(
@@ -2630,6 +2750,7 @@ def test_wayback_resolver_error_paths(monkeypatch, tmp_path, exception, reason) 
 
     assert result.event_reason == reason
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_wayback_resolver_no_snapshot(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2647,6 +2768,7 @@ def test_wayback_resolver_no_snapshot(monkeypatch, tmp_path) -> None:
 
     assert results == []
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_zenodo_resolver_no_doi(tmp_path) -> None:
     resolver = ZenodoResolver()
@@ -2656,6 +2778,7 @@ def test_zenodo_resolver_no_doi(tmp_path) -> None:
     result = next(resolver.iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "no-doi"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 @pytest.mark.parametrize(
@@ -2678,6 +2801,7 @@ def test_zenodo_resolver_errors(monkeypatch, tmp_path, exception, reason) -> Non
 
     assert result.event_reason == reason
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_zenodo_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2692,6 +2816,7 @@ def test_zenodo_resolver_http_error(monkeypatch, tmp_path) -> None:
 
     assert result.event_reason == "http-error"
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_zenodo_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2705,6 +2830,7 @@ def test_zenodo_resolver_json_error(monkeypatch, tmp_path) -> None:
     result = next(ZenodoResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "json-error"
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_zenodo_resolver_emits_urls(monkeypatch, tmp_path) -> None:
@@ -2742,6 +2868,7 @@ def test_zenodo_resolver_emits_urls(monkeypatch, tmp_path) -> None:
 
     assert urls == ["https://zenodo.example/paper.pdf"]
 
+
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_zenodo_resolver_is_enabled(tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2750,6 +2877,7 @@ def test_zenodo_resolver_is_enabled(tmp_path) -> None:
 
     assert resolver.is_enabled(config, artifact) is True
     assert resolver.is_enabled(config, _artifact(tmp_path, doi=None)) is False
+
 
 # ---- test_resolver_providers_additional.py -----------------------------
 def test_zenodo_resolver_malformed_hits(monkeypatch, tmp_path) -> None:
@@ -2765,6 +2893,7 @@ def test_zenodo_resolver_malformed_hits(monkeypatch, tmp_path) -> None:
 
     assert results == []
 
+
 # ---- test_resolvers_namespace.py -----------------------------
 def test_legacy_time_alias_emits_deprecation_warning():
     with warnings.catch_warnings(record=True) as captured:
@@ -2773,6 +2902,7 @@ def test_legacy_time_alias_emits_deprecation_warning():
 
     assert module_time is importlib.import_module("time")
     assert any(w.category is DeprecationWarning for w in captured)
+
 
 # ---- test_resolvers_namespace.py -----------------------------
 def test_reloading_resolvers_preserves_deprecation_behaviour():
@@ -2783,6 +2913,7 @@ def test_reloading_resolvers_preserves_deprecation_behaviour():
 
     assert any(w.category is DeprecationWarning for w in captured)
 
+
 # ---- test_resolvers_unit.py -----------------------------
 pytest.importorskip("pyalex")
 
@@ -2791,6 +2922,7 @@ requests = pytest.importorskip("requests")
 
 # ---- test_resolvers_unit.py -----------------------------
 responses = pytest.importorskip("responses")
+
 
 # ---- test_resolvers_unit.py -----------------------------
 def make_artifact(tmp_path: Path, **overrides: object) -> downloader.WorkArtifact:
@@ -2813,12 +2945,14 @@ def make_artifact(tmp_path: Path, **overrides: object) -> downloader.WorkArtifac
     base_kwargs.update(overrides)
     return downloader.WorkArtifact(**base_kwargs)
 
+
 # ---- test_resolvers_unit.py -----------------------------
 def build_config(**overrides: object) -> ResolverConfig:
     config = ResolverConfig()
     for key, value in overrides.items():
         setattr(config, key, value)
     return config
+
 
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
@@ -2843,6 +2977,7 @@ def test_unpaywall_resolver_success(tmp_path):
     ]
     assert urls == ["https://oa.example/best.pdf", "https://oa.example/extra.pdf"]
 
+
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
 def test_unpaywall_resolver_http_error(tmp_path):
@@ -2857,6 +2992,7 @@ def test_unpaywall_resolver_http_error(tmp_path):
     results = list(UnpaywallResolver().iter_urls(session, config, artifact))
     assert results[0].event == "error"
     assert results[0].event_reason == "http-error"
+
 
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
@@ -2884,6 +3020,7 @@ def test_crossref_resolver_includes_mailto(tmp_path):
     assert urls == ["https://publisher.example/file.pdf"]
     assert "mailto=tester%40example.org" in responses.calls[0].request.url
 
+
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
 def test_crossref_resolver_handles_json_error(tmp_path):
@@ -2899,6 +3036,7 @@ def test_crossref_resolver_handles_json_error(tmp_path):
     results = list(CrossrefResolver().iter_urls(session, config, artifact))
     assert results[0].event == "error"
     assert results[0].event_reason == "json-error"
+
 
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
@@ -2928,9 +3066,10 @@ def test_landing_page_resolver_patterns(tmp_path):
     ]
     assert results[0].metadata["pattern"] == "anchor"
 
+
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
-def test_landing_page_resolver_http_error(tmp_path):
+def test_landing_page_resolver_http_error(tmp_path):  # noqa: F811
     pytest.importorskip("bs4")
     artifact = make_artifact(tmp_path, landing_urls=["https://site.example/error"])
     config = build_config()
@@ -2938,6 +3077,7 @@ def test_landing_page_resolver_http_error(tmp_path):
     session = requests.Session()
     events = [r for r in LandingPageResolver().iter_urls(session, config, artifact) if r.is_event]
     assert events[0].event_reason == "http-error"
+
 
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
@@ -2971,6 +3111,7 @@ def test_pmc_resolver_uses_id_converter(tmp_path):
     assert "https://www.ncbi.nlm.nih.gov/articles/PMC777/pdf/foo.pdf" in results
     assert "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC777/pdf/" in results
 
+
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
 def test_pmc_resolver_handles_request_error(tmp_path):
@@ -2984,6 +3125,7 @@ def test_pmc_resolver_handles_request_error(tmp_path):
     )
     results = list(PmcResolver().iter_urls(session, config, artifact))
     assert results[-1].url.endswith("PMC123/pdf/")
+
 
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
@@ -3013,9 +3155,10 @@ def test_europe_pmc_resolver_filters_pdf(tmp_path):
     urls = [r.url for r in EuropePmcResolver().iter_urls(session, config, artifact)]
     assert urls == ["https://epmc.org/pdf1"]
 
+
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
-def test_europe_pmc_resolver_http_error(tmp_path):
+def test_europe_pmc_resolver_http_error(tmp_path):  # noqa: F811
     session = requests.Session()
     artifact = make_artifact(tmp_path)
     config = build_config()
@@ -3026,6 +3169,7 @@ def test_europe_pmc_resolver_http_error(tmp_path):
     )
     urls = list(EuropePmcResolver().iter_urls(session, config, artifact))
     assert urls == []
+
 
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
@@ -3061,6 +3205,7 @@ def test_openaire_resolver_collects_pdf_candidates(tmp_path):
     urls = [r.url for r in OpenAireResolver().iter_urls(session, config, artifact)]
     assert urls == ["https://openaire.example/paper.pdf"]
 
+
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
 def test_hal_resolver_uses_file_fields(tmp_path):
@@ -3092,6 +3237,7 @@ def test_hal_resolver_uses_file_fields(tmp_path):
         "https://hal.archives-ouvertes.fr/alternate.pdf",
     ]
 
+
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
 def test_osf_resolver_merges_download_links(tmp_path):
@@ -3117,6 +3263,7 @@ def test_osf_resolver_merges_download_links(tmp_path):
     urls = [r.url for r in OsfResolver().iter_urls(session, config, artifact)]
     assert urls == ["https://osf.io/download1", "https://osf.io/download2"]
 
+
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
 def test_core_resolver_success(tmp_path):
@@ -3137,6 +3284,7 @@ def test_core_resolver_success(tmp_path):
     urls = [r.url for r in CoreResolver().iter_urls(session, config, artifact)]
     assert urls == ["https://core.org/paper.pdf", "https://core.org/extra.pdf"]
 
+
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
 def test_core_resolver_handles_failure(tmp_path):
@@ -3150,6 +3298,7 @@ def test_core_resolver_handles_failure(tmp_path):
     assert events[0].event_reason == "http-error"
     assert events[0].http_status == 500
     assert "CORE API returned" in events[0].metadata["error_detail"]
+
 
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
@@ -3177,6 +3326,7 @@ def test_doaj_resolver_filters_pdf(tmp_path):
     urls = [r.url for r in DoajResolver().iter_urls(session, config, artifact)]
     assert urls == ["https://doaj.org/paper.pdf"]
 
+
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
 def test_doaj_resolver_handles_error(tmp_path):
@@ -3190,6 +3340,7 @@ def test_doaj_resolver_handles_error(tmp_path):
     assert events[0].event_reason == "http-error"
     assert events[0].http_status == 429
     assert "DOAJ API returned" in events[0].metadata["error_detail"]
+
 
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
@@ -3208,6 +3359,7 @@ def test_semantic_scholar_resolver_handles_error(tmp_path):
     assert error.http_status == 500
     assert "Semantic Scholar HTTPError" in error.metadata["error_detail"]
 
+
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
 def test_semantic_scholar_resolver_success(tmp_path):
@@ -3222,6 +3374,7 @@ def test_semantic_scholar_resolver_success(tmp_path):
     )
     urls = [r.url for r in SemanticScholarResolver().iter_urls(session, config, artifact)]
     assert urls == ["https://s2.org/paper.pdf"]
+
 
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate
@@ -3245,6 +3398,7 @@ def test_wayback_resolver_success(tmp_path):
     )
     urls = [r.url for r in WaybackResolver().iter_urls(session, config, artifact)]
     assert urls == ["https://web.archive.org/web/20200101/https://dead.example/file.pdf"]
+
 
 # ---- test_resolvers_unit.py -----------------------------
 @responses.activate

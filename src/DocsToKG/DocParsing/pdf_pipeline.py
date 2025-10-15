@@ -10,8 +10,8 @@ behaviour as required.
 from __future__ import annotations
 
 import argparse
-import multiprocessing as mp
 import contextlib
+import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
@@ -52,6 +52,9 @@ def parse_args() -> argparse.Namespace:
 
     Returns:
         Namespace containing parsed CLI arguments.
+
+    Raises:
+        SystemExit: If the provided arguments fail standard argparse checks.
     """
 
     parser = argparse.ArgumentParser("Convert PDFs into DocTags artefacts.")
@@ -85,6 +88,11 @@ class _LegacyModule:
 
     Attributes:
         None: Instances expose stubbed methods only.
+
+    Examples:
+        >>> legacy = _LegacyModule()
+        >>> legacy.start_vllm() is None
+        True
     """
 
     def start_vllm(self, *_args, **_kwargs):
@@ -120,6 +128,9 @@ class _LegacyModule:
 
         Returns:
             None
+
+        Raises:
+            None.
         """
         return None
 

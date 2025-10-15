@@ -24,7 +24,14 @@ from .vectorstore import FaissIndexManager, FaissSearchResult
 
 
 class RequestValidationError(ValueError):
-    """Raised when the caller submits an invalid search request."""
+    """Raised when the caller submits an invalid search request.
+
+    Examples:
+        >>> raise RequestValidationError("page_size must be positive")
+        Traceback (most recent call last):
+        ...
+        RequestValidationError: page_size must be positive
+    """
 
 
 @dataclass(slots=True)
@@ -41,7 +48,28 @@ class ChannelResults:
 
 
 class HybridSearchService:
-    """Execute BM25, SPLADE, and dense retrieval with fusion."""
+    """Execute BM25, SPLADE, and dense retrieval with fusion.
+
+    Attributes:
+        _config_manager: Source of runtime hybrid-search configuration.
+        _feature_generator: Component producing BM25/SPLADE/dense features.
+        _faiss: GPU-backed FAISS index manager for dense retrieval.
+        _opensearch: Simulator used for BM25 and SPLADE lookups.
+        _registry: Chunk registry providing metadata and FAISS id lookups.
+        _observability: Telemetry facade for metrics and traces.
+
+    Examples:
+        >>> service = HybridSearchService(
+        ...     config_manager=HybridSearchConfigManager.from_dict({}),
+        ...     feature_generator=FeatureGenerator(embedding_dim=16),
+        ...     faiss_index=FaissIndexManager(dim=16, config=HybridSearchConfig().dense),
+        ...     opensearch=OpenSearchSimulator(),
+        ...     registry=ChunkRegistry(),
+        ... )
+        >>> request = HybridSearchRequest(query="example", namespace="demo", filters={}, page_size=5)
+        >>> isinstance(service.search(request), HybridSearchResponse)  # doctest: +SKIP
+        True
+    """
 
     def __init__(
         self,
@@ -53,6 +81,16 @@ class HybridSearchService:
         registry: ChunkRegistry,
         observability: Optional[Observability] = None,
     ) -> None:
+        """Initialise the hybrid search service.
+
+        Args:
+            config_manager: Manager providing the latest search configuration.
+            feature_generator: Component responsible for feature extraction.
+            faiss_index: Dense retrieval index manager (GPU-backed).
+            opensearch: Simulator providing BM25/SPLADE access.
+            registry: Chunk registry used for metadata lookups.
+            observability: Optional observability facade (defaults to a no-op).
+        """
         self._config_manager = config_manager
         self._feature_generator = feature_generator
         self._faiss = faiss_index
@@ -71,6 +109,9 @@ class HybridSearchService:
         Returns:
             HybridSearchResponse: Ranked hybrid search results enriched with channel-level
             diagnostics and pagination cursor metadata.
+
+        Raises:
+            RequestValidationError: If ``request`` fails validation checks.
         """
         config = self._config_manager.get()
         self._validate_request(request)
@@ -191,9 +232,7 @@ class HybridSearchService:
         )
         timings["bm25_ms"] = (time.perf_counter() - start) * 1000
         self._observability.metrics.increment("search_channel_requests", channel="bm25")
-        self._observability.metrics.observe(
-            "search_channel_candidates", len(hits), channel="bm25"
-        )
+        self._observability.metrics.observe("search_channel_candidates", len(hits), channel="bm25")
         candidates = [
             FusionCandidate(source="bm25", score=score, chunk=chunk, rank=idx + 1)
             for idx, (chunk, score) in enumerate(hits)
@@ -298,9 +337,28 @@ class HybridSearchService:
 
 
 class HybridSearchAPI:
-    """Minimal synchronous handler for `POST /v1/hybrid-search`."""
+    """Minimal synchronous handler for ``POST /v1/hybrid-search``.
+
+    Attributes:
+        _service: Underlying :class:`HybridSearchService` instance.
+
+    Examples:
+        >>> api = HybridSearchAPI(service)
+        >>> status, body = api.post_hybrid_search({"query": "example"})  # doctest: +SKIP
+        >>> status
+        200
+    """
 
     def __init__(self, service: HybridSearchService) -> None:
+        """Initialise the API facade.
+
+        Args:
+            service: Hybrid search service used to satisfy requests.
+
+        Raises:
+            TypeError: If ``service`` does not inherit from
+                :class:`HybridSearchService`.
+        """
         if not isinstance(service, HybridSearchService):
             raise TypeError("service must be a HybridSearchService instance")
         self._service = service

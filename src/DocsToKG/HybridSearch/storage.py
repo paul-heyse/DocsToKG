@@ -11,7 +11,24 @@ from .types import ChunkPayload, vector_uuid_to_faiss_int
 
 @dataclass(slots=True)
 class OpenSearchIndexTemplate:
-    """Representation of an OpenSearch index template body."""
+    """Representation of an OpenSearch index template body.
+
+    Attributes:
+        name: Canonical name of the index template.
+        namespace: DocsToKG namespace the template belongs to.
+        body: OpenSearch template payload including settings and mappings.
+        chunking: Chunking configuration applied when indexing documents.
+
+    Examples:
+        >>> template = OpenSearchIndexTemplate(
+        ...     name=\"hybrid-chunks-research\",
+        ...     namespace=\"research\",
+        ...     body={\"settings\": {}},
+        ...     chunking=ChunkingConfig(),
+        ... )
+        >>> template.asdict()[\"name\"]
+        'hybrid-chunks-research'
+    """
 
     name: str
     namespace: str
@@ -40,9 +57,20 @@ class OpenSearchIndexTemplate:
 
 
 class OpenSearchSchemaManager:
-    """Bootstrap and track index templates per namespace."""
+    """Bootstrap and track index templates per namespace.
+
+    Attributes:
+        _templates: Internal registry mapping namespace → template instances.
+
+    Examples:
+        >>> manager = OpenSearchSchemaManager()
+        >>> manager.bootstrap_template("research")
+        OpenSearchIndexTemplate(name='hybrid-chunks-research', namespace='research', ...)
+    """
 
     def __init__(self) -> None:
+        """Initialise an empty template registry."""
+
         self._templates: MutableMapping[str, OpenSearchIndexTemplate] = {}
 
     def bootstrap_template(

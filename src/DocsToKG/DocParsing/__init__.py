@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-
 from types import ModuleType
 
 from . import pipelines as _pipelines

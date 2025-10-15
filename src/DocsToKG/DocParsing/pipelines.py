@@ -1,5 +1,4 @@
-"""
-DocParsing Pipeline Utilities
+"""DocParsing Pipeline Utilities
 
 This module hosts the PDF → DocTags conversion workflow _and_ shared helpers
 used by other DocParsing pipelines. It coordinates vLLM server lifecycle,
@@ -23,6 +22,8 @@ Usage:
     exit_code = pipelines.pdf_main(args)
 """
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import argparse
@@ -37,7 +38,7 @@ from collections import deque
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Deque, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Deque, Dict, Iterable, List, Optional, Tuple
 
 import requests
 from tqdm import tqdm
@@ -1419,26 +1420,11 @@ chunking and embedding.
 """
 
 
-import argparse
-import os
-import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass
-from pathlib import Path
-from typing import TYPE_CHECKING, List
-
-from tqdm import tqdm
-
 from DocsToKG.DocParsing._common import (
-    compute_content_hash,
     data_doctags,
     data_html,
-    data_manifests,
     detect_data_root,
     get_logger,
-    load_manifest_index,
-    manifest_append,
-    resolve_hash_algorithm,
 )
 
 HTML_DEFAULT_INPUT_DIR = data_html()

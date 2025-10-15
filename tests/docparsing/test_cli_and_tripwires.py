@@ -9,7 +9,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from types import ModuleType
 
 import pytest
 
@@ -25,6 +24,35 @@ from tests.docparsing.stubs import dependency_stubs  # noqa: E402
 hypothesis = pytest.importorskip("hypothesis")  # noqa: E402
 given = hypothesis.given
 st = hypothesis.strategies
+
+
+class _TokenCountingStub:
+    """Lightweight tokenizer stub for coalescence tests."""
+
+    def count_tokens(self, *, text: str) -> int:
+        stripped = text.strip()
+        if not stripped:
+            return 0
+        return len(stripped.split())
+
+
+def _make_rec(
+    text: str,
+    *,
+    n_tok: int | None = None,
+    src_idxs: list[int] | None = None,
+    refs: list[str] | None = None,
+    pages: list[int] | None = None,
+) -> Rec:
+    """Create a Rec with sensible defaults for unit tests."""
+
+    return Rec(
+        text=text,
+        n_tok=len(text.split()) if n_tok is None else n_tok,
+        src_idxs=src_idxs or [],
+        refs=refs or [],
+        pages=pages or [1],
+    )
 
 COMMANDS = [
     (Path("src/DocsToKG/DocParsing/DoclingHybridChunkerPipelineWithMin.py"), ["--help"]),
@@ -45,7 +73,9 @@ GOLDEN_VECTORS = GOLDEN_DIR / "sample.vectors.jsonl"
 def _reload_cli_modules():
     """Reload CLI modules so newly installed stubs are honoured."""
 
-    chunk_module = importlib.import_module("DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin")
+    chunk_module = importlib.import_module(
+        "DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin"
+    )
     embed_module = importlib.import_module("DocsToKG.DocParsing.EmbeddingV2")
     cli_module = importlib.import_module("DocsToKG.DocParsing.cli")
     importlib.reload(chunk_module)
@@ -80,11 +110,10 @@ def test_chunk_and_embed_cli_with_dependency_stubs(
     module = _reload_cli_modules()
     result = module.main(
         [
-            "docparse",
             "chunk",
-            "--input",
-            str(doctags_path),
-            "--output",
+            "--in-dir",
+            str(doc_dir),
+            "--out-dir",
             str(data_root / "ChunkedDocTagFiles"),
         ]
     )
@@ -92,7 +121,6 @@ def test_chunk_and_embed_cli_with_dependency_stubs(
 
     result = module.main(
         [
-            "docparse",
             "embed",
             "--chunks-dir",
             str(data_root / "ChunkedDocTagFiles"),
@@ -161,33 +189,37 @@ def test_golden_chunk_count_and_hash():
     assert len(rows) == 2
     hashes = [hashlib.sha1(row["text"].encode("utf-8")).hexdigest() for row in rows]
     assert hashes == [
-        "f0b795882ec58d82ddbf4dc3fd830814d0048360",
-        "b2fcd8346677a9b04ba75dc7716f8fd88d4bbd75",
+        "9d40a282aefb81ec15147275d8d490b40c334694",
+        "4baf2d39299bd11c643b7c398248aae3b80765ae",
     ]
 
 
 def test_golden_vectors_hashes():
     rows = list(_load_jsonl(GOLDEN_VECTORS))
     assert len(rows) == 2
-    hashes = [hashlib.sha1(json.dumps(row, sort_keys=True).encode("utf-8")).hexdigest() for row in rows]
+    hashes = [
+        hashlib.sha1(json.dumps(row, sort_keys=True).encode("utf-8")).hexdigest() for row in rows
+    ]
     assert hashes == [
-        "cd31b0d5bafbbe48a4aab1baad4dc72c91236748",
-        "23938490f35c7c6b5bff50ccaa0435915eb82542",
+        "c86f87cefb058167082f3aa0522b7a5076e7eb32",
+        "25265361eca16c886ea307ad6406610343b1f8de",
     ]
 
 
 def test_coalesce_small_runs_idempotent():
     rows = [
-        Rec(start=0, end=5, text="hello"),
-        Rec(start=5, end=10, text="world"),
-        Rec(start=10, end=21, text="another chunk"),
+        _make_rec("hello", src_idxs=[0]),
+        _make_rec("world", src_idxs=[1]),
+        _make_rec("another chunk", src_idxs=[2]),
     ]
-    merged = list(coalesce_small_runs(rows, min_tokens=1))
+    tokenizer = _TokenCountingStub()
+    merged = coalesce_small_runs(rows, tokenizer=tokenizer, min_tokens=1)
     assert merged == rows
 
 
 @given(st.text())
 def test_coalesce_small_runs_handles_unicode(payload: str):
-    rows = [Rec(start=0, end=len(payload), text=payload)]
-    merged = list(coalesce_small_runs(rows, min_tokens=1))
+    rows = [_make_rec(payload, src_idxs=[0])]
+    tokenizer = _TokenCountingStub()
+    merged = coalesce_small_runs(rows, tokenizer=tokenizer, min_tokens=1)
     assert merged[0].text == payload

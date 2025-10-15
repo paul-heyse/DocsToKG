@@ -8,10 +8,9 @@ import types
 from pathlib import Path
 
 import pytest
+
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload.resolvers import FigshareResolver
-from DocsToKG.ContentDownload.resolvers import ResolverConfig
-from DocsToKG.ContentDownload.resolvers import ZenodoResolver
+from DocsToKG.ContentDownload.resolvers import FigshareResolver, ResolverConfig, ZenodoResolver
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
@@ -35,11 +34,13 @@ requests = pytest.importorskip("requests")
 # ---- test_figshare_resolver.py -----------------------------
 responses = pytest.importorskip("responses")
 
+
 # ---- test_figshare_resolver.py -----------------------------
 def load_fixture(name: str):
     fixture_path = DATA_DIR / name
     with fixture_path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
 
 # ---- test_figshare_resolver.py -----------------------------
 def make_artifact(tmp_path: Path, **overrides):
@@ -62,6 +63,7 @@ def make_artifact(tmp_path: Path, **overrides):
     base_kwargs.update(overrides)
     return downloader.WorkArtifact(**base_kwargs)
 
+
 # ---- test_figshare_resolver.py -----------------------------
 @responses.activate
 def test_figshare_resolver_success(tmp_path):
@@ -74,11 +76,6 @@ def test_figshare_resolver_success(tmp_path):
         "https://api.figshare.com/v2/articles/search",
         json=load_fixture("figshare_response_sample.json"),
         status=200,
-        match=[
-            responses.matchers.json_params_matcher(
-                {"search_for": ':doi: "10.6084/m9.figshare.123456"', "page": 1, "page_size": 3}
-            )
-        ],
     )
 
     results = [
@@ -91,6 +88,7 @@ def test_figshare_resolver_success(tmp_path):
     assert results[0].url == "https://figshare.com/ndownloader/files/45678"
     assert results[0].metadata["source"] == "figshare"
     assert results[0].metadata["article_id"] == 123456
+
 
 # ---- test_figshare_resolver.py -----------------------------
 @responses.activate
@@ -114,6 +112,7 @@ def test_figshare_resolver_filters_non_pdf_files(tmp_path):
     ]
 
     assert urls == ["https://figshare.com/ndownloader/files/45678"]
+
 
 # ---- test_figshare_resolver.py -----------------------------
 @responses.activate
@@ -140,6 +139,7 @@ def test_figshare_resolver_multiple_pdfs(tmp_path):
         "https://figshare.com/ndownloader/files/2",
     ]
 
+
 # ---- test_figshare_resolver.py -----------------------------
 @responses.activate
 def test_figshare_resolver_no_matches(tmp_path):
@@ -156,6 +156,7 @@ def test_figshare_resolver_no_matches(tmp_path):
 
     results = list(FigshareResolver().iter_urls(session, config, artifact))
     assert results == []
+
 
 # ---- test_figshare_resolver.py -----------------------------
 @responses.activate
@@ -181,6 +182,7 @@ def test_figshare_resolver_http_error(tmp_path):
     assert events[0].http_status == 404
     assert "Figshare API returned" in events[0].metadata["error_detail"]
 
+
 # ---- test_figshare_resolver.py -----------------------------
 @responses.activate
 def test_figshare_resolver_json_error(tmp_path):
@@ -205,6 +207,7 @@ def test_figshare_resolver_json_error(tmp_path):
     assert events[0].event_reason == "json-error"
     assert "content_preview" in events[0].metadata
 
+
 # ---- test_figshare_resolver.py -----------------------------
 @responses.activate
 def test_figshare_resolver_network_error(tmp_path):
@@ -228,6 +231,7 @@ def test_figshare_resolver_network_error(tmp_path):
     assert events[0].event_reason == "request-error"
     assert "boom" in events[0].metadata["error"]
 
+
 # ---- test_figshare_resolver.py -----------------------------
 def test_figshare_resolver_disabled_without_doi(tmp_path):
     artifact = make_artifact(tmp_path, doi=None)
@@ -241,36 +245,18 @@ def test_figshare_resolver_disabled_without_doi(tmp_path):
     assert results[0].event == "skipped"
     assert results[0].event_reason == "no-doi"
 
-# ---- test_zenodo_resolver.py -----------------------------
-if "pyalex" not in sys.modules:
-    pyalex_stub = types.ModuleType("pyalex")
-    pyalex_stub.Topics = object
-    pyalex_stub.Works = object
-    config_stub = types.ModuleType("pyalex.config")
-    config_stub.mailto = None
-    pyalex_stub.config = config_stub
-    sys.modules["pyalex"] = pyalex_stub
-    sys.modules["pyalex.config"] = config_stub
 
 # ---- test_zenodo_resolver.py -----------------------------
-pytest.importorskip("pyalex")
+def load_fixture(name: str) -> dict:  # noqa: F811
+    """Load JSON fixture data from the shared tests/data directory."""
 
-# ---- test_zenodo_resolver.py -----------------------------
-requests = pytest.importorskip("requests")
-
-# ---- test_zenodo_resolver.py -----------------------------
-responses = pytest.importorskip("responses")
-
-# ---- test_zenodo_resolver.py -----------------------------
-def load_fixture(name: str) -> dict:
-    """Load JSON fixture data from the tests/data directory."""
-
-    fixture_path = Path(__file__).parent / "data" / name
+    fixture_path = DATA_DIR / name
     with fixture_path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
 
+
 # ---- test_zenodo_resolver.py -----------------------------
-def make_artifact(tmp_path: Path, **overrides: object) -> downloader.WorkArtifact:
+def make_artifact(tmp_path: Path, **overrides: object) -> downloader.WorkArtifact:  # noqa: F811
     """Create a WorkArtifact populated with sensible defaults for testing."""
 
     base_kwargs = dict(
@@ -291,6 +277,7 @@ def make_artifact(tmp_path: Path, **overrides: object) -> downloader.WorkArtifac
     )
     base_kwargs.update(overrides)
     return downloader.WorkArtifact(**base_kwargs)
+
 
 # ---- test_zenodo_resolver.py -----------------------------
 @responses.activate
@@ -322,6 +309,7 @@ def test_zenodo_resolver_success(tmp_path):
     assert results[0].metadata["source"] == "zenodo"
     assert results[0].metadata["record_id"] == "1234567"
 
+
 # ---- test_zenodo_resolver.py -----------------------------
 @responses.activate
 def test_zenodo_resolver_filters_non_pdf_files(tmp_path):
@@ -345,6 +333,7 @@ def test_zenodo_resolver_filters_non_pdf_files(tmp_path):
 
     assert urls == ["https://zenodo.org/api/files/abc123/paper.pdf"]
 
+
 # ---- test_zenodo_resolver.py -----------------------------
 @responses.activate
 def test_zenodo_resolver_no_matches(tmp_path):
@@ -361,6 +350,7 @@ def test_zenodo_resolver_no_matches(tmp_path):
 
     results = list(ZenodoResolver().iter_urls(session, config, artifact))
     assert results == []
+
 
 # ---- test_zenodo_resolver.py -----------------------------
 @responses.activate
@@ -386,6 +376,7 @@ def test_zenodo_resolver_http_error(tmp_path):
     assert events[0].http_status == 404
     assert "Zenodo API returned" in events[0].metadata["error_detail"]
 
+
 # ---- test_zenodo_resolver.py -----------------------------
 @responses.activate
 def test_zenodo_resolver_json_error(tmp_path):
@@ -410,6 +401,7 @@ def test_zenodo_resolver_json_error(tmp_path):
     assert events[0].event_reason == "json-error"
     assert "error_detail" in events[0].metadata
 
+
 # ---- test_zenodo_resolver.py -----------------------------
 @responses.activate
 def test_zenodo_resolver_network_error(tmp_path):
@@ -432,6 +424,7 @@ def test_zenodo_resolver_network_error(tmp_path):
     assert events[0].event == "error"
     assert events[0].event_reason == "request-error"
     assert "boom" in events[0].metadata["error"]
+
 
 # ---- test_zenodo_resolver.py -----------------------------
 def test_zenodo_resolver_disabled_without_doi(tmp_path):

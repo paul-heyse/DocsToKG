@@ -88,7 +88,9 @@ def _stub_main_setup(monkeypatch, module, tmp_path, list_return: List) -> Simple
         module, "ensure_vllm", lambda *_a, **_k: (module.PREFERRED_PORT, None, False)
     )
     target_module = getattr(module, "legacy_module", module)
-    monkeypatch.setattr(target_module, "start_vllm", lambda *_a, **_k: SimpleNamespace(poll=lambda: None))
+    monkeypatch.setattr(
+        target_module, "start_vllm", lambda *_a, **_k: SimpleNamespace(poll=lambda: None)
+    )
     monkeypatch.setattr(target_module, "wait_for_vllm", lambda *_a, **_k: ["stub-model"])
     monkeypatch.setattr(target_module, "validate_served_models", lambda *_a, **_k: None)
     monkeypatch.setattr(target_module, "manifest_append", lambda *_a, **_k: None)
@@ -105,6 +107,7 @@ def _import_pdf_module(monkeypatch):
     """Import the PDF conversion script with external deps stubbed."""
 
     monkeypatch.setitem(sys.modules, "requests", mock.MagicMock())
+
     class _TqdmStub:
         def __call__(self, *args, **kwargs):
             return self

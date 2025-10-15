@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import hashlib
-from collections import Counter
 import re
+from collections import Counter
 from typing import Dict, Iterator, List, Sequence, Tuple
 
 import numpy as np

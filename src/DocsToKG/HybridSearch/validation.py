@@ -16,14 +16,12 @@ import numpy as np
 import faiss  # type: ignore
 
 from .config import HybridSearchConfigManager
-from .vectorstore import FaissIndexManager
 from .features import FeatureGenerator
 from .ingest import ChunkIngestionPipeline
 from .observability import Observability
 from .operations import restore_state as ops_restore_state
 from .operations import serialize_state as ops_serialize_state
 from .service import HybridSearchService
-from .vectorstore import pairwise_inner_products
 from .storage import ChunkRegistry, OpenSearchSimulator
 from .types import (
     ChunkPayload,
@@ -33,6 +31,7 @@ from .types import (
     ValidationReport,
     ValidationSummary,
 )
+from .vectorstore import FaissIndexManager, pairwise_inner_products
 
 
 def load_dataset(path: Path) -> List[Mapping[str, object]]:

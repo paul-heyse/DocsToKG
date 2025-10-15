@@ -49,7 +49,6 @@ from DocsToKG.DocParsing._common import (
     atomic_write,
     compute_content_hash,
     data_chunks,
-    data_manifests,
     data_vectors,
     detect_data_root,
     get_logger,
@@ -1165,9 +1164,7 @@ def main(args: argparse.Namespace | None = None) -> int:
             )
         if missing_paths:
             detail = "; ".join(missing_paths)
-            raise FileNotFoundError(
-                "Offline mode requires local model directories. " + detail
-            )
+            raise FileNotFoundError("Offline mode requires local model directories. " + detail)
 
     args.offline = offline_mode
     args.splade_model_dir = splade_model_dir
