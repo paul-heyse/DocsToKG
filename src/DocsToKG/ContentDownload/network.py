@@ -54,21 +54,22 @@ def create_session(
     """Return a ``requests.Session`` configured for DocsToKG network requests.
 
     Args:
-        headers: Optional mapping of HTTP headers applied to the session. The
-            mapping is copied into the session's header store to avoid mutating
-            caller-owned dictionaries.
-        adapter_max_retries: Number of retries configured on mounted HTTP
-            adapters. Defaults to ``0`` so that :func:`request_with_retries`
+        headers (Mapping[str, str] | None): Optional mapping of HTTP headers
+            applied to the session. The mapping is copied into the session's
+            header store so caller-owned dictionaries remain unchanged.
+        adapter_max_retries (int): Retry count configured on mounted HTTP
+            adapters. Set to ``0`` by default so :func:`request_with_retries`
             governs retry behaviour.
 
     Returns:
-        ``requests.Session`` instance with HTTP/HTTPS adapters mounted.
+        requests.Session: Session instance with HTTP/HTTPS adapters mounted and
+        ready for pipeline usage.
 
     Notes:
         The returned session uses ``HTTPAdapter`` for connection pooling. It is
         safe to share across threads provided callers avoid mutating shared
-        mutable state (for example, using ``session.headers.update``) once the
-        session is distributed to workers.
+        mutable state (for example, updating ``session.headers``) once the
+        session is distributed to worker threads.
     """
 
     session = requests.Session()
@@ -95,10 +96,12 @@ def parse_retry_after_header(response: requests.Response) -> Optional[float]:
     """Parse ``Retry-After`` header and return wait time in seconds.
 
     Args:
-        response: HTTP response potentially containing ``Retry-After`` header.
+        response (requests.Response): HTTP response potentially containing a
+            ``Retry-After`` header.
 
     Returns:
-        Float seconds to wait, or ``None`` if header missing/invalid.
+        float | None: Seconds the caller should wait before retrying, or
+        ``None`` when the header is absent or invalid.
 
     Raises:
         None: Invalid headers are tolerated and yield ``None`` without raising.
@@ -152,23 +155,24 @@ def request_with_retries(
     """Execute an HTTP request with exponential backoff and retry handling.
 
     Args:
-        session: :class:`requests.Session` used to execute the request.
-        method: HTTP method such as ``"GET"`` or ``"HEAD"``.
-        url: Fully-qualified URL for the request.
-        max_retries: Maximum number of retry attempts before returning the final
-            response or raising an exception. Defaults to ``3``.
-        retry_statuses: Optional set of HTTP status codes that should trigger a
-            retry. Defaults to ``{429, 500, 502, 503, 504}``.
-        backoff_factor: Base multiplier for exponential backoff delays.
+        session (requests.Session): Session used to execute the outbound
+            request.
+        method (str): HTTP method such as ``"GET"`` or ``"HEAD"``.
+        url (str): Fully-qualified URL for the request.
+        max_retries (int): Maximum number of retry attempts before returning the
+            final response or raising an exception. Defaults to ``3``.
+        retry_statuses (Iterable[int] | None): HTTP status codes that should
+            trigger a retry. Defaults to ``{429, 500, 502, 503, 504}``.
+        backoff_factor (float): Base multiplier for exponential backoff delays.
             Defaults to ``0.75`` seconds.
-        respect_retry_after: Whether to parse and obey ``Retry-After`` headers
-            when provided by the server. Defaults to ``True``.
+        respect_retry_after (bool): Whether to parse and obey ``Retry-After``
+            headers when provided by the server. Defaults to ``True``.
         **kwargs: Additional keyword arguments forwarded directly to
             :meth:`requests.Session.request`.
 
     Returns:
-        A :class:`requests.Response` instance on success. The caller is
-        responsible for closing the response when streaming content.
+        requests.Response: Successful response object. Callers are responsible
+        for closing the response when streaming content.
 
     Raises:
         ValueError: If ``max_retries`` or ``backoff_factor`` are invalid or
@@ -316,7 +320,16 @@ def request_with_retries(
 
 @dataclass
 class CachedResult:
-    """Represents HTTP 304 Not Modified response with prior metadata."""
+    """Represents an HTTP 304 response resolved via cached metadata.
+
+    Attributes:
+        path (str): Filesystem path that stores the cached artifact.
+        sha256 (str): SHA-256 checksum associated with the cached payload.
+        content_length (int): Size of the cached payload in bytes.
+        etag (str | None): Entity tag reported by the origin server.
+        last_modified (str | None): ``Last-Modified`` timestamp provided by the
+            origin server.
+    """
 
     path: str
     sha256: str
@@ -327,14 +340,25 @@ class CachedResult:
 
 @dataclass
 class ModifiedResult:
-    """Represents HTTP 200 response requiring fresh download."""
+    """Represents a fresh HTTP 200 response requiring download.
+
+    Attributes:
+        etag (str | None): Entity tag reported by the origin server.
+        last_modified (str | None): ``Last-Modified`` timestamp describing the
+            remote resource.
+    """
 
     etag: Optional[str]
     last_modified: Optional[str]
 
 
 class ConditionalRequestHelper:
-    """Utility for constructing conditional requests and interpreting responses."""
+    """Construct headers and interpret responses for conditional requests.
+
+    The helper encapsulates cached metadata (ETag, Last-Modified, hashes) so the
+    caller can generate polite conditional headers and validate upstream 304
+    responses before reusing cached artefacts.
+    """
 
     def __init__(
         self,
@@ -344,6 +368,20 @@ class ConditionalRequestHelper:
         prior_content_length: Optional[int] = None,
         prior_path: Optional[str] = None,
     ) -> None:
+        """Initialise cached metadata for conditional requests.
+
+        Args:
+            prior_etag (str | None): Previously observed entity tag for the
+                resource.
+            prior_last_modified (str | None): Prior ``Last-Modified`` timestamp.
+            prior_sha256 (str | None): SHA-256 checksum of the cached payload.
+            prior_content_length (int | None): Byte length of the cached payload.
+            prior_path (str | None): Filesystem path storing the cached artefact.
+
+        Raises:
+            ValueError: If ``prior_content_length`` is provided but negative.
+        """
+
         if prior_content_length is not None and prior_content_length < 0:
             raise ValueError(
                 f"prior_content_length must be non-negative, got {prior_content_length}"
@@ -355,7 +393,11 @@ class ConditionalRequestHelper:
         self.prior_path = prior_path
 
     def build_headers(self) -> Mapping[str, str]:
-        """Generate conditional request headers from cached metadata."""
+        """Generate conditional request headers from cached metadata.
+
+        Returns:
+            Mapping[str, str]: Headers suitable for ``requests`` invocations.
+        """
 
         headers: dict[str, str] = {}
         if self.prior_etag:
@@ -368,7 +410,21 @@ class ConditionalRequestHelper:
         self,
         response: requests.Response,
     ) -> Union[CachedResult, ModifiedResult]:
-        """Interpret response status and headers as cached or modified result."""
+        """Classify origin responses as cached or modified results.
+
+        Args:
+            response (requests.Response): HTTP response returned from the
+                conditional request.
+
+        Returns:
+            CachedResult | ModifiedResult: Cached metadata when the origin
+            reports HTTP 304, otherwise wrapped metadata from a fresh download.
+
+        Raises:
+            ValueError: If a 304 response arrives without complete cached
+                metadata.
+            TypeError: If ``response`` lacks ``status_code`` or ``headers``.
+        """
 
         if not hasattr(response, "status_code") or not hasattr(response, "headers"):
             raise TypeError("response must expose 'status_code' and 'headers' attributes")

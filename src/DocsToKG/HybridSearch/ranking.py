@@ -1,4 +1,4 @@
-"""Result shaping utilities for hybrid search responses."""
+"""Ranking, fusion, and result shaping utilities."""
 
 from __future__ import annotations
 
@@ -8,32 +8,89 @@ from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Sequence
 import numpy as np
 
 from .config import FusionConfig
-from .similarity import cosine_batch, pairwise_inner_products
-from .storage import OpenSearchSimulator
 from .features import tokenize
+from .storage import OpenSearchSimulator
 from .types import (
     ChunkPayload,
+    FusionCandidate,
     HybridSearchDiagnostics,
     HybridSearchRequest,
     HybridSearchResult,
 )
+from .vectorstore import cosine_batch, pairwise_inner_products
 
-if TYPE_CHECKING:  # pragma: no cover - used for type hints only
+if TYPE_CHECKING:  # pragma: no cover - typing only
     import faiss  # type: ignore
 
 
+class ReciprocalRankFusion:
+    """Combine ranked lists using Reciprocal Rank Fusion."""
+
+    def __init__(self, k0: float = 60.0) -> None:
+        if k0 <= 0:
+            raise ValueError("k0 must be positive")
+        self._k0 = k0
+
+    def fuse(self, candidates: Sequence[FusionCandidate]) -> Dict[str, float]:
+        scores: Dict[str, float] = defaultdict(float)
+        for candidate in candidates:
+            contribution = 1.0 / (self._k0 + candidate.rank)
+            scores[candidate.chunk.vector_id] += contribution
+        return dict(scores)
+
+
+def apply_mmr_diversification(
+    fused_candidates: Sequence[FusionCandidate],
+    fused_scores: Mapping[str, float],
+    lambda_param: float,
+    top_k: int,
+    *,
+    device: int = 0,
+    resources: Optional["faiss.StandardGpuResources"] = None,
+) -> List[FusionCandidate]:
+    """Apply maximal marginal relevance to promote diversity."""
+
+    if not 0.0 <= lambda_param <= 1.0:
+        raise ValueError("lambda_param must be within [0, 1]")
+    if not fused_candidates:
+        return []
+    if resources is None:
+        raise RuntimeError("GPU resources are required for MMR diversification")
+
+    embeddings = np.stack(
+        [
+            candidate.chunk.features.embedding.astype(np.float32, copy=False)
+            for candidate in fused_candidates
+        ]
+    )
+
+    candidate_indices = list(range(len(fused_candidates)))
+    selected_indices: List[int] = []
+    sims_all = pairwise_inner_products(embeddings, device=int(device), resources=resources)
+
+    while candidate_indices and len(selected_indices) < top_k:
+        best_idx: Optional[int] = None
+        best_score = float("-inf")
+        for idx in candidate_indices:
+            vector_id = fused_candidates[idx].chunk.vector_id
+            relevance = fused_scores.get(vector_id, 0.0)
+            diversity_penalty = (
+                float(sims_all[idx, selected_indices].max()) if selected_indices else 0.0
+            )
+            score = lambda_param * relevance - (1 - lambda_param) * diversity_penalty
+            if score > best_score:
+                best_idx = idx
+                best_score = score
+        if best_idx is None:
+            break
+        selected_indices.append(best_idx)
+        candidate_indices = [idx for idx in candidate_indices if idx != best_idx]
+
+    return [fused_candidates[idx] for idx in selected_indices]
+
+
 class ResultShaper:
-    """Collapse duplicates, enforce quotas, and generate highlights.
-
-    Attributes:
-        _opensearch: OpenSearch simulator providing highlighting hooks.
-        _fusion_config: Fusion configuration controlling dedupe thresholds and quotas.
-
-    Examples:
-        >>> shaper = ResultShaper(OpenSearchSimulator(), FusionConfig())
-        >>> shaper._fusion_config.max_chunks_per_doc
-        3
-    """
+    """Collapse duplicates, enforce quotas, and generate highlights."""
 
     def __init__(
         self,
@@ -43,18 +100,6 @@ class ResultShaper:
         device: int = 0,
         resources: Optional["faiss.StandardGpuResources"] = None,
     ) -> None:
-        """Initialise the shaper with retrieval backends, fusion settings, and GPU context.
-
-        Args:
-            opensearch: OpenSearch simulator used for highlighting.
-            fusion_config: Fusion configuration controlling dedupe behaviour.
-            device: CUDA device ordinal for GPU-based similarity checks.
-            resources: Optional FAISS GPU resources for cosine comparisons.
-
-        Returns:
-            None
-        """
-
         self._opensearch = opensearch
         self._fusion_config = fusion_config
         self._gpu_device = int(device)
@@ -67,17 +112,6 @@ class ResultShaper:
         request: HybridSearchRequest,
         channel_scores: Mapping[str, Dict[str, float]],
     ) -> List[HybridSearchResult]:
-        """Transform ordered chunks into shaped search results.
-
-        Args:
-            ordered_chunks: Ranked chunk payloads emitted by fusion.
-            fused_scores: Final fused score per vector ID.
-            request: Original hybrid search request used for context.
-            channel_scores: Per-channel scoring maps keyed by vector ID.
-
-        Returns:
-            List of `HybridSearchResult` objects ready for response serialization.
-        """
         if not ordered_chunks:
             return []
 
@@ -133,15 +167,6 @@ class ResultShaper:
         return results
 
     def _within_doc_limit(self, doc_id: str, doc_buckets: Dict[str, int]) -> bool:
-        """Check and update per-document emission counts.
-
-        Args:
-            doc_id: Document identifier being considered for emission.
-            doc_buckets: Mutable counter of chunks emitted per document.
-
-        Returns:
-            True if the document is still below the configured limit.
-        """
         doc_buckets[doc_id] += 1
         return doc_buckets[doc_id] <= self._fusion_config.max_chunks_per_doc
 
@@ -152,17 +177,6 @@ class ResultShaper:
         emitted_indices: Sequence[int],
         pairwise: Optional[np.ndarray] = None,
     ) -> bool:
-        """Determine whether the current chunk is too similar to emitted ones.
-
-        Args:
-            embeddings: Matrix of chunk embeddings ordered to match `ordered_chunks`.
-            current_idx: Index of the chunk currently under consideration.
-            emitted_indices: Indices that have already been emitted in the final results.
-
-        Returns:
-            True when the current chunk's embedding exceeds the cosine similarity threshold.
-        """
-
         if not emitted_indices:
             return False
         if pairwise is not None:
@@ -187,17 +201,15 @@ class ResultShaper:
         return float(sims[0].max()) >= self._fusion_config.cosine_dedupe_threshold
 
     def _build_highlights(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
-        """Generate highlight snippets for a chunk.
-
-        Args:
-            chunk: Chunk payload being rendered.
-            query_tokens: Tokens derived from the user's query.
-
-        Returns:
-            List of highlight strings; falls back to a snippet when necessary.
-        """
         highlights = self._opensearch.highlight(chunk, query_tokens)
         if highlights:
             return highlights
-        snippet = chunk.text[:200]
-        return [snippet] if snippet else []
+        tokens = tokenize(chunk.text)
+        matches = [token for token in tokens if token in set(query_tokens)]
+        if matches:
+            return [" ".join(tokens[: min(len(tokens), 40)])]
+        return [chunk.text[: min(len(chunk.text), 200)]]
+
+
+__all__ = ["ReciprocalRankFusion", "apply_mmr_diversification", "ResultShaper"]
+

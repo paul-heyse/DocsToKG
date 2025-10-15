@@ -16,14 +16,14 @@ import numpy as np
 import faiss  # type: ignore
 
 from .config import HybridSearchConfigManager
-from .dense import FaissIndexManager
+from .vectorstore import FaissIndexManager
 from .features import FeatureGenerator
 from .ingest import ChunkIngestionPipeline
 from .observability import Observability
 from .operations import restore_state as ops_restore_state
 from .operations import serialize_state as ops_serialize_state
-from .retrieval import HybridSearchService
-from .similarity import pairwise_inner_products
+from .service import HybridSearchService
+from .vectorstore import pairwise_inner_products
 from .storage import ChunkRegistry, OpenSearchSimulator
 from .types import (
     ChunkPayload,

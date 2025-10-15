@@ -6,8 +6,8 @@ import base64
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
-from .dense import FaissIndexManager
-from .retrieval import HybridSearchRequest, HybridSearchService
+from .vectorstore import FaissIndexManager
+from .service import HybridSearchRequest, HybridSearchService
 from .storage import ChunkRegistry, OpenSearchSimulator
 
 

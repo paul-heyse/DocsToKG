@@ -63,9 +63,10 @@ def request_with_retries(
     deferring imports to avoid circular dependencies during runtime initialisation.
 
     Args:
-        session: Requests session used to execute the outbound HTTP call.
-        method: HTTP verb such as ``"GET"`` or ``"HEAD"``.
-        url: Fully qualified URL to fetch.
+        session (requests.Session): Requests session used to execute the outbound
+            HTTP call.
+        method (str): HTTP verb such as ``"GET"`` or ``"HEAD"``.
+        url (str): Fully qualified URL to fetch.
         **kwargs: Additional keyword arguments forwarded to the HTTP helper.
 
     Returns:

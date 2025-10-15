@@ -1,14 +1,20 @@
 """
-Resolver Providers
+Resolver Provider Registry
 
-This module consolidates all resolver provider implementations into a single
-registry-backed module. Providers register themselves upon subclassing the
-``RegisteredResolver`` base, allowing ``default_resolvers`` to materialise the
-prioritised resolver stack without manual bookkeeping.
+This module aggregates all resolver provider implementations used by the content
+download pipeline. Providers register themselves via ``RegisteredResolver`` so
+the resolver pipeline can materialise the prioritised stack without manual
+bookkeeping.
 
-The consolidation centralises shared imports, caching helpers, and optional
-third-party dependencies while preserving the public API expected by the
-resolver pipeline and caching utilities.
+Key Features:
+- Central registry that maps resolver names to implementations.
+- Shared helper imports for request retries, caching, and identifier grooming.
+- Optional BeautifulSoup integration for HTML scraping scenarios.
+
+Dependencies:
+- requests: HTTP client leveraged by resolver implementations.
+- DocsToKG.ContentDownload.network: Shared retry helper.
+- DocsToKG.ContentDownload.utils: Identifier normalisation utilities.
 """
 
 from __future__ import annotations
@@ -55,10 +61,10 @@ class ResolverRegistry:
     @classmethod
     def register(cls, resolver_cls: Type[Resolver]) -> Type[Resolver]:
         """Register a resolver class under its declared ``name`` attribute.
-        
+
         Args:
-            resolver_cls: Resolver implementation to register.
-        
+            resolver_cls (Type[Resolver]): Resolver implementation to register.
+
         Returns:
             Type[Resolver]: The registered resolver class for chaining.
         """
@@ -71,10 +77,7 @@ class ResolverRegistry:
     @classmethod
     def create_default(cls) -> List[Resolver]:
         """Instantiate resolver instances in priority order.
-        
-        Args:
-            None
-        
+
         Returns:
             List[Resolver]: Resolver instances ordered by default priority.
         """

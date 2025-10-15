@@ -41,11 +41,8 @@ from __future__ import annotations
 
 import sys
 
-from .api import HybridSearchAPI
 from .config import HybridSearchConfig, HybridSearchConfigManager
-from .dense import FaissIndexManager
 from .features import FeatureGenerator
-from .fusion import ReciprocalRankFusion, apply_mmr_diversification
 from .ingest import ChunkIngestionPipeline
 from .observability import Observability
 from .operations import (
@@ -56,7 +53,9 @@ from .operations import (
     should_rebuild_index,
     verify_pagination,
 )
-from .retrieval import HybridSearchService
+from .ranking import ReciprocalRankFusion, apply_mmr_diversification
+from .service import HybridSearchAPI, HybridSearchService
+from .vectorstore import FaissIndexManager
 from .storage import OpenSearchIndexTemplate, OpenSearchSchemaManager
 from .types import (
     ChunkPayload,
@@ -82,8 +81,6 @@ __all__ = [
     "HybridSearchValidator",
     "OpenSearchSchemaManager",
     "OpenSearchIndexTemplate",
-    "ReciprocalRankFusion",
-    "apply_mmr_diversification",
     "ChunkPayload",
     "DocumentInput",
     "Observability",
@@ -94,9 +91,11 @@ __all__ = [
     "verify_pagination",
     "should_rebuild_index",
     "vector_uuid_to_faiss_int",
+    "ReciprocalRankFusion",
+    "apply_mmr_diversification",
 ]
 
 _package = sys.modules[__name__]
 sys.modules.setdefault(__name__ + ".ids", sys.modules[__name__ + ".types"])
 sys.modules.setdefault(__name__ + ".schema", sys.modules[__name__ + ".storage"])
-sys.modules.setdefault(__name__ + ".similarity_gpu", sys.modules[__name__ + ".similarity"])
+sys.modules.setdefault(__name__ + ".similarity_gpu", sys.modules[__name__ + ".vectorstore"])

@@ -1,15 +1,40 @@
-"""Unified Resolver Module
+"""
+Content Download Resolver Orchestration
 
-This module consolidates resolver configuration, provider implementations,
-pipeline orchestration, and cache utilities into a single file."""
+This module centralises resolver configuration, provider registration,
+pipeline orchestration, and cache helpers for the DocsToKG content download
+stack. Resolver classes encapsulate provider-specific discovery logic while
+the shared pipeline coordinates rate limiting, concurrency, and polite HTTP
+behaviour.
+
+Key Features:
+- Resolver registry supplying default provider ordering and toggles.
+- Shared retry helper integration to ensure consistent network backoff.
+- Manifest and attempt bookkeeping for detailed diagnostics.
+- Utility functions for cache invalidation and signature normalisation.
+
+Dependencies:
+- requests: Outbound HTTP traffic and session management.
+- BeautifulSoup: Optional HTML parsing for resolver implementations.
+- DocsToKG.ContentDownload.network: Shared retry and session helpers.
+
+Usage:
+    from DocsToKG.ContentDownload import resolvers
+
+    config = resolvers.ResolverConfig()
+    active_resolvers = resolvers.default_resolvers()
+    pipeline = resolvers.ResolverPipeline(
+        resolvers=active_resolvers,
+        config=config,
+    )
+"""
 
 from __future__ import annotations
 
 import json
 import logging
 import random
-import re as _re
-import sys
+import re
 import threading
 import time
 import warnings
@@ -17,13 +42,30 @@ from collections import Counter, defaultdict
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Protocol, Sequence, Tuple, Type
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+    Type,
+)
 from urllib.parse import quote, urljoin, urlparse, urlsplit
 
 import requests
 
 from DocsToKG.ContentDownload.network import request_with_retries
-from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
+from DocsToKG.ContentDownload.utils import (
+    dedupe,
+    normalize_doi,
+    normalize_pmcid,
+    strip_prefix,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
@@ -35,7 +77,36 @@ except Exception:  # pragma: no cover - optional dependency missing
 
 LOGGER = logging.getLogger(__name__)
 
-Either a candidate download URL or an informational resolver event.
+_time_alias = time
+_requests_alias = requests
+
+DEFAULT_RESOLVER_ORDER: List[str] = [
+    "openalex",
+    "unpaywall",
+    "crossref",
+    "landing_page",
+    "arxiv",
+    "pmc",
+    "europe_pmc",
+    "core",
+    "zenodo",
+    "figshare",
+    "doaj",
+    "semantic_scholar",
+    "openaire",
+    "hal",
+    "osf",
+    "wayback",
+]
+
+_DEFAULT_RESOLVER_TOGGLES: Dict[str, bool] = {
+    name: name not in {"openaire", "hal", "osf"} for name in DEFAULT_RESOLVER_ORDER
+}
+
+
+@dataclass
+class ResolverResult:
+    """Either a candidate download URL or an informational resolver event.
 
     Attributes:
         url: Candidate download URL emitted by the resolver (``None`` for events).
@@ -506,20 +577,8 @@ class ResolverMetrics:
 
 DownloadFunc = Callable[..., DownloadOutcome]
 
-__all__ = [
-    "AttemptLogger",
-    "AttemptRecord",
-    "DEFAULT_RESOLVER_ORDER",
-    "DownloadFunc",
-    "DownloadOutcome",
-    "PipelineResult",
-    "Resolver",
-    "ResolverConfig",
-    "ResolverMetrics",
-    "ResolverResult",
-]
-
-Return a deterministic cache key for HTTP header dictionaries.
+def headers_cache_key(headers: Dict[str, str]) -> Tuple[Tuple[str, str], ...]:
+    """Return a deterministic cache key for HTTP header dictionaries.
 
     Args:
         headers: Mapping of header names to values.
@@ -534,10 +593,8 @@ Return a deterministic cache key for HTTP header dictionaries.
     )
     return tuple(sorted(items))
 
-
-__all__ = ["headers_cache_key"]
-
-Registry tracking resolver classes by their ``name`` attribute."""
+class ResolverRegistry:
+    """Registry tracking resolver classes by their ``name`` attribute."""
 
     _providers: Dict[str, Type[Resolver]] = {}
 
@@ -2662,68 +2719,19 @@ class ZenodoResolver(RegisteredResolver):
 
 
 def default_resolvers() -> List[Resolver]:
-    """Return default resolver instances in priority order.
-    
-    Args:
-        None
-    
+    """Instantiate the default resolver stack in priority order.
+
     Returns:
-        List[Resolver]: Resolver instances ordered according to defaults.
+        List[Resolver]: Resolver instances ordered according to
+        ``DEFAULT_RESOLVER_ORDER``.
+
+    Examples:
+        >>> from DocsToKG.ContentDownload import resolvers
+        >>> [resolver.name for resolver in resolvers.default_resolvers()]  # doctest: +ELLIPSIS
+        ['openalex', 'unpaywall', ...]
     """
 
     return ResolverRegistry.create_default()
-
-
-__all__ = [
-    "ResolverRegistry",
-    "RegisteredResolver",
-    "default_resolvers",
-    "ArxivResolver",
-    "CoreResolver",
-    "CrossrefResolver",
-    "DoajResolver",
-    "EuropePmcResolver",
-    "FigshareResolver",
-    "HalResolver",
-    "LandingPageResolver",
-    "OpenAireResolver",
-    "OpenAlexResolver",
-    "OsfResolver",
-    "PmcResolver",
-    "SemanticScholarResolver",
-    "UnpaywallResolver",
-    "WaybackResolver",
-    "ZenodoResolver",
-    "_fetch_crossref_data",
-    "_fetch_unpaywall_data",
-    "_fetch_semantic_scholar_data",
-    "headers_cache_key",
-    "_headers_cache_key",
-]
-
-Proxy to :func:`DocsToKG.ContentDownload.network.request_with_retries`.
-
-    The indirection keeps this module compatible with unit tests that monkeypatch
-    either the pipeline-level attribute or the underlying HTTP helper while also
-    deferring imports to avoid circular dependencies during runtime initialisation.
-
-    Args:
-        session: Requests session used to execute the outbound HTTP call.
-        method: HTTP verb such as ``"GET"`` or ``"HEAD"``.
-        url: Fully qualified URL to fetch.
-        **kwargs: Additional keyword arguments forwarded to the HTTP helper.
-
-    Returns:
-        requests.Response: Response object produced by the proxied helper.
-
-    Raises:
-        requests.RequestException: Propagated from the underlying retry helper.
-    """
-
-    from DocsToKG.ContentDownload.network import request_with_retries as _request_with_retries
-
-    return _request_with_retries(session, method, url, **kwargs)
-
 
 def _callable_accepts_argument(func: DownloadFunc, name: str) -> bool:
     """Return ``True`` when ``func`` accepts an argument named ``name``.
@@ -3493,10 +3501,8 @@ class ResolverPipeline:
         self._jitter_sleep()
         return None
 
-
-__all__ = ["ResolverPipeline"]
-
-Clear resolver-level HTTP caches to force fresh lookups.
+def clear_resolver_caches() -> None:
+    """Clear resolver-level HTTP caches to force fresh lookups.
 
     This utility resets the internal LRU caches used by the Unpaywall,
     Crossref, and Semantic Scholar resolvers. It should be called before
@@ -3514,20 +3520,24 @@ Clear resolver-level HTTP caches to force fresh lookups.
     _fetch_crossref_data.cache_clear()
     _fetch_semantic_scholar_data.cache_clear()
 
+_LEGACY_EXPORTS = {
+    "time": _time_alias,
+    "requests": _requests_alias,
+}
 
-__all__ = ["clear_resolver_caches"]
+_DEPRECATION_MESSAGES = {
+    "time": (
+        "DocsToKG.ContentDownload.resolvers.time is deprecated; import 'time' "
+        "directly. This alias will be removed in a future release."
+    ),
+    "requests": (
+        "DocsToKG.ContentDownload.resolvers.requests is deprecated; import the "
+        "'requests' package directly. This alias will be removed in a future release."
+    ),
+}
 
-Return legacy exports while emitting :class:`DeprecationWarning`.
-
-    Args:
-        name: Attribute name requested by the caller.
-
-    Returns:
-        Either the legacy export object or raises :class:`AttributeError` when unknown.
-
-    Raises:
-        AttributeError: If ``name`` is not a recognised legacy export.
-    """
+def __getattr__(name: str):
+    """Return legacy exports while emitting :class:`DeprecationWarning`."""
 
     if name in _LEGACY_EXPORTS:
         warnings.warn(
@@ -3540,3 +3550,40 @@ Return legacy exports while emitting :class:`DeprecationWarning`.
         )
         return _LEGACY_EXPORTS[name]
     raise AttributeError(name)
+
+__all__ = [
+    "AttemptLogger",
+    "AttemptRecord",
+    "DownloadFunc",
+    "DownloadOutcome",
+    "PipelineResult",
+    "Resolver",
+    "ResolverConfig",
+    "ResolverMetrics",
+    "ResolverPipeline",
+    "ResolverRegistry",
+    "RegisteredResolver",
+    "ResolverResult",
+    "DEFAULT_RESOLVER_ORDER",
+    "default_resolvers",
+    "clear_resolver_caches",
+    "headers_cache_key",
+    "ArxivResolver",
+    "CoreResolver",
+    "CrossrefResolver",
+    "DoajResolver",
+    "EuropePmcResolver",
+    "FigshareResolver",
+    "HalResolver",
+    "LandingPageResolver",
+    "OpenAireResolver",
+    "OpenAlexResolver",
+    "OsfResolver",
+    "PmcResolver",
+    "SemanticScholarResolver",
+    "UnpaywallResolver",
+    "WaybackResolver",
+    "ZenodoResolver",
+    "time",
+    "requests",
+]

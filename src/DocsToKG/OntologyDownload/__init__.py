@@ -101,6 +101,12 @@ _LEGACY_MODULE_MAP = {
     ".utils": ".ontology_download",
     ".logging_config": ".ontology_download",
     ".validator_workers": ".ontology_download",
+    ".foundation": ".ontology_download",
+    ".infrastructure": ".ontology_download",
+    ".network": ".ontology_download",
+    ".pipeline": ".ontology_download",
+    ".settings": ".ontology_download",
+    ".validation": ".ontology_download",
     ".cli_utils": ".cli",
 }
 

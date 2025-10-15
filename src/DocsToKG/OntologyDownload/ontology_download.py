@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from .resolvers import RESOLVERS, FetchPlan, normalize_license_to_spdx
-
-
 # --- Foundation utilities ---
 import logging
 import os
@@ -168,6 +165,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - explicit guidance for u
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_core import ValidationError as CoreValidationError
 
 FetchSpec = Any  # type: ignore[assignment]
 
@@ -853,7 +851,7 @@ def build_resolved_config(raw_config: Mapping[str, object]) -> ResolvedConfig:
         if defaults_section and not isinstance(defaults_section, Mapping):
             raise ConfigError("'defaults' section must be a mapping")
         defaults = DefaultsConfig.model_validate(defaults_section)
-    except ValidationError as exc:
+    except (ValidationError, CoreValidationError) as exc:
         messages = []
         for error in exc.errors():
             location = " -> ".join(str(part) for part in error["loc"])
@@ -4188,6 +4186,14 @@ def validate_pronto(request: ValidationRequest, logger: logging.Logger) -> Valid
         payload = {"ok": False, "error": message}
     except ValidatorSubprocessError as exc:
         payload = {"ok": False, "error": str(exc)}
+    except Exception as exc:  # pragma: no cover - defensive catch
+        payload = {"ok": False, "error": str(exc)}
+    except Exception as exc:  # pragma: no cover - defensive catch
+        payload = {"ok": False, "error": str(exc)}
+    except Exception as exc:  # pragma: no cover - defensive catch
+        payload = {"ok": False, "error": str(exc)}
+    except Exception as exc:  # pragma: no cover - defensive catch
+        payload = {"ok": False, "error": str(exc)}
     _write_validation_json(request.validation_dir / "pronto_parse.json", payload)
     logger.warning(
         "pronto validation failed",
@@ -4240,6 +4246,8 @@ def validate_owlready2(request: ValidationRequest, logger: logging.Logger) -> Va
         message = f"Parser timeout after {request.config.defaults.validation.parser_timeout_sec}s"
         payload = {"ok": False, "error": message}
     except ValidatorSubprocessError as exc:
+        payload = {"ok": False, "error": str(exc)}
+    except Exception as exc:  # pragma: no cover - defensive catch
         payload = {"ok": False, "error": str(exc)}
     _write_validation_json(request.validation_dir / "owlready2_parse.json", payload)
     logger.warning(

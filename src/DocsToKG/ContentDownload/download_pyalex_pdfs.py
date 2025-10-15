@@ -178,15 +178,15 @@ def _make_session(headers: Dict[str, str]) -> requests.Session:
     controls backoff, ensuring deterministic retry counts across the pipeline.
 
     Args:
-        headers: Header dictionary returned by :func:`load_resolver_config`. The mapping
-            must already include the project user agent and ``mailto`` contact address.
-            A copy of the mapping is applied to the outgoing session so callers can
-            reuse mutable dictionaries without side effects.
+        headers (Dict[str, str]): Header dictionary returned by
+            :func:`load_resolver_config`. The mapping must already include the
+            project user agent and ``mailto`` contact address. A copy of the
+            mapping is applied to the outgoing session so callers can reuse
+            mutable dictionaries without side effects.
 
     Returns:
         requests.Session: Session with connection pooling enabled and retries
-            disabled at the adapter level so the application layer governs
-            backoff behaviour.
+        disabled at the adapter level so the application layer governs backoff.
 
     Notes:
         Each worker should call this helper to obtain an isolated session instance.
