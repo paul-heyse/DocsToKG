@@ -22,11 +22,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
 from typing import List, Tuple
 
 # Third-party imports
@@ -37,6 +35,7 @@ from docling_core.types.doc.document import DoclingDocument, DocTagsDocument
 from transformers import AutoTokenizer
 
 from DocsToKG.DocParsing._common import (
+    atomic_write,
     compute_content_hash,
     data_chunks,
     data_doctags,
@@ -46,6 +45,7 @@ from DocsToKG.DocParsing._common import (
     iter_doctags,
     load_manifest_index,
     manifest_append,
+    resolve_hash_algorithm,
 )
 from DocsToKG.DocParsing.schemas import (
     CHUNK_SCHEMA_VERSION,
@@ -54,29 +54,6 @@ from DocsToKG.DocParsing.schemas import (
     get_docling_version,
 )
 from DocsToKG.DocParsing.serializers import RichSerializerProvider
-
-
-def _promote_simple_namespace_modules() -> None:
-    """Convert any SimpleNamespace placeholders in sys.modules to real modules.
-
-    Some tests install lightweight SimpleNamespace stubs into sys.modules for
-    optional dependencies (for example ``trafilatura``). Hypothesis' internal
-    providers assume module objects are hashable, which SimpleNamespace is not.
-    Promoting the stubs to ModuleType instances preserves their attributes while
-    restoring hashability, preventing spurious test failures.
-    """
-
-    for name, module in list(sys.modules.items()):
-        if isinstance(module, SimpleNamespace):
-            promoted = ModuleType(name)
-            promoted.__dict__.update(vars(module))
-            sys.modules[name] = promoted
-
-
-_promote_simple_namespace_modules()
-
-SOFT_BARRIER_MARGIN = 64
-
 SOFT_BARRIER_MARGIN = 64
 
 # ---------- Defaults ----------
@@ -660,6 +637,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 schema_version=CHUNK_SCHEMA_VERSION,
                 input_path=str(path),
                 input_hash=input_hash,
+                hash_alg=resolve_hash_algorithm(),
                 output_path=str(out_path),
                 parse_engine=parse_engine,
             )
@@ -702,7 +680,7 @@ def main(args: argparse.Namespace | None = None) -> int:
             )
 
             # Stage 4: write JSONL with schema validation
-            with out_path.open("w", encoding="utf-8") as handle:
+            with atomic_write(out_path) as handle:
                 for cid, r in enumerate(final_recs):
                     provenance = ProvenanceMetadata(
                         parse_engine=parse_engine,
@@ -745,6 +723,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 schema_version=CHUNK_SCHEMA_VERSION,
                 input_path=str(path),
                 input_hash=input_hash,
+                hash_alg=resolve_hash_algorithm(),
                 output_path=str(out_path),
                 chunk_count=len(final_recs),
                 parse_engine=parse_engine,
@@ -759,6 +738,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 schema_version=CHUNK_SCHEMA_VERSION,
                 input_path=str(path),
                 input_hash=input_hash,
+                hash_alg=resolve_hash_algorithm(),
                 output_path=str(out_path),
                 error=str(exc),
                 parse_engine=parse_engine,
