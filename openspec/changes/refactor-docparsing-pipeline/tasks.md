@@ -1319,42 +1319,42 @@
   - Check if lock exists and is stale (PID not running)
   - Use `acquire_lock()` context manager from _common
 
-- [ ] 15.2 Add content hash tracking
+- [x] 15.2 Add content hash tracking
   - Compute hash of input file before processing
   - Store in manifest with output file path
   - On resume, compare hash to detect changes
 
-- [ ] 15.3 Implement --resume flag
+- [x] 15.3 Implement --resume flag
   - Add to all processing scripts
   - Logic: Skip if output exists AND input hash matches manifest entry
   - Log skip reason: "Skipping {doc_id}: output exists and input unchanged"
 
-- [ ] 15.4 Add --force flag to override resume
+- [x] 15.4 Add --force flag to override resume
   - When set, ignore existing outputs and reprocess everything
   - Log: "Force mode: reprocessing all documents"
 
 ## 16. Testing Infrastructure
 
-- [ ] 16.1 Create golden-path fixture directory
+- [x] 16.1 Create golden-path fixture directory
   - `tests/data/docparsing/golden/` with:
     - sample.doctags (small known document)
     - sample.chunks.jsonl (expected chunks)
     - sample.vectors.jsonl (expected vectors)
   - Commit to git for deterministic testing
 
-- [ ] 16.2 Implement deterministic chunk count test
+- [x] 16.2 Implement deterministic chunk count test
   - Read golden fixture
   - Run chunker with fixed parameters
   - Assert chunk count matches expected
   - Assert chunk text hashes match (for ordering stability)
 
-- [ ] 16.3 Implement trip-wire test: coalescer invariants
+- [x] 16.3 Implement trip-wire test: coalescer invariants
   - Test: All chunks have >= min_tokens (except last chunk)
   - Test: No chunks exceed max_tokens
   - Test: Chunks are in document order
   - Use property-based testing (hypothesis) for randomized inputs
 
-- [ ] 16.4 Implement trip-wire test: embedding shapes
+- [x] 16.4 Implement trip-wire test: embedding shapes
   - Test: All Qwen vectors have dimension 2560
   - Test: All SPLADE vectors have non-negative weights
   - Test: BM25 term and weight lists have equal length

@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
-"""
-HTML → DocTags (parallel, CPU-only; no captioning/classification, no HF auth)
-
-- Input : Data/HTML/ (recurses; excludes *.normalized.html)
-- Output: Data/DocTagsFiles/<mirrored_subdirs>/*.doctags
-
-Example:
-  python run_docling_html_to_doctags_parallel.py \
-      --input  Data/HTML \
-      --output Data/DocTagsFiles \
-      --workers 12
-"""
+"""Parallel HTML → DocTags conversion with manifest-aware resume support."""
 
 import os
+import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 from tqdm import tqdm
 
-from DocsToKG.DocParsing._common import data_doctags, data_html, detect_data_root
+from DocsToKG.DocParsing._common import (
+    compute_content_hash,
+    data_doctags,
+    data_html,
+    data_manifests,
+    detect_data_root,
+    load_manifest_index,
+    manifest_append,
+)
 
 DEFAULT_INPUT_DIR = data_html()
 DEFAULT_OUTPUT_DIR = data_doctags()
+MANIFEST_STAGE = "doctags-html"
 
 # keep numeric libs polite; also ensure nothing touches CUDA by mistake
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -37,6 +37,30 @@ from docling.document_converter import DocumentConverter, HTMLFormatOption
 
 # per-process converter cache
 _CONVERTER = None
+
+
+@dataclass
+class HtmlTask:
+    """Work item describing a single HTML conversion job."""
+
+    html_path: Path
+    relative_id: str
+    output_path: Path
+    input_hash: str
+    overwrite: bool
+
+
+@dataclass
+class ConversionResult:
+    """Structured result emitted by worker processes."""
+
+    doc_id: str
+    status: str
+    duration_s: float
+    input_path: str
+    input_hash: str
+    output_path: str
+    error: str | None = None
 
 
 def _get_converter() -> DocumentConverter:
@@ -71,39 +95,57 @@ def list_htmls(root: Path) -> List[Path]:
     return sorted(out)
 
 
-def convert_one(
-    html_path: Path, input_root: Path, output_root: Path, overwrite: bool
-) -> Tuple[str, str]:
-    """Convert a single HTML file to DocTags, honoring overwrite semantics.
+def convert_one(task: HtmlTask) -> ConversionResult:
+    """Convert a single HTML file to DocTags, honoring overwrite semantics."""
 
-    Args:
-        html_path: Path to the source HTML document.
-        input_root: Root directory used to compute relative paths for logging.
-        output_root: Base directory where generated `.doctags` files are stored.
-        overwrite: Whether to replace existing outputs.
-
-    Returns:
-        Tuple of `(relative_path, status)` where status is `ok`, `skip`, or a
-        `fail:<reason>` string describing an error condition.
-    """
-    rel = html_path.relative_to(input_root)
+    start = time.perf_counter()
     try:
-        out_path = (output_root / rel).with_suffix(".doctags")
-        if out_path.exists() and not overwrite:
-            return (rel.as_posix(), "skip")
+        out_path = task.output_path
+        if out_path.exists() and not task.overwrite:
+            return ConversionResult(
+                doc_id=task.relative_id,
+                status="skip",
+                duration_s=0.0,
+                input_path=str(task.html_path),
+                input_hash=task.input_hash,
+                output_path=str(out_path),
+            )
 
         converter = _get_converter()
-        result = converter.convert(html_path, raises_on_error=False)
+        result = converter.convert(task.html_path, raises_on_error=False)
 
         if result.document is None:
-            return (rel.as_posix(), "fail: empty-document")
+            return ConversionResult(
+                doc_id=task.relative_id,
+                status="failure",
+                duration_s=time.perf_counter() - start,
+                input_path=str(task.html_path),
+                input_hash=task.input_hash,
+                output_path=str(out_path),
+                error="empty-document",
+            )
 
         out_path.parent.mkdir(parents=True, exist_ok=True)
         result.document.save_as_doctags(out_path)
-        return (rel.as_posix(), "ok")
+        return ConversionResult(
+            doc_id=task.relative_id,
+            status="success",
+            duration_s=time.perf_counter() - start,
+            input_path=str(task.html_path),
+            input_hash=task.input_hash,
+            output_path=str(out_path),
+        )
 
-    except Exception as e:
-        return (rel.as_posix(), f"fail: {e}")
+    except Exception as exc:  # pragma: no cover - integration failure path
+        return ConversionResult(
+            doc_id=task.relative_id,
+            status="failure",
+            duration_s=time.perf_counter() - start,
+            input_path=str(task.html_path),
+            input_hash=task.input_hash,
+            output_path=str(task.output_path),
+            error=str(exc),
+        )
 
 
 def main():
@@ -152,6 +194,16 @@ def main():
     parser.add_argument(
         "--overwrite", action="store_true", help="Overwrite existing .doctags files"
     )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip documents whose outputs already exist with matching content hash",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force reprocessing even when resume criteria are satisfied",
+    )
     args = parser.parse_args()
 
     data_root_override = args.data_root
@@ -160,6 +212,11 @@ def main():
         if data_root_override is not None
         else detect_data_root()
     )
+
+    if data_root_override is not None:
+        os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved_root)
+
+    data_manifests(resolved_root)
 
     if args.input == DEFAULT_INPUT_DIR and data_root_override is not None:
         input_dir: Path = data_html(resolved_root)
@@ -176,25 +233,86 @@ def main():
     print(f"Output: {output_dir}")
     print(f"Workers: {args.workers}")
 
+    if args.force:
+        print("Force mode: reprocessing all documents")
+    elif args.resume:
+        print("Resume mode enabled: unchanged outputs will be skipped")
+
     files = list_htmls(input_dir)
     if not files:
         print("No HTML files found. Exiting.")
         return
 
+    manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_root) if args.resume else {}
+
+    tasks: List[HtmlTask] = []
     ok = fail = skip = 0
+    for path in files:
+        rel_path = path.relative_to(input_dir)
+        doc_id = rel_path.as_posix()
+        out_path = (output_dir / rel_path).with_suffix(".doctags")
+        input_hash = compute_content_hash(path)
+        manifest_entry = manifest_index.get(doc_id)
+        if (
+            args.resume
+            and not args.force
+            and not args.overwrite
+            and out_path.exists()
+            and manifest_entry
+            and manifest_entry.get("input_hash") == input_hash
+        ):
+            print(f"Skipping {doc_id}: output exists and input unchanged")
+            manifest_append(
+                stage=MANIFEST_STAGE,
+                doc_id=doc_id,
+                status="skip",
+                duration_s=0.0,
+                schema_version="docparse/1.1.0",
+                input_path=str(path),
+                input_hash=input_hash,
+                output_path=str(out_path),
+            )
+            skip += 1
+            continue
+        tasks.append(
+            HtmlTask(
+                html_path=path,
+                relative_id=doc_id,
+                output_path=out_path,
+                input_hash=input_hash,
+                overwrite=args.overwrite,
+            )
+        )
+
+    if not tasks:
+        print(f"\nDone. ok=0, skip={skip}, fail=0")
+        return
+
     with ProcessPoolExecutor(max_workers=args.workers) as ex:
-        futures = [ex.submit(convert_one, p, input_dir, output_dir, args.overwrite) for p in files]
+        futures = [ex.submit(convert_one, task) for task in tasks]
         for fut in tqdm(
             as_completed(futures), total=len(futures), unit="file", desc="HTML → DocTags"
         ):
-            rel, status = fut.result()
-            if status == "ok":
+            result = fut.result()
+            if result.status == "success":
                 ok += 1
-            elif status == "skip":
+            elif result.status == "skip":
                 skip += 1
             else:
                 fail += 1
-                print(f"[FAIL] {rel}: {status}")
+                print(f"[FAIL] {result.doc_id}: {result.error or 'conversion failed'}")
+
+            manifest_append(
+                stage=MANIFEST_STAGE,
+                doc_id=result.doc_id,
+                status=result.status,
+                duration_s=round(result.duration_s, 3),
+                schema_version="docparse/1.1.0",
+                input_path=result.input_path,
+                input_hash=result.input_hash,
+                output_path=result.output_path,
+                error=result.error,
+            )
 
     print(f"\nDone. ok={ok}, skip={skip}, fail={fail}")
 

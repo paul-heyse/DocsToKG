@@ -41,12 +41,15 @@ from vllm import (
 from DocsToKG.DocParsing._common import (
     Batcher,
     atomic_write,
+    compute_content_hash,
     data_chunks,
+    data_manifests,
     data_vectors,
     detect_data_root,
     get_logger,
     jsonl_load,
     jsonl_save,
+    load_manifest_index,
     manifest_append,
 )
 from DocsToKG.DocParsing.schemas import BM25Vector, DenseVector, SPLADEVector, VectorRow
@@ -60,6 +63,7 @@ SPLADE_DIR = MODEL_ROOT / "naver" / "splade-v3"
 DEFAULT_DATA_ROOT = detect_data_root()
 DEFAULT_CHUNKS_DIR = data_chunks(DEFAULT_DATA_ROOT)
 DEFAULT_VECTORS_DIR = data_vectors(DEFAULT_DATA_ROOT)
+MANIFEST_STAGE = "embeddings"
 
 # Make sure every lib (Transformers / HF Hub / Sentence-Transformers) honors this cache.
 os.environ.setdefault("HF_HOME", str(HF_HOME))
@@ -684,6 +688,16 @@ def main():
     parser.add_argument("--qwen-dtype", type=str, default="bfloat16")
     parser.add_argument("--qwen-quant", type=str, default=None)
     parser.add_argument("--tp", type=int, default=1)
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip chunk files whose vector outputs already exist with matching hash",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force reprocessing even when resume criteria are satisfied",
+    )
     args = parser.parse_args()
 
     if args.batch_size_splade < 1 or args.batch_size_qwen < 1:
@@ -697,6 +711,11 @@ def main():
         if data_root_override is not None
         else DEFAULT_DATA_ROOT
     )
+
+    if data_root_override is not None:
+        os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved_root)
+
+    data_manifests(resolved_root)
 
     if args.chunks_dir == DEFAULT_CHUNKS_DIR and data_root_override is not None:
         chunks_dir = data_chunks(resolved_root)
@@ -730,6 +749,11 @@ def main():
         )
         return
 
+    if args.force:
+        logger.info("Force mode: reprocessing all chunk files")
+    elif args.resume:
+        logger.info("Resume mode enabled: unchanged chunk files will be skipped")
+
     attn_impl = None if args.splade_attn == "auto" else args.splade_attn
     args.splade_cfg = SpladeCfg(
         batch_size=args.batch_size_splade,
@@ -755,9 +779,75 @@ def main():
     splade_nnz_all: List[int] = []
     qwen_norms_all: List[float] = []
 
-    for chunk_file in tqdm(files, desc="Pass B: Encoding vectors", unit="file"):
-        count, nnz, norms = process_chunk_file_vectors(
-            chunk_file, uuid_to_chunk, stats, args, validator, logger
+    manifest_index = (
+        load_manifest_index(MANIFEST_STAGE, resolved_root) if args.resume else {}
+    )
+    file_entries = []
+    skipped_files = 0
+    for chunk_file in files:
+        doc_id = chunk_file.relative_to(chunks_dir).as_posix()
+        out_path = args.out_dir / f"{chunk_file.stem.replace('.chunks', '')}.vectors.jsonl"
+        input_hash = compute_content_hash(chunk_file)
+        entry = manifest_index.get(doc_id)
+        if (
+            args.resume
+            and not args.force
+            and out_path.exists()
+            and entry
+            and entry.get("input_hash") == input_hash
+        ):
+            logger.info("Skipping %s: output exists and input unchanged", doc_id)
+            manifest_append(
+                stage=MANIFEST_STAGE,
+                doc_id=doc_id,
+                status="skip",
+                duration_s=0.0,
+                schema_version="embeddings/1.0.0",
+                input_path=str(chunk_file),
+                input_hash=input_hash,
+                output_path=str(out_path),
+            )
+            skipped_files += 1
+            continue
+        file_entries.append((chunk_file, out_path, input_hash, doc_id))
+
+    for chunk_file, out_path, input_hash, doc_id in tqdm(
+        file_entries, desc="Pass B: Encoding vectors", unit="file"
+    ):
+        start = time.perf_counter()
+        try:
+            count, nnz, norms = process_chunk_file_vectors(
+                chunk_file, uuid_to_chunk, stats, args, validator, logger
+            )
+        except Exception as exc:
+            duration = time.perf_counter() - start
+            manifest_append(
+                stage=MANIFEST_STAGE,
+                doc_id=doc_id,
+                status="failure",
+                duration_s=round(duration, 3),
+                schema_version="embeddings/1.0.0",
+                input_path=str(chunk_file),
+                input_hash=input_hash,
+                output_path=str(out_path),
+                error=str(exc),
+            )
+            raise
+
+        duration = time.perf_counter() - start
+        total_vectors += count
+        splade_nnz_all.extend(nnz)
+        qwen_norms_all.extend(norms)
+        manifest_append(
+            stage=MANIFEST_STAGE,
+            doc_id=doc_id,
+            status="success",
+            duration_s=round(duration, 3),
+            schema_version="embeddings/1.0.0",
+            input_path=str(chunk_file),
+            input_hash=input_hash,
+            output_path=str(out_path),
+            vector_count=count,
         )
         total_vectors += count
         splade_nnz_all.extend(nnz)
@@ -813,12 +903,65 @@ def main():
         peak_memory_gb=peak / 1024**3,
     )
 
+    _current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    elapsed_b = time.perf_counter() - pass_b_start
+
+    validator.report(logger)
+
+    zero_pct = (
+        100.0 * len([n for n in splade_nnz_all if n == 0]) / total_vectors
+        if total_vectors
+        else 0.0
+    )
+    avg_nnz = statistics.mean(splade_nnz_all) if splade_nnz_all else 0.0
+    median_nnz = statistics.median(splade_nnz_all) if splade_nnz_all else 0.0
+    avg_norm = statistics.mean(qwen_norms_all) if qwen_norms_all else 0.0
+    std_norm = (
+        statistics.pstdev(qwen_norms_all) if len(qwen_norms_all) > 1 else 0.0
+    )
+
+    logger.info(
+        "Embedding summary",
+        extra={
+            "extra_fields": {
+                "total_vectors": total_vectors,
+                "splade_avg_nnz": round(avg_nnz, 3),
+                "splade_median_nnz": round(median_nnz, 3),
+                "splade_zero_pct": round(zero_pct, 2),
+                "qwen_avg_norm": round(avg_norm, 4),
+                "qwen_std_norm": round(std_norm, 4),
+                "pass_b_seconds": round(elapsed_b, 3),
+                "skipped_files": skipped_files,
+            }
+        },
+    )
+    logger.info("Peak memory: %.2f GB", peak / 1024**3)
+
+    manifest_append(
+        stage=MANIFEST_STAGE,
+        doc_id="__corpus__",
+        status="success",
+        duration_s=round(time.perf_counter() - overall_start, 3),
+        warnings=validator.zero_nnz_chunks[:10] if validator.zero_nnz_chunks else [],
+        schema_version="embeddings/1.0.0",
+        total_vectors=total_vectors,
+        splade_avg_nnz=avg_nnz,
+        splade_median_nnz=median_nnz,
+        splade_zero_pct=zero_pct,
+        qwen_avg_norm=avg_norm,
+        qwen_std_norm=std_norm,
+        peak_memory_gb=peak / 1024**3,
+        skipped_files=skipped_files,
+    )
+
     logger.info(
         "[DONE] Saved vectors",
         extra={
             "extra_fields": {
                 "vectors_dir": str(out_dir),
-                "files": len(files),
+                "processed_files": len(file_entries),
+                "skipped_files": skipped_files,
             }
         },
     )
