@@ -348,6 +348,8 @@ def test_embeddings_failure_cleans_temporary_files(tmp_path, monkeypatch):
             "doc_id": "doc",
             "schema_version": "docparse/1.1.0",
         },
+        {"uuid": "u1", "text": "hello world", "doc_id": "doc"},
+        {"uuid": "u2", "text": "another chunk", "doc_id": "doc"},
     ]
     write_dummy_chunks(env, "doc", rows)
 

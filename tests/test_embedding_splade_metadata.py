@@ -25,6 +25,41 @@ def test_splade_attn_help_text_describes_fallbacks(
     """The CLI help should explain attention fallbacks and explicit modes."""
 
     embed_module = _reload_embedding_module(monkeypatch)
+    tqdm_stub = ModuleType("tqdm")
+    tqdm_stub.tqdm = lambda iterable=None, **_: iterable if iterable is not None else []
+    monkeypatch.setitem(sys.modules, "tqdm", tqdm_stub)
+
+    st_stub = ModuleType("sentence_transformers")
+
+    class _SparseEncoder:  # pragma: no cover - simple placeholder
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+    st_stub.SparseEncoder = _SparseEncoder
+    monkeypatch.setitem(sys.modules, "sentence_transformers", st_stub)
+
+    vllm_stub = ModuleType("vllm")
+
+    class _LLM:  # pragma: no cover - simple placeholder
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+        def embed(self, _batch, pooling_params=None):
+            return []
+
+    class _PoolingParams:  # pragma: no cover - simple placeholder
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+    vllm_stub.LLM = _LLM
+    vllm_stub.PoolingParams = _PoolingParams
+    monkeypatch.setitem(sys.modules, "vllm", vllm_stub)
+
+    import DocsToKG.DocParsing.EmbeddingV2 as embed_module
+    embed_module = importlib.reload(embed_module)
 
     parser = embed_module.build_parser()
     action = _find_action(parser, "--splade-attn")
@@ -40,6 +75,11 @@ def test_summary_manifest_includes_splade_backend_metadata(
     """Summary manifest entries should record SPLADE backend metadata."""
 
     embed_module = _reload_embedding_module(monkeypatch)
+    tqdm_stub = ModuleType("tqdm")
+    tqdm_stub.tqdm = lambda iterable=None, **_: iterable if iterable is not None else []
+    monkeypatch.setitem(sys.modules, "tqdm", tqdm_stub)
+
+    import DocsToKG.DocParsing.EmbeddingV2 as embed_module
 
     manifests: List[Dict[str, Any]] = []
 
@@ -56,6 +96,7 @@ def test_summary_manifest_includes_splade_backend_metadata(
     chunk_file = chunk_dir / "sample.chunks.jsonl"
     chunk_file.write_text(
         '{"uuid": "chunk-1", "text": "Example", "doc_id": "doc", "schema_version": "docparse/1.1.0"}\n',
+        '{"uuid": "chunk-1", "text": "Example", "doc_id": "doc"}\n',
         encoding="utf-8",
     )
 

@@ -133,6 +133,17 @@ def test_download_config_allowed_hosts() -> None:
     assert "purl.obolibrary.org" in config.allowed_hosts
 
 
+def test_download_config_defaults_include_service_limits() -> None:
+    """Default configuration should expose service-specific limits and planners."""
+
+    config = DownloadConfiguration()
+
+    assert config.concurrent_plans == 8
+    assert config.rate_limits["ols"] == "4/second"
+    assert config.rate_limits["bioportal"] == "2/second"
+    assert config.rate_limits["lov"] == "1/second"
+
+
 def test_download_config_normalizes_allowed_hosts() -> None:
     """normalized_allowed_hosts should return punycoded hostnames."""
 

@@ -38,7 +38,8 @@ import uuid
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from types import SimpleNamespace
+from typing import Dict, List, Optional, Sequence, Tuple
 
 # Third-party imports
 from tqdm import tqdm
@@ -127,6 +128,57 @@ QWEN_DIR = _resolve_with_env(
     "DOCSTOKG_QWEN_DIR", MODEL_ROOT / "Qwen" / "Qwen3-Embedding-4B"
 )
 SPLADE_DIR = _resolve_with_env("DOCSTOKG_SPLADE_DIR", MODEL_ROOT / "naver" / "splade-v3")
+# ---- Fixed locations ----
+
+
+def _expand_path(path: str | Path) -> Path:
+    """Return ``path`` expanded to an absolute :class:`Path`."""
+
+    return Path(path).expanduser().resolve()
+
+
+def _resolve_hf_home() -> Path:
+    """Determine the HuggingFace cache directory respecting ``HF_HOME``."""
+
+    env = os.getenv("HF_HOME")
+    if env:
+        return _expand_path(env)
+    return Path.home().expanduser() / ".cache" / "huggingface"
+
+
+def _resolve_model_root(hf_home: Path) -> Path:
+    """Resolve DocsToKG model root with ``DOCSTOKG_MODEL_ROOT`` override."""
+
+    env = os.getenv("DOCSTOKG_MODEL_ROOT")
+    return _expand_path(env) if env else hf_home
+
+
+def _resolve_qwen_dir(model_root: Path) -> Path:
+    """Resolve Qwen model directory with ``DOCSTOKG_QWEN_DIR`` override."""
+
+    env = os.getenv("DOCSTOKG_QWEN_DIR")
+    return _expand_path(env) if env else model_root / "Qwen" / "Qwen3-Embedding-4B"
+
+
+def _resolve_splade_dir(model_root: Path) -> Path:
+    """Resolve SPLADE model directory with ``DOCSTOKG_SPLADE_DIR`` override."""
+
+    env = os.getenv("DOCSTOKG_SPLADE_DIR")
+    return _expand_path(env) if env else model_root / "naver" / "splade-v3"
+
+
+HF_HOME = _resolve_hf_home()
+MODEL_ROOT = _resolve_model_root(HF_HOME)
+QWEN_DIR = _expand_path(_resolve_qwen_dir(MODEL_ROOT))
+SPLADE_DIR = _expand_path(_resolve_splade_dir(MODEL_ROOT))
+
+
+def _expand_optional(path: Optional[Path]) -> Optional[Path]:
+    """Expand optional :class:`Path` values to absolutes when provided."""
+
+    if path is None:
+        return None
+    return path.expanduser().resolve()
 
 DEFAULT_DATA_ROOT = detect_data_root()
 DEFAULT_CHUNKS_DIR = data_chunks(DEFAULT_DATA_ROOT)
@@ -181,26 +233,6 @@ def _ensure_qwen_dependencies() -> None:
 # ---- simple tokenizer for BM25 ----
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)?")
-
-
-@dataclass
-class Chunk:
-    """Minimal representation of a DocTags chunk stored on disk.
-
-    Attributes:
-        uuid: Stable identifier for the chunk.
-        text: Textual content extracted from the DocTags document.
-        doc_id: Identifier of the source document for manifest reporting.
-
-    Examples:
-        >>> chunk = Chunk(uuid="chunk-1", text="Hybrid search is powerful.", doc_id="doc")
-        >>> chunk.uuid
-        'chunk-1'
-    """
-
-    uuid: str
-    text: str
-    doc_id: str
 
 
 def iter_chunk_files(d: Path) -> List[Path]:
@@ -276,21 +308,6 @@ class BM25Stats:
     N: int
     avgdl: float
     df: Dict[str, int]
-
-
-def build_bm25_stats(chunks: Iterable[Chunk]) -> BM25Stats:
-    """Compute corpus statistics required for BM25 weighting.
-
-    Args:
-        chunks: Iterable of text chunks with identifiers.
-
-    Returns:
-        BM25Stats containing document frequency counts and average length.
-    """
-    accumulator = BM25StatsAccumulator()
-    for chunk in chunks:
-        accumulator.add_document(chunk.text)
-    return accumulator.finalize()
 
 
 class BM25StatsAccumulator:
@@ -767,6 +784,14 @@ def process_chunk_file_vectors(
 
     uuids = [row["uuid"] for row in rows]
     texts = [row.get("text", "") for row in rows]
+    uuids: List[str] = []
+    texts: List[str] = []
+    for row in rows:
+        uuid_value = row.get("uuid")
+        if not uuid_value:
+            raise ValueError(f"Chunk row missing UUID in {chunk_file}")
+        uuids.append(uuid_value)
+        texts.append(str(row.get("text", "")))
     splade_results: List[Tuple[Sequence[str], Sequence[float]]] = []
     for batch in Batcher(texts, args.batch_size_splade):
         tokens_batch, weights_batch = splade_encode(
@@ -981,6 +1006,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Override SPLADE model directory (CLI > $DOCSTOKG_SPLADE_DIR > "
             f"{SPLADE_DIR})."
+            "model root/naver/splade-v3)."
         ),
     )
     parser.add_argument(
@@ -1004,6 +1030,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Override Qwen model directory (CLI > $DOCSTOKG_QWEN_DIR > "
             f"{QWEN_DIR})."
+            "model root/Qwen/Qwen3-Embedding-4B)."
         ),
     )
     parser.add_argument("--tp", type=int, default=1)
@@ -1021,8 +1048,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--offline",
         action="store_true",
         help=(
-            "Disable network access during model loading. Requires all models "
-            "to exist locally in the configured directories."
+            "Disable network access by setting TRANSFORMERS_OFFLINE=1. "
+            "All models must already exist in local caches."
         ),
     )
     return parser
@@ -1061,12 +1088,58 @@ def main(args: argparse.Namespace | None = None) -> int:
     logger = get_logger(__name__)
 
     parser = build_parser()
-    defaults = parser.parse_args([])
-    provided = parse_args() if args is None else args
-    for key, value in vars(provided).items():
-        if value is not None:
+    if args is None:
+        parsed_args = parser.parse_args()
+    elif isinstance(args, (argparse.Namespace, SimpleNamespace)):
+        defaults = parser.parse_args([])
+        for key, value in vars(args).items():
             setattr(defaults, key, value)
-    args = defaults
+        parsed_args = defaults
+    elif isinstance(args, list):
+        parsed_args = parser.parse_args(args)
+    else:
+        parsed_args = parser.parse_args(list(args))
+    args = parsed_args
+    offline_mode = bool(getattr(args, "offline", False))
+
+    hf_home = _resolve_hf_home()
+    model_root = _resolve_model_root(hf_home)
+    default_splade_dir = _expand_path(_resolve_splade_dir(model_root))
+    default_qwen_dir = _expand_path(_resolve_qwen_dir(model_root))
+    cli_splade = _expand_optional(getattr(args, "splade_model_dir", None))
+    cli_qwen = _expand_optional(getattr(args, "qwen_model_dir", None))
+    splade_model_dir = cli_splade or default_splade_dir
+    qwen_model_dir = cli_qwen or default_qwen_dir
+
+    global HF_HOME, MODEL_ROOT, QWEN_DIR, SPLADE_DIR
+    HF_HOME = hf_home
+    MODEL_ROOT = model_root
+    QWEN_DIR = default_qwen_dir
+    SPLADE_DIR = default_splade_dir
+
+    os.environ["HF_HOME"] = str(hf_home)
+    os.environ["HF_HUB_CACHE"] = str(hf_home / "hub")
+    os.environ["TRANSFORMERS_CACHE"] = str(hf_home / "transformers")
+    os.environ["SENTENCE_TRANSFORMERS_HOME"] = str(model_root)
+
+    if offline_mode:
+        os.environ["TRANSFORMERS_OFFLINE"] = "1"
+        missing_paths = []
+        if not splade_model_dir.exists():
+            missing_paths.append(
+                f"SPLADE model directory missing: {splade_model_dir}"
+            )
+        if not qwen_model_dir.exists():
+            missing_paths.append(
+                "Qwen model directory not found: "
+                f"{qwen_model_dir}. Pre-download the model before rerunning."
+            )
+        if missing_paths:
+            raise FileNotFoundError("; ".join(missing_paths))
+
+    args.offline = offline_mode
+    args.splade_model_dir = splade_model_dir
+    args.qwen_model_dir = qwen_model_dir
 
     splade_model_dir = _resolve_cli_path(args.splade_model_dir, SPLADE_DIR)
     qwen_model_dir = _resolve_cli_path(args.qwen_model_dir, QWEN_DIR)
@@ -1133,6 +1206,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "splade_model_dir": str(splade_model_dir),
                 "qwen_model_dir": str(qwen_model_dir),
                 "offline": args.offline,
+                "offline": offline_mode,
             }
         },
     )
@@ -1153,6 +1227,7 @@ def main(args: argparse.Namespace | None = None) -> int:
     attn_impl = None if args.splade_attn == "auto" else args.splade_attn
     args.splade_cfg = SpladeCfg(
         model_dir=splade_model_dir,
+        cache_folder=model_root,
         batch_size=args.batch_size_splade,
         max_active_dims=args.splade_max_active_dims,
         attn_impl=attn_impl,
@@ -1168,6 +1243,7 @@ def main(args: argparse.Namespace | None = None) -> int:
 
     stats = process_pass_a(files, logger)
     if stats.N == 0:
+    if not stats.N:
         logger.warning("No chunks found after Pass A")
         return 0
 

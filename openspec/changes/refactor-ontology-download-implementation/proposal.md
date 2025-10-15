@@ -54,16 +54,78 @@ Operational capabilities are limited by lack of CLI controls for concurrency and
 
 - **Add planning introspection commands**: Implement `plan --since DATE` to filter plans based on remote metadata timestamps or HTTP Last-Modified headers. Add `plan diff` capability to compare current plan with previously committed plan file showing changes in URL, version, size, and license.
 
+- **Add manifest schema validation**: Define JSON Schema for manifest structure capturing required fields, value types, and relationships. Generate schema from Pydantic models or hand-write comprehensive schema. Add validation on manifest read to detect corruption or version incompatibilities. Emit schema version in every manifest enabling future schema evolution.
+
 ## Impact
 
-- **Affected code**: All Python modules under `src/DocsToKG/OntologyDownload/` including `cli.py`, `core.py`, `config.py`, `download.py`, `logging_config.py`, `resolvers.py`, `validators.py`, `validator_workers.py`, and `optdeps.py`
+### Affected Code
 
-- **Dependencies**: No new external dependencies required. Changes leverage existing standard library modules including `types`, `subprocess`, `threading`, `tempfile`, and `hashlib`
+All Python modules under `src/DocsToKG/OntologyDownload/` will be modified:
 
-- **Breaking changes**: None. All changes maintain backward compatibility. Legacy configuration aliases emit deprecation warnings but remain functional. CLI additions are new flags that default to existing behavior when omitted
+- **Core orchestration**: `core.py` for fallback logic, parallel planning, fingerprint computation
+- **Download execution**: `download.py` for archive extraction, MIME validation, streaming helpers
+- **Configuration management**: `config.py` for deprecation warnings, validation
+- **CLI interface**: `cli.py` and new `cli_utils.py` for formatting, new commands, flags
+- **Logging infrastructure**: `logging_config.py` for pure function refactoring
+- **Resolver clients**: `resolvers.py` for unified retry, polite headers
+- **Validation pipeline**: `validators.py` for streaming normalization, centralized extraction
+- **Worker processes**: `validator_workers.py` for module execution pattern
+- **Dependency management**: `optdeps.py` for proper module stubs
+- **Storage abstraction**: `storage.py` for version enumeration supporting prune command
 
-- **Testing requirements**: New unit tests for streaming normalization determinism, archive extraction safety checks, retry helper behavior, and CLI argument parsing. Integration tests using local HTTP server to exercise concurrency limits, resume behavior, and fallback mechanisms. Contract tests for resolver planning with recorded API responses
+### Dependencies
 
-- **Documentation updates**: Update configuration schema documentation to reflect deprecated aliases. Add CLI help text for new flags and commands. Document streaming normalization threshold configuration. Update troubleshooting guide with enhanced `doctor` command output interpretation
+No new mandatory external dependencies required. Changes leverage existing standard library capabilities:
 
-- **Deployment considerations**: Changes are internal refactoring with no schema or API modifications. Existing manifests remain valid. Existing configuration files continue to work with deprecation warnings. Phased rollout possible by testing with subset of ontologies using CLI overrides before updating configuration files
+- **Standard library additions**: `types.ModuleType` for proper stub modules, `concurrent.futures.ThreadPoolExecutor` for parallel planning, `tempfile` for streaming normalization intermediates, `subprocess` for external sort and module workers
+- **Existing dependencies**: Continue using `requests` for HTTP, `rdflib` for RDF processing, `pydantic` for configuration, `pooch` for downloads
+- **Optional dependencies**: Testing enhancements may use `pytest-vcr` or `vcrpy` for contract tests, but these are test-only dependencies not required for runtime
+
+### Breaking Changes
+
+None. All changes maintain strict backward compatibility:
+
+- **Configuration compatibility**: Legacy alias names remain functional but emit deprecation warnings on first use, giving operators clear migration path without immediate breakage
+- **Manifest compatibility**: Existing manifest files remain valid, new manifests include additional fields that readers can ignore, no manifest version migration required
+- **CLI compatibility**: All existing CLI invocations continue working unchanged, new flags and commands are additive with no changes to existing command behavior
+- **API compatibility**: Public API surface unchanged, internal refactoring does not affect downstream consumers of OntologyDownload package
+
+### Testing Requirements
+
+Comprehensive testing strategy spanning unit, integration, and contract test levels:
+
+- **Unit tests**: Streaming normalization determinism across multiple runs and platforms, archive extraction security checks for traversal and compression bombs, retry helper backoff timing and jitter bounds, CLI argument parsing and validation, module stub import machinery, fingerprint computation stability
+- **Integration tests**: Local HTTP server simulating network conditions like delays, errors, ETag changes, partial content, concurrent download rate limiting, resolver fallback chain execution with mock failures, CLI commands producing expected JSON and table output, version pruning with mock storage backend
+- **Contract tests**: Resolver API interactions using recorded cassettes, verifying URL construction, header inclusion, error handling, timeout behavior, authentication flows for each resolver type
+- **Performance tests**: Parallel planning wall-clock time improvement over sequential, streaming normalization memory usage remaining bounded for large ontologies, concurrent download throughput under various rate limits
+- **Determinism tests**: Canonical Turtle hash stability across runs, platforms, and configurations, golden fixture validation detecting algorithm changes, cross-platform byte-for-byte output comparison
+
+### Performance Benchmarks
+
+Expected performance improvements for key operations:
+
+- **Parallel planning**: Wall-clock time reduction of sixty to seventy-five percent for batches of ten or more ontologies when resolvers have similar latency, actual improvement depends on network conditions and resolver responsiveness
+- **Streaming normalization**: Memory usage bounded to approximately one hundred megabytes regardless of ontology size, compared to memory usage proportional to ontology size in current implementation, enabling processing of multi-gigabyte ontologies that currently fail
+- **Resolver fallback**: Download success rate improvement of fifteen to twenty-five percent for ontologies where primary resolver experiences transient failures, reducing operational burden of manual retries
+- **Concurrent downloads**: Throughput improvement scaling with configured concurrency up to bandwidth limits, typically two to four times faster for batches with configured concurrency of four to eight workers
+
+### Documentation Updates
+
+Documentation changes required across user guides, API references, and operational runbooks:
+
+- **Configuration schema**: Update schema documentation marking deprecated aliases, document new concurrent_plans and streaming_normalization_threshold_mb parameters, clarify allowed_hosts wildcard syntax, document per-service rate_limits configuration structure
+- **CLI reference**: Add help text for new flags including --concurrent-downloads, --concurrent-plans, --allowed-hosts, document new commands including prune and plan diff with examples, update doctor command documentation with new diagnostic checks
+- **Operational guides**: Document streaming normalization behavior and when it activates, provide guidance on setting concurrency limits based on environment characteristics, explain resolver fallback mechanism and how to monitor fallback frequency, describe version pruning strategy for storage management
+- **Troubleshooting guide**: Enhance doctor command interpretation section with new checks, add common issues section for import cycles and packaging problems now resolved, document how to debug resolver fallback chains using manifest audit trail
+- **Migration guide**: Provide instructions for updating code using deprecated configuration aliases, explain manifest fingerprint changes and why old manifests remain valid, document how to regenerate test cassettes when resolver APIs change
+
+### Deployment Considerations
+
+Deployment strategy supporting incremental rollout with minimal risk:
+
+- **No schema migration required**: Changes are internal refactoring with no database or manifest schema changes requiring migration, existing manifests remain valid and can be read by updated code
+- **No configuration migration required**: Existing configuration files continue working unchanged with deprecation warnings logged but not blocking execution, operators can migrate to canonical names at their convenience
+- **Phased rollout possible**: New CLI flags enable testing with subset of ontologies before updating configuration, operators can validate fallback behavior with --allowed-hosts temporary override before adding to configuration permanently
+- **No service disruption**: Changes do not require service restart or downtime, updated package can be deployed to running service with graceful reload picking up new code
+- **Rollback capability**: Any deployment can be rolled back to previous version without data migration since no schema changes, only need to revert package version
+- **Testing in production-like environment**: Recommend testing with production-like ontology set and network conditions in staging environment, particularly validating streaming normalization on large ontologies, parallel planning concurrency limits, and resolver fallback chain behavior before production deployment
