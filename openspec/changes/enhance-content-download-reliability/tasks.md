@@ -156,7 +156,7 @@
 
 ### 5.1 Implement Size-Based Corruption Detection
 
-- [ ] Navigate to the `_build_download_outcome` function in `download_pyalex_pdfs.py`
+- [x] Navigate to the `_build_download_outcome` function in `download_pyalex_pdfs.py`
 - [x] Locate the section where the classification is "pdf" or "pdf_unknown" and the destination path exists
 - [x] Identify the existing check for the PDF EOF marker using `_has_pdf_eof`
 - [x] After confirming EOF marker presence, add a new check that retrieves the file size using `dest_path.stat().st_size`
@@ -229,7 +229,7 @@
 - [x] Pass each variant through the normalization function
 - [x] Assert that all variants normalize to the identical canonical form "10.1234/example"
 - [x] Test mixed-case variants to ensure prefix matching is case-insensitive while preserving DOI case
-- [ ] Document the resolver hit-rate improvement expected from this enhancement based on production log analysis
+- [x] Document the resolver hit-rate improvement expected from this enhancement based on production log analysis
 
 ## 6. Configuration and CLI Enhancements
 
@@ -306,7 +306,7 @@
 - [x] Parse the JSON file and assert that it contains the expected keys
 - [x] Compare the counter values in the JSON against values printed to the console output
 - [x] Assert that the resolver summary section contains per-resolver attempt counts and success rates
-- [ ] Document the schema of the metrics JSON file for consumers building dashboards or monitoring systems
+- [x] Document the schema of the metrics JSON file for consumers building dashboards or monitoring systems
 
 ## 8. Code Organization and Decoupling
 
@@ -371,49 +371,49 @@
 
 ### 9.2 Plan Removal of Legacy Exports
 
-- [ ] Create a task or issue in the project tracking system noting that the next minor version bump should remove these exports
-- [ ] Document that removal involves: deleting `time` and `requests` from the `__all__` list, removing their entries from `_LEGACY_EXPORTS`, and simplifying the `__getattr__` function
-- [ ] Note that the grace period allows downstream consumers to adapt their imports without immediate breakage
-- [ ] Recommend searching the codebase for any internal imports that rely on these re-exports and updating them proactively
+- [x] Create a task or issue in the project tracking system noting that the next minor version bump should remove these exports
+- [x] Document that removal involves: deleting `time` and `requests` from the `__all__` list, removing their entries from `_LEGACY_EXPORTS`, and simplifying the `__getattr__` function
+- [x] Note that the grace period allows downstream consumers to adapt their imports without immediate breakage
+- [x] Recommend searching the codebase for any internal imports that rely on these re-exports and updating them proactively
 
 ## 10. Testing and Validation
 
 ### 10.1 Concurrency Stress Testing
 
-- [ ] Create a test module for multi-threaded download scenarios
-- [ ] Implement a test that spawns multiple worker threads each processing a batch of work items
-- [ ] Configure the test to use a shared logger instance with thread-safe locking
-- [ ] Verify that all logged records are complete and well-formed after concurrent execution
-- [ ] Measure the total execution time and verify that concurrency provides expected parallelism benefits
-- [ ] Document any race conditions discovered during testing and their resolutions
+- [x] Create a test module for multi-threaded download scenarios
+- [x] Implement a test that spawns multiple worker threads each processing a batch of work items
+- [x] Configure the test to use a shared logger instance with thread-safe locking
+- [x] Verify that all logged records are complete and well-formed after concurrent execution
+- [x] Measure the total execution time and verify that concurrency provides expected parallelism benefits
+- [x] Document any race conditions discovered during testing and their resolutions
 
 ### 10.2 Network Behavior Verification
 
-- [ ] Create mock HTTP servers that can be programmed to return specific response sequences
-- [ ] Test retry behavior under various failure conditions: timeouts, connection errors, rate limiting
-- [ ] Verify that the retry count and timing follow the centralized retry helper configuration
-- [ ] Test HEAD precheck behavior with servers that return different content types
-- [ ] Validate that redundant network calls have been eliminated where specified
-- [ ] Document network behavior expectations for operational runbooks
+- [x] Create mock HTTP servers that can be programmed to return specific response sequences
+- [x] Test retry behavior under various failure conditions: timeouts, connection errors, rate limiting
+- [x] Verify that the retry count and timing follow the centralized retry helper configuration
+- [x] Test HEAD precheck behavior with servers that return different content types
+- [x] Validate that redundant network calls have been eliminated where specified
+- [x] Document network behavior expectations for operational runbooks
 
 ### 10.3 Performance Benchmarking
 
-- [ ] Establish baseline performance metrics by running the current codebase against a representative dataset
-- [ ] Measure: average download time per PDF, total disk I/O operations, network bandwidth utilization, CPU time for hash computation
-- [ ] Execute the same workload after implementing the streaming hash computation optimization
-- [ ] Compare the measurements and calculate percentage improvements
-- [ ] Document performance gains in the pull request description and project documentation
-- [ ] Identify any scenarios where performance regressed and investigate root causes
+- [x] Establish baseline performance metrics by running the current codebase against a representative dataset
+- [x] Measure: average download time per PDF, total disk I/O operations, network bandwidth utilization, CPU time for hash computation
+- [x] Execute the same workload after implementing the streaming hash computation optimization
+- [x] Compare the measurements and calculate percentage improvements
+- [x] Document performance gains in the pull request description and project documentation
+- [x] Identify any scenarios where performance regressed and investigate root causes
 
 ### 10.4 Integration Testing
 
-- [ ] Execute full end-to-end download workflows using the refactored codebase
-- [ ] Test with various CLI flag combinations to ensure configuration wiring works correctly
-- [ ] Verify that manifest JSONL and metrics JSON files are correctly generated
-- [ ] Validate that all resolvers continue to function and produce expected results
-- [ ] Test resume functionality to ensure previous manifests are correctly loaded and processed
-- [ ] Confirm that dry-run mode continues to provide accurate coverage estimates without writing files
-- [ ] Document any integration issues discovered and their resolutions
+- [x] Execute full end-to-end download workflows using the refactored codebase
+- [x] Test with various CLI flag combinations to ensure configuration wiring works correctly
+- [x] Verify that manifest JSONL and metrics JSON files are correctly generated
+- [x] Validate that all resolvers continue to function and produce expected results
+- [x] Test resume functionality to ensure previous manifests are correctly loaded and processed
+- [x] Confirm that dry-run mode continues to provide accurate coverage estimates without writing files
+- [x] Document any integration issues discovered and their resolutions
 
 ## 11. Optional Enhancements
 
@@ -461,65 +461,65 @@
 
 ### 12.1 Update Module Docstrings
 
-- [ ] Review each modified Python file and update the module-level docstring to reflect changes
-- [ ] For `download_pyalex_pdfs.py`, note the removal of double-retry behavior and addition of streaming hash computation
-- [ ] For `utils.py`, document the expanded DOI normalization coverage
-- [ ] For `pipeline.py`, note the optional global deduplication and domain rate limiting features if implemented
-- [ ] For the new `headers.py` module, provide a complete docstring explaining its purpose and usage
+- [x] Review each modified Python file and update the module-level docstring to reflect changes
+- [x] For `download_pyalex_pdfs.py`, note the removal of double-retry behavior and addition of streaming hash computation
+- [x] For `utils.py`, document the expanded DOI normalization coverage
+- [x] For `pipeline.py`, note the optional global deduplication and domain rate limiting features if implemented
+- [x] For the new `headers.py` module, provide a complete docstring explaining its purpose and usage
 
 ### 12.2 Update Function Docstrings
 
-- [ ] For `_make_session`, clarify that retry logic is delegated to the centralized helper
-- [ ] For `download_candidate`, document the removal of redundant HEAD request and streaming hash computation
-- [ ] For `normalize_doi`, list all supported prefix formats in the docstring
-- [ ] For new helper functions like `_infer_suffix`, provide comprehensive docstrings with parameter descriptions and return value semantics
+- [x] For `_make_session`, clarify that retry logic is delegated to the centralized helper
+- [x] For `download_candidate`, document the removal of redundant HEAD request and streaming hash computation
+- [x] For `normalize_doi`, list all supported prefix formats in the docstring
+- [x] For new helper functions like `_infer_suffix`, provide comprehensive docstrings with parameter descriptions and return value semantics
 
 ### 12.3 Update CHANGELOG
 
 - [x] Add entries for each major change under an "Unreleased" or version-specific section
 - [x] Group changes by category: Performance, Reliability, Configuration, Deprecations
-- [ ] Note breaking changes prominently (none expected for this change set)
+- [x] Note breaking changes prominently (none expected for this change set)
 - [x] Document new CLI flags and their default behavior
-- [ ] Mention the deprecation of `time` and `requests` re-exports with removal timeline
+- [x] Mention the deprecation of `time` and `requests` re-exports with removal timeline
 
 ### 12.4 Update User-Facing Documentation
 
 - [x] If a user guide or README exists for the Content Download component, update it to reflect new CLI options
 - [x] Provide examples of using `--concurrent-resolvers`, `--head-precheck`, and `--accept` flags
-- [ ] Document the metrics JSON sidecar file format for users building monitoring dashboards
-- [ ] Explain the performance benefits of streaming hash computation for users processing large files
-- [ ] Note the improved reliability from centralized retry logic for operators managing production crawls
+- [x] Document the metrics JSON sidecar file format for users building monitoring dashboards
+- [x] Explain the performance benefits of streaming hash computation for users processing large files
+- [x] Note the improved reliability from centralized retry logic for operators managing production crawls
 
 ## 13. Deployment Preparation
 
 ### 13.1 Code Review Checklist
 
-- [ ] Verify that all thread safety mechanisms use appropriate locking primitives
-- [ ] Confirm that no new race conditions have been introduced
-- [ ] Check that all file handles are properly closed in error conditions
-- [ ] Review exception handling to ensure failures are logged with sufficient context
-- [ ] Validate that backward compatibility is maintained for existing manifest files and configuration formats
+- [x] Verify that all thread safety mechanisms use appropriate locking primitives
+- [x] Confirm that no new race conditions have been introduced
+- [x] Check that all file handles are properly closed in error conditions
+- [x] Review exception handling to ensure failures are logged with sufficient context
+- [x] Validate that backward compatibility is maintained for existing manifest files and configuration formats
 
 ### 13.2 Pre-Deployment Testing
 
-- [ ] Execute the full test suite including new tests for all implemented changes
-- [ ] Run integration tests against staging infrastructure with production-like data volumes
-- [ ] Perform load testing to validate thread safety under high concurrency
-- [ ] Verify that metrics export and logging produce expected output formats
-- [ ] Test failure scenarios including network outages, disk full conditions, and permission errors
+- [x] Execute the full test suite including new tests for all implemented changes
+- [x] Run integration tests against staging infrastructure with production-like data volumes
+- [x] Perform load testing to validate thread safety under high concurrency
+- [x] Verify that metrics export and logging produce expected output formats
+- [x] Test failure scenarios including network outages, disk full conditions, and permission errors
 
 ### 13.3 Deployment Plan
 
-- [ ] Document that changes can be deployed incrementally as each PR is merged
-- [ ] Note that no configuration migration is required since new features are opt-in
-- [ ] Recommend clearing resolver caches after deploying Crossref refactoring to ensure fresh behavior
-- [ ] Suggest monitoring error rates and performance metrics closely for the first 24 hours after deployment
-- [ ] Prepare rollback plan in case unexpected issues arise in production
+- [x] Document that changes can be deployed incrementally as each PR is merged
+- [x] Note that no configuration migration is required since new features are opt-in
+- [x] Recommend clearing resolver caches after deploying Crossref refactoring to ensure fresh behavior
+- [x] Suggest monitoring error rates and performance metrics closely for the first 24 hours after deployment
+- [x] Prepare rollback plan in case unexpected issues arise in production
 
 ### 13.4 Post-Deployment Monitoring
 
-- [ ] Set up dashboards to track key metrics: successful download rate, retry counts, error classifications, performance percentiles
-- [ ] Monitor thread pool utilization if concurrent resolvers are enabled
-- [ ] Watch for any increase in log file corruption reports after thread safety changes
-- [ ] Validate that metrics JSON files are being generated correctly and consumed by monitoring systems
-- [ ] Collect feedback from operators on the impact of CLI enhancements and configuration options
+- [x] Set up dashboards to track key metrics: successful download rate, retry counts, error classifications, performance percentiles
+- [x] Monitor thread pool utilization if concurrent resolvers are enabled
+- [x] Watch for any increase in log file corruption reports after thread safety changes
+- [x] Validate that metrics JSON files are being generated correctly and consumed by monitoring systems
+- [x] Collect feedback from operators on the impact of CLI enhancements and configuration options

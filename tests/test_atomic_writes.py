@@ -132,7 +132,8 @@ def test_partial_download_leaves_part_file(tmp_path: Path) -> None:
 
 
 def test_successful_download_records_digest(tmp_path: Path) -> None:
-    payload = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n"
+    body = b"A" * 1500
+    payload = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n" + body + b"\n%%EOF\n"
     expected_sha = hashlib.sha256(payload).hexdigest()
     session = _DummySession(_SuccessfulResponse(payload))
 

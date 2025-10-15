@@ -247,6 +247,8 @@ def write_dummy_chunks(env: SimpleNamespace, name: str, rows: Iterable[dict]) ->
     path = env.chunks_dir / f"{name}.chunks.jsonl"
     with path.open("w", encoding="utf-8") as handle:
         for row in rows:
+            row = dict(row)
+            row.setdefault("schema_version", "docparse/1.1.0")
             handle.write(json.dumps(row) + "\n")
 
 
@@ -464,4 +466,3 @@ def test_chunker_concurrent_writes_isolated(tmp_path, monkeypatch):
         texts = {row["text"] for row in rows}
         expected = set(texts_map[name])
         assert texts == expected
-

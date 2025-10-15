@@ -178,6 +178,40 @@ These issues emerged from incremental feature additions without coordinated arch
 - Two write operations per run (negligible overhead at end of processing)
 - **Accepted**: Operational convenience of sidecar file justifies minor duplication
 
+#### Metrics JSON Schema
+
+Metrics sidecars (`<manifest>.metrics.json`) carry the following structure:
+
+| Field       | Type   | Description                                                                   |
+|-------------|--------|-------------------------------------------------------------------------------|
+| `processed` | int    | Total works processed (successful + skipped + HTML only).                     |
+| `saved`     | int    | Works that produced at least one saved PDF.                                   |
+| `html_only` | int    | Works where only HTML artefacts were captured.                                |
+| `skipped`   | int    | Works skipped due to filters, duplicates, or permanent failures.              |
+| `resolvers` | object | Per-resolver counters (`attempts`, `successes`, `html`, `skips`, `failures`). |
+
+Example document:
+
+```json
+{
+  "processed": 128,
+  "saved": 74,
+  "html_only": 19,
+  "skipped": 35,
+  "resolvers": {
+    "attempts": {"unpaywall": 80, "crossref": 42},
+    "successes": {"unpaywall": 55, "crossref": 18},
+    "html": {"landing_page": 12},
+    "skips": {"crossref:duplicate-url": 4},
+    "failures": {"core": 2}
+  }
+}
+```
+
+Keys under `resolvers` are extensible; absent keys should be treated as zero.
+Documents are indented and sorted to simplify deterministic diffs and human
+inspection.
+
 ### Decision 6: Decouple Resolvers via Shared Utility Module
 
 **Context**: Crossref resolver imports `_headers_cache_key` from Unpaywall resolver, creating hidden dependency that complicates testing and refactoring.

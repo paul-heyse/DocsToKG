@@ -1088,11 +1088,17 @@ def main(args: argparse.Namespace | None = None) -> int:
     logger = get_logger(__name__)
 
     parser = build_parser()
-    args = (
-        args
-        if isinstance(args, (argparse.Namespace, SimpleNamespace))
-        else parser.parse_args(args)
-    )
+    if args is None:
+        args = parser.parse_args()
+    elif isinstance(args, argparse.Namespace):
+        pass
+    elif isinstance(args, SimpleNamespace) or hasattr(args, "__dict__"):
+        defaults = parser.parse_args([])
+        for key, value in vars(args).items():
+            setattr(defaults, key, value)
+        args = defaults
+    else:
+        args = parser.parse_args(args)
     offline_mode = bool(getattr(args, "offline", False))
 
     hf_home = _resolve_hf_home()
@@ -1198,7 +1204,6 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "vectors_dir": str(out_dir),
                 "splade_model_dir": str(splade_model_dir),
                 "qwen_model_dir": str(qwen_model_dir),
-                "offline": args.offline,
                 "offline": offline_mode,
             }
         },
