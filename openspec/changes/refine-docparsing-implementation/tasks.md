@@ -2201,7 +2201,7 @@ The embeddings pipeline loads SPLADE and Qwen models from HuggingFace. By defaul
 ---
 
 ### Task 8.6: Document SPLADE attention backend fallback behavior
-- [ ] Task 8.6: Document SPLADE attention backend fallback behavior
+- [x] Task 8.6: Document SPLADE attention backend fallback behavior
 
 **Functional Requirements**:
 

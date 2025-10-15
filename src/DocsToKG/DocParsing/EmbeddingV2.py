@@ -13,6 +13,7 @@ Key Features:
 - Stream SPLADE sparse encoding and Qwen dense embeddings from local caches
 - Validate vector schemas, norms, and dimensions before writing outputs
 - Record manifest metadata for observability and auditing
+- Explain SPLADE attention backend fallbacks (auto→FlashAttention2→SDPA→eager)
 
 Usage:
     python -m DocsToKG.DocParsing.EmbeddingV2 --resume
@@ -91,6 +92,7 @@ DEFAULT_DATA_ROOT = detect_data_root()
 DEFAULT_CHUNKS_DIR = data_chunks(DEFAULT_DATA_ROOT)
 DEFAULT_VECTORS_DIR = data_vectors(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "embeddings"
+SPLADE_SPARSITY_WARN_THRESHOLD_PCT = 1.0
 
 # Make sure every lib (Transformers / HF Hub / Sentence-Transformers) honors this cache.
 os.environ.setdefault("HF_HOME", str(HF_HOME))
@@ -405,6 +407,31 @@ def splade_encode(
 
 
 _SPLADE_ENCODER_CACHE: Dict[Tuple[str, str, Optional[str], Optional[int]], SparseEncoder] = {}
+_SPLADE_ENCODER_BACKENDS: Dict[Tuple[str, str, Optional[str], Optional[int]], str] = {}
+
+
+def _detect_splade_backend(encoder: SparseEncoder, requested: str | None) -> str:
+    """Best-effort detection of the attention backend used by SPLADE."""
+
+    candidates = (
+        ("model", "model", "config", "attn_implementation"),
+        ("model", "config", "attn_implementation"),
+        ("config", "attn_implementation"),
+        ("model", "model", "attn_implementation"),
+    )
+    for path in candidates:
+        value = encoder
+        for attr in path:
+            value = getattr(value, attr, None)
+            if value is None:
+                break
+        else:
+            if isinstance(value, str) and value:
+                return value
+
+    if requested in {"sdpa", "eager", "flash_attention_2"}:
+        return requested
+    return "auto" if requested is None else requested
 
 
 def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
@@ -425,6 +452,8 @@ def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
 
     key = (str(cfg.model_dir), cfg.device, cfg.attn_impl, cfg.max_active_dims)
     if key in _SPLADE_ENCODER_CACHE:
+        if key not in _SPLADE_ENCODER_BACKENDS:
+            _SPLADE_ENCODER_BACKENDS[key] = cfg.attn_impl or "auto"
         return _SPLADE_ENCODER_CACHE[key]
 
     model_kwargs: Dict[str, object] = {}
@@ -433,6 +462,7 @@ def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
     if cfg.max_active_dims is not None:
         model_kwargs["max_active_dims"] = cfg.max_active_dims
 
+    backend_used: str | None = cfg.attn_impl
     try:
         encoder = SparseEncoder(
             str(cfg.model_dir),
@@ -441,6 +471,7 @@ def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
             model_kwargs=model_kwargs,
             local_files_only=True,
         )
+        backend_used = _detect_splade_backend(encoder, backend_used)
     except (ValueError, ImportError) as exc:
         if cfg.attn_impl == "flash_attention_2" and "Flash Attention 2" in str(exc):
             print("[SPLADE] FlashAttention 2 unavailable; retrying with standard attention.")
@@ -453,11 +484,25 @@ def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
                 model_kwargs=fallback_kwargs,
                 local_files_only=True,
             )
+            backend_used = _detect_splade_backend(encoder, "sdpa")
         else:
             raise
 
     _SPLADE_ENCODER_CACHE[key] = encoder
+    _SPLADE_ENCODER_BACKENDS[key] = backend_used or "auto"
     return encoder
+
+
+def _get_splade_backend_used(cfg: SpladeCfg) -> str:
+    """Return the backend string recorded for a given SPLADE configuration."""
+
+    key = (str(cfg.model_dir), cfg.device, cfg.attn_impl, cfg.max_active_dims)
+    backend = _SPLADE_ENCODER_BACKENDS.get(key)
+    if backend:
+        return backend
+    if cfg.attn_impl:
+        return cfg.attn_impl
+    return "auto"
 
 
 class SPLADEValidator:
@@ -885,7 +930,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         default="auto",
         choices=["auto", "sdpa", "eager", "flash_attention_2"],
-        help="Attention backend for SPLADE transformer (default: auto/SDPA).",
+        help=(
+            "Attention backend for SPLADE. 'auto' tries FlashAttention 2, then "
+            "SDPA, then eager. 'flash_attention_2' requires the Flash Attention "
+            "2 package. 'sdpa' forces PyTorch scaled dot-product attention. "
+            "'eager' uses the standard attention implementation."
+        ),
     )
     parser.add_argument("--qwen-dtype", type=str, default="bfloat16")
     parser.add_argument("--qwen-quant", type=str, default=None)
@@ -1115,6 +1165,8 @@ def main(args: argparse.Namespace | None = None) -> int:
     avg_norm = statistics.mean(qwen_norms_all) if qwen_norms_all else 0.0
     std_norm = statistics.pstdev(qwen_norms_all) if len(qwen_norms_all) > 1 else 0.0
 
+    backend_used = _get_splade_backend_used(args.splade_cfg)
+
     logger.info(
         "Embedding summary",
         extra={
@@ -1127,6 +1179,8 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "qwen_std_norm": round(std_norm, 4),
                 "pass_b_seconds": round(elapsed_b, 3),
                 "skipped_files": skipped_files,
+                "splade_attn_backend_used": backend_used,
+                "sparsity_warn_threshold_pct": SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
             }
         },
     )
@@ -1147,6 +1201,8 @@ def main(args: argparse.Namespace | None = None) -> int:
         qwen_std_norm=std_norm,
         peak_memory_gb=peak / 1024**3,
         skipped_files=skipped_files,
+        splade_attn_backend_used=backend_used,
+        sparsity_warn_threshold_pct=SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
     )
 
     logger.info(
