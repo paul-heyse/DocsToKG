@@ -20,42 +20,12 @@ from bioregistry import get_obo_download, get_owl_download, get_rdf_download
 from ols_client import OlsClient
 from ontoportal_client import BioPortalClient
 
-try:  # pragma: no cover - exercised in environments without pystow installed
-    import pystow  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover - provides lightweight fallback for tests
-
-    class _PystowFallback:
-        """Minimal pystow replacement used when optional dependency is absent.
-
-        Attributes:
-            _root: Path root where cached resources should be stored.
-
-        Examples:
-            >>> fallback = _PystowFallback()
-            >>> fallback.join("configs").name
-            'configs'
-        """
-
-        def __init__(self) -> None:
-            self._root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
-
-        def join(self, *segments: str) -> Path:
-            """Join path segments relative to the fallback cache root.
-
-            Args:
-                *segments: Individual path components to append.
-
-            Returns:
-                Path rooted under the fallback pystow directory.
-            """
-            return self._root.joinpath(*segments)
-
-    pystow = _PystowFallback()  # type: ignore
-
 import requests
 
 from .config import ConfigError, ResolvedConfig
+from .optdeps import get_pystow
 
+pystow = get_pystow()
 
 @dataclass(slots=True)
 class FetchPlan:

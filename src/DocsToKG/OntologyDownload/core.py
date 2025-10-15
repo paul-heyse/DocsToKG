@@ -20,37 +20,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Protocol, Sequence
 from urllib.parse import urlparse
 
-try:  # pragma: no cover - exercised in environments without pystow installed
-    import pystow  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover - provides lightweight fallback for tests
-
-    class _PystowFallback:
-        """Minimal pystow replacement used when the dependency is absent.
-
-        Attributes:
-            _root: Base directory used to emulate pystow's storage root.
-
-        Examples:
-            >>> fallback = _PystowFallback()
-            >>> isinstance(fallback.join("ontology"), Path)
-            True
-        """
-
-        def __init__(self) -> None:
-            self._root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
-
-        def join(self, *segments: str) -> Path:
-            """Build a path relative to the fallback pystow root directory.
-
-            Args:
-                *segments: Path segments appended to the root directory.
-
-            Returns:
-                Path object pointing to the requested cache location.
-            """
-            return self._root.joinpath(*segments)
-
-    pystow = _PystowFallback()  # type: ignore
+from .optdeps import get_pystow
 
 from .config import ConfigError, ResolvedConfig, ensure_python_version
 from .download import (
@@ -62,6 +32,8 @@ from .download import (
 from .logging_config import generate_correlation_id, setup_logging
 from .resolvers import RESOLVERS, FetchPlan
 from .validators import ValidationRequest, ValidationResult, run_validators
+
+pystow = get_pystow()
 
 
 class OntologyDownloadError(RuntimeError):
