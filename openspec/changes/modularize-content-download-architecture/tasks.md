@@ -1,10 +1,10 @@
 ## 1. HTTP Retry Infrastructure
 
-- [ ] 1.1 Create `src/DocsToKG/ContentDownload/http.py` module skeleton
+- [x] 1.1 Create `src/DocsToKG/ContentDownload/http.py` module skeleton
   - Import `requests`, `time`, `random`, `Optional`, `Set`, `Any` from typing
   - Add module docstring: "Unified HTTP request utilities with retry and backoff support."
 
-- [ ] 1.2 Implement `parse_retry_after_header(response: requests.Response) -> Optional[float]` function
+- [x] 1.2 Implement `parse_retry_after_header(response: requests.Response) -> Optional[float]` function
 
   ```python
   from email.utils import parsedate_to_datetime
@@ -48,7 +48,7 @@
           return None
   ```
 
-- [ ] 1.3 Implement `request_with_retries()` function with signature:
+- [x] 1.3 Implement `request_with_retries()` function with signature:
 
   ```python
   def request_with_retries(
@@ -64,7 +64,7 @@
   ) -> requests.Response:
   ```
 
-- [ ] 1.4 Implement retry loop logic in `request_with_retries()`
+- [x] 1.4 Implement retry loop logic in `request_with_retries()`
 
   ```python
   def request_with_retries(
@@ -146,24 +146,24 @@
       raise requests.RequestException(f"Exhausted {max_retries} retries for {method} {url}")
   ```
 
-- [ ] 1.5 Add comprehensive docstring to `request_with_retries()`
+- [x] 1.5 Add comprehensive docstring to `request_with_retries()`
   - Document all parameters with types and defaults
   - Document return type and exceptions raised
   - Add usage example for HEAD and GET requests
   - Note thread-safety guarantees (session must be thread-safe)
 
-- [ ] 1.6 Update `src/DocsToKG/ContentDownload/download_pyalex_pdfs.py` imports
+- [x] 1.6 Update `src/DocsToKG/ContentDownload/download_pyalex_pdfs.py` imports
   - Add: `from DocsToKG.ContentDownload.http import request_with_retries`
   - Replace `session.head(url, ...)` call at line ~970 with `request_with_retries(session, "HEAD", url, max_retries=1, ...)`
   - Replace `session.get(url, stream=True, ...)` call at line ~980 with `request_with_retries(session, "GET", url, ...)`
   - Remove HEAD error suppression `contextlib.suppress` since retries handle transients
 
-- [ ] 1.7 Update `src/DocsToKG/ContentDownload/resolvers/__init__.py` to use new utility
+- [x] 1.7 Update `src/DocsToKG/ContentDownload/resolvers/__init__.py` to use new utility
   - Replace `_request_with_retries()` calls (lines ~1199, 1344, 1404, 1482, etc.) with `from DocsToKG.ContentDownload.http import request_with_retries`
   - Remove local `_request_with_retries()` definition (lines ~158-196)
   - Update `_sleep_backoff()` references to use backoff logic from `http.request_with_retries()`
 
-- [ ] 1.8 Add unit tests in `tests/test_http_retry.py`
+- [x] 1.8 Add unit tests in `tests/test_http_retry.py`
 
   ```python
   import time
@@ -325,11 +325,11 @@
 
 ## 2. Conditional Request Helper
 
-- [ ] 2.1 Create `src/DocsToKG/ContentDownload/conditional.py` module skeleton
+- [x] 2.1 Create `src/DocsToKG/ContentDownload/conditional.py` module skeleton
   - Import `dataclass`, `Optional`, `Dict`, `requests`
   - Add module docstring: "Conditional HTTP request helpers for ETag and Last-Modified caching."
 
-- [ ] 2.2 Define `CachedResult` dataclass
+- [x] 2.2 Define `CachedResult` dataclass
 
   ```python
   @dataclass
@@ -342,7 +342,7 @@
       last_modified: Optional[str]
   ```
 
-- [ ] 2.3 Define `ModifiedResult` dataclass
+- [x] 2.3 Define `ModifiedResult` dataclass
 
   ```python
   @dataclass
@@ -352,7 +352,7 @@
       last_modified: Optional[str]
   ```
 
-- [ ] 2.4 Implement `ConditionalRequestHelper` class initialization
+- [x] 2.4 Implement `ConditionalRequestHelper` class initialization
 
   ```python
   class ConditionalRequestHelper:
@@ -371,7 +371,7 @@
           self.prior_path = prior_path
   ```
 
-- [ ] 2.5 Implement `build_headers()` method
+- [x] 2.5 Implement `build_headers()` method
 
   ```python
   def build_headers(self) -> Dict[str, str]:
@@ -384,7 +384,7 @@
       return headers
   ```
 
-- [ ] 2.6 Implement `interpret_response()` method
+- [x] 2.6 Implement `interpret_response()` method
 
   ```python
   def interpret_response(
@@ -407,13 +407,13 @@
       )
   ```
 
-- [ ] 2.7 Update `download_candidate()` in `download_pyalex_pdfs.py` to use helper
+- [x] 2.7 Update `download_candidate()` in `download_pyalex_pdfs.py` to use helper
   - Import `ConditionalRequestHelper`, `CachedResult`, `ModifiedResult`
   - At line ~950, create helper instance: `cond_helper = ConditionalRequestHelper(prior_etag=previous_etag, ...)`
   - Replace manual header building (lines ~958-961) with `headers.update(cond_helper.build_headers())`
   - Replace 304 handling block (lines ~988-999) with: `result = cond_helper.interpret_response(response); if isinstance(result, CachedResult): return DownloadOutcome(...)`
 
-- [ ] 2.8 Add unit tests in `tests/test_conditional_requests.py`
+- [x] 2.8 Add unit tests in `tests/test_conditional_requests.py`
   - Test `build_headers()` with no prior data (empty dict)
   - Test `build_headers()` with ETag only
   - Test `build_headers()` with Last-Modified only
@@ -425,11 +425,11 @@
 
 ## 3. Resolver Module Restructuring - Foundation
 
-- [ ] 3.1 Create directory structure
+- [x] 3.1 Create directory structure
   - `mkdir -p src/DocsToKG/ContentDownload/resolvers/providers`
   - `touch src/DocsToKG/ContentDownload/resolvers/providers/__init__.py`
 
-- [ ] 3.2 Create `src/DocsToKG/ContentDownload/resolvers/types.py`
+- [x] 3.2 Create `src/DocsToKG/ContentDownload/resolvers/types.py`
   - Copy dataclass definitions from `resolvers/__init__.py`:
     - `ResolverResult` (lines ~198-232)
     - `ResolverConfig` (lines ~234-302)
@@ -443,7 +443,7 @@
   - Add imports: `dataclass`, `field`, `Protocol`, `Dict`, `List`, `Optional`, `Any`, `Counter`, `defaultdict`
   - Add module docstring: "Type definitions and protocols for the resolver pipeline."
 
-- [ ] 3.3 Create `src/DocsToKG/ContentDownload/resolvers/pipeline.py`
+- [x] 3.3 Create `src/DocsToKG/ContentDownload/resolvers/pipeline.py`
   - Copy `ResolverPipeline` class (lines ~594-840)
   - Copy helper functions: `_callable_accepts_argument` (lines ~577-591)
   - Import types from `.types`: `ResolverConfig`, `AttemptRecord`, `DownloadOutcome`, `PipelineResult`, `ResolverResult`, `Resolver`, `AttemptLogger`, `DownloadFunc`, `ResolverMetrics`
@@ -451,11 +451,11 @@
   - Import `requests`
   - Add module docstring: "Resolver pipeline orchestration and execution logic."
 
-- [ ] 3.4 Update `resolvers/pipeline.py` imports for new structure
+- [x] 3.4 Update `resolvers/pipeline.py` imports for new structure
   - Change `from DocsToKG.ContentDownload.utils import ...` to relative import if needed
   - Ensure all type references point to `types` module
 
-- [ ] 3.5 Create `src/DocsToKG/ContentDownload/resolvers/providers/__init__.py` with registry
+- [x] 3.5 Create `src/DocsToKG/ContentDownload/resolvers/providers/__init__.py` with registry
 
   ```python
   """Resolver provider implementations and registry."""
@@ -472,7 +472,7 @@
 
 ## 4. Resolver Module Restructuring - Individual Providers
 
-- [ ] 4.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/unpaywall.py`
+- [x] 4.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/unpaywall.py`
   - Copy `UnpaywallResolver` class (lines ~851-988 from `resolvers/__init__.py`)
   - Copy `_fetch_unpaywall_data` helper and LRU cache (lines ~85-101)
   - Copy `_headers_cache_key` helper (lines ~81-82)
@@ -481,64 +481,64 @@
   - Import `requests`, `lru_cache`, `quote`, `Iterable`, `Dict`, `List`, `Tuple`, `Any`
   - Add module docstring: "Unpaywall API resolver for open access PDFs."
 
-- [ ] 4.2 Create `src/DocsToKG/ContentDownload/resolvers/providers/crossref.py`
+- [x] 4.2 Create `src/DocsToKG/ContentDownload/resolvers/providers/crossref.py`
   - Copy `CrossrefResolver` class (lines ~990-1145)
   - Copy `_fetch_crossref_data` helper and LRU cache (lines ~104-121)
   - Import necessary types and utilities
   - Add module docstring: "Crossref API resolver for publisher-hosted PDFs."
 
-- [ ] 4.3 Create `src/DocsToKG/ContentDownload/resolvers/providers/landing_page.py`
+- [x] 4.3 Create `src/DocsToKG/ContentDownload/resolvers/providers/landing_page.py`
   - Copy `LandingPageResolver` class (lines ~1148-1256)
   - Copy `_absolute_url` helper (lines ~844-848)
   - Import optional `BeautifulSoup` dependency with try/except
   - Import necessary types and utilities
   - Add module docstring: "Landing page scraper resolver using BeautifulSoup."
 
-- [ ] 4.4 Create `src/DocsToKG/ContentDownload/resolvers/providers/arxiv.py`
+- [x] 4.4 Create `src/DocsToKG/ContentDownload/resolvers/providers/arxiv.py`
   - Copy `ArxivResolver` class (lines ~1258-1309)
   - Import `strip_prefix` from utils
   - Add module docstring: "arXiv preprint resolver."
 
-- [ ] 4.5 Create `src/DocsToKG/ContentDownload/resolvers/providers/pmc.py`
+- [x] 4.5 Create `src/DocsToKG/ContentDownload/resolvers/providers/pmc.py`
   - Copy `PmcResolver` class (lines ~1312-1433)
   - Import necessary utilities including `normalize_pmcid`, `normalize_doi`, `dedupe`
   - Add module docstring: "PubMed Central resolver using NCBI utilities."
 
-- [ ] 4.6 Create `src/DocsToKG/ContentDownload/resolvers/providers/europe_pmc.py`
+- [x] 4.6 Create `src/DocsToKG/ContentDownload/resolvers/providers/europe_pmc.py`
   - Copy `EuropePmcResolver` class (lines ~1436-1504)
   - Add module docstring: "Europe PMC resolver for European open access articles."
 
-- [ ] 4.7 Create `src/DocsToKG/ContentDownload/resolvers/providers/core.py`
+- [x] 4.7 Create `src/DocsToKG/ContentDownload/resolvers/providers/core.py`
   - Copy `CoreResolver` class (lines ~1507-1581)
   - Add module docstring: "CORE API resolver for aggregated open access content."
 
-- [ ] 4.8 Create `src/DocsToKG/ContentDownload/resolvers/providers/doaj.py`
+- [x] 4.8 Create `src/DocsToKG/ContentDownload/resolvers/providers/doaj.py`
   - Copy `DoajResolver` class (lines ~1584-1658)
   - Add module docstring: "DOAJ (Directory of Open Access Journals) resolver."
 
-- [ ] 4.9 Create `src/DocsToKG/ContentDownload/resolvers/providers/semantic_scholar.py`
+- [x] 4.9 Create `src/DocsToKG/ContentDownload/resolvers/providers/semantic_scholar.py`
   - Copy `SemanticScholarResolver` class (lines ~1661-1721)
   - Copy `_fetch_semantic_scholar_data` helper and LRU cache (lines ~124-143)
   - Add module docstring: "Semantic Scholar Graph API resolver."
 
-- [ ] 4.10 Create `src/DocsToKG/ContentDownload/resolvers/providers/openaire.py`
+- [x] 4.10 Create `src/DocsToKG/ContentDownload/resolvers/providers/openaire.py`
   - Copy `OpenAireResolver` class (lines ~1724-1793)
   - Copy `_collect_candidate_urls` helper (lines ~146-155)
   - Add module docstring: "OpenAIRE research infrastructure resolver."
 
-- [ ] 4.11 Create `src/DocsToKG/ContentDownload/resolvers/providers/hal.py`
+- [x] 4.11 Create `src/DocsToKG/ContentDownload/resolvers/providers/hal.py`
   - Copy `HalResolver` class (lines ~1796-1873)
   - Add module docstring: "HAL (Hyper Articles en Ligne) open archive resolver."
 
-- [ ] 4.12 Create `src/DocsToKG/ContentDownload/resolvers/providers/osf.py`
+- [x] 4.12 Create `src/DocsToKG/ContentDownload/resolvers/providers/osf.py`
   - Copy `OsfResolver` class (lines ~1876-1954)
   - Add module docstring: "Open Science Framework preprints resolver."
 
-- [ ] 4.13 Create `src/DocsToKG/ContentDownload/resolvers/providers/wayback.py`
+- [x] 4.13 Create `src/DocsToKG/ContentDownload/resolvers/providers/wayback.py`
   - Copy `WaybackResolver` class (lines ~1957-2022)
   - Add module docstring: "Internet Archive Wayback Machine fallback resolver."
 
-- [ ] 4.14 Update `resolvers/providers/__init__.py` with complete registry
+- [x] 4.14 Update `resolvers/providers/__init__.py` with complete registry
 
   ```python
   from .unpaywall import UnpaywallResolver
@@ -573,7 +573,7 @@
       ]
   ```
 
-- [ ] 4.15 Create `src/DocsToKG/ContentDownload/resolvers/__init__.py` with backward-compatible exports
+- [x] 4.15 Create `src/DocsToKG/ContentDownload/resolvers/__init__.py` with backward-compatible exports
 
   ```python
   """Resolver pipeline and provider implementations.
