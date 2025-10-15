@@ -78,13 +78,16 @@ include:
 | `DOCSTOKG_DATA_ROOT` | Overrides automatic data-root detection for all stages. |
 | `DOCLING_CUDA_USE_FLASH_ATTENTION2` | Enables Flash Attention optimizations within Docling VLM workers. |
 | `DOCLING_ARTIFACTS_PATH` | Custom cache directory for Docling-rendered artifacts (bitmaps, intermediate assets). |
+| `DOCSTOKG_HASH_ALG` | Forces content hashing algorithm (`sha1` default, set to `sha256`, `sha512`, etc. when compliance requires). Changing this invalidates resume caches created with a different algorithm. |
 
 ## Schema Versioning Strategy
 
 JSONL outputs embed deterministic schema identifiers (`docparse/1.1.0` for
-chunks, `embeddings/1.0.0` for vectors).  Reader utilities validate compatibility
-against declared allow-lists so we can introduce future schema revisions without
-breaking downstream consumers.  When incrementing a schema version:
+chunks, `embeddings/1.0.0` for vectors). Reader utilities now enforce these
+identifiers via ``validate_schema_version`` which raises a ``ValueError`` when a
+row is missing the field or advertises an unsupported version. This fail-fast
+behaviour allows us to introduce future schema revisions without corrupting
+downstream consumers. When incrementing a schema version:
 
 1. Extend the compatibility matrix in `DocsToKG.DocParsing.schemas`.
 2. Preserve validation helpers for older versions until consumers are migrated.
