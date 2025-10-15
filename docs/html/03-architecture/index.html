@@ -121,7 +121,7 @@ between them.</p>
 <h3>2. Document Parsing (<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing</span></code>)<a class="headerlink" href="#document-parsing-docstokg-docparsing" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>Converts PDFs/HTML into DocTags and chunked Markdown using Docling.</p></li>
-<li><p>Pipelines such as <code class="docutils literal notranslate"><span class="pre">DoclingHybridChunkerPipelineWithMin.py</span></code> and <code class="docutils literal notranslate"><span class="pre">run_docling_html_to_doctags_parallel.py</span></code> normalise layout, extract captions, and produce chunk boundaries.</p></li>
+<li><p>Pipelines such as <code class="docutils literal notranslate"><span class="pre">DoclingHybridChunkerPipelineWithMin.py</span></code> and <code class="docutils literal notranslate"><span class="pre">html_pipeline.py</span></code> normalise layout, extract captions, and produce chunk boundaries.</p></li>
 <li><p>Embedding scripts (<code class="docutils literal notranslate"><span class="pre">EmbeddingV2.py</span></code>) generate dense representations consumed by the hybrid search ingest layer.</p></li>
 <li><p>Chunk metadata includes provenance (pages, figure refs) used for highlights and diagnostics.</p></li>
 </ul>

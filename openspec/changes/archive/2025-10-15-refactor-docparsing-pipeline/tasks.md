@@ -1403,8 +1403,8 @@
     - Failed documents: `jq 'select(.status=="failure")' docparse.manifest.jsonl`
     - Average duration by stage: `jq -s 'group_by(.stage) | map({stage: .[0].stage, avg_duration: (map(.duration_s) | add / length)})'`
 - [x] 17.7 Document synthetic benchmarking harness and testing stubs
-  - Reference the new CLI benchmark command in the README and changelog
-  - Describe how `DocsToKG.DocParsing.testing` enables optional dependency stubbing
+  - Reference the synthetic benchmarking tests in the README and changelog
+  - Describe how `tests.docparsing.stubs` enables optional dependency stubbing
 
 ## 18. Integration & Validation
 

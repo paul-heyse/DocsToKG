@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/OntologyDownload/__init__.py
-# hypothesis_version: 6.141.0
-
-['FetchResult', 'FetchSpec', 'PlannedFetch', 'fetch_all', 'fetch_one', 'plan_all', 'plan_one']

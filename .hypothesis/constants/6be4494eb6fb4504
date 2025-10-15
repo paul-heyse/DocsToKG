@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/OntologyDownload/resolvers.py
-# hypothesis_version: 6.141.0
-
-[401, 403, 'Authorization', 'BioPortalResolver', 'FetchPlan', 'OBOResolver', 'OLSResolver', 'RESOLVERS', 'SKOSResolver', 'XBRLResolver', 'acronym', 'application/rdf+xml', 'application/zip', 'attempt', 'bioportal', 'bioregistry', 'config', 'configs', 'download', 'downloadLocation', 'format', 'license', 'links', 'obo', 'ols', 'ols_api_token.txt', 'ontology-fetcher', 'ontologyPurl', 'ontology_id', 'owl', 'plan', 'preferredPrefix', 'rdf', 'resolver', 'resolver timeout', 'shortForm', 'skos', 'sleep_sec', 'stage', 'submissionId', 'text/turtle', 'url', 'version', 'xbrl']

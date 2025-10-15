@@ -27,10 +27,13 @@ except ImportError:
         _OlsClient = None  # type: ignore[assignment]
 from ontoportal_client import BioPortalClient
 
-from .foundation import retry_with_backoff
-from .infrastructure import get_pystow
-from .network import TokenBucket
-from .settings import ConfigError, ResolvedConfig
+from .ontology_download import (
+    ConfigError,
+    ResolvedConfig,
+    TokenBucket,
+    get_pystow,
+    retry_with_backoff,
+)
 
 OlsClient = _OlsClient
 pystow = get_pystow()

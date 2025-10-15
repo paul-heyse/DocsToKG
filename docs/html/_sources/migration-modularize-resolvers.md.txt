@@ -39,7 +39,7 @@ modification.
 - **OpenAlexResolver:** Now participates as the first resolver in the default
   pipeline. Remove bespoke `attempt_openalex_candidates()` integrations.
 - **Centralised HTTP retries:** Every resolver uses
-  `DocsToKG.ContentDownload.http.request_with_retries()` for consistent backoff,
+  `DocsToKG.ContentDownload.network.request_with_retries()` for consistent backoff,
   timeout handling, and `Retry-After` support.
 - **Conditional requests:** Download code paths share the
   `ConditionalRequestHelper` utility to honour ETag and Last-Modified headers.

@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/OntologyDownload/core.py
-# hypothesis_version: 6.141.0
-
-['%Y%m%dT%H%M%SZ', '+00:00', '.zip', 'ConfigurationError', 'FetchResult', 'FetchSpec', 'Manifest', 'Resolver', 'ResolverError', 'ValidationError', 'Z', 'application/zip', 'arelle', 'artifacts', 'batch', 'cache', 'complete', 'configs', 'correlation_id', 'current', 'destination', 'download', 'downloaded_at', 'downloading', 'error', 'etag', 'extract', 'fetch complete', 'fetch_all', 'fetch_one', 'filename', 'https://', 'id', 'last_modified', 'license', 'logs', 'manifest', 'manifest.json', 'normalized', 'ontologies', 'ontology-fetcher', 'ontology_id', 'original', 'owlready2', 'path', 'plan', 'planning fetch', 'progress', 'progress update', 'pronto', 'rdflib', 'resolver', 'robot', 'service', 'sha256', 'stage', 'start', 'starting batch', 'startup', 'status', 'target_formats', 'total', 'url', 'validation', 'version', 'workers']

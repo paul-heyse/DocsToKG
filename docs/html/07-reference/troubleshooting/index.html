@@ -96,7 +96,7 @@ Increase <code class="docutils literal notranslate"><span class="pre">nprobe</sp
 <h2>3. Document Parsing<a class="headerlink" href="#document-parsing" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><strong>Parsing fails on specific PDFs</strong> – Run
-<code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.DocParsing.run_docling_html_to_doctags_parallel</span> <span class="pre">--debug</span></code> to
+<code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.DocParsing.html_pipeline</span> <span class="pre">--debug</span></code> to
 capture detailed failure logs. Consider upgrading Docling or adjusting chunking
 parameters.</p></li>
 <li><p><strong>Embedding throughput low</strong> – Ensure GPU drivers align with <code class="docutils literal notranslate"><span class="pre">requirements.in</span></code>

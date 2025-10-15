@@ -153,13 +153,13 @@
   - Note thread-safety guarantees (session must be thread-safe)
 
 - [x] 1.6 Update `src/DocsToKG/ContentDownload/download_pyalex_pdfs.py` imports
-  - Add: `from DocsToKG.ContentDownload.http import request_with_retries`
+  - Add: `from DocsToKG.ContentDownload.network import request_with_retries`
   - Replace `session.head(url, ...)` call at line ~970 with `request_with_retries(session, "HEAD", url, max_retries=1, ...)`
   - Replace `session.get(url, stream=True, ...)` call at line ~980 with `request_with_retries(session, "GET", url, ...)`
   - Remove HEAD error suppression `contextlib.suppress` since retries handle transients
 
 - [x] 1.7 Update `src/DocsToKG/ContentDownload/resolvers/__init__.py` to use new utility
-  - Replace `_request_with_retries()` calls (lines ~1199, 1344, 1404, 1482, etc.) with `from DocsToKG.ContentDownload.http import request_with_retries`
+  - Replace `_request_with_retries()` calls (lines ~1199, 1344, 1404, 1482, etc.) with `from DocsToKG.ContentDownload.network import request_with_retries`
   - Remove local `_request_with_retries()` definition (lines ~158-196)
   - Update `_sleep_backoff()` references to use backoff logic from `http.request_with_retries()`
 
@@ -170,7 +170,7 @@
   from unittest.mock import Mock, patch
   import pytest
   import requests
-  from DocsToKG.ContentDownload.http import request_with_retries, parse_retry_after_header
+  from DocsToKG.ContentDownload.network import request_with_retries, parse_retry_after_header
 
   def test_successful_request_no_retries():
       """Verify successful request completes immediately without retries."""
@@ -709,7 +709,7 @@
   ) -> bool:
       """Return True if URL passes HEAD pre-check, False to skip."""
       try:
-          from DocsToKG.ContentDownload.http import request_with_retries
+          from DocsToKG.ContentDownload.network import request_with_retries
           response = request_with_retries(
               session, "HEAD", url,
               max_retries=1,
@@ -878,7 +878,7 @@
   from urllib.parse import quote
   from ..types import Resolver, ResolverConfig, ResolverResult
   from DocsToKG.ContentDownload.utils import normalize_doi
-  from DocsToKG.ContentDownload.http import request_with_retries
+  from DocsToKG.ContentDownload.network import request_with_retries
 
   class ZenodoResolver:
       """Resolver for Zenodo open access repository."""
@@ -1054,7 +1054,7 @@
   import requests
   from ..types import Resolver, ResolverConfig, ResolverResult
   from DocsToKG.ContentDownload.utils import normalize_doi
-  from DocsToKG.ContentDownload.http import request_with_retries
+  from DocsToKG.ContentDownload.network import request_with_retries
 
   class FigshareResolver:
       """Resolver for Figshare repository."""
@@ -1427,7 +1427,7 @@
   # In http.py, add logging for retry attempts
   import logging
 
-  LOGGER = logging.getLogger("DocsToKG.ContentDownload.http")
+  LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
 
   # Inside request_with_retries():
   except requests.RequestException as exc:

@@ -56,7 +56,7 @@ def request_with_retries(
     url: str,
     **kwargs: Any,
 ) -> requests.Response:
-    """Proxy to :func:`DocsToKG.ContentDownload.http.request_with_retries`.
+    """Proxy to :func:`DocsToKG.ContentDownload.network.request_with_retries`.
 
     The indirection keeps this module compatible with unit tests that monkeypatch
     either the pipeline-level attribute or the underlying HTTP helper while also
@@ -75,7 +75,7 @@ def request_with_retries(
         requests.RequestException: Propagated from the underlying retry helper.
     """
 
-    from DocsToKG.ContentDownload.http import request_with_retries as _request_with_retries
+    from DocsToKG.ContentDownload.network import request_with_retries as _request_with_retries
 
     return _request_with_retries(session, method, url, **kwargs)
 

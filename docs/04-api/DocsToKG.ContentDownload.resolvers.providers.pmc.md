@@ -1,6 +1,6 @@
 # 1. Module: pmc
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.pmc``.
+This reference describes the ``PmcResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.resolvers.providers``.
 
 PubMed Central Resolver Provider
 
@@ -13,7 +13,7 @@ Key Features:
 - Deduplication of PMCIDs and robust error reporting via resolver events.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.providers.pmc import PmcResolver
+    from DocsToKG.ContentDownload.resolvers.providers import PmcResolver
 
     resolver = PmcResolver()
     results = list(resolver.iter_urls(session, config, artifact))

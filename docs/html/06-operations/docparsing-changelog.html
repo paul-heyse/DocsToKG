@@ -92,8 +92,8 @@ detection, enriched diagnostics, and manifest metadata for served aliases.</p></
 so resumable runs remain idempotent under concurrent execution.</p></li>
 <li><p>Guarded SPLADE and Qwen embedding paths with actionable dependency checks and
 synthetic stubs so <code class="docutils literal notranslate"><span class="pre">--help</span></code> remains available without optional packages.</p></li>
-<li><p>Added a synthetic benchmarking harness
-(<code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.DocParsing.cli.benchmark_embeddings</span></code>) plus end-to-end CLI
+<li><p>Added a synthetic benchmarking harness covered by
+<code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tests/docparsing/test_synthetic_benchmark.py</span></code> plus end-to-end CLI
 tests that install lightweight dependency stubs, validate schema compliance,
 and assert manifest entries.</p></li>
 </ul>
@@ -122,7 +122,7 @@ and assert manifest entries.</p></li>
 </tr>
 </tbody>
 </table>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.DocParsing.cli.doctags_convert<span class="w"> </span><span class="se">\</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.DocParsing.cli<span class="w"> </span>doctags<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--mode<span class="w"> </span>pdf<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--workers<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--input<span class="w"> </span>&lt;pdf_dir&gt;<span class="w"> </span><span class="se">\</span>
@@ -142,9 +142,9 @@ hardware is provisioned.</p>
 </section>
 <section id="synthetic-streaming-benchmark">
 <h3>1.4 Synthetic Streaming Benchmark<a class="headerlink" href="#synthetic-streaming-benchmark" title="Link to this heading"></a></h3>
-<p>Running the synthetic harness
-(<code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.DocParsing.cli.benchmark_embeddings</span> <span class="pre">--chunks</span> <span class="pre">512</span> <span class="pre">--tokens</span> <span class="pre">384</span> <span class="pre">--dense-dim</span> <span class="pre">2560</span></code>)
-estimates the following improvements:</p>
+<p>Running the synthetic harness via
+<code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tests/docparsing/test_synthetic_benchmark.py</span> <span class="pre">-k</span> <span class="pre">simulate</span></code> estimates the
+following improvements:</p>
 <ul class="simple">
 <li><p><strong>Throughput:</strong> 3.781 s → 2.193 s (≈1.72× faster)</p></li>
 <li><p><strong>Peak memory:</strong> 5.00 MiB → 2.10 MiB (≈58 % reduction)</p></li>
@@ -156,7 +156,7 @@ development laptops without GPUs or optional DocParsing dependencies.</p>
 <h3>1.5 Migration Guide<a class="headerlink" href="#migration-guide" title="Link to this heading"></a></h3>
 <ol class="arabic">
 <li><p>Prefer the unified CLI wrapper:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.DocParsing.cli.doctags_convert<span class="w"> </span>--mode<span class="w"> </span>pdf<span class="w"> </span>--model<span class="w"> </span>/path/to/model<span class="w"> </span><span class="se">\</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.DocParsing.cli<span class="w"> </span>doctags<span class="w"> </span>--mode<span class="w"> </span>pdf<span class="w"> </span>--model<span class="w"> </span>/path/to/model<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--served-model-name<span class="w"> </span>granite-docling-258M<span class="w"> </span>--served-model-name<span class="w"> </span>ibm-granite/granite-docling-258M
 </pre></div>
 </div>

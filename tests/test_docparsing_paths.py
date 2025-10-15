@@ -11,11 +11,11 @@ import pytest
 
 pytest.importorskip("transformers")
 
-SCRIPTS = [
-    Path("src/DocsToKG/DocParsing/DoclingHybridChunkerPipelineWithMin.py"),
-    Path("src/DocsToKG/DocParsing/html_pipeline.py"),
-    Path("src/DocsToKG/DocParsing/pdf_pipeline.py"),
-    Path("src/DocsToKG/DocParsing/EmbeddingV2.py"),
+COMMANDS = [
+    (Path("src/DocsToKG/DocParsing/DoclingHybridChunkerPipelineWithMin.py"), ["--help"]),
+    (Path("src/DocsToKG/DocParsing/pipelines.py"), ["--pdf", "--help"]),
+    (Path("src/DocsToKG/DocParsing/pipelines.py"), ["--html", "--help"]),
+    (Path("src/DocsToKG/DocParsing/EmbeddingV2.py"), ["--help"]),
 ]
 
 
@@ -34,9 +34,9 @@ def test_scripts_respect_data_root(tmp_path: Path) -> None:
         path_entries.append(existing_path)
     env["PYTHONPATH"] = os.pathsep.join(path_entries)
 
-    for script in SCRIPTS:
+    for script, args in COMMANDS:
         result = subprocess.run(
-            [sys.executable, str(script), "--help"],
+            [sys.executable, str(script), *args],
             env=env,
             check=False,
             capture_output=True,

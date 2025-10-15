@@ -1,6 +1,6 @@
 # 1. Module: europe_pmc
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.europe_pmc``.
+This reference describes the ``EuropePmcResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.resolvers.providers``.
 
 Europe PMC Resolver Provider
 
@@ -14,7 +14,7 @@ Key Features:
 - Structured error reporting for network and parsing failures.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.providers.europe_pmc import EuropePmcResolver
+    from DocsToKG.ContentDownload.resolvers.providers import EuropePmcResolver
 
     resolver = EuropePmcResolver()
     urls = list(resolver.iter_urls(session, config, artifact))

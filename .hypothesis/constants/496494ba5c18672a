@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/crossref.py
-# hypothesis_version: 6.141.0
-
-[200, 1000, 'CrossrefResolver', 'GET', 'URL', 'WorkArtifact', '_fetch_crossref_data', 'application/pdf', 'connection-error', 'content-type', 'content_preview', 'content_type', 'crossref', 'error', 'error_detail', 'error_type', 'get', 'http-error', 'json-error', 'link', 'mailto', 'message', 'no-doi', 'request-error', 'skipped', 'text', 'text/html', 'timeout', 'unexpected-error']

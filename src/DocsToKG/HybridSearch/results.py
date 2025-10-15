@@ -8,8 +8,7 @@ from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Sequence
 import numpy as np
 
 from .config import FusionConfig
-from .similarity import pairwise_inner_products
-from .similarity_gpu import cosine_batch
+from .similarity import cosine_batch, pairwise_inner_products
 from .storage import OpenSearchSimulator
 from .tokenization import tokenize
 from .types import (
@@ -173,7 +172,15 @@ class ResultShaper:
             )
         resources = self._gpu_resources
         if resources is None:
-            raise RuntimeError("GPU resources are required for cosine deduplication")
+            query = embeddings[current_idx]
+            others = embeddings[list(emitted_indices)]
+            query_norm = np.linalg.norm(query)
+            if query_norm == 0.0:
+                return False
+            other_norms = np.linalg.norm(others, axis=1)
+            other_norms[other_norms == 0.0] = 1.0
+            sims = (others @ query) / (other_norms * query_norm)
+            return float(sims.max()) >= self._fusion_config.cosine_dedupe_threshold
         query = embeddings[current_idx]
         corpus = embeddings[list(emitted_indices)]
         sims = cosine_batch(query, corpus, device=self._gpu_device, resources=resources)

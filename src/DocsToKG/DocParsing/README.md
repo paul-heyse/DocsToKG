@@ -27,7 +27,7 @@ auditing across the toolchain.
 
 ### 1. DocTags Conversion
 
-* **Entry point**: `python -m DocsToKG.DocParsing.cli.doctags_convert`
+* **Entry point**: `python -m DocsToKG.DocParsing.cli doctags`
 * **Output**: `Data/DocTagsFiles/<doc_id>.doctags`
 * **Highlights**:
   - HTML and PDF pipelines use Docling as the default renderer.  PDF conversion
@@ -38,7 +38,7 @@ auditing across the toolchain.
 
 ### 2. Chunking & Coalescence
 
-* **Entry point**: `python -m DocsToKG.DocParsing.cli.chunk_and_coalesce`
+* **Entry point**: `python -m DocsToKG.DocParsing.cli chunk`
 * **Output**: `Data/ChunkedDocTagFiles/<doc_id>.chunks.jsonl`
 * **Highlights**:
   - The hybrid chunker honors Docling structural annotations and only merges
@@ -48,7 +48,7 @@ auditing across the toolchain.
 
 ### 3. Embedding Generation
 
-* **Entry point**: `python -m DocsToKG.DocParsing.cli.embed_vectors`
+* **Entry point**: `python -m DocsToKG.DocParsing.cli embed`
 * **Output**: `Data/Embeddings/<doc_id>.vectors.jsonl`
 * **Highlights**:
   - Streaming two-pass architecture bounds memory usage while collecting BM25
@@ -99,21 +99,21 @@ Typical end-to-end workflow on a small corpus:
 
 ```bash
 # 1) Convert PDFs to DocTags using the visual language pipeline
-python -m DocsToKG.DocParsing.cli.doctags_convert \
+python -m DocsToKG.DocParsing.cli doctags \
   --mode pdf \
   --input Data/PDFs \
   --output Data/DocTagsFiles \
   --resume
 
 # 2) Chunk the DocTags with tokenizer-aligned boundaries
-python -m DocsToKG.DocParsing.cli.chunk_and_coalesce \
+python -m DocsToKG.DocParsing.cli chunk \
   --in-dir Data/DocTagsFiles \
   --out-dir Data/ChunkedDocTagFiles \
   --min-tokens 256 \
   --max-tokens 512
 
 # 3) Generate embeddings with streaming batches
-python -m DocsToKG.DocParsing.cli.embed_vectors \
+python -m DocsToKG.DocParsing.cli embed \
   --chunks-dir Data/ChunkedDocTagFiles \
   --vectors-dir Data/Embeddings \
   --batch-size-qwen 24 \
@@ -134,9 +134,9 @@ Additional tips:
 | CUDA error: re-initialization of context | Process forked before CUDA init | Ensure the PDF converter runs with spawn mode (default) or export `CUDA_VISIBLE_DEVICES` to limit visible GPUs. |
 | Out-of-memory during embedding | Batch size too large | Reduce `--batch-size-qwen` / `--batch-size-splade` or enable gradient checkpointing on the serving side. |
 | vLLM server fails to start | Port conflict or missing model weights | Use `--served-model-name` when launching vLLM and verify the port is free via `lsof -i :8000`. |
-| Schema validation errors | Mixed schema versions in output directories | Run the validation CLI (`python -m DocsToKG.DocParsing.cli.embed_vectors --validate-only`) after cleaning stale shards. |
+| Schema validation errors | Mixed schema versions in output directories | Run the validation CLI (`python -m DocsToKG.DocParsing.cli embed --validate-only`) after cleaning stale shards. |
 | Missing DocTags | Input hashes mismatch resume manifest | Re-run the converter with `--force` or delete the stale DocTags file to trigger regeneration. |
-| `sentence-transformers` / `vllm` ImportError | Optional embedding dependencies not installed | Install the extras (`pip install sentence-transformers vllm`) or run the synthetic benchmark harness described below to verify environment wiring before provisioning GPUs. |
+| `sentence-transformers` / `vllm` ImportError | Optional embedding dependencies not installed | Install the extras (`pip install sentence-transformers vllm`) or run `pytest tests/docparsing/test_synthetic_benchmark.py` to verify stubbed dependencies before provisioning GPUs. |
 
 ## Manifest Query Examples
 
@@ -165,14 +165,13 @@ can reason about historical data sets.
 
 ## Synthetic Benchmarking & Test Utilities
 
-The `DocsToKG.DocParsing.testing` package provides lightweight fixtures that
-allow end-to-end validation without installing heavyweight dependencies:
+The test suite ships lightweight fixtures that allow end-to-end validation
+without installing heavyweight dependencies:
 
-* `dependency_stubs()` installs stub implementations of Docling, vLLM, and
-  sentence-transformers so the CLI wrappers can be exercised on laptops without
-  GPUs. The integration tests reuse these stubs to verify manifest updates and
-  schema compliance.
-* `python -m DocsToKG.DocParsing.cli.benchmark_embeddings` runs a deterministic
-  synthetic benchmark that estimates the throughput and memory savings of the
-  streaming embedding pipeline. This harness only depends on the stubs above
-  and can be invoked as part of CI smoke-tests.
+* `tests.docparsing.stubs.dependency_stubs()` installs stub implementations of
+  Docling, vLLM, and sentence-transformers so the CLI wrappers can be exercised
+  on laptops without GPUs. The integration tests reuse these stubs to verify
+  manifest updates and schema compliance.
+* `tests/docparsing/synthetic.py` contains deterministic factories and a
+  synthetic benchmark model. `tests/docparsing/test_synthetic_benchmark.py`
+  asserts the expected throughput and memory characteristics as part of CI.

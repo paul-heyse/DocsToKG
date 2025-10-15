@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/europe_pmc.py
-# hypothesis_version: 6.141.0
-
-[200, 'EuropePmcResolver', 'WorkArtifact', 'documentStyle', 'europe_pmc', 'format', 'fullTextUrl', 'fullTextUrlList', 'get', 'json', 'pageSize', 'pdf', 'query', 'result', 'resultList', 'source', 'url']

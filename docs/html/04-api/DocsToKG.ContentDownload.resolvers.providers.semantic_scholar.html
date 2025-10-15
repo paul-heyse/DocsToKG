@@ -78,7 +78,7 @@
              
   <section id="module-semantic-scholar">
 <h1>1. Module: semantic_scholar<a class="headerlink" href="#module-semantic-scholar" title="Link to this heading"></a></h1>
-<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.semantic_scholar</span></code>.</p>
+<p>This reference describes the <code class="docutils literal notranslate"><span class="pre">SemanticScholarResolver</span></code> class provided by the consolidated module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers</span></code>.</p>
 <p>Semantic Scholar Resolver Provider</p>
 <p>This module integrates with the Semantic Scholar Graph API to locate open
 access PDFs associated with DOI-indexed papers.</p>
@@ -89,7 +89,7 @@ access PDFs associated with DOI-indexed papers.</p>
 <li><p>Structured error emission covering HTTP and JSON decoding failures.</p></li>
 </ul>
 <p>Usage:
-from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import SemanticScholarResolver</p>
+from DocsToKG.ContentDownload.resolvers.providers import SemanticScholarResolver</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = SemanticScholarResolver()
 results = list(resolver.iter_urls(session, config, artifact))
 </pre></div>

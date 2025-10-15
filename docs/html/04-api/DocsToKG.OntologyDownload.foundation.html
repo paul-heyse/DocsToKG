@@ -1,0 +1,157 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: foundation &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: foundation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.OntologyDownload.foundation.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-foundation">
+<h1>1. Module: foundation<a class="headerlink" href="#module-foundation" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.foundation</span></code>.</p>
+<p>Cross-cutting utilities shared across the ontology downloader package.</p>
+<p>This module intentionally groups helpers that are required by multiple layers
+of the pipeline—retry orchestration, safe filename generation, and correlation
+id creation—so that higher-level modules such as networking, logging, and the
+CLI can depend on a single lightweight utility surface without introducing
+import cycles.</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="retry-with-backoff-func">
+<h3><code class="docutils literal notranslate"><span class="pre">retry_with_backoff(func)</span></code><a class="headerlink" href="#retry-with-backoff-func" title="Link to this heading"></a></h3>
+<p>Execute <code class="docutils literal notranslate"><span class="pre">func</span></code> with exponential backoff until it succeeds.</p>
+<p>Args:
+func: Zero-argument callable to invoke.
+retryable: Predicate returning <code class="docutils literal notranslate"><span class="pre">True</span></code> when the raised exception should
+trigger another attempt.
+max_attempts: Maximum number of attempts including the initial call.
+backoff_base: Base delay in seconds used for the exponential schedule.
+jitter: Maximum random jitter (uniform) added to each delay.
+callback: Optional hook invoked before sleeping with
+<code class="docutils literal notranslate"><span class="pre">(attempt_number,</span> <span class="pre">error,</span> <span class="pre">delay_seconds)</span></code>.
+sleep: Sleep function, overridable for deterministic tests.</p>
+<p>Returns:
+The result produced by <code class="docutils literal notranslate"><span class="pre">func</span></code> when it succeeds.</p>
+<p>Raises:
+ValueError: If <code class="docutils literal notranslate"><span class="pre">max_attempts</span></code> is less than one.
+BaseException: Re-raises the last exception from <code class="docutils literal notranslate"><span class="pre">func</span></code> when retries
+are exhausted or the predicate indicates it is not retryable.</p>
+</section>
+<section id="sanitize-filename-filename">
+<h3><code class="docutils literal notranslate"><span class="pre">sanitize_filename(filename)</span></code><a class="headerlink" href="#sanitize-filename-filename" title="Link to this heading"></a></h3>
+<p>Sanitize filenames to prevent directory traversal and unsafe characters.</p>
+<p>Args:
+filename: Candidate filename provided by an upstream service.</p>
+<p>Returns:
+Safe filename compatible with local filesystem storage.</p>
+</section>
+<section id="generate-correlation-id">
+<h3><code class="docutils literal notranslate"><span class="pre">generate_correlation_id()</span></code><a class="headerlink" href="#generate-correlation-id" title="Link to this heading"></a></h3>
+<p>Create a short-lived identifier that links related log entries.</p>
+</section>
+<section id="mask-sensitive-data-payload">
+<h3><code class="docutils literal notranslate"><span class="pre">mask_sensitive_data(payload)</span></code><a class="headerlink" href="#mask-sensitive-data-payload" title="Link to this heading"></a></h3>
+<p>Remove secrets from structured payloads prior to logging.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -17,7 +17,7 @@ from typing import Iterable
 
 import requests
 
-from DocsToKG.ContentDownload.http import request_with_retries
+from DocsToKG.ContentDownload.network import request_with_retries
 from DocsToKG.ContentDownload.resolvers.types import ResolverConfig, ResolverResult
 
 

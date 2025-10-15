@@ -78,7 +78,7 @@
              
   <section id="module-zenodo">
 <h1>1. Module: zenodo<a class="headerlink" href="#module-zenodo" title="Link to this heading"></a></h1>
-<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.zenodo</span></code>.</p>
+<p>This reference describes the <code class="docutils literal notranslate"><span class="pre">ZenodoResolver</span></code> class provided by the consolidated module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers</span></code>.</p>
 <p>Zenodo Resolver Provider</p>
 <p>This module queries the Zenodo API to locate repository-hosted PDFs associated
 with DOI-indexed research objects.</p>
@@ -89,7 +89,7 @@ with DOI-indexed research objects.</p>
 <li><p>Deduplication-free iteration over PDF file entries.</p></li>
 </ul>
 <p>Usage:
-from DocsToKG.ContentDownload.resolvers.providers.zenodo import ZenodoResolver</p>
+from DocsToKG.ContentDownload.resolvers.providers import ZenodoResolver</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = ZenodoResolver()
 results = list(resolver.iter_urls(session, config, artifact))
 </pre></div>

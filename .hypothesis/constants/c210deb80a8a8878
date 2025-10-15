@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/DocParsing/cli/doctags_convert.py
-# hypothesis_version: 6.141.0
-
-['*.htm', '*.html', '*.pdf', '+', '--data-root', '--force', '--input', '--mode', '--model', '--output', '--overwrite', '--resume', '--served-model-name', '--workers', '__main__', 'append', 'auto', 'data_root', 'extra_fields', 'force', 'html', 'input', 'input_dir', 'mode', 'model', 'output', 'output_dir', 'overwrite', 'pdf', 'resume', 'served_model_names', 'store_true', 'workers']

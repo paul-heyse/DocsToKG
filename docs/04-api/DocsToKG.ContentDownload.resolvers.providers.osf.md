@@ -1,6 +1,6 @@
 # 1. Module: osf
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.osf``.
+This reference describes the ``OsfResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.resolvers.providers``.
 
 OSF Resolver Provider
 
@@ -13,7 +13,7 @@ Key Features:
 - Deduplication of URLs to avoid redundant download attempts.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.providers.osf import OsfResolver
+    from DocsToKG.ContentDownload.resolvers.providers import OsfResolver
 
     resolver = OsfResolver()
     results = list(resolver.iter_urls(session, config, artifact))

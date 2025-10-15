@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/OntologyDownload/logging_config.py
-# hypothesis_version: 6.141.0
-
-[100, 1024, '%Y%m%d', '***masked***', '*.jsonl', '*.jsonl.gz', '+00:00', '.gz', 'INFO', 'ONTOFETCH_LOG_DIR', 'Z', '_ontofetch_managed', 'api_key', 'apikey', 'authorization', 'correlation_id', 'exc_info', 'extra_fields', 'level', 'mask_sensitive_data', 'message', 'ontology_id', 'password', 'rb', 'secret', 'setup_logging', 'stage', 'timestamp', 'token', 'wb']

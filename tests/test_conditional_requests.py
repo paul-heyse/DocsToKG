@@ -32,7 +32,7 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     pytest.skip("hypothesis is required for these tests", allow_module_level=True)
 
-from DocsToKG.ContentDownload.conditional import (
+from DocsToKG.ContentDownload.network import (
     CachedResult,
     ConditionalRequestHelper,
     ModifiedResult,

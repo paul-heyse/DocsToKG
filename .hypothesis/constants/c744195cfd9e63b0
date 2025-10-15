@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/HybridSearch/schema.py
-# hypothesis_version: 6.141.0
-
-['acl', 'analysis', 'analyzer', 'author', 'body', 'chunk_id', 'chunking', 'date', 'default', 'doc_id', 'dynamic', 'index', 'integer', 'keyword', 'mappings', 'max_tokens', 'metadata', 'name', 'namespace', 'number_of_replicas', 'number_of_shards', 'object', 'overlap', 'properties', 'published_at', 'rank_features', 'settings', 'splade', 'standard', 'strict', 'tags', 'text', 'token_count', 'type', 'vector_id']

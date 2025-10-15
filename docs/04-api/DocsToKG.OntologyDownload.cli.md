@@ -13,6 +13,22 @@ rich ASCII tables summarise resolver fallback chains and validator results.
 
 ## 1. Functions
 
+### `format_table(headers, rows)`
+
+Render a padded ASCII table.
+
+### `format_plan_rows(plans)`
+
+Convert planner output into rows for table rendering.
+
+### `format_results_table(results)`
+
+Render download results as a table summarizing status and file paths.
+
+### `format_validation_summary(results)`
+
+Summarise validator outcomes in a compact status table.
+
 ### `_build_parser()`
 
 Configure the top-level CLI parser and subcommands.
@@ -275,3 +291,7 @@ Process exit code indicating success (`0`) or failure.
 Raises:
 ConfigError: If configuration files are invalid or unsafe to overwrite.
 OntologyDownloadError: If download or validation operations fail.
+
+### `_format_row(values)`
+
+*No documentation available.*

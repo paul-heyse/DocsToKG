@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/HybridSearch/similarity.py
-# hypothesis_version: 6.141.0
-
-[0.0, 1.0, '-inf', 'max_inner_product', 'normalize_L2', 'normalize_rows']

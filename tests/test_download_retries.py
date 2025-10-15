@@ -225,14 +225,14 @@ def test_retry_determinism_matches_request_with_retries(monkeypatch, http_server
     handler.statuses = [429, 429, 200]
     url = f"http://127.0.0.1:{server.server_address[1]}/rate-limited.pdf"
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.http.random.random", lambda: 0.0)
+    monkeypatch.setattr("DocsToKG.ContentDownload.network.random.random", lambda: 0.0)
 
     sleep_durations: list[float] = []
 
     def _capture_sleep(delay: float) -> None:
         sleep_durations.append(delay)
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.http.time.sleep", _capture_sleep)
+    monkeypatch.setattr("DocsToKG.ContentDownload.network.time.sleep", _capture_sleep)
 
     _, session, _, outcome = _download(url, tmp_path)
     try:

@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/OntologyDownload/cli.py
-# hypothesis_version: 6.141.0
-
-['*', ',', '--arelle', '--force', '--json', '--log-level', '--owlready2', '--pronto', '--rdflib', '--resolver', '--robot', '--spec', '--target-formats', '--versions', '?', 'DEBUG', 'Download ontologies', 'ERROR', 'INFO', 'Ontology identifier', 'WARNING', '__main__', 'arelle', 'artifacts', 'command', 'complete', 'config', 'config_command', 'failed', 'file', 'filename', 'id', 'ids', 'init', 'manifest', 'manifest.json', 'normalized', 'ok', 'ontofetch', 'ontologies', 'ontology processed', 'ontology_id', 'original', 'owlready2', 'passed', 'path', 'pronto', 'pull', 'rdflib', 'resolver', 'robot', 'sha256', 'show', 'sources.yaml', 'stage', 'status', 'store_true', 'validate', 'validation', 'version']

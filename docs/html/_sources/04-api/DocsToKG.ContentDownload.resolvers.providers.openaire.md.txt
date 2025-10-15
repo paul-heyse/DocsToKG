@@ -1,6 +1,6 @@
 # 1. Module: openaire
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.openaire``.
+This reference describes the ``OpenAireResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.resolvers.providers``.
 
 OpenAIRE Resolver Provider
 
@@ -13,7 +13,7 @@ Key Features:
 - Deduplication of candidate URLs before yielding resolver results.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.providers.openaire import OpenAireResolver
+    from DocsToKG.ContentDownload.resolvers.providers import OpenAireResolver
 
     resolver = OpenAireResolver()
     results = list(resolver.iter_urls(session, config, artifact))

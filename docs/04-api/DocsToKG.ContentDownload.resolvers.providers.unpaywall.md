@@ -1,6 +1,6 @@
 # 1. Module: unpaywall
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.unpaywall``.
+This reference describes the ``UnpaywallResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.resolvers.providers``.
 
 Unpaywall Resolver Provider
 
@@ -13,7 +13,7 @@ Key Features:
 - Deduplication of candidate URLs across best and alternate OA locations.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver
+    from DocsToKG.ContentDownload.resolvers.providers import UnpaywallResolver
 
     resolver = UnpaywallResolver()
     results = list(resolver.iter_urls(session, config, artifact))

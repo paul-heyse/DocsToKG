@@ -11,7 +11,7 @@ from types import ModuleType
 import pytest
 
 import DocsToKG.DocParsing.schemas as schemas
-from DocsToKG.DocParsing.testing import dependency_stubs
+from tests.docparsing.stubs import dependency_stubs
 
 
 def _reload_cli_modules():
@@ -21,13 +21,11 @@ def _reload_cli_modules():
         "DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin"
     )
     embed_module = importlib.import_module("DocsToKG.DocParsing.EmbeddingV2")
-    chunk_cli = importlib.import_module("DocsToKG.DocParsing.cli.chunk_and_coalesce")
-    embed_cli = importlib.import_module("DocsToKG.DocParsing.cli.embed_vectors")
+    cli_module = importlib.import_module("DocsToKG.DocParsing.cli")
     importlib.reload(chunk_module)
     importlib.reload(embed_module)
-    importlib.reload(chunk_cli)
-    importlib.reload(embed_cli)
-    return chunk_cli, embed_cli
+    importlib.reload(cli_module)
+    return cli_module
 
 
 def test_chunk_and_embed_cli_with_dependency_stubs(
@@ -47,7 +45,7 @@ def test_chunk_and_embed_cli_with_dependency_stubs(
     monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
 
     with dependency_stubs():
-        chunk_cli, embed_cli = _reload_cli_modules()
+        cli_module = _reload_cli_modules()
         importlib.reload(schemas)
         import DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin as chunk_module
         import DocsToKG.DocParsing.EmbeddingV2 as embed_module
@@ -60,7 +58,7 @@ def test_chunk_and_embed_cli_with_dependency_stubs(
         embed_module.SPLADEVector = schemas.SPLADEVector
         embed_module.DenseVector = schemas.DenseVector
 
-        chunk_exit = chunk_cli.main(["--data-root", str(data_root)])
+        chunk_exit = cli_module.chunk(["--data-root", str(data_root)])
         assert chunk_exit == 0
 
         chunk_dir = data_root / "ChunkedDocTagFiles"
@@ -76,7 +74,7 @@ def test_chunk_and_embed_cli_with_dependency_stubs(
         for row in chunk_rows:
             schemas.validate_chunk_row(row)
 
-        embed_exit = embed_cli.main(["--data-root", str(data_root)])
+        embed_exit = cli_module.embed(["--data-root", str(data_root)])
         assert embed_exit == 0
 
         vector_dir = data_root / "Vectors"

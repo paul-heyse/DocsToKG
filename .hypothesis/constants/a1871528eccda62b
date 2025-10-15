@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/types.py
-# hypothesis_version: 6.141.0
-
-[0.35, 30.0, 'AttemptLogger', 'AttemptRecord', 'DownloadFunc', 'DownloadOutcome', 'PipelineResult', 'Resolver', 'ResolverConfig', 'ResolverMetrics', 'ResolverResult', 'WorkArtifact', 'arxiv', 'attempts', 'core', 'crossref', 'doaj', 'europe_pmc', 'failures', 'figshare', 'hal', 'html', 'landing_page', 'openaire', 'openalex', 'osf', 'pdf', 'pdf_unknown', 'pmc', 'semantic_scholar', 'skips', 'successes', 'unpaywall', 'wayback', 'zenodo']

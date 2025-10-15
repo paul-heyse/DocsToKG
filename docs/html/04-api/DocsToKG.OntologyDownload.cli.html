@@ -88,6 +88,22 @@ without editing configuration files. JSON output modes support automation while
 rich ASCII tables summarise resolver fallback chains and validator results.</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="format-table-headers-rows">
+<h3><code class="docutils literal notranslate"><span class="pre">format_table(headers,</span> <span class="pre">rows)</span></code><a class="headerlink" href="#format-table-headers-rows" title="Link to this heading"></a></h3>
+<p>Render a padded ASCII table.</p>
+</section>
+<section id="format-plan-rows-plans">
+<h3><code class="docutils literal notranslate"><span class="pre">format_plan_rows(plans)</span></code><a class="headerlink" href="#format-plan-rows-plans" title="Link to this heading"></a></h3>
+<p>Convert planner output into rows for table rendering.</p>
+</section>
+<section id="format-results-table-results">
+<h3><code class="docutils literal notranslate"><span class="pre">format_results_table(results)</span></code><a class="headerlink" href="#format-results-table-results" title="Link to this heading"></a></h3>
+<p>Render download results as a table summarizing status and file paths.</p>
+</section>
+<section id="format-validation-summary-results">
+<h3><code class="docutils literal notranslate"><span class="pre">format_validation_summary(results)</span></code><a class="headerlink" href="#format-validation-summary-results" title="Link to this heading"></a></h3>
+<p>Summarise validator outcomes in a compact status table.</p>
+</section>
 <section id="build-parser">
 <h3><code class="docutils literal notranslate"><span class="pre">_build_parser()</span></code><a class="headerlink" href="#build-parser" title="Link to this heading"></a></h3>
 <p>Configure the top-level CLI parser and subcommands.</p>
@@ -319,6 +335,10 @@ Process exit code indicating success (<code class="docutils literal notranslate"
 <p>Raises:
 ConfigError: If configuration files are invalid or unsafe to overwrite.
 OntologyDownloadError: If download or validation operations fail.</p>
+</section>
+<section id="format-row-values">
+<h3><code class="docutils literal notranslate"><span class="pre">_format_row(values)</span></code><a class="headerlink" href="#format-row-values" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 </section>
 </section>

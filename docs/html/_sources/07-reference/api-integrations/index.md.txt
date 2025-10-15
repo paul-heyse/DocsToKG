@@ -40,7 +40,7 @@ for hit in response.results:
 ## 4. CLI Utilities
 
 - `python -m DocsToKG.ContentDownload.download_pyalex_pdfs` – Batch download scholarly PDFs from the Pyalex API.
-- `python -m DocsToKG.DocParsing.run_docling_html_to_doctags_parallel` – Parallel HTML parsing into DocTags structures.
+- `python -m DocsToKG.DocParsing.html_pipeline` – Parallel HTML parsing into DocTags structures.
 - `python -m DocsToKG.OntologyDownload.cli pull` – Download and validate ontologies described in `sources.yaml`.
 
 Each CLI supports `--help` for flags and is documented in `docs/06-operations/index.md`.

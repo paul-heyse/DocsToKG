@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/hal.py
-# hypothesis_version: 6.141.0
-
-[200, '.pdf', 'HalResolver', 'WorkArtifact', 'connection-error', 'content_preview', 'docs', 'error', 'error_detail', 'error_type', 'fileMain_s', 'fileMain_s,file_s', 'file_s', 'fl', 'get', 'hal', 'http-error', 'json-error', 'no-doi', 'q', 'request-error', 'response', 'skipped', 'source', 'text', 'timeout', 'unexpected-error']

@@ -25,6 +25,22 @@ from typing import Any, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
+import uuid
+
+_MASK_63_BITS = (1 << 63) - 1
+
+
+def vector_uuid_to_faiss_int(vector_id: str) -> int:
+    """Return the FAISS-compatible integer identifier for a vector UUID.
+
+    Args:
+        vector_id: UUID string identifying the stored document vector.
+
+    Returns:
+        int: 63-bit integer compatible with FAISS index identifiers.
+    """
+
+    return uuid.UUID(vector_id).int & _MASK_63_BITS
 
 
 @dataclass(slots=True)

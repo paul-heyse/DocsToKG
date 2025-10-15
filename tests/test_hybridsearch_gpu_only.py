@@ -12,11 +12,15 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from DocsToKG.HybridSearch.config import DenseIndexConfig, FusionConfig
 from DocsToKG.HybridSearch.dense import FaissIndexManager
-from DocsToKG.HybridSearch.ids import vector_uuid_to_faiss_int
 from DocsToKG.HybridSearch.results import ResultShaper
 from DocsToKG.HybridSearch.similarity import cosine_against_corpus_gpu
 from DocsToKG.HybridSearch.storage import OpenSearchSimulator
-from DocsToKG.HybridSearch.types import ChunkFeatures, ChunkPayload, HybridSearchRequest
+from DocsToKG.HybridSearch.types import (
+    ChunkFeatures,
+    ChunkPayload,
+    HybridSearchRequest,
+    vector_uuid_to_faiss_int,
+)
 
 if not hasattr(faiss, "get_num_gpus"):
     pytestmark = pytest.mark.skip(reason="FAISS GPU utilities not available in this build")

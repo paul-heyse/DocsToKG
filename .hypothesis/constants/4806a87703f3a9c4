@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/HybridSearch/config.py
-# hypothesis_version: 6.141.0
-
-[0.6, 0.98, 60.0, 150, 800, 1024, 10000, 'HybridSearchConfig', 'chunking', 'dense', 'flat', 'fusion', 'ivf_flat', 'ivf_pq', 'replicate', 'retrieval', 'single', 'utf-8']

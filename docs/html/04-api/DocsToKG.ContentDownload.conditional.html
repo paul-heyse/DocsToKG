@@ -68,7 +68,7 @@
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
       <li class="breadcrumb-item active">1. Module: conditional</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../_sources/04-api/DocsToKG.ContentDownload.conditional.md.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/04-api/DocsToKG.ContentDownload.network.md.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -78,7 +78,7 @@
              
   <section id="module-conditional">
 <h1>1. Module: conditional<a class="headerlink" href="#module-conditional" title="Link to this heading"></a></h1>
-<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.conditional</span></code>.</p>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.network</span></code>.</p>
 <p>Conditional Request Metadata</p>
 <p>This module centralises helper types for conditional HTTP requests that rely on
 ETag and Last-Modified headers. It provides strongly typed dataclasses for
@@ -97,7 +97,7 @@ unnecessary network transfers.</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">requests</span></code>: Required for the <code class="docutils literal notranslate"><span class="pre">Response</span></code> type used when interpreting outcomes.</p></li>
 </ul>
 <p>Usage:
-from DocsToKG.ContentDownload.conditional import ConditionalRequestHelper</p>
+from DocsToKG.ContentDownload.network import ConditionalRequestHelper</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>helper = ConditionalRequestHelper(prior_etag=&quot;abcd&quot;, prior_path=&quot;/tmp/file.pdf&quot;)
 headers = helper.build_headers()
 response = session.get(url, headers=headers)

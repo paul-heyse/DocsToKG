@@ -8,13 +8,12 @@ import numpy as np
 
 import faiss  # type: ignore
 
-from .similarity_gpu import cosine_batch
-
 __all__ = [
     "normalize_rows",
     "cosine_against_corpus_gpu",
     "pairwise_inner_products",
     "max_inner_product",
+    "cosine_batch",
 ]
 
 
@@ -140,3 +139,37 @@ def max_inner_product(
         return float("-inf")
     sims = cosine_against_corpus_gpu(target, corpus, device=device, resources=resources)
     return float(np.max(sims))
+
+
+def cosine_batch(
+    q: np.ndarray,
+    C: np.ndarray,
+    *,
+    device: int,
+    resources: "faiss.StandardGpuResources",
+) -> np.ndarray:
+    """Return batched cosine similarities using FAISS GPU kernels.
+
+    Args:
+        q: Query vectors to compare against the corpus.
+        C: Corpus vectors providing candidate matches.
+        device: GPU device identifier used for computation.
+        resources: Preallocated FAISS GPU resource manager.
+
+    Returns:
+        np.ndarray: Cosine similarity matrix sized ``(len(q), len(C))``.
+    """
+
+    if q.ndim == 1:
+        q = q.reshape(1, -1)
+    q = np.ascontiguousarray(q, dtype=np.float32).copy()
+    C = np.ascontiguousarray(C, dtype=np.float32).copy()
+    faiss.normalize_L2(q)
+    faiss.normalize_L2(C)
+    return faiss.pairwise_distance_gpu(
+        resources,
+        q,
+        C,
+        metric=faiss.METRIC_INNER_PRODUCT,
+        device=int(device),
+    )

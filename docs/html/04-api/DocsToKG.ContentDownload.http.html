@@ -68,7 +68,7 @@
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
       <li class="breadcrumb-item active">1. Module: http</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../_sources/04-api/DocsToKG.ContentDownload.http.md.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/04-api/DocsToKG.ContentDownload.network.md.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -78,7 +78,7 @@
              
   <section id="module-http">
 <h1>1. Module: http<a class="headerlink" href="#module-http" title="Link to this heading"></a></h1>
-<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.http</span></code>.</p>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.network</span></code>.</p>
 <p>HTTP Utilities with Backoff Support</p>
 <p>This module consolidates resilient HTTP helper functions used across the content
 download pipeline. It provides helpers for parsing retry metadata and executing
@@ -96,7 +96,7 @@ requests with exponential backoff, jitter, and respect for origin-provided
 <li><p><code class="docutils literal notranslate"><span class="pre">datetime</span></code>: Used to interpret HTTP-date headers.</p></li>
 </ul>
 <p>Usage:
-from DocsToKG.ContentDownload.http import request_with_retries</p>
+from DocsToKG.ContentDownload.network import request_with_retries</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>session = requests.Session()
 response = request_with_retries(session, &quot;GET&quot;, &quot;https://example.org/resource&quot;)
 </pre></div>

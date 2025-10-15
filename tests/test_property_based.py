@@ -9,8 +9,10 @@ import requests
 from hypothesis import given
 from hypothesis import strategies as st
 
-from DocsToKG.ContentDownload.conditional import ConditionalRequestHelper
-from DocsToKG.ContentDownload.http import request_with_retries
+from DocsToKG.ContentDownload.network import (
+    ConditionalRequestHelper,
+    request_with_retries,
+)
 from DocsToKG.ContentDownload.utils import dedupe
 
 
@@ -48,8 +50,8 @@ def test_request_with_retries_backoff_sequence(status_codes: List[int]) -> None:
     session.request.side_effect = responses
 
     with (
-        patch("DocsToKG.ContentDownload.http.random.random", return_value=0.0),
-        patch("DocsToKG.ContentDownload.http.time.sleep") as mock_sleep,
+        patch("DocsToKG.ContentDownload.network.random.random", return_value=0.0),
+        patch("DocsToKG.ContentDownload.network.time.sleep") as mock_sleep,
     ):
         result = request_with_retries(
             session,

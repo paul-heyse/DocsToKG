@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/DocParsing/testing/__init__.py
-# hypothesis_version: 6.141.0
-
-[0.0, 0.05, 0.42, 0.58, 0.75, 1.0, 1.5, 128.0, 997.0, 52000.0, 120, 384, 512, 997, 1024, 2560, 'BM25', 'N', 'PictureMoleculeData', 'Qwen3_4B', 'SPLADEv3', 'Synthetic paragraph', 'UUID', '_StubDocTagsDocument', '_StubSparseRow', '__fields_defaults__', 'avgdl', 'b', 'batch_size', 'bfloat16', 'chunk_id', 'dependency_stubs', 'dimension', 'doc_id', 'doc_items_refs', 'docling-html', 'docling_core', 'docling_core.types', 'docling_version', 'docparse/1.1.0', 'dtype', 'embeddings/1.0.0', 'has_image_captions', 'k1', 'model_dump', 'model_id', 'model_metadata', 'normalize', 'num_images', 'num_tokens', 'page_nos', 'parse_engine', 'predicted_classes', 'provenance', 'pydantic', 'qwen', 'schema_version', 'smi', 'source_chunk_idxs', 'source_path', 'splade', 'synthetic', 'terms', 'text', 'tokens', 'tqdm', 'transformers', 'uuid', 'vector', 'vllm', 'weights']

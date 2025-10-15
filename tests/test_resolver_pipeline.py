@@ -417,7 +417,7 @@ def test_head_precheck_skips_html(monkeypatch, tmp_path):
         return DummyHeadResponse(headers={"Content-Type": "text/html"})
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.http.request_with_retries",
+        "DocsToKG.ContentDownload.network.request_with_retries",
         fake_request,
     )
 
@@ -445,7 +445,7 @@ def test_head_precheck_skips_zero_length(monkeypatch, tmp_path):
         return DummyHeadResponse(headers={"Content-Length": "0"})
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.http.request_with_retries",
+        "DocsToKG.ContentDownload.network.request_with_retries",
         fake_request,
     )
 
@@ -473,7 +473,7 @@ def test_head_precheck_skips_error_status(monkeypatch, tmp_path):
         return DummyHeadResponse(status_code=404)
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.http.request_with_retries",
+        "DocsToKG.ContentDownload.network.request_with_retries",
         fake_request,
     )
 
@@ -501,7 +501,7 @@ def test_head_precheck_allows_pdf(monkeypatch, tmp_path):
         return DummyHeadResponse(headers={"Content-Type": "application/pdf"})
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.http.request_with_retries",
+        "DocsToKG.ContentDownload.network.request_with_retries",
         fake_request,
     )
 
@@ -531,7 +531,7 @@ def test_head_precheck_allows_redirect_to_pdf(monkeypatch, tmp_path):
         )
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.http.request_with_retries",
+        "DocsToKG.ContentDownload.network.request_with_retries",
         fake_request,
     )
 
@@ -558,7 +558,7 @@ def test_head_precheck_failure_allows_download(monkeypatch, tmp_path):
         raise requests.Timeout("HEAD timeout")
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.http.request_with_retries",
+        "DocsToKG.ContentDownload.network.request_with_retries",
         fake_request,
     )
 
@@ -587,7 +587,7 @@ def test_head_precheck_respects_global_disable(monkeypatch, tmp_path):
         return DummyHeadResponse()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.http.request_with_retries",
+        "DocsToKG.ContentDownload.network.request_with_retries",
         fake_request,
     )
 
@@ -622,7 +622,7 @@ def test_head_precheck_resolver_override(monkeypatch, tmp_path):
         return DummyHeadResponse(headers={"Content-Type": "application/pdf"})
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.http.request_with_retries",
+        "DocsToKG.ContentDownload.network.request_with_retries",
         fake_request,
     )
 

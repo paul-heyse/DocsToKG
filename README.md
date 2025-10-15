@@ -220,17 +220,23 @@ of the pipeline. The legacy scripts remain available but emit a
 
 ```bash
 # Convert HTML or PDF corpora to DocTags (auto-detects mode when possible)
-python -m DocsToKG.DocParsing.cli.doctags_convert --input Data/HTML
+python -m DocsToKG.DocParsing.cli doctags --input Data/HTML
 
 # Chunk DocTags with topic-aware coalescence
-python -m DocsToKG.DocParsing.cli.chunk_and_coalesce --min-tokens 256 --max-tokens 512
+python -m DocsToKG.DocParsing.cli chunk --min-tokens 256 --max-tokens 512
 
 # Generate hybrid embeddings (BM25 + SPLADE + Qwen)
-python -m DocsToKG.DocParsing.cli.embed_vectors --resume
+python -m DocsToKG.DocParsing.cli embed --resume
+
 ```
 
-Use ``--help`` on each command for the full set of flags, including data-root
-overrides, resume/force controls, and tokenizer configuration.
+Use ``--help`` or append ``-- --help`` after the subcommand for the full set of
+flags, including data-root overrides, resume/force controls, and tokenizer
+configuration.
+
+Synthetic benchmarking now lives in the test suite; run
+``pytest tests/docparsing/test_synthetic_benchmark.py`` to exercise the
+deterministic model and verify baseline performance.
 
 ## 9. Support & Community
 

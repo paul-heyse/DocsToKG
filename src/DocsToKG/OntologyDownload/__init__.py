@@ -11,41 +11,45 @@ from __future__ import annotations
 import importlib
 import sys
 
-from .foundation import generate_correlation_id, retry_with_backoff, sanitize_filename
-from .infrastructure import (
+from .ontology_download import (
     CACHE_DIR,
     CONFIG_DIR,
     LOCAL_ONTOLOGY_DIR,
     LOG_DIR,
-    STORAGE,
+    MANIFEST_SCHEMA_VERSION,
+    DownloadFailure,
+    DownloadResult,
+    FetchResult,
+    FetchSpec,
+    OntologyDownloadError,
+    PlannedFetch,
+    ResolvedConfig,
+    ValidationRequest,
+    ValidationResult,
+    ConfigError,
+    download_stream,
+    extract_archive_safe,
+    fetch_all,
+    fetch_one,
+    generate_correlation_id,
+    get_manifest_schema,
     get_owlready2,
     get_pronto,
     get_pystow,
     get_rdflib,
-)
-from .network import (
-    DownloadFailure,
-    DownloadResult,
-    RDF_MIME_ALIASES,
-    download_stream,
-    extract_archive_safe,
-    validate_url_security,
-)
-from .pipeline import (
-    FetchResult,
-    FetchSpec,
-    MANIFEST_SCHEMA_VERSION,
-    OntologyDownloadError,
-    PlannedFetch,
-    fetch_all,
-    fetch_one,
-    get_manifest_schema,
+    load_config,
     plan_all,
     plan_one,
+    retry_with_backoff,
+    sanitize_filename,
+    setup_logging,
+    ensure_python_version,
     validate_manifest_dict,
+    validate_url_security,
+    run_validators,
+    RDF_MIME_ALIASES,
+    STORAGE,
 )
-from .settings import ConfigError, ResolvedConfig, ensure_python_version, load_config, setup_logging
-from .validation import ValidationRequest, ValidationResult, run_validators
 
 __all__ = [
     "FetchSpec",
@@ -57,6 +61,7 @@ __all__ = [
     "ValidationRequest",
     "ValidationResult",
     "ResolvedConfig",
+    "ConfigError",
     "CACHE_DIR",
     "CONFIG_DIR",
     "LOG_DIR",
@@ -86,23 +91,26 @@ __all__ = [
     "get_manifest_schema",
 ]
 
-# Backwards-compatible module aliases for legacy import paths.
 _LEGACY_MODULE_MAP = {
-    ".core": ".pipeline",
-    ".config": ".settings",
-    ".validators": ".validation",
-    ".download": ".network",
-    ".storage": ".infrastructure",
-    ".optdeps": ".infrastructure",
-    ".utils": ".foundation",
-    ".logging_config": ".settings",
-    ".validator_workers": ".validation",
+    ".core": ".ontology_download",
+    ".config": ".ontology_download",
+    ".validators": ".ontology_download",
+    ".download": ".ontology_download",
+    ".storage": ".ontology_download",
+    ".optdeps": ".ontology_download",
+    ".utils": ".ontology_download",
+    ".logging_config": ".ontology_download",
+    ".validator_workers": ".ontology_download",
     ".cli_utils": ".cli",
 }
+
+_package = sys.modules[__name__]
 
 for legacy_suffix, target_suffix in _LEGACY_MODULE_MAP.items():
     legacy_name = __name__ + legacy_suffix
     target_name = __name__ + target_suffix
-    if legacy_name not in sys.modules:
+    module = sys.modules.get(legacy_name)
+    if module is None:
         module = importlib.import_module(target_name)
         sys.modules.setdefault(legacy_name, module)
+    setattr(_package, legacy_suffix.lstrip("."), module)

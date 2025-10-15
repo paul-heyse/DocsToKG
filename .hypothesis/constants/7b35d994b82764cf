@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/DocParsing/run_docling_html_to_doctags_parallel.py
-# hypothesis_version: 6.141.0
-
-['--mode', '=', '__main__', 'html']

@@ -234,7 +234,7 @@
 </li>
 <li><p>[x] 1.6 Update <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/download_pyalex_pdfs.py</span></code> imports</p>
 <ul class="simple">
-<li><p>Add: <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.http</span> <span class="pre">import</span> <span class="pre">request_with_retries</span></code></p></li>
+<li><p>Add: <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.network</span> <span class="pre">import</span> <span class="pre">request_with_retries</span></code></p></li>
 <li><p>Replace <code class="docutils literal notranslate"><span class="pre">session.head(url,</span> <span class="pre">...)</span></code> call at line ~970 with <code class="docutils literal notranslate"><span class="pre">request_with_retries(session,</span> <span class="pre">&quot;HEAD&quot;,</span> <span class="pre">url,</span> <span class="pre">max_retries=1,</span> <span class="pre">...)</span></code></p></li>
 <li><p>Replace <code class="docutils literal notranslate"><span class="pre">session.get(url,</span> <span class="pre">stream=True,</span> <span class="pre">...)</span></code> call at line ~980 with <code class="docutils literal notranslate"><span class="pre">request_with_retries(session,</span> <span class="pre">&quot;GET&quot;,</span> <span class="pre">url,</span> <span class="pre">...)</span></code></p></li>
 <li><p>Remove HEAD error suppression <code class="docutils literal notranslate"><span class="pre">contextlib.suppress</span></code> since retries handle transients</p></li>
@@ -242,7 +242,7 @@
 </li>
 <li><p>[x] 1.7 Update <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/resolvers/__init__.py</span></code> to use new utility</p>
 <ul class="simple">
-<li><p>Replace <code class="docutils literal notranslate"><span class="pre">_request_with_retries()</span></code> calls (lines ~1199, 1344, 1404, 1482, etc.) with <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.http</span> <span class="pre">import</span> <span class="pre">request_with_retries</span></code></p></li>
+<li><p>Replace <code class="docutils literal notranslate"><span class="pre">_request_with_retries()</span></code> calls (lines ~1199, 1344, 1404, 1482, etc.) with <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.network</span> <span class="pre">import</span> <span class="pre">request_with_retries</span></code></p></li>
 <li><p>Remove local <code class="docutils literal notranslate"><span class="pre">_request_with_retries()</span></code> definition (lines ~158-196)</p></li>
 <li><p>Update <code class="docutils literal notranslate"><span class="pre">_sleep_backoff()</span></code> references to use backoff logic from <code class="docutils literal notranslate"><span class="pre">http.request_with_retries()</span></code></p></li>
 </ul>
@@ -252,7 +252,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">unittest.mock</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mock</span><span class="p">,</span> <span class="n">patch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.http</span><span class="w"> </span><span class="kn">import</span> <span class="n">request_with_retries</span><span class="p">,</span> <span class="n">parse_retry_after_header</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.network</span><span class="w"> </span><span class="kn">import</span> <span class="n">request_with_retries</span><span class="p">,</span> <span class="n">parse_retry_after_header</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">test_successful_request_no_retries</span><span class="p">():</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Verify successful request completes immediately without retries.&quot;&quot;&quot;</span>
@@ -850,7 +850,7 @@
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return True if URL passes HEAD pre-check, False to skip.&quot;&quot;&quot;</span>
     <span class="k">try</span><span class="p">:</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.http</span><span class="w"> </span><span class="kn">import</span> <span class="n">request_with_retries</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.network</span><span class="w"> </span><span class="kn">import</span> <span class="n">request_with_retries</span>
         <span class="n">response</span> <span class="o">=</span> <span class="n">request_with_retries</span><span class="p">(</span>
             <span class="n">session</span><span class="p">,</span> <span class="s2">&quot;HEAD&quot;</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span>
             <span class="n">max_retries</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
@@ -1032,7 +1032,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">urllib.parse</span><span class="w"> </span><span class="kn">import</span> <span class="n">quote</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">..types</span><span class="w"> </span><span class="kn">import</span> <span class="n">Resolver</span><span class="p">,</span> <span class="n">ResolverConfig</span><span class="p">,</span> <span class="n">ResolverResult</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">normalize_doi</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.http</span><span class="w"> </span><span class="kn">import</span> <span class="n">request_with_retries</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.network</span><span class="w"> </span><span class="kn">import</span> <span class="n">request_with_retries</span>
 
 <span class="k">class</span><span class="w"> </span><span class="nc">ZenodoResolver</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Resolver for Zenodo open access repository.&quot;&quot;&quot;</span>
@@ -1215,7 +1215,7 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">..types</span><span class="w"> </span><span class="kn">import</span> <span class="n">Resolver</span><span class="p">,</span> <span class="n">ResolverConfig</span><span class="p">,</span> <span class="n">ResolverResult</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">normalize_doi</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.http</span><span class="w"> </span><span class="kn">import</span> <span class="n">request_with_retries</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.network</span><span class="w"> </span><span class="kn">import</span> <span class="n">request_with_retries</span>
 
 <span class="k">class</span><span class="w"> </span><span class="nc">FigshareResolver</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Resolver for Figshare repository.&quot;&quot;&quot;</span>
@@ -1675,7 +1675,7 @@
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># In http.py, add logging for retry attempts</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 
-<span class="n">LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;DocsToKG.ContentDownload.http&quot;</span><span class="p">)</span>
+<span class="n">LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;DocsToKG.ContentDownload.network&quot;</span><span class="p">)</span>
 
 <span class="c1"># Inside request_with_retries():</span>
 <span class="k">except</span> <span class="n">requests</span><span class="o">.</span><span class="n">RequestException</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>

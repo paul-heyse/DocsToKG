@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/OntologyDownload/storage.py
-# hypothesis_version: 6.141.0
-
-['*', '.tmp', '/', 'CACHE_DIR', 'CONFIG_DIR', 'FsspecStorageBackend', 'LOCAL_ONTOLOGY_DIR', 'LOG_DIR', 'LocalStorageBackend', 'STORAGE', 'StorageBackend', '\\', 'cache', 'configs', 'get_storage_backend', 'latest', 'latest.txt', 'logs', 'manifest.json', 'normalized', 'ontologies', 'ontology-fetcher', 'original', 'size', 'unused', 'validation']

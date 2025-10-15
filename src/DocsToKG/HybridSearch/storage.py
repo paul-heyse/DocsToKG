@@ -3,10 +3,126 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Dict, List, Mapping, Optional, Sequence
+from typing import Callable, Dict, List, Mapping, MutableMapping, Optional, Sequence
 
-from .ids import vector_uuid_to_faiss_int
-from .types import ChunkPayload
+from .config import ChunkingConfig
+from .types import ChunkPayload, vector_uuid_to_faiss_int
+
+
+@dataclass(slots=True)
+class OpenSearchIndexTemplate:
+    """Representation of an OpenSearch index template body."""
+
+    name: str
+    namespace: str
+    body: Mapping[str, object]
+    chunking: ChunkingConfig
+
+    def asdict(self) -> Dict[str, object]:
+        """Serialize the template to a dictionary payload.
+
+        Returns:
+            Dict[str, object]: OpenSearch template representation suitable for APIs.
+        """
+
+        return {
+            "name": self.name,
+            "namespace": self.namespace,
+            "body": dict(self.body),
+            "chunking": {
+                "max_tokens": self.chunking.max_tokens,
+                "overlap": self.chunking.overlap,
+            },
+        }
+
+
+class OpenSearchSchemaManager:
+    """Bootstrap and track index templates per namespace."""
+
+    def __init__(self) -> None:
+        self._templates: MutableMapping[str, OpenSearchIndexTemplate] = {}
+
+    def bootstrap_template(
+        self,
+        namespace: str,
+        chunking: Optional[ChunkingConfig] = None,
+    ) -> OpenSearchIndexTemplate:
+        """Create and register an index template for a namespace.
+
+        Args:
+            namespace: Logical namespace that owns the index template.
+            chunking: Optional chunking configuration for new documents.
+
+        Returns:
+            OpenSearchIndexTemplate: Newly created template stored in the registry.
+        """
+
+        chunking_config = chunking or ChunkingConfig()
+        body = {
+            "settings": {
+                "index": {
+                    "number_of_shards": 1,
+                    "number_of_replicas": 1,
+                },
+                "analysis": {
+                    "analyzer": {
+                        "default": {
+                            "type": "standard",
+                        }
+                    }
+                },
+            },
+            "mappings": {
+                "dynamic": "strict",
+                "properties": {
+                    "doc_id": {"type": "keyword"},
+                    "chunk_id": {"type": "keyword"},
+                    "namespace": {"type": "keyword"},
+                    "vector_id": {"type": "keyword"},
+                    "text": {"type": "text", "analyzer": "standard"},
+                    "splade": {"type": "rank_features"},
+                    "token_count": {"type": "integer"},
+                    "metadata": {
+                        "type": "object",
+                        "properties": {
+                            "author": {"type": "keyword"},
+                            "tags": {"type": "keyword"},
+                            "published_at": {"type": "date"},
+                            "acl": {"type": "keyword"},
+                        },
+                    },
+                },
+            },
+        }
+        template = OpenSearchIndexTemplate(
+            name=f"hybrid-chunks-{namespace}",
+            namespace=namespace,
+            body=body,
+            chunking=chunking_config,
+        )
+        self._templates[namespace] = template
+        return template
+
+    def get_template(self, namespace: str) -> Optional[OpenSearchIndexTemplate]:
+        """Retrieve a registered template for the namespace.
+
+        Args:
+            namespace: Namespace identifier used during bootstrap.
+
+        Returns:
+            Optional[OpenSearchIndexTemplate]: Template when present, otherwise ``None``.
+        """
+
+        return self._templates.get(namespace)
+
+    def list_templates(self) -> Mapping[str, OpenSearchIndexTemplate]:
+        """Return all registered templates indexed by namespace.
+
+        Returns:
+            Mapping[str, OpenSearchIndexTemplate]: Copy of known templates keyed by namespace.
+        """
+
+        return dict(self._templates)
 
 
 def matches_filters(chunk: ChunkPayload, filters: Mapping[str, object]) -> bool:
@@ -36,10 +152,6 @@ def matches_filters(chunk: ChunkPayload, filters: Mapping[str, object]) -> bool:
             if value != expected:
                 return False
     return True
-
-
-if TYPE_CHECKING:  # pragma: no cover - import guard for type checking only
-    from .schema import OpenSearchIndexTemplate
 
 
 @dataclass(slots=True)
@@ -209,7 +321,7 @@ class OpenSearchSimulator:
 
         self._chunks: Dict[str, StoredChunk] = {}
         self._avg_length: float = 0.0
-        self._templates: Dict[str, "OpenSearchIndexTemplate"] = {}
+        self._templates: Dict[str, OpenSearchIndexTemplate] = {}
 
     def bulk_upsert(self, chunks: Sequence[ChunkPayload]) -> None:
         """Insert or replace OpenSearch documents for the provided chunks.
@@ -262,7 +374,7 @@ class OpenSearchSimulator:
         """
         return list(self._chunks.keys())
 
-    def register_template(self, template: "OpenSearchIndexTemplate") -> None:
+    def register_template(self, template: OpenSearchIndexTemplate) -> None:
         """Register an index template used for namespace-specific behavior.
 
         Args:
@@ -273,7 +385,7 @@ class OpenSearchSimulator:
         """
         self._templates[template.namespace] = template
 
-    def template_for(self, namespace: str) -> Optional["OpenSearchIndexTemplate"]:
+    def template_for(self, namespace: str) -> Optional[OpenSearchIndexTemplate]:
         """Look up an index template for the given namespace.
 
         Args:

@@ -31,7 +31,7 @@ AI assistants **must** operate inside the project virtual environment; otherwise
 
 3. **Run commands through direnv (preferred)**
    ```bash
-   direnv exec . python -m DocsToKG.DocParsing.cli.embed_vectors --help
+   direnv exec . python -m DocsToKG.DocParsing.cli embed --help
    ```
    Use this pattern for tests, docs, and CLIs to guarantee the proper interpreter.
 
@@ -44,7 +44,7 @@ AI assistants **must** operate inside the project virtual environment; otherwise
 5. **Verify activation before working**
    ```bash
    python -c "import sys; assert any(p.endswith('DocsToKG') for p in sys.path)"
-   python -m DocsToKG.DocParsing.cli.benchmark_embeddings --chunks 1 --tokens 1 --dense-dim 1
+   pytest tests/docparsing/test_synthetic_benchmark.py::test_simulate_embedding_benchmark_reports_speedup
    ```
 
 > ❗ **Never** run project scripts with the system Python. Missing dependencies indicate the virtual environment was not activated; repeat steps 1–3 to recover.

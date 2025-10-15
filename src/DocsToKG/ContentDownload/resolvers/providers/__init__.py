@@ -22,7 +22,7 @@ from urllib.parse import quote, urljoin, urlparse
 
 import requests
 
-from DocsToKG.ContentDownload.http import request_with_retries
+from DocsToKG.ContentDownload.network import request_with_retries
 from DocsToKG.ContentDownload.utils import (
     dedupe,
     normalize_doi,
@@ -54,6 +54,14 @@ class ResolverRegistry:
 
     @classmethod
     def register(cls, resolver_cls: Type[Resolver]) -> Type[Resolver]:
+        """Register a resolver class under its declared ``name`` attribute.
+        
+        Args:
+            resolver_cls: Resolver implementation to register.
+        
+        Returns:
+            Type[Resolver]: The registered resolver class for chaining.
+        """
         name = getattr(resolver_cls, "name", None)
         if not name:
             raise ValueError(f"Resolver class {resolver_cls.__name__} missing 'name' attribute")
@@ -62,6 +70,14 @@ class ResolverRegistry:
 
     @classmethod
     def create_default(cls) -> List[Resolver]:
+        """Instantiate resolver instances in priority order.
+        
+        Args:
+            None
+        
+        Returns:
+            List[Resolver]: Resolver instances ordered by default priority.
+        """
         instances: List[Resolver] = []
         seen: set[str] = set()
         for name in DEFAULT_RESOLVER_ORDER:
@@ -186,6 +202,15 @@ class ArxivResolver(RegisteredResolver):
     name = "arxiv"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when resolver prerequisites are met for the artifact.
+        
+        Args:
+            config: Resolver configuration containing runtime toggles and credentials.
+            artifact: Work artifact capturing document metadata and identifiers.
+        
+        Returns:
+            bool: ``True`` when the resolver should attempt to resolve the artifact.
+        """
         return bool(artifact.arxiv_id)
 
     def iter_urls(
@@ -194,6 +219,16 @@ class ArxivResolver(RegisteredResolver):
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield resolver results discovered for the supplied artifact.
+        
+        Args:
+            session: Requests session used to communicate with upstream providers.
+            config: Resolver configuration supplying timeouts and headers.
+            artifact: Work artifact describing the document under resolution.
+        
+        Returns:
+            Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
+        """
         arxiv_id = artifact.arxiv_id
         if not arxiv_id:
             yield ResolverResult(url=None, event="skipped", event_reason="no-arxiv-id")
@@ -211,6 +246,15 @@ class CoreResolver(RegisteredResolver):
     name = "core"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when resolver prerequisites are met for the artifact.
+        
+        Args:
+            config: Resolver configuration containing runtime toggles and credentials.
+            artifact: Work artifact capturing document metadata and identifiers.
+        
+        Returns:
+            bool: ``True`` when the resolver should attempt to resolve the artifact.
+        """
         return bool(config.core_api_key and artifact.doi)
 
     def iter_urls(
@@ -219,6 +263,16 @@ class CoreResolver(RegisteredResolver):
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield resolver results discovered for the supplied artifact.
+        
+        Args:
+            session: Requests session used to communicate with upstream providers.
+            config: Resolver configuration supplying timeouts and headers.
+            artifact: Work artifact describing the document under resolution.
+        
+        Returns:
+            Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
@@ -306,6 +360,15 @@ class CrossrefResolver(RegisteredResolver):
     name = "crossref"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when resolver prerequisites are met for the artifact.
+        
+        Args:
+            config: Resolver configuration containing runtime toggles and credentials.
+            artifact: Work artifact capturing document metadata and identifiers.
+        
+        Returns:
+            bool: ``True`` when the resolver should attempt to resolve the artifact.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -314,6 +377,16 @@ class CrossrefResolver(RegisteredResolver):
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield resolver results discovered for the supplied artifact.
+        
+        Args:
+            session: Requests session used to communicate with upstream providers.
+            config: Resolver configuration supplying timeouts and headers.
+            artifact: Work artifact describing the document under resolution.
+        
+        Returns:
+            Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
@@ -473,6 +546,15 @@ class DoajResolver(RegisteredResolver):
     name = "doaj"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when resolver prerequisites are met for the artifact.
+        
+        Args:
+            config: Resolver configuration containing runtime toggles and credentials.
+            artifact: Work artifact capturing document metadata and identifiers.
+        
+        Returns:
+            bool: ``True`` when the resolver should attempt to resolve the artifact.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -481,6 +563,16 @@ class DoajResolver(RegisteredResolver):
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield resolver results discovered for the supplied artifact.
+        
+        Args:
+            session: Requests session used to communicate with upstream providers.
+            config: Resolver configuration supplying timeouts and headers.
+            artifact: Work artifact describing the document under resolution.
+        
+        Returns:
+            Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
@@ -569,6 +661,15 @@ class EuropePmcResolver(RegisteredResolver):
     name = "europe_pmc"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when resolver prerequisites are met for the artifact.
+        
+        Args:
+            config: Resolver configuration containing runtime toggles and credentials.
+            artifact: Work artifact capturing document metadata and identifiers.
+        
+        Returns:
+            bool: ``True`` when the resolver should attempt to resolve the artifact.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -577,6 +678,16 @@ class EuropePmcResolver(RegisteredResolver):
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield resolver results discovered for the supplied artifact.
+        
+        Args:
+            session: Requests session used to communicate with upstream providers.
+            config: Resolver configuration supplying timeouts and headers.
+            artifact: Work artifact describing the document under resolution.
+        
+        Returns:
+            Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
@@ -650,6 +761,15 @@ class FigshareResolver(RegisteredResolver):
     name = "figshare"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when resolver prerequisites are met for the artifact.
+        
+        Args:
+            config: Resolver configuration containing runtime toggles and credentials.
+            artifact: Work artifact capturing document metadata and identifiers.
+        
+        Returns:
+            bool: ``True`` when the resolver should attempt to resolve the artifact.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -658,6 +778,16 @@ class FigshareResolver(RegisteredResolver):
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield resolver results discovered for the supplied artifact.
+        
+        Args:
+            session: Requests session used to communicate with upstream providers.
+            config: Resolver configuration supplying timeouts and headers.
+            artifact: Work artifact describing the document under resolution.
+        
+        Returns:
+            Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
@@ -770,6 +900,15 @@ class HalResolver(RegisteredResolver):
     name = "hal"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when resolver prerequisites are met for the artifact.
+        
+        Args:
+            config: Resolver configuration containing runtime toggles and credentials.
+            artifact: Work artifact capturing document metadata and identifiers.
+        
+        Returns:
+            bool: ``True`` when the resolver should attempt to resolve the artifact.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -778,6 +917,16 @@ class HalResolver(RegisteredResolver):
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield resolver results discovered for the supplied artifact.
+        
+        Args:
+            session: Requests session used to communicate with upstream providers.
+            config: Resolver configuration supplying timeouts and headers.
+            artifact: Work artifact describing the document under resolution.
+        
+        Returns:
+            Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
@@ -868,6 +1017,15 @@ class LandingPageResolver(RegisteredResolver):
     name = "landing_page"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when resolver prerequisites are met for the artifact.
+        
+        Args:
+            config: Resolver configuration containing runtime toggles and credentials.
+            artifact: Work artifact capturing document metadata and identifiers.
+        
+        Returns:
+            bool: ``True`` when the resolver should attempt to resolve the artifact.
+        """
         return bool(artifact.landing_urls)
 
     def iter_urls(
@@ -876,6 +1034,16 @@ class LandingPageResolver(RegisteredResolver):
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield resolver results discovered for the supplied artifact.
+        
+        Args:
+            session: Requests session used to communicate with upstream providers.
+            config: Resolver configuration supplying timeouts and headers.
+            artifact: Work artifact describing the document under resolution.
+        
+        Returns:
+            Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
+        """
         if BeautifulSoup is None:
             yield ResolverResult(url=None, event="skipped", event_reason="no-beautifulsoup")
             return
@@ -982,6 +1150,15 @@ class OpenAireResolver(RegisteredResolver):
     name = "openaire"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when resolver prerequisites are met for the artifact.
+        
+        Args:
+            config: Resolver configuration containing runtime toggles and credentials.
+            artifact: Work artifact capturing document metadata and identifiers.
+        
+        Returns:
+            bool: ``True`` when the resolver should attempt to resolve the artifact.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -990,6 +1167,16 @@ class OpenAireResolver(RegisteredResolver):
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield resolver results discovered for the supplied artifact.
+        
+        Args:
+            session: Requests session used to communicate with upstream providers.
+            config: Resolver configuration supplying timeouts and headers.
+            artifact: Work artifact describing the document under resolution.
+        
+        Returns:
+            Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
@@ -1081,6 +1268,15 @@ class OpenAlexResolver(RegisteredResolver):
     name = "openalex"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when resolver prerequisites are met for the artifact.
+        
+        Args:
+            config: Resolver configuration containing runtime toggles and credentials.
+            artifact: Work artifact capturing document metadata and identifiers.
+        
+        Returns:
+            bool: ``True`` when the resolver should attempt to resolve the artifact.
+        """
         return bool(artifact.pdf_urls or artifact.open_access_url)
 
     def iter_urls(
@@ -1089,6 +1285,16 @@ class OpenAlexResolver(RegisteredResolver):
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield resolver results discovered for the supplied artifact.
+        
+        Args:
+            session: Requests session used to communicate with upstream providers.
+            config: Resolver configuration supplying timeouts and headers.
+            artifact: Work artifact describing the document under resolution.
+        
+        Returns:
+            Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
+        """
         candidates = list(dedupe(artifact.pdf_urls))
         if getattr(artifact, "open_access_url", None):
             candidates.append(artifact.open_access_url)
@@ -1109,6 +1315,15 @@ class OsfResolver(RegisteredResolver):
     name = "osf"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when resolver prerequisites are met for the artifact.
+        
+        Args:
+            config: Resolver configuration containing runtime toggles and credentials.
+            artifact: Work artifact capturing document metadata and identifiers.
+        
+        Returns:
+            bool: ``True`` when the resolver should attempt to resolve the artifact.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -1117,6 +1332,16 @@ class OsfResolver(RegisteredResolver):
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield resolver results discovered for the supplied artifact.
+        
+        Args:
+            session: Requests session used to communicate with upstream providers.
+            config: Resolver configuration supplying timeouts and headers.
+            artifact: Work artifact describing the document under resolution.
+        
+        Returns:
+            Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
@@ -1208,6 +1433,15 @@ class PmcResolver(RegisteredResolver):
     name = "pmc"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when resolver prerequisites are met for the artifact.
+        
+        Args:
+            config: Resolver configuration containing runtime toggles and credentials.
+            artifact: Work artifact capturing document metadata and identifiers.
+        
+        Returns:
+            bool: ``True`` when the resolver should attempt to resolve the artifact.
+        """
         return bool(artifact.pmcid or artifact.pmid or artifact.doi)
 
     def _lookup_pmcids(
@@ -1262,6 +1496,16 @@ class PmcResolver(RegisteredResolver):
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield resolver results discovered for the supplied artifact.
+        
+        Args:
+            session: Requests session used to communicate with upstream providers.
+            config: Resolver configuration supplying timeouts and headers.
+            artifact: Work artifact describing the document under resolution.
+        
+        Returns:
+            Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
+        """
         pmcids: List[str] = []
         if artifact.pmcid:
             pmcids.append(normalize_pmcid(artifact.pmcid))
@@ -1377,6 +1621,15 @@ class SemanticScholarResolver(RegisteredResolver):
     name = "semantic_scholar"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when resolver prerequisites are met for the artifact.
+        
+        Args:
+            config: Resolver configuration containing runtime toggles and credentials.
+            artifact: Work artifact capturing document metadata and identifiers.
+        
+        Returns:
+            bool: ``True`` when the resolver should attempt to resolve the artifact.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -1385,6 +1638,16 @@ class SemanticScholarResolver(RegisteredResolver):
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield resolver results discovered for the supplied artifact.
+        
+        Args:
+            session: Requests session used to communicate with upstream providers.
+            config: Resolver configuration supplying timeouts and headers.
+            artifact: Work artifact describing the document under resolution.
+        
+        Returns:
+            Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
@@ -1468,6 +1731,15 @@ class UnpaywallResolver(RegisteredResolver):
     name = "unpaywall"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when resolver prerequisites are met for the artifact.
+        
+        Args:
+            config: Resolver configuration containing runtime toggles and credentials.
+            artifact: Work artifact capturing document metadata and identifiers.
+        
+        Returns:
+            bool: ``True`` when the resolver should attempt to resolve the artifact.
+        """
         return bool(config.unpaywall_email and artifact.doi)
 
     def iter_urls(
@@ -1476,6 +1748,16 @@ class UnpaywallResolver(RegisteredResolver):
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield resolver results discovered for the supplied artifact.
+        
+        Args:
+            session: Requests session used to communicate with upstream providers.
+            config: Resolver configuration supplying timeouts and headers.
+            artifact: Work artifact describing the document under resolution.
+        
+        Returns:
+            Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
@@ -1636,6 +1918,15 @@ class WaybackResolver(RegisteredResolver):
     name = "wayback"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when resolver prerequisites are met for the artifact.
+        
+        Args:
+            config: Resolver configuration containing runtime toggles and credentials.
+            artifact: Work artifact capturing document metadata and identifiers.
+        
+        Returns:
+            bool: ``True`` when the resolver should attempt to resolve the artifact.
+        """
         return bool(artifact.failed_pdf_urls)
 
     def iter_urls(
@@ -1644,6 +1935,16 @@ class WaybackResolver(RegisteredResolver):
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield resolver results discovered for the supplied artifact.
+        
+        Args:
+            session: Requests session used to communicate with upstream providers.
+            config: Resolver configuration supplying timeouts and headers.
+            artifact: Work artifact describing the document under resolution.
+        
+        Returns:
+            Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
+        """
         if not artifact.failed_pdf_urls:
             yield ResolverResult(url=None, event="skipped", event_reason="no-failed-urls")
             return
@@ -1735,6 +2036,15 @@ class ZenodoResolver(RegisteredResolver):
     name = "zenodo"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
+        """Return ``True`` when resolver prerequisites are met for the artifact.
+        
+        Args:
+            config: Resolver configuration containing runtime toggles and credentials.
+            artifact: Work artifact capturing document metadata and identifiers.
+        
+        Returns:
+            bool: ``True`` when the resolver should attempt to resolve the artifact.
+        """
         return artifact.doi is not None
 
     def iter_urls(
@@ -1743,6 +2053,16 @@ class ZenodoResolver(RegisteredResolver):
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
+        """Yield resolver results discovered for the supplied artifact.
+        
+        Args:
+            session: Requests session used to communicate with upstream providers.
+            config: Resolver configuration supplying timeouts and headers.
+            artifact: Work artifact describing the document under resolution.
+        
+        Returns:
+            Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
+        """
         doi = normalize_doi(artifact.doi)
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
@@ -1853,7 +2173,14 @@ class ZenodoResolver(RegisteredResolver):
 
 
 def default_resolvers() -> List[Resolver]:
-    """Return default resolver instances in priority order."""
+    """Return default resolver instances in priority order.
+    
+    Args:
+        None
+    
+    Returns:
+        List[Resolver]: Resolver instances ordered according to defaults.
+    """
 
     return ResolverRegistry.create_default()
 

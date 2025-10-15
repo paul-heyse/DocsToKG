@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/OntologyDownload/optdeps.py
-# hypothesis_version: 6.141.0
-
-[b'# Stub TTL output\n', '# Stub TTL output\n', '.data', 'Class1', 'Class2', 'Class3', 'PYSTOW_HOME', 'TERM:0000001', 'TERM:0000002', 'format-version: 1.2\n', 'get_owlready2', 'get_pronto', 'get_pystow', 'get_rdflib', 'o', 'obo', 'obojson', 'owlready2', 'p', 'pronto', 'pystow', 'rdflib', 's', 'turtle', 'write', '{"graphs": []}']

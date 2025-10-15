@@ -29,7 +29,7 @@ Usage:
 
 ### `request_with_retries(session, method, url)`
 
-Proxy to :func:`DocsToKG.ContentDownload.http.request_with_retries`.
+Proxy to :func:`DocsToKG.ContentDownload.network.request_with_retries`.
 
 The indirection keeps this module compatible with unit tests that monkeypatch
 either the pipeline-level attribute or the underlying HTTP helper while also

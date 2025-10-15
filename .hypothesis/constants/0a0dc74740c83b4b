@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/semantic_scholar.py
-# hypothesis_version: 6.141.0
-
-[200, 1000, 'WorkArtifact', 'connection-error', 'doi', 'error', 'error_detail', 'error_type', 'fields', 'http-error', 'json-error', 'no-doi', 'no-openaccess-pdf', 'openAccessPdf', 'request-error', 'semantic-scholar', 'semantic_scholar', 'skipped', 'source', 'status_code', 'timeout', 'title,openAccessPdf', 'unexpected-error', 'unknown', 'url', 'x-api-key']

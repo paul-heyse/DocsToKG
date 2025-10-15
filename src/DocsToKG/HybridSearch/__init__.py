@@ -39,6 +39,8 @@ Usage:
 
 from __future__ import annotations
 
+import sys
+
 from .api import HybridSearchAPI
 from .config import HybridSearchConfig, HybridSearchConfigManager
 from .dense import FaissIndexManager
@@ -55,13 +57,14 @@ from .operations import (
     verify_pagination,
 )
 from .retrieval import HybridSearchService
-from .schema import OpenSearchIndexTemplate, OpenSearchSchemaManager
+from .storage import OpenSearchIndexTemplate, OpenSearchSchemaManager
 from .types import (
     ChunkPayload,
     DocumentInput,
     HybridSearchRequest,
     HybridSearchResponse,
     HybridSearchResult,
+    vector_uuid_to_faiss_int,
 )
 from .validation import HybridSearchValidator
 
@@ -90,4 +93,10 @@ __all__ = [
     "restore_state",
     "verify_pagination",
     "should_rebuild_index",
+    "vector_uuid_to_faiss_int",
 ]
+
+_package = sys.modules[__name__]
+sys.modules.setdefault(__name__ + ".ids", sys.modules[__name__ + ".types"])
+sys.modules.setdefault(__name__ + ".schema", sys.modules[__name__ + ".storage"])
+sys.modules.setdefault(__name__ + ".similarity_gpu", sys.modules[__name__ + ".similarity"])

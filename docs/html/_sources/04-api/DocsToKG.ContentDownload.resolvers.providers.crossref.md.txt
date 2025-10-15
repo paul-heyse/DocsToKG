@@ -1,6 +1,6 @@
 # 1. Module: crossref
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.crossref``.
+This reference describes the ``CrossrefResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.resolvers.providers``.
 
 Crossref Resolver Provider
 
@@ -15,7 +15,7 @@ Key Features:
 - Deduplication of returned URLs to minimise redundant download attempts.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.providers.crossref import CrossrefResolver
+    from DocsToKG.ContentDownload.resolvers.providers import CrossrefResolver
 
     resolver = CrossrefResolver()
     results = list(resolver.iter_urls(session, config, artifact))

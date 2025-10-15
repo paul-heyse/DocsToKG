@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/DocParsing/schemas.py
-# hypothesis_version: 6.141.0
-
-[0.75, 1.5, 100000, ', ', 'BM25 b parameter', 'BM25 k1 parameter', 'BM25 sparse vector', 'BM25Vector', 'CHUNK_SCHEMA_VERSION', 'Chunk text content', 'ChunkRow', 'DenseVector', 'Document identifier', 'PYDANTIC_AVAILABLE', 'Page numbers', 'ProvenanceMetadata', 'Qwen3-4B', 'SPLADEVector', 'Token terms', 'UUID', 'VectorRow', '__version__', 'after', 'chunk', 'default', 'doc_id', 'docling-html', 'docling-vlm', 'docparse/1.0.0', 'docparse/1.1.0', 'embeddings/1.0.0', 'forbid', 'get_docling_version', 'naver/splade-v3', 'num_tokens', 'page_nos', 'parse_engine', 'schema', 'schema_version', 'unknown', 'uuid', 'validate_chunk_row', 'validate_vector_row', 'vector']

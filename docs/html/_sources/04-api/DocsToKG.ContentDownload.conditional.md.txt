@@ -1,6 +1,6 @@
 # 1. Module: conditional
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.conditional``.
+This reference documents the DocsToKG module ``DocsToKG.ContentDownload.network``.
 
 Conditional Request Metadata
 
@@ -20,7 +20,7 @@ Dependencies:
 - `requests`: Required for the `Response` type used when interpreting outcomes.
 
 Usage:
-    from DocsToKG.ContentDownload.conditional import ConditionalRequestHelper
+    from DocsToKG.ContentDownload.network import ConditionalRequestHelper
 
     helper = ConditionalRequestHelper(prior_etag="abcd", prior_path="/tmp/file.pdf")
     headers = helper.build_headers()

@@ -1,6 +1,6 @@
 # 1. Module: landing_page
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.landing_page``.
+This reference describes the ``LandingPageResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.resolvers.providers``.
 
 Landing Page Scraper Resolver
 
@@ -13,7 +13,7 @@ Key Features:
 - Graceful degradation when BeautifulSoup or lxml is unavailable.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.providers.landing_page import LandingPageResolver
+    from DocsToKG.ContentDownload.resolvers.providers import LandingPageResolver
 
     resolver = LandingPageResolver()
     results = list(resolver.iter_urls(session, config, artifact))

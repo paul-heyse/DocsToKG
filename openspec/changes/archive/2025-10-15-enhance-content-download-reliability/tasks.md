@@ -48,7 +48,7 @@
 ### 2.3 Refactor Crossref Resolver HTTP Calls
 
 - [x] Open `src/DocsToKG/ContentDownload/resolvers/providers/crossref.py`
-- [x] Import the centralized `request_with_retries` function from `DocsToKG.ContentDownload.http`
+- [x] Import the centralized `request_with_retries` function from `DocsToKG.ContentDownload.network`
 - [x] Locate the branch in `iter_urls` that checks for `hasattr(session, "get")` to determine the live request path
 - [x] Replace the direct `session.get` invocation with a call to `request_with_retries` passing the session, HTTP method string "GET", the endpoint URL, query parameters, headers dictionary, and timeout value
 - [x] Add the `allow_redirects=True` parameter to match the behavior of the standard session GET method

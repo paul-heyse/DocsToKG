@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/OntologyDownload/cli_utils.py
-# hypothesis_version: 6.141.0
-
-[' | ', ', ', '-', '-+-', 'FetchResult', 'PlannedFetch', 'details', 'error', 'file', 'format_plan_rows', 'format_results_table', 'format_table', 'id', 'ok', 'resolver', 'sha256', 'status', 'validator']

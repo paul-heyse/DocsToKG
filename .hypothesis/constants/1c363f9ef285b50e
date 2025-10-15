@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/zenodo.py
-# hypothesis_version: 6.141.0
-
-[200, '.pdf', 'WorkArtifact', 'ZenodoResolver', 'content_preview', 'error', 'error_detail', 'error_type', 'filename', 'files', 'get', 'hits', 'http-error', 'id', 'json-error', 'key', 'links', 'mostrecent', 'no-doi', 'pdf', 'q', 'record_id', 'request-error', 'self', 'size', 'skipped', 'sort', 'source', 'text', 'timeout', 'type', 'unexpected-error', 'zenodo']

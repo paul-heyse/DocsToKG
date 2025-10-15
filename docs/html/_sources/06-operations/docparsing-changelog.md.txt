@@ -12,8 +12,8 @@
   so resumable runs remain idempotent under concurrent execution.
 * Guarded SPLADE and Qwen embedding paths with actionable dependency checks and
   synthetic stubs so `--help` remains available without optional packages.
-* Added a synthetic benchmarking harness
-  (`python -m DocsToKG.DocParsing.cli.benchmark_embeddings`) plus end-to-end CLI
+* Added a synthetic benchmarking harness covered by
+  `pytest tests/docparsing/test_synthetic_benchmark.py` plus end-to-end CLI
   tests that install lightweight dependency stubs, validate schema compliance,
   and assert manifest entries.
 
@@ -26,7 +26,7 @@
 | PDF → DocTags (5 docs, Granite-Docling) | _Pending_ | _Pending_ | GPU-backed run required; see command below. |
 
 ```bash
-python -m DocsToKG.DocParsing.cli.doctags_convert \
+python -m DocsToKG.DocParsing.cli doctags \
   --mode pdf \
   --workers 2 \
   --input <pdf_dir> \
@@ -43,9 +43,9 @@ python -m DocsToKG.DocParsing.cli.doctags_convert \
 
 ### 1.4 Synthetic Streaming Benchmark
 
-Running the synthetic harness
-(`python -m DocsToKG.DocParsing.cli.benchmark_embeddings --chunks 512 --tokens 384 --dense-dim 2560`)
-estimates the following improvements:
+Running the synthetic harness via
+`pytest tests/docparsing/test_synthetic_benchmark.py -k simulate` estimates the
+following improvements:
 
 * **Throughput:** 3.781 s → 2.193 s (≈1.72× faster)
 * **Peak memory:** 5.00 MiB → 2.10 MiB (≈58 % reduction)
@@ -56,7 +56,7 @@ development laptops without GPUs or optional DocParsing dependencies.
 ### 1.5 Migration Guide
 1. Prefer the unified CLI wrapper:
    ```bash
-   python -m DocsToKG.DocParsing.cli.doctags_convert --mode pdf --model /path/to/model \
+   python -m DocsToKG.DocParsing.cli doctags --mode pdf --model /path/to/model \
        --served-model-name granite-docling-258M --served-model-name ibm-granite/granite-docling-258M
    ```
 2. Update automation to consume the manifest metadata fields `model_name`, `served_models`, and `vllm_version` for auditing served model changes.

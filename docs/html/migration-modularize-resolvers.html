@@ -142,7 +142,7 @@ modification.</p>
 <li><p><strong>OpenAlexResolver:</strong> Now participates as the first resolver in the default
 pipeline. Remove bespoke <code class="docutils literal notranslate"><span class="pre">attempt_openalex_candidates()</span></code> integrations.</p></li>
 <li><p><strong>Centralised HTTP retries:</strong> Every resolver uses
-<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.http.request_with_retries()</span></code> for consistent backoff,
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.network.request_with_retries()</span></code> for consistent backoff,
 timeout handling, and <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> support.</p></li>
 <li><p><strong>Conditional requests:</strong> Download code paths share the
 <code class="docutils literal notranslate"><span class="pre">ConditionalRequestHelper</span></code> utility to honour ETag and Last-Modified headers.</p></li>

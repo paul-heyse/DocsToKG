@@ -30,9 +30,13 @@ wheels/
 .pytest_cache/
 .coverage
 htmlcov/
+.benchmarks/
 .tox/
 .nox/
 .cache
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
 nosetests.xml
 coverage.xml
 *.cover
@@ -68,6 +72,7 @@ docs/_build/
 
 # Temporary files and logs
 tmp/
+tmp_pdf/
 *.tmp
 *.temp
 *.log

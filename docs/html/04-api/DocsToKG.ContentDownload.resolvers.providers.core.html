@@ -78,7 +78,7 @@
              
   <section id="module-core">
 <h1>1. Module: core<a class="headerlink" href="#module-core" title="Link to this heading"></a></h1>
-<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.core</span></code>.</p>
+<p>This reference describes the <code class="docutils literal notranslate"><span class="pre">CoreResolver</span></code> class provided by the consolidated module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers</span></code>.</p>
 <p>CORE Resolver Provider</p>
 <p>This module implements a resolver that queries the CORE API for open-access
 content linked to scholarly works. It supplements other providers by covering
@@ -90,7 +90,7 @@ institutional repositories aggregated by CORE.</p>
 <li><p>Deduplicated URL emission to prevent redundant downloads.</p></li>
 </ul>
 <p>Usage:
-from DocsToKG.ContentDownload.resolvers.providers.core import CoreResolver</p>
+from DocsToKG.ContentDownload.resolvers.providers import CoreResolver</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = CoreResolver()
 results = list(resolver.iter_urls(session, config, artifact))
 </pre></div>

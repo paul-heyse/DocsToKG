@@ -1,6 +1,6 @@
 # 1. Module: arxiv
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.arxiv``.
+This reference describes the ``ArxivResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.resolvers.providers``.
 
 arXiv Resolver Provider
 
@@ -14,7 +14,7 @@ Key Features:
 - Records skip events when metadata is incomplete.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.providers.arxiv import ArxivResolver
+    from DocsToKG.ContentDownload.resolvers.providers import ArxivResolver
 
     resolver = ArxivResolver()
     list(resolver.iter_urls(session, config, artifact))

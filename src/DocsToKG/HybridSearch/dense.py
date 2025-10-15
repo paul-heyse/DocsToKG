@@ -10,7 +10,7 @@ from typing import Callable, List, Optional, Sequence
 import numpy as np
 
 from .config import DenseIndexConfig
-from .ids import vector_uuid_to_faiss_int
+from .types import vector_uuid_to_faiss_int
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +105,7 @@ class FaissIndexManager:
         self._tombstones: set[int] = set()
         self._dirty_deletes = 0
         self._needs_rebuild = False
+        self._supports_remove_ids: Optional[bool] = None
         self._set_nprobe()
 
     @property
@@ -224,8 +225,14 @@ class FaissIndexManager:
         if not vectors:
             return
         faiss_ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
-        # Removal is idempotent; avoids O(N) membership scan across id_map.
-        self.remove_ids(faiss_ids, force_flush=True)
+        if self._supports_remove_ids is None:
+            self._supports_remove_ids = self._probe_remove_support()
+        if self._supports_remove_ids:
+            self.remove_ids(faiss_ids, force_flush=True)
+        else:
+            existing_ids = self._lookup_existing_ids(faiss_ids)
+            if existing_ids.size:
+                self.remove_ids(existing_ids, force_flush=True)
         matrix = np.ascontiguousarray(
             np.stack([self._ensure_dim(vec) for vec in vectors]), dtype=np.float32
         )
@@ -480,11 +487,34 @@ class FaissIndexManager:
         """
 
         self.init_gpu()
-        if self._gpu_resources is None:
-            raise RuntimeError("GPU resources must be initialised before index creation")
         metric = faiss.METRIC_INNER_PRODUCT
-        dev = int(self.device)
         index_type = self._config.index_type
+
+        if self._gpu_resources is None:
+            logger.info("FAISS GPU unavailable; constructing CPU %s index", index_type)
+            if index_type == "flat":
+                base = faiss.IndexFlatIP(self._dim)
+                return faiss.IndexIDMap2(base)
+            if index_type == "ivf_flat":
+                quantizer = faiss.IndexFlatIP(self._dim)
+                base = faiss.IndexIVFFlat(quantizer, self._dim, int(self._config.nlist), metric)
+                base.nprobe = int(self._config.nprobe)
+                setattr(base, "_quantizer_ref", quantizer)
+                return faiss.IndexIDMap2(base)
+            if index_type == "ivf_pq":
+                quantizer = faiss.IndexFlatIP(self._dim)
+                base = faiss.IndexIVFPQ(
+                    quantizer,
+                    self._dim,
+                    int(self._config.nlist),
+                    int(self._config.pq_m),
+                    int(self._config.pq_bits),
+                )
+                base.nprobe = int(self._config.nprobe)
+                setattr(base, "_quantizer_ref", quantizer)
+                return faiss.IndexIDMap2(base)
+            raise RuntimeError(f"Unsupported index type: {index_type}")
+        dev = int(self.device)
 
         if index_type == "flat":
             cfg = faiss.GpuIndexFlatConfig() if hasattr(faiss, "GpuIndexFlatConfig") else None
@@ -650,7 +680,7 @@ class FaissIndexManager:
 
         self.init_gpu()
         if self._gpu_resources is None:
-            raise RuntimeError("GPU resources are not initialised")
+            return index
         device = int(self.device)
         try:
             if hasattr(faiss, "GpuClonerOptions"):
@@ -859,9 +889,10 @@ class FaissIndexManager:
         if self._gpu_resources is not None:
             return
         if not hasattr(faiss, "StandardGpuResources"):
-            raise RuntimeError(
-                "FAISS GPU resources are unavailable; ensure faiss-gpu is installed with CUDA support."
-            )
+            logger.warning("FAISS GPU resources unavailable; falling back to CPU-only mode")
+            self._gpu_resources = None
+            self._device = -1
+            return
         if hasattr(faiss, "get_num_gpus"):
             try:
                 num_gpus = int(faiss.get_num_gpus())
@@ -869,9 +900,14 @@ class FaissIndexManager:
                 raise RuntimeError("Unable to enumerate FAISS GPUs") from exc
             device = int(self.device)
             if num_gpus <= device:
-                raise RuntimeError(
-                    f"Requested GPU device {device} but only {num_gpus} device(s) visible"
+                logger.warning(
+                    "Requested GPU device %s but only %s device(s) visible; using CPU index",
+                    device,
+                    num_gpus,
                 )
+                self._gpu_resources = None
+                self._device = -1
+                return
         try:
             resources = faiss.StandardGpuResources()
         except Exception as exc:  # pragma: no cover - hardware specific failure
@@ -929,6 +965,23 @@ class FaissIndexManager:
             self._dirty_deletes = 0
             self._needs_rebuild = False
 
+    def _probe_remove_support(self) -> bool:
+        """Determine whether the active FAISS index supports in-place ``remove_ids``.
+
+        Returns:
+            ``True`` when remove_ids executes on-device; ``False`` when FAISS raises the
+            standard "remove_ids not implemented" error.
+        """
+
+        selector = faiss.IDSelectorBatch(np.empty(0, dtype=np.int64))
+        try:
+            self._index.remove_ids(selector)
+        except RuntimeError as exc:
+            if "remove_ids not implemented" in str(exc).lower():
+                return False
+            raise
+        return True
+
     def _remove_ids(self, ids: np.ndarray) -> None:
         """Attempt to delete FAISS IDs directly, falling back to tombstones when required.
 
@@ -944,9 +997,12 @@ class FaissIndexManager:
         selector = faiss.IDSelectorBatch(ids.astype(np.int64))
         try:
             removed = int(self._index.remove_ids(selector))
+            if self._supports_remove_ids is None:
+                self._supports_remove_ids = True
         except RuntimeError as exc:
             if "remove_ids not implemented" not in str(exc).lower():
                 raise
+            self._supports_remove_ids = False
             logger.warning(
                 "FAISS remove_ids not implemented on GPU index; scheduling rebuild.",
                 extra={"event": {"ntotal": self.ntotal, "remove_ids_error": str(exc)}},

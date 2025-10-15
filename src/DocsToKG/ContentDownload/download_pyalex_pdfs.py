@@ -56,24 +56,24 @@ from urllib.parse import unquote, urlsplit
 import requests
 from pyalex import Topics, Works
 from pyalex import config as oa_config
-from requests.adapters import HTTPAdapter
 
-from DocsToKG.ContentDownload.conditional import (
+from DocsToKG.ContentDownload.network import (
     CachedResult,
     ConditionalRequestHelper,
     ModifiedResult,
+    create_session,
+    request_with_retries,
 )
-from DocsToKG.ContentDownload.http import request_with_retries
-from DocsToKG.ContentDownload.resolvers.cache import clear_resolver_caches
-from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
-from DocsToKG.ContentDownload.resolvers.providers import default_resolvers
-from DocsToKG.ContentDownload.resolvers.types import (
-    AttemptRecord,
-    DownloadOutcome,
-    ResolverConfig,
-    ResolverMetrics,
-)
+from DocsToKG.ContentDownload import resolvers
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
+
+ResolverPipeline = resolvers.ResolverPipeline
+ResolverConfig = resolvers.ResolverConfig
+ResolverMetrics = resolvers.ResolverMetrics
+DownloadOutcome = resolvers.DownloadOutcome
+AttemptRecord = resolvers.AttemptRecord
+default_resolvers = resolvers.default_resolvers
+clear_resolver_caches = resolvers.clear_resolver_caches
 
 MAX_SNIFF_BYTES = 64 * 1024
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
@@ -201,14 +201,8 @@ def _make_session(headers: Dict[str, str]) -> requests.Session:
         once the session is handed to worker threads.
     """
 
-    session = requests.Session()
-    if hasattr(session, "headers") and isinstance(session.headers, dict):
-        session.headers.update(headers)
-    adapter = HTTPAdapter(max_retries=0)
-    if hasattr(session, "mount"):
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
-    return session
+    # Delegate to shared network helper to keep adapter defaults aligned.
+    return create_session(headers)
 
 
 @dataclass

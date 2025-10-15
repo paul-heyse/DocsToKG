@@ -1,6 +1,6 @@
 # 1. Module: http
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.http``.
+This reference documents the DocsToKG module ``DocsToKG.ContentDownload.network``.
 
 HTTP Utilities with Backoff Support
 
@@ -19,7 +19,7 @@ Dependencies:
 - `datetime`: Used to interpret HTTP-date headers.
 
 Usage:
-    from DocsToKG.ContentDownload.http import request_with_retries
+    from DocsToKG.ContentDownload.network import request_with_retries
 
     session = requests.Session()
     response = request_with_retries(session, "GET", "https://example.org/resource")

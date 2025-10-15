@@ -78,7 +78,7 @@
              
   <section id="module-doaj">
 <h1>1. Module: doaj<a class="headerlink" href="#module-doaj" title="Link to this heading"></a></h1>
-<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.doaj</span></code>.</p>
+<p>This reference describes the <code class="docutils literal notranslate"><span class="pre">DoajResolver</span></code> class provided by the consolidated module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers</span></code>.</p>
 <p>DOAJ Resolver Provider</p>
 <p>This module integrates with the Directory of Open Access Journals (DOAJ) API
 to discover publisher-hosted open-access PDFs associated with scholarly works.</p>
@@ -89,7 +89,7 @@ to discover publisher-hosted open-access PDFs associated with scholarly works.</
 <li><p>Integration with the shared retry helper for polite request handling.</p></li>
 </ul>
 <p>Usage:
-from DocsToKG.ContentDownload.resolvers.providers.doaj import DoajResolver</p>
+from DocsToKG.ContentDownload.resolvers.providers import DoajResolver</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = DoajResolver()
 urls = list(resolver.iter_urls(session, config, artifact))
 </pre></div>

@@ -1,6 +1,6 @@
 # 1. Module: semantic_scholar
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.semantic_scholar``.
+This reference describes the ``SemanticScholarResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.resolvers.providers``.
 
 Semantic Scholar Resolver Provider
 
@@ -13,7 +13,7 @@ Key Features:
 - Structured error emission covering HTTP and JSON decoding failures.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import SemanticScholarResolver
+    from DocsToKG.ContentDownload.resolvers.providers import SemanticScholarResolver
 
     resolver = SemanticScholarResolver()
     results = list(resolver.iter_urls(session, config, artifact))

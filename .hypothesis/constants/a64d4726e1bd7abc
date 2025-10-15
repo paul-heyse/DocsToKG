@@ -1,4 +1,0 @@
-# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/osf.py
-# hypothesis_version: 6.141.0
-
-[200, 'OsfResolver', 'WorkArtifact', 'attributes', 'data', 'download', 'filter[doi]', 'get', 'links', 'osf', 'primary_file', 'source']

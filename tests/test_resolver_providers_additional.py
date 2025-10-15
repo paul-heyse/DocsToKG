@@ -648,10 +648,10 @@ def test_crossref_resolver_uses_central_retry_logic(monkeypatch, tmp_path) -> No
             self.calls.append(response.status_code)
             return response
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.http.random.random", lambda: 0.0)
+    monkeypatch.setattr("DocsToKG.ContentDownload.network.random.random", lambda: 0.0)
     sleep_calls: list[float] = []
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.http.time.sleep", lambda delay: sleep_calls.append(delay)
+        "DocsToKG.ContentDownload.network.time.sleep", lambda delay: sleep_calls.append(delay)
     )
 
     session = _Session()

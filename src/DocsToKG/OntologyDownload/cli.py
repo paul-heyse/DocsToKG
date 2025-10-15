@@ -28,22 +28,31 @@ import yaml
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
-from .foundation import sanitize_filename
-from .infrastructure import CACHE_DIR, CONFIG_DIR, LOCAL_ONTOLOGY_DIR, LOG_DIR, STORAGE
-from .pipeline import (
+from .ontology_download import (
+    CACHE_DIR,
+    CONFIG_DIR,
+    LOCAL_ONTOLOGY_DIR,
+    LOG_DIR,
+    STORAGE,
+    ConfigError,
+    ConfigurationError,
     FetchResult,
     FetchSpec,
     MANIFEST_SCHEMA_VERSION,
     OntologyDownloadError,
     PlannedFetch,
+    ResolvedConfig,
     fetch_all,
     get_manifest_schema,
+    load_config,
     plan_all,
-    ConfigurationError,
+    sanitize_filename,
+    setup_logging,
+    validate_config,
     validate_manifest_dict,
+    ValidationRequest,
+    run_validators,
 )
-from .settings import ConfigError, ResolvedConfig, load_config, setup_logging, validate_config
-from .validation import ValidationRequest, run_validators
 
 ONTOLOGY_DIR = LOCAL_ONTOLOGY_DIR
 
@@ -61,7 +70,15 @@ PLAN_DIFF_FIELDS = (
 
 
 def format_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
-    """Render a padded ASCII table."""
+    """Render a padded ASCII table.
+
+    Args:
+        headers: Column headers rendered on the first row.
+        rows: Iterable of table rows; each row must match the header length.
+
+    Returns:
+        Formatted table as a multi-line string.
+    """
 
     column_widths = [len(header) for header in headers]
     for row in rows:
@@ -78,7 +95,14 @@ def format_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
 
 
 def format_plan_rows(plans: Iterable[PlannedFetch]) -> List[Tuple[str, str, str, str, str]]:
-    """Convert planner output into rows for table rendering."""
+    """Convert planner output into rows for table rendering.
+
+    Args:
+        plans: Planned fetch objects emitted by the planner.
+
+    Returns:
+        List of tuples suitable for :func:`format_table`.
+    """
 
     rows: List[Tuple[str, str, str, str, str]] = []
     for plan in plans:
@@ -95,7 +119,14 @@ def format_plan_rows(plans: Iterable[PlannedFetch]) -> List[Tuple[str, str, str,
 
 
 def format_results_table(results: Iterable[FetchResult]) -> str:
-    """Render download results as a table summarizing status and file paths."""
+    """Render download results as a table summarizing status and file paths.
+
+    Args:
+        results: Download results produced by :func:`fetch_all`.
+
+    Returns:
+        Formatted table summarizing ontology downloads.
+    """
 
     rows = [
         (
@@ -111,7 +142,14 @@ def format_results_table(results: Iterable[FetchResult]) -> str:
 
 
 def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
-    """Summarise validator outcomes in a compact status table."""
+    """Summarise validator outcomes in a compact status table.
+
+    Args:
+        results: Mapping of validator names to structured result payloads.
+
+    Returns:
+        Table highlighting validator status and notable detail messages.
+    """
 
     formatted: List[Tuple[str, str, str]] = []
     for name, payload in results.items():
@@ -128,7 +166,11 @@ def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    """Configure the top-level CLI parser and subcommands."""
+    """Configure the top-level CLI parser and subcommands.
+
+    Returns:
+        Argument parser providing the consolidated ``ontofetch`` CLI.
+    """
 
     parser = argparse.ArgumentParser(
         prog="ontofetch",
@@ -367,7 +409,17 @@ def _parse_target_formats(value: Optional[str]) -> List[str]:
 
 
 def _parse_positive_int(value: str) -> int:
-    """Parse CLI argument ensuring it is a positive integer."""
+    """Parse CLI argument ensuring it is a positive integer.
+
+    Args:
+        value: Textual representation of a positive integer.
+
+    Returns:
+        Parsed positive integer value.
+
+    Raises:
+        argparse.ArgumentTypeError: If ``value`` is not a positive integer.
+    """
 
     try:
         parsed = int(value)
@@ -379,7 +431,14 @@ def _parse_positive_int(value: str) -> int:
 
 
 def _parse_allowed_hosts(value: Optional[str]) -> List[str]:
-    """Split comma-delimited host allowlist argument into unique entries."""
+    """Split comma-delimited host allowlist argument into unique entries.
+
+    Args:
+        value: Raw CLI argument containing comma-delimited hostnames.
+
+    Returns:
+        List of unique hostnames preserving input order.
+    """
 
     if not value:
         return []
@@ -392,7 +451,14 @@ def _parse_allowed_hosts(value: Optional[str]) -> List[str]:
 
 
 def _normalize_plan_args(args: Sequence[str]) -> List[str]:
-    """Ensure ``plan`` command defaults to the ``run`` subcommand when omitted."""
+    """Ensure ``plan`` command defaults to the ``run`` subcommand when omitted.
+
+    Args:
+        args: Original CLI argument vector.
+
+    Returns:
+        Updated argument list with explicit subcommands injected as needed.
+    """
 
     tokens = list(args)
     try:
@@ -414,7 +480,17 @@ def _normalize_plan_args(args: Sequence[str]) -> List[str]:
 
 
 def _parse_since_arg(value: str) -> datetime:
-    """Argparse hook parsing YYYY-MM-DD strings into timezone-aware datetimes."""
+    """Parse ``YYYY-MM-DD`` strings into timezone-aware datetimes.
+
+    Args:
+        value: Date string provided on the command line.
+
+    Returns:
+        Timezone-aware datetime instance aligned to UTC.
+
+    Raises:
+        argparse.ArgumentTypeError: If ``value`` is not a valid date.
+    """
 
     try:
         parsed = datetime.strptime(value, "%Y-%m-%d")
@@ -424,7 +500,14 @@ def _parse_since_arg(value: str) -> datetime:
 
 
 def _parse_since(value: Optional[Union[str, datetime]]) -> Optional[datetime]:
-    """Parse optional date input into timezone-aware datetimes."""
+    """Parse optional date input into timezone-aware datetimes.
+
+    Args:
+        value: Either a string date or a pre-parsed datetime.
+
+    Returns:
+        Normalized datetime in UTC, or ``None`` when not supplied.
+    """
 
     if value is None:
         return None
@@ -439,7 +522,14 @@ def _parse_since(value: Optional[Union[str, datetime]]) -> Optional[datetime]:
 
 
 def _format_bytes(num: int) -> str:
-    """Return human-readable byte count representation."""
+    """Return human-readable byte count representation.
+
+    Args:
+        num: Byte count to format.
+
+    Returns:
+        String describing the size using binary units.
+    """
 
     step = 1024.0
     units = ["B", "KB", "MB", "GB", "TB"]
@@ -454,7 +544,14 @@ def _format_bytes(num: int) -> str:
 
 
 def _directory_size(path: Path) -> int:
-    """Return the cumulative size of files under ``path``."""
+    """Return the cumulative size of files under ``path``.
+
+    Args:
+        path: Directory whose contents should be measured.
+
+    Returns:
+        Total number of bytes for regular files within the directory.
+    """
 
     if not path.exists():
         return 0
@@ -470,7 +567,14 @@ def _directory_size(path: Path) -> int:
 
 
 def _parse_version_timestamp(value: Optional[str]) -> Optional[datetime]:
-    """Parse version or manifest timestamps into UTC datetimes."""
+    """Parse version or manifest timestamps into UTC datetimes.
+
+    Args:
+        value: Timestamp string sourced from manifests or version metadata.
+
+    Returns:
+        Normalized UTC datetime, or ``None`` when parsing fails.
+    """
 
     if not value or not isinstance(value, str):
         return None
@@ -496,7 +600,12 @@ def _parse_version_timestamp(value: Optional[str]) -> Optional[datetime]:
 
 
 def _apply_cli_overrides(config: ResolvedConfig, args) -> None:
-    """Mutate resolved configuration based on CLI override arguments."""
+    """Mutate resolved configuration based on CLI override arguments.
+
+    Args:
+        config: Resolved configuration subject to mutation.
+        args: Parsed CLI namespace containing override values.
+    """
 
     downloads = getattr(args, "concurrent_downloads", None)
     if downloads is not None:
@@ -519,7 +628,14 @@ _RATE_LIMIT_RE = re.compile(r"^([\d.]+)/(second|sec|s|minute|min|m|hour|h)$")
 
 
 def _rate_limit_to_rps(value: str) -> Optional[float]:
-    """Convert rate limit string into requests-per-second float."""
+    """Convert rate limit string into a requests-per-second float.
+
+    Args:
+        value: Rate limit expression in ``<amount>/<unit>`` form.
+
+    Returns:
+        Requests-per-second value when parsing succeeds, otherwise ``None``.
+    """
 
     match = _RATE_LIMIT_RE.match(value)
     if not match:
@@ -675,7 +791,14 @@ def _parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
 
 
 def _parse_http_datetime(value: Optional[str]) -> Optional[datetime]:
-    """Parse HTTP header datetime strings into timezone-aware datetimes."""
+    """Parse HTTP header datetime strings into timezone-aware datetimes.
+
+    Args:
+        value: Value sourced from an HTTP ``Date`` or ``Last-Modified`` header.
+
+    Returns:
+        Datetime in UTC when parsing succeeds, otherwise ``None``.
+    """
 
     if not value:
         return None
@@ -691,7 +814,14 @@ def _parse_http_datetime(value: Optional[str]) -> Optional[datetime]:
 
 
 def _extract_response_metadata(response: requests.Response) -> Dict[str, object]:
-    """Return structured metadata from an HTTP response."""
+    """Return structured metadata from an HTTP response.
+
+    Args:
+        response: HTTP response obtained from a requests call.
+
+    Returns:
+        Mapping containing detected headers such as last-modified, etag, and content length.
+    """
 
     metadata: Dict[str, object] = {}
     last_modified = response.headers.get("Last-Modified")
@@ -711,7 +841,12 @@ def _extract_response_metadata(response: requests.Response) -> Dict[str, object]
 
 
 def _collect_plan_metadata(plans: Sequence[PlannedFetch], config: ResolvedConfig) -> None:
-    """Augment planned fetches with remote metadata via HEAD requests."""
+    """Augment planned fetches with remote metadata via HEAD requests.
+
+    Args:
+        plans: Planned fetch objects awaiting metadata enrichment.
+        config: Resolved configuration providing HTTP headers and timeouts.
+    """
 
     if not plans:
         return
@@ -749,7 +884,14 @@ def _collect_plan_metadata(plans: Sequence[PlannedFetch], config: ResolvedConfig
 
 
 def _directory_size_bytes(path: Path) -> int:
-    """Return the cumulative size of files within ``path``."""
+    """Return the cumulative size of files within ``path``.
+
+    Args:
+        path: Directory whose contents should be measured.
+
+    Returns:
+        Total number of bytes encountered within the directory tree.
+    """
 
     total = 0
     for entry in path.rglob("*"):
@@ -762,7 +904,14 @@ def _directory_size_bytes(path: Path) -> int:
 
 
 def _infer_version_timestamp(version: str) -> Optional[datetime]:
-    """Attempt to derive a datetime from a version string."""
+    """Attempt to derive a datetime from a version string.
+
+    Args:
+        version: Version identifier emitted by upstream resolvers.
+
+    Returns:
+        Datetime derived from the version string, or ``None`` when no format matches.
+    """
 
     candidates = [version, version.replace("_", "-"), version.replace("/", "-")]
     formats = [
@@ -849,7 +998,14 @@ def _load_manifest(manifest_path: Path) -> dict:
 
 
 def _collect_version_metadata(ontology_id: str) -> List[Dict[str, object]]:
-    """Return sorted metadata entries for stored ontology versions."""
+    """Return sorted metadata entries for stored ontology versions.
+
+    Args:
+        ontology_id: Identifier of the ontology to inspect.
+
+    Returns:
+        List of metadata dictionaries ordered by most recent timestamp first.
+    """
 
     safe_id = sanitize_filename(ontology_id)
     base_dir = LOCAL_ONTOLOGY_DIR / safe_id
@@ -897,7 +1053,12 @@ def _collect_version_metadata(ontology_id: str) -> List[Dict[str, object]]:
 
 
 def _update_latest_symlink(ontology_id: str, target: Path) -> None:
-    """Ensure latest marker references the provided target directory."""
+    """Ensure latest marker references the provided target directory.
+
+    Args:
+        ontology_id: Ontology identifier whose ``latest`` link should be updated.
+        target: Directory containing the version to mark as latest.
+    """
 
     safe_id = sanitize_filename(ontology_id)
     base_dir = LOCAL_ONTOLOGY_DIR / safe_id
@@ -1108,7 +1269,11 @@ def _handle_prune(args, logger) -> Dict[str, object]:
 
 
 def _doctor_report() -> Dict[str, object]:
-    """Collect diagnostic information for the ``doctor`` command."""
+    """Collect diagnostic information for the ``doctor`` command.
+
+    Returns:
+        Mapping capturing disk, dependency, network, and configuration status.
+    """
 
     directories = {}
     for name, path in {
@@ -1476,9 +1641,6 @@ def _handle_init(path: Path) -> None:
     Args:
         path: Destination path for the generated configuration template.
 
-    Returns:
-        None
-
     Raises:
         ConfigError: If the target file already exists.
     """
@@ -1506,7 +1668,14 @@ def _handle_config_validate(path: Path) -> dict:
 
 
 def _normalize_argv(argv: Sequence[str]) -> List[str]:
-    """Rewrite legacy aliases to the canonical subcommand syntax."""
+    """Rewrite legacy aliases to the canonical subcommand syntax.
+
+    Args:
+        argv: Raw argument vector supplied by the user.
+
+    Returns:
+        Adjusted argument list with legacy ``plan diff`` rewired to ``plan-diff``.
+    """
 
     tokens = list(argv)
     for index in range(len(tokens) - 1):

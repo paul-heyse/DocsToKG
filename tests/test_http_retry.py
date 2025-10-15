@@ -18,7 +18,10 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     pytest.skip("hypothesis is required for these tests", allow_module_level=True)
 
-from DocsToKG.ContentDownload.http import parse_retry_after_header, request_with_retries
+from DocsToKG.ContentDownload.network import (
+    parse_retry_after_header,
+    request_with_retries,
+)
 
 given = hypothesis.given
 
@@ -43,8 +46,8 @@ def test_successful_request_no_retries():
     session.request.assert_called_once_with(method="GET", url="https://example.org/test")
 
 
-@patch("DocsToKG.ContentDownload.http.random.random", return_value=0.0)
-@patch("DocsToKG.ContentDownload.http.time.sleep")
+@patch("DocsToKG.ContentDownload.network.random.random", return_value=0.0)
+@patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_transient_503_with_exponential_backoff(mock_sleep: Mock, _: Mock) -> None:
     """Verify exponential backoff timing for transient 503 errors."""
 
@@ -91,8 +94,8 @@ def test_parse_retry_after_header_invalid_date() -> None:
     assert parse_retry_after_header(response) is None
 
 
-@patch("DocsToKG.ContentDownload.http.random.random", return_value=0.0)
-@patch("DocsToKG.ContentDownload.http.time.sleep")
+@patch("DocsToKG.ContentDownload.network.random.random", return_value=0.0)
+@patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_retry_after_header_overrides_backoff(mock_sleep: Mock, _: Mock) -> None:
     session = Mock(spec=requests.Session)
     retry_headers = {"Retry-After": "10"}
@@ -112,7 +115,7 @@ def test_retry_after_header_overrides_backoff(mock_sleep: Mock, _: Mock) -> None
     assert mock_sleep.call_args_list == [call(10.0)]
 
 
-@patch("DocsToKG.ContentDownload.http.time.sleep")
+@patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_request_exception_raises_after_retries(mock_sleep: Mock) -> None:
     session = Mock(spec=requests.Session)
     error = requests.RequestException("boom")
@@ -125,7 +128,7 @@ def test_request_exception_raises_after_retries(mock_sleep: Mock) -> None:
     assert session.request.call_count == 2
 
 
-@patch("DocsToKG.ContentDownload.http.time.sleep")
+@patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_timeout_retry_handling(mock_sleep: Mock) -> None:
     session = Mock(spec=requests.Session)
     session.request.side_effect = [requests.Timeout("slow"), _mock_response(200)]
@@ -136,7 +139,7 @@ def test_timeout_retry_handling(mock_sleep: Mock) -> None:
     assert mock_sleep.call_count == 1
 
 
-@patch("DocsToKG.ContentDownload.http.time.sleep")
+@patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_connection_error_retry_handling(mock_sleep: Mock) -> None:
     session = Mock(spec=requests.Session)
     session.request.side_effect = [requests.ConnectionError("down"), _mock_response(200)]
@@ -147,7 +150,7 @@ def test_connection_error_retry_handling(mock_sleep: Mock) -> None:
     assert mock_sleep.call_count == 1
 
 
-@patch("DocsToKG.ContentDownload.http.time.sleep")
+@patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_timeout_raises_after_exhaustion(mock_sleep: Mock) -> None:
     """Ensure timeout retries raise after exhausting the retry budget."""
 
@@ -161,7 +164,7 @@ def test_timeout_raises_after_exhaustion(mock_sleep: Mock) -> None:
     assert mock_sleep.call_count == 1
 
 
-@patch("DocsToKG.ContentDownload.http.time.sleep")
+@patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_connection_error_raises_after_exhaustion(mock_sleep: Mock) -> None:
     """Ensure connection errors propagate when retries are exhausted."""
 
@@ -270,7 +273,7 @@ def test_request_with_retries_errors_when_no_callable_available() -> None:
         request_with_retries(_MinimalSession(), "GET", "https://example.org/fail")
 
 
-@patch("DocsToKG.ContentDownload.http.time.sleep")
+@patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_retry_after_header_prefers_longer_delay(mock_sleep: Mock) -> None:
     """Verify Retry-After header longer than backoff takes precedence."""
 
@@ -300,8 +303,8 @@ def test_retry_after_header_prefers_longer_delay(mock_sleep: Mock) -> None:
     assert pytest.approx(sleep_arg, rel=0.01) == 4.0
 
 
-@patch("DocsToKG.ContentDownload.http.time.sleep")
-@patch("DocsToKG.ContentDownload.http.parse_retry_after_header")
+@patch("DocsToKG.ContentDownload.network.time.sleep")
+@patch("DocsToKG.ContentDownload.network.parse_retry_after_header")
 def test_respect_retry_after_false_skips_header(mock_parse: Mock, mock_sleep: Mock) -> None:
     """Ensure disabling respect_retry_after bypasses header parsing."""
 
@@ -338,7 +341,7 @@ def test_parse_retry_after_header_handles_parse_errors(monkeypatch) -> None:
     response.headers = {"Retry-After": "Mon, 01 Jan 2024 00:00:00 GMT"}
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.http.parsedate_to_datetime",
+        "DocsToKG.ContentDownload.network.parsedate_to_datetime",
         Mock(side_effect=TypeError("boom")),
     )
 
@@ -350,7 +353,7 @@ def test_parse_retry_after_header_returns_none_when_parser_returns_none(monkeypa
     response.headers = {"Retry-After": "Mon, 01 Jan 2024 00:00:00 GMT"}
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.http.parsedate_to_datetime",
+        "DocsToKG.ContentDownload.network.parsedate_to_datetime",
         Mock(return_value=None),
     )
 

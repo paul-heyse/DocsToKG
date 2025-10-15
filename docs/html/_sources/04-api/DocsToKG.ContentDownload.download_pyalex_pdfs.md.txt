@@ -288,7 +288,7 @@ WorkArtifact describing the work and candidate URLs.
 Raises:
 KeyError: If required identifiers are missing from the work payload.
 
-### `download_candidate(session, artifact, url, referer, timeout, context)`
+### `download_candidate(session, artifact, url, referer, timeout, context, head_precheck_passed)`
 
 Download a single candidate URL and classify the payload.
 
