@@ -1248,7 +1248,7 @@ After implementation, verify that:
 ---
 
 ### Task 3.2: Replace embeddings direct write with atomic write operation
-- [ ] Task 3.2: Replace embeddings direct write with atomic write operation
+- [x] Task 3.2: Replace embeddings direct write with atomic write operation
 
 **Functional Requirements**:
 
@@ -1284,7 +1284,7 @@ After implementation, verify that:
 ---
 
 ### Task 3.3: Add crash recovery integration test suite
-- [ ] Task 3.3: Add crash recovery integration test suite
+- [x] Task 3.3: Add crash recovery integration test suite
 
 **Functional Requirements**:
 
@@ -1551,7 +1551,7 @@ After implementation:
 ---
 
 ### Task 5.3: Add hash algorithm tag to embeddings manifest entries
-- [ ] Task 5.3: Add hash algorithm tag to embeddings manifest entries
+- [x] Task 5.3: Add hash algorithm tag to embeddings manifest entries
 
 **Functional Requirements**:
 
