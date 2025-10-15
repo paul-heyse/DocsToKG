@@ -126,6 +126,13 @@ def _make_session(headers: Dict[str, str]) -> requests.Session:
 
     Subsequent resolver requests automatically include the polite headers and retry
     policy.
+
+    Thread Safety
+    -------------
+    The returned session is safe for concurrent ``GET`` and ``HEAD`` requests because
+    :class:`requests.adapters.HTTPAdapter` manages a thread-safe connection pool. Avoid
+    mutating shared session state (for example ``session.headers.update``) once the
+    session is handed to worker threads.
     """
 
     session = requests.Session()
@@ -270,6 +277,7 @@ class JsonlLogger:
                 "http_status": record.http_status,
                 "content_type": record.content_type,
                 "elapsed_ms": record.elapsed_ms,
+                "resolver_wall_time_ms": record.resolver_wall_time_ms,
                 "reason": record.reason,
                 "metadata": record.metadata,
                 "sha256": record.sha256,
@@ -375,6 +383,7 @@ class CsvAttemptLoggerAdapter:
         "http_status",
         "content_type",
         "elapsed_ms",
+        "resolver_wall_time_ms",
         "reason",
         "sha256",
         "content_length",
@@ -413,6 +422,7 @@ class CsvAttemptLoggerAdapter:
                 "http_status": record.http_status,
                 "content_type": record.content_type,
                 "elapsed_ms": record.elapsed_ms,
+                "resolver_wall_time_ms": record.resolver_wall_time_ms,
                 "reason": record.reason,
                 "sha256": record.sha256,
                 "content_length": record.content_length,
