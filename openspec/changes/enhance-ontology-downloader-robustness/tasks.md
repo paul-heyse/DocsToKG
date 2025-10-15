@@ -38,9 +38,9 @@ _owlready2: Any = None
 
 **Acceptance Criteria**:
 
-- [ ] File created at correct path
-- [ ] Module imports without errors
-- [ ] Empty module passes linting
+- [x] File created at correct path
+- [x] Module imports without errors
+- [x] Empty module passes linting
 
 #### 1.1.2 Implement `get_pystow()` with fallback stub
 
@@ -112,10 +112,10 @@ def test_pystow_fallback_respects_env_var(monkeypatch):
 
 **Acceptance Criteria**:
 
-- [ ] `get_pystow()` function implemented
-- [ ] Fallback class provides `join()` method
-- [ ] Caching works (same object returned on repeated calls)
-- [ ] All tests pass
+- [x] `get_pystow()` function implemented
+- [x] Fallback class provides `join()` method
+- [x] Caching works (same object returned on repeated calls)
+- [x] All tests pass
 
 #### 1.1.3 Implement `get_rdflib()` with stub Graph class
 
@@ -208,10 +208,10 @@ def test_rdflib_stub_serialize_copies_source():
 
 **Acceptance Criteria**:
 
-- [ ] `get_rdflib()` function implemented
-- [ ] Stub Graph has parse, serialize, **len** methods
-- [ ] Stub behavior matches real rdflib interface for testing
-- [ ] Tests pass
+- [x] `get_rdflib()` function implemented
+- [x] Stub Graph has parse, serialize, **len** methods
+- [x] Stub behavior matches real rdflib interface for testing
+- [x] Tests pass
 
 #### 1.1.4 Implement `get_pronto()` with stub Ontology class
 
@@ -291,9 +291,9 @@ def test_pronto_stub_dump_creates_file():
 
 **Acceptance Criteria**:
 
-- [ ] `get_pronto()` function implemented
-- [ ] Stub Ontology has terms(), dump() methods
-- [ ] Tests pass
+- [x] `get_pronto()` function implemented
+- [x] Stub Ontology has terms(), dump() methods
+- [x] Tests pass
 
 #### 1.1.5 Implement `get_owlready2()` with stub wrapper
 
@@ -381,9 +381,9 @@ def test_owlready2_stub_load_returns_ontology():
 
 **Acceptance Criteria**:
 
-- [ ] `get_owlready2()` function implemented
-- [ ] Stub provides get_ontology() → wrapper → load() → classes() chain
-- [ ] Tests pass
+- [x] `get_owlready2()` function implemented
+- [x] Stub provides get_ontology() → wrapper → load() → classes() chain
+- [x] Tests pass
 
 #### 1.1.6 Add comprehensive docstrings and type hints
 
@@ -421,10 +421,10 @@ __all__ = [
 
 **Acceptance Criteria**:
 
-- [ ] All functions have Google-style docstrings
-- [ ] All functions have type hints
-- [ ] Module docstring explains purpose
-- [ ] `__all__` list defined
+- [x] All functions have Google-style docstrings
+- [x] All functions have type hints
+- [x] Module docstring explains purpose
+- [x] `__all__` list defined
 
 ### 1.2 Migrate Code to Use optdeps Module
 
@@ -465,10 +465,10 @@ pystow = get_pystow()
 
 **Acceptance Criteria**:
 
-- [ ] Local stub removed
-- [ ] optdeps import added
-- [ ] All tests pass
-- [ ] No functionality change
+- [x] Local stub removed
+- [x] optdeps import added
+- [x] All tests pass
+- [x] No functionality change
 
 #### 1.2.2 Update `resolvers.py` to import pystow from `optdeps.get_pystow()`
 
@@ -484,9 +484,9 @@ pystow = get_pystow()
 
 **Acceptance Criteria**:
 
-- [ ] Local stub removed
-- [ ] optdeps import added
-- [ ] Resolver tests pass
+- [x] Local stub removed
+- [x] optdeps import added
+- [x] Resolver tests pass
 
 #### 1.2.3 Update `validators.py` to import rdflib, pronto, owlready2 from optdeps
 
@@ -511,9 +511,9 @@ pystow = get_pystow()
 
 **Acceptance Criteria**:
 
-- [ ] All local stubs removed (135 lines deleted)
-- [ ] optdeps imports added
-- [ ] All validator tests pass
+- [x] All local stubs removed (135 lines deleted)
+- [x] optdeps imports added
+- [x] All validator tests pass
 
 #### 1.2.4 Remove all local stub implementations
 
@@ -527,8 +527,8 @@ pystow = get_pystow()
 
 **Acceptance Criteria**:
 
-- [ ] `grep -r "class _Stub" src/DocsToKG/OntologyDownload/` returns only optdeps.py
-- [ ] No duplicate stub implementations exist
+- [x] `grep -r "class _Stub" src/DocsToKG/OntologyDownload/` returns only optdeps.py
+- [x] No duplicate stub implementations exist
 
 #### 1.2.5 Verify tests pass with centralized stubs
 
@@ -1919,7 +1919,7 @@ def test_validate_media_type_disabled():
 
 ## Task Completion Tracking
 
-**Foundation (1.1-1.4)**: 0/52 tasks complete
+**Foundation (1.1-1.4)**: 11/52 tasks complete
 **Robustness Downloads (2.1-2.4)**: 0/24 tasks complete
 **Robustness Validation (3.1-3.4)**: 0/21 tasks complete
 **Capabilities (4.1-5.2)**: 0/32 tasks complete
@@ -1928,7 +1928,7 @@ def test_validate_media_type_disabled():
 **Testing (8.1-8.5)**: 0/30 tasks complete
 **Deployment (9.1-9.3)**: 0/13 tasks complete
 
-**Total**: 0/195 tasks complete (0%)
+**Total**: 11/195 tasks complete (5.6%)
 
 ## Notes for AI Programming Agents
 
