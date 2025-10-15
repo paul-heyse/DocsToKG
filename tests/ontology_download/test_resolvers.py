@@ -48,6 +48,7 @@ def test_obo_resolver_prefers_requested_format(monkeypatch, resolved_config):
     spec = FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl", "obo"])
     plan = resolvers.OBOResolver().plan(spec, resolved_config, logging.getLogger(__name__))
     assert plan.url.endswith("hp.owl")
+    assert plan.service == "obo"
 
 
 def test_ols_resolver_uses_download_link(monkeypatch, resolved_config):
@@ -68,6 +69,7 @@ def test_ols_resolver_uses_download_link(monkeypatch, resolved_config):
     assert plan.url == "https://example.org/efo.owl"
     assert plan.version == "2024-01-01"
     assert plan.license == "CC-BY-4.0"
+    assert plan.service == "ols"
 
 
 def test_ols_resolver_applies_polite_headers(monkeypatch, resolved_config):
@@ -116,6 +118,7 @@ def test_bioportal_resolver_includes_api_key(monkeypatch, resolved_config, tmp_p
     plan = resolver.plan(spec, resolved_config, logging.getLogger(__name__))
     assert plan.url == "https://example.org/ncit.owl"
     assert plan.headers["Authorization"] == "apikey secret"
+    assert plan.service == "bioportal"
 
 
 def test_bioportal_resolver_applies_polite_headers(monkeypatch, resolved_config, tmp_path):
@@ -166,6 +169,7 @@ def test_xbrl_resolver_success(resolved_config):
     )
     plan = resolver.plan(spec, resolved_config, logging.getLogger(__name__))
     assert plan.media_type == "application/zip"
+    assert plan.service == "xbrl"
 
 
 def test_bioportal_resolver_auth_error(monkeypatch, resolved_config):
@@ -206,6 +210,28 @@ def test_ols_resolver_timeout_retry(monkeypatch, resolved_config):
     plan = resolver.plan(spec, resolved_config, logging.getLogger(__name__))
     assert plan.url == "https://example.org/bfo.owl"
     assert attempts["count"] == 2
+
+
+def test_resolver_uses_service_rate_limit(monkeypatch, resolved_config):
+    calls = {"count": 0}
+
+    class DummyBucket:
+        def consume(self, tokens: float = 1.0) -> None:
+            calls["count"] += 1
+
+    monkeypatch.setattr(resolvers, "_get_service_bucket", lambda service, config: DummyBucket())
+    monkeypatch.setattr(resolvers, "retry_with_backoff", lambda func, **kwargs: func())
+
+    record = {"download": "https://example.org/efo.owl"}
+    client = SimpleNamespace(get_ontology=lambda _: record, get_ontology_versions=lambda _: [])
+    monkeypatch.setattr(resolvers, "OlsClient", lambda: client)
+
+    resolver = resolvers.OLSResolver()
+    spec = FetchSpec(id="efo", resolver="obo", extras={}, target_formats=["owl"])
+    plan = resolver.plan(spec, resolved_config, logging.getLogger(__name__))
+
+    assert plan.service == "ols"
+    assert calls["count"] >= 1
 
 
 def test_normalize_license_to_spdx_variants():
@@ -256,6 +282,7 @@ def test_lov_resolver_parses_metadata(resolved_config):
     assert plan.url == "https://example.org/voaf.ttl"
     assert plan.media_type == "text/turtle"
     assert plan.license == "CC-BY-4.0"
+    assert plan.service == "lov"
     session_headers = resolver.session.headers
     assert session_headers["X-Request-ID"].startswith("lov123-")
 
@@ -277,6 +304,7 @@ def test_ontobee_resolver_prefers_format(resolved_config):
 
     assert plan.url == "https://purl.obolibrary.org/obo/hp.obo"
     assert plan.media_type == "text/plain"
+    assert plan.service == "ontobee"
 
 
 def test_ontobee_resolver_validates_identifier(resolved_config):
