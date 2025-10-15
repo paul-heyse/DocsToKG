@@ -1,0 +1,620 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: pipelines &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: pipelines</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.DocParsing.pipelines.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-pipelines">
+<h1>1. Module: pipelines<a class="headerlink" href="#module-pipelines" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.pipelines</span></code>.</p>
+<p>DocParsing Pipeline Utilities</p>
+<p>This module hosts the PDF → DocTags conversion workflow <em>and</em> shared helpers
+used by other DocParsing pipelines. It coordinates vLLM server lifecycle,
+manifest bookkeeping, and CLI argument scaffolding so chunking and embedding
+components can import consistent behaviours.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Shared CLI helpers (<code class="docutils literal notranslate"><span class="pre">add_data_root_option</span></code>, <code class="docutils literal notranslate"><span class="pre">add_resume_force_options</span></code>,
+<code class="docutils literal notranslate"><span class="pre">prepare_data_root</span></code>, <code class="docutils literal notranslate"><span class="pre">resolve_pipeline_path</span></code>) to centralise directory and
+resume/force handling.</p></li>
+<li><p>PDF conversion pipeline that spins up a vLLM inference server, distributes
+work across processes, and writes DocTags with manifest telemetry.</p></li>
+<li><p>Utility routines for manifest updates, GPU resource configuration, and
+polite rate control against vLLM endpoints.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.DocParsing import pipelines</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>parser = pipelines.pdf_build_parser()
+args = parser.parse_args([&quot;--data-root&quot;, &quot;/datasets/Data&quot;])
+exit_code = pipelines.pdf_main(args)
+</pre></div>
+</div>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="add-data-root-option-parser">
+<h3><code class="docutils literal notranslate"><span class="pre">add_data_root_option(parser)</span></code><a class="headerlink" href="#add-data-root-option-parser" title="Link to this heading"></a></h3>
+<p>Attach the shared <code class="docutils literal notranslate"><span class="pre">--data-root</span></code> option to a CLI parser.</p>
+<p>Args:
+parser (argparse.ArgumentParser): Parser being configured.</p>
+<p>Returns:
+None</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>parser = argparse.ArgumentParser()
+add_data_root_option(parser)
+any(action.dest == “data_root” for action in parser._actions)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="add-resume-force-options-parser">
+<h3><code class="docutils literal notranslate"><span class="pre">add_resume_force_options(parser)</span></code><a class="headerlink" href="#add-resume-force-options-parser" title="Link to this heading"></a></h3>
+<p>Attach <code class="docutils literal notranslate"><span class="pre">--resume</span></code> and <code class="docutils literal notranslate"><span class="pre">--force</span></code> switches to a CLI parser.</p>
+<p>Args:
+parser (argparse.ArgumentParser): Parser being configured.
+resume_help (str): Help text describing resume semantics.
+force_help (str): Help text describing force semantics.</p>
+<p>Returns:
+None</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>parser = argparse.ArgumentParser()
+add_resume_force_options(
+…     parser,
+…     resume_help=”Resume processing”,
+…     force_help=”Force reprocessing”,
+… )
+sorted(action.dest for action in parser._actions if action.option_strings)
+[‘force’, ‘help’, ‘resume’]</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="prepare-data-root-data-root-arg-default-root">
+<h3><code class="docutils literal notranslate"><span class="pre">prepare_data_root(data_root_arg,</span> <span class="pre">default_root)</span></code><a class="headerlink" href="#prepare-data-root-data-root-arg-default-root" title="Link to this heading"></a></h3>
+<p>Resolve and apply DocsToKG data-root settings for CLI pipelines.</p>
+<p>Args:
+data_root_arg (Path | None): CLI-supplied data-root override.
+default_root (Path): Default DocsToKG data directory.</p>
+<p>Returns:
+Path: Resolved data root that downstream stages should use.</p>
+<p>Side Effects:</p>
+<ul class="simple">
+<li><p>When <code class="docutils literal notranslate"><span class="pre">data_root_arg</span></code> is provided, <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_DATA_ROOT</span></code> is updated.</p></li>
+<li><p>Ensures the manifests directory exists for downstream writes.</p></li>
+</ul>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>root = prepare_data_root(None, Path(“/tmp/data”))
+root.as_posix().endswith(“/tmp/data”)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="resolve-pipeline-path">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_pipeline_path()</span></code><a class="headerlink" href="#resolve-pipeline-path" title="Link to this heading"></a></h3>
+<p>Derive a pipeline directory path respecting data-root overrides.</p>
+<p>Args:
+cli_value (Path | None): Path provided via CLI argument (may be <code class="docutils literal notranslate"><span class="pre">None</span></code>).
+default_path (Path): Default path baked into the pipeline module.
+resolved_data_root (Path): Effective data root for the current invocation.
+data_root_overridden (bool): <code class="docutils literal notranslate"><span class="pre">True</span></code> when the CLI supplied <code class="docutils literal notranslate"><span class="pre">--data-root</span></code>.
+resolver (Callable[[Path], Path]): Callable that derives the directory when
+a new data root is supplied (for example :func:<code class="docutils literal notranslate"><span class="pre">data_doctags</span></code>).</p>
+<p>Returns:
+Path: Directory path the pipeline should operate on. Callers may resolve the
+path to an absolute location if required.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>resolve_pipeline_path(
+…     cli_value=None,
+…     default_path=Path(“/tmp/data/DocTagsFiles”),
+…     resolved_data_root=Path(“/tmp/data”),
+…     data_root_overridden=False,
+…     resolver=lambda root: root / “DocTagsFiles”,
+… ).as_posix()
+‘/tmp/data/DocTagsFiles’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="dedupe-preserve-order-names">
+<h3><code class="docutils literal notranslate"><span class="pre">_dedupe_preserve_order(names)</span></code><a class="headerlink" href="#dedupe-preserve-order-names" title="Link to this heading"></a></h3>
+<p>Return a list containing <code class="docutils literal notranslate"><span class="pre">names</span></code> without duplicates while preserving order.</p>
+<p>Args:
+names: Iterable of candidate names that may include duplicates or empty values.</p>
+<p>Returns:
+List of unique names in their original encounter order.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>_dedupe_preserve_order([“a”, “b”, “a”, “c”])
+[‘a’, ‘b’, ‘c’]</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="normalize-served-model-names-raw">
+<h3><code class="docutils literal notranslate"><span class="pre">_normalize_served_model_names(raw)</span></code><a class="headerlink" href="#normalize-served-model-names-raw" title="Link to this heading"></a></h3>
+<p>Flatten CLI-provided served model names into a deduplicated tuple.</p>
+<p>Args:
+raw: Sequence containing strings or nested iterables of strings sourced from
+CLI options.</p>
+<p>Returns:
+Tuple of unique served model names with defaults applied when none were given.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>_normalize_served_model_names([[“a”, “b”], “b”])
+(‘a’, ‘b’)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="detect-vllm-version">
+<h3><code class="docutils literal notranslate"><span class="pre">detect_vllm_version()</span></code><a class="headerlink" href="#detect-vllm-version" title="Link to this heading"></a></h3>
+<p>Detect the installed vLLM package version for diagnostics.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Version string reported by the local vLLM installation or <code class="docutils literal notranslate"><span class="pre">&quot;unknown&quot;</span></code> when
+the package cannot be imported.</p>
+</section>
+<section id="validate-served-models-available-expected">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_served_models(available,</span> <span class="pre">expected)</span></code><a class="headerlink" href="#validate-served-models-available-expected" title="Link to this heading"></a></h3>
+<p>Ensure that at least one of the expected served model names is available.</p>
+<p>Args:
+available: Model aliases exposed by the running vLLM server.
+expected: Tuple of acceptable model aliases configured for conversion.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+RuntimeError: If none of the expected model names are present.</p>
+</section>
+<section id="pdf-build-parser">
+<h3><code class="docutils literal notranslate"><span class="pre">pdf_build_parser()</span></code><a class="headerlink" href="#pdf-build-parser" title="Link to this heading"></a></h3>
+<p>Construct the argument parser for the PDF → DocTags converter.</p>
+<p>Args:
+None: Parser construction does not require inputs.</p>
+<p>Returns:
+Argument parser configured with all supported CLI options.</p>
+<p>Raises:
+ValueError: If parser configuration fails due to invalid defaults.</p>
+</section>
+<section id="pdf-parse-args-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">pdf_parse_args(argv)</span></code><a class="headerlink" href="#pdf-parse-args-argv" title="Link to this heading"></a></h3>
+<p>Parse CLI arguments for standalone execution.</p>
+<p>Args:
+argv: Optional CLI argument list. When <code class="docutils literal notranslate"><span class="pre">None</span></code> the values from
+:data:<code class="docutils literal notranslate"><span class="pre">sys.argv</span></code> are used.</p>
+<p>Returns:
+Namespace containing parsed CLI options.</p>
+<p>Raises:
+SystemExit: Propagated if <code class="docutils literal notranslate"><span class="pre">argparse</span></code> detects invalid arguments.</p>
+</section>
+<section id="normalize-status-raw">
+<h3><code class="docutils literal notranslate"><span class="pre">_normalize_status(raw)</span></code><a class="headerlink" href="#normalize-status-raw" title="Link to this heading"></a></h3>
+<p>Coerce legacy status strings into the canonical vocabulary.</p>
+<p>Args:
+raw: Status string emitted by historical workers or manifests.</p>
+<p>Returns:
+Canonical status string (<code class="docutils literal notranslate"><span class="pre">&quot;success&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;skip&quot;</span></code>, or <code class="docutils literal notranslate"><span class="pre">&quot;failure&quot;</span></code>).</p>
+</section>
+<section id="safe-float-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_safe_float(value)</span></code><a class="headerlink" href="#safe-float-value" title="Link to this heading"></a></h3>
+<p>Convert the supplied value to <code class="docutils literal notranslate"><span class="pre">float</span></code> when possible.</p>
+<p>Args:
+value: Object that may represent a numeric scalar.</p>
+<p>Returns:
+Floating point representation of <code class="docutils literal notranslate"><span class="pre">value</span></code> or <code class="docutils literal notranslate"><span class="pre">0.0</span></code> if conversion fails.</p>
+</section>
+<section id="normalize-conversion-result-result-task">
+<h3><code class="docutils literal notranslate"><span class="pre">normalize_conversion_result(result,</span> <span class="pre">task)</span></code><a class="headerlink" href="#normalize-conversion-result-result-task" title="Link to this heading"></a></h3>
+<p>Adapt heterogeneous worker return values into :class:<code class="docutils literal notranslate"><span class="pre">PdfConversionResult</span></code>.</p>
+<p>Historically the converter returned a tuple <code class="docutils literal notranslate"><span class="pre">(doc_id,</span> <span class="pre">status)</span></code>.  The
+refactor switched to <code class="docutils literal notranslate"><span class="pre">PdfConversionResult</span></code> which broke a regression test
+that still emits tuples.  This helper accepts both shapes—as well as dicts
+produced by ad-hoc stubs—and populates missing metadata from the associated
+:class:<code class="docutils literal notranslate"><span class="pre">PdfTask</span></code> when available.</p>
+<p>Args:
+result: Object returned by a worker invocation.
+task: Related :class:<code class="docutils literal notranslate"><span class="pre">PdfTask</span></code> used to back-fill metadata when needed.</p>
+<p>Returns:
+Normalised :class:<code class="docutils literal notranslate"><span class="pre">PdfConversionResult</span></code> instance encapsulating the
+conversion outcome.</p>
+</section>
+<section id="port-is-free-port">
+<h3><code class="docutils literal notranslate"><span class="pre">port_is_free(port)</span></code><a class="headerlink" href="#port-is-free-port" title="Link to this heading"></a></h3>
+<p>Determine whether a TCP port on localhost is currently available.</p>
+<p>Args:
+port: Port number to probe on the loopback interface.</p>
+<p>Returns:
+True when the port is unused; otherwise False.</p>
+</section>
+<section id="probe-models-port-timeout">
+<h3><code class="docutils literal notranslate"><span class="pre">probe_models(port,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#probe-models-port-timeout" title="Link to this heading"></a></h3>
+<p>Inspect the <code class="docutils literal notranslate"><span class="pre">/v1/models</span></code> endpoint exposed by a vLLM HTTP server.</p>
+<p>Args:
+port: HTTP port where the vLLM server is expected to listen.
+timeout: Seconds to wait for the HTTP request before aborting.</p>
+<p>Returns:
+Tuple containing the list of model identifiers (if any), the raw response
+body, and the HTTP status code. Missing models or connection failures are
+represented by <code class="docutils literal notranslate"><span class="pre">(None,</span> <span class="pre">&lt;error&gt;,</span> <span class="pre">None)</span></code>.</p>
+</section>
+<section id="probe-metrics-port-timeout">
+<h3><code class="docutils literal notranslate"><span class="pre">probe_metrics(port,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#probe-metrics-port-timeout" title="Link to this heading"></a></h3>
+<p>Check whether the vLLM <code class="docutils literal notranslate"><span class="pre">/metrics</span></code> endpoint is healthy.</p>
+<p>Args:
+port: HTTP port where the vLLM server should expose metrics.
+timeout: Seconds to wait for the HTTP response before aborting.</p>
+<p>Returns:
+Tuple of <code class="docutils literal notranslate"><span class="pre">(is_healthy,</span> <span class="pre">status_code)</span></code> where <code class="docutils literal notranslate"><span class="pre">is_healthy</span></code> is True when the
+endpoint responds with HTTP 200.</p>
+</section>
+<section id="stream-logs-proc-prefix-tail">
+<h3><code class="docutils literal notranslate"><span class="pre">stream_logs(proc,</span> <span class="pre">prefix,</span> <span class="pre">tail)</span></code><a class="headerlink" href="#stream-logs-proc-prefix-tail" title="Link to this heading"></a></h3>
+<p>Continuously stream stdout lines from a child process to the console.</p>
+<p>Args:
+proc: Running subprocess whose stdout should be tailed.
+prefix: Text prefix applied to each emitted log line for readability.
+tail: Optional deque that accumulates the most recent log lines.</p>
+<p>Returns:
+None: This routine streams output for side effects only.</p>
+</section>
+<section id="start-vllm-port-model-path-served-model-names-gpu-memory-utilization">
+<h3><code class="docutils literal notranslate"><span class="pre">start_vllm(port,</span> <span class="pre">model_path,</span> <span class="pre">served_model_names,</span> <span class="pre">gpu_memory_utilization)</span></code><a class="headerlink" href="#start-vllm-port-model-path-served-model-names-gpu-memory-utilization" title="Link to this heading"></a></h3>
+<p>Launch a vLLM server process on the requested port.</p>
+<p>Args:
+port: Port on which the vLLM HTTP server should listen.
+model_path: Local directory or HF repository containing model weights.
+served_model_names: Aliases registered with the OpenAI-compatible API.
+gpu_memory_utilization: Fraction of GPU memory the server may allocate.</p>
+<p>Returns:
+Started subprocess handle for the vLLM server.</p>
+<p>Raises:
+SystemExit: If the <code class="docutils literal notranslate"><span class="pre">vllm</span></code> executable is not present on <code class="docutils literal notranslate"><span class="pre">PATH</span></code>.</p>
+</section>
+<section id="wait-for-vllm-port-proc-timeout-s">
+<h3><code class="docutils literal notranslate"><span class="pre">wait_for_vllm(port,</span> <span class="pre">proc,</span> <span class="pre">timeout_s)</span></code><a class="headerlink" href="#wait-for-vllm-port-proc-timeout-s" title="Link to this heading"></a></h3>
+<p>Poll the vLLM server until <code class="docutils literal notranslate"><span class="pre">/v1/models</span></code> responds with success.</p>
+<p>Args:
+port: HTTP port where the server is expected to listen.
+proc: Subprocess handle representing the running vLLM instance.
+timeout_s: Maximum time in seconds to wait for readiness.</p>
+<p>Returns:
+Model names reported by the server upon readiness.</p>
+<p>Raises:
+RuntimeError: If the server exits prematurely or fails to become ready
+within the allotted timeout.</p>
+</section>
+<section id="stop-vllm-proc-own-grace">
+<h3><code class="docutils literal notranslate"><span class="pre">stop_vllm(proc,</span> <span class="pre">own,</span> <span class="pre">grace)</span></code><a class="headerlink" href="#stop-vllm-proc-own-grace" title="Link to this heading"></a></h3>
+<p>Terminate a managed vLLM process if this script launched it.</p>
+<p>Args:
+proc: Subprocess handle returned by <code class="docutils literal notranslate"><span class="pre">start_vllm</span></code>, or None.
+own: Indicates whether the caller owns the process lifetime.
+grace: Seconds to wait for graceful shutdown before forcing exit.</p>
+<p>Returns:
+None.</p>
+</section>
+<section id="ensure-vllm-preferred-model-path-served-model-names-gpu-memory-utilization">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_vllm(preferred,</span> <span class="pre">model_path,</span> <span class="pre">served_model_names,</span> <span class="pre">gpu_memory_utilization)</span></code><a class="headerlink" href="#ensure-vllm-preferred-model-path-served-model-names-gpu-memory-utilization" title="Link to this heading"></a></h3>
+<p>Ensure a vLLM server is available, launching one when necessary.</p>
+<p>Args:
+preferred: Preferred TCP port for the server.
+model_path: Model repository or path passed to the vLLM CLI.
+served_model_names: Aliases that should be exposed via the OpenAI API.
+gpu_memory_utilization: Fractional GPU memory reservation for the server.</p>
+<p>Returns:
+Tuple containing <code class="docutils literal notranslate"><span class="pre">(port,</span> <span class="pre">process,</span> <span class="pre">owns_process)</span></code> where <code class="docutils literal notranslate"><span class="pre">process</span></code> is the
+managed subprocess handle (or None if reusing an existing server) and
+<code class="docutils literal notranslate"><span class="pre">owns_process</span></code> indicates whether the caller should terminate it.</p>
+<p>Raises:
+RuntimeError: If the launched or reused server does not expose the expected
+model aliases, indicating a misconfiguration.</p>
+</section>
+<section id="list-pdfs-root">
+<h3><code class="docutils literal notranslate"><span class="pre">list_pdfs(root)</span></code><a class="headerlink" href="#list-pdfs-root" title="Link to this heading"></a></h3>
+<p>Collect PDF files under a directory recursively.</p>
+<p>Args:
+root: Directory whose subtree should be scanned for PDFs.</p>
+<p>Returns:
+Sorted list of paths to PDF files.</p>
+</section>
+<section id="pdf-convert-one-task">
+<h3><code class="docutils literal notranslate"><span class="pre">pdf_convert_one(task)</span></code><a class="headerlink" href="#pdf-convert-one-task" title="Link to this heading"></a></h3>
+<p>Convert a single PDF into DocTags using a remote vLLM-backed pipeline.</p>
+<p>Args:
+task: Description of the conversion request, including paths and port.</p>
+<p>Returns:
+Populated :class:<code class="docutils literal notranslate"><span class="pre">PdfConversionResult</span></code> reporting success, skip, or failure.</p>
+</section>
+<section id="pdf-main-args">
+<h3><code class="docutils literal notranslate"><span class="pre">pdf_main(args)</span></code><a class="headerlink" href="#pdf-main-args" title="Link to this heading"></a></h3>
+<p>Coordinate vLLM startup and parallel DocTags conversion.</p>
+<p>Args:
+args: Optional argument namespace injected during programmatic use.</p>
+<p>Returns:
+Process exit code, where <code class="docutils literal notranslate"><span class="pre">0</span></code> indicates success.</p>
+<p>Raises:
+RuntimeError: If vLLM fails to start, becomes unhealthy, or conversion
+retries exhaust without success.
+ValueError: If required configuration (such as auto-detected mode) is invalid.</p>
+</section>
+<section id="html-build-parser">
+<h3><code class="docutils literal notranslate"><span class="pre">html_build_parser()</span></code><a class="headerlink" href="#html-build-parser" title="Link to this heading"></a></h3>
+<p>Construct an argument parser for the HTML → DocTags converter.</p>
+<p>Args:
+None: Parser initialization does not require inputs.</p>
+<p>Returns:
+Configured :class:<code class="docutils literal notranslate"><span class="pre">argparse.ArgumentParser</span></code> instance.</p>
+<p>Raises:
+None</p>
+</section>
+<section id="html-parse-args-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">html_parse_args(argv)</span></code><a class="headerlink" href="#html-parse-args-argv" title="Link to this heading"></a></h3>
+<p>Parse command-line arguments for standalone execution.</p>
+<p>Args:
+argv: Optional CLI argument vector. When <code class="docutils literal notranslate"><span class="pre">None</span></code> the values from
+:data:<code class="docutils literal notranslate"><span class="pre">sys.argv</span></code> are used.</p>
+<p>Returns:
+Namespace containing parsed CLI options.</p>
+<p>Raises:
+SystemExit: Propagated if <code class="docutils literal notranslate"><span class="pre">argparse</span></code> detects invalid options.</p>
+</section>
+<section id="get-converter">
+<h3><code class="docutils literal notranslate"><span class="pre">_get_converter()</span></code><a class="headerlink" href="#get-converter" title="Link to this heading"></a></h3>
+<p>Instantiate and cache a Docling HTML converter per worker process.</p>
+<p>Returns:
+DocumentConverter configured for HTML input, cached for reuse within
+the worker process.</p>
+</section>
+<section id="list-htmls-root">
+<h3><code class="docutils literal notranslate"><span class="pre">list_htmls(root)</span></code><a class="headerlink" href="#list-htmls-root" title="Link to this heading"></a></h3>
+<p>Enumerate HTML-like files beneath a directory tree.</p>
+<p>Args:
+root: Directory whose subtree should be searched for HTML files.</p>
+<p>Returns:
+Sorted list of discovered HTML file paths excluding normalized outputs.</p>
+</section>
+<section id="html-convert-one-task">
+<h3><code class="docutils literal notranslate"><span class="pre">html_convert_one(task)</span></code><a class="headerlink" href="#html-convert-one-task" title="Link to this heading"></a></h3>
+<p>Convert a single HTML file to DocTags, honoring overwrite semantics.</p>
+<p>Args:
+task: Conversion details including paths, hash, and overwrite policy.</p>
+<p>Returns:
+:class:<code class="docutils literal notranslate"><span class="pre">ConversionResult</span></code> capturing the conversion status.</p>
+<p>Raises:
+ValueError: Propagated when Docling validation fails prior to internal handling.</p>
+</section>
+<section id="html-main-args">
+<h3><code class="docutils literal notranslate"><span class="pre">html_main(args)</span></code><a class="headerlink" href="#html-main-args" title="Link to this heading"></a></h3>
+<p>Entrypoint for parallel HTML-to-DocTags conversion across a dataset.</p>
+<p>Args:
+args: Optional pre-parsed CLI namespace to override command-line inputs.</p>
+<p>Returns:
+Process exit code, where <code class="docutils literal notranslate"><span class="pre">0</span></code> denotes success.</p>
+</section>
+<section id="getitem-self-index">
+<h3><code class="docutils literal notranslate"><span class="pre">__getitem__(self,</span> <span class="pre">index)</span></code><a class="headerlink" href="#getitem-self-index" title="Link to this heading"></a></h3>
+<p>Provide tuple-like access for compatibility with legacy tests.</p>
+<p>Args:
+index: Position requested by tuple-style accessors.</p>
+<p>Returns:
+PDF path when <code class="docutils literal notranslate"><span class="pre">index</span></code> is <code class="docutils literal notranslate"><span class="pre">0</span></code>.</p>
+<p>Raises:
+IndexError: If <code class="docutils literal notranslate"><span class="pre">index</span></code> is not <code class="docutils literal notranslate"><span class="pre">0</span></code>.</p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="pdftask">
+<h3><code class="docutils literal notranslate"><span class="pre">PdfTask</span></code><a class="headerlink" href="#pdftask" title="Link to this heading"></a></h3>
+<p>Work item representing a single PDF conversion request.</p>
+<p>Attributes:
+pdf_path: Absolute path to the PDF document to convert.
+output_dir: Destination directory where DocTags are stored.
+port: vLLM HTTP port used for remote inference.
+input_hash: Content hash representing the PDF for change detection.
+doc_id: Identifier derived from the PDF path for manifest entries.
+output_path: Final DocTags artifact location.
+served_model_names: Collection of aliases configured for the vLLM server.
+inference_model: Primary model name used when issuing chat completions.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>task = PdfTask(
+…     Path(“/tmp/sample.pdf”),
+…     Path(“/tmp/out”),
+…     8000,
+…     “hash”,
+…     “doc”,
+…     Path(“/tmp/out/doc.doctags”),
+…     (“granite-docling-258M”,),
+…     “granite-docling-258M”,
+… )
+task.doc_id
+‘doc’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="pdfconversionresult">
+<h3><code class="docutils literal notranslate"><span class="pre">PdfConversionResult</span></code><a class="headerlink" href="#pdfconversionresult" title="Link to this heading"></a></h3>
+<p>Structured result returned by worker processes.</p>
+<p>Attributes:
+doc_id: Document identifier associated with the conversion.
+status: Outcome string such as <code class="docutils literal notranslate"><span class="pre">&quot;success&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;failure&quot;</span></code>.
+duration_s: Worker runtime in seconds.
+input_path: Original PDF path recorded for manifest entries.
+input_hash: Content hash used to detect stale outputs.
+output_path: Location of the produced DocTags file.
+error: Optional error detail captured during conversion.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>PdfConversionResult(“doc”, “success”, 1.0, “in.pdf”, “hash”, “out.doctags”)
+PdfConversionResult(doc_id=’doc’, status=’success’, duration_s=1.0, input_path=’in.pdf’, input_hash=’hash’, output_path=’out.doctags’, error=None)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="htmltask">
+<h3><code class="docutils literal notranslate"><span class="pre">HtmlTask</span></code><a class="headerlink" href="#htmltask" title="Link to this heading"></a></h3>
+<p>Work item describing a single HTML conversion job.</p>
+<p>Attributes:
+html_path: Absolute path to the HTML file to be converted.
+relative_id: Relative identifier for manifest entries.
+output_path: Destination DocTags path.
+input_hash: Content hash used for resume detection.
+overwrite: Flag indicating whether existing outputs should be replaced.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>HtmlTask(Path(“/tmp/a.html”), “doc”, Path(“/tmp/doc.doctags”), “hash”, False)
+HtmlTask(html_path=PosixPath(‘/tmp/a.html’), relative_id=’doc’, output_path=PosixPath(‘/tmp/doc.doctags’), input_hash=’hash’, overwrite=False)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="htmlconversionresult">
+<h3><code class="docutils literal notranslate"><span class="pre">HtmlConversionResult</span></code><a class="headerlink" href="#htmlconversionresult" title="Link to this heading"></a></h3>
+<p>Structured result emitted by worker processes.</p>
+<p>Attributes:
+doc_id: Document identifier matching manifest entries.
+status: Conversion outcome (<code class="docutils literal notranslate"><span class="pre">&quot;success&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;skip&quot;</span></code>, or <code class="docutils literal notranslate"><span class="pre">&quot;failure&quot;</span></code>).
+duration_s: Time in seconds spent converting.
+input_path: Source HTML path recorded for auditing.
+input_hash: Content hash captured prior to conversion.
+output_path: Destination DocTags path.
+error: Optional error detail for failures.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>HtmlConversionResult(“doc”, “success”, 1.0, “in.html”, “hash”, “out.doctags”)
+HtmlConversionResult(doc_id=’doc’, status=’success’, duration_s=1.0, input_path=’in.html’, input_hash=’hash’, output_path=’out.doctags’, error=None)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

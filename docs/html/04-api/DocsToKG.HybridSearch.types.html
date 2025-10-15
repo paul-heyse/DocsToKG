@@ -95,6 +95,14 @@ methods, enabling seamless hybrid search capabilities across the platform.</p>
 </ul>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="vector-uuid-to-faiss-int-vector-id">
+<h3><code class="docutils literal notranslate"><span class="pre">vector_uuid_to_faiss_int(vector_id)</span></code><a class="headerlink" href="#vector-uuid-to-faiss-int-vector-id" title="Link to this heading"></a></h3>
+<p>Return the FAISS-compatible integer identifier for a vector UUID.</p>
+<p>Args:
+vector_id: UUID string identifying the stored document vector.</p>
+<p>Returns:
+int: 63-bit integer compatible with FAISS index identifiers.</p>
+</section>
 <section id="copy-self">
 <h3><code class="docutils literal notranslate"><span class="pre">copy(self)</span></code><a class="headerlink" href="#copy-self" title="Link to this heading"></a></h3>
 <p>Create a deep copy of the chunk features.</p>

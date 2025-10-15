@@ -625,7 +625,15 @@ def request_with_retries(
 
 
 class ResolverRegistry:
-    """Registry tracking resolver classes by their ``name`` attribute."""
+    """Registry tracking resolver classes by their ``name`` attribute.
+
+    Attributes:
+        _providers: Mapping of resolver names to resolver classes.
+
+    Examples:
+        >>> ResolverRegistry.register(type("Tmp", (RegisteredResolver,), {"name": "tmp"}))  # doctest: +SKIP
+        <class 'Tmp'>
+    """
 
     _providers: Dict[str, Type[Resolver]] = {}
 
@@ -654,6 +662,9 @@ class ResolverRegistry:
 
         Returns:
             List[Resolver]: Resolver instances ordered by default priority.
+
+        Raises:
+            None.
         """
         instances: List[Resolver] = []
         seen: set[str] = set()
@@ -3766,3 +3777,6 @@ __all__ = [
     "time",
     "requests",
 ]
+
+time = _time_alias
+requests = _requests_alias

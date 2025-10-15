@@ -318,9 +318,9 @@ ValueError: If vector lengths are inconsistent or fail validation.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">build_parser()</span></code><a class="headerlink" href="#build-parser" title="Link to this heading"></a></h3>
 <p>Construct the CLI parser for the embedding pipeline.</p>
 <p>Args:
-None: Parser creation does not require inputs.</p>
+None</p>
 <p>Returns:
-:class:<code class="docutils literal notranslate"><span class="pre">argparse.ArgumentParser</span></code> configured for embedding options.</p>
+argparse.ArgumentParser: Parser configured for embedding options.</p>
 <p>Raises:
 None</p>
 </section>
@@ -328,10 +328,10 @@ None</p>
 <h3><code class="docutils literal notranslate"><span class="pre">parse_args(argv)</span></code><a class="headerlink" href="#parse-args-argv" title="Link to this heading"></a></h3>
 <p>Parse CLI arguments for standalone embedding execution.</p>
 <p>Args:
-argv: Optional CLI argument vector. When <code class="docutils literal notranslate"><span class="pre">None</span></code> the current process
-arguments are used.</p>
+argv (list[str] | None): Optional CLI argument vector. When <code class="docutils literal notranslate"><span class="pre">None</span></code> the
+current process arguments are used.</p>
 <p>Returns:
-Namespace containing parsed embedding configuration.</p>
+argparse.Namespace: Parsed embedding configuration.</p>
 <p>Raises:
 SystemExit: Propagated if <code class="docutils literal notranslate"><span class="pre">argparse</span></code> reports invalid options.</p>
 </section>
@@ -339,9 +339,10 @@ SystemExit: Propagated if <code class="docutils literal notranslate"><span class
 <h3><code class="docutils literal notranslate"><span class="pre">main(args)</span></code><a class="headerlink" href="#main-args" title="Link to this heading"></a></h3>
 <p>CLI entrypoint for chunk UUID cleanup and embedding generation.</p>
 <p>Args:
-args: Optional parsed arguments, primarily for testing or orchestration.</p>
+args (argparse.Namespace | None): Optional parsed arguments, primarily
+for testing or orchestration.</p>
 <p>Returns:
-Exit code where <code class="docutils literal notranslate"><span class="pre">0</span></code> indicates success.</p>
+int: Exit code where <code class="docutils literal notranslate"><span class="pre">0</span></code> indicates success.</p>
 <p>Raises:
 ValueError: If invalid runtime parameters (such as batch sizes) are supplied.</p>
 </section>

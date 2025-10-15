@@ -44,6 +44,9 @@ class ReciprocalRankFusion:
 
         Raises:
             ValueError: If ``k0`` is not strictly positive.
+
+        Returns:
+            None
         """
         if k0 <= 0:
             raise ValueError("k0 must be positive")
@@ -161,6 +164,9 @@ class ResultShaper:
             fusion_config: Fusion configuration influencing dedupe limits.
             device: CUDA device index for GPU-assisted operations.
             resources: Optional FAISS GPU resources passed to similarity helpers.
+
+        Returns:
+            None
         """
         self._opensearch = opensearch
         self._fusion_config = fusion_config

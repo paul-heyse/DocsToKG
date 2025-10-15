@@ -68,7 +68,7 @@
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
       <li class="breadcrumb-item active">1. Module: conditional</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../_sources/04-api/DocsToKG.ContentDownload.network.md.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/04-api/DocsToKG.ContentDownload.conditional.md.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -78,128 +78,14 @@
              
   <section id="module-conditional">
 <h1>1. Module: conditional<a class="headerlink" href="#module-conditional" title="Link to this heading"></a></h1>
-<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.network</span></code>.</p>
-<p>Conditional Request Metadata</p>
-<p>This module centralises helper types for conditional HTTP requests that rely on
-ETag and Last-Modified headers. It provides strongly typed dataclasses for
-capturing cached responses alongside a small orchestration helper that builds
-request headers and interprets origin responses. The utilities are used by the
-content download pipeline to honour polite download practices while avoiding
-unnecessary network transfers.</p>
-<p>Key Features:</p>
-<ul class="simple">
-<li><p>Dataclasses that model cached and modified responses with checksum metadata.</p></li>
-<li><p>Helper for constructing <code class="docutils literal notranslate"><span class="pre">If-None-Match</span></code>/<code class="docutils literal notranslate"><span class="pre">If-Modified-Since</span></code> headers.</p></li>
-<li><p>Utilities for validating 304 responses against previously cached artefacts.</p></li>
-</ul>
-<p>Dependencies:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">requests</span></code>: Required for the <code class="docutils literal notranslate"><span class="pre">Response</span></code> type used when interpreting outcomes.</p></li>
-</ul>
-<p>Usage:
-from DocsToKG.ContentDownload.network import ConditionalRequestHelper</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>helper = ConditionalRequestHelper(prior_etag=&quot;abcd&quot;, prior_path=&quot;/tmp/file.pdf&quot;)
-headers = helper.build_headers()
-response = session.get(url, headers=headers)
-result = helper.interpret_response(response)
+<p>The legacy module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.conditional</span></code> has been merged into
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.network</span></code>. Conditional request helpers and metadata
+classes are available from the unified module. Import examples::</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>from DocsToKG.ContentDownload.network import ConditionalRequestHelper
 </pre></div>
 </div>
-<section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="build-headers-self">
-<h3><code class="docutils literal notranslate"><span class="pre">build_headers(self)</span></code><a class="headerlink" href="#build-headers-self" title="Link to this heading"></a></h3>
-<p>Generate conditional request headers from cached metadata.</p>
-<p>Args:
-self: Helper instance containing cached HTTP metadata.</p>
-<p>Returns:
-Mapping of conditional header names to values ready for <code class="docutils literal notranslate"><span class="pre">requests</span></code>.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>helper = ConditionalRequestHelper(prior_etag=”abcd”, prior_last_modified=”Fri, 01 Jan 2021 00:00:00 GMT”)
-helper.build_headers() == {‘If-None-Match’: ‘abcd’, ‘If-Modified-Since’: ‘Fri, 01 Jan 2021 00:00:00 GMT’}
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-<section id="interpret-response-self-response">
-<h3><code class="docutils literal notranslate"><span class="pre">interpret_response(self,</span> <span class="pre">response)</span></code><a class="headerlink" href="#interpret-response-self-response" title="Link to this heading"></a></h3>
-<p>Interpret response status and headers as cached or modified result.</p>
-<p>Args:
-response: HTTP response returned from the conditional request.</p>
-<p>Returns:
-<code class="docutils literal notranslate"><span class="pre">CachedResult</span></code> when the origin reports HTTP 304, otherwise <code class="docutils literal notranslate"><span class="pre">ModifiedResult</span></code>.</p>
-<p>Raises:
-ValueError: If a 304 response arrives without complete prior metadata.
-TypeError: If <code class="docutils literal notranslate"><span class="pre">response</span></code> lacks the minimal <code class="docutils literal notranslate"><span class="pre">status_code</span></code>/<code class="docutils literal notranslate"><span class="pre">headers</span></code> API.</p>
-</section>
-</section>
-<section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
-<section id="cachedresult">
-<h3><code class="docutils literal notranslate"><span class="pre">CachedResult</span></code><a class="headerlink" href="#cachedresult" title="Link to this heading"></a></h3>
-<p>Represents HTTP 304 Not Modified response with prior metadata.</p>
-<p>Attributes:
-path: File system path to the previously downloaded artifact.
-sha256: SHA256 checksum associated with the cached artifact.
-content_length: Size of the cached payload in bytes.
-etag: Entity tag reported by the origin server, if any.
-last_modified: Last-Modified header value supplied by the origin, if any.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>CachedResult(
-…     path=”/tmp/file.pdf”,
-…     sha256=”abc”,
-…     content_length=1024,
-…     etag=”W/”etag””,
-…     last_modified=”Fri, 01 Jan 2021 00:00:00 GMT”
-… )
-CachedResult(path=’/tmp/file.pdf’, sha256=’abc’, content_length=1024, etag=’W/”etag”’, last_modified=’Fri, 01 Jan 2021 00:00:00 GMT’)</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-<section id="modifiedresult">
-<h3><code class="docutils literal notranslate"><span class="pre">ModifiedResult</span></code><a class="headerlink" href="#modifiedresult" title="Link to this heading"></a></h3>
-<p>Represents HTTP 200 response requiring fresh download.</p>
-<p>Attributes:
-etag: Entity tag reported by the origin server.
-last_modified: Last-Modified header describing the remote resource timestamp.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>ModifiedResult(etag=None, last_modified=None)
-ModifiedResult(etag=None, last_modified=None)</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-<section id="conditionalrequesthelper">
-<h3><code class="docutils literal notranslate"><span class="pre">ConditionalRequestHelper</span></code><a class="headerlink" href="#conditionalrequesthelper" title="Link to this heading"></a></h3>
-<p>Utility for constructing conditional requests and interpreting responses.</p>
-<p>Attributes:
-prior_etag: Previously observed entity tag for the resource.
-prior_last_modified: Previously observed Last-Modified header value.
-prior_sha256: Cached payload hash to validate 304 responses.
-prior_content_length: Size of the cached payload in bytes.
-prior_path: Local path where the cached artifact resides.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>helper = ConditionalRequestHelper(prior_etag=”abcd”, prior_path=”/tmp/file.pdf”)
-helper.build_headers()
-{‘If-None-Match’: ‘abcd’}</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-</section>
+<p>Refer to :doc:<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.network</span> <span class="pre">&lt;DocsToKG.ContentDownload.network&gt;</span></code>
+for detailed documentation.</p>
 </section>
 
 

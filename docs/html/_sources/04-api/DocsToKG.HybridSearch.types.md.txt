@@ -20,6 +20,16 @@ Key Features:
 
 ## 1. Functions
 
+### `vector_uuid_to_faiss_int(vector_id)`
+
+Return the FAISS-compatible integer identifier for a vector UUID.
+
+Args:
+vector_id: UUID string identifying the stored document vector.
+
+Returns:
+int: 63-bit integer compatible with FAISS index identifiers.
+
 ### `copy(self)`
 
 Create a deep copy of the chunk features.

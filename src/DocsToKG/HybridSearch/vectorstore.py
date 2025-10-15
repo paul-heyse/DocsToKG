@@ -85,6 +85,9 @@ class FaissVectorStore:
             dim: Dimensionality of dense embeddings stored in the index.
             config: Dense index configuration controlling layout and GPU flags.
 
+        Returns:
+            None
+
         Raises:
             RuntimeError: If the CUDA-enabled FAISS build is unavailable or no
                 GPU devices are visible to the process.
@@ -338,6 +341,9 @@ class FaissVectorStore:
     def serialize(self) -> bytes:
         """Return a CPU-serialised representation of the FAISS index.
 
+        Args:
+            None
+
         Returns:
             Byte payload produced by :func:`faiss.serialize_index`.
 
@@ -355,6 +361,9 @@ class FaissVectorStore:
 
         Args:
             path: Filesystem destination for the serialised index.
+
+        Returns:
+            None
 
         Raises:
             RuntimeError: If the index has not been initialised.
@@ -456,7 +465,14 @@ class FaissVectorStore:
         return stats
 
     def rebuild_needed(self) -> bool:
-        """Return ``True`` when tombstones require a full FAISS rebuild."""
+        """Return ``True`` when tombstones require a full FAISS rebuild.
+
+        Args:
+            None
+
+        Returns:
+            bool: ``True`` when a rebuild should be triggered.
+        """
         if self._needs_rebuild:
             return True
         if self._rebuild_delete_threshold <= 0:
@@ -466,9 +482,15 @@ class FaissVectorStore:
     def init_gpu(self) -> None:
         """Initialise FAISS GPU resources for the configured CUDA device.
 
+        Args:
+            None
+
         Raises:
             RuntimeError: When GPU support is unavailable or the requested
                 device id is invalid.
+
+        Returns:
+            None
         """
         if self._gpu_resources is not None:
             return
@@ -796,9 +818,7 @@ class FaissVectorStore:
         if arr.ndim != 1:
             raise ValueError("vector must be 1-dimensional")
         if arr.size != self._dim:
-            raise ValueError(
-                f"vector dimension mismatch: expected {self._dim}, got {arr.size}"
-            )
+            raise ValueError(f"vector dimension mismatch: expected {self._dim}, got {arr.size}")
         return arr
 
     def _detect_device(self, index: "faiss.Index") -> Optional[int]:
@@ -846,6 +866,21 @@ def cosine_against_corpus_gpu(
     device: int = 0,
     resources: Optional["faiss.StandardGpuResources"] = None,
 ) -> np.ndarray:
+    """Compute cosine similarity between ``query`` and each vector in ``corpus`` on GPU.
+
+    Args:
+        query: Query vector or matrix (``N x D``) to compare.
+        corpus: Matrix representing the corpus (``M x D``).
+        device: CUDA device id used for the computation.
+        resources: FAISS GPU resources to execute the kernel.
+
+    Returns:
+        numpy.ndarray: Matrix of cosine similarities with shape ``(N, M)``.
+
+    Raises:
+        RuntimeError: If GPU resources are unavailable.
+        ValueError: When the query and corpus dimensionality mismatch.
+    """
     if resources is None:
         raise RuntimeError("FAISS GPU resources are required for cosine comparisons")
     if query.ndim == 1:
@@ -863,6 +898,21 @@ def pairwise_inner_products(
     device: int = 0,
     resources: Optional["faiss.StandardGpuResources"] = None,
 ) -> np.ndarray:
+    """Compute cosine similarities between two corpora on GPU.
+
+    Args:
+        a: First matrix of vectors.
+        b: Optional second matrix; when omitted ``a`` is used (symmetrical case).
+        device: CUDA device id to run the computation.
+        resources: FAISS GPU resources backing the computation.
+
+    Returns:
+        numpy.ndarray: Pairwise similarity matrix with rows from ``a`` and columns from ``b``.
+
+    Raises:
+        RuntimeError: If GPU resources are unavailable.
+        ValueError: When input matrices have mismatched dimensionality.
+    """
     if resources is None:
         raise RuntimeError("FAISS GPU resources are required for cosine comparisons")
     if a.size == 0:
@@ -884,6 +934,20 @@ def max_inner_product(
     device: int = 0,
     resources: Optional["faiss.StandardGpuResources"] = None,
 ) -> float:
+    """Return the maximum cosine similarity between ``target`` and ``corpus``.
+
+    Args:
+        target: Query vector whose maximum similarity is desired.
+        corpus: Corpus matrix used for comparison.
+        device: CUDA device id for FAISS computations.
+        resources: FAISS GPU resources needed for similarity search.
+
+    Returns:
+        float: Maximum cosine similarity value.
+
+    Raises:
+        RuntimeError: If GPU resources are unavailable.
+    """
     if resources is None:
         raise RuntimeError("FAISS GPU resources are required for cosine comparisons")
     if corpus.size == 0:
@@ -899,6 +963,17 @@ def cosine_batch(
     device: int,
     resources: "faiss.StandardGpuResources",
 ) -> np.ndarray:
+    """Helper that normalises and computes cosine similarities on GPU.
+
+    Args:
+        q: Query matrix (``N x D``).
+        C: Corpus matrix (``M x D``).
+        device: CUDA device id used for computation.
+        resources: FAISS GPU resources backing the kernel.
+
+    Returns:
+        numpy.ndarray: Pairwise cosine similarities with shape ``(N, M)``.
+    """
     if q.ndim == 1:
         q = q.reshape(1, -1)
     q = np.ascontiguousarray(q, dtype=np.float32).copy()
@@ -915,6 +990,15 @@ def cosine_batch(
 
 
 def serialize_state(faiss_index: FaissVectorStore, registry: "ChunkRegistry") -> dict[str, object]:
+    """Serialize the vector store and chunk registry to a JSON-safe payload.
+
+    Args:
+        faiss_index: Vector store whose state should be captured.
+        registry: Chunk registry providing vector identifier mappings.
+
+    Returns:
+        dict[str, object]: Dictionary containing base64-encoded FAISS bytes and registry ids.
+    """
     faiss_bytes = faiss_index.serialize()
     encoded = base64.b64encode(faiss_bytes).decode("ascii")
     return {
@@ -924,6 +1008,18 @@ def serialize_state(faiss_index: FaissVectorStore, registry: "ChunkRegistry") ->
 
 
 def restore_state(faiss_index: FaissVectorStore, payload: dict[str, object]) -> None:
+    """Restore the vector store from a payload produced by :func:`serialize_state`.
+
+    Args:
+        faiss_index: Vector store receiving the restored state.
+        payload: Mapping with ``faiss`` (base64) and registry vector ids.
+
+    Returns:
+        None
+
+    Raises:
+        ValueError: If the payload is missing the FAISS byte stream.
+    """
     encoded = payload.get("faiss")
     if not isinstance(encoded, str):
         raise ValueError("Missing FAISS payload")

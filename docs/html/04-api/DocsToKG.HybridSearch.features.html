@@ -82,6 +82,37 @@
 <p>Feature generation utilities for SPLADE weights and dense embeddings.</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="tokenize-text">
+<h3><code class="docutils literal notranslate"><span class="pre">tokenize(text)</span></code><a class="headerlink" href="#tokenize-text" title="Link to this heading"></a></h3>
+<p>Tokenize text into lowercase alphanumeric tokens.</p>
+<p>Args:
+text: Raw text to segment into tokens.</p>
+<p>Returns:
+List[str]: Lowercased alphanumeric tokens extracted from <code class="docutils literal notranslate"><span class="pre">text</span></code>.</p>
+</section>
+<section id="tokenize-with-spans-text">
+<h3><code class="docutils literal notranslate"><span class="pre">tokenize_with_spans(text)</span></code><a class="headerlink" href="#tokenize-with-spans-text" title="Link to this heading"></a></h3>
+<p>Return tokens alongside their character spans.</p>
+<p>Args:
+text: Raw text to tokenize while preserving character offsets.</p>
+<p>Returns:
+Tuple[List[str], List[Tuple[int, int]]]: Token list and the corresponding
+<code class="docutils literal notranslate"><span class="pre">(start,</span> <span class="pre">end)</span></code> character spans for each token.</p>
+</section>
+<section id="sliding-window-tokens-window-overlap">
+<h3><code class="docutils literal notranslate"><span class="pre">sliding_window(tokens,</span> <span class="pre">window,</span> <span class="pre">overlap)</span></code><a class="headerlink" href="#sliding-window-tokens-window-overlap" title="Link to this heading"></a></h3>
+<p>Yield token windows with configurable overlap.</p>
+<p>Args:
+tokens: Token sequence to window over.
+window: Maximum number of tokens per window.
+overlap: Number of tokens shared between consecutive windows.</p>
+<p>Yields:
+List[str]: Next token window respecting <code class="docutils literal notranslate"><span class="pre">window</span></code> and <code class="docutils literal notranslate"><span class="pre">overlap</span></code> constraints.</p>
+<p>Returns:
+Iterator[List[str]]: Iterator producing sliding windows across <code class="docutils literal notranslate"><span class="pre">tokens</span></code>.</p>
+<p>Raises:
+ValueError: If <code class="docutils literal notranslate"><span class="pre">window</span></code> or <code class="docutils literal notranslate"><span class="pre">overlap</span></code> violate expected ranges.</p>
+</section>
 <section id="embedding-dim-self">
 <h3><code class="docutils literal notranslate"><span class="pre">embedding_dim(self)</span></code><a class="headerlink" href="#embedding-dim-self" title="Link to this heading"></a></h3>
 <p>Return the dimensionality used for synthetic dense embeddings.</p>

@@ -286,10 +286,10 @@ ValueError: If vector lengths are inconsistent or fail validation.
 Construct the CLI parser for the embedding pipeline.
 
 Args:
-None: Parser creation does not require inputs.
+None
 
 Returns:
-:class:`argparse.ArgumentParser` configured for embedding options.
+argparse.ArgumentParser: Parser configured for embedding options.
 
 Raises:
 None
@@ -299,11 +299,11 @@ None
 Parse CLI arguments for standalone embedding execution.
 
 Args:
-argv: Optional CLI argument vector. When ``None`` the current process
-arguments are used.
+argv (list[str] | None): Optional CLI argument vector. When ``None`` the
+current process arguments are used.
 
 Returns:
-Namespace containing parsed embedding configuration.
+argparse.Namespace: Parsed embedding configuration.
 
 Raises:
 SystemExit: Propagated if ``argparse`` reports invalid options.
@@ -313,10 +313,11 @@ SystemExit: Propagated if ``argparse`` reports invalid options.
 CLI entrypoint for chunk UUID cleanup and embedding generation.
 
 Args:
-args: Optional parsed arguments, primarily for testing or orchestration.
+args (argparse.Namespace | None): Optional parsed arguments, primarily
+for testing or orchestration.
 
 Returns:
-Exit code where ``0`` indicates success.
+int: Exit code where ``0`` indicates success.
 
 Raises:
 ValueError: If invalid runtime parameters (such as batch sizes) are supplied.

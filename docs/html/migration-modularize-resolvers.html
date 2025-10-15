@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>1. Migration Guide: Modular Content Download Resolvers &mdash; DocsToKG 1.0.0 documentation</title>
+  <title>1. Migration Guide: Unified Content Download Resolvers &mdash; DocsToKG 1.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="_static/css/custom.css" />
@@ -66,7 +66,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">1. Migration Guide: Modular Content Download Resolvers</li>
+      <li class="breadcrumb-item active">1. Migration Guide: Unified Content Download Resolvers</li>
       <li class="wy-breadcrumbs-aside">
             <a href="_sources/migration-modularize-resolvers.md.txt" rel="nofollow"> View page source</a>
       </li>
@@ -76,95 +76,75 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="migration-guide-modular-content-download-resolvers">
-<h1>1. Migration Guide: Modular Content Download Resolvers<a class="headerlink" href="#migration-guide-modular-content-download-resolvers" title="Link to this heading"></a></h1>
-<p>This guide explains how to upgrade existing DocsToKG integrations from the
-monolithic <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers</span></code> module to the modular resolver
-architecture introduced in the <code class="docutils literal notranslate"><span class="pre">modularize-content-download-architecture</span></code>
-proposal.</p>
+  <section id="migration-guide-unified-content-download-resolvers">
+<h1>1. Migration Guide: Unified Content Download Resolvers<a class="headerlink" href="#migration-guide-unified-content-download-resolvers" title="Link to this heading"></a></h1>
+<p>The resolver subsystem has been recomposed into a single module,
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers</span></code>. This guide explains how to migrate code
+that previously relied on the intermediate submodules (<code class="docutils literal notranslate"><span class="pre">.types</span></code>, <code class="docutils literal notranslate"><span class="pre">.pipeline</span></code>,
+<code class="docutils literal notranslate"><span class="pre">.providers</span></code>, <code class="docutils literal notranslate"><span class="pre">.headers</span></code>, <code class="docutils literal notranslate"><span class="pre">.cache</span></code>).</p>
 <section id="update-import-paths">
 <h2>1. Update Import Paths<a class="headerlink" href="#update-import-paths" title="Link to this heading"></a></h2>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">ResolverPipeline</span></code><br>
-Legacy: <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">ResolverPipeline</span></code><br>
-Recommended: <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.pipeline</span> <span class="pre">import</span> <span class="pre">ResolverPipeline</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">default_resolvers</span></code><br>
-Legacy: <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">default_resolvers</span></code><br>
-Recommended: <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.providers</span> <span class="pre">import</span> <span class="pre">default_resolvers</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">ResolverConfig</span></code><br>
-Legacy: <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">ResolverConfig</span></code><br>
-Recommended: <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.types</span> <span class="pre">import</span> <span class="pre">ResolverConfig</span></code></p></li>
-</ul>
-<blockquote>
-<div><p><strong>Compatibility:</strong> Legacy imports continue working via re-exports but emit
-<code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code>. Update code to silence the warning and prepare for
-future removals.</p>
-</div></blockquote>
-</section>
-<section id="adopt-new-configuration-options">
-<h2>2. Adopt New Configuration Options<a class="headerlink" href="#adopt-new-configuration-options" title="Link to this heading"></a></h2>
 <table class="docutils align-default">
 <thead>
-<tr class="row-odd"><th class="head"><p>Option</p></th>
-<th class="head"><p>Default</p></th>
-<th class="head"><p>Description</p></th>
+<tr class="row-odd"><th class="head"><p>Replace</p></th>
+<th class="head"><p>With</p></th>
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">max_concurrent_resolvers</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
-<td><p>Bounds intra-work concurrency. Set to <code class="docutils literal notranslate"><span class="pre">&gt;1</span></code> to enable threaded resolver execution.</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.types</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">enable_head_precheck</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">True</span></code></p></td>
-<td><p>Enables HEAD requests that filter HTML or zero-byte responses before downloading.</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.pipeline</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">resolver_head_precheck</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">{}</span></code></p></td>
-<td><p>Per-resolver override that can disable HEAD checks for services that reject them.</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.providers</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">…</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">resolver_timeouts</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">{}</span></code></p></td>
-<td><p>Resolver-specific timeout overrides (falls back to the global <code class="docutils literal notranslate"><span class="pre">timeout</span></code>).</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.headers</span> <span class="pre">import</span> <span class="pre">headers_cache_key</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">headers_cache_key</span></code></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">resolver_min_interval_s</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">{}</span></code></p></td>
-<td><p>Fine-grained rate limiting expressed as minimum seconds between resolver attempts.</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.cache</span> <span class="pre">import</span> <span class="pre">clear_resolver_caches</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">clear_resolver_caches</span></code></p></td>
 </tr>
 </tbody>
 </table>
-<p>All options are optional—existing configuration files remain valid without
-modification.</p>
+<p>All resolver-related dataclasses (<code class="docutils literal notranslate"><span class="pre">ResolverResult</span></code>, <code class="docutils literal notranslate"><span class="pre">AttemptRecord</span></code>, etc.),
+pipeline helpers, and provider implementations are now re-exported directly
+from the top-level module.</p>
+<blockquote>
+<div><p><strong>Tip:</strong> Legacy import paths will raise <code class="docutils literal notranslate"><span class="pre">ImportError</span></code>. Update your imports to
+ensure compatibility with the unified module.</p>
+</div></blockquote>
 </section>
-<section id="review-behavioural-changes">
-<h2>3. Review Behavioural Changes<a class="headerlink" href="#review-behavioural-changes" title="Link to this heading"></a></h2>
-<ul class="simple">
-<li><p><strong>OpenAlexResolver:</strong> Now participates as the first resolver in the default
-pipeline. Remove bespoke <code class="docutils literal notranslate"><span class="pre">attempt_openalex_candidates()</span></code> integrations.</p></li>
-<li><p><strong>Centralised HTTP retries:</strong> Every resolver uses
-<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.network.request_with_retries()</span></code> for consistent backoff,
-timeout handling, and <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> support.</p></li>
-<li><p><strong>Conditional requests:</strong> Download code paths share the
-<code class="docutils literal notranslate"><span class="pre">ConditionalRequestHelper</span></code> utility to honour ETag and Last-Modified headers.</p></li>
-<li><p><strong>Structured logging:</strong> Attempt records now include <code class="docutils literal notranslate"><span class="pre">resolver_wall_time_ms</span></code>
-for precise wall-clock tracking.</p></li>
-</ul>
+<section id="registering-custom-resolvers">
+<h2>2. Registering Custom Resolvers<a class="headerlink" href="#registering-custom-resolvers" title="Link to this heading"></a></h2>
+<p>Subclass <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.RegisteredResolver</span></code> and make sure
+the subclass is imported during start-up so it registers with the resolver
+registry. To take part in the default order, append instances to
+<code class="docutils literal notranslate"><span class="pre">default_resolvers()</span></code> inside <code class="docutils literal notranslate"><span class="pre">resolvers.py</span></code> or extend the returned list within
+your application.</p>
+</section>
+<section id="configuration-behaviour">
+<h2>3. Configuration &amp; Behaviour<a class="headerlink" href="#configuration-behaviour" title="Link to this heading"></a></h2>
+<p>No configuration keys changed during the consolidation. Existing YAML files
+that reference <code class="docutils literal notranslate"><span class="pre">ResolverConfig</span></code> fields remain valid. Behaviour such as
+centralised retries, HEAD preflight checks, and structured logging carries
+over unchanged.</p>
 </section>
 <section id="testing-checklist">
 <h2>4. Testing Checklist<a class="headerlink" href="#testing-checklist" title="Link to this heading"></a></h2>
 <ol class="arabic simple">
-<li><p>Update imports to the recommended module paths.</p></li>
-<li><p>Run <code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tests/</span></code> to confirm backward compatibility.</p></li>
-<li><p>Inspect logs for unexpected <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> entries.</p></li>
-<li><p>If you maintain custom resolvers, ensure they register via
-<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.default_resolvers()</span></code>.</p></li>
+<li><p>Run <code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tests/</span></code> to confirm your integration still passes the resolver
+suite.</p></li>
+<li><p>If you maintain custom resolvers, verify they are imported so registration
+occurs.</p></li>
+<li><p>Review logs for unexpected warnings after the import changes.</p></li>
 </ol>
 </section>
 <section id="support">
 <h2>5. Support<a class="headerlink" href="#support" title="Link to this heading"></a></h2>
-<p>Reach out in the <code class="docutils literal notranslate"><span class="pre">#docs-to-kg</span></code> channel if you encounter migration issues or
-spot regressions. Include stack traces, configuration snippets, and resolver
-names to speed up triage.</p>
+<p>Reach out in <code class="docutils literal notranslate"><span class="pre">#docs-to-kg</span></code> with stack traces, configuration snippets, and
+resolver names if you encounter migration issues.</p>
 </section>
 </section>
 

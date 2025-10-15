@@ -80,7 +80,24 @@
 <h1>1. Module: DoclingHybridChunkerPipelineWithMin<a class="headerlink" href="#module-doclinghybridchunkerpipelinewithmin" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin</span></code>.</p>
 <p>Docling Hybrid Chunker with Minimum Token Coalescence</p>
-<p>Transforms DocTags documents into chunked records with topic-aware coalescence.</p>
+<p>Transforms DocTags documents into chunked records with topic-aware coalescence.
+The module exposes a CLI (<code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin</span></code>)
+and reusable helpers for other pipelines.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Token-aware chunk merging that respects structural boundaries and image metadata.</p></li>
+<li><p>Shared CLI configuration via :func:<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.pipelines.add_data_root_option</span></code>.</p></li>
+<li><p>Manifest logging that records chunk counts, parsing engines, and durations.</p></li>
+</ul>
+<p>Dependencies:</p>
+<ul class="simple">
+<li><p>docling_core: Provides chunkers, serializers, and DocTags parsing.</p></li>
+<li><p>transformers: Supplies HuggingFace tokenizers.</p></li>
+<li><p>tqdm: Optional progress reporting when imported by callers.</p></li>
+</ul>
+<p>Usage:
+python -m DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin <br />
+–data-root /datasets/Data –min-tokens 256 –max-tokens 512</p>
 <p>Tokenizer Alignment:
 The default tokenizer (<code class="docutils literal notranslate"><span class="pre">Qwen/Qwen3-Embedding-4B</span></code>) aligns with the dense
 embedder used by the embeddings pipeline. When experimenting with other
@@ -185,9 +202,9 @@ preferring same-run neighbors to maintain topical cohesion.
 <h3><code class="docutils literal notranslate"><span class="pre">build_parser()</span></code><a class="headerlink" href="#build-parser" title="Link to this heading"></a></h3>
 <p>Construct an argument parser for the chunking pipeline.</p>
 <p>Args:
-None: Parser construction does not require inputs.</p>
+None</p>
 <p>Returns:
-:class:<code class="docutils literal notranslate"><span class="pre">argparse.ArgumentParser</span></code> configured with chunking options.</p>
+argparse.ArgumentParser: Parser configured with chunking options.</p>
 <p>Raises:
 None</p>
 </section>
@@ -195,10 +212,10 @@ None</p>
 <h3><code class="docutils literal notranslate"><span class="pre">parse_args(argv)</span></code><a class="headerlink" href="#parse-args-argv" title="Link to this heading"></a></h3>
 <p>Parse CLI arguments for standalone chunking execution.</p>
 <p>Args:
-argv: Optional CLI argument vector. When <code class="docutils literal notranslate"><span class="pre">None</span></code> the process arguments
-are parsed.</p>
+argv (list[str] | None): Optional CLI argument vector. When <code class="docutils literal notranslate"><span class="pre">None</span></code> the
+process arguments are parsed.</p>
 <p>Returns:
-Namespace containing parsed CLI options.</p>
+argparse.Namespace: Parsed CLI options.</p>
 <p>Raises:
 SystemExit: Propagated if <code class="docutils literal notranslate"><span class="pre">argparse</span></code> reports invalid arguments.</p>
 </section>
@@ -206,9 +223,10 @@ SystemExit: Propagated if <code class="docutils literal notranslate"><span class
 <h3><code class="docutils literal notranslate"><span class="pre">main(args)</span></code><a class="headerlink" href="#main-args" title="Link to this heading"></a></h3>
 <p>CLI driver that chunks DocTags files and enforces minimum token thresholds.</p>
 <p>Args:
-args: Optional CLI namespace supplied during testing or orchestration.</p>
+args (argparse.Namespace | None): Optional CLI namespace supplied during
+testing or orchestration.</p>
 <p>Returns:
-Exit code where <code class="docutils literal notranslate"><span class="pre">0</span></code> indicates success.</p>
+int: Exit code where <code class="docutils literal notranslate"><span class="pre">0</span></code> indicates success.</p>
 </section>
 <section id="is-small-idx">
 <h3><code class="docutils literal notranslate"><span class="pre">is_small(idx)</span></code><a class="headerlink" href="#is-small-idx" title="Link to this heading"></a></h3>

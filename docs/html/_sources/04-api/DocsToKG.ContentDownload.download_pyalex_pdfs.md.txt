@@ -53,6 +53,24 @@ path: Path to the candidate PDF file.
 Returns:
 ``True`` if the file ends with ``%%EOF``; ``False`` otherwise.
 
+### `_head_precheck_candidate(session, url, timeout)`
+
+Evaluate whether ``url`` is likely to return a PDF payload.
+
+The helper performs a single HEAD request with a tight timeout budget
+to avoid fetching large payloads unnecessarily. Tests rely on this
+behaviour to ensure dry-run execution does not trigger streaming
+downloads.
+
+Args:
+session: HTTP session used for the outbound HEAD request.
+url: Candidate download URL that should be validated.
+timeout: Per-request timeout budget, in seconds.
+
+Returns:
+``True`` when the HEAD response suggests the URL returns a PDF;
+``False`` when the response clearly indicates HTML or a missing file.
+
 ### `slugify(text, keep)`
 
 Create a filesystem-friendly slug for a work title.
@@ -98,15 +116,15 @@ Adapter-level retries remain disabled so :func:`request_with_retries` fully
 controls backoff, ensuring deterministic retry counts across the pipeline.
 
 Args:
-headers: Header dictionary returned by :func:`load_resolver_config`. The mapping
-must already include the project user agent and ``mailto`` contact address.
-A copy of the mapping is applied to the outgoing session so callers can
-reuse mutable dictionaries without side effects.
+headers (Dict[str, str]): Header dictionary returned by
+:func:`load_resolver_config`. The mapping must already include the
+project user agent and ``mailto`` contact address. A copy of the
+mapping is applied to the outgoing session so callers can reuse
+mutable dictionaries without side effects.
 
 Returns:
 requests.Session: Session with connection pooling enabled and retries
-disabled at the adapter level so the application layer governs
-backoff behaviour.
+disabled at the adapter level so the application layer governs backoff.
 
 Notes:
 Each worker should call this helper to obtain an isolated session instance.
@@ -305,6 +323,11 @@ and ``previous`` manifest lookup data.
 Returns:
 DownloadOutcome describing the result of the download attempt including
 streaming hash metadata when available.
+
+Notes:
+A lightweight HEAD preflight is issued when the caller has not already
+validated the URL. This mirrors the resolver pipeline behaviour and
+keeps dry-run tests deterministic.
 
 Raises:
 OSError: If writing the downloaded payload to disk fails.

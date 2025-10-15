@@ -91,6 +91,39 @@ filters: Mapping of filter names to expected values or lists.</p>
 <p>Returns:
 True if the chunk matches all supplied filters, False otherwise.</p>
 </section>
+<section id="asdict-self">
+<h3><code class="docutils literal notranslate"><span class="pre">asdict(self)</span></code><a class="headerlink" href="#asdict-self" title="Link to this heading"></a></h3>
+<p>Serialize the template to a dictionary payload.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Dict[str, object]: OpenSearch template representation suitable for APIs.</p>
+</section>
+<section id="bootstrap-template-self-namespace-chunking">
+<h3><code class="docutils literal notranslate"><span class="pre">bootstrap_template(self,</span> <span class="pre">namespace,</span> <span class="pre">chunking)</span></code><a class="headerlink" href="#bootstrap-template-self-namespace-chunking" title="Link to this heading"></a></h3>
+<p>Create and register an index template for a namespace.</p>
+<p>Args:
+namespace: Logical namespace that owns the index template.
+chunking: Optional chunking configuration for new documents.</p>
+<p>Returns:
+OpenSearchIndexTemplate: Newly created template stored in the registry.</p>
+</section>
+<section id="get-template-self-namespace">
+<h3><code class="docutils literal notranslate"><span class="pre">get_template(self,</span> <span class="pre">namespace)</span></code><a class="headerlink" href="#get-template-self-namespace" title="Link to this heading"></a></h3>
+<p>Retrieve a registered template for the namespace.</p>
+<p>Args:
+namespace: Namespace identifier used during bootstrap.</p>
+<p>Returns:
+Optional[OpenSearchIndexTemplate]: Template when present, otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+</section>
+<section id="list-templates-self">
+<h3><code class="docutils literal notranslate"><span class="pre">list_templates(self)</span></code><a class="headerlink" href="#list-templates-self" title="Link to this heading"></a></h3>
+<p>Return all registered templates indexed by namespace.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Mapping[str, OpenSearchIndexTemplate]: Copy of known templates keyed by namespace.</p>
+</section>
 <section id="upsert-self-chunks">
 <h3><code class="docutils literal notranslate"><span class="pre">upsert(self,</span> <span class="pre">chunks)</span></code><a class="headerlink" href="#upsert-self-chunks" title="Link to this heading"></a></h3>
 <p>Insert or update chunk metadata for the provided vector IDs.</p>
@@ -295,6 +328,46 @@ Mapping containing document count and average token length.</p>
 </section>
 <section id="classes">
 <h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="opensearchindextemplate">
+<h3><code class="docutils literal notranslate"><span class="pre">OpenSearchIndexTemplate</span></code><a class="headerlink" href="#opensearchindextemplate" title="Link to this heading"></a></h3>
+<p>Representation of an OpenSearch index template body.</p>
+<p>Attributes:
+name: Canonical name of the index template.
+namespace: DocsToKG namespace the template belongs to.
+body: OpenSearch template payload including settings and mappings.
+chunking: Chunking configuration applied when indexing documents.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>template = OpenSearchIndexTemplate(
+…     name=”hybrid-chunks-research”,
+…     namespace=”research”,
+…     body={“settings”: {}},
+…     chunking=ChunkingConfig(),
+… )
+template.asdict()[“name”]
+‘hybrid-chunks-research’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="opensearchschemamanager">
+<h3><code class="docutils literal notranslate"><span class="pre">OpenSearchSchemaManager</span></code><a class="headerlink" href="#opensearchschemamanager" title="Link to this heading"></a></h3>
+<p>Bootstrap and track index templates per namespace.</p>
+<p>Attributes:
+_templates: Internal registry mapping namespace → template instances.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>manager = OpenSearchSchemaManager()  # doctest: +SKIP
+manager.bootstrap_template(“research”)  # doctest: +SKIP
+OpenSearchIndexTemplate(name=’hybrid-chunks-research’, namespace=’research’, …)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
 <section id="storedchunk">
 <h3><code class="docutils literal notranslate"><span class="pre">StoredChunk</span></code><a class="headerlink" href="#storedchunk" title="Link to this heading"></a></h3>
 <p>Internal representation of a chunk stored in the OpenSearch simulator.</p>

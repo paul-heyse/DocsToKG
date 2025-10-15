@@ -6,9 +6,11 @@ steps required to implement, register, and validate a new resolver.
 
 ## 1. Create the Resolver Template
 
-Create a new module under
-`src/DocsToKG/ContentDownload/resolvers/providers/your_resolver.py` and
-implement the public surface expected by `ResolverConfig`:
+Create a new module (for example,
+`src/DocsToKG/ContentDownload/resolver_my_provider.py`) or extend
+`src/DocsToKG/ContentDownload/resolvers.py`. Implement the public surface
+expected by `ResolverConfig` using the shared types exposed from the
+`DocsToKG.ContentDownload.resolvers` module:
 
 ```python
 from __future__ import annotations
@@ -17,11 +19,15 @@ from typing import Iterable
 
 import requests
 
-from DocsToKG.ContentDownload.network import request_with_retries
-from DocsToKG.ContentDownload.resolvers.types import ResolverConfig, ResolverResult
+from DocsToKG.ContentDownload.resolvers import (
+    RegisteredResolver,
+    ResolverConfig,
+    ResolverResult,
+    request_with_retries,
+)
 
 
-class MyResolver:
+class MyResolver(RegisteredResolver):
     """Resolve organisation-specific repositories into download URLs."""
 
     name = "my_resolver"
@@ -70,8 +76,8 @@ class MyResolver:
 
 Key requirements:
 
-- Implement `name`, `is_enabled`, and `iter_urls` as defined in
-  `DocsToKG.ContentDownload.resolvers.types.Resolver`.
+- Subclass `RegisteredResolver` and implement `name`, `is_enabled`, and
+  `iter_urls` as defined in `DocsToKG.ContentDownload.resolvers.Resolver`.
 - Surface errors by yielding `ResolverResult` events instead of raising
   exceptions.
 - Use `request_with_retries` for outbound HTTP to benefit from retry policies
@@ -79,20 +85,19 @@ Key requirements:
 
 ## 2. Register the Resolver
 
-Add the resolver to the provider registry in
-`src/DocsToKG/ContentDownload/resolvers/providers/__init__.py` so the DocsToKG
-pipeline can instantiate it:
+If the class lives outside `resolvers.py`, ensure it is imported somewhere
+during start-up so the `RegisteredResolver` mixin can register it. To include
+the resolver in the default ordering, add it to `default_resolvers()` inside
+`src/DocsToKG/ContentDownload/resolvers.py`:
 
 ```python
-from .my_resolver import MyResolver
+from DocsToKG.ContentDownload import resolvers
 
 
 def default_resolvers() -> List[Resolver]:
-    return [
-        OpenAlexResolver(),
-        # ... existing resolvers ...
-        MyResolver(),
-    ]
+    base = resolvers.ResolverRegistry.create_default()
+    base.append(MyResolver())
+    return base
 ```
 
 Order determines fallback precedence—place the resolver alongside providers

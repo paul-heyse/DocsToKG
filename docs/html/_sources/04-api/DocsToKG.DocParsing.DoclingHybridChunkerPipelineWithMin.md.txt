@@ -5,6 +5,22 @@ This reference documents the DocsToKG module ``DocsToKG.DocParsing.DoclingHybrid
 Docling Hybrid Chunker with Minimum Token Coalescence
 
 Transforms DocTags documents into chunked records with topic-aware coalescence.
+The module exposes a CLI (`python -m DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin`)
+and reusable helpers for other pipelines.
+
+Key Features:
+- Token-aware chunk merging that respects structural boundaries and image metadata.
+- Shared CLI configuration via :func:`DocsToKG.DocParsing.pipelines.add_data_root_option`.
+- Manifest logging that records chunk counts, parsing engines, and durations.
+
+Dependencies:
+- docling_core: Provides chunkers, serializers, and DocTags parsing.
+- transformers: Supplies HuggingFace tokenizers.
+- tqdm: Optional progress reporting when imported by callers.
+
+Usage:
+    python -m DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin \
+        --data-root /datasets/Data --min-tokens 256 --max-tokens 512
 
 Tokenizer Alignment:
     The default tokenizer (``Qwen/Qwen3-Embedding-4B``) aligns with the dense
@@ -122,10 +138,10 @@ preferring same-run neighbors to maintain topical cohesion.
 Construct an argument parser for the chunking pipeline.
 
 Args:
-None: Parser construction does not require inputs.
+None
 
 Returns:
-:class:`argparse.ArgumentParser` configured with chunking options.
+argparse.ArgumentParser: Parser configured with chunking options.
 
 Raises:
 None
@@ -135,11 +151,11 @@ None
 Parse CLI arguments for standalone chunking execution.
 
 Args:
-argv: Optional CLI argument vector. When ``None`` the process arguments
-are parsed.
+argv (list[str] | None): Optional CLI argument vector. When ``None`` the
+process arguments are parsed.
 
 Returns:
-Namespace containing parsed CLI options.
+argparse.Namespace: Parsed CLI options.
 
 Raises:
 SystemExit: Propagated if ``argparse`` reports invalid arguments.
@@ -149,10 +165,11 @@ SystemExit: Propagated if ``argparse`` reports invalid arguments.
 CLI driver that chunks DocTags files and enforces minimum token thresholds.
 
 Args:
-args: Optional CLI namespace supplied during testing or orchestration.
+args (argparse.Namespace | None): Optional CLI namespace supplied during
+testing or orchestration.
 
 Returns:
-Exit code where ``0`` indicates success.
+int: Exit code where ``0`` indicates success.
 
 ### `is_small(idx)`
 

@@ -21,9 +21,7 @@ warnings.filterwarnings(
 
 pytest.importorskip("transformers")
 
-pytestmark = pytest.mark.filterwarnings(
-    "ignore:.*SwigPy.*__module__ attribute:DeprecationWarning"
-)
+pytestmark = pytest.mark.filterwarnings("ignore:.*SwigPy.*__module__ attribute:DeprecationWarning")
 
 from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (  # noqa: E402
     Rec,
@@ -64,6 +62,7 @@ def _make_rec(
         refs=refs or [],
         pages=pages or [1],
     )
+
 
 COMMANDS = [
     (Path("src/DocsToKG/DocParsing/DoclingHybridChunkerPipelineWithMin.py"), ["--help"]),

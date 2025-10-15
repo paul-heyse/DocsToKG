@@ -154,7 +154,7 @@ python<span class="w"> </span>src/DocsToKG/DocParsing/EmbeddingV2.py<span class=
 
 <span class="n">config_manager</span> <span class="o">=</span> <span class="n">HybridSearchConfigManager</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config/hybrid_config.json&quot;</span><span class="p">))</span>
 <span class="n">config</span> <span class="o">=</span> <span class="n">config_manager</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
-<span class="n">faiss</span> <span class="o">=</span> <span class="n">FaissIndexManager</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">dense</span><span class="p">)</span>
+<span class="n">faiss</span> <span class="o">=</span> <span class="n">FaissIndexManager</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1536</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">dense</span><span class="p">)</span>
 <span class="n">registry</span> <span class="o">=</span> <span class="n">ChunkRegistry</span><span class="p">()</span>
 <span class="n">opensearch</span> <span class="o">=</span> <span class="n">OpenSearchSimulator</span><span class="p">()</span>
 <span class="n">pipeline</span> <span class="o">=</span> <span class="n">ChunkIngestionPipeline</span><span class="p">(</span>
@@ -203,7 +203,7 @@ python<span class="w"> </span>src/DocsToKG/DocParsing/EmbeddingV2.py<span class=
 <p>Integrate <code class="docutils literal notranslate"><span class="pre">HybridSearchAPI</span></code> into your preferred web framework. Example with FastAPI:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">fastapi</span><span class="w"> </span><span class="kn">import</span> <span class="n">FastAPI</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.service</span><span class="w"> </span><span class="kn">import</span> <span class="n">HybridSearchAPI</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch</span><span class="w"> </span><span class="kn">import</span> <span class="n">HybridSearchAPI</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">my_project.hybrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_hybrid_service</span>  <span class="c1"># assemble service as shown above</span>
 
 <span class="n">app</span> <span class="o">=</span> <span class="n">FastAPI</span><span class="p">()</span>

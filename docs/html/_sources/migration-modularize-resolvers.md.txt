@@ -1,61 +1,51 @@
-# 1. Migration Guide: Modular Content Download Resolvers
+# 1. Migration Guide: Unified Content Download Resolvers
 
-This guide explains how to upgrade existing DocsToKG integrations from the
-monolithic `DocsToKG.ContentDownload.resolvers` module to the modular resolver
-architecture introduced in the `modularize-content-download-architecture`
-proposal.
+The resolver subsystem has been recomposed into a single module,
+`DocsToKG.ContentDownload.resolvers`. This guide explains how to migrate code
+that previously relied on the intermediate submodules (`.types`, `.pipeline`,
+`.providers`, `.headers`, `.cache`).
 
 ## 1. Update Import Paths
 
-- `ResolverPipeline`<br>
-  Legacy: `from DocsToKG.ContentDownload.resolvers import ResolverPipeline`<br>
-  Recommended: `from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline`
-- `default_resolvers`<br>
-  Legacy: `from DocsToKG.ContentDownload.resolvers import default_resolvers`<br>
-  Recommended: `from DocsToKG.ContentDownload.resolvers.providers import default_resolvers`
-- `ResolverConfig`<br>
-  Legacy: `from DocsToKG.ContentDownload.resolvers import ResolverConfig`<br>
-  Recommended: `from DocsToKG.ContentDownload.resolvers.types import ResolverConfig`
+| Replace | With |
+| --- | --- |
+| `from DocsToKG.ContentDownload.resolvers.types import …` | `from DocsToKG.ContentDownload.resolvers import …` |
+| `from DocsToKG.ContentDownload.resolvers.pipeline import …` | `from DocsToKG.ContentDownload.resolvers import …` |
+| `from DocsToKG.ContentDownload.resolvers.providers import …` | `from DocsToKG.ContentDownload.resolvers import …` |
+| `from DocsToKG.ContentDownload.resolvers.headers import headers_cache_key` | `from DocsToKG.ContentDownload.resolvers import headers_cache_key` |
+| `from DocsToKG.ContentDownload.resolvers.cache import clear_resolver_caches` | `from DocsToKG.ContentDownload.resolvers import clear_resolver_caches` |
 
-> **Compatibility:** Legacy imports continue working via re-exports but emit
-> `DeprecationWarning`. Update code to silence the warning and prepare for
-> future removals.
+All resolver-related dataclasses (`ResolverResult`, `AttemptRecord`, etc.),
+pipeline helpers, and provider implementations are now re-exported directly
+from the top-level module.
 
-## 2. Adopt New Configuration Options
+> **Tip:** Legacy import paths will raise `ImportError`. Update your imports to
+> ensure compatibility with the unified module.
 
-| Option | Default | Description |
-| --- | --- | --- |
-| `max_concurrent_resolvers` | `1` | Bounds intra-work concurrency. Set to `>1` to enable threaded resolver execution. |
-| `enable_head_precheck` | `True` | Enables HEAD requests that filter HTML or zero-byte responses before downloading. |
-| `resolver_head_precheck` | `{}` | Per-resolver override that can disable HEAD checks for services that reject them. |
-| `resolver_timeouts` | `{}` | Resolver-specific timeout overrides (falls back to the global `timeout`). |
-| `resolver_min_interval_s` | `{}` | Fine-grained rate limiting expressed as minimum seconds between resolver attempts. |
+## 2. Registering Custom Resolvers
 
-All options are optional—existing configuration files remain valid without
-modification.
+Subclass `DocsToKG.ContentDownload.resolvers.RegisteredResolver` and make sure
+the subclass is imported during start-up so it registers with the resolver
+registry. To take part in the default order, append instances to
+`default_resolvers()` inside `resolvers.py` or extend the returned list within
+your application.
 
-## 3. Review Behavioural Changes
+## 3. Configuration & Behaviour
 
-- **OpenAlexResolver:** Now participates as the first resolver in the default
-  pipeline. Remove bespoke `attempt_openalex_candidates()` integrations.
-- **Centralised HTTP retries:** Every resolver uses
-  `DocsToKG.ContentDownload.network.request_with_retries()` for consistent backoff,
-  timeout handling, and `Retry-After` support.
-- **Conditional requests:** Download code paths share the
-  `ConditionalRequestHelper` utility to honour ETag and Last-Modified headers.
-- **Structured logging:** Attempt records now include `resolver_wall_time_ms`
-  for precise wall-clock tracking.
+No configuration keys changed during the consolidation. Existing YAML files
+that reference `ResolverConfig` fields remain valid. Behaviour such as
+centralised retries, HEAD preflight checks, and structured logging carries
+over unchanged.
 
 ## 4. Testing Checklist
 
-1. Update imports to the recommended module paths.
-2. Run `pytest tests/` to confirm backward compatibility.
-3. Inspect logs for unexpected `DeprecationWarning` entries.
-4. If you maintain custom resolvers, ensure they register via
-   `DocsToKG.ContentDownload.resolvers.providers.default_resolvers()`.
+1. Run `pytest tests/` to confirm your integration still passes the resolver
+   suite.
+2. If you maintain custom resolvers, verify they are imported so registration
+   occurs.
+3. Review logs for unexpected warnings after the import changes.
 
 ## 5. Support
 
-Reach out in the `#docs-to-kg` channel if you encounter migration issues or
-spot regressions. Include stack traces, configuration snippets, and resolver
-names to speed up triage.
+Reach out in `#docs-to-kg` with stack traces, configuration snippets, and
+resolver names if you encounter migration issues.

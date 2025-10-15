@@ -1,0 +1,317 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: network &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: network</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.ContentDownload.network.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-network">
+<h1>1. Module: network<a class="headerlink" href="#module-network" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.network</span></code>.</p>
+<p>Unified Network Utilities</p>
+<p>This module consolidates HTTP retry helpers, conditional request utilities, and
+session construction logic into a single import surface. Historically these
+helpers lived in separate <code class="docutils literal notranslate"><span class="pre">http</span></code> and <code class="docutils literal notranslate"><span class="pre">conditional</span></code> modules; co-locating
+them reduces cross-module bootstrapping and ensures shared defaults remain
+aligned.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">create_session</span></code>: Configure <code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> instances with pooled
+adapters and optional header injection.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code>: Execute resilient HTTP calls with jittered,
+exponential backoff while honouring <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> directives.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ConditionalRequestHelper</span></code>: Build and validate conditional request headers
+for polite revalidation workflows.</p></li>
+</ul>
+<p>Usage:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>from DocsToKG.ContentDownload.network import (
+    ConditionalRequestHelper,
+    create_session,
+    request_with_retries,
+)
+
+session = create_session({&quot;User-Agent&quot;: &quot;DocsToKG/1.0&quot;})
+response = request_with_retries(session, &quot;GET&quot;, &quot;https://example.org/resource&quot;)
+helper = ConditionalRequestHelper(prior_etag=&quot;abc123&quot;)
+headers = helper.build_headers()
+</pre></div>
+</div>
+<p>Args:
+None.</p>
+<p>Returns:
+None.</p>
+<p>Raises:
+None.</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="create-session-headers">
+<h3><code class="docutils literal notranslate"><span class="pre">create_session(headers)</span></code><a class="headerlink" href="#create-session-headers" title="Link to this heading"></a></h3>
+<p>Return a <code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> configured for DocsToKG network requests.</p>
+<p>Args:
+headers: Optional mapping of HTTP headers applied to the session. The mapping
+is copied into the session’s header store so caller-owned dictionaries remain
+unchanged.
+adapter_max_retries: Retry count configured on mounted HTTP adapters. Defaults to
+<code class="docutils literal notranslate"><span class="pre">0</span></code> so :func:<code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code> governs retry behaviour.</p>
+<p>Returns:
+requests.Session: Session instance with HTTP/HTTPS adapters mounted and ready for pipeline usage.</p>
+<p>Raises:
+None.</p>
+<p>Notes:
+The returned session uses <code class="docutils literal notranslate"><span class="pre">HTTPAdapter</span></code> for connection pooling. It is safe to share
+across threads provided callers avoid mutating shared mutable state (for example,
+updating <code class="docutils literal notranslate"><span class="pre">session.headers</span></code>) once the session is distributed to worker threads.</p>
+</section>
+<section id="parse-retry-after-header-response">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_retry_after_header(response)</span></code><a class="headerlink" href="#parse-retry-after-header-response" title="Link to this heading"></a></h3>
+<p>Parse <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> header and return wait time in seconds.</p>
+<p>Args:
+response (requests.Response): HTTP response potentially containing a
+<code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> header.</p>
+<p>Returns:
+float | None: Seconds the caller should wait before retrying, or
+<code class="docutils literal notranslate"><span class="pre">None</span></code> when the header is absent or invalid.</p>
+<p>Raises:
+None: Invalid headers are tolerated and yield <code class="docutils literal notranslate"><span class="pre">None</span></code> without raising.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p class="rubric" id="integer-format">Integer format</p>
+<p>response = requests.Response()
+response.headers = {“Retry-After”: “5”}
+parse_retry_after_header(response)
+5.0</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p class="rubric" id="http-date-format">HTTP-date format</p>
+<p>response.headers = {“Retry-After”: “Wed, 21 Oct 2025 07:28:00 GMT”}
+isinstance(parse_retry_after_header(response), float)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="request-with-retries-session-method-url">
+<h3><code class="docutils literal notranslate"><span class="pre">request_with_retries(session,</span> <span class="pre">method,</span> <span class="pre">url)</span></code><a class="headerlink" href="#request-with-retries-session-method-url" title="Link to this heading"></a></h3>
+<p>Execute an HTTP request with exponential backoff and retry handling.</p>
+<p>Args:
+session: Session used to execute the outbound request.
+method: HTTP method such as <code class="docutils literal notranslate"><span class="pre">&quot;GET&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;HEAD&quot;</span></code>.
+url: Fully qualified URL for the request.
+max_retries: Maximum number of retry attempts before returning the final response or
+raising an exception. Defaults to <code class="docutils literal notranslate"><span class="pre">3</span></code>.
+retry_statuses: HTTP status codes that should trigger a retry. Defaults to
+<code class="docutils literal notranslate"><span class="pre">{429,</span> <span class="pre">500,</span> <span class="pre">502,</span> <span class="pre">503,</span> <span class="pre">504}</span></code>.
+backoff_factor: Base multiplier for exponential backoff delays in seconds. Defaults to <code class="docutils literal notranslate"><span class="pre">0.75</span></code>.
+respect_retry_after: Whether to parse and obey <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> headers. Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.
+**kwargs: Additional keyword arguments forwarded directly to :meth:<code class="docutils literal notranslate"><span class="pre">requests.Session.request</span></code>.</p>
+<p>Returns:
+requests.Response: Successful response object. Callers are responsible for closing the
+response when streaming content.</p>
+<p>Raises:
+ValueError: If <code class="docutils literal notranslate"><span class="pre">max_retries</span></code> or <code class="docutils literal notranslate"><span class="pre">backoff_factor</span></code> are invalid or <code class="docutils literal notranslate"><span class="pre">url</span></code>/<code class="docutils literal notranslate"><span class="pre">method</span></code> are empty.
+requests.RequestException: If all retry attempts fail due to network errors or the session raises an exception.</p>
+</section>
+<section id="build-headers-self">
+<h3><code class="docutils literal notranslate"><span class="pre">build_headers(self)</span></code><a class="headerlink" href="#build-headers-self" title="Link to this heading"></a></h3>
+<p>Generate conditional request headers from cached metadata.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Mapping[str, str]: Headers suitable for <code class="docutils literal notranslate"><span class="pre">requests</span></code> invocations.</p>
+</section>
+<section id="interpret-response-self-response">
+<h3><code class="docutils literal notranslate"><span class="pre">interpret_response(self,</span> <span class="pre">response)</span></code><a class="headerlink" href="#interpret-response-self-response" title="Link to this heading"></a></h3>
+<p>Classify origin responses as cached or modified results.</p>
+<p>Args:
+response (requests.Response): HTTP response returned from the
+conditional request.</p>
+<p>Returns:
+CachedResult | ModifiedResult: Cached metadata when the origin
+reports HTTP 304, otherwise wrapped metadata from a fresh download.</p>
+<p>Raises:
+ValueError: If a 304 response arrives without complete cached
+metadata.
+TypeError: If <code class="docutils literal notranslate"><span class="pre">response</span></code> lacks <code class="docutils literal notranslate"><span class="pre">status_code</span></code> or <code class="docutils literal notranslate"><span class="pre">headers</span></code>.</p>
+</section>
+<section id="request-func">
+<h3><code class="docutils literal notranslate"><span class="pre">request_func()</span></code><a class="headerlink" href="#request-func" title="Link to this heading"></a></h3>
+<p>Invoke the fallback HTTP method when <code class="docutils literal notranslate"><span class="pre">Session.request</span></code> is unavailable.</p>
+<p>Args:
+method: HTTP method name forwarded for logging parity.
+url: Target URL for the request.
+**call_kwargs: Keyword arguments forwarded to the fallback request callable.</p>
+<p>Returns:
+requests.Response: Response returned by the fallback HTTP method.</p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="cachedresult">
+<h3><code class="docutils literal notranslate"><span class="pre">CachedResult</span></code><a class="headerlink" href="#cachedresult" title="Link to this heading"></a></h3>
+<p>Represents an HTTP 304 response resolved via cached metadata.</p>
+<p>Attributes:
+path (str): Filesystem path that stores the cached artifact.
+sha256 (str): SHA-256 checksum associated with the cached payload.
+content_length (int): Size of the cached payload in bytes.
+etag (str | None): Entity tag reported by the origin server.
+last_modified (str | None): <code class="docutils literal notranslate"><span class="pre">Last-Modified</span></code> timestamp provided by the
+origin server.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>CachedResult(path=”/tmp/file.pdf”, sha256=”abc”, content_length=10, etag=None, last_modified=None)
+CachedResult(path=’/tmp/file.pdf’, sha256=’abc’, content_length=10, etag=None, last_modified=None)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="modifiedresult">
+<h3><code class="docutils literal notranslate"><span class="pre">ModifiedResult</span></code><a class="headerlink" href="#modifiedresult" title="Link to this heading"></a></h3>
+<p>Represents a fresh HTTP 200 response requiring download.</p>
+<p>Attributes:
+etag (str | None): Entity tag reported by the origin server.
+last_modified (str | None): <code class="docutils literal notranslate"><span class="pre">Last-Modified</span></code> timestamp describing the
+remote resource.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>ModifiedResult(etag=”abc”, last_modified=”Tue, 15 Nov 1994 12:45:26 GMT”)
+ModifiedResult(etag=’abc’, last_modified=’Tue, 15 Nov 1994 12:45:26 GMT’)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="conditionalrequesthelper">
+<h3><code class="docutils literal notranslate"><span class="pre">ConditionalRequestHelper</span></code><a class="headerlink" href="#conditionalrequesthelper" title="Link to this heading"></a></h3>
+<p>Construct headers and interpret responses for conditional requests.</p>
+<p>The helper encapsulates cached metadata (ETag, Last-Modified, hashes) so the
+caller can generate polite conditional headers and validate upstream 304
+responses before reusing cached artefacts.</p>
+<p>Attributes:
+prior_etag: Cached entity tag from a previous download.
+prior_last_modified: Cached <code class="docutils literal notranslate"><span class="pre">Last-Modified</span></code> header value.
+prior_sha256: SHA-256 checksum of the cached content.
+prior_content_length: Cached payload length in bytes.
+prior_path: Filesystem path storing the cached artefact.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>helper = ConditionalRequestHelper(prior_etag=”abc123”)
+helper.build_headers()
+{‘If-None-Match’: ‘abc123’}</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

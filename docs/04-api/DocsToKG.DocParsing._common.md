@@ -47,11 +47,9 @@ start: Starting directory for the ancestor scan. Defaults to the
 current working directory when ``None``.
 
 Returns:
-Absolute path to the resolved ``Data`` directory.
-
-Raises:
-FileNotFoundError: If ``DOCSTOKG_DATA_ROOT`` points to a non-existent
-directory.
+Absolute path to the resolved ``Data`` directory. When
+``DOCSTOKG_DATA_ROOT`` is set but the directory does not yet exist,
+it is created automatically.
 
 Examples:
 >>> os.environ["DOCSTOKG_DATA_ROOT"] = "/tmp/data"

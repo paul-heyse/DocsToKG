@@ -120,10 +120,9 @@ subdirectories (<code class="docutils literal notranslate"><span class="pre">PDF
 start: Starting directory for the ancestor scan. Defaults to the
 current working directory when <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
 <p>Returns:
-Absolute path to the resolved <code class="docutils literal notranslate"><span class="pre">Data</span></code> directory.</p>
-<p>Raises:
-FileNotFoundError: If <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_DATA_ROOT</span></code> points to a non-existent
-directory.</p>
+Absolute path to the resolved <code class="docutils literal notranslate"><span class="pre">Data</span></code> directory. When
+<code class="docutils literal notranslate"><span class="pre">DOCSTOKG_DATA_ROOT</span></code> is set but the directory does not yet exist,
+it is created automatically.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>

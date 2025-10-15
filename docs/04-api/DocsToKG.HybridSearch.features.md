@@ -6,6 +6,45 @@ Feature generation utilities for SPLADE weights and dense embeddings.
 
 ## 1. Functions
 
+### `tokenize(text)`
+
+Tokenize text into lowercase alphanumeric tokens.
+
+Args:
+text: Raw text to segment into tokens.
+
+Returns:
+List[str]: Lowercased alphanumeric tokens extracted from ``text``.
+
+### `tokenize_with_spans(text)`
+
+Return tokens alongside their character spans.
+
+Args:
+text: Raw text to tokenize while preserving character offsets.
+
+Returns:
+Tuple[List[str], List[Tuple[int, int]]]: Token list and the corresponding
+``(start, end)`` character spans for each token.
+
+### `sliding_window(tokens, window, overlap)`
+
+Yield token windows with configurable overlap.
+
+Args:
+tokens: Token sequence to window over.
+window: Maximum number of tokens per window.
+overlap: Number of tokens shared between consecutive windows.
+
+Yields:
+List[str]: Next token window respecting ``window`` and ``overlap`` constraints.
+
+Returns:
+Iterator[List[str]]: Iterator producing sliding windows across ``tokens``.
+
+Raises:
+ValueError: If ``window`` or ``overlap`` violate expected ranges.
+
 ### `embedding_dim(self)`
 
 Return the dimensionality used for synthetic dense embeddings.

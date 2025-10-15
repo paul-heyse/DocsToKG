@@ -72,6 +72,9 @@ def create_session(
     Returns:
         requests.Session: Session instance with HTTP/HTTPS adapters mounted and ready for pipeline usage.
 
+    Raises:
+        None.
+
     Notes:
         The returned session uses ``HTTPAdapter`` for connection pooling. It is safe to share
         across threads provided callers avoid mutating shared mutable state (for example,
@@ -338,6 +341,10 @@ class CachedResult:
         etag (str | None): Entity tag reported by the origin server.
         last_modified (str | None): ``Last-Modified`` timestamp provided by the
             origin server.
+
+    Examples:
+        >>> CachedResult(path="/tmp/file.pdf", sha256="abc", content_length=10, etag=None, last_modified=None)
+        CachedResult(path='/tmp/file.pdf', sha256='abc', content_length=10, etag=None, last_modified=None)
     """
 
     path: str
@@ -355,6 +362,10 @@ class ModifiedResult:
         etag (str | None): Entity tag reported by the origin server.
         last_modified (str | None): ``Last-Modified`` timestamp describing the
             remote resource.
+
+    Examples:
+        >>> ModifiedResult(etag="abc", last_modified="Tue, 15 Nov 1994 12:45:26 GMT")
+        ModifiedResult(etag='abc', last_modified='Tue, 15 Nov 1994 12:45:26 GMT')
     """
 
     etag: Optional[str]
@@ -367,6 +378,18 @@ class ConditionalRequestHelper:
     The helper encapsulates cached metadata (ETag, Last-Modified, hashes) so the
     caller can generate polite conditional headers and validate upstream 304
     responses before reusing cached artefacts.
+
+    Attributes:
+        prior_etag: Cached entity tag from a previous download.
+        prior_last_modified: Cached ``Last-Modified`` header value.
+        prior_sha256: SHA-256 checksum of the cached content.
+        prior_content_length: Cached payload length in bytes.
+        prior_path: Filesystem path storing the cached artefact.
+
+    Examples:
+        >>> helper = ConditionalRequestHelper(prior_etag="abc123")
+        >>> helper.build_headers()
+        {'If-None-Match': 'abc123'}
     """
 
     def __init__(

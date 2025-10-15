@@ -17,21 +17,49 @@ rich ASCII tables summarise resolver fallback chains and validator results.
 
 Render a padded ASCII table.
 
+Args:
+headers: Column headers rendered on the first row.
+rows: Iterable of table rows; each row must match the header length.
+
+Returns:
+Formatted table as a multi-line string.
+
 ### `format_plan_rows(plans)`
 
 Convert planner output into rows for table rendering.
+
+Args:
+plans: Planned fetch objects emitted by the planner.
+
+Returns:
+List of tuples suitable for :func:`format_table`.
 
 ### `format_results_table(results)`
 
 Render download results as a table summarizing status and file paths.
 
+Args:
+results: Download results produced by :func:`fetch_all`.
+
+Returns:
+Formatted table summarizing ontology downloads.
+
 ### `format_validation_summary(results)`
 
 Summarise validator outcomes in a compact status table.
 
+Args:
+results: Mapping of validator names to structured result payloads.
+
+Returns:
+Table highlighting validator status and notable detail messages.
+
 ### `_build_parser()`
 
 Configure the top-level CLI parser and subcommands.
+
+Returns:
+Argument parser providing the consolidated ``ontofetch`` CLI.
 
 ### `_parse_target_formats(value)`
 
@@ -47,41 +75,105 @@ List of stripped format identifiers, or an empty list when no formats are suppli
 
 Parse CLI argument ensuring it is a positive integer.
 
+Args:
+value: Textual representation of a positive integer.
+
+Returns:
+Parsed positive integer value.
+
+Raises:
+argparse.ArgumentTypeError: If ``value`` is not a positive integer.
+
 ### `_parse_allowed_hosts(value)`
 
 Split comma-delimited host allowlist argument into unique entries.
+
+Args:
+value: Raw CLI argument containing comma-delimited hostnames.
+
+Returns:
+List of unique hostnames preserving input order.
 
 ### `_normalize_plan_args(args)`
 
 Ensure ``plan`` command defaults to the ``run`` subcommand when omitted.
 
+Args:
+args: Original CLI argument vector.
+
+Returns:
+Updated argument list with explicit subcommands injected as needed.
+
 ### `_parse_since_arg(value)`
 
-Argparse hook parsing YYYY-MM-DD strings into timezone-aware datetimes.
+Parse ``YYYY-MM-DD`` strings into timezone-aware datetimes.
+
+Args:
+value: Date string provided on the command line.
+
+Returns:
+Timezone-aware datetime instance aligned to UTC.
+
+Raises:
+argparse.ArgumentTypeError: If ``value`` is not a valid date.
 
 ### `_parse_since(value)`
 
 Parse optional date input into timezone-aware datetimes.
 
+Args:
+value: Either a string date or a pre-parsed datetime.
+
+Returns:
+Normalized datetime in UTC, or ``None`` when not supplied.
+
 ### `_format_bytes(num)`
 
 Return human-readable byte count representation.
+
+Args:
+num: Byte count to format.
+
+Returns:
+String describing the size using binary units.
 
 ### `_directory_size(path)`
 
 Return the cumulative size of files under ``path``.
 
+Args:
+path: Directory whose contents should be measured.
+
+Returns:
+Total number of bytes for regular files within the directory.
+
 ### `_parse_version_timestamp(value)`
 
 Parse version or manifest timestamps into UTC datetimes.
+
+Args:
+value: Timestamp string sourced from manifests or version metadata.
+
+Returns:
+Normalized UTC datetime, or ``None`` when parsing fails.
 
 ### `_apply_cli_overrides(config, args)`
 
 Mutate resolved configuration based on CLI override arguments.
 
+Args:
+config: Resolved configuration subject to mutation.
+args: Parsed CLI namespace containing override values.
+
 ### `_rate_limit_to_rps(value)`
 
-Convert rate limit string into requests-per-second float.
+Convert rate limit string into a requests-per-second float.
+
+Args:
+value: Rate limit expression in ``<amount>/<unit>`` form.
+
+Returns:
+Requests-per-second value when parsing succeeds, otherwise ``None``.
 
 ### `_results_to_dict(result)`
 
@@ -120,21 +212,49 @@ Parse ISO formatted date strings into timezone-aware datetimes.
 
 Parse HTTP header datetime strings into timezone-aware datetimes.
 
+Args:
+value: Value sourced from an HTTP ``Date`` or ``Last-Modified`` header.
+
+Returns:
+Datetime in UTC when parsing succeeds, otherwise ``None``.
+
 ### `_extract_response_metadata(response)`
 
 Return structured metadata from an HTTP response.
+
+Args:
+response: HTTP response obtained from a requests call.
+
+Returns:
+Mapping containing detected headers such as last-modified, etag, and content length.
 
 ### `_collect_plan_metadata(plans, config)`
 
 Augment planned fetches with remote metadata via HEAD requests.
 
+Args:
+plans: Planned fetch objects awaiting metadata enrichment.
+config: Resolved configuration providing HTTP headers and timeouts.
+
 ### `_directory_size_bytes(path)`
 
 Return the cumulative size of files within ``path``.
 
+Args:
+path: Directory whose contents should be measured.
+
+Returns:
+Total number of bytes encountered within the directory tree.
+
 ### `_infer_version_timestamp(version)`
 
 Attempt to derive a datetime from a version string.
+
+Args:
+version: Version identifier emitted by upstream resolvers.
+
+Returns:
+Datetime derived from the version string, or ``None`` when no format matches.
 
 ### `_resolve_version_metadata(ontology_id, version)`
 
@@ -168,9 +288,19 @@ Dictionary representation of the manifest contents.
 
 Return sorted metadata entries for stored ontology versions.
 
+Args:
+ontology_id: Identifier of the ontology to inspect.
+
+Returns:
+List of metadata dictionaries ordered by most recent timestamp first.
+
 ### `_update_latest_symlink(ontology_id, target)`
 
 Ensure latest marker references the provided target directory.
+
+Args:
+ontology_id: Ontology identifier whose ``latest`` link should be updated.
+target: Directory containing the version to mark as latest.
 
 ### `_resolve_specs_from_args(args, base_config)`
 
@@ -206,6 +336,9 @@ Delete surplus ontology versions based on ``--keep`` parameter.
 ### `_doctor_report()`
 
 Collect diagnostic information for the ``doctor`` command.
+
+Returns:
+Mapping capturing disk, dependency, network, and configuration status.
 
 ### `_print_doctor_report(report)`
 
@@ -258,9 +391,6 @@ Create a starter ``sources.yaml`` file for new installations.
 Args:
 path: Destination path for the generated configuration template.
 
-Returns:
-None
-
 Raises:
 ConfigError: If the target file already exists.
 
@@ -277,6 +407,12 @@ Dictionary describing validation status, ontology count, and file path.
 ### `_normalize_argv(argv)`
 
 Rewrite legacy aliases to the canonical subcommand syntax.
+
+Args:
+argv: Raw argument vector supplied by the user.
+
+Returns:
+Adjusted argument list with legacy ``plan diff`` rewired to ``plan-diff``.
 
 ### `main(argv)`
 

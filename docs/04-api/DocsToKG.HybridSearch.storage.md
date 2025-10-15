@@ -17,6 +17,47 @@ filters: Mapping of filter names to expected values or lists.
 Returns:
 True if the chunk matches all supplied filters, False otherwise.
 
+### `asdict(self)`
+
+Serialize the template to a dictionary payload.
+
+Args:
+None
+
+Returns:
+Dict[str, object]: OpenSearch template representation suitable for APIs.
+
+### `bootstrap_template(self, namespace, chunking)`
+
+Create and register an index template for a namespace.
+
+Args:
+namespace: Logical namespace that owns the index template.
+chunking: Optional chunking configuration for new documents.
+
+Returns:
+OpenSearchIndexTemplate: Newly created template stored in the registry.
+
+### `get_template(self, namespace)`
+
+Retrieve a registered template for the namespace.
+
+Args:
+namespace: Namespace identifier used during bootstrap.
+
+Returns:
+Optional[OpenSearchIndexTemplate]: Template when present, otherwise ``None``.
+
+### `list_templates(self)`
+
+Return all registered templates indexed by namespace.
+
+Args:
+None
+
+Returns:
+Mapping[str, OpenSearchIndexTemplate]: Copy of known templates keyed by namespace.
+
 ### `upsert(self, chunks)`
 
 Insert or update chunk metadata for the provided vector IDs.
@@ -267,6 +308,38 @@ Returns:
 Mapping containing document count and average token length.
 
 ## 2. Classes
+
+### `OpenSearchIndexTemplate`
+
+Representation of an OpenSearch index template body.
+
+Attributes:
+name: Canonical name of the index template.
+namespace: DocsToKG namespace the template belongs to.
+body: OpenSearch template payload including settings and mappings.
+chunking: Chunking configuration applied when indexing documents.
+
+Examples:
+>>> template = OpenSearchIndexTemplate(
+...     name="hybrid-chunks-research",
+...     namespace="research",
+...     body={"settings": {}},
+...     chunking=ChunkingConfig(),
+... )
+>>> template.asdict()["name"]
+'hybrid-chunks-research'
+
+### `OpenSearchSchemaManager`
+
+Bootstrap and track index templates per namespace.
+
+Attributes:
+_templates: Internal registry mapping namespace → template instances.
+
+Examples:
+>>> manager = OpenSearchSchemaManager()  # doctest: +SKIP
+>>> manager.bootstrap_template("research")  # doctest: +SKIP
+OpenSearchIndexTemplate(name='hybrid-chunks-research', namespace='research', ...)
 
 ### `StoredChunk`
 

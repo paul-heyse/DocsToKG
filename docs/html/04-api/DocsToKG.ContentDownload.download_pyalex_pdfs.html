@@ -126,6 +126,21 @@ path: Path to the candidate PDF file.</p>
 <p>Returns:
 <code class="docutils literal notranslate"><span class="pre">True</span></code> if the file ends with <code class="docutils literal notranslate"><span class="pre">%%EOF</span></code>; <code class="docutils literal notranslate"><span class="pre">False</span></code> otherwise.</p>
 </section>
+<section id="head-precheck-candidate-session-url-timeout">
+<h3><code class="docutils literal notranslate"><span class="pre">_head_precheck_candidate(session,</span> <span class="pre">url,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#head-precheck-candidate-session-url-timeout" title="Link to this heading"></a></h3>
+<p>Evaluate whether <code class="docutils literal notranslate"><span class="pre">url</span></code> is likely to return a PDF payload.</p>
+<p>The helper performs a single HEAD request with a tight timeout budget
+to avoid fetching large payloads unnecessarily. Tests rely on this
+behaviour to ensure dry-run execution does not trigger streaming
+downloads.</p>
+<p>Args:
+session: HTTP session used for the outbound HEAD request.
+url: Candidate download URL that should be validated.
+timeout: Per-request timeout budget, in seconds.</p>
+<p>Returns:
+<code class="docutils literal notranslate"><span class="pre">True</span></code> when the HEAD response suggests the URL returns a PDF;
+<code class="docutils literal notranslate"><span class="pre">False</span></code> when the response clearly indicates HTML or a missing file.</p>
+</section>
 <section id="slugify-text-keep">
 <h3><code class="docutils literal notranslate"><span class="pre">slugify(text,</span> <span class="pre">keep)</span></code><a class="headerlink" href="#slugify-text-keep" title="Link to this heading"></a></h3>
 <p>Create a filesystem-friendly slug for a work title.</p>
@@ -161,14 +176,14 @@ argparse.ArgumentTypeError: If the argument is malformed or negative.</p>
 <p>Adapter-level retries remain disabled so :func:<code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code> fully
 controls backoff, ensuring deterministic retry counts across the pipeline.</p>
 <p>Args:
-headers: Header dictionary returned by :func:<code class="docutils literal notranslate"><span class="pre">load_resolver_config</span></code>. The mapping
-must already include the project user agent and <code class="docutils literal notranslate"><span class="pre">mailto</span></code> contact address.
-A copy of the mapping is applied to the outgoing session so callers can
-reuse mutable dictionaries without side effects.</p>
+headers (Dict[str, str]): Header dictionary returned by
+:func:<code class="docutils literal notranslate"><span class="pre">load_resolver_config</span></code>. The mapping must already include the
+project user agent and <code class="docutils literal notranslate"><span class="pre">mailto</span></code> contact address. A copy of the
+mapping is applied to the outgoing session so callers can reuse
+mutable dictionaries without side effects.</p>
 <p>Returns:
 requests.Session: Session with connection pooling enabled and retries
-disabled at the adapter level so the application layer governs
-backoff behaviour.</p>
+disabled at the adapter level so the application layer governs backoff.</p>
 <p>Notes:
 Each worker should call this helper to obtain an isolated session instance.
 Example:</p>
@@ -345,6 +360,10 @@ and <code class="docutils literal notranslate"><span class="pre">previous</span>
 <p>Returns:
 DownloadOutcome describing the result of the download attempt including
 streaming hash metadata when available.</p>
+<p>Notes:
+A lightweight HEAD preflight is issued when the caller has not already
+validated the URL. This mirrors the resolver pipeline behaviour and
+keeps dry-run tests deterministic.</p>
 <p>Raises:
 OSError: If writing the downloaded payload to disk fails.
 TypeError: If conditional response parsing returns unexpected objects.</p>

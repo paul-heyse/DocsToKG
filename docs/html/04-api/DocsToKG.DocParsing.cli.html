@@ -93,50 +93,106 @@ point with subcommands. Invoke it with:</p>
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="run-chunk-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">_run_chunk(argv)</span></code><a class="headerlink" href="#run-chunk-argv" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Execute the Docling chunker subcommand.</p>
+<p>Args:
+argv: Argument vector forwarded to the chunker parser.</p>
+<p>Returns:
+Process exit code produced by the Docling chunker pipeline.</p>
 </section>
 <section id="run-embed-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">_run_embed(argv)</span></code><a class="headerlink" href="#run-embed-argv" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Execute the embedding pipeline subcommand.</p>
+<p>Args:
+argv: Argument vector forwarded to the embedding parser.</p>
+<p>Returns:
+Process exit code produced by the embedding pipeline.</p>
 </section>
 <section id="build-doctags-parser-prog">
 <h3><code class="docutils literal notranslate"><span class="pre">_build_doctags_parser(prog)</span></code><a class="headerlink" href="#build-doctags-parser-prog" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Create an :mod:<code class="docutils literal notranslate"><span class="pre">argparse</span></code> parser configured for DocTags conversion.</p>
+<p>Args:
+prog: Program name displayed in help output.</p>
+<p>Returns:
+Argument parser instance for the <code class="docutils literal notranslate"><span class="pre">doctags</span></code> subcommand.</p>
 </section>
 <section id="detect-mode-input-dir">
 <h3><code class="docutils literal notranslate"><span class="pre">_detect_mode(input_dir)</span></code><a class="headerlink" href="#detect-mode-input-dir" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Infer conversion mode based on the contents of <code class="docutils literal notranslate"><span class="pre">input_dir</span></code>.</p>
+<p>Args:
+input_dir: Directory searched for PDF and HTML inputs.</p>
+<p>Returns:
+<code class="docutils literal notranslate"><span class="pre">&quot;pdf&quot;</span></code> when only PDFs are present, <code class="docutils literal notranslate"><span class="pre">&quot;html&quot;</span></code> when only HTML files exist.</p>
+<p>Raises:
+ValueError: If both formats are present or neither can be detected.</p>
 </section>
 <section id="merge-args-parser-overrides">
 <h3><code class="docutils literal notranslate"><span class="pre">_merge_args(parser,</span> <span class="pre">overrides)</span></code><a class="headerlink" href="#merge-args-parser-overrides" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Merge override values into the default parser namespace.</p>
+<p>Args:
+parser: Parser providing default argument values.
+overrides: Mapping of argument names to replacement values.</p>
+<p>Returns:
+Namespace populated with defaults and supplied overrides.</p>
 </section>
 <section id="run-doctags-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">_run_doctags(argv)</span></code><a class="headerlink" href="#run-doctags-argv" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Execute the DocTags conversion subcommand.</p>
+<p>Args:
+argv: Argument vector provided by the CLI dispatcher.</p>
+<p>Returns:
+Process exit code from the selected DocTags backend.</p>
 </section>
 <section id="main-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">main(argv)</span></code><a class="headerlink" href="#main-argv" title="Link to this heading"></a></h3>
 <p>Dispatch to one of the DocParsing subcommands.</p>
+<p>Args:
+argv: Optional argument vector supplied programmatically.</p>
+<p>Returns:
+Process exit code returned by the selected subcommand.</p>
 </section>
 <section id="chunk-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">chunk(argv)</span></code><a class="headerlink" href="#chunk-argv" title="Link to this heading"></a></h3>
 <p>Programmatic helper mirroring <code class="docutils literal notranslate"><span class="pre">docparse</span> <span class="pre">chunk</span></code>.</p>
+<p>Args:
+argv: Optional argument vector supplied for testing.</p>
+<p>Returns:
+Process exit code returned by the chunker pipeline.</p>
 </section>
 <section id="embed-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">embed(argv)</span></code><a class="headerlink" href="#embed-argv" title="Link to this heading"></a></h3>
 <p>Programmatic helper mirroring <code class="docutils literal notranslate"><span class="pre">docparse</span> <span class="pre">embed</span></code>.</p>
+<p>Args:
+argv: Optional argument vector supplied for testing.</p>
+<p>Returns:
+Process exit code returned by the embedding pipeline.</p>
 </section>
 <section id="doctags-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">doctags(argv)</span></code><a class="headerlink" href="#doctags-argv" title="Link to this heading"></a></h3>
 <p>Programmatic helper mirroring <code class="docutils literal notranslate"><span class="pre">docparse</span> <span class="pre">doctags</span></code>.</p>
+<p>Args:
+argv: Optional argument vector supplied for testing.</p>
+<p>Returns:
+Process exit code returned by the DocTags conversion pipeline.</p>
 </section>
 </section>
 <section id="classes">
 <h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="command">
 <h3><code class="docutils literal notranslate"><span class="pre">_Command</span></code><a class="headerlink" href="#command" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Callable wrapper storing handler metadata for subcommands.</p>
+<p>Attributes:
+handler: Callable invoked with the subcommand argument vector.
+help: Short help text displayed in CLI usage.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>cmd = _Command(_run_chunk, “Run the chunker”)
+cmd.handler([])  # doctest: +SKIP
+0</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 </section>
 </section>
