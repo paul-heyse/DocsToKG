@@ -1,9 +1,9 @@
-"""Ontology downloader public API.
+"""Public API for the DocsToKG ontology downloader and resolver pipeline.
 
-Expose the primary fetch utilities used by external callers to plan resolver
-fallback chains, download ontologies with hardened validation, stream
-normalization, and emit schema-compliant manifests with deterministic
-fingerprints.
+This facade exposes the primary fetch utilities used by external callers to
+plan resolver fallback chains, download ontologies with hardened validation,
+perform stream normalization, and emit schema-compliant manifests with
+deterministic fingerprints.
 """
 
 from __future__ import annotations

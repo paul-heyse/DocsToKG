@@ -94,7 +94,7 @@
   <section id="api-reference">
 <h1>1. API Reference<a class="headerlink" href="#api-reference" title="Link to this heading"></a></h1>
 <p>DocsToKG exposes a single HTTP-style interface for hybrid search through the
-<code class="docutils literal notranslate"><span class="pre">HybridSearchAPI</span></code> class in <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.api</span></code>. This reference describes the
+<code class="docutils literal notranslate"><span class="pre">HybridSearchAPI</span></code> class in <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service</span></code>. This reference describes the
 request/response schema and shows how to integrate the API into a web service.</p>
 <blockquote>
 <div><p>ℹ️  DocsToKG does not ship a standalone web server. Use the snippets below to wrap <code class="docutils literal notranslate"><span class="pre">HybridSearchAPI</span></code> with your preferred framework (FastAPI, Flask, etc.).</p>
@@ -267,7 +267,7 @@ ranking audits.</p>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">fastapi</span><span class="w"> </span><span class="kn">import</span> <span class="n">FastAPI</span><span class="p">,</span> <span class="n">HTTPException</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">HybridSearchAPI</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.service</span><span class="w"> </span><span class="kn">import</span> <span class="n">HybridSearchAPI</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">my_project.hybrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_hybrid_service</span>  <span class="c1"># see docs/06-operations/index.md</span>
 
 <span class="n">app</span> <span class="o">=</span> <span class="n">FastAPI</span><span class="p">()</span>

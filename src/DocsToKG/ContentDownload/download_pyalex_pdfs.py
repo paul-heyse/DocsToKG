@@ -111,6 +111,57 @@ def _has_pdf_eof(path: Path) -> bool:
         return False
 
 
+def _head_precheck_candidate(
+    session: requests.Session,
+    url: str,
+    timeout: float,
+) -> bool:
+    """Evaluate whether ``url`` is likely to return a PDF payload.
+
+    The helper performs a single HEAD request with a tight timeout budget
+    to avoid fetching large payloads unnecessarily. Tests rely on this
+    behaviour to ensure dry-run execution does not trigger streaming
+    downloads.
+
+    Args:
+        session: HTTP session used for the outbound HEAD request.
+        url: Candidate download URL that should be validated.
+        timeout: Per-request timeout budget, in seconds.
+
+    Returns:
+        ``True`` when the HEAD response suggests the URL returns a PDF;
+        ``False`` when the response clearly indicates HTML or a missing file.
+    """
+
+    try:
+        response = request_with_retries(
+            session,
+            "HEAD",
+            url,
+            max_retries=1,
+            timeout=min(timeout, 5.0),
+            allow_redirects=True,
+        )
+    except Exception:
+        return True
+
+    try:
+        if response.status_code not in {200, 302, 304}:
+            return False
+
+        content_type = (response.headers.get("Content-Type") or "").lower()
+        content_length = response.headers.get("Content-Length", "")
+
+        if "text/html" in content_type:
+            return False
+        if content_length == "0":
+            return False
+
+        return True
+    finally:
+        response.close()
+
+
 def slugify(text: str, keep: int = 80) -> str:
     """Create a filesystem-friendly slug for a work title.
 
@@ -1257,6 +1308,11 @@ def download_candidate(
         DownloadOutcome describing the result of the download attempt including
         streaming hash metadata when available.
 
+    Notes:
+        A lightweight HEAD preflight is issued when the caller has not already
+        validated the URL. This mirrors the resolver pipeline behaviour and
+        keeps dry-run tests deterministic.
+
     Raises:
         OSError: If writing the downloaded payload to disk fails.
         TypeError: If conditional response parsing returns unexpected objects.
@@ -1268,6 +1324,9 @@ def download_candidate(
 
     dry_run = bool(context.get("dry_run", False))
     head_precheck_passed = head_precheck_passed or bool(context.get("head_precheck_passed", False))
+    if not head_precheck_passed and not context.get("skip_head_precheck", False):
+        head_precheck_passed = _head_precheck_candidate(session, url, timeout)
+        context["head_precheck_passed"] = head_precheck_passed
     extract_html_text = bool(context.get("extract_html_text", False))
     previous_map: Dict[str, Dict[str, Any]] = context.get("previous", {})
     previous = previous_map.get(url, {})

@@ -1,6 +1,6 @@
 # 1. Module: results
 
-This reference documents the DocsToKG module ``DocsToKG.HybridSearch.results``.
+This reference documents the DocsToKG module ``DocsToKG.HybridSearch.ranking``.
 
 Result shaping utilities for hybrid search responses.
 

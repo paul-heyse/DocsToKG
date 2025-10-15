@@ -1,7 +1,7 @@
 # 1. API Reference
 
 DocsToKG exposes a single HTTP-style interface for hybrid search through the
-`HybridSearchAPI` class in `DocsToKG.HybridSearch.api`. This reference describes the
+`HybridSearchAPI` class in `DocsToKG.HybridSearch.service`. This reference describes the
 request/response schema and shows how to integrate the API into a web service.
 
 > ℹ️  DocsToKG does not ship a standalone web server. Use the snippets below to wrap `HybridSearchAPI` with your preferred framework (FastAPI, Flask, etc.).
@@ -111,7 +111,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 
-from DocsToKG.HybridSearch.api import HybridSearchAPI
+from DocsToKG.HybridSearch.service import HybridSearchAPI
 from my_project.hybrid import build_hybrid_service  # see docs/06-operations/index.md
 
 app = FastAPI()

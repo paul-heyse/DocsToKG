@@ -16,13 +16,28 @@ _TOKEN_PATTERN = re.compile(r"[\w']+")
 
 
 def tokenize(text: str) -> List[str]:
-    """Tokenize text into lowercase alphanumeric tokens."""
+    """Tokenize text into lowercase alphanumeric tokens.
+
+    Args:
+        text: Raw text to segment into tokens.
+
+    Returns:
+        List[str]: Lowercased alphanumeric tokens extracted from ``text``.
+    """
 
     return [token.lower() for token in _TOKEN_PATTERN.findall(text)]
 
 
 def tokenize_with_spans(text: str) -> Tuple[List[str], List[Tuple[int, int]]]:
-    """Return tokens alongside their character spans."""
+    """Return tokens alongside their character spans.
+
+    Args:
+        text: Raw text to tokenize while preserving character offsets.
+
+    Returns:
+        Tuple[List[str], List[Tuple[int, int]]]: Token list and the corresponding
+        ``(start, end)`` character spans for each token.
+    """
 
     tokens: List[str] = []
     spans: List[Tuple[int, int]] = []
@@ -33,7 +48,22 @@ def tokenize_with_spans(text: str) -> Tuple[List[str], List[Tuple[int, int]]]:
 
 
 def sliding_window(tokens: Sequence[str], window: int, overlap: int) -> Iterator[List[str]]:
-    """Yield token windows with configurable overlap."""
+    """Yield token windows with configurable overlap.
+
+    Args:
+        tokens: Token sequence to window over.
+        window: Maximum number of tokens per window.
+        overlap: Number of tokens shared between consecutive windows.
+
+    Yields:
+        List[str]: Next token window respecting ``window`` and ``overlap`` constraints.
+
+    Returns:
+        Iterator[List[str]]: Iterator producing sliding windows across ``tokens``.
+
+    Raises:
+        ValueError: If ``window`` or ``overlap`` violate expected ranges.
+    """
 
     if window <= 0:
         raise ValueError("window must be positive")

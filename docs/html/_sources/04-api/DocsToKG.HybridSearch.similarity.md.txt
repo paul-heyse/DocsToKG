@@ -1,6 +1,6 @@
 # 1. Module: similarity
 
-This reference documents the DocsToKG module ``DocsToKG.HybridSearch.similarity``.
+This reference documents the DocsToKG module ``DocsToKG.HybridSearch.vectorstore``.
 
 GPU-accelerated cosine similarity helpers for HybridSearch.
 

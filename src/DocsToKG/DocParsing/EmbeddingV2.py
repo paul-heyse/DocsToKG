@@ -59,6 +59,12 @@ from DocsToKG.DocParsing._common import (
     manifest_append,
     resolve_hash_algorithm,
 )
+from DocsToKG.DocParsing.pipelines import (
+    add_data_root_option,
+    add_resume_force_options,
+    prepare_data_root,
+    resolve_pipeline_path,
+)
 from DocsToKG.DocParsing.schemas import (
     COMPATIBLE_CHUNK_VERSIONS,
     BM25Vector,
@@ -1011,25 +1017,17 @@ def build_parser() -> argparse.ArgumentParser:
     """Construct the CLI parser for the embedding pipeline.
 
     Args:
-        None: Parser creation does not require inputs.
+        None
 
     Returns:
-        :class:`argparse.ArgumentParser` configured for embedding options.
+        argparse.ArgumentParser: Parser configured for embedding options.
 
     Raises:
         None
     """
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--data-root",
-        type=Path,
-        default=None,
-        help=(
-            "Override DocsToKG Data directory. Defaults to auto-detection or "
-            "$DOCSTOKG_DATA_ROOT."
-        ),
-    )
+    add_data_root_option(parser)
     parser.add_argument("--chunks-dir", type=Path, default=DEFAULT_CHUNKS_DIR)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_VECTORS_DIR)
     parser.add_argument("--bm25-k1", type=float, default=1.5)
@@ -1072,15 +1070,10 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--tp", type=int, default=1)
-    parser.add_argument(
-        "--resume",
-        action="store_true",
-        help="Skip chunk files whose vector outputs already exist with matching hash",
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Force reprocessing even when resume criteria are satisfied",
+    add_resume_force_options(
+        parser,
+        resume_help="Skip chunk files whose vector outputs already exist with matching hash",
+        force_help="Force reprocessing even when resume criteria are satisfied",
     )
     parser.add_argument(
         "--offline",
@@ -1097,11 +1090,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse CLI arguments for standalone embedding execution.
 
     Args:
-        argv: Optional CLI argument vector. When ``None`` the current process
-            arguments are used.
+        argv (list[str] | None): Optional CLI argument vector. When ``None`` the
+            current process arguments are used.
 
     Returns:
-        Namespace containing parsed embedding configuration.
+        argparse.Namespace: Parsed embedding configuration.
 
     Raises:
         SystemExit: Propagated if ``argparse`` reports invalid options.
@@ -1114,10 +1107,11 @@ def main(args: argparse.Namespace | None = None) -> int:
     """CLI entrypoint for chunk UUID cleanup and embedding generation.
 
     Args:
-        args: Optional parsed arguments, primarily for testing or orchestration.
+        args (argparse.Namespace | None): Optional parsed arguments, primarily
+            for testing or orchestration.
 
     Returns:
-        Exit code where ``0`` indicates success.
+        int: Exit code where ``0`` indicates success.
 
     Raises:
         ValueError: If invalid runtime parameters (such as batch sizes) are supplied.
@@ -1210,26 +1204,24 @@ def main(args: argparse.Namespace | None = None) -> int:
         raise
 
     data_root_override = args.data_root
-    resolved_root = (
-        detect_data_root(data_root_override)
-        if data_root_override is not None
-        else DEFAULT_DATA_ROOT
-    )
+    data_root_overridden = data_root_override is not None
+    resolved_root = prepare_data_root(data_root_override, DEFAULT_DATA_ROOT)
 
-    if data_root_override is not None:
-        os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved_root)
+    chunks_dir = resolve_pipeline_path(
+        cli_value=args.chunks_dir,
+        default_path=DEFAULT_CHUNKS_DIR,
+        resolved_data_root=resolved_root,
+        data_root_overridden=data_root_overridden,
+        resolver=data_chunks,
+    ).resolve()
 
-    data_manifests(resolved_root)
-
-    if args.chunks_dir == DEFAULT_CHUNKS_DIR and data_root_override is not None:
-        chunks_dir = data_chunks(resolved_root)
-    else:
-        chunks_dir = args.chunks_dir.resolve()
-
-    if args.out_dir == DEFAULT_VECTORS_DIR and data_root_override is not None:
-        out_dir = data_vectors(resolved_root)
-    else:
-        out_dir = args.out_dir.resolve()
+    out_dir = resolve_pipeline_path(
+        cli_value=args.out_dir,
+        default_path=DEFAULT_VECTORS_DIR,
+        resolved_data_root=resolved_root,
+        data_root_overridden=data_root_overridden,
+        resolver=data_vectors,
+    ).resolve()
 
     out_dir.mkdir(parents=True, exist_ok=True)
     args.out_dir = out_dir

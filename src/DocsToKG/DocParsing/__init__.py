@@ -1,4 +1,4 @@
-"""Public entry points for the DocParsing package."""
+"""High-level facade exposing CLI entry points for DocsToKG DocParsing."""
 
 from __future__ import annotations
 

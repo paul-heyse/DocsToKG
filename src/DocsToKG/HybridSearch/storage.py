@@ -21,6 +21,9 @@ class OpenSearchIndexTemplate:
     def asdict(self) -> Dict[str, object]:
         """Serialize the template to a dictionary payload.
 
+        Args:
+            None
+
         Returns:
             Dict[str, object]: OpenSearch template representation suitable for APIs.
         """
@@ -117,6 +120,9 @@ class OpenSearchSchemaManager:
 
     def list_templates(self) -> Mapping[str, OpenSearchIndexTemplate]:
         """Return all registered templates indexed by namespace.
+
+        Args:
+            None
 
         Returns:
             Mapping[str, OpenSearchIndexTemplate]: Copy of known templates keyed by namespace.

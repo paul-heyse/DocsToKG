@@ -1,6 +1,6 @@
 # 1. Module: api
 
-This reference documents the DocsToKG module ``DocsToKG.HybridSearch.api``.
+This reference documents the DocsToKG module ``DocsToKG.HybridSearch.service``.
 
 HTTP-style interface for the hybrid search service.
 

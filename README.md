@@ -65,7 +65,7 @@ python docs/scripts/validate_docs.py
 ### Hybrid Search Service
 
 ```python
-from DocsToKG.HybridSearch.retrieval import HybridSearchRequest
+from DocsToKG.HybridSearch import HybridSearchRequest
 from my_project.hybrid import build_hybrid_service  # see docs/06-operations/index.md
 
 request = HybridSearchRequest(query="ontology alignment best practices", page_size=3)

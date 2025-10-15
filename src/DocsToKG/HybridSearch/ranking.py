@@ -1,4 +1,4 @@
-"""Ranking, fusion, and result shaping utilities."""
+"""Ranking, fusion, and result shaping utilities for DocsToKG hybrid search."""
 
 from __future__ import annotations
 
@@ -32,6 +32,14 @@ class ReciprocalRankFusion:
         self._k0 = k0
 
     def fuse(self, candidates: Sequence[FusionCandidate]) -> Dict[str, float]:
+        """Fuse ranked candidates using Reciprocal Rank Fusion.
+
+        Args:
+            candidates: Ranked candidates from individual retrieval channels.
+
+        Returns:
+            Dict[str, float]: Mapping of vector IDs to fused reciprocal-rank scores.
+        """
         scores: Dict[str, float] = defaultdict(float)
         for candidate in candidates:
             contribution = 1.0 / (self._k0 + candidate.rank)
@@ -48,7 +56,23 @@ def apply_mmr_diversification(
     device: int = 0,
     resources: Optional["faiss.StandardGpuResources"] = None,
 ) -> List[FusionCandidate]:
-    """Apply maximal marginal relevance to promote diversity."""
+    """Apply maximal marginal relevance to promote diversity.
+
+    Args:
+        fused_candidates: Ordered fusion candidates before diversification.
+        fused_scores: Precomputed fused scores for each candidate vector ID.
+        lambda_param: Balancing factor between relevance and diversity (0-1).
+        top_k: Maximum number of diversified candidates to retain.
+        device: GPU device identifier used for similarity computations.
+        resources: FAISS GPU resources used for pairwise similarity.
+
+    Returns:
+        List[FusionCandidate]: Diversified candidate list ordered by MMR score.
+
+    Raises:
+        ValueError: If ``lambda_param`` falls outside ``[0, 1]``.
+        RuntimeError: When GPU resources are not available for diversification.
+    """
 
     if not 0.0 <= lambda_param <= 1.0:
         raise ValueError("lambda_param must be within [0, 1]")
@@ -112,6 +136,18 @@ class ResultShaper:
         request: HybridSearchRequest,
         channel_scores: Mapping[str, Dict[str, float]],
     ) -> List[HybridSearchResult]:
+        """Shape ranked candidates into final results with highlights and diagnostics.
+
+        Args:
+            ordered_chunks: Ranked chunks produced by hybrid fusion.
+            fused_scores: Mapping of vector IDs to fused scores.
+            request: Original hybrid search request, used for query context.
+            channel_scores: Channel-specific score lookups keyed by resolver name.
+
+        Returns:
+            List[HybridSearchResult]: Finalised results respecting per-document quotas
+            and duplicate suppression.
+        """
         if not ordered_chunks:
             return []
 
@@ -212,4 +248,3 @@ class ResultShaper:
 
 
 __all__ = ["ReciprocalRankFusion", "apply_mmr_diversification", "ResultShaper"]
-

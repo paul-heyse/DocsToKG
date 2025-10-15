@@ -36,7 +36,7 @@ import logging
 import random
 import re
 import threading
-import time
+import time as _time
 import warnings
 from collections import Counter, defaultdict
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
@@ -57,9 +57,7 @@ from typing import (
 )
 from urllib.parse import quote, urljoin, urlparse, urlsplit
 
-import requests
-
-from DocsToKG.ContentDownload.network import request_with_retries
+import requests as _requests
 from DocsToKG.ContentDownload.utils import (
     dedupe,
     normalize_doi,
@@ -77,8 +75,8 @@ except Exception:  # pragma: no cover - optional dependency missing
 
 LOGGER = logging.getLogger(__name__)
 
-_time_alias = time
-_requests_alias = requests
+_time_alias = _time
+_requests_alias = _requests
 
 DEFAULT_RESOLVER_ORDER: List[str] = [
     "openalex",
@@ -157,7 +155,7 @@ class ResolverConfig:
         semantic_scholar_api_key: API key for Semantic Scholar resolver.
         doaj_api_key: API key for DOAJ resolver.
         resolver_timeouts: Resolver-specific timeout overrides.
-        resolver_min_interval_s: Minimum interval between resolver requests.
+        resolver_min_interval_s: Minimum interval between resolver _requests.
         domain_min_interval_s: Optional per-domain rate limits overriding resolver settings.
         resolver_rate_limits: Deprecated rate limit configuration retained for compat.
         enable_head_precheck: Toggle applying HEAD filtering before downloads.
@@ -169,7 +167,7 @@ class ResolverConfig:
     Notes:
         ``enable_head_precheck`` toggles inexpensive HEAD lookups before downloads
         to filter obvious HTML responses. ``resolver_head_precheck`` allows
-        per-resolver overrides when specific providers reject HEAD requests.
+        per-resolver overrides when specific providers reject HEAD _requests.
         ``max_concurrent_resolvers`` bounds the number of resolver threads used
         per work while still respecting configured rate limits.
 
@@ -468,14 +466,14 @@ class Resolver(Protocol):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
         """Yield candidate URLs or events for the given artifact.
 
         Args:
-            session: HTTP session used for outbound requests.
+            session: HTTP session used for outbound _requests.
             config: Resolver configuration.
             artifact: Work artifact describing the current item.
 
@@ -593,6 +591,35 @@ def headers_cache_key(headers: Dict[str, str]) -> Tuple[Tuple[str, str], ...]:
     )
     return tuple(sorted(items))
 
+_headers_cache_key = headers_cache_key
+
+
+def request_with_retries(
+    session: _requests.Session,
+   method: str,
+   url: str,
+   **kwargs: Any,
+) -> _requests.Response:
+    """Proxy to :func:`DocsToKG.ContentDownload.network.request_with_retries`.
+
+    Args:
+        session: Requests session used to perform the HTTP call.
+        method: HTTP method such as ``"GET"`` or ``"HEAD"``.
+        url: Fully-qualified URL for the request.
+        **kwargs: Additional parameters forwarded to the network layer helper.
+
+    Returns:
+        requests.Response: Response returned by the shared network helper.
+
+    Notes:
+        The indirection keeps resolver providers compatible with tests that patch the
+        network-layer helper while avoiding circular imports during module initialisation.
+    """
+
+    from DocsToKG.ContentDownload.network import request_with_retries as _request_with_retries
+
+    return _request_with_retries(session, method, url, **kwargs)
+
 class ResolverRegistry:
     """Registry tracking resolver classes by their ``name`` attribute."""
 
@@ -683,7 +710,7 @@ def _fetch_crossref_data(
 
     headers = dict(headers_key)
     params = {"mailto": mailto} if mailto else None
-    response = requests.get(
+    response = _requests.get(
         f"https://api.crossref.org/works/{quote(doi)}",
         params=params,
         timeout=timeout,
@@ -704,7 +731,7 @@ def _fetch_unpaywall_data(
     """Fetch Unpaywall metadata for ``doi`` using polite caching."""
 
     headers = dict(headers_key)
-    response = requests.get(
+    response = _requests.get(
         f"https://api.unpaywall.org/v2/{quote(doi)}",
         params={"email": email} if email else None,
         timeout=timeout,
@@ -727,7 +754,7 @@ def _fetch_semantic_scholar_data(
     headers = dict(headers_key)
     if api_key:
         headers["x-api-key"] = api_key
-    response = requests.get(
+    response = _requests.get(
         f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(doi)}",
         params={"fields": "title,openAccessPdf"},
         timeout=timeout,
@@ -761,7 +788,7 @@ class ArxivResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -805,7 +832,7 @@ class CoreResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -834,7 +861,7 @@ class CoreResolver(RegisteredResolver):
                 headers=headers,
                 timeout=config.get_timeout(self.name),
             )
-        except requests.Timeout as exc:
+        except _requests.Timeout as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -842,7 +869,7 @@ class CoreResolver(RegisteredResolver):
                 metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
             )
             return
-        except requests.ConnectionError as exc:
+        except _requests.ConnectionError as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -850,7 +877,7 @@ class CoreResolver(RegisteredResolver):
                 metadata={"error": str(exc)},
             )
             return
-        except requests.RequestException as exc:
+        except _requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -919,7 +946,7 @@ class CrossrefResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -943,7 +970,7 @@ class CrossrefResolver(RegisteredResolver):
         headers = dict(config.polite_headers)
         data: Optional[Dict[str, Any]] = None
         if hasattr(session, "get"):
-            response: Optional[requests.Response] = None
+            response: Optional[_requests.Response] = None
             try:
                 response = request_with_retries(
                     session,
@@ -954,7 +981,7 @@ class CrossrefResolver(RegisteredResolver):
                     headers=headers,
                     allow_redirects=True,
                 )
-            except requests.Timeout as exc:
+            except _requests.Timeout as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -962,7 +989,7 @@ class CrossrefResolver(RegisteredResolver):
                     metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
                 )
                 return
-            except requests.ConnectionError as exc:
+            except _requests.ConnectionError as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -970,7 +997,7 @@ class CrossrefResolver(RegisteredResolver):
                     metadata={"error": str(exc)},
                 )
                 return
-            except requests.RequestException as exc:
+            except _requests.RequestException as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -1029,7 +1056,7 @@ class CrossrefResolver(RegisteredResolver):
                     config.get_timeout(self.name),
                     headers_cache_key(config.polite_headers),
                 )
-            except requests.HTTPError as exc:
+            except _requests.HTTPError as exc:
                 status = exc.response.status_code if exc.response else None
                 yield ResolverResult(
                     url=None,
@@ -1039,7 +1066,7 @@ class CrossrefResolver(RegisteredResolver):
                     metadata={"error_detail": f"Crossref HTTPError: {status}"},
                 )
                 return
-            except requests.RequestException as exc:  # pragma: no cover - network errors
+            except _requests.RequestException as exc:  # pragma: no cover - network errors
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -1105,7 +1132,7 @@ class DoajResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -1135,7 +1162,7 @@ class DoajResolver(RegisteredResolver):
                 headers=headers,
                 timeout=config.get_timeout(self.name),
             )
-        except requests.Timeout as exc:
+        except _requests.Timeout as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -1143,7 +1170,7 @@ class DoajResolver(RegisteredResolver):
                 metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
             )
             return
-        except requests.ConnectionError as exc:
+        except _requests.ConnectionError as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -1151,7 +1178,7 @@ class DoajResolver(RegisteredResolver):
                 metadata={"error": str(exc)},
             )
             return
-        except requests.RequestException as exc:
+        except _requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -1220,7 +1247,7 @@ class EuropePmcResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -1247,7 +1274,7 @@ class EuropePmcResolver(RegisteredResolver):
                 timeout=config.get_timeout(self.name),
                 headers=config.polite_headers,
             )
-        except requests.Timeout as exc:
+        except _requests.Timeout as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -1255,7 +1282,7 @@ class EuropePmcResolver(RegisteredResolver):
                 metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
             )
             return
-        except requests.RequestException as exc:
+        except _requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -1320,7 +1347,7 @@ class FigshareResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -1355,7 +1382,7 @@ class FigshareResolver(RegisteredResolver):
                 timeout=config.get_timeout(self.name),
                 headers=headers,
             )
-        except requests.Timeout as exc:
+        except _requests.Timeout as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -1366,7 +1393,7 @@ class FigshareResolver(RegisteredResolver):
                 },
             )
             return
-        except requests.RequestException as exc:
+        except _requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -1459,7 +1486,7 @@ class HalResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -1486,7 +1513,7 @@ class HalResolver(RegisteredResolver):
                 headers=config.polite_headers,
                 timeout=config.get_timeout(self.name),
             )
-        except requests.Timeout as exc:
+        except _requests.Timeout as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -1494,7 +1521,7 @@ class HalResolver(RegisteredResolver):
                 metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
             )
             return
-        except requests.ConnectionError as exc:
+        except _requests.ConnectionError as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -1502,7 +1529,7 @@ class HalResolver(RegisteredResolver):
                 metadata={"error": str(exc)},
             )
             return
-        except requests.RequestException as exc:
+        except _requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -1576,7 +1603,7 @@ class LandingPageResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -1602,7 +1629,7 @@ class LandingPageResolver(RegisteredResolver):
                     headers=config.polite_headers,
                     timeout=config.get_timeout(self.name),
                 )
-            except requests.Timeout as exc:
+            except _requests.Timeout as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -1614,7 +1641,7 @@ class LandingPageResolver(RegisteredResolver):
                     },
                 )
                 continue
-            except requests.ConnectionError as exc:
+            except _requests.ConnectionError as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -1622,7 +1649,7 @@ class LandingPageResolver(RegisteredResolver):
                     metadata={"landing": landing, "error": str(exc)},
                 )
                 continue
-            except requests.RequestException as exc:  # pragma: no cover - network errors
+            except _requests.RequestException as exc:  # pragma: no cover - network errors
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -1709,7 +1736,7 @@ class OpenAireResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -1736,7 +1763,7 @@ class OpenAireResolver(RegisteredResolver):
                 headers=config.polite_headers,
                 timeout=config.get_timeout(self.name),
             )
-        except requests.Timeout as exc:
+        except _requests.Timeout as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -1744,7 +1771,7 @@ class OpenAireResolver(RegisteredResolver):
                 metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
             )
             return
-        except requests.ConnectionError as exc:
+        except _requests.ConnectionError as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -1752,7 +1779,7 @@ class OpenAireResolver(RegisteredResolver):
                 metadata={"error": str(exc)},
             )
             return
-        except requests.RequestException as exc:
+        except _requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -1827,7 +1854,7 @@ class OpenAlexResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -1874,7 +1901,7 @@ class OsfResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -1901,7 +1928,7 @@ class OsfResolver(RegisteredResolver):
                 headers=config.polite_headers,
                 timeout=config.get_timeout(self.name),
             )
-        except requests.Timeout as exc:
+        except _requests.Timeout as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -1909,7 +1936,7 @@ class OsfResolver(RegisteredResolver):
                 metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
             )
             return
-        except requests.ConnectionError as exc:
+        except _requests.ConnectionError as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -1917,7 +1944,7 @@ class OsfResolver(RegisteredResolver):
                 metadata={"error": str(exc)},
             )
             return
-        except requests.RequestException as exc:
+        except _requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -1991,7 +2018,7 @@ class PmcResolver(RegisteredResolver):
         return bool(artifact.pmcid or artifact.pmid or artifact.doi)
 
     def _lookup_pmcids(
-        self, session: requests.Session, identifiers: List[str], config: ResolverConfig
+        self, session: _requests.Session, identifiers: List[str], config: ResolverConfig
     ) -> List[str]:
         if not identifiers:
             return []
@@ -2009,13 +2036,13 @@ class PmcResolver(RegisteredResolver):
                 timeout=config.get_timeout(self.name),
                 headers=config.polite_headers,
             )
-        except requests.Timeout as exc:
+        except _requests.Timeout as exc:
             LOGGER.debug("PMC ID lookup timed out: %s", exc)
             return []
-        except requests.ConnectionError as exc:
+        except _requests.ConnectionError as exc:
             LOGGER.debug("PMC ID lookup connection error: %s", exc)
             return []
-        except requests.RequestException as exc:
+        except _requests.RequestException as exc:
             LOGGER.debug("PMC ID lookup request error: %s", exc)
             return []
         except Exception:  # pragma: no cover - defensive
@@ -2038,7 +2065,7 @@ class PmcResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -2079,7 +2106,7 @@ class PmcResolver(RegisteredResolver):
                     timeout=config.get_timeout(self.name),
                     headers=config.polite_headers,
                 )
-            except requests.Timeout as exc:
+            except _requests.Timeout as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -2095,7 +2122,7 @@ class PmcResolver(RegisteredResolver):
                     metadata={"pmcid": pmcid, "source": "pdf-fallback"},
                 )
                 continue
-            except requests.ConnectionError as exc:
+            except _requests.ConnectionError as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -2107,7 +2134,7 @@ class PmcResolver(RegisteredResolver):
                     metadata={"pmcid": pmcid, "source": "pdf-fallback"},
                 )
                 continue
-            except requests.RequestException as exc:
+            except _requests.RequestException as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -2180,7 +2207,7 @@ class SemanticScholarResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -2205,7 +2232,7 @@ class SemanticScholarResolver(RegisteredResolver):
                 config.get_timeout(self.name),
                 headers_cache_key(config.polite_headers),
             )
-        except requests.HTTPError as exc:
+        except _requests.HTTPError as exc:
             status = getattr(exc.response, "status_code", None)
             detail = status if status is not None else "unknown"
             yield ResolverResult(
@@ -2216,7 +2243,7 @@ class SemanticScholarResolver(RegisteredResolver):
                 metadata={"error_detail": f"Semantic Scholar HTTPError: {detail}"},
             )
             return
-        except requests.Timeout as exc:
+        except _requests.Timeout as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -2224,7 +2251,7 @@ class SemanticScholarResolver(RegisteredResolver):
                 metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
             )
             return
-        except requests.ConnectionError as exc:
+        except _requests.ConnectionError as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -2232,7 +2259,7 @@ class SemanticScholarResolver(RegisteredResolver):
                 metadata={"error": str(exc)},
             )
             return
-        except requests.RequestException as exc:
+        except _requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -2290,7 +2317,7 @@ class UnpaywallResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -2319,7 +2346,7 @@ class UnpaywallResolver(RegisteredResolver):
                     timeout=config.get_timeout(self.name),
                     headers=headers,
                 )
-            except requests.Timeout as exc:
+            except _requests.Timeout as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -2327,7 +2354,7 @@ class UnpaywallResolver(RegisteredResolver):
                     metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
                 )
                 return
-            except requests.ConnectionError as exc:
+            except _requests.ConnectionError as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -2335,7 +2362,7 @@ class UnpaywallResolver(RegisteredResolver):
                     metadata={"error": str(exc)},
                 )
                 return
-            except requests.RequestException as exc:
+            except _requests.RequestException as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -2385,7 +2412,7 @@ class UnpaywallResolver(RegisteredResolver):
                     config.get_timeout(self.name),
                     headers_cache_key(config.polite_headers),
                 )
-            except requests.HTTPError as exc:
+            except _requests.HTTPError as exc:
                 status = exc.response.status_code if exc.response else None
                 yield ResolverResult(
                     url=None,
@@ -2395,7 +2422,7 @@ class UnpaywallResolver(RegisteredResolver):
                     metadata={"error_detail": f"Unpaywall HTTPError: {status}"},
                 )
                 return
-            except requests.Timeout as exc:
+            except _requests.Timeout as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -2403,7 +2430,7 @@ class UnpaywallResolver(RegisteredResolver):
                     metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
                 )
                 return
-            except requests.ConnectionError as exc:
+            except _requests.ConnectionError as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -2411,7 +2438,7 @@ class UnpaywallResolver(RegisteredResolver):
                     metadata={"error": str(exc)},
                 )
                 return
-            except requests.RequestException as exc:  # pragma: no cover - network errors
+            except _requests.RequestException as exc:  # pragma: no cover - network errors
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -2477,7 +2504,7 @@ class WaybackResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -2505,7 +2532,7 @@ class WaybackResolver(RegisteredResolver):
                     timeout=config.get_timeout(self.name),
                     headers=config.polite_headers,
                 )
-            except requests.Timeout as exc:
+            except _requests.Timeout as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -2517,7 +2544,7 @@ class WaybackResolver(RegisteredResolver):
                     },
                 )
                 continue
-            except requests.ConnectionError as exc:
+            except _requests.ConnectionError as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -2525,7 +2552,7 @@ class WaybackResolver(RegisteredResolver):
                     metadata={"original": original, "error": str(exc)},
                 )
                 continue
-            except requests.RequestException as exc:
+            except _requests.RequestException as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
@@ -2595,7 +2622,7 @@ class ZenodoResolver(RegisteredResolver):
 
     def iter_urls(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
@@ -2623,7 +2650,7 @@ class ZenodoResolver(RegisteredResolver):
                 timeout=config.get_timeout(self.name),
                 headers=config.polite_headers,
             )
-        except requests.Timeout as exc:
+        except _requests.Timeout as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -2634,7 +2661,7 @@ class ZenodoResolver(RegisteredResolver):
                 },
             )
             return
-        except requests.RequestException as exc:
+        except _requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -2720,6 +2747,9 @@ class ZenodoResolver(RegisteredResolver):
 
 def default_resolvers() -> List[Resolver]:
     """Instantiate the default resolver stack in priority order.
+
+    Args:
+        None
 
     Returns:
         List[Resolver]: Resolver instances ordered according to
@@ -2815,7 +2845,7 @@ class ResolverPipeline:
     The pipeline is safe to reuse across worker threads when
     :attr:`ResolverConfig.max_concurrent_resolvers` is greater than one. All
     mutable shared state is protected by :class:`threading.Lock` instances and
-    only read concurrently without mutation. HTTP ``requests.Session`` objects
+    only read concurrently without mutation. HTTP ``_requests.Session`` objects
     are treated as read-only; callers must avoid mutating shared sessions after
     handing them to the pipeline.
 
@@ -2890,13 +2920,13 @@ class ResolverPipeline:
         wait = 0.0
         with self._lock:
             last = self._last_invocation[resolver_name]
-            now = time.monotonic()
+            now = _time.monotonic()
             delta = now - last
             if delta < limit:
                 wait = limit - delta
             self._last_invocation[resolver_name] = now + wait
         if wait > 0:
-            time.sleep(wait)
+            _time.sleep(wait)
 
     def _respect_domain_limit(self, url: str) -> None:
         """Enforce per-domain throttling when configured.
@@ -2916,7 +2946,7 @@ class ResolverPipeline:
         interval = self.config.domain_min_interval_s.get(host)
         if not interval:
             return
-        now = time.monotonic()
+        now = _time.monotonic()
         wait = 0.0
         with self._host_lock:
             last = self._last_host_hit[host]
@@ -2929,9 +2959,9 @@ class ResolverPipeline:
                 return
             wait = interval - elapsed
         if wait > 0:
-            time.sleep(wait)
+            _time.sleep(wait)
             with self._host_lock:
-                self._last_host_hit[host] = time.monotonic()
+                self._last_host_hit[host] = _time.monotonic()
 
     def _jitter_sleep(self) -> None:
         """Introduce a small delay to avoid stampeding downstream services.
@@ -2945,7 +2975,7 @@ class ResolverPipeline:
 
         if self.config.sleep_jitter <= 0:
             return
-        time.sleep(self.config.sleep_jitter + random.random() * 0.1)
+        _time.sleep(self.config.sleep_jitter + random.random() * 0.1)
 
     def _should_attempt_head_check(self, resolver_name: str) -> bool:
         """Return ``True`` when a resolver should perform a HEAD preflight request.
@@ -2963,7 +2993,7 @@ class ResolverPipeline:
 
     def _head_precheck_url(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         url: str,
         timeout: float,
     ) -> bool:
@@ -3008,7 +3038,7 @@ class ResolverPipeline:
 
     def run(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         artifact: "WorkArtifact",
         context: Optional[Dict[str, Any]] = None,
     ) -> PipelineResult:
@@ -3033,7 +3063,7 @@ class ResolverPipeline:
 
     def _run_sequential(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         artifact: "WorkArtifact",
         context_data: Dict[str, Any],
         state: _RunState,
@@ -3084,7 +3114,7 @@ class ResolverPipeline:
 
     def _run_concurrent(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         artifact: "WorkArtifact",
         context_data: Dict[str, Any],
         state: _RunState,
@@ -3262,7 +3292,7 @@ class ResolverPipeline:
         self,
         resolver_name: str,
         resolver: Resolver,
-        session: requests.Session,
+        session: _requests.Session,
         artifact: "WorkArtifact",
     ) -> Tuple[List[ResolverResult], float]:
         """Collect resolver results while applying rate limits and error handling.
@@ -3279,7 +3309,7 @@ class ResolverPipeline:
 
         results: List[ResolverResult] = []
         self._respect_rate_limit(resolver_name)
-        start = time.monotonic()
+        start = _time.monotonic()
         try:
             for result in resolver.iter_urls(session, self.config, artifact):
                 results.append(result)
@@ -3293,12 +3323,12 @@ class ResolverPipeline:
                     metadata={"message": str(exc)},
                 )
             )
-        wall_ms = (time.monotonic() - start) * 1000.0
+        wall_ms = (_time.monotonic() - start) * 1000.0
         return results, wall_ms
 
     def _process_result(
         self,
-        session: requests.Session,
+        session: _requests.Session,
         artifact: "WorkArtifact",
         resolver_name: str,
         order_index: int,

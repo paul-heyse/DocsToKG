@@ -6,7 +6,7 @@ them with downstream systems.
 ## 2. Hybrid Search REST API
 
 - **Endpoint**: `POST /v1/hybrid-search`
-- **Implementation**: `DocsToKG.HybridSearch.api.HybridSearchAPI`
+- **Implementation**: `DocsToKG.HybridSearch.service.HybridSearchAPI`
 - **Payload**:
   - `query` (string, required)
   - `namespace` (string, optional)
@@ -18,7 +18,7 @@ them with downstream systems.
 - **Response**: Ranked list containing document metadata, highlight spans, fused score
   diagnostics, and pagination cursor.
 
-Use the generated documentation in `docs/04-api/DocsToKG.HybridSearch.api.md` and `docs/04-api/DocsToKG.HybridSearch.retrieval.md` for attribute-level detail.
+Use the generated documentation in `docs/04-api/DocsToKG.HybridSearch.service.md` and `docs/04-api/DocsToKG.HybridSearch.retrieval.md` for attribute-level detail.
 
 ## 3. Python Service Layer
 

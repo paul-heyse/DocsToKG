@@ -14,7 +14,7 @@ GPU-backed cosine helpers for deduplication and fusion.
 - Strict CPU→GPU cloning (used during restore) prohibits CPU coarse quantisers.
 - Runtime device selection via `DenseIndexConfig.device` or the
   `HYBRIDSEARCH_FAISS_DEVICE` environment variable.
-- `DocsToKG.HybridSearch.similarity` provides GPU cosine helpers:
+- `DocsToKG.HybridSearch.vectorstore` provides GPU cosine helpers:
   `cosine_against_corpus_gpu`, `pairwise_inner_products`, and fast L2
   normalisation.
 
@@ -81,7 +81,7 @@ easier to compare recall/latency deltas between experiments.
 ```python
 import numpy as np
 from DocsToKG.HybridSearch.config import DenseIndexConfig
-from DocsToKG.HybridSearch.dense import FaissIndexManager
+from DocsToKG.HybridSearch.vectorstore import FaissIndexManager
 from DocsToKG.HybridSearch.ids import vector_uuid_to_faiss_int
 
 cfg = DenseIndexConfig(index_type="ivf_flat", nlist=1024, nprobe=16, device=0)
@@ -98,12 +98,12 @@ results = manager.search(query, top_k=10)
 
 ## 6. Similarity Helpers
 
-`DocsToKG.HybridSearch.similarity` now exposes GPU utilities that reuse FAISS
+`DocsToKG.HybridSearch.vectorstore` now exposes GPU utilities that reuse FAISS
 resources. They normalise vectors and compute cosine similarity without
 roundtripping through NumPy:
 
 ```python
-from DocsToKG.HybridSearch.similarity import cosine_against_corpus_gpu
+from DocsToKG.HybridSearch.vectorstore import cosine_against_corpus_gpu
 
 scores = cosine_against_corpus_gpu(query, xb)
 ```

@@ -1,6 +1,6 @@
 # 1. Module: tokenization
 
-This reference documents the DocsToKG module ``DocsToKG.HybridSearch.tokenization``.
+This reference documents the DocsToKG module ``DocsToKG.HybridSearch.features``.
 
 Tokenization utilities shared across sparse/dense features.
 

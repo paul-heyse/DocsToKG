@@ -81,11 +81,9 @@ def detect_data_root(start: Optional[Path] = None) -> Path:
             current working directory when ``None``.
 
     Returns:
-        Absolute path to the resolved ``Data`` directory.
-
-    Raises:
-        FileNotFoundError: If ``DOCSTOKG_DATA_ROOT`` points to a non-existent
-            directory.
+        Absolute path to the resolved ``Data`` directory. When
+        ``DOCSTOKG_DATA_ROOT`` is set but the directory does not yet exist,
+        it is created automatically.
 
     Examples:
         >>> os.environ["DOCSTOKG_DATA_ROOT"] = "/tmp/data"
@@ -102,9 +100,7 @@ def detect_data_root(start: Optional[Path] = None) -> Path:
     if env_root:
         env_path = Path(env_root).expanduser().resolve()
         if not env_path.exists():
-            raise FileNotFoundError(
-                f"DOCSTOKG_DATA_ROOT points to non-existent directory: {env_root}"
-            )
+            env_path.mkdir(parents=True, exist_ok=True)
         return env_path
 
     start_path = Path.cwd() if start is None else Path(start).resolve()

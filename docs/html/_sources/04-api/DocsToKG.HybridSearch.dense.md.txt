@@ -1,6 +1,6 @@
 # 1. Module: dense
 
-This reference documents the DocsToKG module ``DocsToKG.HybridSearch.dense``.
+This reference documents the DocsToKG module ``DocsToKG.HybridSearch.vectorstore``.
 
 GPU-only FAISS index management for dense retrieval.
 

@@ -1,6 +1,6 @@
 # 1. Module: similarity_gpu
 
-This reference documents the DocsToKG module ``DocsToKG.HybridSearch.similarity_gpu``.
+This reference documents the DocsToKG module ``DocsToKG.HybridSearch.vectorstore_gpu``.
 
 GPU-native cosine similarity helpers leveraged by HybridSearch pipelines.
 

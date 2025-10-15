@@ -29,7 +29,12 @@ class RequestValidationError(ValueError):
 
 @dataclass(slots=True)
 class ChannelResults:
-    """Results from a single retrieval channel (BM25, SPLADE, or dense)."""
+    """Results from a single retrieval channel (BM25, SPLADE, or dense).
+
+    Attributes:
+        candidates: Ordered list of channel-specific fusion candidates.
+        scores: Mapping of vector identifiers to raw channel scores.
+    """
 
     candidates: List[FusionCandidate]
     scores: Dict[str, float]
@@ -57,6 +62,16 @@ class HybridSearchService:
         self._faiss.set_id_resolver(self._registry.resolve_faiss_id)
 
     def search(self, request: HybridSearchRequest) -> HybridSearchResponse:
+        """Execute a hybrid retrieval round trip for ``request``.
+
+        Args:
+            request: Fully validated hybrid search request describing the query,
+                namespace, filters, and pagination parameters.
+
+        Returns:
+            HybridSearchResponse: Ranked hybrid search results enriched with channel-level
+            diagnostics and pagination cursor metadata.
+        """
         config = self._config_manager.get()
         self._validate_request(request)
         filters = dict(request.filters)
@@ -119,7 +134,9 @@ class HybridSearchService:
                 request,
                 channel_score_map,
             )
-            timings["fusion_ms"] = (time.perf_counter() - total_start) * 1000
+            elapsed = (time.perf_counter() - total_start) * 1000
+            timings["fusion_ms"] = elapsed
+            timings["total_ms"] = elapsed
             self._observability.metrics.increment("hybrid_search_requests")
             self._observability.metrics.observe("hybrid_search_results", len(shaped))
             self._observability.metrics.observe(
@@ -167,7 +184,7 @@ class HybridSearchService:
         timings: Dict[str, float],
     ) -> ChannelResults:
         start = time.perf_counter()
-        hits = self._opensearch.search_bm25(
+        hits, _ = self._opensearch.search_bm25(
             query_features.bm25_terms,
             filters,
             top_k=config.retrieval.bm25_top_k,
@@ -289,6 +306,14 @@ class HybridSearchAPI:
         self._service = service
 
     def post_hybrid_search(self, payload: Mapping[str, Any]) -> tuple[int, Mapping[str, Any]]:
+        """Process a synchronous hybrid search HTTP-style request payload.
+
+        Args:
+            payload: JSON-like mapping containing the hybrid search request body.
+
+        Returns:
+            tuple[int, Mapping[str, Any]]: HTTP status code and serialized response body.
+        """
         try:
             request = self._parse_request(payload)
         except (KeyError, TypeError, ValueError) as exc:
@@ -361,4 +386,3 @@ __all__ = [
     "HybridSearchService",
     "RequestValidationError",
 ]
-

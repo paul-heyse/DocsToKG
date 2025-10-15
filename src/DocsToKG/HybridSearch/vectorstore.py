@@ -275,14 +275,33 @@ class FaissVectorStore:
     def init_gpu(self) -> None:
         if self._gpu_resources is not None:
             return
+        if not hasattr(faiss, "get_num_gpus"):
+            raise RuntimeError(
+                "HybridSearch requires a CUDA-enabled faiss build exposing get_num_gpus(). "
+                "Install faiss-gpu>=1.9 with CUDA support."
+            )
+        available = int(faiss.get_num_gpus())
+        if available <= 0:
+            raise RuntimeError(
+                "HybridSearch requires at least one visible CUDA device. "
+                "Verify GPU drivers and CUDA visibility."
+            )
+        device = int(self.device)
+        if device < 0 or device >= available:
+            raise RuntimeError(
+                f"HybridSearch configured for CUDA device {device}, but only {available} GPU(s) are available. "
+                "Update DenseIndexConfig.device or adjust CUDA visibility."
+            )
         try:
             resources = faiss.StandardGpuResources()
             if self._temp_memory_bytes is not None and hasattr(resources, "setTempMemory"):
                 resources.setTempMemory(self._temp_memory_bytes)
             self._gpu_resources = resources
-        except Exception:  # pragma: no cover - GPU-specific failure
-            logger.warning("Unable to initialise FAISS GPU resources", exc_info=True)
-            self._gpu_resources = None
+        except Exception as exc:  # pragma: no cover - GPU-specific failure
+            raise RuntimeError(
+                "HybridSearch failed to initialise FAISS GPU resources. "
+                "Check CUDA driver installation and faiss-gpu compatibility."
+            ) from exc
 
     def distribute_to_all_gpus(self, index: "faiss.Index", *, shard: bool = False) -> "faiss.Index":
         if not hasattr(faiss, "index_cpu_to_all_gpus") or not hasattr(faiss, "index_cpu_to_gpu"):
@@ -310,7 +329,9 @@ class FaissVectorStore:
     def _maybe_to_gpu(self, index: "faiss.Index") -> "faiss.Index":
         self.init_gpu()
         if self._gpu_resources is None:
-            return index
+            raise RuntimeError(
+                "HybridSearch could not allocate FAISS GPU resources; GPU-backed indexes are mandatory."
+            )
         device = int(self.device)
         try:
             if hasattr(faiss, "GpuClonerOptions"):
@@ -412,31 +433,6 @@ class FaissVectorStore:
         metric = faiss.METRIC_INNER_PRODUCT
         index_type = self._config.index_type
 
-        if self._gpu_resources is None:
-            logger.info("FAISS GPU unavailable; constructing CPU %s index", index_type)
-            if index_type == "flat":
-                base = faiss.IndexFlatIP(self._dim)
-                return faiss.IndexIDMap2(base)
-            if index_type == "ivf_flat":
-                quantizer = faiss.IndexFlatIP(self._dim)
-                base = faiss.IndexIVFFlat(quantizer, self._dim, int(self._config.nlist), metric)
-                base.nprobe = int(self._config.nprobe)
-                setattr(base, "_quantizer_ref", quantizer)
-                return faiss.IndexIDMap2(base)
-            if index_type == "ivf_pq":
-                quantizer = faiss.IndexFlatIP(self._dim)
-                base = faiss.IndexIVFPQ(
-                    quantizer,
-                    self._dim,
-                    int(self._config.nlist),
-                    int(self._config.pq_m),
-                    int(self._config.pq_bits),
-                )
-                base.nprobe = int(self._config.nprobe)
-                setattr(base, "_quantizer_ref", quantizer)
-                return faiss.IndexIDMap2(base)
-            raise RuntimeError(f"Unsupported index type: {index_type}")
-
         dev = int(self.device)
         if index_type == "flat":
             cfg = faiss.GpuIndexFlatConfig() if hasattr(faiss, "GpuIndexFlatConfig") else None
@@ -474,45 +470,103 @@ class FaissVectorStore:
         return gpu_index
 
     def _probe_remove_support(self) -> bool:
-        base = getattr(self._index, "index", None) or self._index
-        return hasattr(base, "remove_ids")
+        selector = faiss.IDSelectorBatch(np.empty(0, dtype=np.int64))
+        try:
+            self._index.remove_ids(selector)
+        except RuntimeError as exc:
+            if "remove_ids not implemented" in str(exc).lower():
+                return False
+            raise
+        return True
 
     def _remove_ids(self, ids: np.ndarray) -> None:
-        base = getattr(self._index, "index", None) or self._index
-        id_selector = faiss.IDSelectorArray(ids.size, faiss.swig_ptr(ids))
-        try:
-            if hasattr(base, "remove_ids"):
-                base.remove_ids(id_selector)
-            elif hasattr(self._index, "remove_ids"):
-                self._index.remove_ids(id_selector)
-            else:
-                self._tombstones.update(int(i) for i in ids)
-                self._dirty_deletes += int(ids.size)
-                return
-        except Exception:  # pragma: no cover - defensive guard
-            self._tombstones.update(int(i) for i in ids)
-            self._dirty_deletes += int(ids.size)
-            self._remove_fallbacks += 1
+        if ids.size == 0:
             return
-        self._dirty_deletes += int(ids.size)
+        selector = faiss.IDSelectorBatch(ids.astype(np.int64))
+        try:
+            removed = int(self._index.remove_ids(selector))
+            if self._supports_remove_ids is None:
+                self._supports_remove_ids = True
+        except RuntimeError as exc:
+            if "remove_ids not implemented" not in str(exc).lower():
+                raise
+            self._supports_remove_ids = False
+            logger.warning(
+                "FAISS remove_ids not implemented on GPU index; scheduling rebuild.",
+                extra={"event": {"ntotal": self.ntotal, "error": str(exc)}},
+            )
+            remaining = ids
+        else:
+            if removed >= int(ids.size):
+                return
+            current = self._current_index_ids()
+            remaining = ids[np.isin(ids, current)]
+            if remaining.size == 0:
+                return
+        self._remove_fallbacks += 1
+        self._tombstones.update(int(v) for v in remaining.tolist())
+        self._dirty_deletes += int(remaining.size)
+        threshold = int(self._rebuild_delete_threshold)
+        if threshold > 0 and self._dirty_deletes >= threshold:
+            self._rebuild_index()
+            self._tombstones.clear()
+            self._dirty_deletes = 0
+            self._needs_rebuild = False
+        else:
+            self._needs_rebuild = True
 
     def _flush_pending_deletes(self, *, force: bool) -> None:
         if not self._tombstones:
             return
         if not force and not self.rebuild_needed():
             return
-        ids = np.array(sorted(self._tombstones), dtype=np.int64)
-        self._tombstones.clear()
-        if ids.size == 0:
+        threshold = int(self._rebuild_delete_threshold)
+        if force or threshold <= 0 or self._dirty_deletes >= threshold:
+            self._rebuild_index()
+            self._tombstones.clear()
+            self._dirty_deletes = 0
+            self._needs_rebuild = False
+
+    def _rebuild_index(self) -> None:
+        old_index = self._index
+        base = old_index.index if hasattr(old_index, "index") else old_index
+        current_ids = self._current_index_ids()
+        if current_ids.size == 0:
+            self._index = self._create_index()
+            self._set_nprobe()
             return
-        base = getattr(self._index, "index", None) or self._index
-        id_selector = faiss.IDSelectorArray(ids.size, faiss.swig_ptr(ids))
-        if hasattr(base, "remove_ids"):
-            base.remove_ids(id_selector)
-        elif hasattr(self._index, "remove_ids"):
-            self._index.remove_ids(id_selector)
-        self._dirty_deletes += int(ids.size)
-        self._needs_rebuild = False
+        if self._tombstones:
+            tombstone_array = np.fromiter(self._tombstones, dtype=np.int64)
+            keep_mask = ~np.isin(current_ids, tombstone_array)
+        else:
+            keep_mask = np.ones_like(current_ids, dtype=bool)
+        keep_positions = np.nonzero(keep_mask)[0].astype(np.int64)
+        survivor_ids = current_ids[keep_mask]
+        if base.ntotal != len(current_ids):  # pragma: no cover - defensive guard
+            raise RuntimeError("FAISS id_map out of sync with underlying index")
+        keys = np.ascontiguousarray(keep_positions, dtype=np.int64)
+        vectors = (
+            base.reconstruct_batch(keys)
+            if keys.size
+            else np.empty((0, self._dim), dtype=np.float32)
+        )
+        vectors = np.ascontiguousarray(vectors, dtype=np.float32)
+        self._index = self._create_index()
+        self._set_nprobe()
+        if vectors.size:
+            base_new = self._index.index if hasattr(self._index, "index") else self._index
+            train_target = base_new
+            if hasattr(faiss, "downcast_index"):
+                try:
+                    train_target = faiss.downcast_index(base_new)
+                except Exception:
+                    train_target = base_new
+            if hasattr(train_target, "is_trained") and not getattr(train_target, "is_trained"):
+                nlist = int(getattr(self._config, "nlist", 1024))
+                oversample = max(1, int(getattr(self._config, "oversample", 2)))
+                ntrain = min(vectors.shape[0], nlist * oversample)
+                train_target.train(vectors[:ntrain])
+            self._index.add_with_ids(vectors, survivor_ids.astype(np.int64))
 
     def _resolve_vector_id(self, internal_id: int) -> Optional[str]:
         if self._id_resolver is None:

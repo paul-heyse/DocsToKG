@@ -1,4 +1,4 @@
-"""Unified ontology downloader module."""
+"""Unified ontology downloader orchestrating settings, retries, and logging."""
 
 from __future__ import annotations
 

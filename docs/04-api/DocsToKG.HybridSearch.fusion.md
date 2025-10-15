@@ -1,6 +1,6 @@
 # 1. Module: fusion
 
-This reference documents the DocsToKG module ``DocsToKG.HybridSearch.fusion``.
+This reference documents the DocsToKG module ``DocsToKG.HybridSearch.ranking``.
 
 Reciprocal Rank Fusion and diversification utilities.
 

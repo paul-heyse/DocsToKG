@@ -54,22 +54,19 @@ def create_session(
     """Return a ``requests.Session`` configured for DocsToKG network requests.
 
     Args:
-        headers (Mapping[str, str] | None): Optional mapping of HTTP headers
-            applied to the session. The mapping is copied into the session's
-            header store so caller-owned dictionaries remain unchanged.
-        adapter_max_retries (int): Retry count configured on mounted HTTP
-            adapters. Set to ``0`` by default so :func:`request_with_retries`
-            governs retry behaviour.
+        headers: Optional mapping of HTTP headers applied to the session. The mapping
+            is copied into the session's header store so caller-owned dictionaries remain
+            unchanged.
+        adapter_max_retries: Retry count configured on mounted HTTP adapters. Defaults to
+            ``0`` so :func:`request_with_retries` governs retry behaviour.
 
     Returns:
-        requests.Session: Session instance with HTTP/HTTPS adapters mounted and
-        ready for pipeline usage.
+        requests.Session: Session instance with HTTP/HTTPS adapters mounted and ready for pipeline usage.
 
     Notes:
-        The returned session uses ``HTTPAdapter`` for connection pooling. It is
-        safe to share across threads provided callers avoid mutating shared
-        mutable state (for example, updating ``session.headers``) once the
-        session is distributed to worker threads.
+        The returned session uses ``HTTPAdapter`` for connection pooling. It is safe to share
+        across threads provided callers avoid mutating shared mutable state (for example,
+        updating ``session.headers``) once the session is distributed to worker threads.
     """
 
     session = requests.Session()
@@ -155,30 +152,24 @@ def request_with_retries(
     """Execute an HTTP request with exponential backoff and retry handling.
 
     Args:
-        session (requests.Session): Session used to execute the outbound
-            request.
-        method (str): HTTP method such as ``"GET"`` or ``"HEAD"``.
-        url (str): Fully-qualified URL for the request.
-        max_retries (int): Maximum number of retry attempts before returning the
-            final response or raising an exception. Defaults to ``3``.
-        retry_statuses (Iterable[int] | None): HTTP status codes that should
-            trigger a retry. Defaults to ``{429, 500, 502, 503, 504}``.
-        backoff_factor (float): Base multiplier for exponential backoff delays.
-            Defaults to ``0.75`` seconds.
-        respect_retry_after (bool): Whether to parse and obey ``Retry-After``
-            headers when provided by the server. Defaults to ``True``.
-        **kwargs: Additional keyword arguments forwarded directly to
-            :meth:`requests.Session.request`.
+        session: Session used to execute the outbound request.
+        method: HTTP method such as ``"GET"`` or ``"HEAD"``.
+        url: Fully qualified URL for the request.
+        max_retries: Maximum number of retry attempts before returning the final response or
+            raising an exception. Defaults to ``3``.
+        retry_statuses: HTTP status codes that should trigger a retry. Defaults to
+            ``{429, 500, 502, 503, 504}``.
+        backoff_factor: Base multiplier for exponential backoff delays in seconds. Defaults to ``0.75``.
+        respect_retry_after: Whether to parse and obey ``Retry-After`` headers. Defaults to ``True``.
+        **kwargs: Additional keyword arguments forwarded directly to :meth:`requests.Session.request`.
 
     Returns:
-        requests.Response: Successful response object. Callers are responsible
-        for closing the response when streaming content.
+        requests.Response: Successful response object. Callers are responsible for closing the
+        response when streaming content.
 
     Raises:
-        ValueError: If ``max_retries`` or ``backoff_factor`` are invalid or
-            ``url``/``method`` are empty.
-        requests.RequestException: If all retry attempts fail due to network
-            errors or the session raises an exception.
+        ValueError: If ``max_retries`` or ``backoff_factor`` are invalid or ``url``/``method`` are empty.
+        requests.RequestException: If all retry attempts fail due to network errors or the session raises an exception.
     """
 
     if max_retries < 0:
@@ -209,7 +200,16 @@ def request_with_retries(
             url: str,
             **call_kwargs: Any,
         ) -> requests.Response:
-            """Invoke the fallback HTTP method when ``Session.request`` is unavailable."""
+            """Invoke the fallback HTTP method when ``Session.request`` is unavailable.
+
+            Args:
+                method: HTTP method name forwarded for logging parity.
+                url: Target URL for the request.
+                **call_kwargs: Keyword arguments forwarded to the fallback request callable.
+
+            Returns:
+                requests.Response: Response returned by the fallback HTTP method.
+            """
 
             return fallback(url, **call_kwargs)
 
@@ -371,12 +371,15 @@ class ConditionalRequestHelper:
         """Initialise cached metadata for conditional requests.
 
         Args:
-            prior_etag (str | None): Previously observed entity tag for the
+            prior_etag: Previously observed entity tag for the
                 resource.
-            prior_last_modified (str | None): Prior ``Last-Modified`` timestamp.
-            prior_sha256 (str | None): SHA-256 checksum of the cached payload.
-            prior_content_length (int | None): Byte length of the cached payload.
-            prior_path (str | None): Filesystem path storing the cached artefact.
+            prior_last_modified: Prior ``Last-Modified`` timestamp.
+            prior_sha256: SHA-256 checksum of the cached payload.
+            prior_content_length: Byte length of the cached payload.
+            prior_path: Filesystem path storing the cached artefact.
+
+        Returns:
+            None
 
         Raises:
             ValueError: If ``prior_content_length`` is provided but negative.
@@ -394,6 +397,9 @@ class ConditionalRequestHelper:
 
     def build_headers(self) -> Mapping[str, str]:
         """Generate conditional request headers from cached metadata.
+
+        Args:
+            None
 
         Returns:
             Mapping[str, str]: Headers suitable for ``requests`` invocations.

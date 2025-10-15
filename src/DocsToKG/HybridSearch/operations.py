@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-import base64
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
-from .vectorstore import FaissIndexManager
-from .service import HybridSearchRequest, HybridSearchService
+from .vectorstore import (
+    FaissIndexManager,
+    restore_state as vectorstore_restore_state,
+    serialize_state as vectorstore_serialize_state,
+)
+from .service import HybridSearchService
 from .storage import ChunkRegistry, OpenSearchSimulator
+from .types import HybridSearchRequest
 
 
 @dataclass(slots=True)
@@ -104,12 +108,7 @@ def serialize_state(
     Returns:
         Mapping containing base64-encoded FAISS bytes and registered vector IDs.
     """
-    faiss_bytes = faiss_index.serialize()
-    encoded = base64.b64encode(faiss_bytes).decode("ascii")
-    return {
-        "faiss": encoded,
-        "vector_ids": registry.vector_ids(),
-    }
+    return vectorstore_serialize_state(faiss_index, registry)
 
 
 def restore_state(faiss_index: FaissIndexManager, payload: Mapping[str, object]) -> None:
@@ -125,10 +124,7 @@ def restore_state(faiss_index: FaissIndexManager, payload: Mapping[str, object])
     Returns:
         None
     """
-    encoded = payload.get("faiss")
-    if not isinstance(encoded, str):
-        raise ValueError("Missing FAISS payload")
-    faiss_index.restore(base64.b64decode(encoded.encode("ascii")))
+    vectorstore_restore_state(faiss_index, payload)
 
 
 def should_rebuild_index(

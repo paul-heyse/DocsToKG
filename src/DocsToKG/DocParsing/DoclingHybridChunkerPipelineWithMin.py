@@ -3,6 +3,22 @@
 Docling Hybrid Chunker with Minimum Token Coalescence
 
 Transforms DocTags documents into chunked records with topic-aware coalescence.
+The module exposes a CLI (`python -m DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin`)
+and reusable helpers for other pipelines.
+
+Key Features:
+- Token-aware chunk merging that respects structural boundaries and image metadata.
+- Shared CLI configuration via :func:`DocsToKG.DocParsing.pipelines.add_data_root_option`.
+- Manifest logging that records chunk counts, parsing engines, and durations.
+
+Dependencies:
+- docling_core: Provides chunkers, serializers, and DocTags parsing.
+- transformers: Supplies HuggingFace tokenizers.
+- tqdm: Optional progress reporting when imported by callers.
+
+Usage:
+    python -m DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin \\
+        --data-root /datasets/Data --min-tokens 256 --max-tokens 512
 
 Tokenizer Alignment:
     The default tokenizer (``Qwen/Qwen3-Embedding-4B``) aligns with the dense
@@ -21,7 +37,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,13 +54,18 @@ from DocsToKG.DocParsing._common import (
     compute_content_hash,
     data_chunks,
     data_doctags,
-    data_manifests,
     detect_data_root,
     get_logger,
     iter_doctags,
     load_manifest_index,
     manifest_append,
     resolve_hash_algorithm,
+)
+from DocsToKG.DocParsing.pipelines import (
+    add_data_root_option,
+    add_resume_force_options,
+    prepare_data_root,
+    resolve_pipeline_path,
 )
 from DocsToKG.DocParsing.schemas import (
     CHUNK_SCHEMA_VERSION,
@@ -439,25 +459,17 @@ def build_parser() -> argparse.ArgumentParser:
     """Construct an argument parser for the chunking pipeline.
 
     Args:
-        None: Parser construction does not require inputs.
+        None
 
     Returns:
-        :class:`argparse.ArgumentParser` configured with chunking options.
+        argparse.ArgumentParser: Parser configured with chunking options.
 
     Raises:
         None
     """
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--data-root",
-        type=Path,
-        default=None,
-        help=(
-            "Override DocsToKG Data directory. Defaults to auto-detection or "
-            "$DOCSTOKG_DATA_ROOT."
-        ),
-    )
+    add_data_root_option(parser)
     parser.add_argument("--in-dir", type=Path, default=DEFAULT_IN_DIR)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--min-tokens", type=int, default=256)
@@ -468,15 +480,10 @@ def build_parser() -> argparse.ArgumentParser:
         default="Qwen/Qwen3-Embedding-4B",
         help="HuggingFace tokenizer model (default aligns with dense embedder)",
     )
-    parser.add_argument(
-        "--resume",
-        action="store_true",
-        help="Skip DocTags whose chunk outputs already exist with matching hash",
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Force reprocessing even when resume criteria are satisfied",
+    add_resume_force_options(
+        parser,
+        resume_help="Skip DocTags whose chunk outputs already exist with matching hash",
+        force_help="Force reprocessing even when resume criteria are satisfied",
     )
     return parser
 
@@ -485,11 +492,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse CLI arguments for standalone chunking execution.
 
     Args:
-        argv: Optional CLI argument vector. When ``None`` the process arguments
-            are parsed.
+        argv (list[str] | None): Optional CLI argument vector. When ``None`` the
+            process arguments are parsed.
 
     Returns:
-        Namespace containing parsed CLI options.
+        argparse.Namespace: Parsed CLI options.
 
     Raises:
         SystemExit: Propagated if ``argparse`` reports invalid arguments.
@@ -502,26 +509,19 @@ def main(args: argparse.Namespace | None = None) -> int:
     """CLI driver that chunks DocTags files and enforces minimum token thresholds.
 
     Args:
-        args: Optional CLI namespace supplied during testing or orchestration.
+        args (argparse.Namespace | None): Optional CLI namespace supplied during
+            testing or orchestration.
 
     Returns:
-        Exit code where ``0`` indicates success.
+        int: Exit code where ``0`` indicates success.
     """
 
     logger = get_logger(__name__)
     args = args if args is not None else build_parser().parse_args()
 
     data_root_override = args.data_root
-    resolved_data_root = (
-        detect_data_root(data_root_override)
-        if data_root_override is not None
-        else DEFAULT_DATA_ROOT
-    )
-
-    if data_root_override is not None:
-        os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved_data_root)
-
-    data_manifests(resolved_data_root)
+    data_root_overridden = data_root_override is not None
+    resolved_data_root = prepare_data_root(data_root_override, DEFAULT_DATA_ROOT)
 
     html_manifest_index = load_manifest_index("doctags-html", resolved_data_root)
     pdf_manifest_index = load_manifest_index("doctags-pdf", resolved_data_root)
@@ -537,15 +537,19 @@ def main(args: argparse.Namespace | None = None) -> int:
     )
     docling_version = get_docling_version()
 
-    in_dir = (
-        data_doctags(resolved_data_root)
-        if args.in_dir == DEFAULT_IN_DIR and data_root_override is not None
-        else (args.in_dir or DEFAULT_IN_DIR)
+    in_dir = resolve_pipeline_path(
+        cli_value=args.in_dir,
+        default_path=DEFAULT_IN_DIR,
+        resolved_data_root=resolved_data_root,
+        data_root_overridden=data_root_overridden,
+        resolver=data_doctags,
     )
-    out_dir = (
-        data_chunks(resolved_data_root)
-        if args.out_dir == DEFAULT_OUT_DIR and data_root_override is not None
-        else (args.out_dir or DEFAULT_OUT_DIR)
+    out_dir = resolve_pipeline_path(
+        cli_value=args.out_dir,
+        default_path=DEFAULT_OUT_DIR,
+        resolved_data_root=resolved_data_root,
+        data_root_overridden=data_root_overridden,
+        resolver=data_chunks,
     )
 
     logger.info(

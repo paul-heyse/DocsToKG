@@ -92,7 +92,7 @@ IVFFlat/PQ builds fast.</p></li>
 <li><p>Strict CPU→GPU cloning (used during restore) prohibits CPU coarse quantisers.</p></li>
 <li><p>Runtime device selection via <code class="docutils literal notranslate"><span class="pre">DenseIndexConfig.device</span></code> or the
 <code class="docutils literal notranslate"><span class="pre">HYBRIDSEARCH_FAISS_DEVICE</span></code> environment variable.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.similarity</span></code> provides GPU cosine helpers:
+<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore</span></code> provides GPU cosine helpers:
 <code class="docutils literal notranslate"><span class="pre">cosine_against_corpus_gpu</span></code>, <code class="docutils literal notranslate"><span class="pre">pairwise_inner_products</span></code>, and fast L2
 normalisation.</p></li>
 </ul>
@@ -159,7 +159,7 @@ easier to compare recall/latency deltas between experiments.</p>
 <h2>5. Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading"></a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">DenseIndexConfig</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.dense</span><span class="w"> </span><span class="kn">import</span> <span class="n">FaissIndexManager</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.vectorstore</span><span class="w"> </span><span class="kn">import</span> <span class="n">FaissIndexManager</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.ids</span><span class="w"> </span><span class="kn">import</span> <span class="n">vector_uuid_to_faiss_int</span>
 
 <span class="n">cfg</span> <span class="o">=</span> <span class="n">DenseIndexConfig</span><span class="p">(</span><span class="n">index_type</span><span class="o">=</span><span class="s2">&quot;ivf_flat&quot;</span><span class="p">,</span> <span class="n">nlist</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span> <span class="n">nprobe</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
@@ -177,10 +177,10 @@ easier to compare recall/latency deltas between experiments.</p>
 </section>
 <section id="similarity-helpers">
 <h2>6. Similarity Helpers<a class="headerlink" href="#similarity-helpers" title="Link to this heading"></a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.similarity</span></code> now exposes GPU utilities that reuse FAISS
+<p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore</span></code> now exposes GPU utilities that reuse FAISS
 resources. They normalise vectors and compute cosine similarity without
 roundtripping through NumPy:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.similarity</span><span class="w"> </span><span class="kn">import</span> <span class="n">cosine_against_corpus_gpu</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.vectorstore</span><span class="w"> </span><span class="kn">import</span> <span class="n">cosine_against_corpus_gpu</span>
 
 <span class="n">scores</span> <span class="o">=</span> <span class="n">cosine_against_corpus_gpu</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">xb</span><span class="p">)</span>
 </pre></div>

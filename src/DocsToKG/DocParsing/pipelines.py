@@ -1,10 +1,26 @@
 """
-Parallel PDF → DocTags conversion pipeline with vLLM orchestration.
+DocParsing Pipeline Utilities
 
-Used by the DocsToKG CLI to launch (or reuse) a local vLLM server and execute
-Docling PDF conversions in parallel worker processes. Provides resilience
-features such as automatic port selection, manifest-aware resume semantics, and
-detailed logging for observability.
+This module hosts the PDF → DocTags conversion workflow _and_ shared helpers
+used by other DocParsing pipelines. It coordinates vLLM server lifecycle,
+manifest bookkeeping, and CLI argument scaffolding so chunking and embedding
+components can import consistent behaviours.
+
+Key Features:
+- Shared CLI helpers (`add_data_root_option`, `add_resume_force_options`,
+  `prepare_data_root`, `resolve_pipeline_path`) to centralise directory and
+  resume/force handling.
+- PDF conversion pipeline that spins up a vLLM inference server, distributes
+  work across processes, and writes DocTags with manifest telemetry.
+- Utility routines for manifest updates, GPU resource configuration, and
+  polite rate control against vLLM endpoints.
+
+Usage:
+    from DocsToKG.DocParsing import pipelines
+
+    parser = pipelines.pdf_build_parser()
+    args = parser.parse_args(["--data-root", "/datasets/Data"])
+    exit_code = pipelines.pdf_main(args)
 """
 
 from __future__ import annotations
@@ -21,7 +37,7 @@ from collections import deque
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Deque, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Deque, Dict, Iterable, List, Optional, Tuple
 
 import requests
 from tqdm import tqdm
@@ -54,6 +70,134 @@ DEFAULT_DATA_ROOT = detect_data_root()
 DEFAULT_INPUT = data_pdfs(DEFAULT_DATA_ROOT)
 DEFAULT_OUTPUT = data_doctags(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "doctags-pdf"
+
+
+def add_data_root_option(parser: argparse.ArgumentParser) -> None:
+    """Attach the shared ``--data-root`` option to a CLI parser.
+
+    Args:
+        parser (argparse.ArgumentParser): Parser being configured.
+
+    Returns:
+        None
+
+    Examples:
+        >>> parser = argparse.ArgumentParser()
+        >>> add_data_root_option(parser)
+        >>> any(action.dest == "data_root" for action in parser._actions)
+        True
+    """
+
+    parser.add_argument(
+        "--data-root",
+        type=Path,
+        default=None,
+        help=(
+            "Override DocsToKG Data directory. Defaults to auto-detection or "
+            "$DOCSTOKG_DATA_ROOT."
+        ),
+    )
+
+
+def add_resume_force_options(
+    parser: argparse.ArgumentParser,
+    *,
+    resume_help: str,
+    force_help: str,
+) -> None:
+    """Attach ``--resume`` and ``--force`` switches to a CLI parser.
+
+    Args:
+        parser (argparse.ArgumentParser): Parser being configured.
+        resume_help (str): Help text describing resume semantics.
+        force_help (str): Help text describing force semantics.
+
+    Returns:
+        None
+
+    Examples:
+        >>> parser = argparse.ArgumentParser()
+        >>> add_resume_force_options(
+        ...     parser,
+        ...     resume_help="Resume processing",
+        ...     force_help="Force reprocessing",
+        ... )
+        >>> sorted(action.dest for action in parser._actions if action.option_strings)
+        ['force', 'help', 'resume']
+    """
+
+    parser.add_argument("--resume", action="store_true", help=resume_help)
+    parser.add_argument("--force", action="store_true", help=force_help)
+
+
+def prepare_data_root(
+    data_root_arg: Optional[Path],
+    default_root: Path,
+) -> Path:
+    """Resolve and apply DocsToKG data-root settings for CLI pipelines.
+
+    Args:
+        data_root_arg (Path | None): CLI-supplied data-root override.
+        default_root (Path): Default DocsToKG data directory.
+
+    Returns:
+        Path: Resolved data root that downstream stages should use.
+
+    Side Effects:
+        - When ``data_root_arg`` is provided, ``DOCSTOKG_DATA_ROOT`` is updated.
+        - Ensures the manifests directory exists for downstream writes.
+
+    Examples:
+        >>> root = prepare_data_root(None, Path("/tmp/data"))
+        >>> root.as_posix().endswith("/tmp/data")
+        True
+    """
+
+    resolved = detect_data_root(data_root_arg) if data_root_arg is not None else default_root
+    if data_root_arg is not None:
+        os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved)
+    data_manifests(resolved)
+    return resolved
+
+
+def resolve_pipeline_path(
+    *,
+    cli_value: Optional[Path],
+    default_path: Path,
+    resolved_data_root: Path,
+    data_root_overridden: bool,
+    resolver: Callable[[Path], Path],
+) -> Path:
+    """Derive a pipeline directory path respecting data-root overrides.
+
+    Args:
+        cli_value (Path | None): Path provided via CLI argument (may be ``None``).
+        default_path (Path): Default path baked into the pipeline module.
+        resolved_data_root (Path): Effective data root for the current invocation.
+        data_root_overridden (bool): ``True`` when the CLI supplied ``--data-root``.
+        resolver (Callable[[Path], Path]): Callable that derives the directory when
+            a new data root is supplied (for example :func:`data_doctags`).
+
+    Returns:
+        Path: Directory path the pipeline should operate on. Callers may resolve the
+        path to an absolute location if required.
+
+    Examples:
+        >>> resolve_pipeline_path(
+        ...     cli_value=None,
+        ...     default_path=Path("/tmp/data/DocTagsFiles"),
+        ...     resolved_data_root=Path("/tmp/data"),
+        ...     data_root_overridden=False,
+        ...     resolver=lambda root: root / "DocTagsFiles",
+        ... ).as_posix()
+        '/tmp/data/DocTagsFiles'
+    """
+
+    if data_root_overridden and (cli_value is None or cli_value == default_path):
+        return resolver(resolved_data_root)
+    if cli_value is None:
+        return default_path
+    return cli_value
 
 
 def _dedupe_preserve_order(names: Iterable[str]) -> List[str]:
@@ -240,15 +384,10 @@ def pdf_build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_GPU_MEMORY_UTILIZATION,
         help="Fraction of GPU memory the vLLM server may allocate",
     )
-    parser.add_argument(
-        "--resume",
-        action="store_true",
-        help="Skip PDFs whose DocTags already exist with matching content hash",
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Force reprocessing even when resume criteria are satisfied",
+    add_resume_force_options(
+        parser,
+        resume_help="Skip PDFs whose DocTags already exist with matching content hash",
+        force_help="Force reprocessing even when resume criteria are satisfied",
     )
     return parser
 
