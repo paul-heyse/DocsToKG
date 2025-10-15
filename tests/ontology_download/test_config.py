@@ -131,6 +131,21 @@ def test_download_config_allowed_hosts() -> None:
     assert "purl.obolibrary.org" in config.allowed_hosts
 
 
+def test_download_config_normalizes_allowed_hosts() -> None:
+    """normalized_allowed_hosts should return punycoded hostnames."""
+
+    config = DownloadConfiguration(
+        allowed_hosts=["Example.org", "*.Example.com", " münchen.example.org "]
+    )
+
+    normalized = config.normalized_allowed_hosts()
+    assert normalized is not None
+    exact, suffixes = normalized
+    assert "example.org" in exact
+    assert "example.com" in suffixes
+    assert "xn--mnchen-3ya.example.org" in exact
+
+
 def test_defaults_config_pydantic() -> None:
     """DefaultsConfig should inherit from BaseModel for Pydantic features."""
 

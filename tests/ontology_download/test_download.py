@@ -490,6 +490,68 @@ def test_validate_url_security_upgrades_http(monkeypatch):
     assert secure_url.startswith("https://example.org")
 
 
+def test_validate_url_security_respects_allowlist(monkeypatch):
+    looked_up = {}
+
+    def fake_getaddrinfo(host, *_args, **_kwargs):
+        looked_up["host"] = host
+        return [(None, None, None, None, ("93.184.216.34", 0))]
+
+    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
+    config = DownloadConfiguration(allowed_hosts=["example.org", "purl.obolibrary.org"])
+
+    secure_url = download.validate_url_security(
+        "https://purl.obolibrary.org/ontology.owl", config
+    )
+
+    assert looked_up["host"] == "purl.obolibrary.org"
+    assert secure_url.startswith("https://purl.obolibrary.org")
+
+
+def test_validate_url_security_blocks_disallowed_host():
+    config = DownloadConfiguration(allowed_hosts=["example.org"])
+
+    with pytest.raises(ConfigError):
+        download.validate_url_security("https://malicious.com/evil.owl", config)
+
+
+def test_validate_url_security_normalizes_idn(monkeypatch):
+    looked_up = {}
+
+    def fake_getaddrinfo(host, *_args, **_kwargs):
+        looked_up["host"] = host
+        return [(None, None, None, None, ("93.184.216.34", 0))]
+
+    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
+
+    config = DownloadConfiguration()
+    secure_url = download.validate_url_security(
+        "https://münchen.example.org/ontology.owl", config
+    )
+
+    assert looked_up["host"] == "xn--mnchen-3ya.example.org"
+    assert secure_url.startswith("https://xn--mnchen-3ya.example.org")
+
+
+def test_validate_url_security_rejects_mixed_script_idn():
+    with pytest.raises(ConfigError):
+        download.validate_url_security("https://раураl.com/ontology.owl")
+
+
+def test_validate_url_security_respects_wildcard_allowlist(monkeypatch):
+    def fake_getaddrinfo(host, *_args, **_kwargs):
+        return [(None, None, None, None, ("93.184.216.34", 0))]
+
+    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
+    config = DownloadConfiguration(allowed_hosts=["*.example.org"])
+
+    secure_url = download.validate_url_security(
+        "https://sub.example.org/ontology.owl", config
+    )
+
+    assert secure_url.startswith("https://sub.example.org")
+
+
 def test_sanitize_filename_removes_traversal():
     sanitized = download.sanitize_filename("../evil.owl")
     assert ".." not in sanitized

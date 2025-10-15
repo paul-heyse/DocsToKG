@@ -1963,12 +1963,62 @@ def test_validate_media_type_disabled():
 - [x] API docs mention `service` usage in fetch plans and download rate limiting.
 - [x] New and existing tests pass validating per-service rate limiting.
 
+### 2.3 Harden URL Validation with Allowlist and IDN Safety
+
+#### 2.3.1 Implement punycode normalization and homograph detection
+
+**Objective**: Ensure URL validation normalizes IDN hosts to punycode and rejects suspicious homograph attempts.
+
+**Implementation**:
+
+- Add `_enforce_idn_safety()` helper in `download.py` to reject invisible Unicode characters and mixed-script labels.
+- Normalize hosts via `.encode("idna").decode("ascii")` before DNS resolution and token bucket lookups.
+- Rebuild URL netloc with normalized hostname while preserving IPv6 bracket notation.
+
+**Acceptance Criteria**:
+
+- [x] IDN hosts such as `münchen.example.org` convert to `xn--mnchen-3ya.example.org` before resolution.
+- [x] Mixed-script homographs (Latin + Cyrillic) raise `ConfigError` prior to any network access.
+- [x] IPv4 and IPv6 literals remain supported after normalization.
+
+#### 2.3.2 Enforce optional host allowlist during validation
+
+**Objective**: Respect `DownloadConfiguration.allowed_hosts` for SSRF mitigation.
+
+**Implementation**:
+
+- Add `DownloadConfiguration.normalized_allowed_hosts()` returning exact and wildcard punycoded hostnames.
+- Update `validate_url_security()` to accept the HTTP configuration and enforce allowlist matches (including `*.example.org` support).
+- Ensure both `core.fetch_one()` and `download_stream()` pass the active HTTP configuration into the validator.
+
+**Acceptance Criteria**:
+
+- [x] URLs to hosts not present in `allowed_hosts` raise `ConfigError`.
+- [x] Wildcard entries such as `*.example.org` permit subdomains.
+- [x] Allowlist lookups occur prior to DNS resolution.
+
+#### 2.3.3 Expand unit tests for URL security features
+
+**Objective**: Cover new allowlist and IDN scenarios with deterministic unit tests.
+
+**Implementation**:
+
+- Add tests in `tests/ontology_download/test_download.py` for allowlist success/failure, punycode normalization, wildcard handling, and mixed-script rejection.
+- Extend `tests/ontology_download/test_config.py` to verify allowlist normalization helper output.
+- Monkeypatch DNS resolution in tests to avoid external lookups and assert normalized hostnames used.
+
+**Acceptance Criteria**:
+
+- [x] Added tests fail on regressions of allowlist enforcement or IDN handling.
+- [x] All updated tests pass locally.
+- [x] Code coverage includes new helper paths.
+
 ---
 
 ## Task Completion Tracking
 
 **Foundation (1.1-1.4)**: 27/52 tasks complete
-**Robustness Downloads (2.1-2.4)**: 9/24 tasks complete
+**Robustness Downloads (2.1-2.4)**: 12/27 tasks complete
 **Robustness Validation (3.1-3.4)**: 0/21 tasks complete
 **Capabilities (4.1-5.2)**: 0/32 tasks complete
 **Storage (6.1)**: 0/10 tasks complete
@@ -1976,7 +2026,7 @@ def test_validate_media_type_disabled():
 **Testing (8.1-8.5)**: 0/30 tasks complete
 **Deployment (9.1-9.3)**: 0/13 tasks complete
 
-**Total**: 36/195 tasks complete (18.5%)
+**Total**: 39/198 tasks complete (19.7%)
 
 ## Notes for AI Programming Agents
 
