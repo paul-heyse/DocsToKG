@@ -42,7 +42,16 @@ owlready2 = get_owlready2()
 
 
 def _run_pronto(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Execute Pronto validation logic in a subprocess context."""
+    """Execute Pronto validation logic in a subprocess context and emit JSON.
+
+    Args:
+        payload: Mapping containing ``file_path`` of the ontology and optional
+            ``normalized_path`` where serialized output should be written.
+
+    Returns:
+        Dictionary describing the validation outcome, including metrics such as
+        ``terms`` and an ``ok`` flag.
+    """
 
     file_path = Path(payload["file_path"])
     ontology = pronto.Ontology(file_path.as_posix())
@@ -60,7 +69,14 @@ def _run_pronto(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _run_owlready2(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Execute Owlready2 validation logic in a subprocess context."""
+    """Execute Owlready2 validation logic in a subprocess context and emit JSON.
+
+    Args:
+        payload: Mapping containing ``file_path`` that should be parsed by Owlready2.
+
+    Returns:
+        Dictionary containing validation status metadata such as entity counts.
+    """
 
     file_path = Path(payload["file_path"])
     ontology = owlready2.get_ontology(file_path.resolve().as_uri()).load()
@@ -69,7 +85,14 @@ def _run_owlready2(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def main() -> None:
-    """Parse command line arguments and execute the requested worker."""
+    """Parse command line arguments and execute the requested worker.
+
+    Args:
+        None
+
+    Returns:
+        None
+    """
 
     parser = argparse.ArgumentParser(description="Ontology validator worker")
     parser.add_argument("worker", choices={"pronto", "owlready2"})
@@ -85,4 +108,3 @@ def main() -> None:
 
 if __name__ == "__main__":  # pragma: no cover - exercised via subprocess
     main()
-

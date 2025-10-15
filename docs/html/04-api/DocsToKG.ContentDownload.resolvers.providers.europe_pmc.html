@@ -79,7 +79,22 @@
   <section id="module-europe-pmc">
 <h1>1. Module: europe_pmc<a class="headerlink" href="#module-europe-pmc" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.europe_pmc</span></code>.</p>
-<p>Europe PMC resolver for European open access articles.</p>
+<p>Europe PMC Resolver Provider</p>
+<p>This module integrates with the Europe PMC REST API to locate open-access PDFs
+hosted across European repositories. It complements other resolver providers by
+covering funder-mandated repositories aggregated by Europe PMC.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Query construction against Europe PMC’s search endpoint using DOI filters.</p></li>
+<li><p>Deduplication of PDF URLs within API responses.</p></li>
+<li><p>Structured error reporting for network and parsing failures.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.resolvers.providers.europe_pmc import EuropePmcResolver</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = EuropePmcResolver()
+urls = list(resolver.iter_urls(session, config, artifact))
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="is-enabled-self-config-artifact">

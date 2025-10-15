@@ -79,7 +79,20 @@
   <section id="module-run-docling-html-to-doctags-parallel">
 <h1>1. Module: run_docling_html_to_doctags_parallel<a class="headerlink" href="#module-run-docling-html-to-doctags-parallel" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.run_docling_html_to_doctags_parallel</span></code>.</p>
-<p>Parallel HTML → DocTags conversion with manifest-aware resume support.</p>
+<p>Parallel HTML → DocTags Conversion</p>
+<p>Executes Docling HTML conversions across multiple processes while tracking
+manifests, resume/force semantics, and advisory file locks. The script is used
+by the DocsToKG pipeline to transform raw HTML corpora into DocTags ready for
+chunking and embedding.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Discover HTML inputs and emit DocTags with Docling exporters</p></li>
+<li><p>Respect resume and force flags to avoid redundant reprocessing</p></li>
+<li><p>Persist conversion outcomes to the DocParsing manifest for observability</p></li>
+<li><p>Provide per-document timing metrics with tqdm progress indicators</p></li>
+</ul>
+<p>Usage:
+python -m DocsToKG.DocParsing.run_docling_html_to_doctags_parallel –resume</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="build-parser">

@@ -1,10 +1,12 @@
 """
 Ontology Download Utilities
 
-This module houses secure download helpers that implement rate limiting,
-content validation, and resumable transfers for ontology documents. It works
-in concert with resolver planning to ensure that downloaded artifacts respect
-size limits and are safe for downstream document processing.
+This module houses secure download helpers that implement per-host and
+per-service rate limiting, Content-Type and size validation via preliminary
+HEAD requests, internationalized domain name hardening, and resumable
+transfers for ontology documents. It works in concert with resolver planning
+to ensure that downloaded artifacts respect size limits, host allowlists, and
+are safe for downstream processing, including guarded archive extraction.
 """
 
 from __future__ import annotations
@@ -83,7 +85,11 @@ class DownloadResult:
 
 
 class TokenBucket:
-    """Simple token bucket implementation for per-host and per-service rate limiting.
+    """Token bucket used to enforce per-host and per-service rate limits.
+
+    Each unique combination of host and logical service identifier receives
+    its own bucket so resolvers can honour provider-specific throttling
+    guidance without starving other endpoints.
 
     Attributes:
         rate: Token replenishment rate per second.
@@ -221,7 +227,11 @@ def _rebuild_netloc(parsed: ParseResult, ascii_host: str) -> str:
 
 
 def validate_url_security(url: str, http_config: Optional[DownloadConfiguration] = None) -> str:
-    """Validate URLs to avoid SSRF, enforce HTTPS, and honor host allowlists.
+    """Validate URLs to avoid SSRF, enforce HTTPS, normalize IDNs, and honor host allowlists.
+
+    Hostnames are converted to punycode before resolution, and both direct IP
+    addresses and DNS results are rejected when they target private or loopback
+    ranges to prevent server-side request forgery.
 
     Args:
         url: URL returned by a resolver for ontology download.
@@ -446,7 +456,7 @@ def extract_zip_safe(
 def extract_tar_safe(
     tar_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None
 ) -> List[Path]:
-    """Safely extract tar archives with traversal and compression checks.
+    """Safely extract tar archives (tar, tar.gz, tar.xz) with traversal and compression checks.
 
     Args:
         tar_path: Path to the tar archive (tar, tar.gz, tar.xz).
@@ -515,7 +525,12 @@ def extract_tar_safe(
 
 
 class StreamingDownloader(pooch.HTTPDownloader):
-    """Custom downloader to support conditional requests, resume, and caching.
+    """Custom downloader supporting HEAD validation, conditional requests, resume, and caching.
+
+    The downloader shares a :mod:`requests` session so it can issue a HEAD probe
+    prior to streaming content, verifies Content-Type and Content-Length against
+    expectations, and persists ETag/Last-Modified headers for cache-friendly
+    revalidation.
 
     Attributes:
         destination: Final location where the ontology will be stored.
@@ -526,6 +541,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         status: Final download status (`fresh`, `updated`, or `cached`).
         response_etag: ETag returned by the upstream server, if present.
         response_last_modified: Last-modified timestamp provided by the server.
+        expected_media_type: MIME type provided by the resolver for validation.
 
     Examples:
         >>> from pathlib import Path
@@ -565,7 +581,11 @@ class StreamingDownloader(pooch.HTTPDownloader):
     def _preliminary_head_check(
         self, url: str, session: requests.Session
     ) -> tuple[Optional[str], Optional[int]]:
-        """Probe the origin with HEAD to audit headers before downloading.
+        """Probe the origin with HEAD to audit media type and size before downloading.
+
+        The HEAD probe allows the pipeline to abort before streaming large
+        payloads that exceed configured limits and to log early warnings for
+        mismatched Content-Type headers reported by the origin.
 
         Args:
             url: Fully qualified download URL resolved by the planner.
@@ -637,7 +657,11 @@ class StreamingDownloader(pooch.HTTPDownloader):
         expected_media_type: Optional[str],
         url: str,
     ) -> None:
-        """Validate that the received ``Content-Type`` header is acceptable.
+        """Validate that the received ``Content-Type`` header is acceptable, tolerating aliases.
+
+        RDF endpoints often return generic XML or Turtle aliases, so the
+        validator accepts a small set of known MIME variants while still
+        surfacing actionable warnings for unexpected types.
 
         Args:
             actual_content_type: Raw header value reported by the origin server.
@@ -872,7 +896,8 @@ def _get_bucket(
         service: Logical service identifier enabling per-service overrides.
 
     Returns:
-        TokenBucket instance shared across downloads for throttling.
+        TokenBucket instance shared across downloads for throttling, seeded
+        with either per-host defaults or service-specific overrides.
     """
     key = f"{service}:{host}" if service else host
     bucket = _TOKEN_BUCKETS.get(key)
@@ -899,14 +924,14 @@ def download_stream(
     expected_media_type: Optional[str] = None,
     service: Optional[str] = None,
 ) -> DownloadResult:
-    """Download ontology content with caching, retries, and hash validation.
+    """Download ontology content with HEAD validation, rate limiting, caching, retries, and hash checks.
 
     Args:
         url: URL of the ontology document to download.
         destination: Target file path for the downloaded content.
         headers: HTTP headers forwarded to the download request.
         previous_manifest: Manifest metadata from a prior run, used for caching.
-        http_config: Download configuration containing timeouts and limits.
+        http_config: Download configuration containing timeouts, limits, and rate controls.
         cache_dir: Directory where intermediary cached files are stored.
         logger: Logger adapter for structured download telemetry.
         expected_media_type: Expected Content-Type for validation, if known.

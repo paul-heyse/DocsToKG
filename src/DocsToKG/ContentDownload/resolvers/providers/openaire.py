@@ -1,4 +1,20 @@
-"""Resolver connecting to the OpenAIRE research infrastructure for discovery."""
+"""
+OpenAIRE Resolver Provider
+
+This module integrates with the OpenAIRE research infrastructure to discover
+open-access artefacts linked to DOI-indexed works.
+
+Key Features:
+- Recursive traversal of OpenAIRE JSON payloads to locate URL candidates.
+- Resilient handling of cases where responses arrive as either JSON or text.
+- Deduplication of candidate URLs before yielding resolver results.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.openaire import OpenAireResolver
+
+    resolver = OpenAireResolver()
+    results = list(resolver.iter_urls(session, config, artifact))
+"""
 
 from __future__ import annotations
 
@@ -18,7 +34,12 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 def _collect_candidate_urls(node: object, results: List[str]) -> None:
-    """Recursively collect HTTP(S) URLs from nested OpenAIRE response payloads."""
+    """Recursively collect HTTP(S) URLs from nested OpenAIRE response payloads.
+
+    Args:
+        node: Arbitrary node from the OpenAIRE response payload.
+        results: Mutable list to append discovered URL strings into.
+    """
 
     if isinstance(node, dict):
         for value in node.values():

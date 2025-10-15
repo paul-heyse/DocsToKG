@@ -1,4 +1,20 @@
-"""Internet Archive Wayback Machine fallback resolver."""
+"""
+Wayback Machine Resolver Provider
+
+This module queries the Internet Archive Wayback Machine to retrieve archived
+snapshots of PDF URLs that previously failed during resolver execution.
+
+Key Features:
+- Recovery of archived snapshots for failed HTTP URLs.
+- Structured error reporting for network and HTTP issues.
+- Graceful handling when no snapshots are available or when failures persist.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.wayback import WaybackResolver
+
+    resolver = WaybackResolver()
+    results = list(resolver.iter_urls(session, config, artifact))
+"""
 
 from __future__ import annotations
 

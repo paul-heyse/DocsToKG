@@ -79,7 +79,19 @@
   <section id="module-doctags-convert">
 <h1>1. Module: doctags_convert<a class="headerlink" href="#module-doctags-convert" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.cli.doctags_convert</span></code>.</p>
-<p>Unified CLI for converting HTML or PDF corpora into DocTags.</p>
+<p>Unified DocTags Conversion CLI</p>
+<p>This command-line interface orchestrates HTML and PDF conversions to DocTags
+using Docling backends. It consolidates disparate scripts into a single entry
+point that auto-detects the appropriate backend, manages manifests, and shares
+DocsToKG-wide defaults.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Auto-detect the conversion backend from input directory contents</p></li>
+<li><p>Forward CLI options to specialised HTML and PDF pipelines</p></li>
+<li><p>Integrate with DocsToKG resume/force semantics for idempotent runs</p></li>
+</ul>
+<p>Usage:
+python -m DocsToKG.DocParsing.cli.doctags_convert –mode auto –input Data/HTML</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="build-parser">
@@ -101,10 +113,27 @@ input_dir: Directory whose contents determine the appropriate backend.</p>
 <code class="docutils literal notranslate"><span class="pre">&quot;pdf&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;html&quot;</span></code> depending on the detected file extensions.</p>
 <p>Raises:
 ValueError: If both PDF and HTML files are present (or neither).</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>tmp = Path(“/tmp/docstokg-cli-examples”)
+_ = tmp.mkdir(exist_ok=True)
+_ = (tmp / “example.html”).write_text(”<html></html>”, encoding=”utf-8”)
+detect_mode(tmp)
+‘html’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 <section id="merge-args-parser-overrides">
 <h3><code class="docutils literal notranslate"><span class="pre">_merge_args(parser,</span> <span class="pre">overrides)</span></code><a class="headerlink" href="#merge-args-parser-overrides" title="Link to this heading"></a></h3>
 <p>Return a parser namespace seeded with override values.</p>
+<p>Args:
+parser: Parser whose default values should seed the namespace.
+overrides: Mapping of argument names to explicit override values.</p>
+<p>Returns:
+:class:<code class="docutils literal notranslate"><span class="pre">argparse.Namespace</span></code> with defaults populated and overrides applied.</p>
 </section>
 <section id="main-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">main(argv)</span></code><a class="headerlink" href="#main-argv" title="Link to this heading"></a></h3>

@@ -2,17 +2,45 @@
 
 This reference documents the DocsToKG module ``DocsToKG.DocParsing.EmbeddingV2``.
 
-EmbedVectors.py
+Hybrid Embedding Pipeline
 
-- Reads chunked JSONL from /home/paul/DocsToKG/Data/ChunkedDocTagFiles
-- Ensures each chunk has a UUID (writes back to the same files)
-- Emits vectors JSONL to /home/paul/DocsToKG/Data/Vectors
+Generates BM25, SPLADE, and Qwen embeddings for DocsToKG chunk files while
+maintaining manifest entries, UUID hygiene, and data quality metrics. The
+pipeline runs in two passes: the first ensures chunk UUID integrity and builds
+BM25 corpus statistics; the second executes SPLADE and Qwen models to emit
+vector JSONL artefacts ready for downstream search.
 
-Uses local HF cache at /home/paul/hf-cache/:
-  - Qwen3-Embedding-4B at   /home/paul/hf-cache/models/Qwen/Qwen3-Embedding-4B
-  - SPLADE-v3 at            /home/paul/hf-cache/models/naver/splade-v3
+Key Features:
+- Auto-detect DocsToKG data directories and manage resume/force semantics
+- Stream SPLADE sparse encoding and Qwen dense embeddings from local caches
+- Validate vector schemas, norms, and dimensions before writing outputs
+- Record manifest metadata for observability and auditing
+
+Usage:
+    python -m DocsToKG.DocParsing.EmbeddingV2 --resume
+
+Dependencies:
+- sentence_transformers (optional): Provides SPLADE sparse encoders.
+- vllm (optional): Hosts the Qwen embedding model with pooling support.
+- tqdm: Surface user-friendly progress bars across pipeline phases.
 
 ## 1. Functions
+
+### `_missing_splade_dependency_message()`
+
+Return a human-readable installation hint for SPLADE extras.
+
+### `_missing_qwen_dependency_message()`
+
+Return a human-readable installation hint for Qwen/vLLM extras.
+
+### `_ensure_splade_dependencies()`
+
+Validate that SPLADE optional dependencies are importable.
+
+### `_ensure_qwen_dependencies()`
+
+Validate that Qwen/vLLM optional dependencies are importable.
 
 ### `iter_chunk_files(d)`
 

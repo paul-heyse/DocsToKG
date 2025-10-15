@@ -1,4 +1,26 @@
-"""Unified HTTP request utilities with retry and backoff support."""
+"""
+HTTP Utilities with Backoff Support
+
+This module consolidates resilient HTTP helper functions used across the content
+download pipeline. It provides helpers for parsing retry metadata and executing
+requests with exponential backoff, jitter, and respect for origin-provided
+``Retry-After`` headers.
+
+Key Features:
+- Parsing of both integer and HTTP-date ``Retry-After`` formats.
+- Unified retry loop with jitter, backoff, and status-code filters.
+- Logging hooks for visibility into retry behaviour.
+
+Dependencies:
+- `requests`: Primary HTTP client used by resolver sessions.
+- `datetime`: Used to interpret HTTP-date headers.
+
+Usage:
+    from DocsToKG.ContentDownload.http import request_with_retries
+
+    session = requests.Session()
+    response = request_with_retries(session, \"GET\", \"https://example.org/resource\")
+"""
 
 from __future__ import annotations
 
@@ -24,7 +46,7 @@ def parse_retry_after_header(response: requests.Response) -> Optional[float]:
         Float seconds to wait, or ``None`` if header missing/invalid.
 
     Raises:
-        None.
+        None: Invalid headers are tolerated and yield ``None`` without raising.
 
     Examples:
         >>> # Integer format

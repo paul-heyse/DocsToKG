@@ -27,15 +27,22 @@ import requests
 pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload import resolvers
+from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
 from DocsToKG.ContentDownload.resolvers.providers.openalex import OpenAlexResolver
+from DocsToKG.ContentDownload.resolvers.types import (
+    AttemptRecord,
+    DownloadOutcome,
+    ResolverConfig,
+    ResolverMetrics,
+    ResolverResult,
+)
 
 
 class MemoryLogger:
     def __init__(self) -> None:
-        self.records: List[resolvers.AttemptRecord] = []
+        self.records: List[AttemptRecord] = []
 
-    def log(self, record: resolvers.AttemptRecord) -> None:
+    def log(self, record: AttemptRecord) -> None:
         self.records.append(record)
 
 
@@ -71,8 +78,8 @@ def make_artifact(tmp_path: Path) -> downloader.WorkArtifact:
     )
 
 
-def build_outcome(classification: str, path: str | None = None) -> resolvers.DownloadOutcome:
-    return resolvers.DownloadOutcome(
+def build_outcome(classification: str, path: str | None = None) -> DownloadOutcome:
+    return DownloadOutcome(
         classification=classification,
         path=path,
         http_status=200 if classification == "pdf" else 400,
@@ -92,16 +99,16 @@ def test_pipeline_respects_custom_order(tmp_path):
             return build_outcome("pdf", path=str(art.pdf_dir / "beta.pdf"))
         return build_outcome("http_error")
 
-    alpha = StubResolver("alpha", [resolvers.ResolverResult(url="https://alpha.example/1")])
-    beta = StubResolver("beta", [resolvers.ResolverResult(url="https://beta.example/1")])
+    alpha = StubResolver("alpha", [ResolverResult(url="https://alpha.example/1")])
+    beta = StubResolver("beta", [ResolverResult(url="https://beta.example/1")])
 
-    config = resolvers.ResolverConfig(
+    config = ResolverConfig(
         resolver_order=["beta", "alpha"],
         resolver_toggles={"alpha": True, "beta": True},
         enable_head_precheck=False,
     )
     logger = MemoryLogger()
-    pipeline = resolvers.ResolverPipeline(
+    pipeline = ResolverPipeline(
         resolvers=[alpha, beta],
         config=config,
         download_func=downloader_fn,
@@ -123,18 +130,18 @@ def test_pipeline_stops_after_max_attempts(tmp_path):
     resolver = StubResolver(
         "single",
         [
-            resolvers.ResolverResult(url="https://example.com/a"),
-            resolvers.ResolverResult(url="https://example.com/b"),
+            ResolverResult(url="https://example.com/a"),
+            ResolverResult(url="https://example.com/b"),
         ],
     )
-    config = resolvers.ResolverConfig(
+    config = ResolverConfig(
         resolver_order=["single"],
         resolver_toggles={"single": True},
         max_attempts_per_work=1,
         enable_head_precheck=False,
     )
     logger = MemoryLogger()
-    pipeline = resolvers.ResolverPipeline(
+    pipeline = ResolverPipeline(
         resolvers=[resolver],
         config=config,
         download_func=downloader_fn,
@@ -152,11 +159,11 @@ def test_pipeline_deduplicates_urls(tmp_path):
     resolver = StubResolver(
         "dup",
         [
-            resolvers.ResolverResult(url="https://dup.example/x"),
-            resolvers.ResolverResult(url="https://dup.example/x"),
+            ResolverResult(url="https://dup.example/x"),
+            ResolverResult(url="https://dup.example/x"),
         ],
     )
-    config = resolvers.ResolverConfig(
+    config = ResolverConfig(
         resolver_order=["dup"],
         resolver_toggles={"dup": True},
         enable_head_precheck=False,
@@ -166,7 +173,7 @@ def test_pipeline_deduplicates_urls(tmp_path):
     def downloader_fn(session, art, url, referer, timeout):
         return build_outcome("http_error")
 
-    pipeline = resolvers.ResolverPipeline(
+    pipeline = ResolverPipeline(
         resolvers=[resolver],
         config=config,
         download_func=downloader_fn,
@@ -187,14 +194,14 @@ def test_pipeline_collects_html_paths(tmp_path):
         html_path.write_text("<html></html>", encoding="utf-8")
         return build_outcome("html", path=str(html_path))
 
-    resolver = StubResolver("html", [resolvers.ResolverResult(url="https://example.com/html")])
-    config = resolvers.ResolverConfig(
+    resolver = StubResolver("html", [ResolverResult(url="https://example.com/html")])
+    config = ResolverConfig(
         resolver_order=["html"],
         resolver_toggles={"html": True},
         enable_head_precheck=False,
     )
     logger = MemoryLogger()
-    pipeline = resolvers.ResolverPipeline(
+    pipeline = ResolverPipeline(
         resolvers=[resolver],
         config=config,
         download_func=downloader_fn,
@@ -218,20 +225,22 @@ def test_pipeline_rate_limit_enforced(monkeypatch, tmp_path):
     def fake_sleep(duration):
         sleeps.append(duration)
 
-    monkeypatch.setattr(resolvers.time, "monotonic", fake_monotonic)
-    monkeypatch.setattr(resolvers.time, "sleep", fake_sleep)
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.pipeline.time.monotonic", fake_monotonic
+    )
+    monkeypatch.setattr("DocsToKG.ContentDownload.resolvers.pipeline.time.sleep", fake_sleep)
 
     def downloader_fn(session, art, url, referer, timeout):
         return build_outcome("pdf", path=str(art.pdf_dir / "out.pdf"))
 
-    resolver = StubResolver("limited", [resolvers.ResolverResult(url="https://example.com/pdf")])
-    config = resolvers.ResolverConfig(
+    resolver = StubResolver("limited", [ResolverResult(url="https://example.com/pdf")])
+    config = ResolverConfig(
         resolver_order=["limited"],
         resolver_toggles={"limited": True},
         resolver_rate_limits={"limited": 1.0},
         enable_head_precheck=False,
     )
-    pipeline = resolvers.ResolverPipeline(
+    pipeline = ResolverPipeline(
         resolvers=[resolver],
         config=config,
         download_func=downloader_fn,
@@ -261,16 +270,16 @@ def test_openalex_resolver_executes_first(tmp_path):
         return build_outcome("pdf", path=str(pdf_path))
 
     fallback = StubResolver(
-        "fallback", [resolvers.ResolverResult(url="https://fallback.example/pdf")]
+        "fallback", [ResolverResult(url="https://fallback.example/pdf")]
     )
-    config = resolvers.ResolverConfig(
+    config = ResolverConfig(
         resolver_order=["openalex", "fallback"],
         resolver_toggles={"openalex": True, "fallback": True},
         enable_head_precheck=False,
     )
     logger = MemoryLogger()
-    metrics = resolvers.ResolverMetrics()
-    pipeline = resolvers.ResolverPipeline(
+    metrics = ResolverMetrics()
+    pipeline = ResolverPipeline(
         resolvers=[OpenAlexResolver(), fallback],
         config=config,
         download_func=downloader_fn,
@@ -301,19 +310,21 @@ def test_openalex_respects_rate_limit(monkeypatch, tmp_path):
     def fake_sleep(duration):
         sleeps.append(duration)
 
-    monkeypatch.setattr(resolvers.time, "monotonic", fake_monotonic)
-    monkeypatch.setattr(resolvers.time, "sleep", fake_sleep)
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.pipeline.time.monotonic", fake_monotonic
+    )
+    monkeypatch.setattr("DocsToKG.ContentDownload.resolvers.pipeline.time.sleep", fake_sleep)
 
     def downloader_fn(session, art, url, referer, timeout):
         return build_outcome("pdf", path=str(art.pdf_dir / "result.pdf"))
 
-    config = resolvers.ResolverConfig(
+    config = ResolverConfig(
         resolver_order=["openalex"],
         resolver_toggles={"openalex": True},
         resolver_min_interval_s={"openalex": 0.8},
         enable_head_precheck=False,
     )
-    pipeline = resolvers.ResolverPipeline(
+    pipeline = ResolverPipeline(
         resolvers=[OpenAlexResolver()],
         config=config,
         download_func=downloader_fn,
@@ -333,14 +344,14 @@ def test_pipeline_records_failed_urls(tmp_path):
     def downloader_fn(session, art, url, referer, timeout):
         return build_outcome("http_error")
 
-    config = resolvers.ResolverConfig(
+    config = ResolverConfig(
         resolver_order=["openalex"],
         resolver_toggles={"openalex": True},
         max_attempts_per_work=1,
         enable_head_precheck=False,
     )
     logger = MemoryLogger()
-    pipeline = resolvers.ResolverPipeline(
+    pipeline = ResolverPipeline(
         resolvers=[OpenAlexResolver()],
         config=config,
         download_func=downloader_fn,

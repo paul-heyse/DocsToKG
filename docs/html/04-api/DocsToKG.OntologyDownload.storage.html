@@ -1,0 +1,303 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: storage &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: storage</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.OntologyDownload.storage.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-storage">
+<h1>1. Module: storage<a class="headerlink" href="#module-storage" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.storage</span></code>.</p>
+<p>Storage backends for ontology artifacts.</p>
+<p>This module centralizes access to ontology storage locations, supporting both
+the default local filesystem layout (managed via :mod:<code class="docutils literal notranslate"><span class="pre">pystow</span></code>) and optional
+remote backends powered by :mod:<code class="docutils literal notranslate"><span class="pre">fsspec</span></code>. Callers interact with the storage
+backend abstractly, allowing the downloader to mirror versioned ontology
+artifacts to remote object stores while maintaining a local working copy for
+streaming and validation.</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="safe-identifiers-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">_safe_identifiers(ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#safe-identifiers-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Return sanitized identifiers suitable for filesystem usage.</p>
+</section>
+<section id="get-storage-backend">
+<h3><code class="docutils literal notranslate"><span class="pre">get_storage_backend()</span></code><a class="headerlink" href="#get-storage-backend" title="Link to this heading"></a></h3>
+<p>Instantiate the appropriate storage backend based on environment settings.</p>
+<p>Args:
+None</p>
+<p>Returns:
+StorageBackend implementation bound to either local or remote storage.</p>
+</section>
+<section id="prepare-version-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">prepare_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#prepare-version-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Return a local directory prepared for the given ontology/version.</p>
+<p>Args:
+ontology_id: Stable ontology identifier requested by the caller.
+version: Canonical version string resolved for the ontology.</p>
+<p>Returns:
+Path pointing to a base directory containing all working sub-folders.</p>
+</section>
+<section id="ensure-local-version-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_local_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#ensure-local-version-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Ensure the specified version exists locally, syncing from remote if needed.</p>
+<p>Args:
+ontology_id: Ontology identifier whose artefacts are required.
+version: Version string that must be present locally.</p>
+<p>Returns:
+Path to the local directory where the ontology version resides.</p>
+</section>
+<section id="available-versions-self-ontology-id">
+<h3><code class="docutils literal notranslate"><span class="pre">available_versions(self,</span> <span class="pre">ontology_id)</span></code><a class="headerlink" href="#available-versions-self-ontology-id" title="Link to this heading"></a></h3>
+<p>Return sorted list of available versions from storage.</p>
+<p>Args:
+ontology_id: Ontology identifier to inspect.</p>
+<p>Returns:
+Sorted list of version strings available to the backend.</p>
+</section>
+<section id="finalize-version-self-ontology-id-version-local-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#finalize-version-self-ontology-id-version-local-dir" title="Link to this heading"></a></h3>
+<p>Persist local version directory to remote storage when applicable.</p>
+<p>Args:
+ontology_id: Ontology identifier that completed processing.
+version: Version string corresponding to the processed ontology.
+local_dir: Local directory tree ready for publication.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="version-dir-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">_version_dir(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#version-dir-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">prepare_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Create a local working directory structure for an ontology version.</p>
+<p>Args:
+ontology_id: Identifier of the ontology being processed.
+version: Canonical version string for the ontology.</p>
+<p>Returns:
+Path to the prepared base directory containing <code class="docutils literal notranslate"><span class="pre">original</span></code>,
+<code class="docutils literal notranslate"><span class="pre">normalized</span></code>, and <code class="docutils literal notranslate"><span class="pre">validation</span></code> subdirectories.</p>
+</section>
+<section id="id2">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_local_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<p>Ensure a local directory exists for the requested ontology version.</p>
+<p>Args:
+ontology_id: Identifier of the ontology being processed.
+version: Version string that should exist locally.</p>
+<p>Returns:
+Path to the local directory for the ontology version.</p>
+</section>
+<section id="id3">
+<h3><code class="docutils literal notranslate"><span class="pre">available_versions(self,</span> <span class="pre">ontology_id)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<p>List versions already present on disk for an ontology.</p>
+<p>Args:
+ontology_id: Identifier of the ontology whose versions are requested.</p>
+<p>Returns:
+Sorted list of version strings discovered in the local store.</p>
+</section>
+<section id="id4">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<p>Finalize a local version directory (no-op for purely local storage).</p>
+<p>Args:
+ontology_id: Identifier of the ontology that finished processing.
+version: Version string associated with the processed ontology.
+local_dir: Path to the local directory ready for consumption.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="remote-version-path-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">_remote_version_path(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#remote-version-path-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id5">
+<h3><code class="docutils literal notranslate"><span class="pre">available_versions(self,</span> <span class="pre">ontology_id)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
+<p>Return unique versions aggregated from local cache and remote storage.</p>
+<p>Args:
+ontology_id: Identifier of the ontology whose versions are requested.</p>
+<p>Returns:
+Sorted list of versions available either locally or remotely.</p>
+</section>
+<section id="id6">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_local_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
+<p>Mirror a remote ontology version into the local cache if necessary.</p>
+<p>Args:
+ontology_id: Identifier of the ontology being requested.
+version: Version string to ensure locally.</p>
+<p>Returns:
+Path to the local directory containing the requested version.</p>
+</section>
+<section id="id7">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
+<p>Upload the finalized local version directory to the remote store.</p>
+<p>Args:
+ontology_id: Identifier of the ontology ready for publication.
+version: Version string for the finalized ontology artifacts.
+local_dir: Local directory tree containing normalized outputs.</p>
+<p>Returns:
+None</p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="storagebackend">
+<h3><code class="docutils literal notranslate"><span class="pre">StorageBackend</span></code><a class="headerlink" href="#storagebackend" title="Link to this heading"></a></h3>
+<p>Protocol describing storage backend operations.</p>
+<p>Implementations may store data locally, mirror to remote backends, or both.
+Callers rely on the common interface to prepare working directories,
+enumerate versions, and finalize artefacts after downloads complete.</p>
+<p>Attributes:
+prepare_version: Callable producing a working directory path.
+ensure_local_version: Callable that guarantees a local working copy.
+available_versions: Callable returning stored version identifiers.
+finalize_version: Callable persisting local results to durable storage.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>backend = LocalStorageBackend(Path(“/tmp/ontologies”))
+isinstance(backend.available_versions(“hp”), list)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="localstoragebackend">
+<h3><code class="docutils literal notranslate"><span class="pre">LocalStorageBackend</span></code><a class="headerlink" href="#localstoragebackend" title="Link to this heading"></a></h3>
+<p>Storage backend that keeps ontology artifacts on the local filesystem.</p>
+<p>Attributes:
+root: Root directory under which ontology artifacts are stored. Each
+ontology/version pair receives a dedicated subdirectory.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>backend = LocalStorageBackend(Path(“/tmp/ontologies”))
+workspace = backend.prepare_version(“hp”, “2024-01-01”)
+(workspace / “original”).exists()
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="fsspecstoragebackend">
+<h3><code class="docutils literal notranslate"><span class="pre">FsspecStorageBackend</span></code><a class="headerlink" href="#fsspecstoragebackend" title="Link to this heading"></a></h3>
+<p>Storage backend that mirrors ontology artifacts to a remote location via fsspec.</p>
+<p>Attributes:
+fs: fsspec filesystem instance used for remote interactions.
+base_path: Root path within the remote filesystem where artefacts live.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>backend = FsspecStorageBackend(“memory://ontologies”)
+Traceback (most recent call last):
+…
+ConfigError: fsspec required for remote storage. Install it via ‘pip install fsspec’.</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,4 +1,20 @@
-"""Figshare repository resolver for DOI-indexed research outputs."""
+"""
+Figshare Resolver Provider
+
+This module integrates with the Figshare API to locate repository-hosted PDFs
+associated with DOI-indexed research outputs.
+
+Key Features:
+- POST-based Figshare search requests with polite headers.
+- Iteration over article file metadata to extract PDF download URLs.
+- Extensive logging for malformed payloads and API errors.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.figshare import FigshareResolver
+
+    resolver = FigshareResolver()
+    results = list(resolver.iter_urls(session, config, artifact))
+"""
 
 from __future__ import annotations
 
@@ -62,9 +78,6 @@ class FigshareResolver:
         Returns:
             Iterable[ResolverResult]: Iterator yielding resolver results for each candidate URL.
 
-        Raises:
-            None
-
         Notes:
             Requests honour resolver-specific timeouts using
             :meth:`ResolverConfig.get_timeout` and reuse
@@ -101,14 +114,6 @@ class FigshareResolver:
                     "timeout": config.get_timeout(self.name),
                     "error": str(exc),
                 },
-            )
-            return
-        except requests.ConnectionError as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="connection-error",
-                metadata={"error": str(exc)},
             )
             return
         except requests.RequestException as exc:

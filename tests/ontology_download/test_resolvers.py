@@ -28,13 +28,13 @@ pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
 from DocsToKG.OntologyDownload import resolvers
-from DocsToKG.OntologyDownload.config import DefaultsConfiguration, ResolvedConfig
+from DocsToKG.OntologyDownload.config import DefaultsConfig, ResolvedConfig
 from DocsToKG.OntologyDownload.core import FetchSpec
 
 
 @pytest.fixture()
 def resolved_config():
-    return ResolvedConfig(defaults=DefaultsConfiguration(), specs=())
+    return ResolvedConfig(defaults=DefaultsConfig(), specs=[])
 
 
 def test_obo_resolver_prefers_requested_format(monkeypatch, resolved_config):
@@ -70,6 +70,32 @@ def test_ols_resolver_uses_download_link(monkeypatch, resolved_config):
     assert plan.license == "CC-BY-4.0"
 
 
+def test_ols_resolver_applies_polite_headers(monkeypatch, resolved_config):
+    session_headers = {}
+
+    class StubSession:
+        def __init__(self):
+            self.headers = session_headers
+
+    def get_ontology(_):
+        return {"download": "https://example.org/efo.owl"}
+
+    client = SimpleNamespace(
+        get_ontology=get_ontology,
+        get_ontology_versions=lambda _: [],
+        session=StubSession(),
+    )
+    monkeypatch.setattr(resolvers, "OlsClient", lambda: client)
+
+    resolver = resolvers.OLSResolver()
+    logger = logging.LoggerAdapter(logging.getLogger(__name__), {"correlation_id": "corr123"})
+    spec = FetchSpec(id="efo", resolver="ols", extras={}, target_formats=["owl"])
+    resolver.plan(spec, resolved_config, logger)
+
+    assert "User-Agent" in session_headers
+    assert session_headers["X-Request-ID"].startswith("corr123-")
+
+
 def test_bioportal_resolver_includes_api_key(monkeypatch, resolved_config, tmp_path):
     monkeypatch.setattr(
         resolvers.BaseResolver, "_execute_with_retry", lambda self, func, **kwargs: func()
@@ -90,6 +116,37 @@ def test_bioportal_resolver_includes_api_key(monkeypatch, resolved_config, tmp_p
     plan = resolver.plan(spec, resolved_config, logging.getLogger(__name__))
     assert plan.url == "https://example.org/ncit.owl"
     assert plan.headers["Authorization"] == "apikey secret"
+
+
+def test_bioportal_resolver_applies_polite_headers(monkeypatch, resolved_config, tmp_path):
+    session_headers = {}
+
+    class StubSession:
+        def __init__(self):
+            self.headers = session_headers
+
+    resolved_config.defaults.http.polite_headers["mailto"] = "team@example.org"
+
+    ontology = {"license": "CC-BY"}
+    submission = {"download": "https://example.org/ncit.owl", "version": "2024"}
+    client = SimpleNamespace(
+        get_ontology=lambda _: ontology,
+        get_latest_submission=lambda _: submission,
+        session=StubSession(),
+    )
+    monkeypatch.setattr(resolvers, "BioPortalClient", lambda: client)
+    monkeypatch.setattr(resolvers.pystow, "join", lambda *parts: tmp_path)
+
+    resolver = resolvers.BioPortalResolver()
+    resolver.client = client
+    resolver.api_key_path = tmp_path / "bioportal_api_key.txt"
+    logger = logging.LoggerAdapter(logging.getLogger(__name__), {"correlation_id": "abc456"})
+    spec = FetchSpec(id="ncit", resolver="bioportal", extras={}, target_formats=["owl"])
+    resolver.plan(spec, resolved_config, logger)
+
+    assert "User-Agent" in session_headers
+    assert session_headers["X-Request-ID"].startswith("abc456-")
+    assert session_headers["From"] == "team@example.org"
 
 
 def test_skos_resolver_requires_url(resolved_config):
@@ -156,3 +213,79 @@ def test_normalize_license_to_spdx_variants():
     assert resolvers.normalize_license_to_spdx("public domain") == "CC0-1.0"
     assert resolvers.normalize_license_to_spdx("Apache License 2.0") == "Apache-2.0"
     assert resolvers.normalize_license_to_spdx("Custom License") == "Custom License"
+
+
+def test_lov_resolver_parses_metadata(resolved_config):
+    payload = {
+        "vocabulary": {
+            "downloadURL": "https://example.org/voaf.ttl",
+            "license": "Creative Commons Attribution 4.0",
+            "version": "2024-01-01",
+            "mediaType": "text/turtle",
+        }
+    }
+
+    class StubResponse:
+        def __init__(self, data):
+            self._data = data
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self._data
+
+    class StubSession:
+        def __init__(self):
+            self.headers = {}
+
+        def get(self, url, params=None, timeout=None):
+            assert params["uri"] == "http://purl.org/vocommons/voaf"
+            return StubResponse(payload)
+
+    resolver = resolvers.LOVResolver(session=StubSession())
+    logger = logging.LoggerAdapter(logging.getLogger(__name__), {"correlation_id": "lov123"})
+    spec = FetchSpec(
+        id="voaf",
+        resolver="lov",
+        extras={"uri": "http://purl.org/vocommons/voaf"},
+        target_formats=["ttl"],
+    )
+    plan = resolver.plan(spec, resolved_config, logger)
+
+    assert plan.url == "https://example.org/voaf.ttl"
+    assert plan.media_type == "text/turtle"
+    assert plan.license == "CC-BY-4.0"
+    session_headers = resolver.session.headers
+    assert session_headers["X-Request-ID"].startswith("lov123-")
+
+
+def test_lov_resolver_requires_uri(resolved_config):
+    resolver = resolvers.LOVResolver(
+        session=SimpleNamespace(headers={}, get=lambda *args, **kwargs: None)
+    )
+    spec = FetchSpec(id="voaf", resolver="lov", extras={}, target_formats=["ttl"])
+    with pytest.raises(resolvers.ConfigError):
+        resolver.plan(spec, resolved_config, logging.getLogger(__name__))
+
+
+def test_ontobee_resolver_prefers_format(resolved_config):
+    resolver = resolvers.OntobeeResolver()
+    logger = logging.getLogger(__name__)
+    spec = FetchSpec(id="HP", resolver="ontobee", extras={}, target_formats=["obo", "owl"])
+    plan = resolver.plan(spec, resolved_config, logger)
+
+    assert plan.url == "https://purl.obolibrary.org/obo/hp.obo"
+    assert plan.media_type == "text/plain"
+
+
+def test_ontobee_resolver_validates_identifier(resolved_config):
+    resolver = resolvers.OntobeeResolver()
+    spec = FetchSpec(id="invalid-id", resolver="ontobee", extras={}, target_formats=["owl"])
+    with pytest.raises(resolvers.ConfigError):
+        resolver.plan(spec, resolved_config, logging.getLogger(__name__))
+
+
+def test_resolver_registry_includes_new_entries():
+    assert "lov" in resolvers.RESOLVERS
+    assert "ontobee" in resolvers.RESOLVERS

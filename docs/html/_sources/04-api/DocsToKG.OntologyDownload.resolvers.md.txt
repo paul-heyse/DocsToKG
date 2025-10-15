@@ -6,13 +6,13 @@ Ontology Resolver Implementations
 
 This module defines the resolver strategies that convert download
 specifications into actionable fetch plans. Each resolver encapsulates the
-API integration, retry logic, and metadata extraction necessary to interact
-with external services such as the OBO Library, OLS, BioPortal, and SKOS/XBRL
-endpoints.
+API integration, polite header management, and metadata extraction necessary
+to interact with external services such as the OBO Library, OLS, BioPortal,
+Linked Open Vocabularies (LOV), Ontobee, and SKOS/XBRL endpoints.
 
 Key Features:
 - Shared retry/backoff helpers for consistent API resilience
-- Resolver-specific metadata extraction (version, license, media type)
+- Resolver-specific metadata extraction (version, license, media type) with SPDX normalization
 - Support for additional services through the pluggable ``RESOLVERS`` map
 
 Usage:
@@ -22,6 +22,20 @@ Usage:
     plan = resolver.plan(spec, config, logger)
 
 ## 1. Functions
+
+### `normalize_license_to_spdx(value)`
+
+Normalize common license strings to canonical SPDX identifiers.
+
+Resolver metadata frequently reports informal variants such as ``CC BY 4.0``;
+converting to SPDX ensures allowlist comparisons remain consistent.
+
+Args:
+value: Raw license string returned by a resolver (may be ``None``).
+
+Returns:
+Canonical SPDX identifier when a mapping is known, otherwise the
+cleaned original value or ``None`` when the input is empty.
 
 ### `_execute_with_retry(self, func)`
 
@@ -38,6 +52,38 @@ Result returned by the supplied callable.
 
 Raises:
 ConfigError: When retry limits are exceeded or HTTP errors occur.
+
+### `_extract_correlation_id(self, logger)`
+
+Return the correlation id from a logger adapter when available.
+
+Args:
+logger: Logger or adapter potentially carrying an ``extra`` dictionary.
+
+Returns:
+Correlation identifier string when present, otherwise ``None``.
+
+### `_build_polite_headers(self, config, logger)`
+
+Create polite headers derived from configuration and logger context.
+
+Args:
+config: Resolved configuration providing HTTP header defaults.
+logger: Logger adapter whose correlation id is propagated to headers.
+
+Returns:
+Dictionary of polite header values ready to attach to HTTP sessions.
+
+### `_apply_headers_to_session(session, headers)`
+
+Apply polite headers to a client session when supported.
+
+Args:
+session: HTTP client or session object whose ``headers`` may be updated.
+headers: Mapping of header names to polite values to merge.
+
+Returns:
+None
 
 ### `_build_plan(self)`
 
@@ -90,10 +136,10 @@ ConfigError: When the API rejects credentials or yields no URLs.
 Load the BioPortal API key from disk when available.
 
 Args:
-None
+self: Resolver instance requesting the API key.
 
 Returns:
-API key string stripped of whitespace, or ``None`` when missing.
+Optional[str]: API key string stripped of whitespace, or ``None`` when missing.
 
 ### `plan(self, spec, config, logger)`
 
@@ -109,6 +155,29 @@ FetchPlan containing the resolved download URL and headers.
 
 Raises:
 ConfigError: If authentication fails or no download link is available.
+
+### `_fetch_metadata(self, uri, timeout)`
+
+*No documentation available.*
+
+### `_iter_dicts(payload)`
+
+*No documentation available.*
+
+### `plan(self, spec, config, logger)`
+
+Discover download metadata from the LOV API.
+
+Args:
+spec: Fetch specification providing ontology identifier and extras.
+config: Resolved configuration supplying timeout and header defaults.
+logger: Logger adapter used to emit planning telemetry.
+
+Returns:
+FetchPlan describing the resolved download URL and metadata.
+
+Raises:
+ConfigError: If required metadata is missing or the LOV API fails.
 
 ### `plan(self, spec, config, logger)`
 
@@ -139,6 +208,21 @@ FetchPlan referencing the specified ZIP archive.
 
 Raises:
 ConfigError: If the specification omits the required URL.
+
+### `plan(self, spec, config, logger)`
+
+Return a fetch plan pointing to Ontobee-managed PURLs.
+
+Args:
+spec: Fetch specification describing the ontology identifier and preferred formats.
+config: Resolved configuration (unused beyond interface compatibility).
+logger: Logger adapter for structured telemetry.
+
+Returns:
+FetchPlan pointing to an Ontobee-hosted download URL.
+
+Raises:
+ConfigError: If the ontology identifier is invalid.
 
 ## 2. Classes
 
@@ -171,6 +255,9 @@ Examples:
 ### `BaseResolver`
 
 Shared helpers for resolver implementations.
+
+Provides polite header construction, retry orchestration, and metadata
+normalization utilities shared across concrete resolver classes.
 
 Attributes:
 None
@@ -222,6 +309,22 @@ Examples:
 >>> resolver.api_key_path.suffix
 '.txt'
 
+### `LOVResolver`
+
+Resolve vocabularies from Linked Open Vocabularies (LOV).
+
+Queries the LOV API, normalises metadata fields, and returns Turtle
+download plans enriched with service identifiers for rate limiting.
+
+Attributes:
+API_ROOT: Base URL for the LOV API endpoints.
+session: Requests session used to execute API calls.
+
+Examples:
+>>> resolver = LOVResolver()
+>>> isinstance(resolver.session, requests.Session)
+True
+
 ### `SKOSResolver`
 
 Resolver for direct SKOS/RDF URLs.
@@ -245,3 +348,18 @@ Examples:
 >>> resolver = XBRLResolver()
 >>> callable(getattr(resolver, "plan"))
 True
+
+### `OntobeeResolver`
+
+Resolver that constructs Ontobee-backed PURLs for OBO ontologies.
+
+Provides a lightweight fallback resolver that constructs deterministic
+PURLs for OBO prefixes when primary resolvers fail.
+
+Attributes:
+_FORMAT_MAP: Mapping of preferred formats to extensions and media types.
+
+Examples:
+>>> resolver = OntobeeResolver()
+>>> resolver._FORMAT_MAP['owl'][0]
+'owl'

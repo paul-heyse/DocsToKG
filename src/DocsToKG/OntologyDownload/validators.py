@@ -12,6 +12,8 @@ Key Features:
 - Timeout and memory instrumentation for resource-intensive validators
 - JSON reporting helpers compatible with automated documentation generation
 - Pluggable registry enabling selective validator execution
+- Canonical Turtle normalization with deterministic SHA-256 hashing
+- Subprocess isolation for memory-intensive Pronto and Owlready2 validators
 
 Usage:
     from DocsToKG.OntologyDownload.validators import run_validators
@@ -23,9 +25,9 @@ Usage:
 from __future__ import annotations
 
 import hashlib
-import os
 import json
 import logging
+import os
 import platform
 import shutil
 import subprocess
@@ -175,7 +177,12 @@ def _write_validation_json(path: Path, payload: MutableMapping[str, object]) -> 
 
 
 def _canonicalize_turtle(graph) -> str:
-    """Return canonical Turtle output with sorted prefixes and triples."""
+    """Return canonical Turtle output with sorted prefixes and triples.
+
+    The canonical form mirrors the ontology downloader specification by sorting
+    prefixes lexicographically and emitting triples ordered by subject,
+    predicate, and object so downstream hashing yields deterministic values.
+    """
 
     namespace_manager = getattr(graph, "namespace_manager", None)
     if namespace_manager is None or not hasattr(namespace_manager, "namespaces"):
@@ -228,13 +235,28 @@ def _canonicalize_turtle(graph) -> str:
 
 
 class ValidatorSubprocessError(RuntimeError):
-    """Raised when a validator subprocess exits unsuccessfully."""
+    """Raised when a validator subprocess exits unsuccessfully.
+
+    Attributes:
+        message: Human-readable description of the underlying subprocess failure.
+
+    Examples:
+        >>> raise ValidatorSubprocessError("rdflib validator crashed")
+        Traceback (most recent call last):
+        ...
+        ValidatorSubprocessError: rdflib validator crashed
+    """
 
 
 def _run_validator_subprocess(
     name: str, payload: Dict[str, object], *, timeout: int
 ) -> Dict[str, object]:
-    """Execute a validator worker module within a subprocess."""
+    """Execute a validator worker module within a subprocess.
+
+    The subprocess workflow enforces parser timeouts, returns JSON payloads,
+    and helps release memory held by heavy libraries such as Pronto and
+    Owlready2 after each validation completes.
+    """
 
     worker_script = Path(__file__).resolve().with_name("validator_workers.py")
     command = [sys.executable, str(worker_script), name]
@@ -261,9 +283,7 @@ def _run_validator_subprocess(
 
     if completed.returncode != 0:
         stderr = completed.stderr.decode("utf-8", errors="ignore").strip()
-        message = stderr or (
-            f"{name} validator subprocess failed with code {completed.returncode}"
-        )
+        message = stderr or (f"{name} validator subprocess failed with code {completed.returncode}")
         raise ValidatorSubprocessError(message)
 
     stdout = completed.stdout.decode("utf-8", errors="ignore").strip()
@@ -272,9 +292,7 @@ def _run_validator_subprocess(
     try:
         return json.loads(stdout)
     except json.JSONDecodeError as exc:
-        raise ValidatorSubprocessError(
-            f"{name} validator returned invalid JSON output"
-        ) from exc
+        raise ValidatorSubprocessError(f"{name} validator returned invalid JSON output") from exc
 
 
 def _run_with_timeout(func, timeout_sec: int) -> None:
@@ -400,14 +418,15 @@ def _prepare_xbrl_package(
 
 
 def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> ValidationResult:
-    """Parse ontologies with rdflib and optionally produce Turtle output.
+    """Parse ontologies with rdflib, canonicalize Turtle output, and emit hashes.
 
     Args:
         request: Validation request describing the target ontology and output directories.
         logger: Logger adapter used for structured validation events.
 
     Returns:
-        ValidationResult capturing success state, metadata, and generated files.
+        ValidationResult capturing success state, metadata, canonical hash,
+        and generated files.
 
     Raises:
         ValidationTimeout: Propagated when parsing exceeds configured timeout.
@@ -461,14 +480,15 @@ def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> Valid
 
 
 def validate_pronto(request: ValidationRequest, logger: logging.Logger) -> ValidationResult:
-    """Execute Pronto-based validation and emit OBO Graphs when requested.
+    """Execute Pronto validation in an isolated subprocess and emit OBO Graphs when requested.
 
     Args:
         request: Validation request describing ontology inputs and output directories.
         logger: Structured logger for recording warnings and failures.
 
     Returns:
-        ValidationResult with parsed ontology statistics and generated artifacts.
+        ValidationResult with parsed ontology statistics, subprocess output,
+        and any generated artifacts.
 
     Raises:
         ValidationTimeout: Propagated when Pronto takes longer than allowed.
@@ -510,7 +530,7 @@ def validate_pronto(request: ValidationRequest, logger: logging.Logger) -> Valid
 
 
 def validate_owlready2(request: ValidationRequest, logger: logging.Logger) -> ValidationResult:
-    """Inspect ontologies with Owlready2 to count entities and catch parsing errors.
+    """Inspect ontologies with Owlready2 in a subprocess to count entities and catch parsing errors.
 
     Args:
         request: Validation request referencing the ontology to parse.
@@ -531,7 +551,12 @@ def validate_owlready2(request: ValidationRequest, logger: logging.Logger) -> Va
             _write_validation_json(request.validation_dir / "owlready2_parse.json", payload)
             logger.info(
                 "owlready2 reasoning skipped",
-                extra={"stage": "validate", "validator": "owlready2", "file_size_mb": round(size_mb, 2), "limit_mb": limit},
+                extra={
+                    "stage": "validate",
+                    "validator": "owlready2",
+                    "file_size_mb": round(size_mb, 2),
+                    "limit_mb": limit,
+                },
             )
             return ValidationResult(ok=True, details=payload, output_files=[])
         timeout = request.config.defaults.validation.parser_timeout_sec
@@ -541,7 +566,9 @@ def validate_owlready2(request: ValidationRequest, logger: logging.Logger) -> Va
         _log_memory(logger, "owlready2", "after")
         result_payload.setdefault("ok", True)
         _write_validation_json(request.validation_dir / "owlready2_parse.json", result_payload)
-        return ValidationResult(ok=bool(result_payload.get("ok")), details=result_payload, output_files=[])
+        return ValidationResult(
+            ok=bool(result_payload.get("ok")), details=result_payload, output_files=[]
+        )
     except ValidationTimeout:
         message = f"Parser timeout after {request.config.defaults.validation.parser_timeout_sec}s"
         payload = {"ok": False, "error": message}

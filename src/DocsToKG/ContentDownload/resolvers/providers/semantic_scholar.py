@@ -1,4 +1,20 @@
-"""Resolver that queries the Semantic Scholar Graph API for open access PDFs."""
+"""
+Semantic Scholar Resolver Provider
+
+This module integrates with the Semantic Scholar Graph API to locate open
+access PDFs associated with DOI-indexed papers.
+
+Key Features:
+- Memoised API lookups to respect rate limits and improve performance.
+- Optional API key support via standard ``x-api-key`` headers.
+- Structured error emission covering HTTP and JSON decoding failures.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import SemanticScholarResolver
+
+    resolver = SemanticScholarResolver()
+    results = list(resolver.iter_urls(session, config, artifact))
+"""
 
 from __future__ import annotations
 
@@ -28,7 +44,20 @@ def _fetch_semantic_scholar_data(
     timeout: float,
     headers_key: Tuple[Tuple[str, str], ...],
 ) -> Dict[str, Any]:
-    """Fetch Semantic Scholar Graph API metadata for ``doi`` with caching."""
+    """Fetch Semantic Scholar Graph API metadata for ``doi`` with caching.
+
+    Args:
+        doi: Normalised DOI string to query.
+        api_key: Optional Semantic Scholar API key to include in the request.
+        timeout: Request timeout in seconds.
+        headers_key: Hashable representation of polite headers for cache lookups.
+
+    Returns:
+        Decoded JSON payload returned by the Semantic Scholar Graph API.
+
+    Raises:
+        requests.HTTPError: If the API responds with a non-success status code.
+    """
 
     headers = dict(headers_key)
     if api_key:
@@ -100,13 +129,14 @@ class SemanticScholarResolver:
                 _headers_cache_key(config.polite_headers),
             )
         except requests.HTTPError as exc:
-            status = exc.response.status_code if exc.response else None
+            status = getattr(exc.response, "status_code", None)
+            detail = status if status is not None else "unknown"
             yield ResolverResult(
                 url=None,
                 event="error",
                 event_reason="http-error",
                 http_status=status,
-                metadata={"error_detail": f"Semantic Scholar HTTPError: {status}"},
+                metadata={"error_detail": f"Semantic Scholar HTTPError: {detail}"},
             )
             return
         except requests.Timeout as exc:

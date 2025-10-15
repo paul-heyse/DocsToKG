@@ -29,12 +29,12 @@ pytest.importorskip("pyalex")
 import requests
 
 from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact, classify_payload, ensure_dir
-from DocsToKG.ContentDownload.resolvers import (
+from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
+from DocsToKG.ContentDownload.resolvers.types import (
     AttemptRecord,
     DownloadOutcome,
     ResolverConfig,
     ResolverMetrics,
-    ResolverPipeline,
     ResolverResult,
 )
 from DocsToKG.ContentDownload.resolvers.providers.landing_page import LandingPageResolver
@@ -221,7 +221,6 @@ def test_landing_page_resolver_meta_parsing(tmp_path, monkeypatch):
 
 
 def test_head_precheck_allows_redirect(monkeypatch, tmp_path):
-    artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", ["https://example.org/file.pdf"])
     config = ResolverConfig(
         resolver_order=["stub"], resolver_toggles={"stub": True}, enable_head_precheck=True

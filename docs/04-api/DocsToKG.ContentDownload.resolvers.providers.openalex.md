@@ -2,7 +2,21 @@
 
 This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.openalex``.
 
-OpenAlex direct URL resolver (position 0 in pipeline).
+OpenAlex Resolver Provider
+
+This module yields candidate download URLs directly from OpenAlex metadata,
+serving as the first resolver in the pipeline for low-latency successes.
+
+Key Features:
+- Deduplication of OpenAlex-provided PDF and open-access URLs.
+- Skip events when no URLs are advertised within the OpenAlex record.
+- Compatibility shim that ignores unused parameters required by the resolver protocol.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.openalex import OpenAlexResolver
+
+    resolver = OpenAlexResolver()
+    results = list(resolver.iter_urls(session, config, artifact))
 
 ## 1. Functions
 
@@ -15,7 +29,7 @@ config: Resolver configuration (unused but required for interface parity).
 artifact: OpenAlex metadata object containing URL fields.
 
 Returns:
-``True`` when at least one candidate PDF URL is available, otherwise ``False``.
+bool: ``True`` when at least one candidate PDF URL is available.
 
 ### `iter_urls(self, session, config, artifact)`
 
@@ -27,10 +41,7 @@ config: Resolver configuration (unused but accepted for uniform signature).
 artifact: OpenAlex metadata object providing URL candidates.
 
 Returns:
-Iterator producing :class:`ResolverResult` objects for each unique URL.
-
-Raises:
-None
+Iterable[ResolverResult]: Iterator producing resolver results for each unique URL.
 
 ## 2. Classes
 

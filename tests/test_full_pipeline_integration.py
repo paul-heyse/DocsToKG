@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from types import MethodType
 from pathlib import Path
+from types import MethodType
 from typing import List
 
 import pytest
@@ -13,14 +13,14 @@ import pytest
 pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
-from DocsToKG.ContentDownload.resolvers import (
+from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
+from DocsToKG.ContentDownload.resolvers.providers import default_resolvers
+from DocsToKG.ContentDownload.resolvers.types import (
     AttemptRecord,
     DownloadOutcome,
     ResolverConfig,
     ResolverMetrics,
-    ResolverPipeline,
     ResolverResult,
-    default_resolvers,
 )
 
 
@@ -51,7 +51,9 @@ def _make_artifact(tmp_path: Path) -> WorkArtifact:
     )
 
 
-def test_pipeline_executes_resolvers_in_expected_order(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_pipeline_executes_resolvers_in_expected_order(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     artifact = _make_artifact(tmp_path)
     artifact.pdf_dir.mkdir(parents=True, exist_ok=True)
     artifact.html_dir.mkdir(parents=True, exist_ok=True)
@@ -143,7 +145,6 @@ def test_real_network_download(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     logger = MemoryLogger([])
 
     from DocsToKG.ContentDownload.download_pyalex_pdfs import _make_session, download_candidate
-    from DocsToKG.ContentDownload.download_pyalex_pdfs import download_candidate, _make_session
 
     session = _make_session({"User-Agent": "DocsToKG-Test/1.0"})
     try:

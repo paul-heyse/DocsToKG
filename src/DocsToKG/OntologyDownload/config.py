@@ -3,13 +3,15 @@ Ontology Downloader Configuration
 
 This module centralizes configuration schema definitions, environment
 overrides, and YAML parsing for DocsToKG's ontology downloader. It builds on
-Pydantic models to provide strong validation, type-safe defaults, and runtime
-mutability where operational overrides are required.
+Pydantic v2 models to provide strong validation, type-safe defaults, automatic
+JSON Schema generation, and runtime mutability where operational overrides are
+required.
 
 Key Features:
 - Declarative Pydantic models for HTTP, validation, and logging settings
 - YAML loading with structural validation and friendly error messages
-- Environment variable overrides for containerized deployments
+- Environment variable overrides merged via :class:`pydantic_settings.BaseSettings`
+- JSON Schema export for documentation and validation tooling
 - Utilities to merge defaults with ad-hoc fetch specifications
 
 Dependencies:
@@ -29,6 +31,8 @@ from __future__ import annotations
 import logging
 import re
 import sys
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -208,7 +212,7 @@ _RATE_LIMIT_PATTERN = re.compile(r"^([\d.]+)/(second|sec|s|minute|min|m|hour|h)$
 
 
 class DownloadConfiguration(BaseModel):
-    """HTTP download and retry settings.
+    """HTTP download, throttling, and polite header settings for resolvers.
 
     Attributes:
         max_retries: Maximum retry attempts for failed download requests.
@@ -221,6 +225,7 @@ class DownloadConfiguration(BaseModel):
         validate_media_type: Whether to enforce Content-Type validation.
         rate_limits: Optional per-service rate limit overrides.
         allowed_hosts: Optional allowlist restricting download hostnames.
+        polite_headers: Default polite HTTP headers applied to resolver API calls.
 
     Examples:
         >>> cfg = DownloadConfiguration(per_host_rate_limit="10/second")
@@ -242,6 +247,11 @@ class DownloadConfiguration(BaseModel):
     validate_media_type: bool = Field(default=True)
     rate_limits: Dict[str, str] = Field(default_factory=dict)
     allowed_hosts: Optional[List[str]] = Field(default=None)
+    polite_headers: Dict[str, str] = Field(
+        default_factory=lambda: {
+            "User-Agent": "DocsToKG-OntologyDownloader/1.0 (+https://github.com/allenai/DocsToKG)",
+        }
+    )
 
     @field_validator("rate_limits")
     @classmethod
@@ -369,6 +379,50 @@ class DownloadConfiguration(BaseModel):
 
         return exact, suffixes
 
+    def polite_http_headers(
+        self,
+        *,
+        correlation_id: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timestamp: Optional[datetime] = None,
+    ) -> Dict[str, str]:
+        """Return polite HTTP headers suitable for resolver API calls.
+
+        The headers include a deterministic ``User-Agent`` string, propagate a
+        ``From`` contact address when configured, and synthesize an ``X-Request-ID``
+        correlated with the current fetch so API providers can trace requests.
+
+        Args:
+            correlation_id: Identifier attached to the current batch for log correlation.
+            request_id: Optional override for ``X-Request-ID`` header; auto-generated when ``None``.
+            timestamp: Optional timestamp used when constructing the request identifier.
+
+        Returns:
+            Mapping of header names to polite values complying with provider guidelines.
+        """
+
+        headers: Dict[str, str] = {
+            str(key): str(value)
+            for key, value in (self.polite_headers or {}).items()
+            if str(value).strip()
+        }
+
+        if not any(key.lower() == "user-agent" for key in headers):
+            headers["User-Agent"] = (
+                "DocsToKG-OntologyDownloader/1.0 (+https://github.com/allenai/DocsToKG)"
+            )
+
+        moment = timestamp or datetime.now(timezone.utc)
+        if request_id is None:
+            seed = correlation_id or uuid.uuid4().hex[:12]
+            request_id = f"{seed}-{moment.strftime('%Y%m%dT%H%M%SZ')}"
+        headers.setdefault("X-Request-ID", request_id)
+
+        if "From" not in headers and "mailto" in headers:
+            headers.setdefault("From", headers["mailto"])
+
+        return headers
+
     model_config = {
         "frozen": False,
         "validate_assignment": True,
@@ -399,6 +453,7 @@ class DefaultsConfig(BaseModel):
         validation: Validation configuration defaults.
         logging: Logging configuration defaults.
         continue_on_error: Whether processing continues after failures.
+        resolver_fallback_enabled: Whether automatic resolver fallback is enabled.
 
     Examples:
         >>> defaults = DefaultsConfig()
@@ -415,6 +470,7 @@ class DefaultsConfig(BaseModel):
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
     logging: LoggingConfiguration = Field(default_factory=LoggingConfiguration)
     continue_on_error: bool = Field(default=True)
+    resolver_fallback_enabled: bool = Field(default=True)
 
     @field_validator("prefer_source")
     @classmethod
@@ -719,6 +775,7 @@ def _validate_schema(raw: Mapping[str, object], config: Optional[ResolvedConfig]
             "validation",
             "logging",
             "continue_on_error",
+            "resolver_fallback_enabled",
         }
         for key in defaults:
             if key not in allowed_keys:

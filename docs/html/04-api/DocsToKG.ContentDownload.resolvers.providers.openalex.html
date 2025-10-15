@@ -79,7 +79,21 @@
   <section id="module-openalex">
 <h1>1. Module: openalex<a class="headerlink" href="#module-openalex" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.openalex</span></code>.</p>
-<p>OpenAlex direct URL resolver (position 0 in pipeline).</p>
+<p>OpenAlex Resolver Provider</p>
+<p>This module yields candidate download URLs directly from OpenAlex metadata,
+serving as the first resolver in the pipeline for low-latency successes.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Deduplication of OpenAlex-provided PDF and open-access URLs.</p></li>
+<li><p>Skip events when no URLs are advertised within the OpenAlex record.</p></li>
+<li><p>Compatibility shim that ignores unused parameters required by the resolver protocol.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.resolvers.providers.openalex import OpenAlexResolver</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = OpenAlexResolver()
+results = list(resolver.iter_urls(session, config, artifact))
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="is-enabled-self-config-artifact">
@@ -89,7 +103,7 @@
 config: Resolver configuration (unused but required for interface parity).
 artifact: OpenAlex metadata object containing URL fields.</p>
 <p>Returns:
-<code class="docutils literal notranslate"><span class="pre">True</span></code> when at least one candidate PDF URL is available, otherwise <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when at least one candidate PDF URL is available.</p>
 </section>
 <section id="iter-urls-self-session-config-artifact">
 <h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#iter-urls-self-session-config-artifact" title="Link to this heading"></a></h3>
@@ -99,9 +113,7 @@ session: Requests session forwarded for interface compatibility.
 config: Resolver configuration (unused but accepted for uniform signature).
 artifact: OpenAlex metadata object providing URL candidates.</p>
 <p>Returns:
-Iterator producing :class:<code class="docutils literal notranslate"><span class="pre">ResolverResult</span></code> objects for each unique URL.</p>
-<p>Raises:
-None</p>
+Iterable[ResolverResult]: Iterator producing resolver results for each unique URL.</p>
 </section>
 </section>
 <section id="classes">

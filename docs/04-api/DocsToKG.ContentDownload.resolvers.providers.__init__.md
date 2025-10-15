@@ -2,12 +2,20 @@
 
 This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.__init__``.
 
-Resolver provider implementations and registry used by the content download pipeline.
+Resolver Provider Registry
 
-The registry ships with resolvers for Unpaywall, Crossref, OpenAlex, Wayback,
-Zenodo, Figshare, and additional open-access aggregators. ``default_resolvers()``
-returns provider instances in execution order so callers can build customised
-pipelines or extend the registry with project-specific resolvers.
+This package aggregates resolver provider implementations and exposes a helper
+for constructing the default resolver stack used by the content download
+pipeline.
+
+Key Features:
+- Explicit imports of all resolver provider classes for easy discovery.
+- ``default_resolvers`` helper that instantiates providers in priority order.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers import default_resolvers
+
+    resolvers = default_resolvers()
 
 ## 1. Functions
 

@@ -9,6 +9,7 @@ environments such as CI workflows or air-gapped deployments.
 Key Features:
 - ASCII table rendering for deterministic console output
 - Validation summary formatting that mirrors structured JSON payloads
+- Status-aware formatting that highlights validator outcomes consistently
 - Utilities designed for reuse across multiple CLI subcommands
 
 Usage:

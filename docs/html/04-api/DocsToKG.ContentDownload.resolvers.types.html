@@ -79,14 +79,37 @@
   <section id="module-types">
 <h1>1. Module: types<a class="headerlink" href="#module-types" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.types</span></code>.</p>
-<p>Type definitions and protocols for the resolver pipeline.</p>
+<p>Resolver Type Declarations</p>
+<p>This module collects dataclasses, type aliases, and protocols that formalise
+the interfaces between resolver providers, the pipeline engine, and downstream
+consumers of resolver output. Centralising these definitions keeps provider
+implementations lean while ensuring documentation generators can expose the
+full API surface.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Dataclasses describing resolver results, logs, and pipeline outcomes.</p></li>
+<li><p>Protocols for logging callbacks and resolver implementations.</p></li>
+<li><p>Lightweight metrics collector for resolver attempt statistics.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.resolvers.types import Resolver, ResolverConfig</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>class ExampleResolver:
+    name = &quot;example&quot;
+
+    def is_enabled(self, config, artifact):
+        return True
+
+    def iter_urls(self, session, config, artifact):
+        yield ResolverResult(url=&quot;https://example.org/example.pdf&quot;)
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="is-event-self">
 <h3><code class="docutils literal notranslate"><span class="pre">is_event(self)</span></code><a class="headerlink" href="#is-event-self" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when this result represents an informational event.</p>
 <p>Args:
-None</p>
+self: Resolver result instance under inspection.</p>
 <p>Returns:
 bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> if the resolver emitted an event instead of a URL.</p>
 </section>
@@ -108,9 +131,9 @@ bool: <code class="docutils literal notranslate"><span class="pre">True</span></
 </section>
 <section id="post-init-self">
 <h3><code class="docutils literal notranslate"><span class="pre">__post_init__(self)</span></code><a class="headerlink" href="#post-init-self" title="Link to this heading"></a></h3>
-<p>Validate configuration fields and apply defaults.</p>
+<p>Validate configuration fields and apply defaults for missing values.</p>
 <p>Args:
-None</p>
+self: Configuration instance requiring validation.</p>
 <p>Returns:
 None</p>
 </section>
@@ -126,7 +149,7 @@ None</p>
 <h3><code class="docutils literal notranslate"><span class="pre">is_pdf(self)</span></code><a class="headerlink" href="#is-pdf-self" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when the classification represents a PDF.</p>
 <p>Args:
-None</p>
+self: Download outcome to evaluate.</p>
 <p>Returns:
 bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> if the outcome corresponds to a PDF download.</p>
 </section>
@@ -167,11 +190,19 @@ reason: Short description explaining the skip.</p>
 <p>Returns:
 None</p>
 </section>
+<section id="record-failure-self-resolver-name">
+<h3><code class="docutils literal notranslate"><span class="pre">record_failure(self,</span> <span class="pre">resolver_name)</span></code><a class="headerlink" href="#record-failure-self-resolver-name" title="Link to this heading"></a></h3>
+<p>Record a resolver failure occurrence.</p>
+<p>Args:
+resolver_name: Resolver that raised an exception during execution.</p>
+<p>Returns:
+None</p>
+</section>
 <section id="summary-self">
 <h3><code class="docutils literal notranslate"><span class="pre">summary(self)</span></code><a class="headerlink" href="#summary-self" title="Link to this heading"></a></h3>
 <p>Return aggregated metrics summarizing resolver behaviour.</p>
 <p>Args:
-None</p>
+self: Metrics collector instance aggregating resolver statistics.</p>
 <p>Returns:
 Dict[str, Any]: Snapshot of attempts, successes, HTML hits, and skips.</p>
 <p>Examples:</p>
@@ -227,7 +258,14 @@ resolver_min_interval_s: Minimum interval between resolver requests.
 resolver_rate_limits: Deprecated rate limit configuration retained for compat.
 enable_head_precheck: Toggle applying HEAD filtering before downloads.
 resolver_head_precheck: Per-resolver overrides for HEAD filtering behaviour.
-mailto: Contact email appended to polite headers and user agent string.</p>
+mailto: Contact email appended to polite headers and user agent string.
+max_concurrent_resolvers: Upper bound on concurrent resolver threads per work.</p>
+<p>Notes:
+<code class="docutils literal notranslate"><span class="pre">enable_head_precheck</span></code> toggles inexpensive HEAD lookups before downloads
+to filter obvious HTML responses. <code class="docutils literal notranslate"><span class="pre">resolver_head_precheck</span></code> allows
+per-resolver overrides when specific providers reject HEAD requests.
+<code class="docutils literal notranslate"><span class="pre">max_concurrent_resolvers</span></code> bounds the number of resolver threads used
+per work while still respecting configured rate limits.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>
@@ -251,6 +289,8 @@ status: Classification or status string for the attempt.
 http_status: HTTP status code (when available).
 content_type: Response content type.
 elapsed_ms: Approximate elapsed time for the attempt in milliseconds.
+resolver_wall_time_ms: Wall-clock time spent inside the resolver including
+rate limiting, measured in milliseconds.
 reason: Optional descriptive reason for failures or skips.
 metadata: Arbitrary metadata supplied by the resolver.
 sha256: SHA-256 digest of downloaded content, when available.
@@ -277,6 +317,8 @@ dry_run: Flag indicating whether the attempt occurred in dry-run mode.</p>
 <section id="attemptlogger">
 <h3><code class="docutils literal notranslate"><span class="pre">AttemptLogger</span></code><a class="headerlink" href="#attemptlogger" title="Link to this heading"></a></h3>
 <p>Protocol for logging resolver attempts.</p>
+<p>Attributes:
+None: The protocol formalises the callable surface without storing state.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>
@@ -292,8 +334,6 @@ True</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>
-<p>Attributes:
-None</p>
 </section>
 <section id="downloadoutcome">
 <h3><code class="docutils literal notranslate"><span class="pre">DownloadOutcome</span></code><a class="headerlink" href="#downloadoutcome" title="Link to this heading"></a></h3>

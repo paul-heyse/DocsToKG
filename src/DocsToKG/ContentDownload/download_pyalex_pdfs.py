@@ -1,5 +1,32 @@
 #!/usr/bin/env python3
-"""Download PDFs for OpenAlex works with a configurable resolver stack."""
+"""
+OpenAlex PDF Downloader CLI
+
+This module implements the command-line interface responsible for downloading
+open-access PDFs referenced by OpenAlex works. It combines resolver discovery,
+content classification, manifest logging, and polite crawling behaviours into a
+single executable entrypoint. The implementation aligns with the modular content
+download architecture documented in the OpenSpec proposal and exposes hooks for
+custom resolver configuration, dry-run execution, and manifest resume logic.
+
+Key Features:
+- Threaded resolver pipeline with conditional request caching.
+- Structured JSONL/CSV logging including manifest entries and attempt metrics.
+- Content sniffing utilities that differentiate PDF, HTML, and corrupt payloads.
+- CLI flags for controlling topic selection, time ranges, resolver order, and
+  polite crawling identifiers.
+
+Dependencies:
+- `requests`, `urllib3`: HTTP communication and retry adapters.
+- `pyalex`: Query construction for OpenAlex works and topics.
+- `DocsToKG.ContentDownload` submodules: Resolver pipeline orchestration,
+  conditional caching, and shared utilities.
+
+Usage:
+    python -m DocsToKG.ContentDownload.download_pyalex_pdfs \\
+        --topic \"knowledge graphs\" --year-start 2020 --year-end 2023 \\
+        --out ./pdfs --resolver-config download_config.yaml
+"""
 
 from __future__ import annotations
 
@@ -31,14 +58,14 @@ from DocsToKG.ContentDownload.conditional import (
     ModifiedResult,
 )
 from DocsToKG.ContentDownload.http import request_with_retries
-from DocsToKG.ContentDownload.resolvers import (
+from DocsToKG.ContentDownload.resolvers.cache import clear_resolver_caches
+from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
+from DocsToKG.ContentDownload.resolvers.providers import default_resolvers
+from DocsToKG.ContentDownload.resolvers.types import (
     AttemptRecord,
     DownloadOutcome,
     ResolverConfig,
     ResolverMetrics,
-    ResolverPipeline,
-    clear_resolver_caches,
-    default_resolvers,
 )
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
 
@@ -47,13 +74,24 @@ LOGGER = logging.getLogger("DocsToKG.ContentDownload")
 
 
 def _utc_timestamp() -> str:
-    """Return an ISO 8601 UTC timestamp with a trailing 'Z' suffix."""
+    """Return the current time as an ISO 8601 UTC timestamp.
+
+    Returns:
+        Timestamp string formatted with a trailing ``'Z'`` suffix.
+    """
 
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _has_pdf_eof(path: Path) -> bool:
-    """Return ``True`` when ``path`` appears to end with the ``%%EOF`` marker."""
+    """Check whether a PDF file terminates with the ``%%EOF`` marker.
+
+    Args:
+        path: Path to the candidate PDF file.
+
+    Returns:
+        ``True`` if the file ends with ``%%EOF``; ``False`` otherwise.
+    """
 
     try:
         with path.open("rb") as handle:
@@ -86,10 +124,13 @@ def ensure_dir(path: Path) -> None:
     """Create a directory if it does not already exist.
 
     Args:
-        path: Directory path to create.
+        path: Directory path to create when absent.
 
     Returns:
         None
+
+    Raises:
+        OSError: If the directory cannot be created because of permissions.
     """
     path.mkdir(parents=True, exist_ok=True)
 
@@ -97,37 +138,28 @@ def ensure_dir(path: Path) -> None:
 def _make_session(headers: Dict[str, str]) -> requests.Session:
     """Create a retry-enabled :class:`requests.Session` configured for polite crawling.
 
-    Parameters
-    ----------
-    headers:
-        Header dictionary returned by :func:`load_resolver_config`. The mapping **must**
-        already include the project user agent and mailto contact address. The factory
-        copies the mapping before applying it to the outgoing session so tests may pass
-        mutable dictionaries without worrying about side effects.
+    Args:
+        headers: Header dictionary returned by :func:`load_resolver_config`. The mapping
+            must already include the project user agent and ``mailto`` contact address.
+            A copy of the mapping is applied to the outgoing session so callers can
+            reuse mutable dictionaries without side effects.
 
-    Returns
-    -------
-    requests.Session
-        A session with exponential backoff retry behaviour suitable for resolver
-        traffic. Both ``http`` and ``https`` transports share the same
-        :class:`urllib3.util.retry.Retry` configuration.
+    Returns:
+        requests.Session: Session with exponential backoff retry behaviour suitable
+            for resolver traffic. Both ``http`` and ``https`` transports share the
+            same :class:`urllib3.util.retry.Retry` configuration.
 
-    Notes
-    -----
-    Each worker should call this helper to obtain an isolated session instance. Example
-    usage::
+    Notes:
+        Each worker should call this helper to obtain an isolated session instance.
+        Example:
 
-        session = _make_session({"User-Agent": "DocsToKGDownloader/1.0", "mailto": "ops@example.org"})
+            >>> _make_session({\"User-Agent\": \"DocsToKGDownloader/1.0\", \"mailto\": \"ops@example.org\"})  # doctest: +ELLIPSIS
+            <requests.sessions.Session object at ...>
 
-    Subsequent resolver requests automatically include the polite headers and retry
-    policy.
-
-    Thread Safety
-    -------------
-    The returned session is safe for concurrent ``GET`` and ``HEAD`` requests because
-    :class:`requests.adapters.HTTPAdapter` manages a thread-safe connection pool. Avoid
-    mutating shared session state (for example ``session.headers.update``) once the
-    session is handed to worker threads.
+        The returned session is safe for concurrent ``GET`` and ``HEAD`` requests
+        because :class:`requests.adapters.HTTPAdapter` manages a thread-safe connection
+        pool. Avoid mutating shared session state (for example ``session.headers.update``)
+        once the session is handed to worker threads.
     """
 
     session = requests.Session()
@@ -338,7 +370,7 @@ class JsonlLogger:
         """Close the underlying file handle.
 
         Args:
-            None
+            self: Logger instance managing the JSONL file descriptor.
 
         Returns:
             None
@@ -381,6 +413,19 @@ class CsvAttemptLoggerAdapter:
     ]
 
     def __init__(self, logger: JsonlLogger, path: Path) -> None:
+        """Initialise the adapter with JSONL and CSV targets.
+
+        Args:
+            logger: Underlying :class:`JsonlLogger` used for JSONL output.
+            path: Destination CSV path used to persist attempt records.
+
+        Returns:
+            None
+
+        Raises:
+            OSError: If the CSV file cannot be opened for appending.
+        """
+
         self._logger = logger
         ensure_dir(path.parent)
         exists = path.exists()
@@ -458,7 +503,7 @@ class CsvAttemptLoggerAdapter:
         """Close both the JSONL logger and the CSV file handle.
 
         Args:
-            None
+            self: Adapter instance coordinating CSV and JSONL streams.
 
         Returns:
             None
@@ -558,7 +603,7 @@ def build_manifest_entry(
 
 
 def classify_payload(head_bytes: bytes, content_type: str, url: str) -> Optional[str]:
-    """Return 'pdf', 'html', or None if undecided.
+    """Classify a payload as PDF, HTML, or unknown based on heuristics.
 
     Args:
         head_bytes: Leading bytes from the HTTP payload.
@@ -566,15 +611,12 @@ def classify_payload(head_bytes: bytes, content_type: str, url: str) -> Optional
         url: Source URL of the payload.
 
     Returns:
-        Optional[str]: Classification string or ``None`` when unknown.
+        Classification string ``\"pdf\"`` or ``\"html\"`` when detection succeeds,
+        otherwise ``None``.
 
     Raises:
-        UnicodeDecodeError: If payload sniffing encounters invalid encoding when
-            decoding the tail of the file (rare; captured by fallback logic).
-        requests.RequestException: Propagated if header or GET requests fail
-            before protective guards are applied.
-        OSError: If filesystem writes fail while persisting the payload.
-        ValueError: If payload metadata cannot be interpreted while classifying.
+        UnicodeDecodeError: If heuristics attempt to decode malformed byte
+            sequences while inspecting the payload prefix.
     """
 
     ctype = (content_type or "").lower()
@@ -662,7 +704,7 @@ class WorkArtifact:
         """Define namespace mappings for output artefact directories.
 
         Args:
-            None
+            self: Instance whose namespace mapping is being initialised.
 
         Returns:
             None
@@ -707,6 +749,23 @@ def _build_download_outcome(
     The helper normalises classification labels, performs the terminal ``%%EOF``
     check for PDFs (skipping when running in ``--dry-run`` mode), and attaches
     bookkeeping metadata such as digests and conditional request headers.
+
+    Args:
+        artifact: Work metadata describing the current OpenAlex record.
+        classification: Initial classification derived from content sniffing.
+        dest_path: Final storage path for the artefact (if any).
+        response: HTTP response object returned by :func:`request_with_retries`.
+        elapsed_ms: Download duration in milliseconds.
+        flagged_unknown: Whether heuristics flagged the payload as ambiguous.
+        sha256: SHA-256 digest of the payload when computed.
+        content_length: Size of the payload in bytes, if known.
+        etag: ETag header value supplied by the origin.
+        last_modified: Last-Modified header value supplied by the origin.
+        extracted_text_path: Optional path to extracted HTML text artefacts.
+        dry_run: Indicates whether this execution runs in dry-run mode.
+
+    Returns:
+        DownloadOutcome capturing the normalized classification and metadata.
     """
 
     normalized = classification or "empty"
@@ -749,7 +808,14 @@ def _build_download_outcome(
 
 
 def _normalize_pmid(pmid: Optional[str]) -> Optional[str]:
-    """Extract the numeric PubMed identifier or return ``None`` when absent."""
+    """Extract the numeric PubMed identifier or return ``None`` when absent.
+
+    Args:
+        pmid: Raw PubMed identifier string which may include prefixes.
+
+    Returns:
+        Normalised numeric PMCID string or ``None`` when not parsable.
+    """
 
     if not pmid:
         return None
@@ -759,7 +825,14 @@ def _normalize_pmid(pmid: Optional[str]) -> Optional[str]:
 
 
 def _normalize_arxiv(arxiv_id: Optional[str]) -> Optional[str]:
-    """Normalize arXiv identifiers by removing prefixes and whitespace."""
+    """Normalize arXiv identifiers by removing prefixes and whitespace.
+
+    Args:
+        arxiv_id: Raw arXiv identifier which may include URL or prefix.
+
+    Returns:
+        Canonical arXiv identifier without prefixes or whitespace.
+    """
 
     if not arxiv_id:
         return None
@@ -769,14 +842,25 @@ def _normalize_arxiv(arxiv_id: Optional[str]) -> Optional[str]:
 
 
 def _collect_location_urls(work: Dict[str, Any]) -> Dict[str, List[str]]:
-    """Return landing/PDF/source URL collections derived from OpenAlex metadata."""
+    """Return landing/PDF/source URL collections derived from OpenAlex metadata.
+
+    Args:
+        work: OpenAlex work payload as returned by the Works API.
+
+    Returns:
+        Dictionary containing ``landing``, ``pdf``, and ``sources`` URL lists.
+    """
 
     landing_urls: List[str] = []
     pdf_urls: List[str] = []
     sources: List[str] = []
 
     def _append_location(loc: Optional[Dict[str, Any]]) -> None:
-        """Accumulate location URLs from a single OpenAlex location record."""
+        """Accumulate location URLs from a single OpenAlex location record.
+
+        Args:
+            loc: Location dictionary as returned by OpenAlex (may be None).
+        """
 
         if not isinstance(loc, dict):
             return
@@ -940,11 +1024,8 @@ def download_candidate(
         DownloadOutcome describing the result of the download attempt.
 
     Raises:
-        requests.RequestException: If HTTP requests fail unexpectedly outside
-            guarded sections.
         OSError: If writing the downloaded payload to disk fails.
-        ValueError: If response payloads cannot be interpreted during
-            classification.
+        TypeError: If conditional response parsing returns unexpected objects.
     """
     context = context or {}
     headers: Dict[str, str] = {}
@@ -1353,7 +1434,7 @@ def iterate_openalex(
         Work payload dictionaries returned by the OpenAlex API.
 
     Returns:
-        Iterable yielding work payload dictionaries.
+        Iterable yielding the same work payload dictionaries for convenience.
     """
     pager = query.paginate(per_page=per_page, n_max=None)
     retrieved = 0
@@ -1533,7 +1614,12 @@ def process_one_work(
 
 
 def main() -> None:
-    """CLI entrypoint for the OpenAlex PDF downloader.
+    """Parse CLI arguments, configure resolvers, and execute downloads.
+
+    The entrypoint wires together argument parsing, resolver configuration,
+    logging setup, and the resolver pipeline orchestration documented in the
+    modular content download specification. It is exposed both as the module's
+    ``__main__`` handler and via `python -m`.
 
     Args:
         None

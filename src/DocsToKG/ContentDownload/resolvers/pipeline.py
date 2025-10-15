@@ -1,4 +1,27 @@
-"""Resolver pipeline orchestration and execution logic."""
+"""
+Resolver Pipeline Execution Engine
+
+This module coordinates the execution of resolver providers that discover
+downloadable artefacts for scholarly works. It encapsulates sequential and
+concurrent strategies, rate limiting, duplicate detection, and callback hooks
+for logging and metrics collection.
+
+Key Features:
+- Sequential and concurrent resolver scheduling with configurable concurrency.
+- Rate-limiting enforcement and optional HEAD preflight checks.
+- State tracking for seen URLs, HTML fallbacks, and failure metrics.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
+
+    pipeline = ResolverPipeline(
+        resolvers=[],
+        config=ResolverConfig(),
+        download_func=lambda *args, **kwargs: DownloadOutcome("miss"),
+        logger=lambda record: None,
+        metrics=ResolverMetrics(),
+    )
+"""
 
 from __future__ import annotations
 
@@ -24,6 +47,36 @@ from .types import (
 
 if TYPE_CHECKING:
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
+
+
+def request_with_retries(
+    session: requests.Session,
+    method: str,
+    url: str,
+    **kwargs: Any,
+) -> requests.Response:
+    """Proxy to :func:`DocsToKG.ContentDownload.http.request_with_retries`.
+
+    The indirection keeps this module compatible with unit tests that monkeypatch
+    either the pipeline-level attribute or the underlying HTTP helper while also
+    deferring imports to avoid circular dependencies during runtime initialisation.
+
+    Args:
+        session: Requests session used to execute the outbound HTTP call.
+        method: HTTP verb such as ``"GET"`` or ``"HEAD"``.
+        url: Fully qualified URL to fetch.
+        **kwargs: Additional keyword arguments forwarded to the HTTP helper.
+
+    Returns:
+        requests.Response: Response object produced by the proxied helper.
+
+    Raises:
+        requests.RequestException: Propagated from the underlying retry helper.
+    """
+
+    from DocsToKG.ContentDownload.http import request_with_retries as _request_with_retries
+
+    return _request_with_retries(session, method, url, **kwargs)
 
 
 def _callable_accepts_argument(func: DownloadFunc, name: str) -> bool:
@@ -188,7 +241,7 @@ class ResolverPipeline:
         """Introduce a small delay to avoid stampeding downstream services.
 
         Args:
-            None
+            self: Pipeline instance executing resolver scheduling logic.
 
         Returns:
             None
@@ -230,8 +283,6 @@ class ResolverPipeline:
         """
 
         try:
-            from DocsToKG.ContentDownload.http import request_with_retries
-
             response = request_with_retries(
                 session,
                 "HEAD",
@@ -308,13 +359,6 @@ class ResolverPipeline:
             if resolver is None:
                 continue
 
-            resolver_start = time.monotonic()
-            self._respect_rate_limit(resolver_name)
-            with self._lock:
-                self._last_invocation[resolver_name] = time.monotonic()
-
-            for result in resolver.iter_urls(session, self.config, artifact):
-                wall_ms = (time.monotonic() - resolver_start) * 1000.0
             results, wall_ms = self._collect_resolver_results(
                 resolver_name,
                 resolver,

@@ -79,12 +79,35 @@
   <section id="module-semantic-scholar">
 <h1>1. Module: semantic_scholar<a class="headerlink" href="#module-semantic-scholar" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.semantic_scholar</span></code>.</p>
-<p>Resolver that queries the Semantic Scholar Graph API for open access PDFs.</p>
+<p>Semantic Scholar Resolver Provider</p>
+<p>This module integrates with the Semantic Scholar Graph API to locate open
+access PDFs associated with DOI-indexed papers.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Memoised API lookups to respect rate limits and improve performance.</p></li>
+<li><p>Optional API key support via standard <code class="docutils literal notranslate"><span class="pre">x-api-key</span></code> headers.</p></li>
+<li><p>Structured error emission covering HTTP and JSON decoding failures.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import SemanticScholarResolver</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = SemanticScholarResolver()
+results = list(resolver.iter_urls(session, config, artifact))
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="fetch-semantic-scholar-data-doi-api-key-timeout-headers-key">
 <h3><code class="docutils literal notranslate"><span class="pre">_fetch_semantic_scholar_data(doi,</span> <span class="pre">api_key,</span> <span class="pre">timeout,</span> <span class="pre">headers_key)</span></code><a class="headerlink" href="#fetch-semantic-scholar-data-doi-api-key-timeout-headers-key" title="Link to this heading"></a></h3>
 <p>Fetch Semantic Scholar Graph API metadata for <code class="docutils literal notranslate"><span class="pre">doi</span></code> with caching.</p>
+<p>Args:
+doi: Normalised DOI string to query.
+api_key: Optional Semantic Scholar API key to include in the request.
+timeout: Request timeout in seconds.
+headers_key: Hashable representation of polite headers for cache lookups.</p>
+<p>Returns:
+Decoded JSON payload returned by the Semantic Scholar Graph API.</p>
+<p>Raises:
+requests.HTTPError: If the API responds with a non-success status code.</p>
 </section>
 <section id="is-enabled-self-config-artifact">
 <h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#is-enabled-self-config-artifact" title="Link to this heading"></a></h3>

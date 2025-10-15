@@ -26,7 +26,8 @@ import pytest
 
 pytest.importorskip("requests")
 
-from DocsToKG.ContentDownload.resolvers import ResolverConfig, ResolverPipeline
+from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
+from DocsToKG.ContentDownload.resolvers.types import ResolverConfig
 
 
 class _NullLogger:

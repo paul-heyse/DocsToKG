@@ -1,4 +1,21 @@
-"""Resolver that queries the Crossref metadata API to surface publisher-hosted PDFs."""
+"""
+Crossref Resolver Provider
+
+This module integrates with the Crossref metadata API to surface direct and
+publisher-hosted PDF links for scholarly works. It uses polite rate limiting
+and caching strategies to comply with Crossref service guidelines.
+
+Key Features:
+- Cached metadata retrieval with header normalisation for polite access.
+- Robust error handling for HTTP, timeout, and JSON parsing failures.
+- Deduplication of returned URLs to minimise redundant download attempts.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.crossref import CrossrefResolver
+
+    resolver = CrossrefResolver()
+    results = list(resolver.iter_urls(session, config, artifact))
+"""
 
 from __future__ import annotations
 
@@ -24,11 +41,24 @@ LOGGER = logging.getLogger(__name__)
 @lru_cache(maxsize=1000)
 def _fetch_crossref_data(
     doi: str,
-    mailto: Optional[str],
+   mailto: Optional[str],
     timeout: float,
     headers_key: Tuple[Tuple[str, str], ...],
 ) -> Dict[str, Any]:
-    """Retrieve Crossref metadata for ``doi`` with polite header caching."""
+    """Retrieve Crossref metadata for ``doi`` with polite header caching.
+
+    Args:
+        doi: Normalised DOI string to request metadata for.
+        mailto: Contact email used for Crossref's polite rate limiting headers.
+        timeout: Request timeout in seconds.
+        headers_key: Hashable representation of polite headers for cache lookups.
+
+    Returns:
+        Decoded JSON payload returned by the Crossref API.
+
+    Raises:
+        requests.HTTPError: If the Crossref API responds with a non-success status.
+    """
 
     headers = dict(headers_key)
     params = {"mailto": mailto} if mailto else None

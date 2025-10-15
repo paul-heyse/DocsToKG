@@ -4,6 +4,7 @@ Instructions for AI coding assistants using OpenSpec for spec-driven development
 
 ## TL;DR Quick Checklist
 
+- Bootstrap / activate environment before running any commands (see **Environment Activation** below)
 - Search existing work: `openspec spec list --long`, `openspec list` (use `rg` only for full-text search)
 - Decide scope: new capability vs modify existing capability
 - Pick a unique `change-id`: kebab-case, verb-led (`add-`, `update-`, `remove-`, `refactor-`)
@@ -11,6 +12,42 @@ Instructions for AI coding assistants using OpenSpec for spec-driven development
 - Write deltas: use `## ADDED|MODIFIED|REMOVED|RENAMED Requirements`; include at least one `#### Scenario:` per requirement
 - Validate: `openspec validate [change-id] --strict` and fix issues
 - Request approval: Do not start implementation until proposal is approved
+
+## Environment Activation (Agents & Automation)
+
+AI assistants **must** operate inside the project virtual environment; otherwise required packages (docling, vLLM, tqdm, etc.) will be missing and commands will fail. Follow this sequence before running any tooling, tests, or CLIs:
+
+1. **Bootstrap the virtualenv (idempotent)**
+   ```bash
+   ./scripts/bootstrap_env.sh
+   ```
+   Creates `.venv` if absent and installs DocsToKG in editable mode so the package resolves from `src/`.
+
+2. **Load `.envrc` via direnv**
+   ```bash
+   direnv allow
+   ```
+   The repository’s `.envrc` exports `VIRTUAL_ENV=.venv`, prepends `.venv/bin` to `PATH`, and appends `src/` to `PYTHONPATH`. Any command executed as `direnv exec . …` now inherits the correct environment.
+
+3. **Run commands through direnv (preferred)**
+   ```bash
+   direnv exec . python -m DocsToKG.DocParsing.cli.embed_vectors --help
+   ```
+   Use this pattern for tests, docs, and CLIs to guarantee the proper interpreter.
+
+4. **Fallback when direnv is unavailable**
+   ```bash
+   source .venv/bin/activate
+   export PYTHONPATH="$PWD/src:${PYTHONPATH:-}"
+   ```
+
+5. **Verify activation before working**
+   ```bash
+   python -c "import sys; assert any(p.endswith('DocsToKG') for p in sys.path)"
+   python -m DocsToKG.DocParsing.cli.benchmark_embeddings --chunks 1 --tokens 1 --dense-dim 1
+   ```
+
+> ❗ **Never** run project scripts with the system Python. Missing dependencies indicate the virtual environment was not activated; repeat steps 1–3 to recover.
 
 ## Three-Stage Workflow
 

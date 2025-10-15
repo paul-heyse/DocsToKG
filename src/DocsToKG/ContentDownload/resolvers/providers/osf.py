@@ -1,4 +1,20 @@
-"""Resolver targeting the Open Science Framework API for preprint downloads."""
+"""
+OSF Resolver Provider
+
+This module queries the Open Science Framework (OSF) API to retrieve download
+links for preprints and other research artefacts hosted on the platform.
+
+Key Features:
+- Support for both direct download links and primary file relationships.
+- Structured error handling for timeouts, connection failures, and JSON errors.
+- Deduplication of URLs to avoid redundant download attempts.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.osf import OsfResolver
+
+    resolver = OsfResolver()
+    results = list(resolver.iter_urls(session, config, artifact))
+"""
 
 from __future__ import annotations
 

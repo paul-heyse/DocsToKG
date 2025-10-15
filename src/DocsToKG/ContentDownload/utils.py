@@ -1,4 +1,22 @@
-"""Shared utility functions for the ContentDownload module."""
+"""
+Content Download Utility Helpers
+
+This module provides small string and identifier normalisation helpers shared
+across resolver implementations. The utilities ensure consistent handling of
+scholarly identifiers such as DOIs, PMCIDs, and arXiv IDs while also providing
+lightweight string manipulation helpers used during manifest generation.
+
+Key Features:
+- Normalisation of DOI, PMCID, and arXiv identifiers from heterogeneous sources.
+- Prefix stripping for resolver-specific metadata cleaning.
+- Duplicate removal while preserving original ordering.
+
+Usage:
+    from DocsToKG.ContentDownload import utils
+
+    doi = utils.normalize_doi("https://doi.org/10.1234/example")
+    pmcid = utils.normalize_pmcid("PMC12345")
+"""
 
 from __future__ import annotations
 

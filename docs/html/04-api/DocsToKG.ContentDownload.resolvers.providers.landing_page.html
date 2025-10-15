@@ -79,12 +79,31 @@
   <section id="module-landing-page">
 <h1>1. Module: landing_page<a class="headerlink" href="#module-landing-page" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.landing_page</span></code>.</p>
-<p>Landing page scraper resolver using BeautifulSoup.</p>
+<p>Landing Page Scraper Resolver</p>
+<p>This module uses lightweight HTML parsing to discover PDF links embedded within
+landing pages when resolvers fail to return direct download URLs.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Detection of <code class="docutils literal notranslate"><span class="pre">citation_pdf_url</span></code> meta tags and alternate link elements.</p></li>
+<li><p>Heuristic scanning of anchor text and href targets for PDF references.</p></li>
+<li><p>Graceful degradation when BeautifulSoup or lxml is unavailable.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.resolvers.providers.landing_page import LandingPageResolver</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = LandingPageResolver()
+results = list(resolver.iter_urls(session, config, artifact))
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="absolute-url-base-href">
 <h3><code class="docutils literal notranslate"><span class="pre">_absolute_url(base,</span> <span class="pre">href)</span></code><a class="headerlink" href="#absolute-url-base-href" title="Link to this heading"></a></h3>
 <p>Resolve relative links on a landing page against the page URL.</p>
+<p>Args:
+base: Landing page URL used as the base for resolution.
+href: Relative or absolute link discovered in the page.</p>
+<p>Returns:
+Absolute URL string that can be used for downstream requests.</p>
 </section>
 <section id="is-enabled-self-config-artifact">
 <h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#is-enabled-self-config-artifact" title="Link to this heading"></a></h3>

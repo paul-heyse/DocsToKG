@@ -1,0 +1,299 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Migration Guide: Modular Content Download Resolvers &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/css/custom.css" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=8d563738"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Migration Guide: Modular Content Download Resolvers</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/migration-modularize-resolvers.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="migration-guide-modular-content-download-resolvers">
+<h1>Migration Guide: Modular Content Download Resolvers<a class="headerlink" href="#migration-guide-modular-content-download-resolvers" title="Link to this heading"></a></h1>
+<p>This guide helps teams upgrade from the monolithic
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers</span></code> module to the modular resolver
+architecture introduced by the <code class="docutils literal notranslate"><span class="pre">modularize-content-download-architecture</span></code>
+change proposal.</p>
+<section id="import-path-updates">
+<h2>1. Import Path Updates<a class="headerlink" href="#import-path-updates" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Legacy Import</p></th>
+<th class="head"><p>Recommended Import</p></th>
+<th class="head"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">ResolverPipeline</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.pipeline</span> <span class="pre">import</span> <span class="pre">ResolverPipeline</span></code></p></td>
+<td><p>New path exposes the same API with improved typing.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">default_resolvers</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.providers</span> <span class="pre">import</span> <span class="pre">default_resolvers</span></code></p></td>
+<td><p>Provider registry now lives alongside individual resolver modules.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">ResolverConfig</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.types</span> <span class="pre">import</span> <span class="pre">ResolverConfig</span></code></p></td>
+<td><p>Configuration dataclasses reside in the dedicated <code class="docutils literal notranslate"><span class="pre">types</span></code> module.</p></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<div><p><strong>Compatibility:</strong> All legacy imports continue working via re-exports, but
+they now emit <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code>. Update imports to silence the warning
+and prepare for future removals.</p>
+</div></blockquote>
+</section>
+<section id="new-configuration-options">
+<h2>2. New Configuration Options<a class="headerlink" href="#new-configuration-options" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">max_concurrent_resolvers</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p>Bounds intra-work concurrency. Set to <code class="docutils literal notranslate"><span class="pre">&gt;1</span></code> to enable threaded resolver execution.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">enable_head_precheck</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">True</span></code></p></td>
+<td><p>Performs HEAD requests before downloads to filter HTML and zero-byte responses.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">resolver_head_precheck</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">{}</span></code></p></td>
+<td><p>Per-resolver override for HEAD behaviour (set to <code class="docutils literal notranslate"><span class="pre">False</span></code> for resolvers that reject HEAD).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">resolver_timeouts</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">{}</span></code></p></td>
+<td><p>Resolver-specific timeout overrides (fallbacks to <code class="docutils literal notranslate"><span class="pre">timeout</span></code>).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">resolver_min_interval_s</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">{}</span></code></p></td>
+<td><p>Granular rate-limiting expressed as minimum seconds between resolver invocations.</p></td>
+</tr>
+</tbody>
+</table>
+<p>All new options are optional. Existing configuration files that omit the
+fields continue to function without modification.</p>
+</section>
+<section id="behavioural-changes">
+<h2>3. Behavioural Changes<a class="headerlink" href="#behavioural-changes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>OpenAlexResolver:</strong> OpenAlex-provided URLs now flow through the standard
+resolver pipeline as the first resolver. Remove any custom
+<code class="docutils literal notranslate"><span class="pre">attempt_openalex_candidates()</span></code> integration code.</p></li>
+<li><p><strong>Centralised HTTP retries:</strong> All resolvers use
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.http.request_with_retries()</span></code> for consistent
+backoff, timeout, and <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> handling.</p></li>
+<li><p><strong>Conditional requests:</strong> Download code paths share the
+<code class="docutils literal notranslate"><span class="pre">ConditionalRequestHelper</span></code> utility to honour ETag and Last-Modified headers.</p></li>
+<li><p><strong>Structured logging:</strong> Attempt records include <code class="docutils literal notranslate"><span class="pre">resolver_wall_time_ms</span></code>
+for total resolver wall-clock tracking.</p></li>
+</ul>
+</section>
+<section id="testing-checklist">
+<h2>4. Testing Checklist<a class="headerlink" href="#testing-checklist" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>Update imports to the recommended module paths.</p></li>
+<li><p>Run <code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tests/</span></code> to confirm backward compatibility.</p></li>
+<li><p>Inspect logs for any unexpected <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> occurrences.</p></li>
+<li><p>If you provide custom resolvers, ensure they are registered via
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.default_resolvers()</span></code>.</p></li>
+</ol>
+</section>
+<section id="support">
+<h2>5. Support<a class="headerlink" href="#support" title="Link to this heading"></a></h2>
+<p>Reach out in the <code class="docutils literal notranslate"><span class="pre">#docs-to-kg</span></code> channel if you encounter migration issues or
+spot regressions. Include stack traces, configuration snippets, and resolver
+names to speed up triage.</p>
+</section>
+</section>
+<section id="migration-guide-modular-resolver-architecture">
+<h1>Migration Guide: Modular Resolver Architecture<a class="headerlink" href="#migration-guide-modular-resolver-architecture" title="Link to this heading"></a></h1>
+<p>This guide describes how to upgrade custom tooling to the modular resolver
+layout introduced by the <code class="docutils literal notranslate"><span class="pre">modularize-content-download-architecture</span></code> change.</p>
+<section id="legacy-import-paths">
+<h2>Legacy Import Paths<a class="headerlink" href="#legacy-import-paths" title="Link to this heading"></a></h2>
+<p>Existing code commonly imported pipeline classes and helper utilities directly
+from the monolithic namespace:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.resolvers</span><span class="w"> </span><span class="kn">import</span> <span class="n">ResolverPipeline</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.resolvers</span><span class="w"> </span><span class="kn">import</span> <span class="n">ResolverConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.resolvers</span><span class="w"> </span><span class="kn">import</span> <span class="n">default_resolvers</span>
+</pre></div>
+</div>
+<p>These imports continue to work and emit a <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> when accessing the
+legacy <code class="docutils literal notranslate"><span class="pre">time</span></code> or <code class="docutils literal notranslate"><span class="pre">requests</span></code> shims.</p>
+</section>
+<section id="recommended-import-paths">
+<h2>Recommended Import Paths<a class="headerlink" href="#recommended-import-paths" title="Link to this heading"></a></h2>
+<p>Prefer importing directly from the new module hierarchy to benefit from static
+typing and clearer dependencies:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.resolvers.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">ResolverPipeline</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.resolvers.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">ResolverConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.resolvers.providers</span><span class="w"> </span><span class="kn">import</span> <span class="n">default_resolvers</span>
+</pre></div>
+</div>
+<p>Individual providers may be imported from
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.&lt;name&gt;</span></code>.</p>
+</section>
+<section id="updated-configuration-options">
+<h2>Updated Configuration Options<a class="headerlink" href="#updated-configuration-options" title="Link to this heading"></a></h2>
+<p>The refactor introduces the following configuration settings. They are available
+on <code class="docutils literal notranslate"><span class="pre">ResolverConfig</span></code> and in YAML/CLI overrides:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">max_concurrent_resolvers</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p>Upper bound on concurrent resolver threads per work item.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">enable_head_precheck</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">True</span></code></p></td>
+<td><p>Toggle HEAD preflight checks that skip obvious HTML/empty responses.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">resolver_head_precheck</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">{}</span></code></p></td>
+<td><p>Per-resolver override for HEAD preflight behaviour.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">resolver_min_interval_s</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">{}</span></code></p></td>
+<td><p>Fine-grained rate limiting per resolver (supersedes <code class="docutils literal notranslate"><span class="pre">resolver_rate_limits</span></code>).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">resolver_timeouts</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">{}</span></code></p></td>
+<td><p>Resolver-specific timeout overrides.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="behaviour-changes">
+<h2>Behaviour Changes<a class="headerlink" href="#behaviour-changes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Resolver executions are routed through a shared <code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code>
+helper that respects <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> headers and consistent backoff policies.</p></li>
+<li><p>Resolver exceptions are captured and surfaced as structured events instead of
+bubbling through the pipeline.</p></li>
+<li><p>Zenodo and Figshare resolvers are now part of the default resolver set.</p></li>
+<li><p>Legacy <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.time</span></code> and
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.requests</span></code> aliases emit deprecation
+warnings and will be removed in a future release.</p></li>
+</ul>
+</section>
+<section id="validation-checklist">
+<h2>Validation Checklist<a class="headerlink" href="#validation-checklist" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>Run the full resolver test suite: <code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tests/test_resolver_pipeline.py</span></code>.</p></li>
+<li><p>Execute your custom resolver integration using the new imports.</p></li>
+<li><p>Confirm that manifests still record wall-clock timing via
+<code class="docutils literal notranslate"><span class="pre">resolver_wall_time_ms</span></code>.</p></li>
+<li><p>Update any documentation or onboarding material to reference the new
+modules.</p></li>
+</ol>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

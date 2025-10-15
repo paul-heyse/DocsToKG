@@ -2,38 +2,41 @@
 
 This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.__init__``.
 
-Resolver pipeline and provider implementations.
+Resolver Package Facade
 
-This module maintains backward compatibility by re-exporting legacy entry points
-so existing integrations and tests can continue to monkeypatch ``requests`` or
-``time`` on the resolver namespace. Accessing ``time`` or ``requests`` now emits
-a :class:`DeprecationWarning`; import the standard modules directly when
-updating custom tooling.
+This module exposes the public interface for resolver pipeline utilities and
+provider implementations used by the modular content download architecture. It
+re-exports pipeline classes, resolver types, and concrete provider factories to
+preserve backward compatibility with legacy imports while gently steering
+callers towards explicit submodules.
 
-The module also exposes ``ResolverPipeline``/``ResolverConfig`` convenience
-aliases for callers that have not yet migrated to the modular
-``pipeline``/``types`` submodules.
+Key Features:
+- Facade for the resolver pipeline orchestration classes and metrics types.
+- Explicit export of default resolver configuration and provider implementations.
+- Backward-compatible aliases for deprecated imports (``time`` and ``requests``).
 
-.. note::
-   Importing from this facade now emits ``DeprecationWarning``. Prefer importing
-   from explicit submodules such as
-   ``DocsToKG.ContentDownload.resolvers.pipeline`` or
-   ``DocsToKG.ContentDownload.resolvers.types``.
+Usage:
+    from DocsToKG.ContentDownload.resolvers import ResolverPipeline, default_resolvers
+
+    pipeline = ResolverPipeline(
+        resolvers=default_resolvers(),
+        config=ResolverConfig(),
+        download_func=lambda *args, **kwargs: None,
+        logger=lambda record: None,
+        metrics=ResolverMetrics(),
+    )
 
 ## 1. Functions
 
-### `clear_resolver_caches()`
-
-Clear resolver-level LRU caches.
-
-Args:
-None
-
-Returns:
-None
-
 ### `__getattr__(name)`
 
-Return compatibility shims for deprecated attributes (``time`` and
-``requests``) while emitting :class:`DeprecationWarning` to encourage direct
-imports.
+Return legacy exports while emitting :class:`DeprecationWarning`.
+
+Args:
+name: Attribute name requested by the caller.
+
+Returns:
+Either the legacy export object or raises :class:`AttributeError` when unknown.
+
+Raises:
+AttributeError: If ``name`` is not a recognised legacy export.

@@ -31,7 +31,18 @@ pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
 from DocsToKG.OntologyDownload import download
-from DocsToKG.OntologyDownload.config import ConfigError, DownloadConfiguration
+from DocsToKG.OntologyDownload.config import (
+    ConfigError,
+    DefaultsConfig,
+    DownloadConfiguration,
+    ResolvedConfig,
+)
+from DocsToKG.OntologyDownload.core import (
+    ConfigurationError,
+    FetchSpec,
+    _ensure_license_allowed,
+)
+from DocsToKG.OntologyDownload.resolvers import FetchPlan
 
 
 @dataclass
@@ -624,6 +635,38 @@ def test_validate_url_security_respects_wildcard_allowlist(monkeypatch):
     secure_url = download.validate_url_security("https://sub.example.org/ontology.owl", config)
 
     assert secure_url.startswith("https://sub.example.org")
+
+
+def test_ensure_license_allowed_normalizes_spdx() -> None:
+    config = ResolvedConfig(
+        defaults=DefaultsConfig(accept_licenses=["CC-BY-4.0"]),
+        specs=[],
+    )
+    spec = FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"])
+    plan = FetchPlan(
+        url="https://example.org/hp.owl",
+        headers={},
+        filename_hint=None,
+        version=None,
+        license="Creative Commons Attribution 4.0",
+        media_type="application/rdf+xml",
+        service="obo",
+    )
+
+    _ensure_license_allowed(plan, config, spec)
+
+    disallowed_plan = FetchPlan(
+        url="https://example.org/hp.owl",
+        headers={},
+        filename_hint=None,
+        version=None,
+        license="GPL",
+        media_type="application/rdf+xml",
+        service="obo",
+    )
+
+    with pytest.raises(ConfigurationError):
+        _ensure_license_allowed(disallowed_plan, config, spec)
 
 
 def test_sanitize_filename_removes_traversal():

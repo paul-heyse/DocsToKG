@@ -79,14 +79,26 @@
   <section id="module-chunk-and-coalesce">
 <h1>1. Module: chunk_and_coalesce<a class="headerlink" href="#module-chunk-and-coalesce" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.cli.chunk_and_coalesce</span></code>.</p>
-<p>Convenience CLI wrapper for the DocTags chunking pipeline.</p>
+<p>Chunking CLI Wrapper</p>
+<p>This lightweight CLI exposes the Docling hybrid chunker with DocsToKG-specific
+defaults. It delegates substantive work to
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin</span></code> while presenting a
+user-friendly interface aligned with the wider DocParsing toolchain.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Share the same argument surface as the standalone chunking script</p></li>
+<li><p>Provide descriptive help text for DocsToKG operators</p></li>
+<li><p>Enable orchestration scripts to call the chunker via <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span></code></p></li>
+</ul>
+<p>Usage:
+python -m DocsToKG.DocParsing.cli.chunk_and_coalesce –in-dir Data/DocTagsFiles</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="build-parser">
 <h3><code class="docutils literal notranslate"><span class="pre">build_parser()</span></code><a class="headerlink" href="#build-parser" title="Link to this heading"></a></h3>
 <p>Expose the chunker parser with an enhanced description.</p>
 <p>Args:
-None</p>
+None: Parser creation does not require inputs.</p>
 <p>Returns:
 :class:<code class="docutils literal notranslate"><span class="pre">argparse.ArgumentParser</span></code> configured for chunking CLI usage.</p>
 <p>Raises:
@@ -96,9 +108,10 @@ None</p>
 <h3><code class="docutils literal notranslate"><span class="pre">main(argv)</span></code><a class="headerlink" href="#main-argv" title="Link to this heading"></a></h3>
 <p>Parse arguments and invoke the chunking pipeline.</p>
 <p>Args:
-argv: Optional sequence of command-line arguments.</p>
+argv: Optional sequence of command-line arguments. When <code class="docutils literal notranslate"><span class="pre">None</span></code> the
+values from :data:<code class="docutils literal notranslate"><span class="pre">sys.argv</span></code> are used.</p>
 <p>Returns:
-Exit code from the chunking pipeline.</p>
+Exit code returned by the underlying chunking pipeline.</p>
 <p>Raises:
 SystemExit: Propagated when argument parsing fails.</p>
 </section>

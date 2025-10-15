@@ -5,7 +5,10 @@ dependencies used across the ontology downloader. When a dependency is not
 installed in the current environment the helpers return lightweight stub
 implementations that provide just enough behaviour for tests and basic
 execution paths. The approach keeps optional dependencies truly optional
-while avoiding scattered try/except blocks throughout the codebase.
+while avoiding scattered try/except blocks throughout the codebase, and
+provides centralized fallbacks for pystow (path management), rdflib
+(canonical Turtle support), pronto, and owlready2 as described in the
+robust ontology downloader specification.
 
 Examples:
     >>> from DocsToKG.OntologyDownload.optdeps import get_pystow
@@ -171,20 +174,22 @@ class _StubGraph:
 
         return len(self._triples) or 1
 
-    def serialize(self, destination: Any, format: str = "turtle") -> None:
-        """Write a stub serialization result.
+    def serialize(self, destination: Any = None, format: str = "turtle") -> Any:
+        """Write a stub serialization result or return inline output.
 
         Args:
-            destination: Output path or file-like object.
+            destination: Output path, file-like object, or ``None`` for inline output.
             format: Serialization format. Ignored by the stub.
 
         Returns:
-            None
+            ``None`` for file destinations, or a string when ``destination`` is ``None``.
 
         Raises:
             None.
         """
 
+        if destination is None:
+            return "# Stub TTL output\n"
         if isinstance(destination, (str, Path)):
             dest_path = Path(destination)
             dest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -192,8 +197,11 @@ class _StubGraph:
                 dest_path.write_bytes(self._source.read_bytes())
             else:
                 dest_path.write_text("# Stub TTL output\n")
-        else:
+            return None
+        if hasattr(destination, "write"):
             destination.write(b"# Stub TTL output\n")
+            return None
+        return destination
 
 
 class _StubRDFLib:

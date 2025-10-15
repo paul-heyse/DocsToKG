@@ -1,8 +1,27 @@
-"""Resolver that transforms arXiv identifiers into direct PDF download URLs."""
+"""
+arXiv Resolver Provider
+
+This module implements a lightweight resolver that converts arXiv identifiers
+into direct PDF download URLs. It participates in the modular content download
+pipeline when arXiv metadata is available for a work.
+
+Key Features:
+- Normalises arXiv identifiers sourced from OpenAlex metadata.
+- Emits deterministic PDF URLs suitable for direct download.
+- Records skip events when metadata is incomplete.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.arxiv import ArxivResolver
+
+    resolver = ArxivResolver()
+    list(resolver.iter_urls(session, config, artifact))
+"""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterable
+
+import requests
 
 from DocsToKG.ContentDownload.utils import strip_prefix
 

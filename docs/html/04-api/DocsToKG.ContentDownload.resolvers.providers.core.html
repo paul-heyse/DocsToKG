@@ -79,7 +79,22 @@
   <section id="module-core">
 <h1>1. Module: core<a class="headerlink" href="#module-core" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.core</span></code>.</p>
-<p>CORE API resolver for aggregated open access content.</p>
+<p>CORE Resolver Provider</p>
+<p>This module implements a resolver that queries the CORE API for open-access
+content linked to scholarly works. It supplements other providers by covering
+institutional repositories aggregated by CORE.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Authenticated CORE API requests with polite header support.</p></li>
+<li><p>Rich error reporting for timeouts, connection issues, and JSON parsing.</p></li>
+<li><p>Deduplicated URL emission to prevent redundant downloads.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.resolvers.providers.core import CoreResolver</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = CoreResolver()
+results = list(resolver.iter_urls(session, config, artifact))
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="is-enabled-self-config-artifact">

@@ -79,7 +79,21 @@
   <section id="module-hal">
 <h1>1. Module: hal<a class="headerlink" href="#module-hal" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.hal</span></code>.</p>
-<p>HAL (Hyper Articles en Ligne) open archive resolver.</p>
+<p>HAL Resolver Provider</p>
+<p>This module integrates with the HAL (Hyper Articles en Ligne) open archive API
+to discover repository-hosted PDFs for works indexed in OpenAlex.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Query construction against HAL search endpoints using DOI filters.</p></li>
+<li><p>Extraction of both main and auxiliary file URLs with PDF filtering.</p></li>
+<li><p>Error handling and logging for HTTP and JSON parsing issues.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.resolvers.providers.hal import HalResolver</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = HalResolver()
+urls = list(resolver.iter_urls(session, config, artifact))
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="is-enabled-self-config-artifact">

@@ -85,7 +85,10 @@ dependencies used across the ontology downloader. When a dependency is not
 installed in the current environment the helpers return lightweight stub
 implementations that provide just enough behaviour for tests and basic
 execution paths. The approach keeps optional dependencies truly optional
-while avoiding scattered try/except blocks throughout the codebase.</p>
+while avoiding scattered try/except blocks throughout the codebase, and
+provides centralized fallbacks for pystow (path management), rdflib
+(canonical Turtle support), pronto, and owlready2 as described in the
+robust ontology downloader specification.</p>
 <p>Examples:
 &gt;&gt;&gt; from DocsToKG.OntologyDownload.optdeps import get_pystow
 &gt;&gt;&gt; pystow = get_pystow()
@@ -182,12 +185,12 @@ Integer representing the number of stored triples.</p>
 </section>
 <section id="serialize-self-destination-format">
 <h3><code class="docutils literal notranslate"><span class="pre">serialize(self,</span> <span class="pre">destination,</span> <span class="pre">format)</span></code><a class="headerlink" href="#serialize-self-destination-format" title="Link to this heading"></a></h3>
-<p>Write a stub serialization result.</p>
+<p>Write a stub serialization result or return inline output.</p>
 <p>Args:
-destination: Output path or file-like object.
+destination: Output path, file-like object, or <code class="docutils literal notranslate"><span class="pre">None</span></code> for inline output.
 format: Serialization format. Ignored by the stub.</p>
 <p>Returns:
-None</p>
+<code class="docutils literal notranslate"><span class="pre">None</span></code> for file destinations, or a string when <code class="docutils literal notranslate"><span class="pre">destination</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
 <p>Raises:
 None.</p>
 </section>

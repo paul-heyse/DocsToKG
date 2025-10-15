@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
-"""Unified CLI for converting HTML or PDF corpora into DocTags."""
+"""
+Unified DocTags Conversion CLI
+
+This command-line interface orchestrates HTML and PDF conversions to DocTags
+using Docling backends. It consolidates disparate scripts into a single entry
+point that auto-detects the appropriate backend, manages manifests, and shares
+DocsToKG-wide defaults.
+
+Key Features:
+- Auto-detect the conversion backend from input directory contents
+- Forward CLI options to specialised HTML and PDF pipelines
+- Integrate with DocsToKG resume/force semantics for idempotent runs
+
+Usage:
+    python -m DocsToKG.DocParsing.cli.doctags_convert --mode auto --input Data/HTML
+"""
 
 from __future__ import annotations
 
@@ -130,6 +145,13 @@ def detect_mode(input_dir: Path) -> str:
 
     Raises:
         ValueError: If both PDF and HTML files are present (or neither).
+
+    Examples:
+        >>> tmp = Path("/tmp/docstokg-cli-examples")
+        >>> _ = tmp.mkdir(exist_ok=True)
+        >>> _ = (tmp / "example.html").write_text("<html></html>", encoding="utf-8")
+        >>> detect_mode(tmp)
+        'html'
     """
 
     pdf_count = sum(1 for _ in input_dir.rglob("*.pdf"))
@@ -146,7 +168,15 @@ def detect_mode(input_dir: Path) -> str:
 
 
 def _merge_args(parser: argparse.ArgumentParser, overrides: Dict[str, Any]) -> argparse.Namespace:
-    """Return a parser namespace seeded with override values."""
+    """Return a parser namespace seeded with override values.
+
+    Args:
+        parser: Parser whose default values should seed the namespace.
+        overrides: Mapping of argument names to explicit override values.
+
+    Returns:
+        :class:`argparse.Namespace` with defaults populated and overrides applied.
+    """
 
     base = parser.parse_args([])
     for key, value in overrides.items():

@@ -1,4 +1,29 @@
-"""Type definitions and protocols for the resolver pipeline."""
+"""
+Resolver Type Declarations
+
+This module collects dataclasses, type aliases, and protocols that formalise
+the interfaces between resolver providers, the pipeline engine, and downstream
+consumers of resolver output. Centralising these definitions keeps provider
+implementations lean while ensuring documentation generators can expose the
+full API surface.
+
+Key Features:
+- Dataclasses describing resolver results, logs, and pipeline outcomes.
+- Protocols for logging callbacks and resolver implementations.
+- Lightweight metrics collector for resolver attempt statistics.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.types import Resolver, ResolverConfig
+
+    class ExampleResolver:
+        name = "example"
+
+        def is_enabled(self, config, artifact):
+            return True
+
+        def iter_urls(self, session, config, artifact):
+            yield ResolverResult(url="https://example.org/example.pdf")
+"""
 
 from __future__ import annotations
 
@@ -64,7 +89,7 @@ class ResolverResult:
         """Return ``True`` when this result represents an informational event.
 
         Args:
-            None
+            self: Resolver result instance under inspection.
 
         Returns:
             bool: ``True`` if the resolver emitted an event instead of a URL.
@@ -154,10 +179,10 @@ class ResolverConfig:
         return self.resolver_toggles.get(resolver_name, True)
 
     def __post_init__(self) -> None:
-        """Validate configuration fields and apply defaults.
+        """Validate configuration fields and apply defaults for missing values.
 
         Args:
-            self: Instance whose configuration fields require validation.
+            self: Configuration instance requiring validation.
 
         Returns:
             None
@@ -259,6 +284,9 @@ class AttemptRecord:
 class AttemptLogger(Protocol):
     """Protocol for logging resolver attempts.
 
+    Attributes:
+        None: The protocol formalises the callable surface without storing state.
+
     Examples:
         >>> class Collector:
         ...     def __init__(self):
@@ -268,9 +296,6 @@ class AttemptLogger(Protocol):
         >>> collector = Collector()
         >>> isinstance(collector, AttemptLogger)
         True
-
-    Attributes:
-        None
     """
 
     def log(self, record: AttemptRecord) -> None:
@@ -323,7 +348,7 @@ class DownloadOutcome:
         """Return ``True`` when the classification represents a PDF.
 
         Args:
-            None
+            self: Download outcome to evaluate.
 
         Returns:
             bool: ``True`` if the outcome corresponds to a PDF download.
@@ -470,7 +495,7 @@ class ResolverMetrics:
         """Return aggregated metrics summarizing resolver behaviour.
 
         Args:
-            None
+            self: Metrics collector instance aggregating resolver statistics.
 
         Returns:
             Dict[str, Any]: Snapshot of attempts, successes, HTML hits, and skips.

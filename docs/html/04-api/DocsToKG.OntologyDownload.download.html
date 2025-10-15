@@ -80,10 +80,12 @@
 <h1>1. Module: download<a class="headerlink" href="#module-download" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.download</span></code>.</p>
 <p>Ontology Download Utilities</p>
-<p>This module houses secure download helpers that implement rate limiting,
-content validation, and resumable transfers for ontology documents. It works
-in concert with resolver planning to ensure that downloaded artifacts respect
-size limits and are safe for downstream document processing.</p>
+<p>This module houses secure download helpers that implement per-host and
+per-service rate limiting, Content-Type and size validation via preliminary
+HEAD requests, internationalized domain name hardening, and resumable
+transfers for ontology documents. It works in concert with resolver planning
+to ensure that downloaded artifacts respect size limits, host allowlists, and
+are safe for downstream processing, including guarded archive extraction.</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="log-memory-logger-event">
@@ -124,7 +126,10 @@ String suitable for use as the netloc portion of a URL.</p>
 </section>
 <section id="validate-url-security-url-http-config">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_url_security(url,</span> <span class="pre">http_config)</span></code><a class="headerlink" href="#validate-url-security-url-http-config" title="Link to this heading"></a></h3>
-<p>Validate URLs to avoid SSRF, enforce HTTPS, and honor host allowlists.</p>
+<p>Validate URLs to avoid SSRF, enforce HTTPS, normalize IDNs, and honor host allowlists.</p>
+<p>Hostnames are converted to punycode before resolution, and both direct IP
+addresses and DNS results are rejected when they target private or loopback
+ranges to prevent server-side request forgery.</p>
 <p>Args:
 url: URL returned by a resolver for ontology download.
 http_config: Download configuration providing optional host allowlist.</p>
@@ -177,7 +182,7 @@ ConfigError: If the archive contains unsafe paths, compression bombs, or is miss
 </section>
 <section id="extract-tar-safe-tar-path-destination">
 <h3><code class="docutils literal notranslate"><span class="pre">extract_tar_safe(tar_path,</span> <span class="pre">destination)</span></code><a class="headerlink" href="#extract-tar-safe-tar-path-destination" title="Link to this heading"></a></h3>
-<p>Safely extract tar archives with traversal and compression checks.</p>
+<p>Safely extract tar archives (tar, tar.gz, tar.xz) with traversal and compression checks.</p>
 <p>Args:
 tar_path: Path to the tar archive (tar, tar.gz, tar.xz).
 destination: Directory where extracted files should be stored.
@@ -195,17 +200,18 @@ host: Hostname extracted from the download URL.
 http_config: Download configuration providing base rate limits.
 service: Logical service identifier enabling per-service overrides.</p>
 <p>Returns:
-TokenBucket instance shared across downloads for throttling.</p>
+TokenBucket instance shared across downloads for throttling, seeded
+with either per-host defaults or service-specific overrides.</p>
 </section>
 <section id="download-stream">
 <h3><code class="docutils literal notranslate"><span class="pre">download_stream()</span></code><a class="headerlink" href="#download-stream" title="Link to this heading"></a></h3>
-<p>Download ontology content with caching, retries, and hash validation.</p>
+<p>Download ontology content with HEAD validation, rate limiting, caching, retries, and hash checks.</p>
 <p>Args:
 url: URL of the ontology document to download.
 destination: Target file path for the downloaded content.
 headers: HTTP headers forwarded to the download request.
 previous_manifest: Manifest metadata from a prior run, used for caching.
-http_config: Download configuration containing timeouts and limits.
+http_config: Download configuration containing timeouts, limits, and rate controls.
 cache_dir: Directory where intermediary cached files are stored.
 logger: Logger adapter for structured download telemetry.
 expected_media_type: Expected Content-Type for validation, if known.
@@ -225,7 +231,10 @@ None</p>
 </section>
 <section id="preliminary-head-check-self-url-session">
 <h3><code class="docutils literal notranslate"><span class="pre">_preliminary_head_check(self,</span> <span class="pre">url,</span> <span class="pre">session)</span></code><a class="headerlink" href="#preliminary-head-check-self-url-session" title="Link to this heading"></a></h3>
-<p>Probe the origin with HEAD to audit headers before downloading.</p>
+<p>Probe the origin with HEAD to audit media type and size before downloading.</p>
+<p>The HEAD probe allows the pipeline to abort before streaming large
+payloads that exceed configured limits and to log early warnings for
+mismatched Content-Type headers reported by the origin.</p>
 <p>Args:
 url: Fully qualified download URL resolved by the planner.
 session: Prepared requests session used for outbound calls.</p>
@@ -238,7 +247,10 @@ configured <code class="docutils literal notranslate"><span class="pre">max_down
 </section>
 <section id="validate-media-type-self-actual-content-type-expected-media-type-url">
 <h3><code class="docutils literal notranslate"><span class="pre">_validate_media_type(self,</span> <span class="pre">actual_content_type,</span> <span class="pre">expected_media_type,</span> <span class="pre">url)</span></code><a class="headerlink" href="#validate-media-type-self-actual-content-type-expected-media-type-url" title="Link to this heading"></a></h3>
-<p>Validate that the received <code class="docutils literal notranslate"><span class="pre">Content-Type</span></code> header is acceptable.</p>
+<p>Validate that the received <code class="docutils literal notranslate"><span class="pre">Content-Type</span></code> header is acceptable, tolerating aliases.</p>
+<p>RDF endpoints often return generic XML or Turtle aliases, so the
+validator accepts a small set of known MIME variants while still
+surfacing actionable warnings for unexpected types.</p>
 <p>Args:
 actual_content_type: Raw header value reported by the origin server.
 expected_media_type: MIME type declared by resolver metadata.
@@ -284,7 +296,10 @@ result.status
 </section>
 <section id="tokenbucket">
 <h3><code class="docutils literal notranslate"><span class="pre">TokenBucket</span></code><a class="headerlink" href="#tokenbucket" title="Link to this heading"></a></h3>
-<p>Simple token bucket implementation for per-host and per-service rate limiting.</p>
+<p>Token bucket used to enforce per-host and per-service rate limits.</p>
+<p>Each unique combination of host and logical service identifier receives
+its own bucket so resolvers can honour provider-specific throttling
+guidance without starving other endpoints.</p>
 <p>Attributes:
 rate: Token replenishment rate per second.
 capacity: Maximum number of tokens the bucket may hold.
@@ -305,7 +320,11 @@ True</p>
 </section>
 <section id="streamingdownloader">
 <h3><code class="docutils literal notranslate"><span class="pre">StreamingDownloader</span></code><a class="headerlink" href="#streamingdownloader" title="Link to this heading"></a></h3>
-<p>Custom downloader to support conditional requests, resume, and caching.</p>
+<p>Custom downloader supporting HEAD validation, conditional requests, resume, and caching.</p>
+<p>The downloader shares a :mod:<code class="docutils literal notranslate"><span class="pre">requests</span></code> session so it can issue a HEAD probe
+prior to streaming content, verifies Content-Type and Content-Length against
+expectations, and persists ETag/Last-Modified headers for cache-friendly
+revalidation.</p>
 <p>Attributes:
 destination: Final location where the ontology will be stored.
 custom_headers: HTTP headers supplied by the resolver.
@@ -314,7 +333,8 @@ previous_manifest: Manifest from prior runs used for caching.
 logger: Logger used for structured telemetry.
 status: Final download status (<code class="docutils literal notranslate"><span class="pre">fresh</span></code>, <code class="docutils literal notranslate"><span class="pre">updated</span></code>, or <code class="docutils literal notranslate"><span class="pre">cached</span></code>).
 response_etag: ETag returned by the upstream server, if present.
-response_last_modified: Last-modified timestamp provided by the server.</p>
+response_last_modified: Last-modified timestamp provided by the server.
+expected_media_type: MIME type provided by the resolver for validation.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>

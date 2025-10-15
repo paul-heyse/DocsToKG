@@ -1,14 +1,26 @@
 #!/usr/bin/env python3
 """
-EmbedVectors.py
+Hybrid Embedding Pipeline
 
-- Reads chunked JSONL from /home/paul/DocsToKG/Data/ChunkedDocTagFiles
-- Ensures each chunk has a UUID (writes back to the same files)
-- Emits vectors JSONL to /home/paul/DocsToKG/Data/Vectors
+Generates BM25, SPLADE, and Qwen embeddings for DocsToKG chunk files while
+maintaining manifest entries, UUID hygiene, and data quality metrics. The
+pipeline runs in two passes: the first ensures chunk UUID integrity and builds
+BM25 corpus statistics; the second executes SPLADE and Qwen models to emit
+vector JSONL artefacts ready for downstream search.
 
-Uses local HF cache at /home/paul/hf-cache/:
-  - Qwen3-Embedding-4B at   /home/paul/hf-cache/models/Qwen/Qwen3-Embedding-4B
-  - SPLADE-v3 at            /home/paul/hf-cache/models/naver/splade-v3
+Key Features:
+- Auto-detect DocsToKG data directories and manage resume/force semantics
+- Stream SPLADE sparse encoding and Qwen dense embeddings from local caches
+- Validate vector schemas, norms, and dimensions before writing outputs
+- Record manifest metadata for observability and auditing
+
+Usage:
+    python -m DocsToKG.DocParsing.EmbeddingV2 --resume
+
+Dependencies:
+- sentence_transformers (optional): Provides SPLADE sparse encoders.
+- vllm (optional): Hosts the Qwen embedding model with pooling support.
+- tqdm: Surface user-friendly progress bars across pipeline phases.
 """
 
 from __future__ import annotations
@@ -50,6 +62,7 @@ try:  # Optional dependency used for SPLADE sparse embeddings
     from sentence_transformers import (
         SparseEncoder,
     )  # loads from local dir if given (cache_folder supported)
+
     _SENTENCE_TRANSFORMERS_IMPORT_ERROR: Exception | None = None
 except Exception as exc:  # pragma: no cover - exercised via tests with stubs
     SparseEncoder = None  # type: ignore[assignment]
@@ -60,6 +73,7 @@ try:  # Optional dependency used for Qwen dense embeddings
         LLM,
         PoolingParams,
     )  # PoolingParams(dimensions=...) selects output dim if model supports MRL
+
     _VLLM_IMPORT_ERROR: Exception | None = None
 except Exception as exc:  # pragma: no cover - exercised via tests with stubs
     LLM = None  # type: ignore[assignment]
@@ -108,7 +122,9 @@ def _ensure_splade_dependencies() -> None:
     """Validate that SPLADE optional dependencies are importable."""
 
     if SparseEncoder is None:
-        raise ImportError(_missing_splade_dependency_message()) from _SENTENCE_TRANSFORMERS_IMPORT_ERROR
+        raise ImportError(
+            _missing_splade_dependency_message()
+        ) from _SENTENCE_TRANSFORMERS_IMPORT_ERROR
 
 
 def _ensure_qwen_dependencies() -> None:
@@ -237,6 +253,14 @@ class BM25StatsAccumulator:
     """
 
     def __init__(self) -> None:
+        """Initialise counters used to accumulate BM25 corpus statistics.
+
+        Args:
+            self: Accumulator instance being initialised.
+
+        Returns:
+            None
+        """
         self.N = 0
         self.total_tokens = 0
         self.df = Counter()
@@ -450,6 +474,14 @@ class SPLADEValidator:
     """
 
     def __init__(self) -> None:
+        """Initialise internal counters for SPLADE sparsity tracking.
+
+        Args:
+            self: Validator instance being initialised.
+
+        Returns:
+            None
+        """
         self.total_chunks = 0
         self.zero_nnz_chunks: List[str] = []
         self.nnz_counts: List[int] = []

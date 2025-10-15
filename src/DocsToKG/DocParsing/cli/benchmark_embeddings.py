@@ -1,5 +1,24 @@
 #!/usr/bin/env python3
-"""Synthetic benchmark harness for the DocParsing embedding pipeline."""
+"""
+DocParsing Embedding Benchmark CLI
+
+This command-line interface estimates the performance benefits of the streaming
+embedding pipeline relative to the legacy whole-corpus workflow. It relies on
+synthetic, deterministic inputs to provide fast feedback without requiring the
+full DocsToKG environment.
+
+Key Features:
+- Parameterise chunk counts, token lengths, and dense vector dimensionality
+- Leverage testing utilities to model runtime and memory characteristics
+- Output a ready-to-share textual summary for performance reports
+
+Usage:
+    python -m DocsToKG.DocParsing.cli.benchmark_embeddings --chunks 1024 --tokens 512
+
+Dependencies:
+- argparse: Parse command-line options exposed by the CLI.
+- DocsToKG.DocParsing.testing: Provides simulation primitives used under the hood.
+"""
 
 from __future__ import annotations
 
@@ -13,7 +32,17 @@ from DocsToKG.DocParsing.testing import (
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Construct the CLI parser for the synthetic benchmark harness."""
+    """Construct the CLI parser for the synthetic benchmark harness.
+
+    Args:
+        None: Parser creation does not require inputs.
+
+    Returns:
+        :class:`argparse.ArgumentParser` configured with benchmark options.
+
+    Raises:
+        None
+    """
 
     parser = argparse.ArgumentParser(
         description=(
@@ -44,7 +73,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Execute the synthetic benchmark and emit a human-friendly summary."""
+    """Execute the synthetic benchmark and emit a human-friendly summary.
+
+    Args:
+        argv: Optional sequence of command-line arguments. When ``None`` the
+            values from :data:`sys.argv` are used.
+
+    Returns:
+        Exit code where ``0`` indicates the benchmark completed successfully.
+
+    Raises:
+        SystemExit: Propagated if argument parsing fails.
+    """
 
     parser = build_parser()
     args = parser.parse_args(argv)

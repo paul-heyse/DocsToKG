@@ -79,7 +79,20 @@
   <section id="module-init">
 <h1>1. Module: <strong>init</strong><a class="headerlink" href="#module-init" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.__init__</span></code>.</p>
-<p>Resolver provider implementations and registry used by the content download pipeline.</p>
+<p>Resolver Provider Registry</p>
+<p>This package aggregates resolver provider implementations and exposes a helper
+for constructing the default resolver stack used by the content download
+pipeline.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Explicit imports of all resolver provider classes for easy discovery.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">default_resolvers</span></code> helper that instantiates providers in priority order.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.resolvers.providers import default_resolvers</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolvers = default_resolvers()
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="default-resolvers">

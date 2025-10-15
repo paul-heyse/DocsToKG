@@ -134,6 +134,12 @@
 </pre></div>
 </div>
 <p>If you use direnv, run <code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">allow</span></code> after activation so <code class="docutils literal notranslate"><span class="pre">.envrc</span></code> can automatically load the environment next time.</p>
+<blockquote>
+<div><p>✅ Prefer automation? Execute <code class="docutils literal notranslate"><span class="pre">./scripts/bootstrap_env.sh</span></code> from the repository root.<br />
+The script creates <code class="docutils literal notranslate"><span class="pre">.venv</span></code>, installs DocsToKG in editable mode, and reminds you to run<br />
+<code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">allow</span></code>. The bundled <code class="docutils literal notranslate"><span class="pre">.envrc</span></code> automatically activates <code class="docutils literal notranslate"><span class="pre">.venv</span></code> and appends <code class="docutils literal notranslate"><span class="pre">src/</span></code> to<br />
+<code class="docutils literal notranslate"><span class="pre">PYTHONPATH</span></code>, so shells or agents that rely on direnv (for example <code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">exec</span> <span class="pre">.</span> <span class="pre">…</span></code>) will always resolve the project package without extra flags.</p>
+</div></blockquote>
 </section>
 <section id="install-dependencies">
 <h3>3. Install Dependencies<a class="headerlink" href="#install-dependencies" title="Link to this heading"></a></h3>

@@ -1,4 +1,20 @@
-"""PubMed Central resolver leveraging NCBI utilities and OA endpoints."""
+"""
+PubMed Central Resolver Provider
+
+This module integrates with PubMed Central (PMC) utilities to resolve open
+access PDFs using DOI, PMID, or PMCID identifiers.
+
+Key Features:
+- Conversion of DOI/PMID identifiers into PMCIDs using NCBI idconv service.
+- Retrieval of PMC Open Access links with fallback to static PDF endpoints.
+- Deduplication of PMCIDs and robust error reporting via resolver events.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.pmc import PmcResolver
+
+    resolver = PmcResolver()
+    results = list(resolver.iter_urls(session, config, artifact))
+"""
 
 from __future__ import annotations
 
@@ -19,7 +35,15 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 def _absolute_url(base: str, href: str) -> str:
-    """Resolve relative ``href`` values against ``base`` to obtain absolute URLs."""
+    """Resolve relative ``href`` values against ``base`` to obtain absolute URLs.
+
+    Args:
+        base: Base URL used as the reference for resolving the link.
+        href: Relative or absolute URL extracted from PMC HTML content.
+
+    Returns:
+        Absolute URL pointing to the resource referenced by ``href``.
+    """
 
     parsed = urlparse(href)
     if parsed.scheme and parsed.netloc:
@@ -96,7 +120,7 @@ class PmcResolver:
         except requests.RequestException as exc:
             LOGGER.debug("PMC ID lookup request error: %s", exc)
             return []
-        except Exception as exc:  # pragma: no cover - defensive
+        except Exception:  # pragma: no cover - defensive
             LOGGER.exception("Unexpected error looking up PMC IDs")
             return []
         if resp.status_code != 200:

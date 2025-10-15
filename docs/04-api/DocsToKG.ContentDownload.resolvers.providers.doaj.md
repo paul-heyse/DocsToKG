@@ -2,7 +2,21 @@
 
 This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.doaj``.
 
-DOAJ (Directory of Open Access Journals) resolver.
+DOAJ Resolver Provider
+
+This module integrates with the Directory of Open Access Journals (DOAJ) API
+to discover publisher-hosted open-access PDFs associated with scholarly works.
+
+Key Features:
+- Optional authenticated access via DOAJ API keys.
+- Deduplicated URL emission and structured error metadata.
+- Integration with the shared retry helper for polite request handling.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.doaj import DoajResolver
+
+    resolver = DoajResolver()
+    urls = list(resolver.iter_urls(session, config, artifact))
 
 ## 1. Functions
 

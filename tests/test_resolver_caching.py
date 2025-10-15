@@ -23,7 +23,8 @@ import pytest
 
 pytest.importorskip("requests")
 
-from DocsToKG.ContentDownload.resolvers import ResolverConfig, clear_resolver_caches
+from DocsToKG.ContentDownload.resolvers.cache import clear_resolver_caches
+from DocsToKG.ContentDownload.resolvers.types import ResolverConfig
 from DocsToKG.ContentDownload.resolvers.providers.crossref import CrossrefResolver
 from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import SemanticScholarResolver
 from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver
@@ -70,7 +71,7 @@ def test_resolver_caches_prevent_duplicate_requests(monkeypatch):
 
         return _Resp()
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.resolvers.requests.get", fake_get)
+    monkeypatch.setattr("requests.get", fake_get)
 
     config = ResolverConfig()
     config.unpaywall_email = "test@example.org"

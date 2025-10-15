@@ -29,6 +29,18 @@ pip install -r requirements.in         # optional GPU / ML stack
 pip install -r docs/build/sphinx/requirements.txt  # documentation tooling
 ```
 
+Or let the bootstrap script handle those steps:
+
+```bash
+./scripts/bootstrap_env.sh
+direnv allow  # re-load the environment so .envrc activates .venv automatically
+```
+
+> ℹ️  The repository ships with a preconfigured `.envrc` that adds `.venv/bin` to `PATH`,
+> exports `VIRTUAL_ENV`, and appends `src/` to `PYTHONPATH`. Any shell (or AI agent) that
+> runs commands via `direnv exec . …` automatically picks up the project virtual environment
+> without additional configuration.
+
 Create a `.env` file (or export variables manually):
 
 ```bash

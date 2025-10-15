@@ -1,5 +1,21 @@
 #!/usr/bin/env python3
-"""Parallel HTML → DocTags conversion with manifest-aware resume support."""
+"""
+Parallel HTML → DocTags Conversion
+
+Executes Docling HTML conversions across multiple processes while tracking
+manifests, resume/force semantics, and advisory file locks. The script is used
+by the DocsToKG pipeline to transform raw HTML corpora into DocTags ready for
+chunking and embedding.
+
+Key Features:
+- Discover HTML inputs and emit DocTags with Docling exporters
+- Respect resume and force flags to avoid redundant reprocessing
+- Persist conversion outcomes to the DocParsing manifest for observability
+- Provide per-document timing metrics with tqdm progress indicators
+
+Usage:
+    python -m DocsToKG.DocParsing.run_docling_html_to_doctags_parallel --resume
+"""
 
 from __future__ import annotations
 

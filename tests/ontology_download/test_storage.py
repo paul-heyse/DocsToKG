@@ -1,0 +1,39 @@
+"""Storage backend tests."""
+
+from __future__ import annotations
+
+import importlib
+from pathlib import Path
+
+import pytest
+
+pytest.importorskip("pydantic")
+pytest.importorskip("pydantic_settings")
+
+from DocsToKG.OntologyDownload import storage
+
+
+@pytest.mark.skipif(importlib.util.find_spec("fsspec") is None, reason="fsspec not installed")
+def test_fsspec_storage_roundtrip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Remote storage should mirror uploads and allow subsequent retrievals."""
+
+    monkeypatch.setenv("PYSTOW_HOME", str(tmp_path))
+    monkeypatch.setenv("ONTOFETCH_STORAGE_URL", "memory://ontologies")
+
+    mod = importlib.reload(storage)
+    backend = mod.STORAGE
+
+    local_dir = backend.prepare_version("hp", "2024")
+    manifest = local_dir / "manifest.json"
+    manifest.write_text("{}")
+
+    backend.finalize_version("hp", "2024", local_dir)
+
+    manifest.unlink()
+    assert not manifest.exists()
+
+    backend.ensure_local_version("hp", "2024")
+    assert manifest.exists()
+
+    monkeypatch.delenv("ONTOFETCH_STORAGE_URL", raising=False)
+    importlib.reload(storage)

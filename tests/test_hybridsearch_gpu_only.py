@@ -5,7 +5,10 @@ from typing import Callable
 import numpy as np
 import pytest
 
-faiss = pytest.importorskip("faiss")  # type: ignore
+try:
+    import faiss  # type: ignore
+except ImportError:  # pragma: no cover - optional dependency
+    pytest.skip("faiss is required for these tests", allow_module_level=True)
 
 from DocsToKG.HybridSearch.config import DenseIndexConfig, FusionConfig
 from DocsToKG.HybridSearch.dense import FaissIndexManager

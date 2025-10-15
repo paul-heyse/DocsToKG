@@ -79,7 +79,21 @@
   <section id="module-wayback">
 <h1>1. Module: wayback<a class="headerlink" href="#module-wayback" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.wayback</span></code>.</p>
-<p>Internet Archive Wayback Machine fallback resolver.</p>
+<p>Wayback Machine Resolver Provider</p>
+<p>This module queries the Internet Archive Wayback Machine to retrieve archived
+snapshots of PDF URLs that previously failed during resolver execution.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Recovery of archived snapshots for failed HTTP URLs.</p></li>
+<li><p>Structured error reporting for network and HTTP issues.</p></li>
+<li><p>Graceful handling when no snapshots are available or when failures persist.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.resolvers.providers.wayback import WaybackResolver</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = WaybackResolver()
+results = list(resolver.iter_urls(session, config, artifact))
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="is-enabled-self-config-artifact">

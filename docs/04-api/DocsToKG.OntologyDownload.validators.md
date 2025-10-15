@@ -15,6 +15,8 @@ Key Features:
 - Timeout and memory instrumentation for resource-intensive validators
 - JSON reporting helpers compatible with automated documentation generation
 - Pluggable registry enabling selective validator execution
+- Canonical Turtle normalization with deterministic SHA-256 hashing
+- Subprocess isolation for memory-intensive Pronto and Owlready2 validators
 
 Usage:
     from DocsToKG.OntologyDownload.validators import run_validators
@@ -47,6 +49,22 @@ payload: Mapping containing validation results.
 Returns:
 None
 
+### `_canonicalize_turtle(graph)`
+
+Return canonical Turtle output with sorted prefixes and triples.
+
+The canonical form mirrors the ontology downloader specification by sorting
+prefixes lexicographically and emitting triples ordered by subject,
+predicate, and object so downstream hashing yields deterministic values.
+
+### `_run_validator_subprocess(name, payload)`
+
+Execute a validator worker module within a subprocess.
+
+The subprocess workflow enforces parser timeouts, returns JSON payloads,
+and helps release memory held by heavy libraries such as Pronto and
+Owlready2 after each validation completes.
+
 ### `_run_with_timeout(func, timeout_sec)`
 
 Execute a callable and raise :class:`ValidationTimeout` on deadline expiry.
@@ -77,35 +95,37 @@ ValueError: If the archive is malformed or contains unsafe paths.
 
 ### `validate_rdflib(request, logger)`
 
-Parse ontologies with rdflib and optionally produce Turtle output.
+Parse ontologies with rdflib, canonicalize Turtle output, and emit hashes.
 
 Args:
 request: Validation request describing the target ontology and output directories.
 logger: Logger adapter used for structured validation events.
 
 Returns:
-ValidationResult capturing success state, metadata, and generated files.
+ValidationResult capturing success state, metadata, canonical hash,
+and generated files.
 
 Raises:
 ValidationTimeout: Propagated when parsing exceeds configured timeout.
 
 ### `validate_pronto(request, logger)`
 
-Execute Pronto-based validation and emit OBO Graphs when requested.
+Execute Pronto validation in an isolated subprocess and emit OBO Graphs when requested.
 
 Args:
 request: Validation request describing ontology inputs and output directories.
 logger: Structured logger for recording warnings and failures.
 
 Returns:
-ValidationResult with parsed ontology statistics and generated artifacts.
+ValidationResult with parsed ontology statistics, subprocess output,
+and any generated artifacts.
 
 Raises:
 ValidationTimeout: Propagated when Pronto takes longer than allowed.
 
 ### `validate_owlready2(request, logger)`
 
-Inspect ontologies with Owlready2 to count entities and catch parsing errors.
+Inspect ontologies with Owlready2 in a subprocess to count entities and catch parsing errors.
 
 Args:
 request: Validation request referencing the ontology to parse.
@@ -167,13 +187,13 @@ None
 Returns:
 Dictionary with boolean status, detail payload, and output paths.
 
+### `_term_to_string(term)`
+
+*No documentation available.*
+
 ### `_parse()`
 
 Parse the ontology with rdflib to populate the graph object.
-
-### `_load()`
-
-Load the ontology into memory using Pronto.
 
 ### `_handler(signum, frame)`
 
@@ -182,10 +202,6 @@ Signal handler converting SIGALRM into :class:`ValidationTimeout`.
 Args:
 signum: Received signal number.
 frame: Current stack frame (unused).
-
-### `_execute()`
-
-Load the ontology and capture term statistics.
 
 ## 2. Classes
 
@@ -240,9 +256,25 @@ Traceback (most recent call last):
 ...
 ValidationTimeout: rdflib exceeded 60s
 
+### `ValidatorSubprocessError`
+
+Raised when a validator subprocess exits unsuccessfully.
+
+Attributes:
+message: Human-readable description of the underlying subprocess failure.
+
+Examples:
+>>> raise ValidatorSubprocessError("rdflib validator crashed")
+Traceback (most recent call last):
+...
+ValidatorSubprocessError: rdflib validator crashed
+
 ### `_Alarm`
 
 Sentinel exception raised when the alarm signal fires.
+
+Args:
+message: Optional description associated with the exception.
 
 Attributes:
 message: Optional description associated with the exception.

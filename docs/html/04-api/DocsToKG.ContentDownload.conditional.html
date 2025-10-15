@@ -79,16 +79,50 @@
   <section id="module-conditional">
 <h1>1. Module: conditional<a class="headerlink" href="#module-conditional" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.conditional</span></code>.</p>
-<p>Conditional HTTP request helpers for ETag and Last-Modified caching.</p>
+<p>Conditional Request Metadata</p>
+<p>This module centralises helper types for conditional HTTP requests that rely on
+ETag and Last-Modified headers. It provides strongly typed dataclasses for
+capturing cached responses alongside a small orchestration helper that builds
+request headers and interprets origin responses. The utilities are used by the
+content download pipeline to honour polite download practices while avoiding
+unnecessary network transfers.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Dataclasses that model cached and modified responses with checksum metadata.</p></li>
+<li><p>Helper for constructing <code class="docutils literal notranslate"><span class="pre">If-None-Match</span></code>/<code class="docutils literal notranslate"><span class="pre">If-Modified-Since</span></code> headers.</p></li>
+<li><p>Utilities for validating 304 responses against previously cached artefacts.</p></li>
+</ul>
+<p>Dependencies:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">requests</span></code>: Required for the <code class="docutils literal notranslate"><span class="pre">Response</span></code> type used when interpreting outcomes.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.conditional import ConditionalRequestHelper</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>helper = ConditionalRequestHelper(prior_etag=&quot;abcd&quot;, prior_path=&quot;/tmp/file.pdf&quot;)
+headers = helper.build_headers()
+response = session.get(url, headers=headers)
+result = helper.interpret_response(response)
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="build-headers-self">
 <h3><code class="docutils literal notranslate"><span class="pre">build_headers(self)</span></code><a class="headerlink" href="#build-headers-self" title="Link to this heading"></a></h3>
-<p>Generate conditional request headers from prior metadata.</p>
+<p>Generate conditional request headers from cached metadata.</p>
 <p>Args:
-None</p>
+self: Helper instance containing cached HTTP metadata.</p>
 <p>Returns:
-Dictionary containing conditional HTTP headers suited for reuse in requests.</p>
+Mapping of conditional header names to values ready for <code class="docutils literal notranslate"><span class="pre">requests</span></code>.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>helper = ConditionalRequestHelper(prior_etag=”abcd”, prior_last_modified=”Fri, 01 Jan 2021 00:00:00 GMT”)
+helper.build_headers() == {‘If-None-Match’: ‘abcd’, ‘If-Modified-Since’: ‘Fri, 01 Jan 2021 00:00:00 GMT’}
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 <section id="interpret-response-self-response">
 <h3><code class="docutils literal notranslate"><span class="pre">interpret_response(self,</span> <span class="pre">response)</span></code><a class="headerlink" href="#interpret-response-self-response" title="Link to this heading"></a></h3>
@@ -98,7 +132,8 @@ response: HTTP response returned from the conditional request.</p>
 <p>Returns:
 <code class="docutils literal notranslate"><span class="pre">CachedResult</span></code> when the origin reports HTTP 304, otherwise <code class="docutils literal notranslate"><span class="pre">ModifiedResult</span></code>.</p>
 <p>Raises:
-ValueError: If a 304 response arrives without complete prior metadata.</p>
+ValueError: If a 304 response arrives without complete prior metadata.
+TypeError: If <code class="docutils literal notranslate"><span class="pre">response</span></code> lacks the minimal <code class="docutils literal notranslate"><span class="pre">status_code</span></code>/<code class="docutils literal notranslate"><span class="pre">headers</span></code> API.</p>
 </section>
 </section>
 <section id="classes">

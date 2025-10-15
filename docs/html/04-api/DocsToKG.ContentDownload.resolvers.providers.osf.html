@@ -79,7 +79,21 @@
   <section id="module-osf">
 <h1>1. Module: osf<a class="headerlink" href="#module-osf" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.osf</span></code>.</p>
-<p>Resolver targeting the Open Science Framework API for preprint downloads.</p>
+<p>OSF Resolver Provider</p>
+<p>This module queries the Open Science Framework (OSF) API to retrieve download
+links for preprints and other research artefacts hosted on the platform.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Support for both direct download links and primary file relationships.</p></li>
+<li><p>Structured error handling for timeouts, connection failures, and JSON errors.</p></li>
+<li><p>Deduplication of URLs to avoid redundant download attempts.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.resolvers.providers.osf import OsfResolver</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = OsfResolver()
+results = list(resolver.iter_urls(session, config, artifact))
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="is-enabled-self-config-artifact">

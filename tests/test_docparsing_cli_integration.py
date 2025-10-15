@@ -51,6 +51,7 @@ def test_chunk_and_embed_cli_with_dependency_stubs(
         importlib.reload(schemas)
         import DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin as chunk_module
         import DocsToKG.DocParsing.EmbeddingV2 as embed_module
+
         importlib.reload(embed_module)
         chunk_module.ProvenanceMetadata = schemas.ProvenanceMetadata
         chunk_module.ChunkRow = schemas.ChunkRow
@@ -97,10 +98,7 @@ def test_chunk_and_embed_cli_with_dependency_stubs(
         manifest_rows = [json.loads(line) for line in handle]
 
     assert any(row["stage"] == "chunks" and row["status"] == "success" for row in manifest_rows)
-    assert any(
-        row["stage"] == "embeddings" and row["status"] == "success"
-        for row in manifest_rows
-    )
+    assert any(row["stage"] == "embeddings" and row["status"] == "success" for row in manifest_rows)
 
 
 def test_embedding_dependency_guard_message(monkeypatch: pytest.MonkeyPatch) -> None:

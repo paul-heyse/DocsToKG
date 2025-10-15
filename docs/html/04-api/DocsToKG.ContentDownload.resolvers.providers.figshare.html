@@ -79,7 +79,21 @@
   <section id="module-figshare">
 <h1>1. Module: figshare<a class="headerlink" href="#module-figshare" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.figshare</span></code>.</p>
-<p>Figshare repository resolver for DOI-indexed research outputs.</p>
+<p>Figshare Resolver Provider</p>
+<p>This module integrates with the Figshare API to locate repository-hosted PDFs
+associated with DOI-indexed research outputs.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>POST-based Figshare search requests with polite headers.</p></li>
+<li><p>Iteration over article file metadata to extract PDF download URLs.</p></li>
+<li><p>Extensive logging for malformed payloads and API errors.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.resolvers.providers.figshare import FigshareResolver</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = FigshareResolver()
+results = list(resolver.iter_urls(session, config, artifact))
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="is-enabled-self-config-artifact">
@@ -89,7 +103,7 @@
 config: Resolver configuration (unused but part of the protocol signature).
 artifact: Work metadata that may reference a Figshare DOI.</p>
 <p>Returns:
-<code class="docutils literal notranslate"><span class="pre">True</span></code> when a DOI is present, otherwise <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when a DOI is present, otherwise <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
 </section>
 <section id="iter-urls-self-session-config-artifact">
 <h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#iter-urls-self-session-config-artifact" title="Link to this heading"></a></h3>
@@ -99,9 +113,11 @@ session: Requests session used for API calls (supports retry injection).
 config: Resolver configuration providing polite headers and timeouts.
 artifact: Work metadata containing the DOI search key.</p>
 <p>Returns:
-Iterator yielding :class:<code class="docutils literal notranslate"><span class="pre">ResolverResult</span></code> objects for each candidate URL.</p>
-<p>Raises:
-None</p>
+Iterable[ResolverResult]: Iterator yielding resolver results for each candidate URL.</p>
+<p>Notes:
+Requests honour resolver-specific timeouts using
+:meth:<code class="docutils literal notranslate"><span class="pre">ResolverConfig.get_timeout</span></code> and reuse
+:func:<code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code> for resilient execution.</p>
 </section>
 </section>
 <section id="classes">

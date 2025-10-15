@@ -17,13 +17,16 @@ def test_format_table_basic() -> None:
     rows = [["hp", "success"], ["efo", "cached"]]
 
     result = format_table(headers, rows)
+    expected = "\n".join(
+        [
+            "ID  | Status ",
+            "----+--------",
+            "hp  | success",
+            "efo | cached ",
+        ]
+    )
 
-    assert "ID" in result
-    assert "Status" in result
-    assert "hp" in result
-    assert "success" in result
-    assert "|" in result
-    assert "-" in result
+    assert result == expected
 
 
 def test_format_table_column_alignment() -> None:
@@ -47,10 +50,14 @@ def test_format_table_empty_rows() -> None:
     rows: list[list[str]] = []
 
     result = format_table(headers, rows)
-    lines = result.split("\n")
+    expected = "\n".join(
+        [
+            "Name | Value",
+            "-----+------",
+        ]
+    )
 
-    assert lines[0] == "Name | Value"
-    assert len(lines) == 2
+    assert result == expected
 
 
 def test_format_validation_summary_success() -> None:
@@ -59,11 +66,15 @@ def test_format_validation_summary_success() -> None:
     results = {"rdflib": {"ok": True, "details": {"triples": 1234, "elapsed": 2.5}}}
 
     result = format_validation_summary(results)
+    expected = "\n".join(
+        [
+            "validator | status | details                  ",
+            "----------+--------+--------------------------",
+            "rdflib    | ok     | triples=1234, elapsed=2.5",
+        ]
+    )
 
-    assert "rdflib" in result
-    assert "ok" in result
-    assert "triples=1234" in result
-    assert "elapsed=2.5" in result
+    assert result == expected
 
 
 def test_format_validation_summary_error() -> None:
@@ -72,10 +83,15 @@ def test_format_validation_summary_error() -> None:
     results = {"pronto": {"ok": False, "details": {"error": "timeout after 60s"}}}
 
     result = format_validation_summary(results)
+    expected = "\n".join(
+        [
+            "validator | status | details          ",
+            "----------+--------+------------------",
+            "pronto    | error  | timeout after 60s",
+        ]
+    )
 
-    assert "pronto" in result
-    assert "error" in result
-    assert "timeout" in result
+    assert result == expected
 
 
 def test_format_validation_summary_multiple() -> None:

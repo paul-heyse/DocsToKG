@@ -2,13 +2,34 @@
 
 This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.pmc``.
 
-PubMed Central resolver leveraging NCBI utilities and OA endpoints.
+PubMed Central Resolver Provider
+
+This module integrates with PubMed Central (PMC) utilities to resolve open
+access PDFs using DOI, PMID, or PMCID identifiers.
+
+Key Features:
+- Conversion of DOI/PMID identifiers into PMCIDs using NCBI idconv service.
+- Retrieval of PMC Open Access links with fallback to static PDF endpoints.
+- Deduplication of PMCIDs and robust error reporting via resolver events.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.pmc import PmcResolver
+
+    resolver = PmcResolver()
+    results = list(resolver.iter_urls(session, config, artifact))
 
 ## 1. Functions
 
 ### `_absolute_url(base, href)`
 
 Resolve relative ``href`` values against ``base`` to obtain absolute URLs.
+
+Args:
+base: Base URL used as the reference for resolving the link.
+href: Relative or absolute URL extracted from PMC HTML content.
+
+Returns:
+Absolute URL pointing to the resource referenced by ``href``.
 
 ### `is_enabled(self, config, artifact)`
 

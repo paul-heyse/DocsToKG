@@ -12,7 +12,7 @@ pytest.importorskip("requests")
 pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload.download_pyalex_pdfs import CsvAttemptLoggerAdapter, JsonlLogger
-from DocsToKG.ContentDownload.resolvers import AttemptRecord
+from DocsToKG.ContentDownload.resolvers.types import AttemptRecord
 
 
 @pytest.mark.parametrize("wall_ms", [None, 432.5])

@@ -1,4 +1,21 @@
-"""CORE API resolver for aggregated open access content."""
+"""
+CORE Resolver Provider
+
+This module implements a resolver that queries the CORE API for open-access
+content linked to scholarly works. It supplements other providers by covering
+institutional repositories aggregated by CORE.
+
+Key Features:
+- Authenticated CORE API requests with polite header support.
+- Rich error reporting for timeouts, connection issues, and JSON parsing.
+- Deduplicated URL emission to prevent redundant downloads.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.core import CoreResolver
+
+    resolver = CoreResolver()
+    results = list(resolver.iter_urls(session, config, artifact))
+"""
 
 from __future__ import annotations
 

@@ -20,12 +20,15 @@ from typing import List
 
 import pytest
 
-hypothesis = pytest.importorskip("hypothesis")
-from hypothesis import strategies as st  # type: ignore
-
-given = hypothesis.given
+try:
+    import hypothesis
+    from hypothesis import strategies as st  # type: ignore
+except ImportError:  # pragma: no cover - optional dependency
+    pytest.skip("hypothesis is required for these tests", allow_module_level=True)
 
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
+
+given = hypothesis.given
 
 
 def test_normalize_doi_with_https_prefix() -> None:

@@ -175,6 +175,8 @@ def dependency_stubs(dense_dim: int = 2560) -> Iterator[None]:
     installed: Dict[str, ModuleType | None] = {}
 
     def _install(name: str, module: ModuleType) -> None:
+        """Register a stub module and remember any previous definition."""
+
         installed[name] = sys.modules.get(name)
         sys.modules[name] = module
 

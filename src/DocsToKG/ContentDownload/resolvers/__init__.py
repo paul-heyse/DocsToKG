@@ -1,10 +1,35 @@
-"""Resolver pipeline and provider implementations with compatibility shims."""
+"""
+Resolver Package Facade
+
+This module exposes the public interface for resolver pipeline utilities and
+provider implementations used by the modular content download architecture. It
+re-exports pipeline classes, resolver types, and concrete provider factories to
+preserve backward compatibility with legacy imports while gently steering
+callers towards explicit submodules.
+
+Key Features:
+- Facade for the resolver pipeline orchestration classes and metrics types.
+- Explicit export of default resolver configuration and provider implementations.
+- Backward-compatible aliases for deprecated imports (``time`` and ``requests``).
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers import ResolverPipeline, default_resolvers
+
+    pipeline = ResolverPipeline(
+        resolvers=default_resolvers(),
+        config=ResolverConfig(),
+        download_func=lambda *args, **kwargs: None,
+        logger=lambda record: None,
+        metrics=ResolverMetrics(),
+    )
+"""
 
 import time as _time
 import warnings
 
 import requests as _requests
 
+from .cache import clear_resolver_caches
 from .pipeline import ResolverPipeline
 from .providers import (
     ArxivResolver,
@@ -67,25 +92,6 @@ warnings.warn(
 )
 
 
-def clear_resolver_caches() -> None:
-    """Clear resolver-level LRU caches.
-
-    Args:
-        None
-
-    Returns:
-        None
-    """
-
-    from .providers.crossref import _fetch_crossref_data
-    from .providers.semantic_scholar import _fetch_semantic_scholar_data
-    from .providers.unpaywall import _fetch_unpaywall_data
-
-    _fetch_unpaywall_data.cache_clear()
-    _fetch_crossref_data.cache_clear()
-    _fetch_semantic_scholar_data.cache_clear()
-
-
 __all__ = [
     "AttemptRecord",
     "AttemptLogger",
@@ -121,7 +127,17 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    """Return legacy exports while emitting :class:`DeprecationWarning`."""
+    """Return legacy exports while emitting :class:`DeprecationWarning`.
+
+    Args:
+        name: Attribute name requested by the caller.
+
+    Returns:
+        Either the legacy export object or raises :class:`AttributeError` when unknown.
+
+    Raises:
+        AttributeError: If ``name`` is not a recognised legacy export.
+    """
 
     if name in _LEGACY_EXPORTS:
         warnings.warn(

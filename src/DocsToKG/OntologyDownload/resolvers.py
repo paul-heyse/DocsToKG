@@ -3,13 +3,13 @@ Ontology Resolver Implementations
 
 This module defines the resolver strategies that convert download
 specifications into actionable fetch plans. Each resolver encapsulates the
-API integration, retry logic, and metadata extraction necessary to interact
-with external services such as the OBO Library, OLS, BioPortal, and SKOS/XBRL
-endpoints.
+API integration, polite header management, and metadata extraction necessary
+to interact with external services such as the OBO Library, OLS, BioPortal,
+Linked Open Vocabularies (LOV), Ontobee, and SKOS/XBRL endpoints.
 
 Key Features:
 - Shared retry/backoff helpers for consistent API resilience
-- Resolver-specific metadata extraction (version, license, media type)
+- Resolver-specific metadata extraction (version, license, media type) with SPDX normalization
 - Support for additional services through the pluggable ``RESOLVERS`` map
 
 Usage:
@@ -22,9 +22,10 @@ Usage:
 from __future__ import annotations
 
 import logging
+import re
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 
 import requests
 from bioregistry import get_obo_download, get_owl_download, get_rdf_download
@@ -38,7 +39,18 @@ pystow = get_pystow()
 
 
 def normalize_license_to_spdx(value: Optional[str]) -> Optional[str]:
-    """Normalize common license strings to canonical SPDX identifiers."""
+    """Normalize common license strings to canonical SPDX identifiers.
+
+    Resolver metadata frequently reports informal variants such as ``CC BY 4.0``;
+    converting to SPDX ensures allowlist comparisons remain consistent.
+
+    Args:
+        value: Raw license string returned by a resolver (may be ``None``).
+
+    Returns:
+        Canonical SPDX identifier when a mapping is known, otherwise the
+        cleaned original value or ``None`` when the input is empty.
+    """
 
     if value is None:
         return None
@@ -114,6 +126,9 @@ class FetchPlan:
 class BaseResolver:
     """Shared helpers for resolver implementations.
 
+    Provides polite header construction, retry orchestration, and metadata
+    normalization utilities shared across concrete resolver classes.
+
     Attributes:
         None
 
@@ -171,6 +186,62 @@ class BaseResolver:
                 if status in {401, 403}:
                     raise
                 raise ConfigError(f"{name} API error {status}: {exc}") from exc
+
+    def _extract_correlation_id(self, logger: logging.Logger) -> Optional[str]:
+        """Return the correlation id from a logger adapter when available.
+
+        Args:
+            logger: Logger or adapter potentially carrying an ``extra`` dictionary.
+
+        Returns:
+            Correlation identifier string when present, otherwise ``None``.
+        """
+
+        extra = getattr(logger, "extra", None)
+        if isinstance(extra, dict):
+            value = extra.get("correlation_id")
+            if isinstance(value, str):
+                return value
+        return None
+
+    def _build_polite_headers(
+        self, config: ResolvedConfig, logger: logging.Logger
+    ) -> Dict[str, str]:
+        """Create polite headers derived from configuration and logger context.
+
+        Args:
+            config: Resolved configuration providing HTTP header defaults.
+            logger: Logger adapter whose correlation id is propagated to headers.
+
+        Returns:
+            Dictionary of polite header values ready to attach to HTTP sessions.
+        """
+
+        http_config = config.defaults.http
+        return http_config.polite_http_headers(correlation_id=self._extract_correlation_id(logger))
+
+    @staticmethod
+    def _apply_headers_to_session(session: Any, headers: Dict[str, str]) -> None:
+        """Apply polite headers to a client session when supported.
+
+        Args:
+            session: HTTP client or session object whose ``headers`` may be updated.
+            headers: Mapping of header names to polite values to merge.
+
+        Returns:
+            None
+        """
+
+        if session is None:
+            return
+        mapping = getattr(session, "headers", None)
+        if mapping is None:
+            return
+        updater = getattr(mapping, "update", None)
+        if callable(updater):
+            updater(headers)
+        elif isinstance(mapping, dict):  # pragma: no cover - defensive branch
+            mapping.update(headers)
 
     def _build_plan(
         self,
@@ -294,6 +365,9 @@ class OLSResolver(BaseResolver):
             ConfigError: When the API rejects credentials or yields no URLs.
         """
         ontology_id = spec.id.lower()
+        headers = self._build_polite_headers(config, logger)
+        self._apply_headers_to_session(getattr(self.client, "session", None), headers)
+
         try:
             record = self._execute_with_retry(
                 lambda: self.client.get_ontology(ontology_id),
@@ -403,6 +477,9 @@ class BioPortalResolver(BaseResolver):
             ConfigError: If authentication fails or no download link is available.
         """
         acronym = spec.extras.get("acronym", spec.id.upper())
+        headers = self._build_polite_headers(config, logger)
+        self._apply_headers_to_session(getattr(self.client, "session", None), headers)
+
         try:
             ontology = self._execute_with_retry(
                 lambda: self.client.get_ontology(acronym),
@@ -461,6 +538,138 @@ class BioPortalResolver(BaseResolver):
             headers=headers,
             version=version,
             license=license_value,
+            service=spec.resolver,
+        )
+
+
+class LOVResolver(BaseResolver):
+    """Resolve vocabularies from Linked Open Vocabularies (LOV).
+
+    Queries the LOV API, normalises metadata fields, and returns Turtle
+    download plans enriched with service identifiers for rate limiting.
+
+    Attributes:
+        API_ROOT: Base URL for the LOV API endpoints.
+        session: Requests session used to execute API calls.
+
+    Examples:
+        >>> resolver = LOVResolver()
+        >>> isinstance(resolver.session, requests.Session)
+        True
+    """
+
+    API_ROOT = "https://lov.linkeddata.es/dataset/lov/api/v2"
+
+    def __init__(self, session: Optional[requests.Session] = None) -> None:
+        self.session = session or requests.Session()
+
+    def _fetch_metadata(self, uri: str, timeout: int) -> Any:
+        response = self.session.get(
+            f"{self.API_ROOT}/vocabulary/info",
+            params={"uri": uri},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    @staticmethod
+    def _iter_dicts(payload: Any) -> Iterable[Dict[str, Any]]:
+        if isinstance(payload, dict):
+            yield payload
+            for value in payload.values():
+                yield from LOVResolver._iter_dicts(value)
+        elif isinstance(payload, list):
+            for item in payload:
+                yield from LOVResolver._iter_dicts(item)
+
+    def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Discover download metadata from the LOV API.
+
+        Args:
+            spec: Fetch specification providing ontology identifier and extras.
+            config: Resolved configuration supplying timeout and header defaults.
+            logger: Logger adapter used to emit planning telemetry.
+
+        Returns:
+            FetchPlan describing the resolved download URL and metadata.
+
+        Raises:
+            ConfigError: If required metadata is missing or the LOV API fails.
+        """
+
+        uri = spec.extras.get("uri")
+        if not uri:
+            raise ConfigError("LOV resolver requires 'extras.uri'")
+
+        headers = self._build_polite_headers(config, logger)
+        self._apply_headers_to_session(self.session, headers)
+
+        timeout = config.defaults.http.timeout_sec
+        metadata = self._execute_with_retry(
+            lambda: self._fetch_metadata(uri, timeout),
+            config=config,
+            logger=logger,
+            name="lov",
+        )
+
+        download_url: Optional[str] = None
+        license_value: Optional[str] = None
+        version: Optional[str] = None
+        media_type: Optional[str] = None
+
+        for candidate in self._iter_dicts(metadata):
+            if download_url is None:
+                for key in (
+                    "downloadURL",
+                    "downloadUrl",
+                    "download",
+                    "accessURL",
+                    "accessUrl",
+                    "url",
+                ):
+                    value = candidate.get(key)
+                    if isinstance(value, str) and value.strip():
+                        download_url = value.strip()
+                        break
+                    if isinstance(value, dict):
+                        nested = value.get("url") or value.get("downloadURL")
+                        if isinstance(nested, str) and nested.strip():
+                            download_url = nested.strip()
+                            break
+            license_value = license_value or candidate.get("license")
+            if isinstance(license_value, dict):
+                label = license_value.get("title") or license_value.get("label")
+                if isinstance(label, str):
+                    license_value = label
+            if version is None:
+                for key in ("version", "issued", "release", "releaseDate"):
+                    value = candidate.get(key)
+                    if isinstance(value, str) and value.strip():
+                        version = value.strip()
+                        break
+            if media_type is None:
+                candidate_type = candidate.get("mediaType") or candidate.get("format")
+                if isinstance(candidate_type, str) and candidate_type.strip():
+                    media_type = candidate_type.strip()
+
+        if not download_url:
+            raise ConfigError("LOV metadata did not include a download URL")
+
+        logger.info(
+            "resolved download url",
+            extra={
+                "stage": "plan",
+                "resolver": "lov",
+                "ontology_id": spec.id,
+                "url": download_url,
+            },
+        )
+
+        return self._build_plan(
+            url=download_url,
+            license=license_value,
+            version=version,
+            media_type=media_type or "text/turtle",
             service=spec.resolver,
         )
 
@@ -545,13 +754,93 @@ class XBRLResolver(BaseResolver):
         )
 
 
+class OntobeeResolver(BaseResolver):
+    """Resolver that constructs Ontobee-backed PURLs for OBO ontologies.
+
+    Provides a lightweight fallback resolver that constructs deterministic
+    PURLs for OBO prefixes when primary resolvers fail.
+
+    Attributes:
+        _FORMAT_MAP: Mapping of preferred formats to extensions and media types.
+
+    Examples:
+        >>> resolver = OntobeeResolver()
+        >>> resolver._FORMAT_MAP['owl'][0]
+        'owl'
+    """
+
+    _FORMAT_MAP = {
+        "owl": ("owl", "application/rdf+xml"),
+        "obo": ("obo", "text/plain"),
+        "ttl": ("ttl", "text/turtle"),
+    }
+
+    def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Return a fetch plan pointing to Ontobee-managed PURLs.
+
+        Args:
+            spec: Fetch specification describing the ontology identifier and preferred formats.
+            config: Resolved configuration (unused beyond interface compatibility).
+            logger: Logger adapter for structured telemetry.
+
+        Returns:
+            FetchPlan pointing to an Ontobee-hosted download URL.
+
+        Raises:
+            ConfigError: If the ontology identifier is invalid.
+        """
+
+        prefix = spec.id.strip()
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]+", prefix):
+            raise ConfigError("Ontobee resolver requires alphanumeric ontology id")
+
+        preferred = [fmt.lower() for fmt in (spec.target_formats or []) if isinstance(fmt, str)]
+        if not preferred:
+            preferred = ["owl", "obo"]
+
+        for fmt in preferred:
+            mapping = self._FORMAT_MAP.get(fmt)
+            if mapping:
+                extension, media_type = mapping
+                url = f"https://purl.obolibrary.org/obo/{prefix.lower()}.{extension}"
+                logger.info(
+                    "resolved download url",
+                    extra={
+                        "stage": "plan",
+                        "resolver": "ontobee",
+                        "ontology_id": spec.id,
+                        "url": url,
+                    },
+                )
+                return self._build_plan(
+                    url=url,
+                    media_type=media_type,
+                    service=spec.resolver,
+                )
+
+        # Fall back to OWL representation if no preferred format matched.
+        url = f"https://purl.obolibrary.org/obo/{prefix.lower()}.owl"
+        logger.info(
+            "resolved download url",
+            extra={
+                "stage": "plan",
+                "resolver": "ontobee",
+                "ontology_id": spec.id,
+                "url": url,
+            },
+        )
+        return self._build_plan(url=url, media_type="application/rdf+xml", service=spec.resolver)
+
+
 RESOLVERS = {
     "obo": OBOResolver(),
     "bioregistry": OBOResolver(),
     "ols": OLSResolver(),
     "bioportal": BioPortalResolver(),
+    "lov": LOVResolver(),
     "skos": SKOSResolver(),
     "xbrl": XBRLResolver(),
+    "ontobee": OntobeeResolver(),
 }
 
 
@@ -560,8 +849,10 @@ __all__ = [
     "OBOResolver",
     "OLSResolver",
     "BioPortalResolver",
+    "LOVResolver",
     "SKOSResolver",
     "XBRLResolver",
+    "OntobeeResolver",
     "RESOLVERS",
     "normalize_license_to_spdx",
 ]

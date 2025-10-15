@@ -79,12 +79,31 @@
   <section id="module-pmc">
 <h1>1. Module: pmc<a class="headerlink" href="#module-pmc" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.pmc</span></code>.</p>
-<p>PubMed Central resolver leveraging NCBI utilities and OA endpoints.</p>
+<p>PubMed Central Resolver Provider</p>
+<p>This module integrates with PubMed Central (PMC) utilities to resolve open
+access PDFs using DOI, PMID, or PMCID identifiers.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Conversion of DOI/PMID identifiers into PMCIDs using NCBI idconv service.</p></li>
+<li><p>Retrieval of PMC Open Access links with fallback to static PDF endpoints.</p></li>
+<li><p>Deduplication of PMCIDs and robust error reporting via resolver events.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.resolvers.providers.pmc import PmcResolver</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = PmcResolver()
+results = list(resolver.iter_urls(session, config, artifact))
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="absolute-url-base-href">
 <h3><code class="docutils literal notranslate"><span class="pre">_absolute_url(base,</span> <span class="pre">href)</span></code><a class="headerlink" href="#absolute-url-base-href" title="Link to this heading"></a></h3>
 <p>Resolve relative <code class="docutils literal notranslate"><span class="pre">href</span></code> values against <code class="docutils literal notranslate"><span class="pre">base</span></code> to obtain absolute URLs.</p>
+<p>Args:
+base: Base URL used as the reference for resolving the link.
+href: Relative or absolute URL extracted from PMC HTML content.</p>
+<p>Returns:
+Absolute URL pointing to the resource referenced by <code class="docutils literal notranslate"><span class="pre">href</span></code>.</p>
 </section>
 <section id="is-enabled-self-config-artifact">
 <h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#is-enabled-self-config-artifact" title="Link to this heading"></a></h3>

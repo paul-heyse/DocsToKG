@@ -21,6 +21,8 @@ import types
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 
 class _StubRequestsModule(SimpleNamespace):
     """Lightweight stand-in for the requests module used in tests."""
@@ -149,3 +151,14 @@ if "pooch" not in sys.modules:
     _stub_pooch.HTTPDownloader = _HTTPDownloader  # type: ignore[attr-defined]
     _stub_pooch.retrieve = _retrieve  # type: ignore[attr-defined]
     sys.modules["pooch"] = _stub_pooch
+
+from DocsToKG.OntologyDownload import core  # noqa: E402  (after stubs)
+
+_ORIGINAL_BUILD_DESTINATION = core._build_destination
+
+
+@pytest.fixture(autouse=True)
+def _reset_build_destination(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure tests see the canonical _build_destination implementation."""
+
+    monkeypatch.setattr(core, "_build_destination", _ORIGINAL_BUILD_DESTINATION, raising=False)

@@ -30,7 +30,7 @@ pytest.importorskip("requests")
 import requests
 
 from DocsToKG.ContentDownload.download_pyalex_pdfs import JsonlLogger, process_one_work
-from DocsToKG.ContentDownload.resolvers import ResolverMetrics
+from DocsToKG.ContentDownload.resolvers.types import ResolverMetrics
 
 
 class _NoopPipeline:

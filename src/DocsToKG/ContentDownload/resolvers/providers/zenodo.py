@@ -1,4 +1,20 @@
-"""Zenodo repository resolver for DOI-indexed research outputs."""
+"""
+Zenodo Resolver Provider
+
+This module queries the Zenodo API to locate repository-hosted PDFs associated
+with DOI-indexed research objects.
+
+Key Features:
+- Support for sorting and limiting Zenodo API search results.
+- Extensive logging for malformed responses and missing file metadata.
+- Deduplication-free iteration over PDF file entries.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.zenodo import ZenodoResolver
+
+    resolver = ZenodoResolver()
+    results = list(resolver.iter_urls(session, config, artifact))
+"""
 
 from __future__ import annotations
 
@@ -62,9 +78,6 @@ class ZenodoResolver:
         Returns:
             Iterable[ResolverResult]: Iterator yielding resolver results for accessible PDFs.
 
-        Raises:
-            None
-
         Notes:
             All HTTP calls honour per-resolver timeouts by delegating to
             :meth:`ResolverConfig.get_timeout`.
@@ -93,14 +106,6 @@ class ZenodoResolver:
                     "timeout": config.get_timeout(self.name),
                     "error": str(exc),
                 },
-            )
-            return
-        except requests.ConnectionError as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="connection-error",
-                metadata={"error": str(exc)},
             )
             return
         except requests.RequestException as exc:

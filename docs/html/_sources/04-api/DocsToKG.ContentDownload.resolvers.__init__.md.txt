@@ -2,20 +2,41 @@
 
 This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.__init__``.
 
-Resolver pipeline and provider implementations.
+Resolver Package Facade
 
-This module maintains backward compatibility by re-exporting legacy entry points
-so existing integrations and tests can continue to monkeypatch ``requests`` or
-``time`` on the resolver namespace.
+This module exposes the public interface for resolver pipeline utilities and
+provider implementations used by the modular content download architecture. It
+re-exports pipeline classes, resolver types, and concrete provider factories to
+preserve backward compatibility with legacy imports while gently steering
+callers towards explicit submodules.
+
+Key Features:
+- Facade for the resolver pipeline orchestration classes and metrics types.
+- Explicit export of default resolver configuration and provider implementations.
+- Backward-compatible aliases for deprecated imports (``time`` and ``requests``).
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers import ResolverPipeline, default_resolvers
+
+    pipeline = ResolverPipeline(
+        resolvers=default_resolvers(),
+        config=ResolverConfig(),
+        download_func=lambda *args, **kwargs: None,
+        logger=lambda record: None,
+        metrics=ResolverMetrics(),
+    )
 
 ## 1. Functions
 
-### `clear_resolver_caches()`
+### `__getattr__(name)`
 
-Clear resolver-level LRU caches.
+Return legacy exports while emitting :class:`DeprecationWarning`.
 
 Args:
-None
+name: Attribute name requested by the caller.
 
 Returns:
-None
+Either the legacy export object or raises :class:`AttributeError` when unknown.
+
+Raises:
+AttributeError: If ``name`` is not a recognised legacy export.

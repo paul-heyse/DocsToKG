@@ -79,12 +79,29 @@
   <section id="module-openaire">
 <h1>1. Module: openaire<a class="headerlink" href="#module-openaire" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.providers.openaire</span></code>.</p>
-<p>Resolver connecting to the OpenAIRE research infrastructure for discovery.</p>
+<p>OpenAIRE Resolver Provider</p>
+<p>This module integrates with the OpenAIRE research infrastructure to discover
+open-access artefacts linked to DOI-indexed works.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Recursive traversal of OpenAIRE JSON payloads to locate URL candidates.</p></li>
+<li><p>Resilient handling of cases where responses arrive as either JSON or text.</p></li>
+<li><p>Deduplication of candidate URLs before yielding resolver results.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.resolvers.providers.openaire import OpenAireResolver</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = OpenAireResolver()
+results = list(resolver.iter_urls(session, config, artifact))
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="collect-candidate-urls-node-results">
 <h3><code class="docutils literal notranslate"><span class="pre">_collect_candidate_urls(node,</span> <span class="pre">results)</span></code><a class="headerlink" href="#collect-candidate-urls-node-results" title="Link to this heading"></a></h3>
 <p>Recursively collect HTTP(S) URLs from nested OpenAIRE response payloads.</p>
+<p>Args:
+node: Arbitrary node from the OpenAIRE response payload.
+results: Mutable list to append discovered URL strings into.</p>
 </section>
 <section id="is-enabled-self-config-artifact">
 <h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#is-enabled-self-config-artifact" title="Link to this heading"></a></h3>

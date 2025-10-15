@@ -79,7 +79,23 @@
   <section id="module-utils">
 <h1>1. Module: utils<a class="headerlink" href="#module-utils" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.utils</span></code>.</p>
-<p>Shared utility functions for the ContentDownload module.</p>
+<p>Content Download Utility Helpers</p>
+<p>This module provides small string and identifier normalisation helpers shared
+across resolver implementations. The utilities ensure consistent handling of
+scholarly identifiers such as DOIs, PMCIDs, and arXiv IDs while also providing
+lightweight string manipulation helpers used during manifest generation.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Normalisation of DOI, PMCID, and arXiv identifiers from heterogeneous sources.</p></li>
+<li><p>Prefix stripping for resolver-specific metadata cleaning.</p></li>
+<li><p>Duplicate removal while preserving original ordering.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload import utils</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>doi = utils.normalize_doi(&quot;https://doi.org/10.1234/example&quot;)
+pmcid = utils.normalize_pmcid(&quot;PMC12345&quot;)
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="normalize-doi-doi">

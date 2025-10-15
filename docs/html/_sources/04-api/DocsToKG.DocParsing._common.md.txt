@@ -2,14 +2,34 @@
 
 This reference documents the DocsToKG module ``DocsToKG.DocParsing._common``.
 
-Shared utilities for DocParsing pipeline stages (path resolution, I/O, logging, batching).
+DocParsing Shared Utilities
 
-This module centralizes helpers that were historically duplicated across the
-DocParsing scripts. Functions cover path resolution, structured logging,
-atomic file writes, JSONL helpers, batching utilities, content hashing, and
-simple manifest management. The utilities are intentionally lightweight so
-they can be imported from multiprocessing workers without introducing heavy
-dependencies.
+This module consolidates lightweight helpers that power multiple DocParsing
+pipeline stages. Utilities span path discovery, atomic file writes, JSONL
+parsing, manifest bookkeeping, and structured logging so that chunking,
+embedding, and conversion scripts can share consistent behaviour without an
+additional dependency layer.
+
+Key Features:
+- Resolve DocsToKG data directories with environment and ancestor discovery
+- Stream JSONL inputs and outputs with validation and error tolerance
+- Emit structured JSON logs suited for machine ingestion and dashboards
+- Manage pipeline manifests, batching helpers, and advisory file locks
+
+Usage:
+    from DocsToKG.DocParsing import _common as common_util
+
+    chunks_dir = common_util.data_chunks()
+    with common_util.atomic_write(chunks_dir / "example.jsonl") as handle:
+        handle.write("{}")
+
+Dependencies:
+- json, pathlib, logging: Provide standard I/O and diagnostics primitives.
+- typing: Supply type hints consumed by Sphinx autodoc and API generators.
+- pydantic (optional): Some helpers integrate with schema validation routines.
+
+All helpers are safe to import in multiprocessing contexts and avoid heavy
+third-party dependencies beyond the standard library.
 
 ## 1. Functions
 
@@ -366,6 +386,10 @@ Examples:
 >>> target = Path("/tmp/lock.txt")
 >>> with acquire_lock(target):
 ...     pass
+
+### `_pid_is_running(pid)`
+
+Return ``True`` if a process with the given PID appears to be alive.
 
 ### `__iter__(self)`
 

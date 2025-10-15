@@ -2,19 +2,47 @@
 
 This reference documents the DocsToKG module ``DocsToKG.ContentDownload.conditional``.
 
-Conditional HTTP request helpers for ETag and Last-Modified caching.
+Conditional Request Metadata
+
+This module centralises helper types for conditional HTTP requests that rely on
+ETag and Last-Modified headers. It provides strongly typed dataclasses for
+capturing cached responses alongside a small orchestration helper that builds
+request headers and interprets origin responses. The utilities are used by the
+content download pipeline to honour polite download practices while avoiding
+unnecessary network transfers.
+
+Key Features:
+- Dataclasses that model cached and modified responses with checksum metadata.
+- Helper for constructing `If-None-Match`/`If-Modified-Since` headers.
+- Utilities for validating 304 responses against previously cached artefacts.
+
+Dependencies:
+- `requests`: Required for the `Response` type used when interpreting outcomes.
+
+Usage:
+    from DocsToKG.ContentDownload.conditional import ConditionalRequestHelper
+
+    helper = ConditionalRequestHelper(prior_etag="abcd", prior_path="/tmp/file.pdf")
+    headers = helper.build_headers()
+    response = session.get(url, headers=headers)
+    result = helper.interpret_response(response)
 
 ## 1. Functions
 
 ### `build_headers(self)`
 
-Generate conditional request headers from prior metadata.
+Generate conditional request headers from cached metadata.
 
 Args:
-None
+self: Helper instance containing cached HTTP metadata.
 
 Returns:
-Dictionary containing conditional HTTP headers suited for reuse in requests.
+Mapping of conditional header names to values ready for ``requests``.
+
+Examples:
+>>> helper = ConditionalRequestHelper(prior_etag="abcd", prior_last_modified="Fri, 01 Jan 2021 00:00:00 GMT")
+>>> helper.build_headers() == {'If-None-Match': 'abcd', 'If-Modified-Since': 'Fri, 01 Jan 2021 00:00:00 GMT'}
+True
 
 ### `interpret_response(self, response)`
 
@@ -27,8 +55,8 @@ Returns:
 `CachedResult` when the origin reports HTTP 304, otherwise `ModifiedResult`.
 
 Raises:
-ValueError: If a 304 response arrives without complete prior metadata. The
-exception lists missing fields to simplify debugging manifest issues.
+ValueError: If a 304 response arrives without complete prior metadata.
+TypeError: If ``response`` lacks the minimal ``status_code``/``headers`` API.
 
 ## 2. Classes
 

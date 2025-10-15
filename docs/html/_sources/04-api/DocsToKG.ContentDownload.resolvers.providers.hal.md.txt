@@ -2,7 +2,21 @@
 
 This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.hal``.
 
-HAL (Hyper Articles en Ligne) open archive resolver.
+HAL Resolver Provider
+
+This module integrates with the HAL (Hyper Articles en Ligne) open archive API
+to discover repository-hosted PDFs for works indexed in OpenAlex.
+
+Key Features:
+- Query construction against HAL search endpoints using DOI filters.
+- Extraction of both main and auxiliary file URLs with PDF filtering.
+- Error handling and logging for HTTP and JSON parsing issues.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.hal import HalResolver
+
+    resolver = HalResolver()
+    urls = list(resolver.iter_urls(session, config, artifact))
 
 ## 1. Functions
 

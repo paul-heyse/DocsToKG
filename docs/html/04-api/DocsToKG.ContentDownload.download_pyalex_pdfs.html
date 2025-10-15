@@ -79,16 +79,47 @@
   <section id="module-download-pyalex-pdfs">
 <h1>1. Module: download_pyalex_pdfs<a class="headerlink" href="#module-download-pyalex-pdfs" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.download_pyalex_pdfs</span></code>.</p>
-<p>Download PDFs for OpenAlex works with a configurable resolver stack.</p>
+<p>OpenAlex PDF Downloader CLI</p>
+<p>This module implements the command-line interface responsible for downloading
+open-access PDFs referenced by OpenAlex works. It combines resolver discovery,
+content classification, manifest logging, and polite crawling behaviours into a
+single executable entrypoint. The implementation aligns with the modular content
+download architecture documented in the OpenSpec proposal and exposes hooks for
+custom resolver configuration, dry-run execution, and manifest resume logic.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Threaded resolver pipeline with conditional request caching.</p></li>
+<li><p>Structured JSONL/CSV logging including manifest entries and attempt metrics.</p></li>
+<li><p>Content sniffing utilities that differentiate PDF, HTML, and corrupt payloads.</p></li>
+<li><p>CLI flags for controlling topic selection, time ranges, resolver order, and
+polite crawling identifiers.</p></li>
+</ul>
+<p>Dependencies:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">requests</span></code>, <code class="docutils literal notranslate"><span class="pre">urllib3</span></code>: HTTP communication and retry adapters.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pyalex</span></code>: Query construction for OpenAlex works and topics.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload</span></code> submodules: Resolver pipeline orchestration,
+conditional caching, and shared utilities.</p></li>
+</ul>
+<p>Usage:
+python -m DocsToKG.ContentDownload.download_pyalex_pdfs <br />
+–topic “knowledge graphs” –year-start 2020 –year-end 2023 <br />
+–out ./pdfs –resolver-config download_config.yaml</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="utc-timestamp">
 <h3><code class="docutils literal notranslate"><span class="pre">_utc_timestamp()</span></code><a class="headerlink" href="#utc-timestamp" title="Link to this heading"></a></h3>
-<p>Return an ISO 8601 UTC timestamp with a trailing ‘Z’ suffix.</p>
+<p>Return the current time as an ISO 8601 UTC timestamp.</p>
+<p>Returns:
+Timestamp string formatted with a trailing <code class="docutils literal notranslate"><span class="pre">'Z'</span></code> suffix.</p>
 </section>
 <section id="has-pdf-eof-path">
 <h3><code class="docutils literal notranslate"><span class="pre">_has_pdf_eof(path)</span></code><a class="headerlink" href="#has-pdf-eof-path" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when <code class="docutils literal notranslate"><span class="pre">path</span></code> appears to end with the <code class="docutils literal notranslate"><span class="pre">%%EOF</span></code> marker.</p>
+<p>Check whether a PDF file terminates with the <code class="docutils literal notranslate"><span class="pre">%%EOF</span></code> marker.</p>
+<p>Args:
+path: Path to the candidate PDF file.</p>
+<p>Returns:
+<code class="docutils literal notranslate"><span class="pre">True</span></code> if the file ends with <code class="docutils literal notranslate"><span class="pre">%%EOF</span></code>; <code class="docutils literal notranslate"><span class="pre">False</span></code> otherwise.</p>
 </section>
 <section id="slugify-text-keep">
 <h3><code class="docutils literal notranslate"><span class="pre">slugify(text,</span> <span class="pre">keep)</span></code><a class="headerlink" href="#slugify-text-keep" title="Link to this heading"></a></h3>
@@ -103,40 +134,39 @@ Sanitized slug string suitable for filenames.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_dir(path)</span></code><a class="headerlink" href="#ensure-dir-path" title="Link to this heading"></a></h3>
 <p>Create a directory if it does not already exist.</p>
 <p>Args:
-path: Directory path to create.</p>
+path: Directory path to create when absent.</p>
 <p>Returns:
 None</p>
+<p>Raises:
+OSError: If the directory cannot be created because of permissions.</p>
 </section>
 <section id="make-session-headers">
 <h3><code class="docutils literal notranslate"><span class="pre">_make_session(headers)</span></code><a class="headerlink" href="#make-session-headers" title="Link to this heading"></a></h3>
 <p>Create a retry-enabled :class:<code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> configured for polite crawling.</p>
-</section>
-</section>
-<section id="parameters">
-<h2>Parameters<a class="headerlink" href="#parameters" title="Link to this heading"></a></h2>
-<p>headers:
-Header dictionary returned by :func:<code class="docutils literal notranslate"><span class="pre">load_resolver_config</span></code>. The mapping <strong>must</strong>
-already include the project user agent and mailto contact address. The factory
-copies the mapping before applying it to the outgoing session so tests may pass
-mutable dictionaries without worrying about side effects.</p>
-</section>
-<section id="returns">
-<h2>Returns<a class="headerlink" href="#returns" title="Link to this heading"></a></h2>
-<p>requests.Session
-A session with exponential backoff retry behaviour suitable for resolver
-traffic. Both <code class="docutils literal notranslate"><span class="pre">http</span></code> and <code class="docutils literal notranslate"><span class="pre">https</span></code> transports share the same
-:class:<code class="docutils literal notranslate"><span class="pre">urllib3.util.retry.Retry</span></code> configuration.</p>
-</section>
-<section id="notes">
-<h2>Notes<a class="headerlink" href="#notes" title="Link to this heading"></a></h2>
-<p>Each worker should call this helper to obtain an isolated session instance. Example
-usage::</p>
-<p>session = _make_session({“User-Agent”: “DocsToKGDownloader/1.0”, “mailto”: “ops&#64;example.org”})</p>
-<p>Subsequent resolver requests automatically include the polite headers and retry
-policy.</p>
-<section id="make-session-for-worker-headers">
-<h3><code class="docutils literal notranslate"><span class="pre">_make_session_for_worker(headers)</span></code><a class="headerlink" href="#make-session-for-worker-headers" title="Link to this heading"></a></h3>
-<p>Factory helper for per-worker sessions.</p>
+<p>Args:
+headers: Header dictionary returned by :func:<code class="docutils literal notranslate"><span class="pre">load_resolver_config</span></code>. The mapping
+must already include the project user agent and <code class="docutils literal notranslate"><span class="pre">mailto</span></code> contact address.
+A copy of the mapping is applied to the outgoing session so callers can
+reuse mutable dictionaries without side effects.</p>
+<p>Returns:
+requests.Session: Session with exponential backoff retry behaviour suitable
+for resolver traffic. Both <code class="docutils literal notranslate"><span class="pre">http</span></code> and <code class="docutils literal notranslate"><span class="pre">https</span></code> transports share the
+same :class:<code class="docutils literal notranslate"><span class="pre">urllib3.util.retry.Retry</span></code> configuration.</p>
+<p>Notes:
+Each worker should call this helper to obtain an isolated session instance.
+Example:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>_make_session({“User-Agent”: “DocsToKGDownloader/1.0”, “mailto”: “ops&#64;example.org”})  # doctest: +ELLIPSIS
+&lt;requests.sessions.Session object at …&gt;</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+<p>The returned session is safe for concurrent <code class="docutils literal notranslate"><span class="pre">GET</span></code> and <code class="docutils literal notranslate"><span class="pre">HEAD</span></code> requests
+because :class:<code class="docutils literal notranslate"><span class="pre">requests.adapters.HTTPAdapter</span></code> manages a thread-safe connection
+pool. Avoid mutating shared session state (for example <code class="docutils literal notranslate"><span class="pre">session.headers.update</span></code>)
+once the session is handed to worker threads.</p>
 </section>
 <section id="load-previous-manifest-path">
 <h3><code class="docutils literal notranslate"><span class="pre">load_previous_manifest(path)</span></code><a class="headerlink" href="#load-previous-manifest-path" title="Link to this heading"></a></h3>
@@ -168,20 +198,17 @@ ManifestEntry populated with download metadata.</p>
 </section>
 <section id="classify-payload-head-bytes-content-type-url">
 <h3><code class="docutils literal notranslate"><span class="pre">classify_payload(head_bytes,</span> <span class="pre">content_type,</span> <span class="pre">url)</span></code><a class="headerlink" href="#classify-payload-head-bytes-content-type-url" title="Link to this heading"></a></h3>
-<p>Return ‘pdf’, ‘html’, or None if undecided.</p>
+<p>Classify a payload as PDF, HTML, or unknown based on heuristics.</p>
 <p>Args:
 head_bytes: Leading bytes from the HTTP payload.
 content_type: Content-Type header reported by the server.
 url: Source URL of the payload.</p>
 <p>Returns:
-Optional[str]: Classification string or <code class="docutils literal notranslate"><span class="pre">None</span></code> when unknown.</p>
+Classification string <code class="docutils literal notranslate"><span class="pre">&quot;pdf&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;html&quot;</span></code> when detection succeeds,
+otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
 <p>Raises:
-UnicodeDecodeError: If payload sniffing encounters invalid encoding when
-decoding the tail of the file (rare; captured by fallback logic).
-requests.RequestException: Propagated if header or GET requests fail
-before protective guards are applied.
-OSError: If filesystem writes fail while persisting the payload.
-ValueError: If payload metadata cannot be interpreted while classifying.</p>
+UnicodeDecodeError: If heuristics attempt to decode malformed byte
+sequences while inspecting the payload prefix.</p>
 </section>
 <section id="build-download-outcome">
 <h3><code class="docutils literal notranslate"><span class="pre">_build_download_outcome()</span></code><a class="headerlink" href="#build-download-outcome" title="Link to this heading"></a></h3>
@@ -189,18 +216,45 @@ ValueError: If payload metadata cannot be interpreted while classifying.</p>
 <p>The helper normalises classification labels, performs the terminal <code class="docutils literal notranslate"><span class="pre">%%EOF</span></code>
 check for PDFs (skipping when running in <code class="docutils literal notranslate"><span class="pre">--dry-run</span></code> mode), and attaches
 bookkeeping metadata such as digests and conditional request headers.</p>
+<p>Args:
+artifact: Work metadata describing the current OpenAlex record.
+classification: Initial classification derived from content sniffing.
+dest_path: Final storage path for the artefact (if any).
+response: HTTP response object returned by :func:<code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code>.
+elapsed_ms: Download duration in milliseconds.
+flagged_unknown: Whether heuristics flagged the payload as ambiguous.
+sha256: SHA-256 digest of the payload when computed.
+content_length: Size of the payload in bytes, if known.
+etag: ETag header value supplied by the origin.
+last_modified: Last-Modified header value supplied by the origin.
+extracted_text_path: Optional path to extracted HTML text artefacts.
+dry_run: Indicates whether this execution runs in dry-run mode.</p>
+<p>Returns:
+DownloadOutcome capturing the normalized classification and metadata.</p>
 </section>
 <section id="normalize-pmid-pmid">
 <h3><code class="docutils literal notranslate"><span class="pre">_normalize_pmid(pmid)</span></code><a class="headerlink" href="#normalize-pmid-pmid" title="Link to this heading"></a></h3>
 <p>Extract the numeric PubMed identifier or return <code class="docutils literal notranslate"><span class="pre">None</span></code> when absent.</p>
+<p>Args:
+pmid: Raw PubMed identifier string which may include prefixes.</p>
+<p>Returns:
+Normalised numeric PMCID string or <code class="docutils literal notranslate"><span class="pre">None</span></code> when not parsable.</p>
 </section>
 <section id="normalize-arxiv-arxiv-id">
 <h3><code class="docutils literal notranslate"><span class="pre">_normalize_arxiv(arxiv_id)</span></code><a class="headerlink" href="#normalize-arxiv-arxiv-id" title="Link to this heading"></a></h3>
 <p>Normalize arXiv identifiers by removing prefixes and whitespace.</p>
+<p>Args:
+arxiv_id: Raw arXiv identifier which may include URL or prefix.</p>
+<p>Returns:
+Canonical arXiv identifier without prefixes or whitespace.</p>
 </section>
 <section id="collect-location-urls-work">
 <h3><code class="docutils literal notranslate"><span class="pre">_collect_location_urls(work)</span></code><a class="headerlink" href="#collect-location-urls-work" title="Link to this heading"></a></h3>
 <p>Return landing/PDF/source URL collections derived from OpenAlex metadata.</p>
+<p>Args:
+work: OpenAlex work payload as returned by the Works API.</p>
+<p>Returns:
+Dictionary containing <code class="docutils literal notranslate"><span class="pre">landing</span></code>, <code class="docutils literal notranslate"><span class="pre">pdf</span></code>, and <code class="docutils literal notranslate"><span class="pre">sources</span></code> URL lists.</p>
 </section>
 <section id="build-query-args">
 <h3><code class="docutils literal notranslate"><span class="pre">build_query(args)</span></code><a class="headerlink" href="#build-query-args" title="Link to this heading"></a></h3>
@@ -244,11 +298,8 @@ and <code class="docutils literal notranslate"><span class="pre">previous</span>
 <p>Returns:
 DownloadOutcome describing the result of the download attempt.</p>
 <p>Raises:
-requests.RequestException: If HTTP requests fail unexpectedly outside
-guarded sections.
 OSError: If writing the downloaded payload to disk fails.
-ValueError: If response payloads cannot be interpreted during
-classification.</p>
+TypeError: If conditional response parsing returns unexpected objects.</p>
 </section>
 <section id="read-resolver-config-path">
 <h3><code class="docutils literal notranslate"><span class="pre">read_resolver_config(path)</span></code><a class="headerlink" href="#read-resolver-config-path" title="Link to this heading"></a></h3>
@@ -293,7 +344,7 @@ max_results: Optional maximum number of works to yield.</p>
 <p>Yields:
 Work payload dictionaries returned by the OpenAlex API.</p>
 <p>Returns:
-Iterable yielding work payload dictionaries.</p>
+Iterable yielding the same work payload dictionaries for convenience.</p>
 </section>
 <section id="process-one-work-work-session-pdf-dir-html-dir-pipeline-logger-metrics">
 <h3><code class="docutils literal notranslate"><span class="pre">process_one_work(work,</span> <span class="pre">session,</span> <span class="pre">pdf_dir,</span> <span class="pre">html_dir,</span> <span class="pre">pipeline,</span> <span class="pre">logger,</span> <span class="pre">metrics)</span></code><a class="headerlink" href="#process-one-work-work-session-pdf-dir-html-dir-pipeline-logger-metrics" title="Link to this heading"></a></h3>
@@ -319,7 +370,11 @@ Exception: Bubbling from resolver pipeline internals when not handled.</p>
 </section>
 <section id="main">
 <h3><code class="docutils literal notranslate"><span class="pre">main()</span></code><a class="headerlink" href="#main" title="Link to this heading"></a></h3>
-<p>CLI entrypoint for the OpenAlex PDF downloader.</p>
+<p>Parse CLI arguments, configure resolvers, and execute downloads.</p>
+<p>The entrypoint wires together argument parsing, resolver configuration,
+logging setup, and the resolver pipeline orchestration documented in the
+modular content download specification. It is exposed both as the module’s
+<code class="docutils literal notranslate"><span class="pre">__main__</span></code> handler and via <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span></code>.</p>
 <p>Args:
 None</p>
 <p>Returns:
@@ -370,7 +425,7 @@ None</p>
 <h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#close-self" title="Link to this heading"></a></h3>
 <p>Close the underlying file handle.</p>
 <p>Args:
-None</p>
+self: Logger instance managing the JSONL file descriptor.</p>
 <p>Returns:
 None</p>
 </section>
@@ -410,7 +465,7 @@ None</p>
 <h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
 <p>Close both the JSONL logger and the CSV file handle.</p>
 <p>Args:
-None</p>
+self: Adapter instance coordinating CSV and JSONL streams.</p>
 <p>Returns:
 None</p>
 </section>
@@ -418,13 +473,15 @@ None</p>
 <h3><code class="docutils literal notranslate"><span class="pre">__post_init__(self)</span></code><a class="headerlink" href="#post-init-self" title="Link to this heading"></a></h3>
 <p>Define namespace mappings for output artefact directories.</p>
 <p>Args:
-None</p>
+self: Instance whose namespace mapping is being initialised.</p>
 <p>Returns:
 None</p>
 </section>
 <section id="append-location-loc">
 <h3><code class="docutils literal notranslate"><span class="pre">_append_location(loc)</span></code><a class="headerlink" href="#append-location-loc" title="Link to this heading"></a></h3>
 <p>Accumulate location URLs from a single OpenAlex location record.</p>
+<p>Args:
+loc: Location dictionary as returned by OpenAlex (may be None).</p>
 </section>
 <section id="session-factory">
 <h3><code class="docutils literal notranslate"><span class="pre">_session_factory()</span></code><a class="headerlink" href="#session-factory" title="Link to this heading"></a></h3>

@@ -23,7 +23,7 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload.config import LoggingConfig
+from DocsToKG.OntologyDownload.config import LoggingConfiguration
 from DocsToKG.OntologyDownload.logging_config import mask_sensitive_data, setup_logging
 
 
@@ -40,7 +40,7 @@ def test_mask_sensitive_data_masks_tokens():
 
 
 def test_setup_logging_emits_structured_json(tmp_path):
-    config = LoggingConfig(level="INFO", max_log_size_mb=1, retention_days=1)
+    config = LoggingConfiguration(level="INFO", max_log_size_mb=1, retention_days=1)
     logger = setup_logging(config, log_dir=tmp_path)
     try:
         logger.info(

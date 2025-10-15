@@ -32,7 +32,11 @@ from DocsToKG.ContentDownload.download_pyalex_pdfs import (
     download_candidate,
     process_one_work,
 )
-from DocsToKG.ContentDownload.resolvers import DownloadOutcome, PipelineResult, ResolverMetrics
+from DocsToKG.ContentDownload.resolvers.types import (
+    DownloadOutcome,
+    PipelineResult,
+    ResolverMetrics,
+)
 
 requests = pytest.importorskip("requests")
 responses = pytest.importorskip("responses")

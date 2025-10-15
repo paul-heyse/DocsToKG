@@ -79,14 +79,28 @@
   <section id="module-serializers">
 <h1>1. Module: serializers<a class="headerlink" href="#module-serializers" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.serializers</span></code>.</p>
-<p>Picture and table serializers for DocParsing pipeline.</p>
-<p>These serializers extract rich metadata from Docling documents including image
-captions, classifications, and SMILES molecular structures.</p>
-<p>Example Usage:
-&gt;&gt;&gt; from DocsToKG.DocParsing.serializers import RichSerializerProvider
-&gt;&gt;&gt; provider = RichSerializerProvider()
-&gt;&gt;&gt; isinstance(provider.get_serializer(None), ChunkingDocSerializer)  # doctest: +SKIP
-True</p>
+<p>DocParsing Rich Serializers</p>
+<p>This module extends Docling serializers to capture captions, classifications,
+and molecular annotations when generating DocTags. It provides picture and
+table serializers tailored to DocsToKG along with a convenience provider that
+bundles them for hybrid chunking pipelines.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Extract human-readable captions and classification labels for images</p></li>
+<li><p>Preserve SMILES strings discovered during document parsing</p></li>
+<li><p>Wrap the enhanced serializers in a provider compatible with Docling chunkers</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.DocParsing.serializers import RichSerializerProvider</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>provider = RichSerializerProvider()
+serializer = provider.get_serializer(doc)  # doctest: +SKIP
+</pre></div>
+</div>
+<p>Dependencies:</p>
+<ul class="simple">
+<li><p>docling_core: Supplies Docling data structures and base serializer classes.</p></li>
+<li><p>typing_extensions.override: Ensures subclass overrides remain explicit.</p></li>
+</ul>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="serialize-self">

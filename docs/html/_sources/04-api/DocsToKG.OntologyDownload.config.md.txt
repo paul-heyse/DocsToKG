@@ -6,13 +6,15 @@ Ontology Downloader Configuration
 
 This module centralizes configuration schema definitions, environment
 overrides, and YAML parsing for DocsToKG's ontology downloader. It builds on
-Pydantic models to provide strong validation, type-safe defaults, and runtime
-mutability where operational overrides are required.
+Pydantic v2 models to provide strong validation, type-safe defaults, automatic
+JSON Schema generation, and runtime mutability where operational overrides are
+required.
 
 Key Features:
 - Declarative Pydantic models for HTTP, validation, and logging settings
 - YAML loading with structural validation and friendly error messages
-- Environment variable overrides for containerized deployments
+- Environment variable overrides merged via :class:`pydantic_settings.BaseSettings`
+- JSON Schema export for documentation and validation tooling
 - Utilities to merge defaults with ad-hoc fetch specifications
 
 Dependencies:
@@ -231,6 +233,22 @@ otherwise ``None`` if no valid allowlist entries are configured.
 Raises:
 ValueError: If any configured hostname cannot be converted to punycode.
 
+### `polite_http_headers(self)`
+
+Return polite HTTP headers suitable for resolver API calls.
+
+The headers include a deterministic ``User-Agent`` string, propagate a
+``From`` contact address when configured, and synthesize an ``X-Request-ID``
+correlated with the current fetch so API providers can trace requests.
+
+Args:
+correlation_id: Identifier attached to the current batch for log correlation.
+request_id: Optional override for ``X-Request-ID`` header; auto-generated when ``None``.
+timestamp: Optional timestamp used when constructing the request identifier.
+
+Returns:
+Mapping of header names to polite values complying with provider guidelines.
+
 ### `validate_prefer_source(cls, value)`
 
 Ensure resolver names are recognized.
@@ -298,7 +316,7 @@ Examples:
 
 ### `DownloadConfiguration`
 
-HTTP download and retry settings.
+HTTP download, throttling, and polite header settings for resolvers.
 
 Attributes:
 max_retries: Maximum retry attempts for failed download requests.
@@ -311,6 +329,7 @@ concurrent_downloads: Allowed number of simultaneous downloads.
 validate_media_type: Whether to enforce Content-Type validation.
 rate_limits: Optional per-service rate limit overrides.
 allowed_hosts: Optional allowlist restricting download hostnames.
+polite_headers: Default polite HTTP headers applied to resolver API calls.
 
 Examples:
 >>> cfg = DownloadConfiguration(per_host_rate_limit="10/second")
@@ -329,6 +348,7 @@ http: Download configuration defaults.
 validation: Validation configuration defaults.
 logging: Logging configuration defaults.
 continue_on_error: Whether processing continues after failures.
+resolver_fallback_enabled: Whether automatic resolver fallback is enabled.
 
 Examples:
 >>> defaults = DefaultsConfig()

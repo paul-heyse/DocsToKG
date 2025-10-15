@@ -2,13 +2,39 @@
 
 This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.semantic_scholar``.
 
-Resolver that queries the Semantic Scholar Graph API for open access PDFs.
+Semantic Scholar Resolver Provider
+
+This module integrates with the Semantic Scholar Graph API to locate open
+access PDFs associated with DOI-indexed papers.
+
+Key Features:
+- Memoised API lookups to respect rate limits and improve performance.
+- Optional API key support via standard ``x-api-key`` headers.
+- Structured error emission covering HTTP and JSON decoding failures.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import SemanticScholarResolver
+
+    resolver = SemanticScholarResolver()
+    results = list(resolver.iter_urls(session, config, artifact))
 
 ## 1. Functions
 
 ### `_fetch_semantic_scholar_data(doi, api_key, timeout, headers_key)`
 
 Fetch Semantic Scholar Graph API metadata for ``doi`` with caching.
+
+Args:
+doi: Normalised DOI string to query.
+api_key: Optional Semantic Scholar API key to include in the request.
+timeout: Request timeout in seconds.
+headers_key: Hashable representation of polite headers for cache lookups.
+
+Returns:
+Decoded JSON payload returned by the Semantic Scholar Graph API.
+
+Raises:
+requests.HTTPError: If the API responds with a non-success status code.
 
 ### `is_enabled(self, config, artifact)`
 

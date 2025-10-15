@@ -1,4 +1,21 @@
-"""Europe PMC resolver for European open access articles."""
+"""
+Europe PMC Resolver Provider
+
+This module integrates with the Europe PMC REST API to locate open-access PDFs
+hosted across European repositories. It complements other resolver providers by
+covering funder-mandated repositories aggregated by Europe PMC.
+
+Key Features:
+- Query construction against Europe PMC's search endpoint using DOI filters.
+- Deduplication of PDF URLs within API responses.
+- Structured error reporting for network and parsing failures.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.europe_pmc import EuropePmcResolver
+
+    resolver = EuropePmcResolver()
+    urls = list(resolver.iter_urls(session, config, artifact))
+"""
 
 from __future__ import annotations
 
@@ -84,14 +101,6 @@ class EuropePmcResolver:
                 metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
             )
             return
-        except requests.ConnectionError as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="connection-error",
-                metadata={"error": str(exc)},
-            )
-            return
         except requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
@@ -110,12 +119,8 @@ class EuropePmcResolver:
             )
             return
         if resp.status_code != 200:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="http-error",
-                http_status=resp.status_code,
-                metadata={"error_detail": f"Europe PMC API returned {resp.status_code}"},
+            LOGGER.warning(
+                "Europe PMC API returned %s for DOI %s", resp.status_code, doi
             )
             return
         try:

@@ -37,7 +37,7 @@ from DocsToKG.ContentDownload.download_pyalex_pdfs import (
     _make_session,
     download_candidate,
 )
-from DocsToKG.ContentDownload.resolvers import DownloadOutcome
+from DocsToKG.ContentDownload.resolvers.types import DownloadOutcome
 
 
 class _SequencedHandler(BaseHTTPRequestHandler):

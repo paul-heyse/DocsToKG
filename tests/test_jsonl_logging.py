@@ -28,7 +28,7 @@ pytest.importorskip("requests")
 pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload.download_pyalex_pdfs import JsonlLogger, ManifestEntry
-from DocsToKG.ContentDownload.resolvers import AttemptRecord
+from DocsToKG.ContentDownload.resolvers.types import AttemptRecord
 from scripts.export_attempts_csv import export_attempts_jsonl_to_csv
 
 

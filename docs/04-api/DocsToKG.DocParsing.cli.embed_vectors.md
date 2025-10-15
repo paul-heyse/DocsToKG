@@ -2,7 +2,20 @@
 
 This reference documents the DocsToKG module ``DocsToKG.DocParsing.cli.embed_vectors``.
 
-Convenience CLI wrapper for the hybrid embedding pipeline.
+Embedding CLI Wrapper
+
+This CLI exposes the hybrid embedding pipeline that generates BM25, SPLADE, and
+Qwen vectors for DocsToKG chunk files. It reuses the core parser and runtime
+logic from ``DocsToKG.DocParsing.EmbeddingV2`` while enhancing descriptions for
+operator-facing documentation.
+
+Key Features:
+- Share argument definitions with the primary embedding module
+- Provide concise messaging suited for orchestration scripts
+- Support ``python -m`` invocation without altering defaults
+
+Usage:
+    python -m DocsToKG.DocParsing.cli.embed_vectors --resume
 
 ## 1. Functions
 

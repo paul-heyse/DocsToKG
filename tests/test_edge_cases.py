@@ -35,13 +35,13 @@ from DocsToKG.ContentDownload.download_pyalex_pdfs import (
     download_candidate,
     process_one_work,
 )
-from DocsToKG.ContentDownload.resolvers import (
+from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
+from DocsToKG.ContentDownload.resolvers.providers.wayback import WaybackResolver
+from DocsToKG.ContentDownload.resolvers.types import (
     DownloadOutcome,
     ResolverConfig,
     ResolverMetrics,
-    ResolverPipeline,
     ResolverResult,
-    WaybackResolver,
 )
 from DocsToKG.ContentDownload.resolvers.providers.openalex import OpenAlexResolver
 

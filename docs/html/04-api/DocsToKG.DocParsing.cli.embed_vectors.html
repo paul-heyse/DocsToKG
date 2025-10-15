@@ -79,7 +79,19 @@
   <section id="module-embed-vectors">
 <h1>1. Module: embed_vectors<a class="headerlink" href="#module-embed-vectors" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.cli.embed_vectors</span></code>.</p>
-<p>Convenience CLI wrapper for the hybrid embedding pipeline.</p>
+<p>Embedding CLI Wrapper</p>
+<p>This CLI exposes the hybrid embedding pipeline that generates BM25, SPLADE, and
+Qwen vectors for DocsToKG chunk files. It reuses the core parser and runtime
+logic from <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.EmbeddingV2</span></code> while enhancing descriptions for
+operator-facing documentation.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Share argument definitions with the primary embedding module</p></li>
+<li><p>Provide concise messaging suited for orchestration scripts</p></li>
+<li><p>Support <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span></code> invocation without altering defaults</p></li>
+</ul>
+<p>Usage:
+python -m DocsToKG.DocParsing.cli.embed_vectors –resume</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="build-parser">

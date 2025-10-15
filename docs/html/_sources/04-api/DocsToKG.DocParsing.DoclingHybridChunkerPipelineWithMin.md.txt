@@ -20,6 +20,16 @@ Tokenizer Alignment:
 
 ## 1. Functions
 
+### `_promote_simple_namespace_modules()`
+
+Convert any SimpleNamespace placeholders in sys.modules to real modules.
+
+Some tests install lightweight SimpleNamespace stubs into sys.modules for
+optional dependencies (for example ``trafilatura``). Hypothesis' internal
+providers assume module objects are hashable, which SimpleNamespace is not.
+Promoting the stubs to ModuleType instances preserves their attributes while
+restoring hashability, preventing spurious test failures.
+
 ### `read_utf8(p)`
 
 Load text from disk using UTF-8 with replacement for invalid bytes.

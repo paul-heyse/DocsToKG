@@ -27,7 +27,7 @@ import pytest
 pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload.resolvers import ResolverConfig
+from DocsToKG.ContentDownload.resolvers.types import ResolverConfig
 from DocsToKG.ContentDownload.resolvers.providers.core import CoreResolver
 from DocsToKG.ContentDownload.resolvers.providers.crossref import CrossrefResolver
 from DocsToKG.ContentDownload.resolvers.providers.doaj import DoajResolver

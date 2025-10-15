@@ -79,7 +79,28 @@
   <section id="module-http">
 <h1>1. Module: http<a class="headerlink" href="#module-http" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.http</span></code>.</p>
-<p>Unified HTTP request utilities with retry and backoff support.</p>
+<p>HTTP Utilities with Backoff Support</p>
+<p>This module consolidates resilient HTTP helper functions used across the content
+download pipeline. It provides helpers for parsing retry metadata and executing
+requests with exponential backoff, jitter, and respect for origin-provided
+<code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> headers.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Parsing of both integer and HTTP-date <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> formats.</p></li>
+<li><p>Unified retry loop with jitter, backoff, and status-code filters.</p></li>
+<li><p>Logging hooks for visibility into retry behaviour.</p></li>
+</ul>
+<p>Dependencies:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">requests</span></code>: Primary HTTP client used by resolver sessions.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">datetime</span></code>: Used to interpret HTTP-date headers.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.http import request_with_retries</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>session = requests.Session()
+response = request_with_retries(session, &quot;GET&quot;, &quot;https://example.org/resource&quot;)
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="parse-retry-after-header-response">
@@ -90,7 +111,7 @@ response: HTTP response potentially containing <code class="docutils literal not
 <p>Returns:
 Float seconds to wait, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if header missing/invalid.</p>
 <p>Raises:
-None.</p>
+None: Invalid headers are tolerated and yield <code class="docutils literal notranslate"><span class="pre">None</span></code> without raising.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>
@@ -135,6 +156,8 @@ when provided by the server. Defaults to <code class="docutils literal notransla
 A :class:<code class="docutils literal notranslate"><span class="pre">requests.Response</span></code> instance on success. The caller is
 responsible for closing the response when streaming content.</p>
 <p>Raises:
+ValueError: If <code class="docutils literal notranslate"><span class="pre">max_retries</span></code> or <code class="docutils literal notranslate"><span class="pre">backoff_factor</span></code> are invalid or
+<code class="docutils literal notranslate"><span class="pre">url</span></code>/<code class="docutils literal notranslate"><span class="pre">method</span></code> are empty.
 requests.RequestException: If all retry attempts fail due to network
 errors or the session raises an exception.</p>
 <p>Example:</p>

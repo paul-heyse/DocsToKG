@@ -26,10 +26,11 @@ from typing import Any, Dict, Optional
 
 import pytest
 
-hypothesis = pytest.importorskip("hypothesis")
-from hypothesis import strategies as st  # type: ignore
-
-given = hypothesis.given
+try:
+    import hypothesis
+    from hypothesis import strategies as st  # type: ignore
+except ImportError:  # pragma: no cover - optional dependency
+    pytest.skip("hypothesis is required for these tests", allow_module_level=True)
 
 from DocsToKG.ContentDownload.conditional import (
     CachedResult,
@@ -40,6 +41,8 @@ from DocsToKG.ContentDownload.conditional import (
 HAS_REQUESTS = find_spec("requests") is not None
 HAS_PYALEX = find_spec("pyalex") is not None
 
+given = hypothesis.given
+
 if HAS_REQUESTS and HAS_PYALEX:
     from DocsToKG.ContentDownload.download_pyalex_pdfs import (
         ManifestEntry,
@@ -47,7 +50,7 @@ if HAS_REQUESTS and HAS_PYALEX:
         build_manifest_entry,
         download_candidate,
     )
-    from DocsToKG.ContentDownload.resolvers import DownloadOutcome
+    from DocsToKG.ContentDownload.resolvers.types import DownloadOutcome
 
     class _DummyResponse:
         def __init__(self, status_code: int, headers: Dict[str, str]) -> None:
@@ -319,6 +322,8 @@ def test_interpret_response_cached_property(path: str, sha: str, size: int) -> N
     assert result.path == path
     assert result.sha256 == sha
     assert result.content_length == size
+
+
 def test_conditional_helper_rejects_negative_length() -> None:
     with pytest.raises(ValueError):
         ConditionalRequestHelper(prior_content_length=-1)

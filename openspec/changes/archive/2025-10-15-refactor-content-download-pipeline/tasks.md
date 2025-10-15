@@ -181,7 +181,7 @@
 - [x] 8.4 Extract outcome building to helper function: `def _build_download_outcome(detected: Optional[str], dest_path: Optional[Path], response: requests.Response, elapsed_ms: float, flagged_unknown: bool, sha256: str, content_length: int) -> DownloadOutcome: ...`
 - [x] 8.5 Replace multiple `return DownloadOutcome(...)` statements with calls to `_build_download_outcome(...)`
 - [x] 8.6 Add docstring to `_build_download_outcome()` explaining classification logic and EOF check
-- [ ] 8.7 Run existing test suite (`tests/test_download_pyalex_pdfs.py`, `tests/test_resolvers.py`) to verify no regressions
+- [x] 8.7 Run existing test suite (`tests/test_download_pyalex_pdfs.py`, `tests/test_resolvers.py`) to verify no regressions
 
 ## 9. Parallel Execution with ThreadPoolExecutor
 
@@ -469,7 +469,7 @@
 - [ ] 16.3 Run smoke test with --resume-from, verify skipped works not re-attempted
 - [ ] 16.4 Run full test suite: `pytest tests/ -v --cov=src/DocsToKG/ContentDownload --cov-report=html`
 - [ ] 16.5 Verify coverage >=85% for ContentDownload modules
-- [ ] 16.6 Run linter: `ruff check src/DocsToKG/ContentDownload/` and fix any issues
+- [x] 16.6 Run linter: `ruff check src/DocsToKG/ContentDownload/` and fix any issues
 - [ ] 16.7 Run type checker: `mypy src/DocsToKG/ContentDownload/` and resolve any type errors
 - [ ] 16.8 Performance benchmark: compare single-threaded vs --workers=5 throughput on 500 works, document speedup
 - [ ] 16.9 Verify atomic writes: kill process mid-download (SIGKILL), verify no corrupt files, only .part files

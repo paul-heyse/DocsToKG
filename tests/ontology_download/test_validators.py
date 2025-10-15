@@ -31,7 +31,7 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload.config import DefaultsConfiguration, ResolvedConfig
+from DocsToKG.OntologyDownload.config import DefaultsConfig, ResolvedConfig
 from DocsToKG.OntologyDownload.validators import (
     ValidationRequest,
     ValidatorSubprocessError,
@@ -45,7 +45,7 @@ from DocsToKG.OntologyDownload.validators import (
 
 @pytest.fixture()
 def config():
-    return ResolvedConfig(defaults=DefaultsConfiguration(), specs=())
+    return ResolvedConfig(defaults=DefaultsConfig(), specs=[])
 
 
 @pytest.fixture()
@@ -145,6 +145,7 @@ def test_validate_arelle_with_stub(monkeypatch, xbrl_package, tmp_path, config):
 
 def test_validate_owlready2_memory_error(monkeypatch, owl_file, tmp_path, config):
     request = ValidationRequest("owlready2", owl_file, tmp_path / "norm", tmp_path / "val", config)
+
     def _raise(*args, **kwargs):  # pragma: no cover - exercised in test
         raise ValidatorSubprocessError("memory exceeded")
 

@@ -79,19 +79,40 @@
   <section id="module-init">
 <h1>1. Module: <strong>init</strong><a class="headerlink" href="#module-init" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.__init__</span></code>.</p>
-<p>Resolver pipeline and provider implementations.</p>
-<p>This module maintains backward compatibility by re-exporting legacy entry points
-so existing integrations and tests can continue to monkeypatch <code class="docutils literal notranslate"><span class="pre">requests</span></code> or
-<code class="docutils literal notranslate"><span class="pre">time</span></code> on the resolver namespace.</p>
+<p>Resolver Package Facade</p>
+<p>This module exposes the public interface for resolver pipeline utilities and
+provider implementations used by the modular content download architecture. It
+re-exports pipeline classes, resolver types, and concrete provider factories to
+preserve backward compatibility with legacy imports while gently steering
+callers towards explicit submodules.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Facade for the resolver pipeline orchestration classes and metrics types.</p></li>
+<li><p>Explicit export of default resolver configuration and provider implementations.</p></li>
+<li><p>Backward-compatible aliases for deprecated imports (<code class="docutils literal notranslate"><span class="pre">time</span></code> and <code class="docutils literal notranslate"><span class="pre">requests</span></code>).</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.resolvers import ResolverPipeline, default_resolvers</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline = ResolverPipeline(
+    resolvers=default_resolvers(),
+    config=ResolverConfig(),
+    download_func=lambda *args, **kwargs: None,
+    logger=lambda record: None,
+    metrics=ResolverMetrics(),
+)
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="clear-resolver-caches">
-<h3><code class="docutils literal notranslate"><span class="pre">clear_resolver_caches()</span></code><a class="headerlink" href="#clear-resolver-caches" title="Link to this heading"></a></h3>
-<p>Clear resolver-level LRU caches.</p>
+<section id="getattr-name">
+<h3><code class="docutils literal notranslate"><span class="pre">__getattr__(name)</span></code><a class="headerlink" href="#getattr-name" title="Link to this heading"></a></h3>
+<p>Return legacy exports while emitting :class:<code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code>.</p>
 <p>Args:
-None</p>
+name: Attribute name requested by the caller.</p>
 <p>Returns:
-None</p>
+Either the legacy export object or raises :class:<code class="docutils literal notranslate"><span class="pre">AttributeError</span></code> when unknown.</p>
+<p>Raises:
+AttributeError: If <code class="docutils literal notranslate"><span class="pre">name</span></code> is not a recognised legacy export.</p>
 </section>
 </section>
 </section>

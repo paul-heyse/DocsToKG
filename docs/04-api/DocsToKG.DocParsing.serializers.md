@@ -2,16 +2,27 @@
 
 This reference documents the DocsToKG module ``DocsToKG.DocParsing.serializers``.
 
-Picture and table serializers for DocParsing pipeline.
+DocParsing Rich Serializers
 
-These serializers extract rich metadata from Docling documents including image
-captions, classifications, and SMILES molecular structures.
+This module extends Docling serializers to capture captions, classifications,
+and molecular annotations when generating DocTags. It provides picture and
+table serializers tailored to DocsToKG along with a convenience provider that
+bundles them for hybrid chunking pipelines.
 
-Example Usage:
-    >>> from DocsToKG.DocParsing.serializers import RichSerializerProvider
-    >>> provider = RichSerializerProvider()
-    >>> isinstance(provider.get_serializer(None), ChunkingDocSerializer)  # doctest: +SKIP
-    True
+Key Features:
+- Extract human-readable captions and classification labels for images
+- Preserve SMILES strings discovered during document parsing
+- Wrap the enhanced serializers in a provider compatible with Docling chunkers
+
+Usage:
+    from DocsToKG.DocParsing.serializers import RichSerializerProvider
+
+    provider = RichSerializerProvider()
+    serializer = provider.get_serializer(doc)  # doctest: +SKIP
+
+Dependencies:
+- docling_core: Supplies Docling data structures and base serializer classes.
+- typing_extensions.override: Ensures subclass overrides remain explicit.
 
 ## 1. Functions
 

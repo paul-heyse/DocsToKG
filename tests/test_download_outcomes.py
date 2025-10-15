@@ -17,7 +17,7 @@ if "pyalex" not in sys.modules:
     sys.modules["pyalex.config"] = config_stub
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload.resolvers import DownloadOutcome
+from DocsToKG.ContentDownload.resolvers.types import DownloadOutcome
 
 
 class FakeResponse:

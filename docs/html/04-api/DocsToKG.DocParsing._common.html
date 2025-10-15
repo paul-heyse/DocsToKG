@@ -79,13 +79,34 @@
   <section id="module-common">
 <h1>1. Module: _common<a class="headerlink" href="#module-common" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing._common</span></code>.</p>
-<p>Shared utilities for DocParsing pipeline stages (path resolution, I/O, logging, batching).</p>
-<p>This module centralizes helpers that were historically duplicated across the
-DocParsing scripts. Functions cover path resolution, structured logging,
-atomic file writes, JSONL helpers, batching utilities, content hashing, and
-simple manifest management. The utilities are intentionally lightweight so
-they can be imported from multiprocessing workers without introducing heavy
-dependencies.</p>
+<p>DocParsing Shared Utilities</p>
+<p>This module consolidates lightweight helpers that power multiple DocParsing
+pipeline stages. Utilities span path discovery, atomic file writes, JSONL
+parsing, manifest bookkeeping, and structured logging so that chunking,
+embedding, and conversion scripts can share consistent behaviour without an
+additional dependency layer.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Resolve DocsToKG data directories with environment and ancestor discovery</p></li>
+<li><p>Stream JSONL inputs and outputs with validation and error tolerance</p></li>
+<li><p>Emit structured JSON logs suited for machine ingestion and dashboards</p></li>
+<li><p>Manage pipeline manifests, batching helpers, and advisory file locks</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.DocParsing import _common as common_util</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>chunks_dir = common_util.data_chunks()
+with common_util.atomic_write(chunks_dir / &quot;example.jsonl&quot;) as handle:
+    handle.write(&quot;{}&quot;)
+</pre></div>
+</div>
+<p>Dependencies:</p>
+<ul class="simple">
+<li><p>json, pathlib, logging: Provide standard I/O and diagnostics primitives.</p></li>
+<li><p>typing: Supply type hints consumed by Sphinx autodoc and API generators.</p></li>
+<li><p>pydantic (optional): Some helpers integrate with schema validation routines.</p></li>
+</ul>
+<p>All helpers are safe to import in multiprocessing contexts and avoid heavy
+third-party dependencies beyond the standard library.</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="detect-data-root-start">
@@ -491,6 +512,10 @@ with acquire_lock(target):
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>
+</section>
+<section id="pid-is-running-pid">
+<h3><code class="docutils literal notranslate"><span class="pre">_pid_is_running(pid)</span></code><a class="headerlink" href="#pid-is-running-pid" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> if a process with the given PID appears to be alive.</p>
 </section>
 <section id="iter-self">
 <h3><code class="docutils literal notranslate"><span class="pre">__iter__(self)</span></code><a class="headerlink" href="#iter-self" title="Link to this heading"></a></h3>

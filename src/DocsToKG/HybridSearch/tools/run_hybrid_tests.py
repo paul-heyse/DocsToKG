@@ -11,7 +11,14 @@ import sys
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run selected hybrid-search pytest suites with optional extra arguments."""
+    """Run selected hybrid-search pytest suites with optional extra arguments.
+
+    Args:
+        argv: Optional argument vector forwarded to :mod:`argparse`.
+
+    Returns:
+        int: Exit code returned by the invoked pytest command.
+    """
 
     parser = argparse.ArgumentParser(description="Run hybrid search pytest suites")
     parser.add_argument(

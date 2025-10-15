@@ -79,16 +79,61 @@
   <section id="module-pipeline">
 <h1>1. Module: pipeline<a class="headerlink" href="#module-pipeline" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.pipeline</span></code>.</p>
-<p>Resolver pipeline orchestration and execution logic.</p>
+<p>Resolver Pipeline Execution Engine</p>
+<p>This module coordinates the execution of resolver providers that discover
+downloadable artefacts for scholarly works. It encapsulates sequential and
+concurrent strategies, rate limiting, duplicate detection, and callback hooks
+for logging and metrics collection.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Sequential and concurrent resolver scheduling with configurable concurrency.</p></li>
+<li><p>Rate-limiting enforcement and optional HEAD preflight checks.</p></li>
+<li><p>State tracking for seen URLs, HTML fallbacks, and failure metrics.</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline = ResolverPipeline(
+    resolvers=[],
+    config=ResolverConfig(),
+    download_func=lambda *args, **kwargs: DownloadOutcome(&quot;miss&quot;),
+    logger=lambda record: None,
+    metrics=ResolverMetrics(),
+)
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="request-with-retries-session-method-url">
+<h3><code class="docutils literal notranslate"><span class="pre">request_with_retries(session,</span> <span class="pre">method,</span> <span class="pre">url)</span></code><a class="headerlink" href="#request-with-retries-session-method-url" title="Link to this heading"></a></h3>
+<p>Proxy to :func:<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.http.request_with_retries</span></code>.</p>
+<p>The indirection keeps this module compatible with unit tests that monkeypatch
+either the pipeline-level attribute or the underlying HTTP helper while also
+deferring imports to avoid circular dependencies during runtime initialisation.</p>
+<p>Args:
+session: Requests session used to execute the outbound HTTP call.
+method: HTTP verb such as <code class="docutils literal notranslate"><span class="pre">&quot;GET&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;HEAD&quot;</span></code>.
+url: Fully qualified URL to fetch.
+**kwargs: Additional keyword arguments forwarded to the HTTP helper.</p>
+<p>Returns:
+requests.Response: Response object produced by the proxied helper.</p>
+<p>Raises:
+requests.RequestException: Propagated from the underlying retry helper.</p>
+</section>
 <section id="callable-accepts-argument-func-name">
 <h3><code class="docutils literal notranslate"><span class="pre">_callable_accepts_argument(func,</span> <span class="pre">name)</span></code><a class="headerlink" href="#callable-accepts-argument-func-name" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when <code class="docutils literal notranslate"><span class="pre">func</span></code> accepts an argument named <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<p>Args:
+func: Download function whose call signature should be inspected.
+name: Argument name whose presence should be detected.</p>
+<p>Returns:
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when <code class="docutils literal notranslate"><span class="pre">func</span></code> accepts the argument or variable parameters.</p>
 </section>
 <section id="respect-rate-limit-self-resolver-name">
 <h3><code class="docutils literal notranslate"><span class="pre">_respect_rate_limit(self,</span> <span class="pre">resolver_name)</span></code><a class="headerlink" href="#respect-rate-limit-self-resolver-name" title="Link to this heading"></a></h3>
 <p>Sleep as required to respect per-resolver rate limiting policies.</p>
+<p>The method performs an atomic read-modify-write on
+:attr:<code class="docutils literal notranslate"><span class="pre">_last_invocation</span></code> guarded by :attr:<code class="docutils literal notranslate"><span class="pre">_lock</span></code> to ensure that
+concurrent threads honour resolver spacing requirements.</p>
 <p>Args:
 resolver_name: Name of the resolver to rate limit.</p>
 <p>Returns:
@@ -98,7 +143,7 @@ None</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_jitter_sleep(self)</span></code><a class="headerlink" href="#jitter-sleep-self" title="Link to this heading"></a></h3>
 <p>Introduce a small delay to avoid stampeding downstream services.</p>
 <p>Args:
-None</p>
+self: Pipeline instance executing resolver scheduling logic.</p>
 <p>Returns:
 None</p>
 </section>
@@ -172,7 +217,7 @@ resolver: Resolver instance that will generate candidate URLs.
 session: Requests session forwarded to the resolver.
 artifact: Work artifact describing the current document.</p>
 <p>Returns:
-List of :class:<code class="docutils literal notranslate"><span class="pre">ResolverResult</span></code> entries produced by the resolver.</p>
+Tuple of resolver results and the resolver wall time (ms).</p>
 </section>
 <section id="process-result-self-session-artifact-resolver-name-order-index-result-context-data-state">
 <h3><code class="docutils literal notranslate"><span class="pre">_process_result(self,</span> <span class="pre">session,</span> <span class="pre">artifact,</span> <span class="pre">resolver_name,</span> <span class="pre">order_index,</span> <span class="pre">result,</span> <span class="pre">context_data,</span> <span class="pre">state)</span></code><a class="headerlink" href="#process-result-self-session-artifact-resolver-name-order-index-result-context-data-state" title="Link to this heading"></a></h3>
@@ -184,7 +229,8 @@ resolver_name: Name of the resolver that produced the result.
 order_index: 1-based index of the resolver in the execution order.
 result: Resolver result containing either a URL or event metadata.
 context_data: Execution context dictionary.
-state: Mutable run state tracking attempts and duplicates.</p>
+state: Mutable run state tracking attempts and duplicates.
+resolver_wall_time_ms: Wall-clock time spent in the resolver.</p>
 <p>Returns:
 PipelineResult when resolution succeeds, otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
 </section>
@@ -203,6 +249,8 @@ Updated index pointing to the next resolver candidate that has not been submitte
 <section id="runstate">
 <h3><code class="docutils literal notranslate"><span class="pre">_RunState</span></code><a class="headerlink" href="#runstate" title="Link to this heading"></a></h3>
 <p>Mutable pipeline execution state shared across resolvers.</p>
+<p>Args:
+dry_run: Indicates whether downloads should be skipped.</p>
 <p>Attributes:
 dry_run: Indicates whether downloads should be skipped.
 seen_urls: Set of URLs already attempted.
@@ -223,6 +271,12 @@ True</p>
 <section id="resolverpipeline">
 <h3><code class="docutils literal notranslate"><span class="pre">ResolverPipeline</span></code><a class="headerlink" href="#resolverpipeline" title="Link to this heading"></a></h3>
 <p>Executes resolvers in priority order until a PDF download succeeds.</p>
+<p>The pipeline is safe to reuse across worker threads when
+:attr:<code class="docutils literal notranslate"><span class="pre">ResolverConfig.max_concurrent_resolvers</span></code> is greater than one. All
+mutable shared state is protected by :class:<code class="docutils literal notranslate"><span class="pre">threading.Lock</span></code> instances and
+only read concurrently without mutation. HTTP <code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> objects
+are treated as read-only; callers must avoid mutating shared sessions after
+handing them to the pipeline.</p>
 <p>Attributes:
 config: Resolver configuration containing ordering and rate limits.
 download_func: Callable responsible for downloading resolved URLs.

@@ -2,13 +2,34 @@
 
 This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.landing_page``.
 
-Landing page scraper resolver using BeautifulSoup.
+Landing Page Scraper Resolver
+
+This module uses lightweight HTML parsing to discover PDF links embedded within
+landing pages when resolvers fail to return direct download URLs.
+
+Key Features:
+- Detection of ``citation_pdf_url`` meta tags and alternate link elements.
+- Heuristic scanning of anchor text and href targets for PDF references.
+- Graceful degradation when BeautifulSoup or lxml is unavailable.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.landing_page import LandingPageResolver
+
+    resolver = LandingPageResolver()
+    results = list(resolver.iter_urls(session, config, artifact))
 
 ## 1. Functions
 
 ### `_absolute_url(base, href)`
 
 Resolve relative links on a landing page against the page URL.
+
+Args:
+base: Landing page URL used as the base for resolution.
+href: Relative or absolute link discovered in the page.
+
+Returns:
+Absolute URL string that can be used for downstream requests.
 
 ### `is_enabled(self, config, artifact)`
 

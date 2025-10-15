@@ -79,19 +79,45 @@
   <section id="module-embeddingv2">
 <h1>1. Module: EmbeddingV2<a class="headerlink" href="#module-embeddingv2" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.EmbeddingV2</span></code>.</p>
-<p>EmbedVectors.py</p>
+<p>Hybrid Embedding Pipeline</p>
+<p>Generates BM25, SPLADE, and Qwen embeddings for DocsToKG chunk files while
+maintaining manifest entries, UUID hygiene, and data quality metrics. The
+pipeline runs in two passes: the first ensures chunk UUID integrity and builds
+BM25 corpus statistics; the second executes SPLADE and Qwen models to emit
+vector JSONL artefacts ready for downstream search.</p>
+<p>Key Features:</p>
 <ul class="simple">
-<li><p>Reads chunked JSONL from /home/paul/DocsToKG/Data/ChunkedDocTagFiles</p></li>
-<li><p>Ensures each chunk has a UUID (writes back to the same files)</p></li>
-<li><p>Emits vectors JSONL to /home/paul/DocsToKG/Data/Vectors</p></li>
+<li><p>Auto-detect DocsToKG data directories and manage resume/force semantics</p></li>
+<li><p>Stream SPLADE sparse encoding and Qwen dense embeddings from local caches</p></li>
+<li><p>Validate vector schemas, norms, and dimensions before writing outputs</p></li>
+<li><p>Record manifest metadata for observability and auditing</p></li>
 </ul>
-<p>Uses local HF cache at /home/paul/hf-cache/:</p>
+<p>Usage:
+python -m DocsToKG.DocParsing.EmbeddingV2 –resume</p>
+<p>Dependencies:</p>
 <ul class="simple">
-<li><p>Qwen3-Embedding-4B at   /home/paul/hf-cache/models/Qwen/Qwen3-Embedding-4B</p></li>
-<li><p>SPLADE-v3 at            /home/paul/hf-cache/models/naver/splade-v3</p></li>
+<li><p>sentence_transformers (optional): Provides SPLADE sparse encoders.</p></li>
+<li><p>vllm (optional): Hosts the Qwen embedding model with pooling support.</p></li>
+<li><p>tqdm: Surface user-friendly progress bars across pipeline phases.</p></li>
 </ul>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="missing-splade-dependency-message">
+<h3><code class="docutils literal notranslate"><span class="pre">_missing_splade_dependency_message()</span></code><a class="headerlink" href="#missing-splade-dependency-message" title="Link to this heading"></a></h3>
+<p>Return a human-readable installation hint for SPLADE extras.</p>
+</section>
+<section id="missing-qwen-dependency-message">
+<h3><code class="docutils literal notranslate"><span class="pre">_missing_qwen_dependency_message()</span></code><a class="headerlink" href="#missing-qwen-dependency-message" title="Link to this heading"></a></h3>
+<p>Return a human-readable installation hint for Qwen/vLLM extras.</p>
+</section>
+<section id="ensure-splade-dependencies">
+<h3><code class="docutils literal notranslate"><span class="pre">_ensure_splade_dependencies()</span></code><a class="headerlink" href="#ensure-splade-dependencies" title="Link to this heading"></a></h3>
+<p>Validate that SPLADE optional dependencies are importable.</p>
+</section>
+<section id="ensure-qwen-dependencies">
+<h3><code class="docutils literal notranslate"><span class="pre">_ensure_qwen_dependencies()</span></code><a class="headerlink" href="#ensure-qwen-dependencies" title="Link to this heading"></a></h3>
+<p>Validate that Qwen/vLLM optional dependencies are importable.</p>
+</section>
 <section id="iter-chunk-files-d">
 <h3><code class="docutils literal notranslate"><span class="pre">iter_chunk_files(d)</span></code><a class="headerlink" href="#iter-chunk-files-d" title="Link to this heading"></a></h3>
 <p>Enumerate chunked DocTags JSONL files in a directory.</p>

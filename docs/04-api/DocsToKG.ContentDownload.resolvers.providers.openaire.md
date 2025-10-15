@@ -2,13 +2,31 @@
 
 This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.openaire``.
 
-Resolver connecting to the OpenAIRE research infrastructure for discovery.
+OpenAIRE Resolver Provider
+
+This module integrates with the OpenAIRE research infrastructure to discover
+open-access artefacts linked to DOI-indexed works.
+
+Key Features:
+- Recursive traversal of OpenAIRE JSON payloads to locate URL candidates.
+- Resilient handling of cases where responses arrive as either JSON or text.
+- Deduplication of candidate URLs before yielding resolver results.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.openaire import OpenAireResolver
+
+    resolver = OpenAireResolver()
+    results = list(resolver.iter_urls(session, config, artifact))
 
 ## 1. Functions
 
 ### `_collect_candidate_urls(node, results)`
 
 Recursively collect HTTP(S) URLs from nested OpenAIRE response payloads.
+
+Args:
+node: Arbitrary node from the OpenAIRE response payload.
+results: Mutable list to append discovered URL strings into.
 
 ### `is_enabled(self, config, artifact)`
 

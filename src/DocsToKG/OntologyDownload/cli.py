@@ -29,23 +29,31 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
+import os
+import shutil
 import sys
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
+
+import requests
 
 from .cli_utils import format_table, format_validation_summary
 from .config import ConfigError, ResolvedConfig, load_config, validate_config
 from .core import (
-    CONFIG_DIR,
-    ONTOLOGY_DIR,
     FetchResult,
     FetchSpec,
     OntologyDownloadError,
+    PlannedFetch,
     fetch_all,
+    plan_all,
 )
 from .logging_config import setup_logging
+from .storage import CACHE_DIR, CONFIG_DIR, LOCAL_ONTOLOGY_DIR, LOG_DIR, STORAGE
 from .validators import ValidationRequest, run_validators
+
+ONTOLOGY_DIR = LOCAL_ONTOLOGY_DIR
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -87,6 +95,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Comma-separated formats (e.g., owl,obo)",
     )
     pull.add_argument("--json", action="store_true", help="Emit pull results as JSON")
+    pull.add_argument(
+        "--dry-run", action="store_true", help="Preview resolver actions without downloading"
+    )
+
+    plan_cmd = subparsers.add_parser("plan", help="Preview resolver plans without downloading")
+    plan_cmd.add_argument("ids", nargs="*", help="Ontology identifiers to plan")
+    plan_cmd.add_argument(
+        "--spec", type=Path, help="Path to sources.yaml (default: configs/sources.yaml)"
+    )
+    plan_cmd.add_argument("--resolver", help="Resolver type for single ontology")
+    plan_cmd.add_argument("--target-formats", help="Comma-separated formats (e.g., owl,obo)")
+    plan_cmd.add_argument("--json", action="store_true", help="Emit plan details as JSON")
 
     show = subparsers.add_parser("show", help="Display ontology metadata")
     show.add_argument("id", help="Ontology identifier")
@@ -118,6 +138,9 @@ def _build_parser() -> argparse.ArgumentParser:
     config_validate.add_argument(
         "--json", action="store_true", help="Output validation result as JSON"
     )
+
+    doctor = subparsers.add_parser("doctor", help="Diagnose environment issues")
+    doctor.add_argument("--json", action="store_true", help="Output diagnostics as JSON")
 
     return parser
 
@@ -192,6 +215,29 @@ def _results_to_dict(result: FetchResult) -> dict:
     }
 
 
+def _plan_to_dict(plan: PlannedFetch) -> dict:
+    """Convert a planned fetch into a JSON-friendly dictionary.
+
+    Args:
+        plan: Planned fetch data produced by :func:`plan_one` or :func:`plan_all`.
+
+    Returns:
+        Mapping containing resolver metadata and planned download details suitable
+        for serialization.
+    """
+
+    return {
+        "id": plan.spec.id,
+        "resolver": plan.resolver,
+        "url": plan.plan.url,
+        "version": plan.plan.version,
+        "license": plan.plan.license,
+        "media_type": plan.plan.media_type,
+        "service": plan.plan.service,
+        "headers": plan.plan.headers,
+    }
+
+
 def _ensure_manifest_path(ontology_id: str, version: Optional[str]) -> Path:
     """Return the manifest path for a given ontology and version.
 
@@ -205,19 +251,18 @@ def _ensure_manifest_path(ontology_id: str, version: Optional[str]) -> Path:
     Raises:
         ConfigError: If the ontology or manifest cannot be located locally.
     """
-    ontology_dir = ONTOLOGY_DIR / ontology_id
-    if not ontology_dir.exists():
-        raise ConfigError(f"Ontology '{ontology_id}' has not been downloaded yet")
-    if version:
-        version_dir = ontology_dir / version
+    selected_version = version
+    if selected_version:
+        local_dir = STORAGE.ensure_local_version(ontology_id, selected_version)
     else:
-        versions = sorted((d for d in ontology_dir.iterdir() if d.is_dir()), reverse=True)
+        versions = STORAGE.available_versions(ontology_id)
         if not versions:
             raise ConfigError(f"No versions stored for ontology '{ontology_id}'")
-        version_dir = versions[0]
-    manifest_path = version_dir / "manifest.json"
+        selected_version = versions[-1]
+        local_dir = STORAGE.ensure_local_version(ontology_id, selected_version)
+    manifest_path = local_dir / "manifest.json"
     if not manifest_path.exists():
-        raise ConfigError(f"Manifest not found for ontology '{ontology_id}' at {version_dir}")
+        raise ConfigError(f"Manifest not found for ontology '{ontology_id}' at {selected_version}")
     return manifest_path
 
 
@@ -233,46 +278,188 @@ def _load_manifest(manifest_path: Path) -> dict:
     return json.loads(manifest_path.read_text())
 
 
-def _handle_pull(args, base_config: Optional[ResolvedConfig]) -> List[FetchResult]:
-    """Execute the ``pull`` subcommand workflow.
+def _resolve_specs_from_args(
+    args, base_config: Optional[ResolvedConfig]
+) -> tuple[ResolvedConfig, List[FetchSpec]]:
+    """Return configuration and fetch specifications derived from CLI arguments.
 
     Args:
-        args: Parsed CLI arguments for the pull command.
+        args: Parsed command-line arguments for `pull`/`plan` commands.
         base_config: Optional pre-loaded configuration used when no spec file is supplied.
 
     Returns:
-        List of fetch results describing downloaded or cached ontologies.
+        Tuple containing the active resolved configuration and the list of fetch specs
+        that should be processed.
 
     Raises:
-        ConfigError: If neither ID arguments nor a configuration file are provided.
+        ConfigError: If neither explicit IDs nor a configuration file are provided.
     """
-    target_formats = _parse_target_formats(args.target_formats)
-    config_path = args.spec
-    if config_path is None and not args.ids:
+
+    target_formats = _parse_target_formats(getattr(args, "target_formats", None))
+    config_path: Optional[Path] = getattr(args, "spec", None)
+    ids: Sequence[str] = getattr(args, "ids", [])
+    if config_path is None and not ids:
         default_config = CONFIG_DIR / "sources.yaml"
         if default_config.exists():
             config_path = default_config
+
     if config_path:
         config = load_config(config_path)
-        config.defaults.logging.level = args.log_level
-        results = fetch_all(config.specs, config=config, force=args.force)
-        return results
-    if not args.ids:
-        raise ConfigError("Please provide ontology IDs or --spec configuration")
-    config = base_config or ResolvedConfig.from_defaults()
-    config.defaults.logging.level = args.log_level
-    resolver = args.resolver or config.defaults.prefer_source[0]
-    specs = [
-        FetchSpec(
-            id=oid,
-            resolver=resolver,
-            extras={},
-            target_formats=target_formats or config.defaults.normalize_to,
+    else:
+        config = base_config or ResolvedConfig.from_defaults()
+
+    config.defaults.logging.level = getattr(args, "log_level", config.defaults.logging.level)
+
+    if ids:
+        resolver_name = getattr(args, "resolver", None) or config.defaults.prefer_source[0]
+        formats = target_formats or config.defaults.normalize_to
+        specs = [
+            FetchSpec(id=oid, resolver=resolver_name, extras={}, target_formats=formats)
+            for oid in ids
+        ]
+        return config, specs
+
+    if config.specs:
+        return config, config.specs
+
+    raise ConfigError("Please provide ontology IDs or --spec configuration")
+
+
+def _handle_pull(
+    args,
+    base_config: Optional[ResolvedConfig],
+    *,
+    dry_run: bool = False,
+):
+    """Execute the ``pull`` subcommand workflow."""
+
+    config, specs = _resolve_specs_from_args(args, base_config)
+    if dry_run:
+        return plan_all(specs, config=config)
+    return fetch_all(
+        specs,
+        config=config,
+        force=getattr(args, "force", False),
+    )
+
+
+def _handle_plan(args, base_config: Optional[ResolvedConfig]) -> List[PlannedFetch]:
+    """Resolve plans without executing downloads."""
+
+    config, specs = _resolve_specs_from_args(args, base_config)
+    return plan_all(specs, config=config)
+
+
+def _doctor_report() -> Dict[str, object]:
+    """Collect diagnostic information for the ``doctor`` command.
+
+    Returns:
+        Mapping containing directory health, dependency availability, remote
+        service connectivity, and storage backend information.
+    """
+
+    directories = {}
+    for name, path in {
+        "configs": CONFIG_DIR,
+        "cache": CACHE_DIR,
+        "logs": LOG_DIR,
+        "ontologies": LOCAL_ONTOLOGY_DIR,
+    }.items():
+        directories[name] = {
+            "path": str(path),
+            "exists": path.exists(),
+            "writable": os.access(path, os.W_OK),
+        }
+
+    api_key_path = CONFIG_DIR / "bioportal_api_key.txt"
+    bioportal = {
+        "path": str(api_key_path),
+        "configured": api_key_path.exists() and api_key_path.read_text().strip() != "",
+    }
+
+    try:
+        response = requests.get(
+            "https://www.ebi.ac.uk/ols4/api/health",
+            timeout=5,
         )
-        for oid in args.ids
-    ]
-    results = fetch_all(specs, config=config, force=args.force)
-    return results
+        ols_status = {
+            "ok": response.ok,
+            "detail": f"status {response.status_code}",
+        }
+    except Exception as exc:  # pragma: no cover - network failures vary
+        ols_status = {"ok": False, "detail": f"error: {exc}"}
+
+    disk_usage = shutil.disk_usage(LOCAL_ONTOLOGY_DIR)
+
+    module_checks = {
+        "rdflib": importlib.util.find_spec("rdflib") is not None,
+        "pronto": importlib.util.find_spec("pronto") is not None,
+        "owlready2": importlib.util.find_spec("owlready2") is not None,
+        "arelle": importlib.util.find_spec("arelle") is not None,
+    }
+    module_checks["robot"] = shutil.which("robot") is not None
+
+    storage_backend = {
+        "backend": STORAGE.__class__.__name__,
+        "remote": hasattr(STORAGE, "fs"),
+    }
+
+    report: Dict[str, object] = {
+        "directories": directories,
+        "bioportal_api_key": bioportal,
+        "ols_api": ols_status,
+        "disk": {
+            "total_bytes": disk_usage.total,
+            "free_bytes": disk_usage.free,
+        },
+        "dependencies": module_checks,
+        "storage": storage_backend,
+    }
+    return report
+
+
+def _print_doctor_report(report: Dict[str, object]) -> None:
+    """Render human-readable diagnostics from :func:`_doctor_report`.
+
+    Args:
+        report: Diagnostics mapping generated by :func:`_doctor_report`.
+    """
+
+    print("Directories:")
+    for name, info in report["directories"].items():
+        status = []
+        if info["exists"]:
+            status.append("exists")
+        else:
+            status.append("missing")
+        if info["writable"]:
+            status.append("writable")
+        else:
+            status.append("read-only")
+        print(f"  - {name}: {', '.join(status)} ({info['path']})")
+
+    bioportal = report["bioportal_api_key"]
+    print(
+        "BioPortal API key:",
+        "configured" if bioportal["configured"] else f"missing ({bioportal['path']})",
+    )
+
+    ols = report["ols_api"]
+    print("OLS API:", "accessible" if ols["ok"] else f"unreachable ({ols['detail']})")
+
+    disk = report["disk"]
+    free_gb = disk["free_bytes"] / (1024**3)
+    print(f"Disk free: {free_gb:.2f} GB")
+
+    print("Optional dependencies:")
+    for name, available in report["dependencies"].items():
+        print(f"  - {name}: {'available' if available else 'missing'}")
+
+    storage = report["storage"]
+    backend_desc = storage["backend"]
+    if storage["remote"]:
+        backend_desc += " (remote)"
+    print(f"Storage backend: {backend_desc}")
 
 
 def _handle_show(args) -> None:
@@ -288,11 +475,13 @@ def _handle_show(args) -> None:
         ConfigError: When the manifest cannot be located.
     """
     if args.versions:
-        versions = sorted(d.name for d in (ONTOLOGY_DIR / args.id).iterdir() if d.is_dir())
+        versions = STORAGE.available_versions(args.id)
+        if not versions:
+            raise ConfigError(f"No versions stored for ontology '{args.id}'")
         for version in versions:
             print(version)
         return
-    manifest_path = _ensure_manifest_path(args.id, None)
+    manifest_path = _ensure_manifest_path(args.id, args.version)
     manifest = _load_manifest(manifest_path)
     if args.json:
         json.dump(manifest, sys.stdout, indent=2)
@@ -408,37 +597,86 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         base_config.defaults.logging.level = args.log_level
         logger = setup_logging(base_config.defaults.logging)
         if args.command == "pull":
-            results = _handle_pull(args, base_config)
+            if getattr(args, "dry_run", False):
+                plans = _handle_pull(args, base_config, dry_run=True)
+                if args.json:
+                    json.dump([_plan_to_dict(plan) for plan in plans], sys.stdout, indent=2)
+                    sys.stdout.write("\n")
+                else:
+                    if plans:
+                        table = format_table(
+                            ("id", "resolver", "service", "media_type", "url"),
+                            [
+                                (
+                                    plan.spec.id,
+                                    plan.resolver,
+                                    plan.plan.service or "-",
+                                    plan.plan.media_type or "-",
+                                    plan.plan.url,
+                                )
+                                for plan in plans
+                            ],
+                        )
+                        print(table)
+                    else:
+                        print("No ontologies to process")
+            else:
+                results = _handle_pull(args, base_config, dry_run=False)
+                if args.json:
+                    json.dump(
+                        [_results_to_dict(result) for result in results], sys.stdout, indent=2
+                    )
+                    sys.stdout.write("\n")
+                else:
+                    if results:
+                        table = format_table(
+                            ("id", "resolver", "status", "sha256", "file"),
+                            [
+                                (
+                                    result.spec.id,
+                                    result.spec.resolver,
+                                    result.status,
+                                    result.sha256[:12],
+                                    result.local_path.name,
+                                )
+                                for result in results
+                            ],
+                        )
+                        print(table)
+                    else:
+                        print("No ontologies to process")
+                for result in results:
+                    logger.info(
+                        "ontology processed",
+                        extra={
+                            "stage": "complete",
+                            "ontology_id": result.spec.id,
+                            "status": result.status,
+                        },
+                    )
+        elif args.command == "plan":
+            plans = _handle_plan(args, base_config)
             if args.json:
-                json.dump([_results_to_dict(result) for result in results], sys.stdout, indent=2)
+                json.dump([_plan_to_dict(plan) for plan in plans], sys.stdout, indent=2)
                 sys.stdout.write("\n")
             else:
-                if results:
+                if plans:
                     table = format_table(
-                        ("id", "resolver", "status", "sha256", "file"),
+                        ("id", "resolver", "service", "media_type", "url"),
                         [
                             (
-                                result.spec.id,
-                                result.spec.resolver,
-                                result.status,
-                                result.sha256[:12],
-                                result.local_path.name,
+                                plan.spec.id,
+                                plan.resolver,
+                                plan.plan.service or "-",
+                                plan.plan.media_type or "-",
+                                plan.plan.url,
                             )
-                            for result in results
+                            for plan in plans
                         ],
                     )
                     print(table)
                 else:
                     print("No ontologies to process")
-            for result in results:
-                logger.info(
-                    "ontology processed",
-                    extra={
-                        "stage": "complete",
-                        "ontology_id": result.spec.id,
-                        "status": result.status,
-                    },
-                )
         elif args.command == "show":
             _handle_show(args)
         elif args.command == "validate":
@@ -460,6 +698,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 print(
                     f"Configuration {status} ({report['ontologies']} ontologies) -> {report['path']}"
                 )
+        elif args.command == "doctor":
+            report = _doctor_report()
+            if args.json:
+                json.dump(report, sys.stdout, indent=2)
+                sys.stdout.write("\n")
+            else:
+                _print_doctor_report(report)
         return 0
     except ConfigError as exc:
         print(f"Error: {exc}", file=sys.stderr)

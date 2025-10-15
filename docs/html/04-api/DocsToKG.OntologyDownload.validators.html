@@ -91,6 +91,8 @@ when utilities are absent.</p>
 <li><p>Timeout and memory instrumentation for resource-intensive validators</p></li>
 <li><p>JSON reporting helpers compatible with automated documentation generation</p></li>
 <li><p>Pluggable registry enabling selective validator execution</p></li>
+<li><p>Canonical Turtle normalization with deterministic SHA-256 hashing</p></li>
+<li><p>Subprocess isolation for memory-intensive Pronto and Owlready2 validators</p></li>
 </ul>
 <p>Usage:
 from DocsToKG.OntologyDownload.validators import run_validators</p>
@@ -119,6 +121,20 @@ payload: Mapping containing validation results.</p>
 <p>Returns:
 None</p>
 </section>
+<section id="canonicalize-turtle-graph">
+<h3><code class="docutils literal notranslate"><span class="pre">_canonicalize_turtle(graph)</span></code><a class="headerlink" href="#canonicalize-turtle-graph" title="Link to this heading"></a></h3>
+<p>Return canonical Turtle output with sorted prefixes and triples.</p>
+<p>The canonical form mirrors the ontology downloader specification by sorting
+prefixes lexicographically and emitting triples ordered by subject,
+predicate, and object so downstream hashing yields deterministic values.</p>
+</section>
+<section id="run-validator-subprocess-name-payload">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_validator_subprocess(name,</span> <span class="pre">payload)</span></code><a class="headerlink" href="#run-validator-subprocess-name-payload" title="Link to this heading"></a></h3>
+<p>Execute a validator worker module within a subprocess.</p>
+<p>The subprocess workflow enforces parser timeouts, returns JSON payloads,
+and helps release memory held by heavy libraries such as Pronto and
+Owlready2 after each validation completes.</p>
+</section>
 <section id="run-with-timeout-func-timeout-sec">
 <h3><code class="docutils literal notranslate"><span class="pre">_run_with_timeout(func,</span> <span class="pre">timeout_sec)</span></code><a class="headerlink" href="#run-with-timeout-func-timeout-sec" title="Link to this heading"></a></h3>
 <p>Execute a callable and raise :class:<code class="docutils literal notranslate"><span class="pre">ValidationTimeout</span></code> on deadline expiry.</p>
@@ -143,29 +159,31 @@ ValueError: If the archive is malformed or contains unsafe paths.</p>
 </section>
 <section id="validate-rdflib-request-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_rdflib(request,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#validate-rdflib-request-logger" title="Link to this heading"></a></h3>
-<p>Parse ontologies with rdflib and optionally produce Turtle output.</p>
+<p>Parse ontologies with rdflib, canonicalize Turtle output, and emit hashes.</p>
 <p>Args:
 request: Validation request describing the target ontology and output directories.
 logger: Logger adapter used for structured validation events.</p>
 <p>Returns:
-ValidationResult capturing success state, metadata, and generated files.</p>
+ValidationResult capturing success state, metadata, canonical hash,
+and generated files.</p>
 <p>Raises:
 ValidationTimeout: Propagated when parsing exceeds configured timeout.</p>
 </section>
 <section id="validate-pronto-request-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_pronto(request,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#validate-pronto-request-logger" title="Link to this heading"></a></h3>
-<p>Execute Pronto-based validation and emit OBO Graphs when requested.</p>
+<p>Execute Pronto validation in an isolated subprocess and emit OBO Graphs when requested.</p>
 <p>Args:
 request: Validation request describing ontology inputs and output directories.
 logger: Structured logger for recording warnings and failures.</p>
 <p>Returns:
-ValidationResult with parsed ontology statistics and generated artifacts.</p>
+ValidationResult with parsed ontology statistics, subprocess output,
+and any generated artifacts.</p>
 <p>Raises:
 ValidationTimeout: Propagated when Pronto takes longer than allowed.</p>
 </section>
 <section id="validate-owlready2-request-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_owlready2(request,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#validate-owlready2-request-logger" title="Link to this heading"></a></h3>
-<p>Inspect ontologies with Owlready2 to count entities and catch parsing errors.</p>
+<p>Inspect ontologies with Owlready2 in a subprocess to count entities and catch parsing errors.</p>
 <p>Args:
 request: Validation request referencing the ontology to parse.
 logger: Logger for reporting failures or memory warnings.</p>
@@ -214,13 +232,13 @@ None</p>
 <p>Returns:
 Dictionary with boolean status, detail payload, and output paths.</p>
 </section>
+<section id="term-to-string-term">
+<h3><code class="docutils literal notranslate"><span class="pre">_term_to_string(term)</span></code><a class="headerlink" href="#term-to-string-term" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="parse">
 <h3><code class="docutils literal notranslate"><span class="pre">_parse()</span></code><a class="headerlink" href="#parse" title="Link to this heading"></a></h3>
 <p>Parse the ontology with rdflib to populate the graph object.</p>
-</section>
-<section id="load">
-<h3><code class="docutils literal notranslate"><span class="pre">_load()</span></code><a class="headerlink" href="#load" title="Link to this heading"></a></h3>
-<p>Load the ontology into memory using Pronto.</p>
 </section>
 <section id="handler-signum-frame">
 <h3><code class="docutils literal notranslate"><span class="pre">_handler(signum,</span> <span class="pre">frame)</span></code><a class="headerlink" href="#handler-signum-frame" title="Link to this heading"></a></h3>
@@ -228,10 +246,6 @@ Dictionary with boolean status, detail payload, and output paths.</p>
 <p>Args:
 signum: Received signal number.
 frame: Current stack frame (unused).</p>
-</section>
-<section id="execute">
-<h3><code class="docutils literal notranslate"><span class="pre">_execute()</span></code><a class="headerlink" href="#execute" title="Link to this heading"></a></h3>
-<p>Load the ontology and capture term statistics.</p>
 </section>
 </section>
 <section id="classes">
@@ -299,9 +313,28 @@ ValidationTimeout: rdflib exceeded 60s</p>
 </div></blockquote>
 </div></blockquote>
 </section>
+<section id="validatorsubprocesserror">
+<h3><code class="docutils literal notranslate"><span class="pre">ValidatorSubprocessError</span></code><a class="headerlink" href="#validatorsubprocesserror" title="Link to this heading"></a></h3>
+<p>Raised when a validator subprocess exits unsuccessfully.</p>
+<p>Attributes:
+message: Human-readable description of the underlying subprocess failure.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>raise ValidatorSubprocessError(“rdflib validator crashed”)
+Traceback (most recent call last):
+…
+ValidatorSubprocessError: rdflib validator crashed</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
 <section id="alarm">
 <h3><code class="docutils literal notranslate"><span class="pre">_Alarm</span></code><a class="headerlink" href="#alarm" title="Link to this heading"></a></h3>
 <p>Sentinel exception raised when the alarm signal fires.</p>
+<p>Args:
+message: Optional description associated with the exception.</p>
 <p>Attributes:
 message: Optional description associated with the exception.</p>
 <p>Examples:</p>

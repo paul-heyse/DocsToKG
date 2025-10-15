@@ -1,4 +1,20 @@
-"""Resolver that integrates with the Unpaywall API to locate open access PDFs."""
+"""
+Unpaywall Resolver Provider
+
+This module interfaces with the Unpaywall API to discover open-access PDFs for
+scholarly works that expose DOI metadata.
+
+Key Features:
+- Configurable polite headers and email registration for API compliance.
+- Fallback path that leverages memoised requests when no session is supplied.
+- Deduplication of candidate URLs across best and alternate OA locations.
+
+Usage:
+    from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver
+
+    resolver = UnpaywallResolver()
+    results = list(resolver.iter_urls(session, config, artifact))
+"""
 
 from __future__ import annotations
 
@@ -21,7 +37,14 @@ LOGGER = logging.getLogger(__name__)
 
 
 def _headers_cache_key(headers: Dict[str, str]) -> Tuple[Tuple[str, str], ...]:
-    """Create a hashable cache key for polite header dictionaries."""
+    """Create a hashable cache key for polite header dictionaries.
+
+    Args:
+        headers: Mapping of header names to values used in Unpaywall requests.
+
+    Returns:
+        Tuple of key/value pairs sorted to ensure deterministic hashing.
+    """
 
     return tuple(sorted((headers or {}).items()))
 
@@ -33,7 +56,20 @@ def _fetch_unpaywall_data(
     timeout: float,
     headers_key: Tuple[Tuple[str, str], ...],
 ) -> Dict[str, Any]:
-    """Fetch Unpaywall metadata for ``doi`` using polite caching."""
+    """Fetch Unpaywall metadata for ``doi`` using polite caching.
+
+    Args:
+        doi: DOI identifier to query against the Unpaywall API.
+        email: Registered contact email required by the Unpaywall terms.
+        timeout: Request timeout in seconds.
+        headers_key: Hashable representation of polite headers for cache lookups.
+
+    Returns:
+        Parsed JSON payload describing open-access locations for the DOI.
+
+    Raises:
+        requests.HTTPError: If the Unpaywall API returns a non-success status code.
+    """
 
     headers = dict(headers_key)
     response = requests.get(
