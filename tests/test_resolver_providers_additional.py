@@ -24,6 +24,7 @@ from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 from DocsToKG.ContentDownload.resolvers.providers.arxiv import ArxivResolver
 from DocsToKG.ContentDownload.resolvers.providers.core import CoreResolver
 from DocsToKG.ContentDownload.resolvers.providers.crossref import CrossrefResolver
+from DocsToKG.ContentDownload.resolvers.providers.crossref import _fetch_crossref_data
 from DocsToKG.ContentDownload.resolvers.providers.doaj import DoajResolver
 from DocsToKG.ContentDownload.resolvers.providers.europe_pmc import EuropePmcResolver
 from DocsToKG.ContentDownload.resolvers.providers.pmc import PmcResolver
@@ -394,6 +395,53 @@ def test_crossref_resolver_link_not_list(monkeypatch, tmp_path) -> None:
     results = list(CrossrefResolver().iter_urls(_Session(), config, artifact))
 
     assert results == []
+
+
+def test_crossref_resolver_skip_without_doi(tmp_path) -> None:
+    artifact = _artifact(tmp_path, doi=None)
+    config = ResolverConfig()
+    session = Mock()
+
+    result = next(CrossrefResolver().iter_urls(session, config, artifact))
+
+    assert result.event_reason == "no-doi"
+
+
+def test_fetch_crossref_data_http_error(monkeypatch) -> None:
+    _fetch_crossref_data.cache_clear()
+
+    class _Resp:
+        status_code = 502
+
+        def raise_for_status(self):
+            raise requests.HTTPError("boom", response=Mock(status_code=502))
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.providers.crossref.requests.get",
+        lambda *args, **kwargs: _Resp(),
+    )
+
+    with pytest.raises(requests.HTTPError):
+        _fetch_crossref_data("10.1000/example", "user@example.org", 5.0, ())
+
+
+def test_fetch_crossref_data_success(monkeypatch) -> None:
+    _fetch_crossref_data.cache_clear()
+
+    class _Resp:
+        status_code = 200
+
+        def json(self):
+            return {"message": "ok"}
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.providers.crossref.requests.get",
+        lambda *args, **kwargs: _Resp(),
+    )
+
+    data = _fetch_crossref_data("10.1000/example", None, 5.0, ())
+
+    assert data["message"] == "ok"
 
 
 @pytest.mark.parametrize(

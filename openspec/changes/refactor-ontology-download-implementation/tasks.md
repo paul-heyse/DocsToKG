@@ -1,0 +1,339 @@
+# Implementation Tasks
+
+## 1. Code Quality and Import Structure
+
+### 1.1 Refactor Logging Configuration
+
+- [ ] Modify `setup_logging()` function in `logging_config.py` to accept explicit parameters for log directory path, logging level string, retention days integer, and maximum log file size in megabytes
+- [ ] Remove all imports from orchestration modules within the logging configuration module, specifically eliminating any imports from `core.py` or other downloader components
+- [ ] Implement environment variable reading as fallback defaults when parameters are not explicitly provided, reading from `ONTOFETCH_LOG_DIR` for directory location
+- [ ] Update `cli.py` to pass logging configuration values explicitly from parsed configuration or command arguments when initializing logging
+- [ ] Update `core.py` to pass logging configuration values from resolved configuration when setting up logging for orchestration functions
+- [ ] Verify that logging module can be imported in isolation without triggering import of other package modules
+
+### 1.2 Deprecate Legacy Configuration Aliases
+
+- [ ] Add deprecation warnings module-level for legacy configuration class names including `DefaultsConfiguration`, `LoggingConfig`, and `ValidationConfiguration` in `config.py`
+- [ ] Implement deprecation warning emission using warnings module that fires exactly once per interpreter session when legacy names are accessed
+- [ ] Update module `__all__` export list to exclude legacy alias names so they do not appear in public API documentation
+- [ ] Search all internal package code for uses of legacy names and replace with canonical names including `DefaultsConfig`, `LoggingConfiguration`, and `ValidationConfig`
+- [ ] Add unit test verifying that importing legacy class name triggers deprecation warning exactly once
+- [ ] Add unit test verifying that legacy names remain functional despite deprecation to maintain backward compatibility
+
+### 1.3 Centralize Archive Extraction
+
+- [ ] Create unified `extract_archive_safe()` function in `download.py` that accepts archive path and destination directory as parameters
+- [ ] Implement archive format detection logic examining file suffix including consideration of double extensions like `.tar.gz` and `.tar.xz`
+- [ ] Add dispatch logic routing to appropriate extraction function based on detected format including ZIP for `.zip` and TAR for `.tar`, `.tgz`, `.tar.gz`, `.txz`, `.tar.xz` extensions
+- [ ] Ensure TAR extraction function includes same security checks as ZIP extraction including path traversal prevention and compression ratio validation
+- [ ] Implement safe path validation checking for absolute paths, parent directory traversal attempts using `..` segments, and empty path components
+- [ ] Add compression bomb detection calculating ratio of uncompressed to compressed size and rejecting archives exceeding ten-to-one ratio
+- [ ] Update all validators currently performing inline ZIP extraction to call centralized `extract_archive_safe()` function
+- [ ] Remove duplicate extraction implementations from validator modules once centralized function is integrated
+- [ ] Add error case for unsupported archive formats raising descriptive exception with format name
+
+### 1.4 Standardize Subprocess Worker Execution
+
+- [ ] Modify `validator_workers.py` to support execution as module using standard Python module invocation with `python -m` syntax
+- [ ] Implement proper `if __name__ == "__main__":` guard with command-line argument parsing for worker selection in worker module
+- [ ] Update `validators.py` subprocess invocation to use module execution pattern building command as list with interpreter path, `-m` flag, full module name, and validator arguments
+- [ ] Remove all `sys.path` modification code from validator worker module that attempts to add source directories dynamically
+- [ ] Remove file path imports that locate worker script using `__file__` or relative path resolution
+- [ ] Verify worker processes inherit correct module search path from parent process without manual path manipulation
+- [ ] Test worker invocation succeeds in clean virtual environment without development source tree mounted
+- [ ] Ensure worker can be invoked from any working directory without dependency on relative file paths
+
+### 1.5 Convert Optional Dependency Stubs to Module Types
+
+- [ ] Import `types` module at top of `optdeps.py` to access `ModuleType` constructor
+- [ ] Create helper function accepting module name string and attributes dictionary, returning properly constructed `ModuleType` instance
+- [ ] Have helper function create new module instance using `ModuleType(name)` constructor
+- [ ] Have helper function set attributes on module instance by iterating attributes dictionary and using `setattr()`
+- [ ] Have helper function insert completed module into `sys.modules` dictionary using module name as key
+- [ ] Update `_PystowFallback` creation to wrap instance in `ModuleType` before storing in module cache
+- [ ] Update `_StubRDFLib` creation to wrap class in `ModuleType` with `Graph` attribute before caching
+- [ ] Update `_StubPronto` creation to wrap class in `ModuleType` with `Ontology` attribute before caching
+- [ ] Update `_StubOwlready2` creation to wrap class in `ModuleType` with `get_ontology` attribute before caching
+- [ ] Verify that import machinery accepts stub modules without warnings or errors
+- [ ] Verify that type checkers can resolve imports to stub modules without reporting missing modules
+
+### 1.6 Deduplicate Archive Extraction in Validators
+
+- [ ] Search `validators.py` for inline ZIP file opening and extraction code within validator functions
+- [ ] Identify XBRL validator and any other validators performing direct archive extraction
+- [ ] Replace inline `zipfile.ZipFile` opening and member extraction with calls to `extract_archive_safe()` from download module
+- [ ] Ensure extraction destination directories match previous inline extraction behavior for manifest path compatibility
+- [ ] Remove now-unused imports of `zipfile` module from validators file
+- [ ] Add tests verifying extracted file paths match expected structure after validator execution
+- [ ] Verify no duplicate path traversal checks remain in validators after centralization
+
+### 1.7 Centralize MIME Type Alias Mapping
+
+- [ ] Define module-level constant `RDF_MIME_ALIASES` in `download.py` as set containing all recognized RDF MIME type strings
+- [ ] Include primary types `application/rdf+xml`, `text/turtle`, `application/n-triples` in alias set
+- [ ] Include acceptable variations `application/xml`, `text/xml`, `application/x-turtle`, `text/plain` for RDF formats
+- [ ] Include additional formats `application/trig`, `application/ld+json` commonly returned by ontology services
+- [ ] Update `_validate_media_type()` method in `StreamingDownloader` to check actual content type against alias set when expected type is RDF format
+- [ ] Update CLI output formatting in `cli.py` to use alias set when summarizing downloaded content types
+- [ ] Update validator format detection logic to reference alias set for identifying parseable RDF formats
+- [ ] Consider adding secondary mapping for MIME type to format name for consistent labeling across modules
+
+### 1.8 Extract CLI Formatting Utilities
+
+- [ ] Create new `cli_utils.py` module in OntologyDownload package directory
+- [ ] Move `_format_table()` function from `cli.py` to `cli_utils.py` making it public with `format_table` name
+- [ ] Move `_format_row()` helper function to `cli_utils.py` as private function supporting table formatter
+- [ ] Keep existing `format_validation_summary()` in `cli_utils.py` since it already exists there
+- [ ] Create `format_plan_rows()` function accepting list of `PlannedFetch` objects and returning formatted table rows
+- [ ] Create `format_results_table()` function accepting list of `FetchResult` objects and returning formatted table string
+- [ ] Update imports in `cli.py` to use formatting functions from `cli_utils` module
+- [ ] Replace inline table formatting code in `pull` command handler with call to `format_results_table()`
+- [ ] Replace inline table formatting code in `plan` command handler with call to `format_plan_rows()`
+- [ ] Add module docstring to `cli_utils.py` describing purpose as CLI output formatting helpers
+- [ ] Add `__all__` export list to `cli_utils.py` including all public formatting functions
+
+## 2. Reliability and Robustness
+
+### 2.1 Implement Download-Time Resolver Fallback
+
+- [ ] Extend `PlannedFetch` dataclass to include `candidates` attribute containing ordered list of alternative resolver fetch plans
+- [ ] Modify `_resolve_plan_with_fallback()` in `core.py` to populate candidates list with all viable resolver plans during planning phase
+- [ ] Store resolver name, URL, headers, and media type for each candidate in structured format enabling later retry attempts
+- [ ] Wrap `download_stream()` call in `fetch_one()` with retry loop that iterates through candidate plans on retryable failures
+- [ ] Define retryable failures as HTTP 503 service unavailable, HTTP 403 forbidden, network timeouts, and connection errors
+- [ ] Preserve polite headers and user agent when constructing request for fallback candidate
+- [ ] Log warning message for each fallback attempt including original resolver failure reason and candidate resolver being attempted
+- [ ] Record complete fallback chain in manifest including primary attempt and all fallback attempts with their outcomes
+- [ ] Add `resolver_attempts` field to manifest JSON containing array of dictionaries with resolver name, URL, and result status
+- [ ] Ensure manifest reflects actual successful resolver used rather than originally planned resolver when fallback occurs
+- [ ] Test fallback mechanism with mock HTTP server returning 503 for first URL and 200 for second URL
+- [ ] Verify fallback chain appears correctly in saved manifest after successful fallback
+
+### 2.2 Add Streaming Normalization for Large Ontologies
+
+- [ ] Create `normalize_streaming()` function in `validators.py` accepting source file path and optional output file path
+- [ ] Have function create temporary file using `tempfile.NamedTemporaryFile` for intermediate N-Triples output
+- [ ] Parse source ontology using rdflib graph and serialize to N-Triples format into temporary file
+- [ ] Create second temporary file for sorted N-Triples output
+- [ ] Invoke platform sort command using `subprocess.run()` with input from first temporary and output to second temporary
+- [ ] Open sorted N-Triples file for reading in binary mode using chunks for memory efficiency
+- [ ] Initialize SHA-256 hasher using `hashlib.sha256()` for computing canonical hash
+- [ ] When output path provided, open output file for writing in binary mode alongside hash computation
+- [ ] Stream through sorted N-Triples reading fixed-size chunks and updating hash with each chunk
+- [ ] When output path provided, write each chunk to output file in addition to hash computation
+- [ ] Close all file handles and delete temporary files ensuring cleanup occurs even on exception
+- [ ] Return computed hexadecimal hash digest as function result
+- [ ] Modify existing `validate_rdflib()` function to detect large ontologies exceeding configured threshold
+- [ ] Route large ontologies to streaming normalization path and small ontologies to existing in-memory path
+- [ ] Add configuration parameter `streaming_normalization_threshold_mb` with default value of two hundred megabytes
+- [ ] Include fallback to external Python merge sort when platform sort command unavailable for pure-Python execution
+- [ ] Test determinism by computing hash multiple times from same source and verifying identical results
+- [ ] Test cross-platform determinism by computing hash on Linux and comparing with hash from same file on macOS
+
+### 2.3 Unify Retry Mechanisms
+
+- [ ] Create new `utils.py` module in OntologyDownload package for shared utility functions
+- [ ] Implement `retry_with_backoff()` function accepting callable, retryable predicate function, maximum attempts integer, backoff base float, and jitter float
+- [ ] Have retry function iterate from one to maximum attempts executing callable within try block
+- [ ] Catch all exceptions from callable and check if exception satisfies retryable predicate function
+- [ ] When exception is not retryable or maximum attempts exhausted, re-raise exception unchanged
+- [ ] When exception is retryable and attempts remain, calculate sleep duration using exponential backoff formula
+- [ ] Compute sleep time as backoff base multiplied by two raised to attempt minus one power
+- [ ] Add random jitter by generating random float between zero and jitter parameter and adding to sleep time
+- [ ] Sleep for computed duration before next retry attempt
+- [ ] Return callable result immediately upon successful execution without consuming remaining attempts
+- [ ] Replace retry logic in resolver `_execute_with_retry()` method with call to unified retry helper
+- [ ] Replace retry logic in `StreamingDownloader.__call__()` method with call to unified retry helper
+- [ ] Define retryable predicate for resolver API calls accepting timeout and connection errors but not authentication failures
+- [ ] Define retryable predicate for download operations accepting connection errors, timeouts, and HTTP 5xx status codes
+- [ ] Add optional callback parameter to retry function for logging retry attempts with attempt number and error
+- [ ] Test retry helper with forced exceptions verifying exponential backoff timing and jitter bounds
+- [ ] Test retry helper with non-retryable exception verifying immediate re-raise without delay
+
+### 2.4 Strengthen Manifest Fingerprint
+
+- [ ] Locate fingerprint computation logic in `fetch_one()` function within `core.py`
+- [ ] Extend `fingerprint_components` list to include `MANIFEST_SCHEMA_VERSION` constant at beginning
+- [ ] Add sorted target formats by converting `spec.target_formats` to sorted list and joining with comma separator
+- [ ] Add normalization mode string indicating whether streaming or in-memory normalization was used
+- [ ] Maintain existing components including ontology ID, resolver name, version, SHA-256 hash, normalized hash, and URL
+- [ ] Join all components with pipe character as before and compute SHA-256 hash of concatenated string
+- [ ] Define `MANIFEST_SCHEMA_VERSION` constant as string with current version number at module level
+- [ ] Emit schema version field in manifest JSON separate from fingerprint to enable version-based parsing
+- [ ] Test that changing target formats order produces different fingerprint before sorting fix
+- [ ] Test that changing normalization mode from in-memory to streaming produces different fingerprint
+- [ ] Test that fingerprint remains stable when components provided in same configuration
+- [ ] Document fingerprint computation formula in manifest structure documentation
+
+### 2.5 Parallelize Resolver Planning
+
+- [ ] Import `ThreadPoolExecutor` and `as_completed` from `concurrent.futures` module in `core.py`
+- [ ] Modify `plan_all()` function to use thread pool for concurrent execution of planning operations
+- [ ] Read maximum concurrent plans from configuration with path `defaults.http.concurrent_plans` defaulting to eight workers
+- [ ] Create thread pool executor with maximum workers set to configured concurrency limit
+- [ ] Submit `plan_one()` call for each ontology specification as separate future to executor
+- [ ] Create dictionary mapping future objects to ontology specification for result correlation
+- [ ] Iterate over completed futures using `as_completed()` to yield results as they finish
+- [ ] Extract result from each completed future and append to results list
+- [ ] Handle exceptions from futures by catching and logging without terminating entire batch when continue-on-error enabled
+- [ ] Close thread pool using context manager to ensure cleanup even on exception
+- [ ] Maintain per-service token bucket limits within resolver API clients to prevent overwhelming individual services
+- [ ] Pass service identifier from fetch specification through to resolver so proper token bucket selected
+- [ ] Configure per-service rate limits with defaults respecting published API rate limits for OLS, BioPortal, LOV
+- [ ] Test concurrent planning reduces wall-clock time compared to sequential planning for batch of ten ontologies
+- [ ] Test per-service limits prevent exceeding five concurrent requests to same service even with higher overall concurrency
+- [ ] Verify ordering of results maintains correspondence with input specification order
+
+## 3. Operational Capabilities
+
+### 3.1 Add CLI Concurrency Controls
+
+- [ ] Add `--concurrent-downloads` argument to `pull` command parser accepting positive integer
+- [ ] Add `--concurrent-plans` argument to `plan` command parser accepting positive integer
+- [ ] Add `--concurrent-downloads` argument to `plan` command parser for consistency when used with `--dry-run`
+- [ ] Update argument help text describing flags control maximum simultaneous operations
+- [ ] Extract concurrent downloads value from parsed arguments in `_handle_pull()` function
+- [ ] When CLI argument provided, override `config.defaults.http.concurrent_downloads` with argument value before calling orchestration
+- [ ] Extract concurrent plans value from parsed arguments in `_handle_plan()` function
+- [ ] When CLI argument provided, create new HTTP configuration section if needed and set concurrent plans limit
+- [ ] Flow modified configuration to `plan_all()` function ensuring thread pool uses overridden limit
+- [ ] Validate argument values are positive integers and raise argument error for invalid values
+- [ ] Add integration test verifying `--concurrent-downloads 3` limits active download threads to three
+- [ ] Add integration test verifying `--concurrent-plans 5` limits active planning threads to five
+- [ ] Document flags in CLI help text and user guide with examples of production use cases
+
+### 3.2 Add CLI Host Allowlist Override
+
+- [ ] Add `--allowed-hosts` argument to `pull` command parser accepting comma-separated string
+- [ ] Add `--allowed-hosts` argument to `plan` command parser accepting comma-separated string
+- [ ] Update argument help text describing flag accepts comma-separated domain list added to allowlist
+- [ ] Parse comma-separated host string into list by splitting on comma and stripping whitespace from each entry
+- [ ] Filter empty strings from parsed list after splitting and stripping
+- [ ] Retrieve existing allowed hosts from configuration or initialize empty list if not configured
+- [ ] Merge CLI-provided hosts with configuration hosts by converting both to sets and taking union
+- [ ] Assign merged set back to `config.defaults.http.allowed_hosts` before calling orchestration
+- [ ] Preserve configuration wildcard prefixes if present in CLI-provided hosts by keeping original string format
+- [ ] Test merge produces unique list when same host appears in both configuration and CLI argument
+- [ ] Test wildcard domain in CLI argument works correctly for subdomain matching during download
+- [ ] Document flag with examples showing temporary allowlist addition for ad-hoc downloads
+
+### 3.3 Expand System Diagnostics Command
+
+- [ ] Locate `_doctor_report()` function in `cli.py` and expand checks dictionary
+- [ ] Add ROBOT tool check using `shutil.which("robot")` to locate robot command in system PATH
+- [ ] When ROBOT found, execute robot with `--version` flag capturing output to extract version string
+- [ ] Parse ROBOT version from output using regular expression and include in diagnostics report
+- [ ] Add disk space check using `shutil.disk_usage()` for ontology directory path
+- [ ] Calculate free gigabytes by dividing free bytes by one billion and include in report with total space
+- [ ] Add disk space warning when free space drops below ten gigabytes or ten percent of total whichever is larger
+- [ ] Add rate limit validation check parsing each configured rate limit string against expected pattern
+- [ ] Report any invalid rate limit strings in diagnostics with original value and explanation of correct format
+- [ ] Add network egress check for each resolver service making HEAD request to representative endpoint
+- [ ] Use short timeout of three seconds for each network check to avoid blocking on unresponsive services
+- [ ] Record success or failure for each service check including HTTP status code when available
+- [ ] For OLS check `https://www.ebi.ac.uk/ols4/api/health` endpoint
+- [ ] For BioPortal check `https://data.bioontology.org` endpoint
+- [ ] For Bioregistry check `https://bioregistry.io` endpoint
+- [ ] Report network connectivity status for each service in both JSON and human-readable format
+- [ ] Update `_print_doctor_report()` to format new checks with clear status indicators and recommendations
+- [ ] Test doctor command output contains all expected sections with sample configuration
+- [ ] Test doctor command identifies invalid rate limit pattern and reports it clearly
+
+### 3.4 Implement Version Pruning Command
+
+- [ ] Add `prune` subcommand to CLI parser with description about managing ontology version history
+- [ ] Add `--keep` argument to prune parser accepting positive integer for number of versions to retain
+- [ ] Add optional `--ids` argument accepting list of ontology identifiers to limit pruning scope
+- [ ] Add `--dry-run` flag to prune parser for preview mode showing what would be deleted
+- [ ] Implement `_handle_prune()` function accepting parsed arguments and configuration
+- [ ] Query storage backend for list of ontology identifiers using `STORAGE.available_ontologies()` if not filtered by IDs
+- [ ] For each ontology identifier, retrieve available versions using `STORAGE.available_versions()`
+- [ ] Sort versions by timestamp extracted from version string or manifest creation time
+- [ ] Identify versions to delete as all except the N most recent where N is keep argument value
+- [ ] In dry-run mode, print list of versions that would be deleted with file sizes if available
+- [ ] In normal mode, delete each surplus version by removing version directory and all contained artifacts
+- [ ] Preserve latest symlink or current version marker ensuring it always points to newest retained version
+- [ ] Log each deletion including ontology identifier, version string, and freed disk space
+- [ ] Add safety check refusing to delete when keep value would remove all versions
+- [ ] Emit summary at end showing total versions deleted and total disk space freed
+- [ ] Test prune keeps correct number of versions and deletes older ones in correct order
+- [ ] Test prune dry-run shows expected deletions without actually deleting files
+- [ ] Test prune with `--ids` argument only affects specified ontologies
+
+### 3.5 Add Planning Introspection Commands
+
+- [ ] Add `--since` argument to `plan` command parser accepting date string in YYYY-MM-DD format
+- [ ] Parse date string into Python datetime object using `datetime.strptime()` with appropriate format string
+- [ ] Modify planning logic to skip ontologies where last-modified date precedes since date
+- [ ] Retrieve last-modified information from resolver metadata or HTTP Last-Modified header during planning
+- [ ] Compare last-modified datetime with since datetime using timezone-aware comparison
+- [ ] Filter planned fetches removing those with last-modified older than since date before returning results
+- [ ] Add `plan diff` subcommand to CLI parser for comparing plans
+- [ ] Implement `_handle_plan_diff()` function loading current plan and previous plan from file
+- [ ] Define plan file format as JSON containing array of plan objects with URL, version, size, license fields
+- [ ] Load previous plan file from default location or path specified in `--baseline` argument
+- [ ] Generate current plan by calling `plan_all()` and converting results to comparable dictionary format
+- [ ] Compare plans by matching ontology identifiers and detecting changes in URL, version, license, or media type
+- [ ] Report new ontologies present in current plan but absent from previous plan
+- [ ] Report removed ontologies present in previous plan but absent from current plan
+- [ ] Report modified ontologies where any tracked field changed between plans
+- [ ] Format diff output showing additions with plus prefix, removals with minus prefix, modifications with tilde prefix
+- [ ] Support JSON output format for diff showing structured changes consumable by automation tools
+- [ ] Test `--since` filtering excludes ontologies with old timestamps and includes recent ones
+- [ ] Test plan diff correctly identifies added, removed, and modified ontologies between plans
+- [ ] Test plan diff JSON output has expected structure for programmatic consumption
+
+## 4. Testing and Validation
+
+### 4.1 Determinism Tests for Canonical Turtle
+
+- [ ] Create test fixture directory with complex ontology examples including blank nodes and multiple prefixes
+- [ ] Generate synthetic ontology with at least one hundred triples using diverse RDF node types
+- [ ] Include blank nodes in various positions to test sorting stability
+- [ ] Include multiple namespace prefixes to test prefix handling consistency
+- [ ] Write test running normalization process five times on same input file
+- [ ] Compute SHA-256 hash for each normalization output
+- [ ] Assert all five hashes are identical verifying deterministic output
+- [ ] Run test on Linux and macOS platforms verifying cross-platform hash consistency
+- [ ] Store golden hash value for each test fixture in test configuration
+- [ ] Verify actual hash matches golden value detecting regressions in normalization algorithm
+- [ ] Add test for streaming normalization producing identical hash as in-memory normalization
+- [ ] Test edge cases including empty graph, single-triple graph, and graph with only blank nodes
+
+### 4.2 Concurrency Stress Testing via Local HTTP Server
+
+- [ ] Create test helper HTTP server using FastAPI or standard library HTTP server
+- [ ] Implement configurable delay endpoint accepting milliseconds parameter and sleeping before response
+- [ ] Implement configurable error endpoint accepting status code parameter and returning specified HTTP error
+- [ ] Implement ETag flip endpoint tracking request count and returning different ETag after threshold
+- [ ] Implement conditional request handler supporting If-None-Match header returning 304 when ETag matches
+- [ ] Implement partial content handler supporting Range header returning 206 with correct Content-Range
+- [ ] Implement Content-Type override endpoint accepting media-type parameter and returning specified type regardless of actual content
+- [ ] Create integration test spawning local server and configuring downloader to use localhost URLs
+- [ ] Test scenario where first GET returns 503 and second GET returns 200 verifying retry succeeds
+- [ ] Test scenario where HEAD returns different Content-Type than GET verifying warning logged
+- [ ] Test scenario where ETag changes mid-stream verifying download restart behavior
+- [ ] Test scenario where 304 Not Modified returned verifying cache hit behavior
+- [ ] Test concurrent downloads from same host verifying token bucket limits requests correctly
+- [ ] Test concurrent downloads from different hosts verifying no artificial serialization
+- [ ] Verify JSON output and table output from CLI contain expected fields for each test scenario
+- [ ] Add timeout protection ensuring test server shuts down cleanly even on test failure
+
+### 4.3 Resolver Contract Tests with Record/Replay
+
+- [ ] Choose cassette library for recording HTTP interactions such as pytest-vcr or vcrpy
+- [ ] Create test fixture directory for storing recorded resolver API responses
+- [ ] Write contract test for OBO resolver verifying correct URL construction from ontology identifier
+- [ ] Write contract test for OLS resolver verifying API query includes correct parameters and headers
+- [ ] Write contract test for BioPortal resolver verifying authorization header included when API key present
+- [ ] Write contract test for LOV resolver verifying metadata endpoint queried with correct URI parameter
+- [ ] Write contract test for Ontobee resolver verifying PURL format matches expected pattern
+- [ ] For each resolver, record minimal API response yielding successful FetchPlan
+- [ ] Verify plan includes required fields: URL, headers, version, license, media type, service identifier
+- [ ] Verify polite headers included in request: User-Agent, Accept, X-Request-ID when applicable
+- [ ] Test failure modes with recorded error responses: missing API key, ontology not found, service unavailable
+- [ ] Verify resolver raises appropriate exception type with descriptive message for each failure mode
+- [ ] Test that resolver respects configuration timeouts and rate limits during API interaction
+- [ ] Add test verifying resolver fallback chain when primary resolver fails
+- [ ] Verify recorded cassettes scrub sensitive data including API keys and authorization tokens
+- [ ] Test contract validation runs successfully in CI environment without live network access
