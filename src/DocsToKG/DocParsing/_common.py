@@ -692,6 +692,16 @@ def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
     lock_path = path.with_suffix(path.suffix + ".lock")
     start = time.time()
     while lock_path.exists():
+        try:
+            pid_text = lock_path.read_text(encoding="utf-8").strip()
+            existing_pid = int(pid_text) if pid_text else None
+        except (OSError, ValueError):
+            existing_pid = None
+
+        if existing_pid and not _pid_is_running(existing_pid):
+            lock_path.unlink(missing_ok=True)
+            continue
+
         if time.time() - start > timeout:
             raise TimeoutError(f"Could not acquire lock on {path} after {timeout}s")
         time.sleep(0.1)
@@ -701,3 +711,19 @@ def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
         yield True
     finally:
         lock_path.unlink(missing_ok=True)
+
+
+def _pid_is_running(pid: int) -> bool:
+    """Return ``True`` if a process with the given PID appears to be alive."""
+
+    if pid is None or pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:  # pragma: no cover - platform specific
+        return True
+    except OSError:  # pragma: no cover - defensive guard
+        return False
+    return True
