@@ -28,9 +28,11 @@ pytest.importorskip("pyalex")
 from DocsToKG.ContentDownload.download_pyalex_pdfs import load_resolver_config
 
 
-def test_deprecated_resolver_rate_limits_warning(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+def test_deprecated_resolver_rate_limits_warning(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     config_path = tmp_path / "config.json"
-    config_path.write_text("{" "\"resolver_rate_limits\": {\"unpaywall\": 2.0}" "}")
+    config_path.write_text("{" '"resolver_rate_limits": {"unpaywall": 2.0}' "}")
     args = Namespace(
         resolver_config=str(config_path),
         unpaywall_email=None,
@@ -73,6 +75,9 @@ def test_user_agent_includes_mailto(tmp_path: Path) -> None:
 
     config = load_resolver_config(args, ["unpaywall", "crossref", "openaire"], None)
     user_agent = config.polite_headers.get("User-Agent")
-    assert user_agent == "DocsToKGDownloader/1.0 (+ua-tester@example.org; mailto:ua-tester@example.org)"
+    assert (
+        user_agent
+        == "DocsToKGDownloader/1.0 (+ua-tester@example.org; mailto:ua-tester@example.org)"
+    )
     assert config.polite_headers.get("mailto") == "ua-tester@example.org"
     assert config.resolver_toggles["openaire"] is True

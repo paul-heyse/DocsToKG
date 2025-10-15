@@ -119,16 +119,6 @@ logger: Logger adapter scoped to the current fetch request.
 Returns:
 Concrete plan containing download URL, headers, and metadata.
 
-### `join(self)`
-
-Build a path relative to the fallback pystow root directory.
-
-Args:
-*segments: Path segments appended to the root directory.
-
-Returns:
-Path object pointing to the requested cache location.
-
 ## Classes
 
 ### `OntologyDownloadError`
@@ -288,15 +278,3 @@ Examples:
 >>> plan = DummyResolver().plan(spec, ResolvedConfig.from_defaults(), logging.getLogger("test"))
 >>> plan.url
 'https://example.org/chebi.owl'
-
-### `_PystowFallback`
-
-Minimal pystow replacement used when the dependency is absent.
-
-Attributes:
-_root: Base directory used to emulate pystow's storage root.
-
-Examples:
->>> fallback = _PystowFallback()
->>> isinstance(fallback.join("ontology"), Path)
-True

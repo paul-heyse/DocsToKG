@@ -22,10 +22,12 @@ from pathlib import Path
 import pytest
 import requests
 
-responses = pytest.importorskip("responses")
+pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
 from DocsToKG.ContentDownload import resolvers
+
+responses = pytest.importorskip("responses")
 
 
 class MemoryLogger:
@@ -48,7 +50,9 @@ def test_resolver_pipeline_downloads_pdf_end_to_end(tmp_path):
         "locations": [],
         "open_access": {"oa_url": None},
     }
-    artifact = downloader.create_artifact(work, pdf_dir=tmp_path / "pdf", html_dir=tmp_path / "html")
+    artifact = downloader.create_artifact(
+        work, pdf_dir=tmp_path / "pdf", html_dir=tmp_path / "html"
+    )
 
     pdf_url = "https://cdn.example/resolver-demo.pdf"
     responses.add(
@@ -105,7 +109,9 @@ def test_download_candidate_marks_corrupt_without_eof(tmp_path):
         "locations": [],
         "open_access": {"oa_url": None},
     }
-    artifact = downloader.create_artifact(work, pdf_dir=tmp_path / "pdf", html_dir=tmp_path / "html")
+    artifact = downloader.create_artifact(
+        work, pdf_dir=tmp_path / "pdf", html_dir=tmp_path / "html"
+    )
     pdf_url = "https://cdn.example/corrupt.pdf"
     responses.add(
         responses.GET,

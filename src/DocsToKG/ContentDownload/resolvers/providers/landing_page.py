@@ -7,8 +7,9 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 
-from ..types import Resolver, ResolverConfig, ResolverResult
 from DocsToKG.ContentDownload.http import request_with_retries
+
+from ..types import ResolverConfig, ResolverResult
 
 try:  # Optional dependency guarded at runtime
     from bs4 import BeautifulSoup  # type: ignore
@@ -27,12 +28,29 @@ def _absolute_url(base: str, href: str) -> str:
 
 
 class LandingPageResolver:
-    """Attempt to scrape landing pages when explicit PDFs are unavailable."""
+    """Attempt to scrape landing pages when explicit PDFs are unavailable.
+
+    Attributes:
+        name: Resolver identifier surfaced to the pipeline dispatcher.
+
+    Examples:
+        >>> resolver = LandingPageResolver()
+        >>> resolver.name
+        'landing_page'
+    """
 
     name = "landing_page"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
-        """Return ``True`` when the artifact exposes landing page URLs."""
+        """Return ``True`` when the artifact exposes landing page URLs.
+
+        Args:
+            config: Resolver configuration controlling scraping behaviour.
+            artifact: Work artifact containing landing page URLs.
+
+        Returns:
+            Boolean indicating whether landing pages should be scraped.
+        """
 
         return bool(artifact.landing_urls)
 
@@ -42,7 +60,16 @@ class LandingPageResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        """Yield candidate URLs discovered by scraping landing pages."""
+        """Yield candidate URLs discovered by scraping landing pages.
+
+        Args:
+            session: HTTP session used to download landing pages.
+            config: Resolver configuration providing headers and timeouts.
+            artifact: Work artifact listing landing page URLs to inspect.
+
+        Returns:
+            Iterable of resolver results representing discovered download URLs.
+        """
 
         if BeautifulSoup is None:
             yield ResolverResult(

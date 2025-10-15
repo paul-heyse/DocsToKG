@@ -18,6 +18,10 @@ Usage:
 
 import json
 
+import pytest
+
+pytest.importorskip("pydantic")
+
 from DocsToKG.OntologyDownload.config import LoggingConfig
 from DocsToKG.OntologyDownload.logging_config import mask_sensitive_data, setup_logging
 

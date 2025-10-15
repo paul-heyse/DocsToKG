@@ -14,8 +14,8 @@ import asyncio
 import re
 import sys
 from pathlib import Path
-from urllib.parse import urljoin, urlparse
 from typing import Dict, List, Optional, Set, Tuple
+from urllib.parse import urlparse
 
 try:
     import aiohttp

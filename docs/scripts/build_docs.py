@@ -7,11 +7,10 @@ It can build HTML documentation, check for broken links, and validate documentat
 """
 
 import argparse
+import shutil
 import subprocess
 import sys
-import shutil
 from pathlib import Path
-from typing import List, Optional
 
 
 class DocsBuilder:
@@ -20,6 +19,7 @@ class DocsBuilder:
     def __init__(self, source_dir: str = "docs/build/sphinx", build_dir: str = "docs/build/_build"):
         self.source_dir = Path(source_dir)
         self.build_dir = Path(build_dir)
+        self.docs_root = Path("docs")
         self.sphinx_cmd = "sphinx-build"
 
     def check_sphinx_installation(self) -> bool:
@@ -40,10 +40,44 @@ class DocsBuilder:
             print(f"🧹 Cleaning build directory: {self.build_dir}")
             shutil.rmtree(self.build_dir)
 
+    def prepare_source_tree(self) -> None:
+        """Mirror the Markdown documentation tree into the Sphinx source directory."""
+
+        docs_root = self.docs_root
+        if not docs_root.exists():
+            return
+
+        skip_dirs = {"build", "scripts", "__pycache__"}
+
+        for src_path in docs_root.iterdir():
+            if not src_path.is_dir():
+                continue
+            if src_path.name in skip_dirs:
+                continue
+
+            dest_path = self.source_dir / src_path.name
+
+            if dest_path.exists() or dest_path.is_symlink():
+                if dest_path.is_symlink() or dest_path.is_file():
+                    dest_path.unlink()
+                elif dest_path.is_dir():
+                    shutil.rmtree(dest_path)
+
+            shutil.copytree(src_path, dest_path)
+
+        for src_file in docs_root.glob("*.md"):
+            dest_file = self.source_dir / src_file.name
+            if dest_file.exists():
+                dest_file.unlink()
+            shutil.copy2(src_file, dest_file)
+
+
     def build_html(self, clean: bool = True) -> bool:
         """Build HTML documentation."""
         if clean:
             self.clean_build_directory()
+
+        self.prepare_source_tree()
 
         print("🔨 Building HTML documentation...")
 
@@ -58,7 +92,7 @@ class DocsBuilder:
         ]
 
         try:
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
             print("✅ HTML documentation built successfully")
 
             # Copy to main docs directory if it exists
@@ -84,10 +118,12 @@ class DocsBuilder:
         """Build LaTeX documentation (for PDF generation)."""
         print("📄 Building LaTeX documentation...")
 
+        self.prepare_source_tree()
+
         cmd = [self.sphinx_cmd, "-b", "latex", str(self.source_dir), str(self.build_dir / "latex")]
 
         try:
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
             print("✅ LaTeX documentation built successfully")
             return True
 
@@ -99,6 +135,8 @@ class DocsBuilder:
         """Check for broken links in the documentation."""
         print("🔗 Checking for broken links...")
 
+        self.prepare_source_tree()
+
         cmd = [
             self.sphinx_cmd,
             "-b",
@@ -108,7 +146,7 @@ class DocsBuilder:
         ]
 
         try:
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
             print("✅ Link check completed")
 
             # Check if there are any broken links
@@ -135,6 +173,8 @@ class DocsBuilder:
         """Check documentation coverage."""
         print("📊 Checking documentation coverage...")
 
+        self.prepare_source_tree()
+
         cmd = [
             self.sphinx_cmd,
             "-b",
@@ -144,7 +184,7 @@ class DocsBuilder:
         ]
 
         try:
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
             print("✅ Coverage check completed")
 
             # Show coverage report

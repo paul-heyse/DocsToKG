@@ -26,15 +26,16 @@ import json
 from http import HTTPStatus
 from pathlib import Path
 from typing import Callable, List, Mapping, Sequence
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import numpy as np
 import pytest
 
 from DocsToKG.HybridSearch import (
     ChunkIngestionPipeline,
-    HybridSearchAPI,
     DocumentInput,
     FeatureGenerator,
+    HybridSearchAPI,
     HybridSearchConfigManager,
     HybridSearchRequest,
     HybridSearchService,
@@ -49,18 +50,22 @@ from DocsToKG.HybridSearch import (
 )
 from DocsToKG.HybridSearch.config import DenseIndexConfig
 from DocsToKG.HybridSearch.dense import FaissIndexManager
-from DocsToKG.HybridSearch.storage import ChunkRegistry, OpenSearchSimulator
-from DocsToKG.HybridSearch.validation import load_dataset
-from DocsToKG.HybridSearch.tokenization import tokenize
 from DocsToKG.HybridSearch.ingest import IngestError
+from DocsToKG.HybridSearch.storage import ChunkRegistry, OpenSearchSimulator
+from DocsToKG.HybridSearch.tokenization import tokenize
 from DocsToKG.HybridSearch.types import ChunkFeatures, ChunkPayload
-from uuid import NAMESPACE_URL, uuid5, uuid4
+from DocsToKG.HybridSearch.validation import load_dataset
 
 
 def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
     config_payload = {
         "dense": {"index_type": "flat", "oversample": 3},
-        "fusion": {"k0": 50.0, "mmr_lambda": 0.7, "cosine_dedupe_threshold": 0.95, "max_chunks_per_doc": 2},
+        "fusion": {
+            "k0": 50.0,
+            "mmr_lambda": 0.7,
+            "cosine_dedupe_threshold": 0.95,
+            "max_chunks_per_doc": 2,
+        },
         "retrieval": {"bm25_top_k": 20, "splade_top_k": 20, "dense_top_k": 20},
     }
     path = tmp_path / "hybrid_config.json"
@@ -76,14 +81,17 @@ def dataset() -> Sequence[Mapping[str, object]]:
 @pytest.fixture
 def stack(
     tmp_path: Path,
-) -> Callable[[], tuple[
-    ChunkIngestionPipeline,
-    HybridSearchService,
-    ChunkRegistry,
-    HybridSearchValidator,
-    FeatureGenerator,
-    OpenSearchSimulator,
-]]:
+) -> Callable[
+    [],
+    tuple[
+        ChunkIngestionPipeline,
+        HybridSearchService,
+        ChunkRegistry,
+        HybridSearchValidator,
+        FeatureGenerator,
+        OpenSearchSimulator,
+    ],
+]:
     def factory() -> tuple[
         ChunkIngestionPipeline,
         HybridSearchService,
@@ -205,7 +213,17 @@ def _write_document_artifacts(
 
 
 def test_hybrid_retrieval_end_to_end(
-    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FeatureGenerator, OpenSearchSimulator]],
+    stack: Callable[
+        [],
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FeatureGenerator,
+            OpenSearchSimulator,
+        ],
+    ],
     dataset: Sequence[Mapping[str, object]],
 ) -> None:
     ingestion, service, registry, _, _, _ = stack()
@@ -227,7 +245,17 @@ def test_hybrid_retrieval_end_to_end(
 
 
 def test_reingest_updates_dense_and_sparse_channels(
-    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FeatureGenerator, OpenSearchSimulator]],
+    stack: Callable[
+        [],
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FeatureGenerator,
+            OpenSearchSimulator,
+        ],
+    ],
     tmp_path: Path,
 ) -> None:
     ingestion, service, registry, _, feature_generator, _ = stack()
@@ -242,7 +270,9 @@ def test_reingest_updates_dense_and_sparse_channels(
     )
     ingestion.upsert_documents([doc])
 
-    request = HybridSearchRequest(query="dense retrieval guidance", namespace="research", filters={}, page_size=3)
+    request = HybridSearchRequest(
+        query="dense retrieval guidance", namespace="research", filters={}, page_size=3
+    )
     first = service.search(request)
     assert first.results and "Original" in first.results[0].text
 
@@ -262,7 +292,17 @@ def test_reingest_updates_dense_and_sparse_channels(
 
 
 def test_validation_harness_reports(
-    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FeatureGenerator, OpenSearchSimulator]],
+    stack: Callable[
+        [],
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FeatureGenerator,
+            OpenSearchSimulator,
+        ],
+    ],
     dataset: Sequence[Mapping[str, object]],
     tmp_path: Path,
 ) -> None:
@@ -293,7 +333,17 @@ def test_schema_manager_bootstrap_and_registration() -> None:
 
 
 def test_api_post_hybrid_search_success_and_validation(
-    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FeatureGenerator, OpenSearchSimulator]],
+    stack: Callable[
+        [],
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FeatureGenerator,
+            OpenSearchSimulator,
+        ],
+    ],
     dataset: Sequence[Mapping[str, object]],
 ) -> None:
     ingestion, service, _, _, _, _ = stack()
@@ -318,7 +368,17 @@ def test_api_post_hybrid_search_success_and_validation(
 
 
 def test_operations_snapshot_and_restore_roundtrip(
-    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FeatureGenerator, OpenSearchSimulator]],
+    stack: Callable[
+        [],
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FeatureGenerator,
+            OpenSearchSimulator,
+        ],
+    ],
     dataset: Sequence[Mapping[str, object]],
 ) -> None:
     ingestion, service, registry, _, _, opensearch = stack()
@@ -335,11 +395,23 @@ def test_operations_snapshot_and_restore_roundtrip(
     assert not pagination_result.duplicate_detected
 
     assert not should_rebuild_index(registry, deleted_since_snapshot=0, threshold=0.5)
-    assert should_rebuild_index(registry, deleted_since_snapshot=max(1, registry.count() // 2), threshold=0.25)
+    assert should_rebuild_index(
+        registry, deleted_since_snapshot=max(1, registry.count() // 2), threshold=0.25
+    )
 
 
 def test_ingest_missing_vector_raises(
-    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FeatureGenerator, OpenSearchSimulator]],
+    stack: Callable[
+        [],
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FeatureGenerator,
+            OpenSearchSimulator,
+        ],
+    ],
     tmp_path: Path,
 ) -> None:
     ingestion, _, _, _, feature_generator, _ = stack()
@@ -352,9 +424,15 @@ def test_ingest_missing_vector_raises(
         metadata={},
         feature_generator=feature_generator,
     )
-    vector_entries = [json.loads(line) for line in doc.vector_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    vector_entries = [
+        json.loads(line)
+        for line in doc.vector_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
     vector_entries[0]["UUID"] = "00000000-0000-0000-0000-000000000000"
-    doc.vector_path.write_text("\n".join(json.dumps(entry) for entry in vector_entries) + "\n", encoding="utf-8")
+    doc.vector_path.write_text(
+        "\n".join(json.dumps(entry) for entry in vector_entries) + "\n", encoding="utf-8"
+    )
 
     with pytest.raises(IngestError):
         ingestion.upsert_documents([doc])

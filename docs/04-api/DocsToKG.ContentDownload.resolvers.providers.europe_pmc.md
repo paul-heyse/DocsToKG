@@ -1,0 +1,42 @@
+# Module: europe_pmc
+
+Europe PMC resolver for European open access articles.
+
+## Functions
+
+### `is_enabled(self, config, artifact)`
+
+Return ``True`` when the artifact has a DOI suitable for lookup.
+
+Args:
+config: Resolver configuration providing Europe PMC preferences.
+artifact: Work artifact containing DOI metadata.
+
+Returns:
+Boolean indicating whether the resolver should attempt a lookup.
+
+### `iter_urls(self, session, config, artifact)`
+
+Yield candidate URLs from the Europe PMC API.
+
+Args:
+session: HTTP session used to execute Europe PMC API requests.
+config: Resolver configuration including polite headers and timeouts.
+artifact: Work artifact representing the target scholarly output.
+
+Returns:
+Iterable of resolver results containing discovered URLs.
+
+## Classes
+
+### `EuropePmcResolver`
+
+Resolve Open Access links via the Europe PMC REST API.
+
+Attributes:
+name: Resolver identifier exposed to the orchestration pipeline.
+
+Examples:
+>>> resolver = EuropePmcResolver()
+>>> resolver.name
+'europe_pmc'

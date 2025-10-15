@@ -3,11 +3,20 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Sequence,
+)
 
 try:  # pragma: no cover - dependency check
     import yaml  # type: ignore
@@ -29,11 +38,31 @@ PYTHON_MIN_VERSION = (3, 9)
 
 
 class ConfigError(RuntimeError):
-    """Raised when ontology configuration files are invalid or inconsistent."""
+    """Raised when ontology configuration files are invalid or inconsistent.
+
+    Attributes:
+        message: Human-readable explanation of the configuration flaw.
+
+    Examples:
+        >>> try:
+        ...     raise ConfigError("missing id")
+        ... except ConfigError as exc:
+        ...     assert "missing id" in str(exc)
+    """
 
 
 def ensure_python_version() -> None:
-    """Ensure the interpreter meets the minimum supported Python version."""
+    """Ensure the interpreter meets the minimum supported Python version.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        SystemExit: If the current interpreter version is below the minimum.
+    """
 
     if sys.version_info < PYTHON_MIN_VERSION:
         print("Error: Python 3.9+ required", file=sys.stderr)
@@ -41,7 +70,14 @@ def ensure_python_version() -> None:
 
 
 def _coerce_sequence(value: Optional[Iterable[str]]) -> List[str]:
-    """Normalize configuration entries into a list of strings."""
+    """Normalize configuration entries into a list of strings.
+
+    Args:
+        value: Input value that may be ``None``, a string, or an iterable of strings.
+
+    Returns:
+        List of strings suitable for downstream configuration processing.
+    """
 
     if value is None:
         return []
@@ -51,7 +87,18 @@ def _coerce_sequence(value: Optional[Iterable[str]]) -> List[str]:
 
 
 class LoggingConfiguration(BaseModel):
-    """Structured logging options for ontology download operations."""
+    """Structured logging options for ontology download operations.
+
+    Attributes:
+        level: Logging level for downloader telemetry (DEBUG, INFO, etc.).
+        max_log_size_mb: Maximum size of log files before rotation occurs.
+        retention_days: Number of days log files are retained on disk.
+
+    Examples:
+        >>> config = LoggingConfiguration(level="debug")
+        >>> config.level
+        'DEBUG'
+    """
 
     level: str = Field(
         default="INFO",
@@ -71,7 +118,17 @@ class LoggingConfiguration(BaseModel):
     @field_validator("level")
     @classmethod
     def validate_level(cls, value: str) -> str:
-        """Validate logging level values."""
+        """Validate logging level values.
+
+        Args:
+            value: Logging level provided in configuration.
+
+        Returns:
+            Uppercase logging level string accepted by :mod:`logging`.
+
+        Raises:
+            ValueError: If the supplied level is not among the supported options.
+        """
 
         valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR"}
         upper = value.upper()
@@ -86,7 +143,17 @@ class LoggingConfiguration(BaseModel):
 
 
 class ValidationConfig(BaseModel):
-    """Validation limits governing parser execution."""
+    """Validation limits governing parser execution.
+
+    Attributes:
+        parser_timeout_sec: Maximum runtime allowed for ontology parsing.
+        max_memory_mb: Memory ceiling allocated to validation routines.
+        skip_reasoning_if_size_mb: Threshold above which reasoning is skipped.
+
+    Examples:
+        >>> ValidationConfig(parser_timeout_sec=120).parser_timeout_sec
+        120
+    """
 
     parser_timeout_sec: int = Field(
         default=60,
@@ -115,7 +182,25 @@ _RATE_LIMIT_PATTERN = re.compile(r"^([\d.]+)/(second|sec|s|minute|min|m|hour|h)$
 
 
 class DownloadConfiguration(BaseModel):
-    """HTTP download and retry settings."""
+    """HTTP download and retry settings.
+
+    Attributes:
+        max_retries: Maximum retry attempts for failed download requests.
+        timeout_sec: Base timeout applied to metadata requests.
+        download_timeout_sec: Timeout applied to streaming download operations.
+        backoff_factor: Exponential backoff multiplier between retry attempts.
+        per_host_rate_limit: Token bucket rate limit string for host throttling.
+        max_download_size_gb: Maximum permitted download size in gigabytes.
+        concurrent_downloads: Allowed number of simultaneous downloads.
+        validate_media_type: Whether to enforce Content-Type validation.
+        rate_limits: Optional per-service rate limit overrides.
+        allowed_hosts: Optional allowlist restricting download hostnames.
+
+    Examples:
+        >>> cfg = DownloadConfiguration(per_host_rate_limit="10/second")
+        >>> round(cfg.rate_limit_per_second(), 2)
+        10.0
+    """
 
     max_retries: int = Field(default=5, ge=0, le=20)
     timeout_sec: int = Field(default=30, gt=0, le=300)
@@ -135,7 +220,17 @@ class DownloadConfiguration(BaseModel):
     @field_validator("rate_limits")
     @classmethod
     def validate_rate_limits(cls, value: Dict[str, str]) -> Dict[str, str]:
-        """Ensure rate limit strings follow the expected pattern."""
+        """Ensure rate limit strings follow the expected pattern.
+
+        Args:
+            value: Mapping of service name to rate limit expression.
+
+        Returns:
+            Validated mapping preserving the original values.
+
+        Raises:
+            ValueError: If any rate limit fails to match the accepted pattern.
+        """
 
         for service, limit in value.items():
             if not _RATE_LIMIT_PATTERN.match(limit):
@@ -146,7 +241,17 @@ class DownloadConfiguration(BaseModel):
         return value
 
     def rate_limit_per_second(self) -> float:
-        """Convert ``per_host_rate_limit`` to a requests-per-second value."""
+        """Convert ``per_host_rate_limit`` to a requests-per-second value.
+
+        Args:
+            None
+
+        Returns:
+            Floating-point requests-per-second value derived from configuration.
+
+        Raises:
+            ValueError: If the configured rate limit string is invalid.
+        """
 
         match = _RATE_LIMIT_PATTERN.match(self.per_host_rate_limit)
         if not match:
@@ -162,7 +267,17 @@ class DownloadConfiguration(BaseModel):
         raise ValueError(f"Unknown rate limit unit: {unit}")
 
     def parse_service_rate_limit(self, service: str) -> Optional[float]:
-        """Parse a per-service rate limit to requests per second."""
+        """Parse a per-service rate limit to requests per second.
+
+        Args:
+            service: Logical service name to look up.
+
+        Returns:
+            Requests-per-second value when configured, otherwise ``None``.
+
+        Raises:
+            None.
+        """
 
         limit_str = self.rate_limits.get(service)
         if not limit_str:
@@ -200,15 +315,28 @@ _VALID_RESOLVERS = {
 
 
 class DefaultsConfig(BaseModel):
-    """Collection of default settings for ontology fetch specifications."""
+    """Collection of default settings for ontology fetch specifications.
+
+    Attributes:
+        accept_licenses: Licenses accepted by default during downloads.
+        normalize_to: Preferred formats for normalized ontology output.
+        prefer_source: Ordered list of resolver priorities.
+        http: Download configuration defaults.
+        validation: Validation configuration defaults.
+        logging: Logging configuration defaults.
+        continue_on_error: Whether processing continues after failures.
+
+    Examples:
+        >>> defaults = DefaultsConfig()
+        >>> "obo" in defaults.prefer_source
+        True
+    """
 
     accept_licenses: List[str] = Field(
         default_factory=lambda: ["CC-BY-4.0", "CC0-1.0", "OGL-UK-3.0"]
     )
     normalize_to: List[str] = Field(default_factory=lambda: ["ttl"])
-    prefer_source: List[str] = Field(
-        default_factory=lambda: ["obo", "ols", "bioportal", "direct"]
-    )
+    prefer_source: List[str] = Field(default_factory=lambda: ["obo", "ols", "bioportal", "direct"])
     http: DownloadConfiguration = Field(default_factory=DownloadConfiguration)
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
     logging: LoggingConfiguration = Field(default_factory=LoggingConfiguration)
@@ -217,7 +345,17 @@ class DefaultsConfig(BaseModel):
     @field_validator("prefer_source")
     @classmethod
     def validate_prefer_source(cls, value: List[str]) -> List[str]:
-        """Ensure resolver names are recognized."""
+        """Ensure resolver names are recognized.
+
+        Args:
+            value: Ordered list of resolver names provided in configuration.
+
+        Returns:
+            Validated list containing only supported resolver identifiers.
+
+        Raises:
+            ValueError: If any resolver name is not part of the supported set.
+        """
 
         for resolver in value:
             if resolver not in _VALID_RESOLVERS:
@@ -232,14 +370,31 @@ class DefaultsConfig(BaseModel):
 
 
 class ResolvedConfig(BaseModel):
-    """Container for merged configuration defaults and fetch specifications."""
+    """Container for merged configuration defaults and fetch specifications.
+
+    Attributes:
+        defaults: Default configuration applied to all ontology fetch specs.
+        specs: List of individual fetch specifications after merging defaults.
+
+    Examples:
+        >>> config = ResolvedConfig.from_defaults()
+        >>> isinstance(config.defaults, DefaultsConfig)
+        True
+    """
 
     defaults: DefaultsConfig
     specs: List["FetchSpec"] = Field(default_factory=list)
 
     @classmethod
     def from_defaults(cls) -> "ResolvedConfig":
-        """Create an empty resolved configuration with library defaults."""
+        """Create an empty resolved configuration with library defaults.
+
+        Args:
+            None
+
+        Returns:
+            ResolvedConfig populated with default settings and no fetch specs.
+        """
 
         return cls(defaults=DefaultsConfig(), specs=[])
 
@@ -254,36 +409,59 @@ ResolvedConfig.model_rebuild()
 
 
 class EnvironmentOverrides(BaseSettings):
-    """Environment variable overrides for ontology downloader defaults."""
+    """Environment variable overrides for ontology downloader defaults.
+
+    Attributes:
+        max_retries: Override for retry count via ``ONTOFETCH_MAX_RETRIES``.
+        timeout_sec: Override for metadata timeout via ``ONTOFETCH_TIMEOUT_SEC``.
+        download_timeout_sec: Override for streaming timeout.
+        per_host_rate_limit: Override for per-host rate limit string.
+        backoff_factor: Override for exponential backoff multiplier.
+        log_level: Override for logging level.
+
+    Examples:
+        >>> overrides = EnvironmentOverrides()
+        >>> overrides.model_config['env_prefix']
+        'ONTOFETCH_'
+    """
 
     max_retries: Optional[int] = Field(default=None, alias="ONTOFETCH_MAX_RETRIES")
     timeout_sec: Optional[int] = Field(default=None, alias="ONTOFETCH_TIMEOUT_SEC")
     download_timeout_sec: Optional[int] = Field(
         default=None, alias="ONTOFETCH_DOWNLOAD_TIMEOUT_SEC"
     )
-    per_host_rate_limit: Optional[str] = Field(
-        default=None, alias="ONTOFETCH_PER_HOST_RATE_LIMIT"
-    )
-    backoff_factor: Optional[float] = Field(
-        default=None, alias="ONTOFETCH_BACKOFF_FACTOR"
-    )
+    per_host_rate_limit: Optional[str] = Field(default=None, alias="ONTOFETCH_PER_HOST_RATE_LIMIT")
+    backoff_factor: Optional[float] = Field(default=None, alias="ONTOFETCH_BACKOFF_FACTOR")
     log_level: Optional[str] = Field(default=None, alias="ONTOFETCH_LOG_LEVEL")
 
     model_config = SettingsConfigDict(env_prefix="ONTOFETCH_", case_sensitive=False, extra="ignore")
 
 
 def get_env_overrides() -> Dict[str, str]:
-    """Return raw environment override values for backwards compatibility."""
+    """Return raw environment override values for backwards compatibility.
+
+    Args:
+        None
+
+    Returns:
+        Mapping of configuration field name to override value sourced from the environment.
+    """
 
     env = EnvironmentOverrides()
     return {
-        key: str(value)
-        for key, value in env.model_dump(by_alias=False, exclude_none=True).items()
+        key: str(value) for key, value in env.model_dump(by_alias=False, exclude_none=True).items()
     }
 
 
 def _apply_env_overrides(defaults: DefaultsConfig) -> None:
-    """Apply environment variable overrides to default configuration."""
+    """Apply environment variable overrides to default configuration.
+
+    Args:
+        defaults: Defaults configuration object that will be mutated in place.
+
+    Returns:
+        None
+    """
 
     env = EnvironmentOverrides()
     logger = logging.getLogger("DocsToKG.OntologyDownload")
@@ -338,7 +516,17 @@ def _make_fetch_spec(
     extras: Mapping[str, object],
     target_formats: Sequence[str],
 ) -> "FetchSpec":
-    """Instantiate a FetchSpec from raw YAML fields."""
+    """Instantiate a FetchSpec from raw YAML fields.
+
+    Args:
+        ontology_id: Identifier of the ontology being configured.
+        resolver: Name of the resolver responsible for fetching content.
+        extras: Additional resolver-specific configuration parameters.
+        target_formats: Desired output formats for the ontology artefact.
+
+    Returns:
+        Fully initialised ``FetchSpec`` object ready for execution.
+    """
 
     from .core import FetchSpec as _FetchSpec  # Local import avoids circular dependency
 
@@ -354,7 +542,18 @@ def merge_defaults(
     ontology_spec: Mapping[str, object],
     defaults: Optional[DefaultsConfig] = None,
 ):
-    """Merge an ontology specification with resolved default settings."""
+    """Merge an ontology specification with resolved default settings.
+
+    Args:
+        ontology_spec: Raw ontology specification mapping loaded from YAML.
+        defaults: Optional resolved defaults to merge with the specification.
+
+    Returns:
+        FetchSpec instance describing the fully-merged ontology configuration.
+
+    Raises:
+        ConfigError: If required fields are missing or invalid in the specification.
+    """
 
     if defaults is None:
         return build_resolved_config(ontology_spec)
@@ -377,7 +576,17 @@ def merge_defaults(
 
 
 def build_resolved_config(raw_config: Mapping[str, object]) -> ResolvedConfig:
-    """Construct fully-resolved configuration from raw YAML contents."""
+    """Construct fully-resolved configuration from raw YAML contents.
+
+    Args:
+        raw_config: Parsed YAML mapping defining defaults and ontologies.
+
+    Returns:
+        ResolvedConfig combining defaults and individual fetch specifications.
+
+    Raises:
+        ConfigError: If validation fails or required sections are missing.
+    """
 
     try:
         defaults_section = raw_config.get("defaults", {})
@@ -389,9 +598,7 @@ def build_resolved_config(raw_config: Mapping[str, object]) -> ResolvedConfig:
         for error in exc.errors():
             location = " -> ".join(str(part) for part in error["loc"])
             messages.append(f"{location}: {error['msg']}")
-        raise ConfigError(
-            "Configuration validation failed:\n  " + "\n  ".join(messages)
-        ) from exc
+        raise ConfigError("Configuration validation failed:\n  " + "\n  ".join(messages)) from exc
 
     _apply_env_overrides(defaults)
 
@@ -411,7 +618,18 @@ def build_resolved_config(raw_config: Mapping[str, object]) -> ResolvedConfig:
 
 
 def _validate_schema(raw: Mapping[str, object], config: Optional[ResolvedConfig] = None) -> None:
-    """Perform additional structural validation beyond Pydantic models."""
+    """Perform additional structural validation beyond Pydantic models.
+
+    Args:
+        raw: Raw configuration mapping used for structural checks.
+        config: Optional resolved configuration for cross-field validation.
+
+    Returns:
+        None
+
+    Raises:
+        ConfigError: When structural constraints are violated.
+    """
 
     errors: List[str] = []
     defaults = raw.get("defaults")
@@ -452,7 +670,18 @@ def _validate_schema(raw: Mapping[str, object], config: Optional[ResolvedConfig]
 
 
 def load_raw_yaml(config_path: Path) -> MutableMapping[str, object]:
-    """Load and parse a YAML configuration file into a mutable mapping."""
+    """Load and parse a YAML configuration file into a mutable mapping.
+
+    Args:
+        config_path: Path to the YAML configuration file.
+
+    Returns:
+        Mutable mapping representation of the YAML content.
+
+    Raises:
+        SystemExit: If the file is not found on disk.
+        ConfigError: If the YAML cannot be parsed or is structurally invalid.
+    """
 
     try:
         text = config_path.read_text()
@@ -474,14 +703,34 @@ def load_raw_yaml(config_path: Path) -> MutableMapping[str, object]:
 
 
 def load_config(config_path: Path) -> ResolvedConfig:
-    """Load configuration from disk without performing additional schema validation."""
+    """Load configuration from disk without performing additional schema validation.
+
+    Args:
+        config_path: Path to the YAML configuration file.
+
+    Returns:
+        ResolvedConfig produced from the raw file contents.
+
+    Raises:
+        ConfigError: If the configuration cannot be parsed or validated.
+    """
 
     raw = load_raw_yaml(config_path)
     return build_resolved_config(raw)
 
 
 def validate_config(config_path: Path) -> ResolvedConfig:
-    """Validate a configuration file and return the resolved settings."""
+    """Validate a configuration file and return the resolved settings.
+
+    Args:
+        config_path: Path to the YAML configuration file.
+
+    Returns:
+        ResolvedConfig object after validation.
+
+    Raises:
+        ConfigError: If validation fails.
+    """
 
     raw = load_raw_yaml(config_path)
     config = build_resolved_config(raw)

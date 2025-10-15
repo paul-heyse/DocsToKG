@@ -1,4 +1,4 @@
-"""arXiv preprint resolver."""
+"""Resolver that transforms arXiv identifiers into direct PDF download URLs."""
 
 from __future__ import annotations
 
@@ -6,20 +6,38 @@ from typing import TYPE_CHECKING, Iterable
 
 import requests
 
-from ..types import Resolver, ResolverConfig, ResolverResult
 from DocsToKG.ContentDownload.utils import strip_prefix
+
+from ..types import ResolverConfig, ResolverResult
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
 
 class ArxivResolver:
-    """Resolve arXiv preprints using arXiv identifier lookups."""
+    """Resolve arXiv preprints using arXiv identifier lookups.
+
+    Attributes:
+        name: Resolver identifier announced to the pipeline.
+
+    Examples:
+        >>> resolver = ArxivResolver()
+        >>> resolver.name
+        'arxiv'
+    """
 
     name = "arxiv"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
-        """Return ``True`` when the artifact has an arXiv identifier."""
+        """Return ``True`` when the artifact has an arXiv identifier.
+
+        Args:
+            config: Resolver configuration providing arXiv availability toggles.
+            artifact: Work artifact potentially containing an arXiv identifier.
+
+        Returns:
+            Boolean indicating whether arXiv resolution should be attempted.
+        """
 
         return bool(artifact.arxiv_id)
 
@@ -29,7 +47,16 @@ class ArxivResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        """Yield candidate arXiv download URLs."""
+        """Yield candidate arXiv download URLs.
+
+        Args:
+            session: HTTP session available to perform network requests.
+            config: Resolver configuration describing timeouts and headers.
+            artifact: Work artifact with arXiv metadata for resolution.
+
+        Returns:
+            Iterable of resolver results containing download URLs or metadata events.
+        """
 
         arxiv_id = artifact.arxiv_id
         if not arxiv_id:

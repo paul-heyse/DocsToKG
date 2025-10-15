@@ -1,4 +1,4 @@
-"""Crossref API resolver for publisher-hosted PDFs."""
+"""Resolver that queries the Crossref metadata API to surface publisher-hosted PDFs."""
 
 from __future__ import annotations
 
@@ -8,9 +8,10 @@ from urllib.parse import quote
 
 import requests
 
-from ..types import Resolver, ResolverConfig, ResolverResult
-from .unpaywall import _headers_cache_key
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi
+
+from ..types import ResolverConfig, ResolverResult
+from .unpaywall import _headers_cache_key
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
@@ -37,12 +38,29 @@ def _fetch_crossref_data(
 
 
 class CrossrefResolver:
-    """Resolve candidate URLs from the Crossref metadata API."""
+    """Resolve candidate URLs from the Crossref metadata API.
+
+    Attributes:
+        name: Resolver identifier advertised to the orchestrating pipeline.
+
+    Examples:
+        >>> resolver = CrossrefResolver()
+        >>> resolver.name
+        'crossref'
+    """
 
     name = "crossref"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
-        """Return ``True`` when the artifact has a DOI available for lookup."""
+        """Return ``True`` when the artifact has a DOI available for lookup.
+
+        Args:
+            config: Resolver configuration providing Crossref connectivity details.
+            artifact: Work artifact containing bibliographic metadata.
+
+        Returns:
+            Boolean indicating whether a Crossref query should be attempted.
+        """
 
         return artifact.doi is not None
 
@@ -52,7 +70,16 @@ class CrossrefResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        """Yield URLs discovered via the Crossref API for a given artifact."""
+        """Yield URLs discovered via the Crossref API for a given artifact.
+
+        Args:
+            session: HTTP session capable of issuing outbound requests.
+            config: Resolver configuration including timeouts and polite headers.
+            artifact: Work artifact carrying DOI metadata.
+
+        Returns:
+            Iterable of resolver results describing discovered URLs or errors.
+        """
 
         doi = normalize_doi(artifact.doi)
         if not doi:

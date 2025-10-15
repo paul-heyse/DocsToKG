@@ -19,17 +19,16 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, MutableMapping, Optional, cast
+from typing import Dict, Iterable, List, MutableMapping, cast
 
 import psutil
 
+from .config import ResolvedConfig
 from .optdeps import get_owlready2, get_pronto, get_rdflib
 
 rdflib = get_rdflib()
 pronto = get_pronto()
 owlready2 = get_owlready2()
-
-from .config import ResolvedConfig
 
 
 @dataclass(slots=True)

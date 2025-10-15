@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -19,8 +18,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Protocol, Sequence
 from urllib.parse import urlparse
-
-from .optdeps import get_pystow
 
 from .config import ConfigError, ResolvedConfig, ensure_python_version
 from .download import (
@@ -30,6 +27,7 @@ from .download import (
     validate_url_security,
 )
 from .logging_config import generate_correlation_id, setup_logging
+from .optdeps import get_pystow
 from .resolvers import RESOLVERS, FetchPlan
 from .validators import ValidationRequest, ValidationResult, run_validators
 

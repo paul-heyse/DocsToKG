@@ -10,22 +10,20 @@ downloading ontology content.
 from __future__ import annotations
 
 import logging
-import os
 import time
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Dict, Optional
 
+import requests
 from bioregistry import get_obo_download, get_owl_download, get_rdf_download
 from ols_client import OlsClient
 from ontoportal_client import BioPortalClient
-
-import requests
 
 from .config import ConfigError, ResolvedConfig
 from .optdeps import get_pystow
 
 pystow = get_pystow()
+
 
 @dataclass(slots=True)
 class FetchPlan:

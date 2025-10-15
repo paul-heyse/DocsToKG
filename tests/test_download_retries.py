@@ -113,13 +113,18 @@ def _download(
     artifact = _make_artifact(tmp_path)
     context = {"dry_run": False, "extract_html_text": False, "previous": {}}
     session = _make_session({})
-    return artifact, session, context, download_candidate(
-        session,
+    return (
         artifact,
-        url,
-        referer=None,
-        timeout=5.0,
-        context=context,
+        session,
+        context,
+        download_candidate(
+            session,
+            artifact,
+            url,
+            referer=None,
+            timeout=5.0,
+            context=context,
+        ),
     )
 
 

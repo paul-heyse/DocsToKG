@@ -27,6 +27,8 @@ from types import SimpleNamespace
 
 import pytest
 
+pytest.importorskip("pydantic")
+
 from DocsToKG.OntologyDownload.config import DefaultsConfiguration, ResolvedConfig
 from DocsToKG.OntologyDownload.validators import (
     ValidationRequest,
@@ -77,7 +79,9 @@ def make_request(path: Path, tmp_path: Path, config: ResolvedConfig) -> Validati
 def xbrl_package(tmp_path: Path) -> Path:
     archive = tmp_path / "taxonomy.zip"
     with zipfile.ZipFile(archive, "w") as zf:
-        zf.writestr("taxonomy/entrypoint.xsd", "<schema xmlns=\"http://www.w3.org/2001/XMLSchema\" />")
+        zf.writestr(
+            "taxonomy/entrypoint.xsd", '<schema xmlns="http://www.w3.org/2001/XMLSchema" />'
+        )
     return archive
 
 

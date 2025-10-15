@@ -57,7 +57,7 @@ def example_function(param: str) -> bool:
 
 ### Links and References
 
-- Use descriptive link text: `[OpenSpec Instructions](../openspec/AGENTS.md)`
+- Use descriptive link text: `[OpenSpec Instructions](https://github.com/paul-heyse/DocsToKG/blob/main/openspec/AGENTS.md)`
 - Create anchors for internal links: `## Section Title {#section-title}`
 - Reference requirements by ID when possible
 

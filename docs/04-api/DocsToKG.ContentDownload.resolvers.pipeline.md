@@ -1,0 +1,46 @@
+# Module: pipeline
+
+Resolver pipeline orchestration and execution logic.
+
+## Functions
+
+### `_callable_accepts_argument(func, name)`
+
+*No documentation available.*
+
+### `_respect_rate_limit(self, resolver_name)`
+
+*No documentation available.*
+
+### `_jitter_sleep(self)`
+
+*No documentation available.*
+
+### `run(self, session, artifact, context)`
+
+Execute resolvers sequentially until a PDF is obtained or exhausted.
+
+Args:
+session: HTTP session shared across resolver invocations.
+artifact: Work artifact representing the item being resolved.
+context: Optional dictionary carrying pipeline execution context.
+
+Returns:
+PipelineResult describing the final outcome of resolver execution.
+
+## Classes
+
+### `ResolverPipeline`
+
+Executes resolvers in priority order until a PDF download succeeds.
+
+Attributes:
+config: Resolver configuration containing ordering and rate limits.
+download_func: Callable responsible for downloading resolved URLs.
+logger: Structured attempt logger capturing resolver telemetry.
+metrics: Metrics collector tracking resolver performance.
+
+Examples:
+>>> pipeline = ResolverPipeline([], ResolverConfig(), lambda *args, **kwargs: None, None)  # doctest: +SKIP
+>>> isinstance(pipeline.metrics, ResolverMetrics)  # doctest: +SKIP
+True

@@ -1,4 +1,4 @@
-"""Unpaywall API resolver for open access PDFs."""
+"""Resolver that integrates with the Unpaywall API to locate open access PDFs."""
 
 from __future__ import annotations
 
@@ -8,8 +8,9 @@ from urllib.parse import quote
 
 import requests
 
-from ..types import Resolver, ResolverConfig, ResolverResult
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi
+
+from ..types import ResolverConfig, ResolverResult
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
@@ -39,12 +40,29 @@ def _fetch_unpaywall_data(
 
 
 class UnpaywallResolver:
-    """Resolve PDFs via the Unpaywall API."""
+    """Resolve PDFs via the Unpaywall API.
+
+    Attributes:
+        name: Resolver identifier announced to the pipeline.
+
+    Examples:
+        >>> resolver = UnpaywallResolver()
+        >>> resolver.name
+        'unpaywall'
+    """
 
     name = "unpaywall"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
-        """Return ``True`` when Unpaywall is configured and the work has a DOI."""
+        """Return ``True`` when Unpaywall is configured and the work has a DOI.
+
+        Args:
+            config: Resolver configuration containing Unpaywall credentials.
+            artifact: Work artifact potentially containing a DOI identifier.
+
+        Returns:
+            Boolean indicating whether the Unpaywall resolver should run.
+        """
 
         return bool(config.unpaywall_email and artifact.doi)
 
@@ -54,7 +72,16 @@ class UnpaywallResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        """Yield candidate PDF URLs discovered via the Unpaywall API."""
+        """Yield candidate PDF URLs discovered via the Unpaywall API.
+
+        Args:
+            session: HTTP session used to issue API requests.
+            config: Resolver configuration defining headers, timeouts, and email.
+            artifact: Work artifact describing the scholarly record to resolve.
+
+        Returns:
+            Iterable of resolver results with download URLs or status events.
+        """
 
         doi = normalize_doi(artifact.doi)
         if not doi:

@@ -6,21 +6,39 @@ from typing import TYPE_CHECKING, Iterable
 
 import requests
 
-from ..types import Resolver, ResolverConfig, ResolverResult
 from DocsToKG.ContentDownload.http import request_with_retries
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi
+
+from ..types import ResolverConfig, ResolverResult
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
 
 class DoajResolver:
-    """Resolve Open Access links using the DOAJ API."""
+    """Resolve Open Access links using the DOAJ API.
+
+    Attributes:
+        name: Resolver identifier surfaced to the orchestration pipeline.
+
+    Examples:
+        >>> resolver = DoajResolver()
+        >>> resolver.name
+        'doaj'
+    """
 
     name = "doaj"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
-        """Return ``True`` when the artifact has a DOI for DOAJ lookup."""
+        """Return ``True`` when the artifact has a DOI for DOAJ lookup.
+
+        Args:
+            config: Resolver configuration containing DOAJ API credentials.
+            artifact: Work artifact possibly holding a DOI identifier.
+
+        Returns:
+            Boolean indicating whether DOAJ resolution should run.
+        """
 
         return artifact.doi is not None
 
@@ -30,7 +48,16 @@ class DoajResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        """Yield candidate URLs discovered via DOAJ article metadata."""
+        """Yield candidate URLs discovered via DOAJ article metadata.
+
+        Args:
+            session: HTTP session capable of performing DOAJ API requests.
+            config: Resolver configuration specifying headers and API key.
+            artifact: Work artifact representing the item being resolved.
+
+        Returns:
+            Iterable of resolver results for candidate Open Access URLs.
+        """
 
         doi = normalize_doi(artifact.doi)
         if not doi:

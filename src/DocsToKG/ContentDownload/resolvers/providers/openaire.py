@@ -1,4 +1,4 @@
-"""OpenAIRE research infrastructure resolver."""
+"""Resolver connecting to the OpenAIRE research infrastructure for discovery."""
 
 from __future__ import annotations
 
@@ -7,9 +7,10 @@ from typing import TYPE_CHECKING, Iterable, List
 
 import requests
 
-from ..types import Resolver, ResolverConfig, ResolverResult
 from DocsToKG.ContentDownload.http import request_with_retries
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi
+
+from ..types import ResolverConfig, ResolverResult
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
@@ -28,12 +29,29 @@ def _collect_candidate_urls(node: object, results: List[str]) -> None:
 
 
 class OpenAireResolver:
-    """Resolve URLs using the OpenAIRE API."""
+    """Resolve URLs using the OpenAIRE API.
+
+    Attributes:
+        name: Resolver identifier used when interacting with the pipeline.
+
+    Examples:
+        >>> resolver = OpenAireResolver()
+        >>> resolver.name
+        'openaire'
+    """
 
     name = "openaire"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
-        """Return ``True`` when the artifact has a DOI."""
+        """Return ``True`` when the artifact has a DOI.
+
+        Args:
+            config: Resolver configuration controlling OpenAIRE behaviour.
+            artifact: Work artifact containing metadata such as DOI.
+
+        Returns:
+            Boolean indicating whether an OpenAIRE lookup should be attempted.
+        """
 
         return artifact.doi is not None
 
@@ -43,7 +61,16 @@ class OpenAireResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        """Yield candidate URLs discovered via OpenAIRE search."""
+        """Yield candidate URLs discovered via OpenAIRE search.
+
+        Args:
+            session: HTTP session available for outbound requests.
+            config: Resolver configuration with polite headers and timeouts.
+            artifact: Work artifact describing the item being resolved.
+
+        Returns:
+            Iterable of resolver results representing discovered URLs.
+        """
 
         doi = normalize_doi(artifact.doi)
         if not doi:

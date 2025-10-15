@@ -15,19 +15,7 @@ downloading ontology content.
 
 ### `_build_plan(self)`
 
-Create a FetchPlan instance with resolver metadata and service identifier.
-
-Args:
-url: Final download URL returned by the resolver.
-headers: Optional HTTP headers required by the upstream service.
-filename_hint: Suggested filename derived from resolver metadata.
-version: Optional ontology version string.
-license: Optional license text supplied by the service.
-media_type: Optional MIME type describing the artifact.
-service: Optional logical service identifier for rate limiting.
-
-Returns:
-FetchPlan populated with the provided metadata.
+*No documentation available.*
 
 ### `plan(self, spec, config, logger)`
 
@@ -108,16 +96,6 @@ FetchPlan referencing the specified ZIP archive.
 Raises:
 ConfigError: If the specification omits the required URL.
 
-### `join(self)`
-
-Join path segments relative to the fallback cache root.
-
-Args:
-*segments: Individual path components to append.
-
-Returns:
-Path rooted under the fallback pystow directory.
-
 ## Classes
 
 ### `FetchPlan`
@@ -131,7 +109,7 @@ filename_hint: Optional filename recommended by the resolver.
 version: Version identifier derived from resolver metadata.
 license: License reported for the ontology.
 media_type: MIME type of the artifact when known.
-service: Logical service identifier used for rate limiting (e.g., ``"ols"``).
+service: Logical service identifier used for rate limiting.
 
 Examples:
 >>> plan = FetchPlan(
@@ -223,15 +201,3 @@ Examples:
 >>> resolver = XBRLResolver()
 >>> callable(getattr(resolver, "plan"))
 True
-
-### `_PystowFallback`
-
-Minimal pystow replacement used when optional dependency is absent.
-
-Attributes:
-_root: Path root where cached resources should be stored.
-
-Examples:
->>> fallback = _PystowFallback()
->>> fallback.join("configs").name
-'configs'

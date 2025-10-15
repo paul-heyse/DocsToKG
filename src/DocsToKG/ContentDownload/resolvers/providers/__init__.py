@@ -1,4 +1,4 @@
-"""Resolver provider implementations and registry."""
+"""Resolver provider implementations and registry used by the content download pipeline."""
 
 from typing import List
 
@@ -19,7 +19,14 @@ from .wayback import WaybackResolver
 
 
 def default_resolvers() -> List[Resolver]:
-    """Return default resolver instances in priority order."""
+    """Return default resolver instances in priority order.
+
+    Args:
+        None
+
+    Returns:
+        List of resolver instances ordered by preferred execution priority.
+    """
 
     return [
         UnpaywallResolver(),

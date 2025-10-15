@@ -132,88 +132,6 @@ Dictionary with boolean status, detail payload, and output paths.
 
 *No documentation available.*
 
-### `parse(self, path)`
-
-Record the source path so downstream operations can inspect it.
-
-Args:
-path: Filesystem path passed to the stub parser.
-
-Returns:
-None
-
-Raises:
-None
-
-### `__len__(self)`
-
-*No documentation available.*
-
-### `serialize(self, destination, format)`
-
-Write the previously parsed payload to the destination path.
-
-Args:
-destination: Output path where serialized content will be written.
-format: Serialization format requested by the caller.
-
-Returns:
-None
-
-### `terms(self)`
-
-Yield placeholder ontology terms for test environments.
-
-Args:
-None
-
-Returns:
-List[str]: Static list of representative term identifiers.
-
-### `dump(self, destination, format)`
-
-Write a minimal ontology representation to disk.
-
-Args:
-destination: Path where the serialized ontology should be stored.
-format: Requested output format (ignored by the stub).
-
-Returns:
-None
-
-### `classes(self)`
-
-Return placeholder class identifiers for compatibility tests.
-
-Args:
-None
-
-Returns:
-list[str]: Static list of ontology class identifiers.
-
-### `load(self)`
-
-Simulate ontology loading and return a stub content object.
-
-Args:
-None
-
-Returns:
-_StubLoadedOntology: Placeholder ontology representation.
-
-Raises:
-None
-
-### `get_ontology(uri)`
-
-Return a stub ontology wrapper for the provided URI.
-
-Args:
-uri: URI identifying the ontology resource.
-
-Returns:
-_StubOntologyWrapper: Lightweight wrapper exposing `.load()`.
-
 ## Classes
 
 ### `ValidationRequest`
@@ -266,34 +184,6 @@ Examples:
 Traceback (most recent call last):
 ...
 ValidationTimeout: rdflib exceeded 60s
-
-### `_StubGraph`
-
-*No documentation available.*
-
-### `_StubRDFLib`
-
-*No documentation available.*
-
-### `_StubOntology`
-
-*No documentation available.*
-
-### `_StubPronto`
-
-*No documentation available.*
-
-### `_StubLoadedOntology`
-
-*No documentation available.*
-
-### `_StubOntologyWrapper`
-
-*No documentation available.*
-
-### `_StubOwlready2`
-
-*No documentation available.*
 
 ### `_Alarm`
 

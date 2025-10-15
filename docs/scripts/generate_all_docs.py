@@ -16,7 +16,7 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 
 class DocumentationGenerator:
@@ -41,7 +41,7 @@ class DocumentationGenerator:
 
         print(f"🏃 Running {script_name}...")
         try:
-            result = subprocess.run(cmd, cwd=self.project_root, check=True)
+            subprocess.run(cmd, cwd=self.project_root, check=True)
             print(f"✅ {script_name} completed successfully")
             return True
         except subprocess.CalledProcessError as e:

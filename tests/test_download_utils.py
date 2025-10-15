@@ -20,6 +20,8 @@ Usage:
 
 import pytest
 
+pytest.importorskip("pyalex")
+
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
 from DocsToKG.ContentDownload.utils import normalize_doi, normalize_pmcid
 

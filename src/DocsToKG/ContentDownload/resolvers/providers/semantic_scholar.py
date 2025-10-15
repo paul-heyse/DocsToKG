@@ -1,4 +1,4 @@
-"""Semantic Scholar Graph API resolver."""
+"""Resolver that queries the Semantic Scholar Graph API for open access PDFs."""
 
 from __future__ import annotations
 
@@ -8,9 +8,10 @@ from urllib.parse import quote
 
 import requests
 
-from ..types import Resolver, ResolverConfig, ResolverResult
-from .unpaywall import _headers_cache_key
 from DocsToKG.ContentDownload.utils import normalize_doi
+
+from ..types import ResolverConfig, ResolverResult
+from .unpaywall import _headers_cache_key
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
@@ -23,10 +24,9 @@ def _fetch_semantic_scholar_data(
     timeout: float,
     headers_key: Tuple[Tuple[str, str], ...],
 ) -> Dict[str, Any]:
-        headers = dict(headers_key)
-        if api_key:
-            headers = dict(headers)
-            headers["x-api-key"] = api_key
+    headers = dict(headers_key)
+    if api_key:
+        headers["x-api-key"] = api_key
     response = requests.get(
         f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(doi)}",
         params={"fields": "title,openAccessPdf"},
@@ -39,12 +39,29 @@ def _fetch_semantic_scholar_data(
 
 
 class SemanticScholarResolver:
-    """Resolve PDFs via the Semantic Scholar Graph API."""
+    """Resolve PDFs via the Semantic Scholar Graph API.
+
+    Attributes:
+        name: Resolver identifier exposed to the orchestration layer.
+
+    Examples:
+        >>> resolver = SemanticScholarResolver()
+        >>> resolver.name
+        'semantic_scholar'
+    """
 
     name = "semantic_scholar"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
-        """Return ``True`` when the artifact has a DOI suitable for lookup."""
+        """Return ``True`` when the artifact has a DOI suitable for lookup.
+
+        Args:
+            config: Resolver configuration containing Semantic Scholar settings.
+            artifact: Work artifact potentially carrying a DOI.
+
+        Returns:
+            Boolean indicating whether the resolver can operate on the artifact.
+        """
 
         return artifact.doi is not None
 
@@ -54,7 +71,16 @@ class SemanticScholarResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        """Yield candidate URLs discovered via Semantic Scholar."""
+        """Yield candidate URLs discovered via Semantic Scholar.
+
+        Args:
+            session: HTTP session for outbound API communication.
+            config: Resolver configuration providing headers and timeouts.
+            artifact: Work artifact describing the scholarly work to resolve.
+
+        Returns:
+            Iterable of resolver results containing download URLs or metadata events.
+        """
 
         doi = normalize_doi(artifact.doi)
         if not doi:

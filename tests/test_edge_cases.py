@@ -27,10 +27,7 @@ from typing import Any, Dict, Iterable, Iterator, List
 
 import pytest
 
-pytest.importorskip("requests")
-import requests
-
-responses = pytest.importorskip("responses")
+pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload.download_pyalex_pdfs import (
     JsonlLogger,
@@ -47,6 +44,9 @@ from DocsToKG.ContentDownload.resolvers import (
     ResolverResult,
     WaybackResolver,
 )
+
+requests = pytest.importorskip("requests")
+responses = pytest.importorskip("responses")
 
 
 def _make_artifact(tmp_path: Path, **overrides: Any) -> WorkArtifact:
@@ -99,7 +99,9 @@ def test_wayback_resolver_skips_unavailable_archives(tmp_path: Path) -> None:
     responses.add(
         responses.GET,
         "https://archive.org/wayback/available",
-        json={"archived_snapshots": {"closest": {"available": False, "url": "https://archive.org"}}},
+        json={
+            "archived_snapshots": {"closest": {"available": False, "url": "https://archive.org"}}
+        },
         status=200,
     )
 
@@ -175,9 +177,19 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
     logger.close()
 
     assert result["saved"] is True
-    records = [json.loads(line) for line in logger_path.read_text(encoding="utf-8").strip().splitlines()]
-    attempts = [entry for entry in records if entry["record_type"] == "attempt" and entry["status"] in {"pdf", "pdf_unknown"}]
-    manifests = [entry for entry in records if entry["record_type"] == "manifest" and entry["classification"] in {"pdf", "pdf_unknown"}]
+    records = [
+        json.loads(line) for line in logger_path.read_text(encoding="utf-8").strip().splitlines()
+    ]
+    attempts = [
+        entry
+        for entry in records
+        if entry["record_type"] == "attempt" and entry["status"] in {"pdf", "pdf_unknown"}
+    ]
+    manifests = [
+        entry
+        for entry in records
+        if entry["record_type"] == "manifest" and entry["classification"] in {"pdf", "pdf_unknown"}
+    ]
     assert len(attempts) == 1
     assert len(manifests) == 1
     assert attempts[0]["work_id"] == manifests[0]["work_id"] == "WEDGE"
@@ -206,7 +218,9 @@ def test_openalex_attempts_use_session_headers(tmp_path: Path) -> None:
         {"dry_run": True, "extract_html_text": False, "previous": {}},
     )
 
-    assert any(call.request.headers.get("User-Agent") == "EdgeTester/1.0" for call in responses.calls)
+    assert any(
+        call.request.headers.get("User-Agent") == "EdgeTester/1.0" for call in responses.calls
+    )
     logger.close()
 
 

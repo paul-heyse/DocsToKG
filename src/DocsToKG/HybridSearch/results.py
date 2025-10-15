@@ -81,7 +81,9 @@ class ResultShaper:
             rank = current_idx + 1
             if not self._within_doc_limit(chunk.doc_id, doc_buckets):
                 continue
-            if emitted_indices and self._is_near_duplicate(embeddings, current_idx, emitted_indices):
+            if emitted_indices and self._is_near_duplicate(
+                embeddings, current_idx, emitted_indices
+            ):
                 continue
             highlights = self._build_highlights(chunk, query_tokens)
             diagnostics = HybridSearchDiagnostics(
@@ -126,7 +128,16 @@ class ResultShaper:
         current_idx: int,
         emitted_indices: Sequence[int],
     ) -> bool:
-        """Determine whether the current chunk is too similar to emitted ones."""
+        """Determine whether the current chunk is too similar to emitted ones.
+
+        Args:
+            embeddings: Matrix of chunk embeddings ordered to match `ordered_chunks`.
+            current_idx: Index of the chunk currently under consideration.
+            emitted_indices: Indices that have already been emitted in the final results.
+
+        Returns:
+            True when the current chunk's embedding exceeds the cosine similarity threshold.
+        """
 
         if not emitted_indices:
             return False

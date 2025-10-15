@@ -8,10 +8,9 @@ functions, and methods according to the established standards.
 This is an example implementation - not the actual production code.
 """
 
-from typing import List, Dict, Optional, Any
-from dataclasses import dataclass
-import asyncio
 import logging
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 
 @dataclass

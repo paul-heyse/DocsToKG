@@ -28,9 +28,7 @@ def test_successful_request_no_retries():
     result = request_with_retries(session, "GET", "https://example.org/test")
 
     assert result is response
-    session.request.assert_called_once_with(
-        method="GET", url="https://example.org/test"
-    )
+    session.request.assert_called_once_with(method="GET", url="https://example.org/test")
 
 
 @patch("DocsToKG.ContentDownload.http.random.random", return_value=0.0)

@@ -24,14 +24,27 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("requests")
-import requests
-
-responses = pytest.importorskip("responses")
-from responses import matchers
+pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload import resolvers
+from DocsToKG.ContentDownload.resolvers import ResolverConfig
+from DocsToKG.ContentDownload.resolvers.providers.core import CoreResolver
+from DocsToKG.ContentDownload.resolvers.providers.crossref import CrossrefResolver
+from DocsToKG.ContentDownload.resolvers.providers.doaj import DoajResolver
+from DocsToKG.ContentDownload.resolvers.providers.europe_pmc import EuropePmcResolver
+from DocsToKG.ContentDownload.resolvers.providers.hal import HalResolver
+from DocsToKG.ContentDownload.resolvers.providers.landing_page import LandingPageResolver
+from DocsToKG.ContentDownload.resolvers.providers.openaire import OpenAireResolver
+from DocsToKG.ContentDownload.resolvers.providers.osf import OsfResolver
+from DocsToKG.ContentDownload.resolvers.providers.pmc import PmcResolver
+from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import (
+    SemanticScholarResolver,
+)
+from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver
+from DocsToKG.ContentDownload.resolvers.providers.wayback import WaybackResolver
+
+requests = pytest.importorskip("requests")
+responses = pytest.importorskip("responses")
 
 
 def make_artifact(tmp_path: Path, **overrides: object) -> downloader.WorkArtifact:
@@ -55,8 +68,8 @@ def make_artifact(tmp_path: Path, **overrides: object) -> downloader.WorkArtifac
     return downloader.WorkArtifact(**base_kwargs)
 
 
-def build_config(**overrides: object) -> resolvers.ResolverConfig:
-    config = resolvers.ResolverConfig()
+def build_config(**overrides: object) -> ResolverConfig:
+    config = ResolverConfig()
     for key, value in overrides.items():
         setattr(config, key, value)
     return config
@@ -77,7 +90,11 @@ def test_unpaywall_resolver_success(tmp_path):
         status=200,
     )
 
-    urls = [result.url for result in resolvers.UnpaywallResolver().iter_urls(session, config, artifact) if not result.is_event]
+    urls = [
+        result.url
+        for result in UnpaywallResolver().iter_urls(session, config, artifact)
+        if not result.is_event
+    ]
     assert urls == ["https://oa.example/best.pdf", "https://oa.example/extra.pdf"]
 
 
@@ -91,7 +108,7 @@ def test_unpaywall_resolver_http_error(tmp_path):
         "https://api.unpaywall.org/v2/10.1000/example",
         status=503,
     )
-    results = list(resolvers.UnpaywallResolver().iter_urls(session, config, artifact))
+    results = list(UnpaywallResolver().iter_urls(session, config, artifact))
     assert results[0].event == "error"
     assert results[0].event_reason == "http-error"
 
@@ -117,7 +134,7 @@ def test_crossref_resolver_includes_mailto(tmp_path):
         status=200,
     )
 
-    urls = [r.url for r in resolvers.CrossrefResolver().iter_urls(session, config, artifact)]
+    urls = [r.url for r in CrossrefResolver().iter_urls(session, config, artifact)]
     assert urls == ["https://publisher.example/file.pdf"]
     assert "mailto=tester%40example.org" in responses.calls[0].request.url
 
@@ -133,7 +150,7 @@ def test_crossref_resolver_handles_json_error(tmp_path):
         body="not-json",
         status=200,
     )
-    results = list(resolvers.CrossrefResolver().iter_urls(session, config, artifact))
+    results = list(CrossrefResolver().iter_urls(session, config, artifact))
     assert results[0].event == "error"
     assert results[0].event_reason == "json-error"
 
@@ -150,7 +167,11 @@ def test_landing_page_resolver_patterns(tmp_path):
     """
     responses.add(responses.GET, "https://site.example/article", body=html, status=200)
     session = requests.Session()
-    results = [r for r in resolvers.LandingPageResolver().iter_urls(session, config, artifact) if not r.is_event]
+    results = [
+        r
+        for r in LandingPageResolver().iter_urls(session, config, artifact)
+        if not r.is_event
+    ]
     assert results[0].url == "https://site.example/files/paper.pdf"
 
     html_anchor = """
@@ -158,7 +179,11 @@ def test_landing_page_resolver_patterns(tmp_path):
     """
     responses.add(responses.GET, "https://site.example/anchor", body=html_anchor, status=200)
     artifact.landing_urls = ["https://site.example/anchor"]
-    results = [r for r in resolvers.LandingPageResolver().iter_urls(session, config, artifact) if not r.is_event]
+    results = [
+        r
+        for r in LandingPageResolver().iter_urls(session, config, artifact)
+        if not r.is_event
+    ]
     assert results[0].metadata["pattern"] == "anchor"
 
 
@@ -169,7 +194,11 @@ def test_landing_page_resolver_http_error(tmp_path):
     config = build_config()
     responses.add(responses.GET, "https://site.example/error", status=500)
     session = requests.Session()
-    events = [r for r in resolvers.LandingPageResolver().iter_urls(session, config, artifact) if r.is_event]
+    events = [
+        r
+        for r in LandingPageResolver().iter_urls(session, config, artifact)
+        if r.is_event
+    ]
     assert events[0].event_reason == "http-error"
 
 
@@ -181,7 +210,16 @@ def test_pmc_resolver_uses_id_converter(tmp_path):
     responses.add(
         responses.GET,
         "https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/",
-        match=[matchers.query_param_matcher({"ids": "10.1000/example", "format": "json", "tool": "docs-to-kg", "email": "tester@example.org"})],
+        match=[
+            responses.matchers.query_param_matcher(
+                {
+                    "ids": "10.1000/example",
+                    "format": "json",
+                    "tool": "docs-to-kg",
+                    "email": "tester@example.org",
+                }
+            )
+        ],
         json={"records": [{"pmcid": "PMC777"}]},
         status=200,
     )
@@ -191,7 +229,7 @@ def test_pmc_resolver_uses_id_converter(tmp_path):
         body='href="/articles/PMC777/pdf/foo.pdf"',
         status=200,
     )
-    results = [r.url for r in resolvers.PmcResolver().iter_urls(session, config, artifact)]
+    results = [r.url for r in PmcResolver().iter_urls(session, config, artifact)]
     assert "https://www.ncbi.nlm.nih.gov/articles/PMC777/pdf/foo.pdf" in results
     assert "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC777/pdf/" in results
 
@@ -206,7 +244,7 @@ def test_pmc_resolver_handles_request_error(tmp_path):
         "https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id=PMC123",
         body=responses.ConnectionError("boom"),
     )
-    results = list(resolvers.PmcResolver().iter_urls(session, config, artifact))
+    results = list(PmcResolver().iter_urls(session, config, artifact))
     assert results[-1].url.endswith("PMC123/pdf/")
 
 
@@ -234,7 +272,7 @@ def test_europe_pmc_resolver_filters_pdf(tmp_path):
         },
         status=200,
     )
-    urls = [r.url for r in resolvers.EuropePmcResolver().iter_urls(session, config, artifact)]
+    urls = [r.url for r in EuropePmcResolver().iter_urls(session, config, artifact)]
     assert urls == ["https://epmc.org/pdf1"]
 
 
@@ -248,7 +286,7 @@ def test_europe_pmc_resolver_http_error(tmp_path):
         "https://www.ebi.ac.uk/europepmc/webservices/rest/search",
         status=500,
     )
-    urls = list(resolvers.EuropePmcResolver().iter_urls(session, config, artifact))
+    urls = list(EuropePmcResolver().iter_urls(session, config, artifact))
     assert urls == []
 
 
@@ -282,7 +320,7 @@ def test_openaire_resolver_collects_pdf_candidates(tmp_path):
         status=200,
     )
 
-    urls = [r.url for r in resolvers.OpenAireResolver().iter_urls(session, config, artifact)]
+    urls = [r.url for r in OpenAireResolver().iter_urls(session, config, artifact)]
     assert urls == ["https://openaire.example/paper.pdf"]
 
 
@@ -310,7 +348,7 @@ def test_hal_resolver_uses_file_fields(tmp_path):
         status=200,
     )
 
-    urls = [r.url for r in resolvers.HalResolver().iter_urls(session, config, artifact)]
+    urls = [r.url for r in HalResolver().iter_urls(session, config, artifact)]
     assert urls == [
         "https://hal.archives-ouvertes.fr/fileMain.pdf",
         "https://hal.archives-ouvertes.fr/alternate.pdf",
@@ -330,9 +368,7 @@ def test_osf_resolver_merges_download_links(tmp_path):
                 {
                     "links": {"download": "https://osf.io/download1"},
                     "attributes": {
-                        "primary_file": {
-                            "links": {"download": "https://osf.io/download2"}
-                        }
+                        "primary_file": {"links": {"download": "https://osf.io/download2"}}
                     },
                 }
             ]
@@ -340,7 +376,7 @@ def test_osf_resolver_merges_download_links(tmp_path):
         status=200,
     )
 
-    urls = [r.url for r in resolvers.OsfResolver().iter_urls(session, config, artifact)]
+    urls = [r.url for r in OsfResolver().iter_urls(session, config, artifact)]
     assert urls == ["https://osf.io/download1", "https://osf.io/download2"]
 
 
@@ -360,7 +396,7 @@ def test_core_resolver_success(tmp_path):
         },
         status=200,
     )
-    urls = [r.url for r in resolvers.CoreResolver().iter_urls(session, config, artifact)]
+    urls = [r.url for r in CoreResolver().iter_urls(session, config, artifact)]
     assert urls == ["https://core.org/paper.pdf", "https://core.org/extra.pdf"]
 
 
@@ -370,7 +406,7 @@ def test_core_resolver_handles_failure(tmp_path):
     artifact = make_artifact(tmp_path)
     config = build_config(core_api_key="abc123")
     responses.add(responses.GET, "https://api.core.ac.uk/v3/search/works", status=500)
-    urls = list(resolvers.CoreResolver().iter_urls(session, config, artifact))
+    urls = list(CoreResolver().iter_urls(session, config, artifact))
     assert urls == []
 
 
@@ -396,7 +432,7 @@ def test_doaj_resolver_filters_pdf(tmp_path):
         },
         status=200,
     )
-    urls = [r.url for r in resolvers.DoajResolver().iter_urls(session, config, artifact)]
+    urls = [r.url for r in DoajResolver().iter_urls(session, config, artifact)]
     assert urls == ["https://doaj.org/paper.pdf"]
 
 
@@ -406,7 +442,7 @@ def test_doaj_resolver_handles_error(tmp_path):
     artifact = make_artifact(tmp_path)
     config = build_config()
     responses.add(responses.GET, "https://doaj.org/api/v2/search/articles/", status=429)
-    urls = list(resolvers.DoajResolver().iter_urls(session, config, artifact))
+    urls = list(DoajResolver().iter_urls(session, config, artifact))
     assert urls == []
 
 
@@ -420,7 +456,7 @@ def test_semantic_scholar_resolver_handles_error(tmp_path):
         "https://api.semanticscholar.org/graph/v1/paper/DOI:10.1000/example",
         status=500,
     )
-    results = list(resolvers.SemanticScholarResolver().iter_urls(session, config, artifact))
+    results = list(SemanticScholarResolver().iter_urls(session, config, artifact))
     assert results == []
 
 
@@ -435,7 +471,7 @@ def test_semantic_scholar_resolver_success(tmp_path):
         json={"openAccessPdf": {"url": "https://s2.org/paper.pdf"}},
         status=200,
     )
-    urls = [r.url for r in resolvers.SemanticScholarResolver().iter_urls(session, config, artifact)]
+    urls = [r.url for r in SemanticScholarResolver().iter_urls(session, config, artifact)]
     assert urls == ["https://s2.org/paper.pdf"]
 
 
@@ -458,7 +494,7 @@ def test_wayback_resolver_success(tmp_path):
         },
         status=200,
     )
-    urls = [r.url for r in resolvers.WaybackResolver().iter_urls(session, config, artifact)]
+    urls = [r.url for r in WaybackResolver().iter_urls(session, config, artifact)]
     assert urls == ["https://web.archive.org/web/20200101/https://dead.example/file.pdf"]
 
 
@@ -473,5 +509,5 @@ def test_wayback_resolver_handles_missing_snapshot(tmp_path):
         json={"archived_snapshots": {"closest": {"available": False}}},
         status=200,
     )
-    urls = list(resolvers.WaybackResolver().iter_urls(session, config, artifact))
+    urls = list(WaybackResolver().iter_urls(session, config, artifact))
     assert urls == []

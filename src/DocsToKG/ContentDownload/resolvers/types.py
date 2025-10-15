@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterable, List, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Protocol
 
 import requests
+
+if TYPE_CHECKING:
+    from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
 DEFAULT_RESOLVER_ORDER: List[str] = [
     "unpaywall",

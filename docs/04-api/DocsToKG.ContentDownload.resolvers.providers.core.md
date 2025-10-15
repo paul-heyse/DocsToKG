@@ -1,0 +1,42 @@
+# Module: core
+
+CORE API resolver for aggregated open access content.
+
+## Functions
+
+### `is_enabled(self, config, artifact)`
+
+Return ``True`` when a CORE API key and DOI are available.
+
+Args:
+config: Resolver configuration containing CORE credentials.
+artifact: Work artifact that may include a DOI identifier.
+
+Returns:
+Boolean indicating whether CORE resolution should proceed.
+
+### `iter_urls(self, session, config, artifact)`
+
+Yield candidate URLs returned by the CORE API.
+
+Args:
+session: HTTP session for issuing API requests to CORE.
+config: Resolver configuration offering headers and timeouts.
+artifact: Work artifact representing the scholarly work under consideration.
+
+Returns:
+Iterable of resolver results containing download URLs.
+
+## Classes
+
+### `CoreResolver`
+
+Resolve PDFs using the CORE API.
+
+Attributes:
+name: Resolver identifier exposed to the orchestration pipeline.
+
+Examples:
+>>> resolver = CoreResolver()
+>>> resolver.name
+'core'

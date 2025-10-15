@@ -24,6 +24,26 @@ None
 Returns:
 DenseIndexConfig associated with this manager.
 
+### `gpu_resources(self)`
+
+Return the FAISS GPU resources backing the index.
+
+Args:
+None
+
+Returns:
+`faiss.StandardGpuResources` instance when GPU execution is enabled, otherwise ``None``.
+
+### `device(self)`
+
+Return the GPU device identifier assigned to the index manager.
+
+Args:
+None
+
+Returns:
+Integer CUDA device ordinal used for FAISS kernels.
+
 ### `set_id_resolver(self, resolver)`
 
 Register a callback translating FAISS internal IDs to vector UUIDs.
@@ -133,6 +153,10 @@ Dictionary containing index configuration and diagnostics.
 
 *No documentation available.*
 
+### `_maybe_reserve_memory(self, index)`
+
+*No documentation available.*
+
 ### `_to_cpu(self, index)`
 
 *No documentation available.*
@@ -168,6 +192,10 @@ int: GPU device identifier to use for FAISS operations.
 *No documentation available.*
 
 ### `_ensure_dim(self, vector)`
+
+*No documentation available.*
+
+### `_flush_pending_deletes(self)`
 
 *No documentation available.*
 

@@ -24,6 +24,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("pyalex")
+
 pytest.importorskip("requests")
 import requests
 
@@ -74,7 +76,9 @@ def test_resume_skips_completed_work(tmp_path: Path) -> None:
     logger.close()
 
     assert result["skipped"] is True
-    entries = [json.loads(line) for line in logger_path.read_text(encoding="utf-8").strip().splitlines()]
+    entries = [
+        json.loads(line) for line in logger_path.read_text(encoding="utf-8").strip().splitlines()
+    ]
     manifest_entries = [entry for entry in entries if entry["record_type"] == "manifest"]
     assert len(manifest_entries) == 1
     manifest = manifest_entries[0]

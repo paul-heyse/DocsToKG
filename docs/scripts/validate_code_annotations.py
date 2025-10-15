@@ -15,13 +15,12 @@ Usage:
     python docs/scripts/validate_code_annotations.py [source_directory]
 """
 
+import argparse
 import ast
 import re
 import sys
-import os
 from pathlib import Path
-from typing import Dict, List, Set, Tuple, Any
-import argparse
+from typing import Dict, List
 
 
 class CodeAnnotationValidator:
@@ -388,7 +387,7 @@ class CodeAnnotationValidator:
                 issues_by_type[issue_type] = []
             issues_by_type[issue_type].append(issue)
 
-        print(f"\n📋 Code Annotation Validation Report")
+        print("\n📋 Code Annotation Validation Report")
         print("=" * 60)
 
         total_issues = len(issues)

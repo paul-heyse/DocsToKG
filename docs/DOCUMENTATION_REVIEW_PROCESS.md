@@ -283,8 +283,8 @@ For large documentation changes:
 
 - **Style Guide**: [STYLE_GUIDE.md](STYLE_GUIDE.md) for writing standards
 - **Code Standards**: [CODE_ANNOTATION_STANDARDS.md](CODE_ANNOTATION_STANDARDS.md) for code documentation
-- **Templates**: [templates/](templates/) for documentation formats
-- **Examples**: [examples/](examples/) for implementation patterns
+- **Templates**: [Documentation templates](https://github.com/paul-heyse/DocsToKG/tree/main/docs/templates) for common formats
+- **Examples**: [Reference examples](https://github.com/paul-heyse/DocsToKG/tree/main/docs/examples) for implementation patterns
 
 ### 💬 **Support**
 

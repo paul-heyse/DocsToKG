@@ -25,6 +25,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("pydantic")
+
 from DocsToKG.OntologyDownload import core, download, resolvers, validators
 from DocsToKG.OntologyDownload.config import DefaultsConfiguration, ResolvedConfig
 
@@ -196,5 +198,8 @@ def test_fetch_all_logs_progress(monkeypatch, patched_dirs, stubbed_validators, 
     monkeypatch.setitem(resolvers.RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
     config = ResolvedConfig(defaults=DefaultsConfiguration(), specs=())
     caplog.set_level(logging.INFO)
-    core.fetch_all([core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"])], config=config)
+    core.fetch_all(
+        [core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"])],
+        config=config,
+    )
     assert any("progress" in record.getMessage() for record in caplog.records)

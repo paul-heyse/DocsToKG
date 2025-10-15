@@ -304,7 +304,20 @@ class StreamingDownloader(pooch.HTTPDownloader):
     def _preliminary_head_check(
         self, url: str, session: requests.Session
     ) -> tuple[Optional[str], Optional[int]]:
-        """Perform a HEAD request to gather metadata prior to GET."""
+        """Probe the origin with HEAD to audit headers before downloading.
+
+        Args:
+            url: Fully qualified download URL resolved by the planner.
+            session: Prepared requests session used for outbound calls.
+
+        Returns:
+            Tuple ``(content_type, content_length)`` extracted from response
+            headers. Each element is ``None`` when the origin omits it.
+
+        Raises:
+            ConfigError: If the origin reports a payload larger than the
+                configured ``max_download_size_gb`` limit.
+        """
 
         try:
             response = session.head(
@@ -363,7 +376,16 @@ class StreamingDownloader(pooch.HTTPDownloader):
         expected_media_type: Optional[str],
         url: str,
     ) -> None:
-        """Validate that the received Content-Type matches expectations."""
+        """Validate that the received ``Content-Type`` header is acceptable.
+
+        Args:
+            actual_content_type: Raw header value reported by the origin server.
+            expected_media_type: MIME type declared by resolver metadata.
+            url: Download URL logged when mismatches occur.
+
+        Returns:
+            None
+        """
 
         if not self.http_config.validate_media_type:
             return

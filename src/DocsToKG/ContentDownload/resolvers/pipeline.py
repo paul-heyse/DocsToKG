@@ -6,7 +6,7 @@ import random
 import threading
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
 
 import requests
 
@@ -14,13 +14,14 @@ from .types import (
     AttemptLogger,
     AttemptRecord,
     DownloadFunc,
-    DownloadOutcome,
     PipelineResult,
     Resolver,
     ResolverConfig,
     ResolverMetrics,
-    ResolverResult,
 )
+
+if TYPE_CHECKING:
+    from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
 
 def _callable_accepts_argument(func: DownloadFunc, name: str) -> bool:
@@ -46,7 +47,19 @@ def _callable_accepts_argument(func: DownloadFunc, name: str) -> bool:
 
 
 class ResolverPipeline:
-    """Executes resolvers in priority order until a PDF download succeeds."""
+    """Executes resolvers in priority order until a PDF download succeeds.
+
+    Attributes:
+        config: Resolver configuration containing ordering and rate limits.
+        download_func: Callable responsible for downloading resolved URLs.
+        logger: Structured attempt logger capturing resolver telemetry.
+        metrics: Metrics collector tracking resolver performance.
+
+    Examples:
+        >>> pipeline = ResolverPipeline([], ResolverConfig(), lambda *args, **kwargs: None, None)  # doctest: +SKIP
+        >>> isinstance(pipeline.metrics, ResolverMetrics)  # doctest: +SKIP
+        True
+    """
 
     def __init__(
         self,
@@ -93,7 +106,16 @@ class ResolverPipeline:
         artifact: "WorkArtifact",
         context: Optional[Dict[str, Any]] = None,
     ) -> PipelineResult:
-        """Execute resolvers sequentially until a PDF is obtained or exhausted."""
+        """Execute resolvers sequentially until a PDF is obtained or exhausted.
+
+        Args:
+            session: HTTP session shared across resolver invocations.
+            artifact: Work artifact representing the item being resolved.
+            context: Optional dictionary carrying pipeline execution context.
+
+        Returns:
+            PipelineResult describing the final outcome of resolver execution.
+        """
 
         context_data: Dict[str, Any] = context or {}
         dry_run = bool(context_data.get("dry_run", False))

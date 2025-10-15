@@ -80,10 +80,10 @@ graph LR
 
 Ready to explore DocsToKG? Here's your path:
 
-1. **[Setup Guide](../02-setup/)** - Get the system running locally
-2. **[API Reference](../04-api/)** - Learn to integrate with the system
-3. **[Architecture Deep Dive](../03-architecture/)** - Understand the internals
-4. **[Development Guide](../05-development/)** - Contribute to the project
+1. **[Setup Guide](../02-setup/index.md)** - Get the system running locally
+2. **[API Reference](../04-api/index.md)** - Learn to integrate with the system
+3. **[Architecture Deep Dive](../03-architecture/index.md)** - Understand the internals
+4. **[Development Guide](../05-development/index.md)** - Contribute to the project
 
 ## 9. Project Status
 

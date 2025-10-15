@@ -1,0 +1,42 @@
+# Module: hal
+
+HAL (Hyper Articles en Ligne) open archive resolver.
+
+## Functions
+
+### `is_enabled(self, config, artifact)`
+
+Return ``True`` when the artifact has a DOI for HAL lookup.
+
+Args:
+config: Resolver configuration providing HAL request settings.
+artifact: Work artifact potentially containing a DOI identifier.
+
+Returns:
+Boolean indicating whether HAL resolution is applicable.
+
+### `iter_urls(self, session, config, artifact)`
+
+Yield candidate HAL download URLs.
+
+Args:
+session: HTTP session used for outbound HAL API requests.
+config: Resolver configuration specifying headers and timeouts.
+artifact: Work artifact representing the item to resolve.
+
+Returns:
+Iterable of resolver results describing resolved URLs.
+
+## Classes
+
+### `HalResolver`
+
+Resolve publications from the HAL open archive.
+
+Attributes:
+name: Resolver identifier communicated to the pipeline orchestration.
+
+Examples:
+>>> resolver = HalResolver()
+>>> resolver.name
+'hal'

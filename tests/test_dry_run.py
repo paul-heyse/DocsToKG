@@ -24,18 +24,18 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("requests")
-import requests
-
-responses = pytest.importorskip("responses")
+pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload.download_pyalex_pdfs import (
     JsonlLogger,
-    process_one_work,
-    download_candidate,
     WorkArtifact,
+    download_candidate,
+    process_one_work,
 )
 from DocsToKG.ContentDownload.resolvers import DownloadOutcome, PipelineResult, ResolverMetrics
+
+requests = pytest.importorskip("requests")
+responses = pytest.importorskip("responses")
 
 
 def _make_artifact(tmp_path: Path) -> WorkArtifact:
@@ -127,7 +127,9 @@ def test_process_one_work_logs_manifest_in_dry_run(tmp_path: Path) -> None:
     logger.close()
 
     assert result["saved"] is True
-    contents = [json.loads(line) for line in logger_path.read_text(encoding="utf-8").strip().splitlines()]
+    contents = [
+        json.loads(line) for line in logger_path.read_text(encoding="utf-8").strip().splitlines()
+    ]
     manifest_records = [entry for entry in contents if entry["record_type"] == "manifest"]
     assert manifest_records, "Expected at least one manifest record"
     assert all(record["dry_run"] is True for record in manifest_records)

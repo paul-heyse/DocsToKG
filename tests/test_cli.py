@@ -22,9 +22,10 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
 
 import pytest
+
+pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
 from DocsToKG.ContentDownload import resolvers
@@ -105,7 +106,11 @@ def test_main_writes_manifest_and_sets_mailto(monkeypatch, tmp_path):
         return "https://openalex.org/T1"
 
     monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", fake_resolve)
-    monkeypatch.setattr(downloader, "attempt_openalex_candidates", lambda *args, **kwargs: (outcome, "https://oa.example/direct.pdf"))
+    monkeypatch.setattr(
+        downloader,
+        "attempt_openalex_candidates",
+        lambda *args, **kwargs: (outcome, "https://oa.example/direct.pdf"),
+    )
 
     argv = [
         "download_pyalex_pdfs.py",
@@ -136,6 +141,8 @@ def test_main_writes_manifest_and_sets_mailto(monkeypatch, tmp_path):
 
 
 def test_main_requires_topic_or_topic_id(monkeypatch):
-    monkeypatch.setattr(sys, "argv", ["download_pyalex_pdfs.py", "--year-start", "2020", "--year-end", "2020"])
+    monkeypatch.setattr(
+        sys, "argv", ["download_pyalex_pdfs.py", "--year-start", "2020", "--year-end", "2020"]
+    )
     with pytest.raises(SystemExit):
         downloader.main()

@@ -21,9 +21,10 @@ Usage:
 import logging
 from types import SimpleNamespace
 
+import pytest
 import requests
 
-import pytest
+pytest.importorskip("pydantic")
 
 from DocsToKG.OntologyDownload import resolvers
 from DocsToKG.OntologyDownload.config import DefaultsConfiguration, ResolvedConfig
@@ -36,8 +37,12 @@ def resolved_config():
 
 
 def test_obo_resolver_prefers_requested_format(monkeypatch, resolved_config):
-    monkeypatch.setattr(resolvers, "get_owl_download", lambda prefix: f"https://example.org/{prefix}.owl")
-    monkeypatch.setattr(resolvers, "get_obo_download", lambda prefix: f"https://example.org/{prefix}.obo")
+    monkeypatch.setattr(
+        resolvers, "get_owl_download", lambda prefix: f"https://example.org/{prefix}.owl"
+    )
+    monkeypatch.setattr(
+        resolvers, "get_obo_download", lambda prefix: f"https://example.org/{prefix}.obo"
+    )
     monkeypatch.setattr(resolvers, "get_rdf_download", lambda prefix: None)
     spec = FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl", "obo"])
     plan = resolvers.OBOResolver().plan(spec, resolved_config, logging.getLogger(__name__))
@@ -45,7 +50,9 @@ def test_obo_resolver_prefers_requested_format(monkeypatch, resolved_config):
 
 
 def test_ols_resolver_uses_download_link(monkeypatch, resolved_config):
-    monkeypatch.setattr(resolvers.BaseResolver, "_execute_with_retry", lambda self, func, **kwargs: func())
+    monkeypatch.setattr(
+        resolvers.BaseResolver, "_execute_with_retry", lambda self, func, **kwargs: func()
+    )
     record = {
         "download": "https://example.org/efo.owl",
         "version": "2024-01-01",
@@ -63,16 +70,22 @@ def test_ols_resolver_uses_download_link(monkeypatch, resolved_config):
 
 
 def test_bioportal_resolver_includes_api_key(monkeypatch, resolved_config, tmp_path):
-    monkeypatch.setattr(resolvers.BaseResolver, "_execute_with_retry", lambda self, func, **kwargs: func())
+    monkeypatch.setattr(
+        resolvers.BaseResolver, "_execute_with_retry", lambda self, func, **kwargs: func()
+    )
     ontology = {"license": "CC-BY"}
     submission = {"download": "https://example.org/ncit.owl", "version": "2024"}
-    client = SimpleNamespace(get_ontology=lambda _: ontology, get_latest_submission=lambda _: submission)
+    client = SimpleNamespace(
+        get_ontology=lambda _: ontology, get_latest_submission=lambda _: submission
+    )
     monkeypatch.setattr(resolvers, "BioPortalClient", lambda: client)
     api_key_path = tmp_path / "bioportal_api_key.txt"
     api_key_path.write_text("secret")
     monkeypatch.setattr(resolvers.pystow, "join", lambda *parts: tmp_path)
     resolver = resolvers.BioPortalResolver()
-    spec = FetchSpec(id="ncit", resolver="bioportal", extras={"acronym": "NCIT"}, target_formats=["owl"])
+    spec = FetchSpec(
+        id="ncit", resolver="bioportal", extras={"acronym": "NCIT"}, target_formats=["owl"]
+    )
     plan = resolver.plan(spec, resolved_config, logging.getLogger(__name__))
     assert plan.url == "https://example.org/ncit.owl"
     assert plan.headers["Authorization"] == "apikey secret"
@@ -87,7 +100,12 @@ def test_skos_resolver_requires_url(resolved_config):
 
 def test_xbrl_resolver_success(resolved_config):
     resolver = resolvers.XBRLResolver()
-    spec = FetchSpec(id="ifrs", resolver="xbrl", extras={"url": "https://example.org/ifrs.zip"}, target_formats=[])
+    spec = FetchSpec(
+        id="ifrs",
+        resolver="xbrl",
+        extras={"url": "https://example.org/ifrs.zip"},
+        target_formats=[],
+    )
     plan = resolver.plan(spec, resolved_config, logging.getLogger(__name__))
     assert plan.media_type == "application/zip"
 
@@ -100,7 +118,9 @@ def test_bioportal_resolver_auth_error(monkeypatch, resolved_config):
     def failing_call():
         raise error
 
-    monkeypatch.setattr(resolvers.BaseResolver, "_execute_with_retry", lambda self, func, **kwargs: func())
+    monkeypatch.setattr(
+        resolvers.BaseResolver, "_execute_with_retry", lambda self, func, **kwargs: func()
+    )
     resolver = resolvers.BioPortalResolver()
     resolver.client = SimpleNamespace(
         get_ontology=lambda acronym: failing_call(),

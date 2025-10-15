@@ -1,4 +1,4 @@
-"""PubMed Central resolver using NCBI utilities."""
+"""PubMed Central resolver leveraging NCBI utilities and OA endpoints."""
 
 from __future__ import annotations
 
@@ -8,9 +8,10 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 
-from ..types import Resolver, ResolverConfig, ResolverResult
 from DocsToKG.ContentDownload.http import request_with_retries
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid
+
+from ..types import ResolverConfig, ResolverResult
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
@@ -24,12 +25,29 @@ def _absolute_url(base: str, href: str) -> str:
 
 
 class PmcResolver:
-    """Resolve PubMed Central articles via identifiers and lookups."""
+    """Resolve PubMed Central articles via identifiers and lookups.
+
+    Attributes:
+        name: Resolver identifier published to the pipeline scheduler.
+
+    Examples:
+        >>> resolver = PmcResolver()
+        >>> resolver.name
+        'pmc'
+    """
 
     name = "pmc"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
-        """Return ``True`` when the artifact has PMC, PMID, or DOI identifiers."""
+        """Return ``True`` when the artifact has PMC, PMID, or DOI identifiers.
+
+        Args:
+            config: Resolver configuration providing PMC connectivity hints.
+            artifact: Work artifact capturing PMC/PMID/DOI metadata.
+
+        Returns:
+            Boolean indicating whether PMC resolution should be attempted.
+        """
 
         return bool(artifact.pmcid or artifact.pmid or artifact.doi)
 
@@ -73,7 +91,16 @@ class PmcResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        """Yield candidate PMC download URLs derived from identifiers."""
+        """Yield candidate PMC download URLs derived from identifiers.
+
+        Args:
+            session: HTTP session used to issue PMC and utility API requests.
+            config: Resolver configuration, including timeouts and headers.
+            artifact: Work artifact describing the scholarly item under resolution.
+
+        Returns:
+            Iterable of resolver results pointing to PMC hosted PDFs.
+        """
 
         pmcids: List[str] = []
         if artifact.pmcid:

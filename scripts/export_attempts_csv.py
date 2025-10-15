@@ -9,7 +9,6 @@ import json
 from pathlib import Path
 from typing import Iterable, List, Optional
 
-
 CSV_HEADER: List[str] = [
     "timestamp",
     "work_id",

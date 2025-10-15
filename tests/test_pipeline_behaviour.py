@@ -24,6 +24,8 @@ from typing import List
 import pytest
 import requests
 
+pytest.importorskip("pyalex")
+
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
 from DocsToKG.ContentDownload import resolvers
 
@@ -243,24 +245,26 @@ def test_attempt_openalex_candidates_returns_tuple(monkeypatch, tmp_path):
     html_path = artifact.html_dir / "example.html"
     html_path.parent.mkdir(parents=True, exist_ok=True)
 
-    outcomes = iter([
-        resolvers.DownloadOutcome(
-            classification="html",
-            path=str(html_path),
-            http_status=200,
-            content_type="text/html",
-            elapsed_ms=5.0,
-            error=None,
-        ),
-        resolvers.DownloadOutcome(
-            classification="pdf",
-            path=str(artifact.pdf_dir / "example.pdf"),
-            http_status=200,
-            content_type="application/pdf",
-            elapsed_ms=5.0,
-            error=None,
-        ),
-    ])
+    outcomes = iter(
+        [
+            resolvers.DownloadOutcome(
+                classification="html",
+                path=str(html_path),
+                http_status=200,
+                content_type="text/html",
+                elapsed_ms=5.0,
+                error=None,
+            ),
+            resolvers.DownloadOutcome(
+                classification="pdf",
+                path=str(artifact.pdf_dir / "example.pdf"),
+                http_status=200,
+                content_type="application/pdf",
+                elapsed_ms=5.0,
+                error=None,
+            ),
+        ]
+    )
 
     def fake_download(session, art, url, referer, timeout):
         return next(outcomes)

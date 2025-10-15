@@ -70,7 +70,7 @@ def test_jsonl_logger_writes_valid_records(tmp_path: Path) -> None:
         html_paths=[],
         sha256="deadbeef",
         content_length=1024,
-        etag="\"etag\"",
+        etag='"etag"',
         last_modified="Mon, 01 Jan 2024 00:00:00 GMT",
         extracted_text_path=None,
         dry_run=False,

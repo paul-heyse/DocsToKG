@@ -26,6 +26,8 @@ from pathlib import Path
 import pytest
 import requests
 
+pytest.importorskip("pydantic")
+
 from DocsToKG.OntologyDownload import download
 from DocsToKG.OntologyDownload.config import ConfigError, DownloadConfiguration
 
@@ -79,7 +81,9 @@ class DummySession:
         self.calls.append(response.request_headers)
         return response
 
-    def head(self, url, *, headers=None, timeout=None, allow_redirects=None):  # pragma: no cover - exercised via downloader
+    def head(
+        self, url, *, headers=None, timeout=None, allow_redirects=None
+    ):  # pragma: no cover - exercised via downloader
         response = self.head_queue.pop(0) if self.head_queue else DummyResponse(405, b"", {})
         if isinstance(response, Exception):
             raise response
@@ -150,7 +154,7 @@ def test_download_stream_resumes_from_partial(monkeypatch, tmp_path):
     part = cache_dir / "file.owl.part"
     part.write_bytes(b"hello")
     response = DummyResponse(206, b" world", {"ETag": "abc"})
-    session = make_session(monkeypatch, [response])
+    make_session(monkeypatch, [response])
     destination = tmp_path / "file.owl"
     result = download.download_stream(
         url="https://example.org/file.owl",
@@ -194,9 +198,7 @@ def test_download_stream_rate_limiting(monkeypatch, tmp_path):
         def consume(self):
             consumed.append(True)
 
-    monkeypatch.setattr(
-        download, "_get_bucket", lambda host, config, service=None: StubBucket()
-    )
+    monkeypatch.setattr(download, "_get_bucket", lambda host, config, service=None: StubBucket())
     destination = tmp_path / "file.owl"
     download.download_stream(
         url="https://example.org/file.owl",
@@ -238,9 +240,7 @@ def test_get_bucket_falls_back_to_host_limit():
 
 
 def test_get_bucket_independent_keys_for_services():
-    config = DownloadConfiguration(
-        rate_limits={"ols": "2/second", "bioportal": "1/second"}
-    )
+    config = DownloadConfiguration(rate_limits={"ols": "2/second", "bioportal": "1/second"})
 
     ols_bucket = download._get_bucket("api.example.org", config, "ols")
     bioportal_bucket = download._get_bucket("api.example.org", config, "bioportal")
@@ -462,9 +462,9 @@ def test_download_stream_hash_mismatch_triggers_retry(monkeypatch, tmp_path):
         DummyResponse(200, b"first", {}),
         DummyResponse(200, b"second", {}),
     ]
-    session = make_session(monkeypatch, responses)
+    make_session(monkeypatch, responses)
     destination = tmp_path / "file.owl"
-    result = download.download_stream(
+    download.download_stream(
         url="https://example.org/file.owl",
         destination=destination,
         headers={},

@@ -15,9 +15,10 @@ import random
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Mapping, Dict, Sequence
+from typing import Dict, Iterable, List, Mapping, Sequence
 
 import numpy as np
+
 DEFAULT_CHUNKS_DIR = Path("Data/ChunkedDocTagFiles")
 DEFAULT_VECTORS_DIR = Path("Data/Vectors")
 DEFAULT_OUTPUT_DIR = Path("Data/HybridScaleFixture")
@@ -87,7 +88,9 @@ def list_candidate_docs(chunks_dir: Path, vectors_dir: Path) -> List[str]:
         return path.stem
 
     chunk_files = {chunk_id(path, ".chunks.jsonl") for path in chunks_dir.glob("*.chunks.jsonl")}
-    vector_files = {chunk_id(path, ".vectors.jsonl") for path in vectors_dir.glob("*.vectors.jsonl")}
+    vector_files = {
+        chunk_id(path, ".vectors.jsonl") for path in vectors_dir.glob("*.vectors.jsonl")
+    }
     candidates = []
     for doc_id in sorted(chunk_files & vector_files):
         chunk_path = chunks_dir / f"{doc_id}.chunks.jsonl"
@@ -336,7 +339,9 @@ def write_readme(
     readme_path = output_dir / "README.md"
     namespace_text = ", ".join(namespaces) if namespaces else DEFAULT_NAMESPACE
     namespace_flag = (
-        f" --namespaces {','.join(namespaces)}" if namespaces else f" --namespace {DEFAULT_NAMESPACE}"
+        f" --namespaces {','.join(namespaces)}"
+        if namespaces
+        else f" --namespace {DEFAULT_NAMESPACE}"
     )
     content = f"""# Real Hybrid Search Fixture
 
@@ -364,7 +369,9 @@ audited when refreshing the fixture.
 def ensure_output_dir(path: Path, overwrite: bool) -> None:
     if path.exists():
         if not overwrite:
-            raise SystemExit(f"Output directory {path} already exists. Use --overwrite to replace it.")
+            raise SystemExit(
+                f"Output directory {path} already exists. Use --overwrite to replace it."
+            )
         for child in path.iterdir():
             if child.is_file():
                 child.unlink()

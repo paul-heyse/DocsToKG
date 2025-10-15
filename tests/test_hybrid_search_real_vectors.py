@@ -21,8 +21,8 @@ Usage:
 from __future__ import annotations
 
 import json
-from http import HTTPStatus
 import os
+from http import HTTPStatus
 from pathlib import Path
 from typing import Callable, Dict, List, Mapping, Sequence
 
@@ -47,9 +47,8 @@ from DocsToKG.HybridSearch import (
 from DocsToKG.HybridSearch.config import DenseIndexConfig
 from DocsToKG.HybridSearch.dense import FaissIndexManager
 from DocsToKG.HybridSearch.storage import ChunkRegistry, OpenSearchSimulator
-from DocsToKG.HybridSearch.validation import infer_embedding_dim, load_dataset
 from DocsToKG.HybridSearch.types import DocumentInput
-
+from DocsToKG.HybridSearch.validation import infer_embedding_dim, load_dataset
 
 DATASET_PATH = Path("Data/HybridScaleFixture/dataset.jsonl")
 
@@ -59,7 +58,12 @@ pytestmark = pytest.mark.real_vectors
 def _build_config(tmp_path: Path, *, oversample: int = 3) -> HybridSearchConfigManager:
     config_payload = {
         "dense": {"index_type": "flat", "oversample": oversample},
-        "fusion": {"k0": 50.0, "mmr_lambda": 0.6, "cosine_dedupe_threshold": 0.95, "max_chunks_per_doc": 3},
+        "fusion": {
+            "k0": 50.0,
+            "mmr_lambda": 0.6,
+            "cosine_dedupe_threshold": 0.95,
+            "max_chunks_per_doc": 3,
+        },
         "retrieval": {"bm25_top_k": 40, "splade_top_k": 40, "dense_top_k": 40},
     }
     config_path = tmp_path / "real_hybrid_config.json"
@@ -91,9 +95,17 @@ def _to_documents(entries: Sequence[Mapping[str, object]]) -> List[DocumentInput
 
 
 @pytest.fixture
-def stack(
-    tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]
-) -> Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FaissIndexManager, OpenSearchSimulator]]:
+def stack(tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]) -> Callable[
+    [],
+    tuple[
+        ChunkIngestionPipeline,
+        HybridSearchService,
+        ChunkRegistry,
+        HybridSearchValidator,
+        FaissIndexManager,
+        OpenSearchSimulator,
+    ],
+]:
     def factory() -> tuple[
         ChunkIngestionPipeline,
         HybridSearchService,
@@ -136,7 +148,17 @@ def stack(
 
 
 def test_real_fixture_ingest_and_search(
-    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FaissIndexManager, OpenSearchSimulator]],
+    stack: Callable[
+        [],
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FaissIndexManager,
+            OpenSearchSimulator,
+        ],
+    ],
     real_dataset: Sequence[Mapping[str, object]],
 ) -> None:
     ingestion, service, registry, validator, _, _ = stack()
@@ -162,7 +184,17 @@ def test_real_fixture_ingest_and_search(
 
 
 def test_real_fixture_reingest_and_reports(
-    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FaissIndexManager, OpenSearchSimulator]],
+    stack: Callable[
+        [],
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FaissIndexManager,
+            OpenSearchSimulator,
+        ],
+    ],
     real_dataset: Sequence[Mapping[str, object]],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -225,7 +257,9 @@ def test_real_fixture_reingest_and_reports(
     stats_snapshot = build_stats_snapshot(faiss_index, opensearch, registry)
     assert stats_snapshot["faiss"]["ntotal"] >= registry.count()
 
-    request = HybridSearchRequest(query="caregiving burden", namespace="real-fixture", filters={}, page_size=2)
+    request = HybridSearchRequest(
+        query="caregiving burden", namespace="real-fixture", filters={}, page_size=2
+    )
     pagination = verify_pagination(service, request)
     assert not pagination.duplicate_detected
 
@@ -233,7 +267,17 @@ def test_real_fixture_reingest_and_reports(
 
 
 def test_real_fixture_api_roundtrip(
-    stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FaissIndexManager, OpenSearchSimulator]],
+    stack: Callable[
+        [],
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FaissIndexManager,
+            OpenSearchSimulator,
+        ],
+    ],
     real_dataset: Sequence[Mapping[str, object]],
 ) -> None:
     ingestion, service, registry, _, _, _ = stack()
@@ -268,8 +312,6 @@ def test_remove_ids_cpu_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
         return original_create_index()
 
     monkeypatch.setattr(manager, "_create_index", tracking_create_index)
-
-    original_remove_ids = manager._index.remove_ids
 
     def failing_remove_ids(selector: object) -> None:
         raise RuntimeError("remove_ids not implemented for this type of index")

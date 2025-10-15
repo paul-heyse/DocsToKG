@@ -61,17 +61,9 @@ List of extracted file paths.
 Raises:
 ConfigError: If the archive contains unsafe paths or is missing.
 
-### `_get_bucket(host, http_config, service=None)`
+### `_get_bucket(host, http_config, service)`
 
-Return (and cache) a token bucket enforcing rate limits for a host/service pair.
-
-Args:
-host: Hostname derived from the download URL.
-http_config: Download configuration containing rate limit definitions.
-service: Optional logical service identifier (e.g., ``"ols"``).
-
-Returns:
-TokenBucket configured with the appropriate requests-per-second value.
+*No documentation available.*
 
 ### `download_stream()`
 
@@ -86,7 +78,7 @@ http_config: Download configuration containing timeouts and limits.
 cache_dir: Directory where intermediary cached files are stored.
 logger: Logger adapter for structured download telemetry.
 expected_media_type: Expected Content-Type for validation, if known.
-service: Logical service identifier used for rate limiting.
+service: Logical service identifier for per-service rate limiting.
 
 Returns:
 DownloadResult describing the final artifact and metadata.
@@ -100,6 +92,34 @@ Consume tokens from the bucket, sleeping until capacity is available.
 
 Args:
 tokens: Number of tokens required for the current download request.
+
+Returns:
+None
+
+### `_preliminary_head_check(self, url, session)`
+
+Probe the origin with HEAD to audit headers before downloading.
+
+Args:
+url: Fully qualified download URL resolved by the planner.
+session: Prepared requests session used for outbound calls.
+
+Returns:
+Tuple ``(content_type, content_length)`` extracted from response
+headers. Each element is ``None`` when the origin omits it.
+
+Raises:
+ConfigError: If the origin reports a payload larger than the
+configured ``max_download_size_gb`` limit.
+
+### `_validate_media_type(self, actual_content_type, expected_media_type, url)`
+
+Validate that the received ``Content-Type`` header is acceptable.
+
+Args:
+actual_content_type: Raw header value reported by the origin server.
+expected_media_type: MIME type declared by resolver metadata.
+url: Download URL logged when mismatches occur.
 
 Returns:
 None

@@ -6,21 +6,39 @@ from typing import TYPE_CHECKING, Iterable, List
 
 import requests
 
-from ..types import Resolver, ResolverConfig, ResolverResult
 from DocsToKG.ContentDownload.http import request_with_retries
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi
+
+from ..types import ResolverConfig, ResolverResult
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
 
 class EuropePmcResolver:
-    """Resolve Open Access links via the Europe PMC REST API."""
+    """Resolve Open Access links via the Europe PMC REST API.
+
+    Attributes:
+        name: Resolver identifier exposed to the orchestration pipeline.
+
+    Examples:
+        >>> resolver = EuropePmcResolver()
+        >>> resolver.name
+        'europe_pmc'
+    """
 
     name = "europe_pmc"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
-        """Return ``True`` when the artifact has a DOI suitable for lookup."""
+        """Return ``True`` when the artifact has a DOI suitable for lookup.
+
+        Args:
+            config: Resolver configuration providing Europe PMC preferences.
+            artifact: Work artifact containing DOI metadata.
+
+        Returns:
+            Boolean indicating whether the resolver should attempt a lookup.
+        """
 
         return artifact.doi is not None
 
@@ -30,7 +48,16 @@ class EuropePmcResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        """Yield candidate URLs from the Europe PMC API."""
+        """Yield candidate URLs from the Europe PMC API.
+
+        Args:
+            session: HTTP session used to execute Europe PMC API requests.
+            config: Resolver configuration including polite headers and timeouts.
+            artifact: Work artifact representing the target scholarly output.
+
+        Returns:
+            Iterable of resolver results containing discovered URLs.
+        """
 
         doi = normalize_doi(artifact.doi)
         if not doi:

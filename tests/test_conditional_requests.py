@@ -101,7 +101,7 @@ if HAS_REQUESTS and HAS_PYALEX:
         artifact = _make_artifact(tmp_path)
         previous_path = str(artifact.pdf_dir / "conditional.pdf")
         previous = {
-            "etag": "\"etag\"",
+            "etag": '"etag"',
             "last_modified": "Mon, 01 Jan 2024 00:00:00 GMT",
             "path": previous_path,
             "sha256": "abc",
@@ -136,7 +136,7 @@ if HAS_REQUESTS and HAS_PYALEX:
             elapsed_ms=12.3,
             sha256="deadbeef",
             content_length=42,
-            etag="\"tag\"",
+            etag='"tag"',
             last_modified="Mon, 01 Jan 2024 00:00:00 GMT",
         )
         artifact = WorkArtifact(
@@ -155,9 +155,11 @@ if HAS_REQUESTS and HAS_PYALEX:
             pdf_dir=Path("/tmp"),
             html_dir=Path("/tmp"),
         )
-        entry = build_manifest_entry(artifact, "resolver", "https://example.org", outcome, [], dry_run=False)
+        entry = build_manifest_entry(
+            artifact, "resolver", "https://example.org", outcome, [], dry_run=False
+        )
         assert isinstance(entry, ManifestEntry)
-        assert entry.etag == "\"tag\""
+        assert entry.etag == '"tag"'
         assert entry.last_modified == "Mon, 01 Jan 2024 00:00:00 GMT"
 
 
@@ -167,7 +169,9 @@ class _HelperResponse:
     headers: Dict[str, str]
 
 
-def _make_helper_response(status_code: int, headers: Optional[Dict[str, str]] = None) -> _HelperResponse:
+def _make_helper_response(
+    status_code: int, headers: Optional[Dict[str, str]] = None
+) -> _HelperResponse:
     return _HelperResponse(status_code=status_code, headers=headers or {})
 
 
@@ -186,9 +190,7 @@ def test_build_headers_etag_only() -> None:
 def test_build_headers_last_modified_only() -> None:
     helper = ConditionalRequestHelper(prior_last_modified="Wed, 21 Oct 2015 07:28:00 GMT")
 
-    assert helper.build_headers() == {
-        "If-Modified-Since": "Wed, 21 Oct 2015 07:28:00 GMT"
-    }
+    assert helper.build_headers() == {"If-Modified-Since": "Wed, 21 Oct 2015 07:28:00 GMT"}
 
 
 def test_build_headers_with_both_headers() -> None:

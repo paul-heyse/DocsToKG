@@ -6,21 +6,39 @@ from typing import TYPE_CHECKING, Iterable, List
 
 import requests
 
-from ..types import Resolver, ResolverConfig, ResolverResult
 from DocsToKG.ContentDownload.http import request_with_retries
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi
+
+from ..types import ResolverConfig, ResolverResult
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
 
 class HalResolver:
-    """Resolve publications from the HAL open archive."""
+    """Resolve publications from the HAL open archive.
+
+    Attributes:
+        name: Resolver identifier communicated to the pipeline orchestration.
+
+    Examples:
+        >>> resolver = HalResolver()
+        >>> resolver.name
+        'hal'
+    """
 
     name = "hal"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
-        """Return ``True`` when the artifact has a DOI for HAL lookup."""
+        """Return ``True`` when the artifact has a DOI for HAL lookup.
+
+        Args:
+            config: Resolver configuration providing HAL request settings.
+            artifact: Work artifact potentially containing a DOI identifier.
+
+        Returns:
+            Boolean indicating whether HAL resolution is applicable.
+        """
 
         return artifact.doi is not None
 
@@ -30,7 +48,16 @@ class HalResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        """Yield candidate HAL download URLs."""
+        """Yield candidate HAL download URLs.
+
+        Args:
+            session: HTTP session used for outbound HAL API requests.
+            config: Resolver configuration specifying headers and timeouts.
+            artifact: Work artifact representing the item to resolve.
+
+        Returns:
+            Iterable of resolver results describing resolved URLs.
+        """
 
         doi = normalize_doi(artifact.doi)
         if not doi:

@@ -96,6 +96,7 @@ if "requests" not in sys.modules:
         sys.modules["requests"] = _real_requests
 
 if "pystow" not in sys.modules:
+
     class _StubPystow(SimpleNamespace):
         def join(self, *segments):
             root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
@@ -104,6 +105,7 @@ if "pystow" not in sys.modules:
     sys.modules["pystow"] = _StubPystow()
 
 if "psutil" not in sys.modules:
+
     class _StubProcess:
         def memory_info(self):
             return SimpleNamespace(rss=0)
@@ -111,11 +113,14 @@ if "psutil" not in sys.modules:
     sys.modules["psutil"] = SimpleNamespace(Process=lambda: _StubProcess())
 
 if "pooch" not in sys.modules:
+
     class _HTTPDownloader:
         def __init__(self, *args, **kwargs):
             pass
 
-        def __call__(self, url, output_file, pooch_logger):  # pragma: no cover - overridden in tests
+        def __call__(
+            self, url, output_file, pooch_logger
+        ):  # pragma: no cover - overridden in tests
             raise NotImplementedError("pooch downloader stub should be overridden")
 
     def _retrieve(url, *, path, fname, downloader, **kwargs):

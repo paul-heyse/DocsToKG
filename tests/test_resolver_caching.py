@@ -23,13 +23,12 @@ import pytest
 
 pytest.importorskip("requests")
 
-from DocsToKG.ContentDownload.resolvers import (
-    CrossrefResolver,
-    ResolverConfig,
+from DocsToKG.ContentDownload.resolvers import ResolverConfig, clear_resolver_caches
+from DocsToKG.ContentDownload.resolvers.providers.crossref import CrossrefResolver
+from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import (
     SemanticScholarResolver,
-    UnpaywallResolver,
-    clear_resolver_caches,
 )
+from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver
 
 
 @pytest.fixture(autouse=True)
@@ -68,9 +67,7 @@ def test_resolver_caches_prevent_duplicate_requests(monkeypatch):
                         }
                     }
                 if "semanticscholar" in url:
-                    return {
-                        "openAccessPdf": {"url": "https://example.org/s2.pdf"}
-                    }
+                    return {"openAccessPdf": {"url": "https://example.org/s2.pdf"}}
                 raise AssertionError(f"unexpected URL {url}")
 
         return _Resp()

@@ -6,12 +6,12 @@ Welcome to the DocsToKG development community! This guide will help you contribu
 
 ### 1. Set Up Development Environment
 
-Follow the [Setup Guide](../02-setup/) to get your local environment running.
+Follow the [Setup Guide](../02-setup/index.md) to get your local environment running.
 
 ### 2. Understand the Codebase
 
-- **Start with the overview**: Read [Architecture Guide](../03-architecture/) to understand system components
-- **Explore the API**: Check [API Reference](../04-api/) for integration points
+- **Start with the overview**: Read [Architecture Guide](../03-architecture/index.md) to understand system components
+- **Explore the API**: Check [API Reference](../04-api/index.md) for integration points
 - **Study key modules**: Focus on `src/DocsToKG/ContentDownload`, `src/DocsToKG/DocParsing`, `src/DocsToKG/HybridSearch`, and `src/DocsToKG/OntologyDownload`
 
 ### 3. Find Your First Issue

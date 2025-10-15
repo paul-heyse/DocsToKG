@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import importlib
+import io
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
-import importlib
-import io
 
 import pytest
+
+pytest.importorskip("pydantic")
 
 from DocsToKG.OntologyDownload import optdeps
 
@@ -129,7 +131,7 @@ def test_pronto_stub_behaviour(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
 
     output = tmp_path / "out.obojson"
     ontology.dump(str(output), format="obojson")
-    assert output.read_text() == "{\"graphs\": []}"
+    assert output.read_text() == '{"graphs": []}'
 
 
 def test_owlready2_stub_load(monkeypatch: pytest.MonkeyPatch) -> None:

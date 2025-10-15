@@ -1,0 +1,45 @@
+# Module: cli_utils
+
+CLI formatting utilities for the ontology downloader.
+
+## Functions
+
+### `format_table(headers, rows)`
+
+Format tabular data as an ASCII table.
+
+Args:
+headers: Ordered column header strings.
+rows: Iterable of rows where each row is a sequence of cell strings.
+
+Returns:
+A string containing the formatted table with aligned columns.
+
+Examples:
+>>> print(format_table(["Name", "Status"], [["hp", "success"], ["efo", "cached"]]))
+Name | Status
+-----+--------
+hp   | success
+efo  | cached
+
+### `format_validation_summary(results)`
+
+Format validator results as a status table.
+
+Args:
+results: Mapping of validator name to dictionaries containing ``ok`` and
+``details`` keys describing the validator outcome.
+
+Returns:
+A formatted table with validator names, status, and detail summaries.
+
+Examples:
+>>> summary = {"rdflib": {"ok": True, "details": {"triples": 100}}}
+>>> print(format_validation_summary(summary))
+validator | status | details
+----------+--------+---------
+rdflib    | ok     | triples=100
+
+### `_format_row(values)`
+
+*No documentation available.*

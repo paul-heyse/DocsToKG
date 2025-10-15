@@ -6,21 +6,39 @@ from typing import TYPE_CHECKING, Iterable
 
 import requests
 
-from ..types import Resolver, ResolverConfig, ResolverResult
 from DocsToKG.ContentDownload.http import request_with_retries
 from DocsToKG.ContentDownload.utils import normalize_doi
+
+from ..types import ResolverConfig, ResolverResult
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
 
 class CoreResolver:
-    """Resolve PDFs using the CORE API."""
+    """Resolve PDFs using the CORE API.
+
+    Attributes:
+        name: Resolver identifier exposed to the orchestration pipeline.
+
+    Examples:
+        >>> resolver = CoreResolver()
+        >>> resolver.name
+        'core'
+    """
 
     name = "core"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
-        """Return ``True`` when a CORE API key and DOI are available."""
+        """Return ``True`` when a CORE API key and DOI are available.
+
+        Args:
+            config: Resolver configuration containing CORE credentials.
+            artifact: Work artifact that may include a DOI identifier.
+
+        Returns:
+            Boolean indicating whether CORE resolution should proceed.
+        """
 
         return bool(config.core_api_key and artifact.doi)
 
@@ -30,7 +48,16 @@ class CoreResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        """Yield candidate URLs returned by the CORE API."""
+        """Yield candidate URLs returned by the CORE API.
+
+        Args:
+            session: HTTP session for issuing API requests to CORE.
+            config: Resolver configuration offering headers and timeouts.
+            artifact: Work artifact representing the scholarly work under consideration.
+
+        Returns:
+            Iterable of resolver results containing download URLs.
+        """
 
         doi = normalize_doi(artifact.doi)
         if not doi:

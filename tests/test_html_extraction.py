@@ -25,12 +25,12 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("requests")
-import requests
-
-responses = pytest.importorskip("responses")
+pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact, download_candidate
+
+requests = pytest.importorskip("requests")
+responses = pytest.importorskip("responses")
 
 
 class _FakeTrafilatura:

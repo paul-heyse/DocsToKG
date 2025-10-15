@@ -10,6 +10,9 @@ from pathlib import Path
 from typing import Dict
 
 import pytest
+
+pytest.importorskip("pydantic")
+
 from pydantic import BaseModel, ValidationError
 
 from DocsToKG.OntologyDownload import core, resolvers
@@ -280,7 +283,9 @@ def test_fetch_one_unknown_resolver() -> None:
 
     spec = core.FetchSpec(id="example", resolver="missing", extras={}, target_formats=["owl"])
     with pytest.raises(core.ResolverError):
-        core.fetch_one(spec, config=ResolvedConfig.from_defaults(), force=True, logger=_noop_logger())
+        core.fetch_one(
+            spec, config=ResolvedConfig.from_defaults(), force=True, logger=_noop_logger()
+        )
 
 
 def test_fetch_one_download_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -301,10 +306,14 @@ def test_fetch_one_download_error(monkeypatch: pytest.MonkeyPatch) -> None:
             )
 
     monkeypatch.setitem(resolvers.RESOLVERS, "obo", StubResolver())
-    monkeypatch.setattr(core, "download_stream", lambda **_: (_ for _ in ()).throw(ConfigError("boom")))
+    monkeypatch.setattr(
+        core, "download_stream", lambda **_: (_ for _ in ()).throw(ConfigError("boom"))
+    )
 
     with pytest.raises(core.OntologyDownloadError):
-        core.fetch_one(spec, config=ResolvedConfig.from_defaults(), force=True, logger=_noop_logger())
+        core.fetch_one(
+            spec, config=ResolvedConfig.from_defaults(), force=True, logger=_noop_logger()
+        )
 
 
 def _noop_logger() -> logging.Logger:

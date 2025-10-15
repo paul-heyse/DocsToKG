@@ -223,9 +223,7 @@ class ChunkIngestionPipeline:
         if sample_size >= len(population):
             sample = population
         else:
-            indices = TRAINING_SAMPLE_RNG.choice(
-                len(population), size=sample_size, replace=False
-            )
+            indices = TRAINING_SAMPLE_RNG.choice(len(population), size=sample_size, replace=False)
             sample = [population[idx] for idx in indices]
         return [chunk.features.embedding for chunk in sample]
 

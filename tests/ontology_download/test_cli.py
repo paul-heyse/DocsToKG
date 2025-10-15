@@ -22,6 +22,8 @@ import json
 
 import pytest
 
+pytest.importorskip("pydantic")
+
 from DocsToKG.OntologyDownload import cli
 from DocsToKG.OntologyDownload.config import DefaultsConfiguration, ResolvedConfig
 from DocsToKG.OntologyDownload.core import FetchResult, FetchSpec
@@ -53,7 +55,11 @@ def test_cli_pull_json_output(monkeypatch, stub_logger, tmp_path, capsys):
     )
     monkeypatch.setattr(cli, "fetch_all", lambda specs, config, force: [result])
     monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
-    monkeypatch.setattr(cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfiguration(), specs=())))
+    monkeypatch.setattr(
+        cli.ResolvedConfig,
+        "from_defaults",
+        classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfiguration(), specs=())),
+    )
     assert cli.main(["pull", "hp", "--json"]) == 0
     output = capsys.readouterr().out
     payload = json.loads(output)
@@ -71,7 +77,11 @@ def test_cli_pull_table_output(monkeypatch, stub_logger, tmp_path, capsys):
     )
     monkeypatch.setattr(cli, "fetch_all", lambda specs, config, force: [result])
     monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
-    monkeypatch.setattr(cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfiguration(), specs=())))
+    monkeypatch.setattr(
+        cli.ResolvedConfig,
+        "from_defaults",
+        classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfiguration(), specs=())),
+    )
     assert cli.main(["pull", "hp"]) == 0
     output = capsys.readouterr().out
     assert "hp" in output
@@ -106,9 +116,19 @@ def test_cli_validate_json_output(monkeypatch, stub_logger, tmp_path, capsys):
     }
     (manifest_dir / "manifest.json").write_text(json.dumps(manifest))
     monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
-    monkeypatch.setattr(cli, "run_validators", lambda requests, logger: {req.name: type("R", (), {"to_dict": lambda self: {"ok": True}})() for req in requests})
+    monkeypatch.setattr(
+        cli,
+        "run_validators",
+        lambda requests, logger: {
+            req.name: type("R", (), {"to_dict": lambda self: {"ok": True}})() for req in requests
+        },
+    )
     monkeypatch.setattr(cli, "ONTOLOGY_DIR", tmp_path)
-    monkeypatch.setattr(cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfiguration(), specs=())))
+    monkeypatch.setattr(
+        cli.ResolvedConfig,
+        "from_defaults",
+        classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfiguration(), specs=())),
+    )
     assert cli.main(["validate", "hp", "2024", "--json", "--rdflib"]) == 0
     output = capsys.readouterr().out
     payload = json.loads(output)
@@ -119,7 +139,11 @@ def test_cli_config_validate(monkeypatch, stub_logger, tmp_path, capsys):
     config_path = tmp_path / "sources.yaml"
     config_path.write_text("ontologies:\n  - id: hp\n    resolver: obo\n")
     monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
-    monkeypatch.setattr(cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfiguration(), specs=())))
+    monkeypatch.setattr(
+        cli.ResolvedConfig,
+        "from_defaults",
+        classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfiguration(), specs=())),
+    )
     assert cli.main(["config", "validate", "--spec", str(config_path)]) == 0
     output = capsys.readouterr().out
     assert "Configuration passed" in output
@@ -129,7 +153,11 @@ def test_cli_config_validate_json(monkeypatch, stub_logger, tmp_path, capsys):
     config_path = tmp_path / "sources.yaml"
     config_path.write_text("ontologies:\n  - id: hp\n    resolver: obo\n")
     monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
-    monkeypatch.setattr(cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfiguration(), specs=())))
+    monkeypatch.setattr(
+        cli.ResolvedConfig,
+        "from_defaults",
+        classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfiguration(), specs=())),
+    )
     assert cli.main(["config", "validate", "--spec", str(config_path), "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"]
@@ -138,7 +166,37 @@ def test_cli_config_validate_json(monkeypatch, stub_logger, tmp_path, capsys):
 def test_cli_config_validate_missing_file(monkeypatch, stub_logger, tmp_path):
     missing = tmp_path / "missing.yaml"
     monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
-    monkeypatch.setattr(cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfiguration(), specs=())))
+    monkeypatch.setattr(
+        cli.ResolvedConfig,
+        "from_defaults",
+        classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfiguration(), specs=())),
+    )
     with pytest.raises(SystemExit) as exc_info:
         cli.main(["config", "validate", "--spec", str(missing)])
     assert exc_info.value.code == 2
+
+
+def test_cli_init_writes_example(monkeypatch, stub_logger, tmp_path, capsys):
+    target = tmp_path / "sources.yaml"
+    monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
+
+    exit_code = cli.main(["init", str(target)])
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Wrote example configuration" in output
+    contents = target.read_text()
+    assert "defaults:" in contents
+    assert "ontologies:" in contents
+
+
+def test_cli_init_refuses_overwrite(monkeypatch, stub_logger, tmp_path, capsys):
+    target = tmp_path / "sources.yaml"
+    target.write_text("existing")
+    monkeypatch.setattr(cli, "setup_logging", lambda *_: stub_logger)
+
+    exit_code = cli.main(["init", str(target)])
+
+    assert exit_code == 1
+    stderr = capsys.readouterr().err
+    assert "Refusing to overwrite" in stderr

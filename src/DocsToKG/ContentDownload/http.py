@@ -20,6 +20,9 @@ def parse_retry_after_header(response: requests.Response) -> Optional[float]:
     Returns:
         Float seconds to wait, or ``None`` if header missing/invalid.
 
+    Raises:
+        None.
+
     Examples:
         >>> # Integer format
         >>> response = requests.Response()
@@ -126,7 +129,7 @@ def request_with_retries(
             if attempt >= max_retries:
                 return response
 
-            base_delay = backoff_factor * (2 ** attempt)
+            base_delay = backoff_factor * (2**attempt)
             jitter = random.random() * 0.1
             delay = base_delay + jitter
 
@@ -142,7 +145,7 @@ def request_with_retries(
             if attempt >= max_retries:
                 raise
 
-            delay = backoff_factor * (2 ** attempt) + random.random() * 0.1
+            delay = backoff_factor * (2**attempt) + random.random() * 0.1
             time.sleep(delay)
 
     if last_exception is not None:

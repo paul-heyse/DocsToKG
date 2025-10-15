@@ -18,10 +18,12 @@ Usage:
     pytest tests/test_resolver_pipeline.py
 """
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
+
+pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload.download_pyalex_pdfs import (
     WorkArtifact,
@@ -32,12 +34,12 @@ from DocsToKG.ContentDownload.resolvers import (
     AttemptRecord,
     DownloadOutcome,
     ResolverConfig,
+    ResolverMetrics,
     ResolverPipeline,
     ResolverResult,
-    UnpaywallResolver,
-    LandingPageResolver,
-    ResolverMetrics,
 )
+from DocsToKG.ContentDownload.resolvers.providers.landing_page import LandingPageResolver
+from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver
 
 
 class DummySession:
@@ -130,7 +132,10 @@ def test_pipeline_stops_on_first_success(tmp_path):
 
     resolver_a = StubResolver("resolver_a", ["https://a.example/1"])
     resolver_b = StubResolver("resolver_b", ["https://b.example/pdf"])
-    config = ResolverConfig(resolver_order=["resolver_a", "resolver_b"], resolver_toggles={"resolver_a": True, "resolver_b": True})
+    config = ResolverConfig(
+        resolver_order=["resolver_a", "resolver_b"],
+        resolver_toggles={"resolver_a": True, "resolver_b": True},
+    )
     logger = ListLogger()
     metrics = ResolverMetrics()
     pipeline = ResolverPipeline(

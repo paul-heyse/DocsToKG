@@ -16,14 +16,6 @@ Command-line interface for the ontology downloader.
 
 *No documentation available.*
 
-### `_format_table(headers, rows)`
-
-*No documentation available.*
-
-### `_format_validation_summary(results)`
-
-*No documentation available.*
-
 ### `_ensure_manifest_path(ontology_id, version)`
 
 *No documentation available.*
@@ -69,7 +61,3 @@ Process exit code indicating success (`0`) or failure.
 Raises:
 ConfigError: If configuration files are invalid or unsafe to overwrite.
 OntologyDownloadError: If download or validation operations fail.
-
-### `_format_row(values)`
-
-*No documentation available.*

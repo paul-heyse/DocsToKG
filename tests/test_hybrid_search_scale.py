@@ -36,8 +36,8 @@ from DocsToKG.HybridSearch import (
 )
 from DocsToKG.HybridSearch.dense import FaissIndexManager
 from DocsToKG.HybridSearch.storage import ChunkRegistry, OpenSearchSimulator
-from DocsToKG.HybridSearch.validation import infer_embedding_dim, load_dataset
 from DocsToKG.HybridSearch.types import DocumentInput
+from DocsToKG.HybridSearch.validation import infer_embedding_dim, load_dataset
 
 DATASET_PATH = Path("Data/HybridScaleFixture/dataset.jsonl")
 
@@ -66,9 +66,17 @@ def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
 
 
 @pytest.fixture
-def scale_stack(
-    tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]
-) -> Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FaissIndexManager, OpenSearchSimulator]]:
+def scale_stack(tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]) -> Callable[
+    [],
+    tuple[
+        ChunkIngestionPipeline,
+        HybridSearchService,
+        ChunkRegistry,
+        HybridSearchValidator,
+        FaissIndexManager,
+        OpenSearchSimulator,
+    ],
+]:
     def factory() -> tuple[
         ChunkIngestionPipeline,
         HybridSearchService,
@@ -113,7 +121,17 @@ def scale_stack(
 @pytest.mark.real_vectors
 @pytest.mark.scale_vectors
 def test_hybrid_scale_suite(
-    scale_stack: Callable[[], tuple[ChunkIngestionPipeline, HybridSearchService, ChunkRegistry, HybridSearchValidator, FaissIndexManager, OpenSearchSimulator]],
+    scale_stack: Callable[
+        [],
+        tuple[
+            ChunkIngestionPipeline,
+            HybridSearchService,
+            ChunkRegistry,
+            HybridSearchValidator,
+            FaissIndexManager,
+            OpenSearchSimulator,
+        ],
+    ],
     scale_dataset: Sequence[Mapping[str, object]],
     tmp_path: Path,
 ) -> None:

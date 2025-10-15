@@ -28,17 +28,17 @@ doc_buckets: Mutable counter of chunks emitted per document.
 Returns:
 True if the document is still below the configured limit.
 
-### `_is_near_duplicate(self, current_idx, emitted_indices, similarity_matrix)`
+### `_is_near_duplicate(self, embeddings, current_idx, emitted_indices)`
 
 Determine whether the current chunk is too similar to emitted ones.
 
 Args:
-current_idx: Index of the current chunk in `ordered_chunks`.
-emitted_indices: Indices already emitted into the result set.
-similarity_matrix: Precomputed pairwise similarity matrix.
+embeddings: Matrix of chunk embeddings ordered to match `ordered_chunks`.
+current_idx: Index of the chunk currently under consideration.
+emitted_indices: Indices that have already been emitted in the final results.
 
 Returns:
-True if cosine similarity exceeds the dedupe threshold.
+True when the current chunk's embedding exceeds the cosine similarity threshold.
 
 ### `_build_highlights(self, chunk, query_tokens)`
 
