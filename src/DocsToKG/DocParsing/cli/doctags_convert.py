@@ -22,8 +22,8 @@ import argparse
 from pathlib import Path
 from typing import Any, Dict
 
-from DocsToKG.DocParsing import run_docling_html_to_doctags_parallel as html_backend
-from DocsToKG.DocParsing import run_docling_parallel_with_vllm_debug as pdf_backend
+from DocsToKG.DocParsing.legacy import run_docling_html_to_doctags_parallel as html_backend
+from DocsToKG.DocParsing.legacy import run_docling_parallel_with_vllm_debug as pdf_backend
 from DocsToKG.DocParsing._common import (
     data_doctags,
     data_html,
@@ -185,11 +185,11 @@ def _merge_args(parser: argparse.ArgumentParser, overrides: Dict[str, Any]) -> a
     return base
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(args: argparse.Namespace | list[str] | None = None) -> int:
     """Dispatch conversion to the HTML or PDF backend based on requested mode.
 
     Args:
-        argv: Optional CLI arguments; defaults to :data:`sys.argv` when omitted.
+        args: Either an :class:`argparse.Namespace`, a list of CLI arguments, or ``None``.
 
     Returns:
         Exit code from the selected conversion backend.
@@ -199,7 +199,8 @@ def main(argv: list[str] | None = None) -> int:
     """
 
     parser = build_parser()
-    args = parser.parse_args(argv)
+    parsed_args = args if isinstance(args, argparse.Namespace) else parser.parse_args(args)
+    args = parsed_args
     logger = get_logger(__name__)
 
     resolved_root = (

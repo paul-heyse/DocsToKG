@@ -8,6 +8,7 @@ mocked responses so they remain fast and deterministic.
 
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, List, Optional
 from unittest.mock import Mock
 
@@ -203,6 +204,30 @@ def test_landing_page_resolver_http_error(monkeypatch, tmp_path) -> None:
     result = next(LandingPageResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "http-error"
+
+
+@pytest.mark.parametrize(
+    "exception,reason",
+    [
+        (requests.Timeout("slow"), "timeout"),
+        (requests.ConnectionError("down"), "connection-error"),
+        (requests.RequestException("boom"), "request-error"),
+    ],
+)
+def test_landing_page_resolver_request_errors(monkeypatch, tmp_path, exception, reason) -> None:
+    artifact = _artifact(tmp_path)
+    artifact.landing_urls = ["https://example.org/article"]
+    config = ResolverConfig()
+
+    monkeypatch.setattr(
+        landing_page_module,
+        "request_with_retries",
+        Mock(side_effect=exception),
+    )
+
+    result = next(LandingPageResolver().iter_urls(Mock(), config, artifact))
+
+    assert result.event_reason == reason
 
 
 # --- CoreResolver -------------------------------------------------------------------------
@@ -407,6 +432,63 @@ def test_crossref_resolver_skip_without_doi(tmp_path) -> None:
     assert result.event_reason == "no-doi"
 
 
+def test_crossref_resolver_is_enabled(tmp_path) -> None:
+    artifact = _artifact(tmp_path)
+    config = ResolverConfig()
+    resolver = CrossrefResolver()
+
+    assert resolver.is_enabled(config, artifact) is True
+    assert resolver.is_enabled(config, _artifact(tmp_path, doi=None)) is False
+
+
+def test_crossref_resolver_session_success(monkeypatch, tmp_path) -> None:
+    artifact = _artifact(tmp_path)
+    config = ResolverConfig()
+    config.mailto = "user@example.org"
+
+    response = _StubResponse(
+        json_data={
+            "message": {
+                "link": [
+                    {
+                        "URL": "https://publisher.example/paper.pdf",
+                        "content-type": "application/pdf",
+                    },
+                    {
+                        "URL": "https://publisher.example/paper.pdf",
+                        "content-type": "application/pdf",
+                    },
+                ]
+            }
+        }
+    )
+    session = Mock()
+    session.get = Mock(return_value=response)
+
+    results = list(CrossrefResolver().iter_urls(session, config, artifact))
+
+    session.get.assert_called_once()
+    assert results[0].metadata["content_type"] == "application/pdf"
+    assert len(results) == 1
+
+
+def test_crossref_resolver_cached_request_error(monkeypatch, tmp_path) -> None:
+    artifact = _artifact(tmp_path)
+    config = ResolverConfig()
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.providers.crossref._fetch_crossref_data",
+        Mock(side_effect=requests.RequestException("boom")),
+    )
+
+    class _Session:
+        pass
+
+    result = next(CrossrefResolver().iter_urls(_Session(), config, artifact))
+
+    assert result.event_reason == "request-error"
+
+
 def test_fetch_crossref_data_http_error(monkeypatch) -> None:
     _fetch_crossref_data.cache_clear()
 
@@ -571,6 +653,37 @@ def test_doaj_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> 
     assert result.event_reason == reason
 
 
+def test_doaj_resolver_includes_api_key(monkeypatch, tmp_path) -> None:
+    artifact = _artifact(tmp_path)
+    config = ResolverConfig()
+    config.doaj_api_key = "secret"
+
+    captured_headers = {}
+
+    def _fake_request(session, method, url, **kwargs):
+        nonlocal captured_headers
+        captured_headers = kwargs.get("headers", {})
+        return _StubResponse(json_data={"results": []})
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.providers.doaj.request_with_retries",
+        _fake_request,
+    )
+
+    list(DoajResolver().iter_urls(Mock(), config, artifact))
+
+    assert captured_headers.get("X-API-KEY") == "secret"
+
+
+def test_doaj_resolver_skip_no_doi(tmp_path) -> None:
+    artifact = _artifact(tmp_path, doi=None)
+    config = ResolverConfig()
+
+    result = next(DoajResolver().iter_urls(Mock(), config, artifact))
+
+    assert result.event_reason == "no-doi"
+
+
 def test_europe_pmc_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -710,6 +823,24 @@ def test_hal_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> N
     assert result.event_reason == reason
 
 
+def test_hal_resolver_is_enabled(tmp_path) -> None:
+    artifact = _artifact(tmp_path)
+    config = ResolverConfig()
+    resolver = HalResolver()
+
+    assert resolver.is_enabled(config, artifact) is True
+    assert resolver.is_enabled(config, _artifact(tmp_path, doi=None)) is False
+
+
+def test_hal_resolver_skip_no_doi(tmp_path) -> None:
+    artifact = _artifact(tmp_path, doi=None)
+    config = ResolverConfig()
+
+    result = next(HalResolver().iter_urls(Mock(), config, artifact))
+
+    assert result.event_reason == "no-doi"
+
+
 def test_openaire_resolver_emits_pdf(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -754,6 +885,36 @@ def test_openaire_resolver_json_error(monkeypatch, tmp_path) -> None:
     result = next(OpenAireResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "json-error"
+
+
+def test_openaire_resolver_fallback_json_load(monkeypatch, tmp_path) -> None:
+    artifact = _artifact(tmp_path)
+    config = ResolverConfig()
+
+    payload = {
+        "response": {
+            "results": {
+                "result": [
+                    {
+                        "metadata": {
+                            "instance": {
+                                "url": "https://openaire.example/alt.pdf",
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    }
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.providers.openaire.request_with_retries",
+        lambda *args, **kwargs: _StubResponse(json_data=ValueError("bad"), text=json.dumps(payload)),
+    )
+
+    urls = [result.url for result in OpenAireResolver().iter_urls(Mock(), config, artifact)]
+
+    assert urls == ["https://openaire.example/alt.pdf"]
 
 
 @pytest.mark.parametrize(
@@ -844,6 +1005,15 @@ def test_osf_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> N
     assert result.event_reason == reason
 
 
+def test_osf_resolver_skip_no_doi(tmp_path) -> None:
+    artifact = _artifact(tmp_path, doi=None)
+    config = ResolverConfig()
+
+    result = next(OsfResolver().iter_urls(Mock(), config, artifact))
+
+    assert result.event_reason == "no-doi"
+
+
 # --- UnpaywallResolver -------------------------------------------------------------------
 
 
@@ -930,6 +1100,37 @@ def test_unpaywall_resolver_session_json_error(monkeypatch, tmp_path) -> None:
     result = next(UnpaywallResolver().iter_urls(session, config, artifact))
 
     assert result.event_reason == "json-error"
+
+
+def test_unpaywall_resolver_is_enabled(tmp_path) -> None:
+    artifact = _artifact(tmp_path)
+    config = ResolverConfig()
+    config.unpaywall_email = "user@example.org"
+    resolver = UnpaywallResolver()
+
+    assert resolver.is_enabled(config, artifact) is True
+    assert resolver.is_enabled(config, _artifact(tmp_path, doi=None)) is False
+    config.unpaywall_email = None
+    assert resolver.is_enabled(config, artifact) is False
+
+
+def test_unpaywall_resolver_session_success(monkeypatch, tmp_path) -> None:
+    artifact = _artifact(tmp_path)
+    config = ResolverConfig()
+    config.unpaywall_email = "user@example.org"
+
+    payload = {
+        "best_oa_location": {"url_for_pdf": "https://unpaywall.example/best.pdf"},
+        "oa_locations": [],
+    }
+
+    session = Mock()
+    session.get = Mock(return_value=_StubResponse(json_data=payload))
+
+    results = list(UnpaywallResolver().iter_urls(session, config, artifact))
+
+    session.get.assert_called_once()
+    assert results[0].url == "https://unpaywall.example/best.pdf"
 
 
 def test_semantic_scholar_resolver_http_error(monkeypatch, tmp_path) -> None:
@@ -1195,6 +1396,23 @@ def test_wayback_resolver_error_paths(monkeypatch, tmp_path, exception, reason) 
     assert result.event_reason == reason
 
 
+def test_wayback_resolver_no_snapshot(monkeypatch, tmp_path) -> None:
+    artifact = _artifact(tmp_path)
+    artifact.failed_pdf_urls = ["https://example.org/pdf"]
+    config = ResolverConfig()
+
+    payload = {"archived_snapshots": {}}
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.providers.wayback.request_with_retries",
+        lambda *args, **kwargs: _StubResponse(json_data=payload),
+    )
+
+    results = list(WaybackResolver().iter_urls(Mock(), config, artifact))
+
+    assert results == []
+
+
 def test_zenodo_resolver_no_doi(tmp_path) -> None:
     resolver = ZenodoResolver()
     artifact = _artifact(tmp_path, doi=None)
@@ -1288,3 +1506,26 @@ def test_zenodo_resolver_emits_urls(monkeypatch, tmp_path) -> None:
     urls = [result.url for result in ZenodoResolver().iter_urls(Mock(), config, artifact)]
 
     assert urls == ["https://zenodo.example/paper.pdf"]
+
+
+def test_zenodo_resolver_is_enabled(tmp_path) -> None:
+    artifact = _artifact(tmp_path)
+    resolver = ZenodoResolver()
+    config = ResolverConfig()
+
+    assert resolver.is_enabled(config, artifact) is True
+    assert resolver.is_enabled(config, _artifact(tmp_path, doi=None)) is False
+
+
+def test_zenodo_resolver_malformed_hits(monkeypatch, tmp_path) -> None:
+    artifact = _artifact(tmp_path)
+    config = ResolverConfig()
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.providers.zenodo.request_with_retries",
+        lambda *args, **kwargs: _StubResponse(json_data={"hits": "unexpected"}),
+    )
+
+    results = list(ZenodoResolver().iter_urls(Mock(), config, artifact))
+
+    assert results == []
