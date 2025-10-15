@@ -171,20 +171,22 @@ class _StubGraph:
 
         return len(self._triples) or 1
 
-    def serialize(self, destination: Any, format: str = "turtle") -> None:
-        """Write a stub serialization result.
+    def serialize(self, destination: Any = None, format: str = "turtle") -> Any:
+        """Write a stub serialization result or return inline output.
 
         Args:
-            destination: Output path or file-like object.
+            destination: Output path, file-like object, or ``None`` for inline output.
             format: Serialization format. Ignored by the stub.
 
         Returns:
-            None
+            ``None`` for file destinations, or a string when ``destination`` is ``None``.
 
         Raises:
             None.
         """
 
+        if destination is None:
+            return "# Stub TTL output\n"
         if isinstance(destination, (str, Path)):
             dest_path = Path(destination)
             dest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -192,8 +194,11 @@ class _StubGraph:
                 dest_path.write_bytes(self._source.read_bytes())
             else:
                 dest_path.write_text("# Stub TTL output\n")
-        else:
+            return None
+        if hasattr(destination, "write"):
             destination.write(b"# Stub TTL output\n")
+            return None
+        return destination
 
 
 class _StubRDFLib:
