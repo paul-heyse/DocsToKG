@@ -761,18 +761,18 @@
 
 ## 7. Bounded Intra-Work Concurrency
 
-- [ ] 7.1 Add concurrency fields to `ResolverConfig` dataclass
+- [x] 7.1 Add concurrency fields to `ResolverConfig` dataclass
 
   ```python
   # In resolvers/types.py
   max_concurrent_resolvers: int = 1  # Sequential by default
   ```
 
-- [ ] 7.2 Add thread-safe rate limit tracking in `ResolverPipeline.__init__()`
+- [x] 7.2 Add thread-safe rate limit tracking in `ResolverPipeline.__init__()`
   - Ensure `_last_invocation` dict and `_lock` are used for thread safety
   - Already present in current implementation; verify thread-safety annotations
 
-- [ ] 7.3 Implement concurrent resolver execution in `ResolverPipeline.run()`
+- [x] 7.3 Implement concurrent resolver execution in `ResolverPipeline.run()`
   - At start of method, check `if self.config.max_concurrent_resolvers == 1:` to use existing sequential path
   - For concurrent mode (`> 1`), implement:
 
@@ -804,11 +804,11 @@
                   return PipelineResult(success=True, ...)
   ```
 
-- [ ] 7.4 Ensure thread-safe metrics recording
+- [x] 7.4 Ensure thread-safe metrics recording
   - Verify `ResolverMetrics` uses `Counter` which is thread-safe
   - Verify `self.logger.log()` calls are thread-safe (they are, since file writes use OS-level locks)
 
-- [ ] 7.5 Add configuration validation
+- [x] 7.5 Add configuration validation
 
   ```python
   # In resolvers/types.py, add to ResolverConfig class
@@ -859,7 +859,7 @@
           )
   ```
 
-- [ ] 7.6 Add concurrent execution tests in `tests/test_bounded_concurrency.py`
+- [x] 7.6 Add concurrent execution tests in `tests/test_bounded_concurrency.py`
   - Test `max_concurrent_resolvers=1` uses sequential path
   - Test `max_concurrent_resolvers=3` executes up to 3 resolvers concurrently
   - Test rate limits are enforced despite concurrency
@@ -869,7 +869,7 @@
 
 ## 8. Zenodo Resolver
 
-- [ ] 8.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/zenodo.py`
+- [x] 8.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/zenodo.py`
 
   ```python
   """Zenodo repository resolver for DOI-indexed research outputs."""
@@ -953,14 +953,14 @@
                           )
   ```
 
-- [ ] 8.2 Add Zenodo to resolver registry
+- [x] 8.2 Add Zenodo to resolver registry
   - Import `ZenodoResolver` in `resolvers/providers/__init__.py`
   - Insert in `default_resolvers()` after `CoreResolver`, before `DoajResolver`
 
-- [ ] 8.3 Update `DEFAULT_RESOLVER_ORDER` constant
+- [x] 8.3 Update `DEFAULT_RESOLVER_ORDER` constant
   - Insert `"zenodo"` after `"core"` in list
 
-- [ ] 8.4 Add Zenodo resolver tests in `tests/test_zenodo_resolver.py`
+- [x] 8.4 Add Zenodo resolver tests in `tests/test_zenodo_resolver.py`
   - Test DOI query with successful response containing PDF file
   - Test DOI query with multiple files, filter to PDF only
   - Test DOI query with no matches (empty hits)
@@ -969,7 +969,7 @@
   - Test DOI query with network error
   - Use `responses` library for mock HTTP fixtures
 
-- [ ] 8.5 Add test fixture for Zenodo API response
+- [x] 8.5 Add test fixture for Zenodo API response
 
   ```python
   # Create tests/data/zenodo_response_sample.json
