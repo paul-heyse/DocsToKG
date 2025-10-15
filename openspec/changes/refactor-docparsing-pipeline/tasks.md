@@ -1194,16 +1194,16 @@
         main()
     ```
 
-- [ ] 10.3 Refactor backend scripts to accept args object
+- [x] 10.3 Refactor backend scripts to accept args object
   - Update `run_docling_html_to_doctags_parallel.py` main() to accept optional args parameter
   - Update `run_docling_parallel_with_vllm_debug.py` main() similarly
   - If args is None, parse from sys.argv as usual
 
-- [ ] 10.4 Add comprehensive help text
+- [x] 10.4 Add comprehensive help text
   - Add examples section to argparse epilog showing common usage patterns
   - Document PDF-specific vs HTML-specific flags
 
-- [ ] 10.5 Add deprecation notice to old scripts
+- [x] 10.5 Add deprecation notice to old scripts
   - At top of `run_docling_html_to_doctags_parallel.py` and `run_docling_parallel_with_vllm_debug.py`:
 
     ```python
@@ -1218,24 +1218,24 @@
 
 ## 11. Refactored Module CLIs
 
-- [ ] 11.1 Create `cli/chunk_and_coalesce.py`
+- [x] 11.1 Create `cli/chunk_and_coalesce.py`
   - Wrap chunking logic from `DoclingHybridChunkerPipelineWithMin.py`
   - Import main processing function as callable
   - Add all CLI flags: --min-tokens, --max-tokens, --tokenizer-model, --in-dir, --out-dir
   - Preserve existing functionality while providing clean CLI interface
 
-- [ ] 11.2 Create `cli/embed_vectors.py`
+- [x] 11.2 Create `cli/embed_vectors.py`
   - Wrap embedding logic from `EmbeddingV2.py`
   - Add all CLI flags for batch sizes, model paths
   - Import core embedding functions as library code
 
-- [ ] 11.3 Update documentation to reference new CLIs
+- [x] 11.3 Update documentation to reference new CLIs
   - Update README with new command examples
   - Mark old script paths as "legacy" but still functional
 
 ## 12. Logging Infrastructure
 
-- [ ] 12.1 Update all print statements to use logging
+- [x] 12.1 Update all print statements to use logging
   - Search for `print(` in all DocParsing scripts
   - Replace with appropriate log level:
     - Errors: `logger.error()`
@@ -1244,36 +1244,36 @@
     - Debug: `logger.debug()`
   - Keep tqdm progress bars (they write to stderr)
 
-- [ ] 12.2 Add structured context to log messages
+- [x] 12.2 Add structured context to log messages
   - Use `extra={"extra_fields": {...}}` for structured data
   - Example: `logger.info("Processing complete", extra={"extra_fields": {"doc_id": doc_id, "duration_s": elapsed}})`
 
-- [ ] 12.3 Create Data/Manifests/ directory in each script's initialization
+- [x] 12.3 Create Data/Manifests/ directory in each script's initialization
   - Call `data_manifests()` early to ensure directory exists
 
-- [ ] 12.4 Add manifest entries at key milestones
+- [x] 12.4 Add manifest entries at key milestones
   - DocTags conversion: success/failure/skip per document
   - Chunking: success/failure per document with chunk count
   - Embeddings: success/failure per document with vector count
 
 ## 13. Provenance Enrichment
 
-- [ ] 13.1 Detect parse engine in conversion scripts
+- [x] 13.1 Detect parse engine in conversion scripts
   - In HTML converter: set `parse_engine = "docling-html"`
   - In PDF converter: set `parse_engine = "docling-vlm"`
   - Pass to chunk writing function
 
-- [ ] 13.2 Detect docling version
+- [x] 13.2 Detect docling version
   - Call `get_docling_version()` from schemas module
   - Include in every chunk row
 
-- [ ] 13.3 Track image annotations during serialization
+- [x] 13.3 Track image annotations during serialization
   - In `CaptionPlusAnnotationPictureSerializer.serialize()`, count:
     - has_image_captions: len(parts) > 1 (more than just "<!-- image -->")
     - has_image_classification: any classification annotations present
   - Accumulate these flags in provenance metadata
 
-- [ ] 13.4 Add provenance to ChunkRow during writing
+- [x] 13.4 Add provenance to ChunkRow during writing
   - Construct ProvenanceMetadata object
   - Validate with schema
   - Include in JSONL output
@@ -1359,7 +1359,7 @@
   - Test: All SPLADE vectors have non-negative weights
   - Test: BM25 term and weight lists have equal length
 
-- [ ] 16.5 Add CI configuration
+- [x] 16.5 Add CI configuration
   - Create `.github/workflows/docparsing-tests.yml`
   - Run tests on: Python 3.9, 3.10, 3.11
   - Install dependencies: pytest, hypothesis, pydantic
@@ -1367,31 +1367,31 @@
 
 ## 17. Documentation
 
-- [ ] 17.1 Create `src/DocsToKG/DocParsing/README.md` with architecture overview
+- [x] 17.1 Create `src/DocsToKG/DocParsing/README.md` with architecture overview
   - Sections: Overview, Architecture, Stage Descriptions, Configuration, CLI Reference, Troubleshooting
 
-- [ ] 17.2 Document environment variables
+- [x] 17.2 Document environment variables
   - `DOCSTOKG_DATA_ROOT`: Override data directory location
   - `DOCLING_CUDA_USE_FLASH_ATTENTION2`: Enable flash attention
   - `DOCLING_ARTIFACTS_PATH`: Cache directory for Docling artifacts
 
-- [ ] 17.3 Document schema versioning strategy
+- [x] 17.3 Document schema versioning strategy
   - Explain version string format
   - Describe backward compatibility approach
   - Provide migration examples for version updates
 
-- [ ] 17.4 Add CLI usage examples
+- [x] 17.4 Add CLI usage examples
   - Show complete workflows from PDFs → DocTags → Chunks → Vectors
   - Include --resume flag usage for large datasets
   - Show troubleshooting commands
 
-- [ ] 17.5 Create troubleshooting guide
+- [x] 17.5 Create troubleshooting guide
   - CUDA errors: spawn mode, memory limits
   - OOM errors: reduce batch sizes
   - vLLM startup failures: model path, port conflicts
   - Validation errors: schema mismatch, missing fields
 
-- [ ] 17.6 Document manifest query examples
+- [x] 17.6 Document manifest query examples
   - Show jq queries for common questions:
     - Failed documents: `jq 'select(.status=="failure")' docparse.manifest.jsonl`
     - Average duration by stage: `jq -s 'group_by(.stage) | map({stage: .[0].stage, avg_duration: (map(.duration_s) | add / length)})'`
@@ -1404,7 +1404,7 @@
   - Validate outputs at each stage
   - Check manifest completeness
 
-- [ ] 18.2 Validate all JSONL outputs against schemas
+- [x] 18.2 Validate all JSONL outputs against schemas
   - Load each output file
   - Validate every row with Pydantic models
   - Assert zero validation errors

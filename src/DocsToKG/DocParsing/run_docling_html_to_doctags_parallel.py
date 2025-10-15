@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Parallel HTML → DocTags conversion with manifest-aware resume support."""
 
+from __future__ import annotations
+
+import argparse
 import os
 import time
+import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,6 +20,7 @@ from DocsToKG.DocParsing._common import (
     data_html,
     data_manifests,
     detect_data_root,
+    get_logger,
     load_manifest_index,
     manifest_append,
 )
@@ -23,6 +28,15 @@ from DocsToKG.DocParsing._common import (
 DEFAULT_INPUT_DIR = data_html()
 DEFAULT_OUTPUT_DIR = data_doctags()
 MANIFEST_STAGE = "doctags-html"
+
+warnings.warn(
+    "Direct invocation of run_docling_html_to_doctags_parallel.py is deprecated. "
+    "Use unified CLI: python -m DocsToKG.DocParsing.cli.doctags_convert --mode html",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+_LOGGER = get_logger(__name__)
 
 # keep numeric libs polite; also ensure nothing touches CUDA by mistake
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -37,6 +51,61 @@ from docling.document_converter import DocumentConverter, HTMLFormatOption
 
 # per-process converter cache
 _CONVERTER = None
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Construct an argument parser for the HTML → DocTags converter."""
+
+    parser = argparse.ArgumentParser(
+        description="Convert HTML corpora to DocTags using Docling",
+    )
+    parser.add_argument(
+        "--data-root",
+        type=Path,
+        default=None,
+        help=(
+            "Override DocsToKG Data directory. Defaults to auto-detection or "
+            "$DOCSTOKG_DATA_ROOT."
+        ),
+    )
+    parser.add_argument(
+        "--input",
+        type=Path,
+        default=DEFAULT_INPUT_DIR,
+        help="Folder with HTML files (recurses)",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_OUTPUT_DIR,
+        help="Destination for .doctags",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=max(1, (os.cpu_count() or 8) - 1),
+        help="Parallel workers",
+    )
+    parser.add_argument(
+        "--overwrite", action="store_true", help="Overwrite existing .doctags files"
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip documents whose outputs already exist with matching content hash",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force reprocessing even when resume criteria are satisfied",
+    )
+    return parser
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse command-line arguments for standalone execution."""
+
+    return build_parser().parse_args(argv)
 
 
 @dataclass
@@ -148,63 +217,23 @@ def convert_one(task: HtmlTask) -> ConversionResult:
         )
 
 
-def main():
-    """Entrypoint for parallel HTML-to-DocTags conversion across a dataset.
+def main(args: argparse.Namespace | None = None) -> int:
+    """Entrypoint for parallel HTML-to-DocTags conversion across a dataset."""
 
-    Args:
-        None
-
-    Returns:
-        None
-    """
-    import argparse
     import multiprocessing as mp
 
-    # safer start method for multi-proc even though we're CPU-only
     try:
         mp.set_start_method("spawn", force=True)
     except RuntimeError:
         pass  # already set
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--data-root",
-        type=Path,
-        default=None,
-        help=(
-            "Override DocsToKG Data directory. Defaults to auto-detection or "
-            "$DOCSTOKG_DATA_ROOT."
-        ),
-    )
-    parser.add_argument(
-        "--input",
-        type=Path,
-        default=DEFAULT_INPUT_DIR,
-        help="Folder with HTML files (recurses)",
-    )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        default=DEFAULT_OUTPUT_DIR,
-        help="Destination for .doctags",
-    )
-    parser.add_argument(
-        "--workers", type=int, default=max(1, (os.cpu_count() or 8) - 1), help="Parallel workers"
-    )
-    parser.add_argument(
-        "--overwrite", action="store_true", help="Overwrite existing .doctags files"
-    )
-    parser.add_argument(
-        "--resume",
-        action="store_true",
-        help="Skip documents whose outputs already exist with matching content hash",
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Force reprocessing even when resume criteria are satisfied",
-    )
-    args = parser.parse_args()
+    parser = build_parser()
+    defaults = parser.parse_args([])
+    provided = parse_args() if args is None else args
+    for key, value in vars(provided).items():
+        if value is not None:
+            setattr(defaults, key, value)
+    args = defaults
 
     data_root_override = args.data_root
     resolved_root = (
@@ -221,17 +250,30 @@ def main():
     if args.input == DEFAULT_INPUT_DIR and data_root_override is not None:
         input_dir: Path = data_html(resolved_root)
     else:
-        input_dir = args.input.resolve()
+        input_dir = (args.input or DEFAULT_INPUT_DIR).resolve()
 
     if args.output == DEFAULT_OUTPUT_DIR and data_root_override is not None:
         output_dir: Path = data_doctags(resolved_root)
     else:
-        output_dir = args.output.resolve()
+        output_dir = (args.output or DEFAULT_OUTPUT_DIR).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Input : {input_dir}")
-    print(f"Output: {output_dir}")
-    print(f"Workers: {args.workers}")
+    _LOGGER.info(
+        "HTML conversion configuration",
+        extra={
+            "extra_fields": {
+                "data_root": str(resolved_root),
+                "input_dir": str(input_dir),
+                "output_dir": str(output_dir),
+                "workers": args.workers,
+            }
+        },
+    )
+
+    if args.force:
+        _LOGGER.info("Force mode: reprocessing all documents")
+    elif args.resume:
+        _LOGGER.info("Resume mode enabled: unchanged outputs will be skipped")
 
     if args.force:
         print("Force mode: reprocessing all documents")
@@ -240,8 +282,10 @@ def main():
 
     files = list_htmls(input_dir)
     if not files:
-        print("No HTML files found. Exiting.")
-        return
+        _LOGGER.warning(
+            "No HTML files found", extra={"extra_fields": {"input_dir": str(input_dir)}}
+        )
+        return 0
 
     manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_root) if args.resume else {}
 
@@ -261,7 +305,15 @@ def main():
             and manifest_entry
             and manifest_entry.get("input_hash") == input_hash
         ):
-            print(f"Skipping {doc_id}: output exists and input unchanged")
+            _LOGGER.info(
+                "Skipping HTML document",
+                extra={
+                    "extra_fields": {
+                        "doc_id": doc_id,
+                        "output_path": str(out_path),
+                    }
+                },
+            )
             manifest_append(
                 stage=MANIFEST_STAGE,
                 doc_id=doc_id,
@@ -271,6 +323,7 @@ def main():
                 input_path=str(path),
                 input_hash=input_hash,
                 output_path=str(out_path),
+                parse_engine="docling-html",
             )
             skip += 1
             continue
@@ -282,11 +335,20 @@ def main():
                 input_hash=input_hash,
                 overwrite=args.overwrite,
             )
-        )
+            )
 
     if not tasks:
-        print(f"\nDone. ok=0, skip={skip}, fail=0")
-        return
+        _LOGGER.info(
+            "HTML conversion summary",
+            extra={
+                "extra_fields": {
+                    "ok": 0,
+                    "skip": skip,
+                    "fail": 0,
+                }
+            },
+        )
+        return 0
 
     with ProcessPoolExecutor(max_workers=args.workers) as ex:
         futures = [ex.submit(convert_one, task) for task in tasks]
@@ -300,7 +362,15 @@ def main():
                 skip += 1
             else:
                 fail += 1
-                print(f"[FAIL] {result.doc_id}: {result.error or 'conversion failed'}")
+                _LOGGER.error(
+                    "HTML conversion failure",
+                    extra={
+                        "extra_fields": {
+                            "doc_id": result.doc_id,
+                            "error": result.error or "conversion failed",
+                        }
+                    },
+                )
 
             manifest_append(
                 stage=MANIFEST_STAGE,
@@ -312,10 +382,22 @@ def main():
                 input_hash=result.input_hash,
                 output_path=result.output_path,
                 error=result.error,
+                parse_engine="docling-html",
             )
 
-    print(f"\nDone. ok={ok}, skip={skip}, fail={fail}")
+    _LOGGER.info(
+        "HTML conversion summary",
+        extra={
+            "extra_fields": {
+                "ok": ok,
+                "skip": skip,
+                "fail": fail,
+            }
+        },
+    )
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

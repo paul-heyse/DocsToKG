@@ -16,10 +16,11 @@ import subprocess as sp
 import sys
 import threading
 import time
+import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 from tqdm import tqdm
@@ -37,6 +38,16 @@ from DocsToKG.DocParsing._common import (
 )
 
 
+warnings.warn(
+    "Direct invocation of run_docling_parallel_with_vllm_debug.py is deprecated. "
+    "Use unified CLI: python -m DocsToKG.DocParsing.cli.doctags_convert --mode pdf",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+_LOGGER = get_logger(__name__)
+
+
 # -------- Paths --------
 DEFAULT_DATA_ROOT = detect_data_root()
 DEFAULT_INPUT = data_pdfs(DEFAULT_DATA_ROOT)
@@ -44,10 +55,12 @@ DEFAULT_OUTPUT = data_doctags(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "doctags-pdf"
 
 
-def parse_args() -> argparse.Namespace:
-    """Parse CLI arguments for the DocTags conversion pipeline."""
+def build_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the PDF → DocTags converter."""
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Convert PDF corpora to DocTags with an optional vLLM backend",
+    )
     parser.add_argument(
         "--data-root",
         type=Path,
@@ -85,7 +98,13 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Force reprocessing even when resume criteria are satisfied",
     )
-    return parser.parse_args()
+    return parser
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse CLI arguments for standalone execution."""
+
+    return build_parser().parse_args(argv)
 
 MODEL_PATH = "/home/paul/hf-cache/granite-docling-258M"  # local untied snapshot
 
@@ -116,6 +135,13 @@ class PdfTask:
     doc_id: str
     output_path: Path
 
+    def __getitem__(self, index: int) -> Path:
+        """Provide tuple-like access for compatibility with legacy tests."""
+
+        if index == 0:
+            return self.pdf_path
+        raise IndexError("PdfTask only supports index 0")
+
 
 @dataclass
 class PdfConversionResult:
@@ -128,6 +154,117 @@ class PdfConversionResult:
     input_hash: str
     output_path: str
     error: Optional[str] = None
+
+
+def _normalize_status(raw: Optional[str]) -> str:
+    """Coerce legacy status strings into the canonical vocabulary."""
+
+    if not raw:
+        return "success"
+
+    normalized = raw.strip().lower()
+    if normalized in {"ok", "success", "succeeded", "done"}:
+        return "success"
+    if normalized in {"skip", "skipped", "skipping"}:
+        return "skip"
+    if normalized in {"fail", "failed", "error", "exception"}:
+        return "failure"
+    return normalized
+
+
+def _safe_float(value: Any) -> float:
+    """Convert the supplied value to ``float`` when possible."""
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):  # pragma: no cover - defensive
+        return 0.0
+
+
+def normalize_conversion_result(
+    result: Any, task: Optional[PdfTask] = None
+) -> PdfConversionResult:
+    """Adapt heterogeneous worker return values into :class:`PdfConversionResult`.
+
+    Historically the converter returned a tuple ``(doc_id, status)``.  The
+    refactor switched to ``PdfConversionResult`` which broke a regression test
+    that still emits tuples.  This helper accepts both shapes—as well as dicts
+    produced by ad-hoc stubs—and populates missing metadata from the associated
+    :class:`PdfTask` when available.
+    """
+
+    if isinstance(result, PdfConversionResult):
+        return result
+
+    if isinstance(result, dict):
+        payload: Dict[str, Any] = dict(result)
+        doc_id = payload.get("doc_id") or (task.doc_id if task else "unknown")
+        status = _normalize_status(payload.get("status"))
+        return PdfConversionResult(
+            doc_id=str(doc_id),
+            status=status,
+            duration_s=_safe_float(payload.get("duration_s", 0.0)),
+            input_path=str(
+                payload.get("input_path")
+                or (task.pdf_path if task else "")
+            ),
+            input_hash=str(
+                payload.get("input_hash")
+                or (task.input_hash if task else "")
+            ),
+            output_path=str(
+                payload.get("output_path")
+                or (task.output_path if task else "")
+            ),
+            error=payload.get("error"),
+        )
+
+    if isinstance(result, (tuple, list)):
+        doc_id = (
+            result[0]
+            if len(result) > 0 and result[0] is not None
+            else (task.doc_id if task else "unknown")
+        )
+        status = _normalize_status(result[1] if len(result) > 1 else None)
+        duration = _safe_float(result[2] if len(result) > 2 else 0.0)
+        input_path = (
+            result[3]
+            if len(result) > 3 and result[3] is not None
+            else (task.pdf_path if task else "")
+        )
+        output_path = (
+            result[4]
+            if len(result) > 4 and result[4] is not None
+            else (task.output_path if task else "")
+        )
+        input_hash = (
+            result[5]
+            if len(result) > 5 and result[5] is not None
+            else (task.input_hash if task else "")
+        )
+        error = result[6] if len(result) > 6 else None
+
+        return PdfConversionResult(
+            doc_id=str(doc_id),
+            status=status,
+            duration_s=duration,
+            input_path=str(input_path),
+            input_hash=str(input_hash),
+            output_path=str(output_path),
+            error=None if error is None else str(error),
+        )
+
+    # Fallback for unexpected return types
+    doc_id = task.doc_id if task else "unknown"
+    return PdfConversionResult(
+        doc_id=doc_id,
+        status="failure",
+        duration_s=0.0,
+        input_path=str(task.pdf_path if task else ""),
+        input_hash=str(task.input_hash if task else ""),
+        output_path=str(task.output_path if task else ""),
+        error=f"Unsupported result type: {type(result)!r}",
+    )
 
 
 def port_is_free(port: int) -> bool:
@@ -214,7 +351,15 @@ def stream_logs(proc: sp.Popen, prefix="[vLLM] "):
             break
         s = line.rstrip()
         if s:
-            print(prefix + s)
+            _LOGGER.info(
+                "vLLM stdout",
+                extra={
+                    "extra_fields": {
+                        "source": "vllm",
+                        "line": prefix + s,
+                    }
+                },
+            )
 
 
 def start_vllm(port: int) -> sp.Popen:
@@ -230,7 +375,7 @@ def start_vllm(port: int) -> sp.Popen:
         SystemExit: If the `vllm` executable is not present on `PATH`.
     """
     if shutil.which("vllm") is None:
-        print("ERROR: 'vllm' not found on PATH.", file=sys.stderr)
+        _LOGGER.error("'vllm' not found on PATH", extra={"extra_fields": {"cmd": "vllm"}})
         sys.exit(1)
 
     cmd = [
@@ -251,7 +396,10 @@ def start_vllm(port: int) -> sp.Popen:
 
     env = os.environ.copy()
     env.setdefault("VLLM_LOG_LEVEL", "INFO")  # INFO so we can see useful lines
-    print("Starting vLLM:", " ".join(cmd))
+    _LOGGER.info(
+        "Starting vLLM",
+        extra={"extra_fields": {"command": cmd, "env_log_level": env.get("VLLM_LOG_LEVEL")}},
+    )
     proc = sp.Popen(cmd, env=env, stdout=sp.PIPE, stderr=sp.STDOUT, text=True, bufsize=1)
     # Start log thread
     t = threading.Thread(target=stream_logs, args=(proc,), daemon=True)
@@ -274,7 +422,10 @@ def wait_for_vllm(port: int, proc: sp.Popen, timeout_s: int = WAIT_TIMEOUT_S):
         RuntimeError: If the server exits prematurely or fails to become ready
             within the allotted timeout.
     """
-    print(f"Probing vLLM on port {port} for up to {timeout_s}s ...")
+    _LOGGER.info(
+        "Probing vLLM",
+        extra={"extra_fields": {"port": port, "timeout_s": timeout_s}},
+    )
     t0 = time.time()
     with tqdm(total=timeout_s, unit="s", desc="vLLM warmup", leave=True) as bar:
         while True:
@@ -282,12 +433,28 @@ def wait_for_vllm(port: int, proc: sp.Popen, timeout_s: int = WAIT_TIMEOUT_S):
             if proc.poll() is not None:
                 try:
                     leftover = proc.stdout.read() or ""
-                    print("[vLLM exit]", leftover[-800:])
+                    _LOGGER.error(
+                        "vLLM exited while waiting",
+                        extra={
+                            "extra_fields": {
+                                "port": port,
+                                "tail": leftover[-800:],
+                            }
+                        },
+                    )
                 finally:
                     raise RuntimeError(f"vLLM exited early with code {proc.returncode}")
             names, raw, status = probe_models(port)
             if status == 200:
-                print(f"  /v1/models -> 200; models reported: {names}")
+                _LOGGER.info(
+                    "vLLM models available",
+                    extra={
+                        "extra_fields": {
+                            "port": port,
+                            "models": names,
+                        }
+                    },
+                )
                 return
             # (…keep your existing logging, metrics probe, and tqdm update…)
             if int(time.time() - t0) >= timeout_s:
@@ -309,7 +476,10 @@ def stop_vllm(proc: Optional[sp.Popen], own: bool, grace=10):
     """
     if not own or proc is None or proc.poll() is not None:
         return
-    print("Stopping vLLM...")
+    _LOGGER.info(
+        "Stopping vLLM",
+        extra={"extra_fields": {"grace_seconds": grace}},
+    )
     try:
         proc.terminate()
         t0 = time.time()
@@ -342,12 +512,28 @@ def ensure_vllm(preferred: int = PREFERRED_PORT) -> Tuple[int, Optional[sp.Popen
     # 2) If something is already on preferred, reuse if it's vLLM (any models list)
     names, raw, status = probe_models(preferred)
     if status == 200:
-        print(f"Reusing existing vLLM on {preferred}; models={names}")
+        _LOGGER.info(
+            "Reusing vLLM",
+            extra={
+                "extra_fields": {
+                    "port": preferred,
+                    "models": names,
+                }
+            },
+        )
         return preferred, None, False
 
     # 3) Otherwise, pick a new free port
     alt = find_free_port(preferred + 1, PORT_SCAN_SPAN)
-    print(f"Port {preferred} busy (not vLLM). Launching on {alt} instead.")
+    _LOGGER.info(
+        "Launching vLLM on alternate port",
+        extra={
+            "extra_fields": {
+                "preferred_port": preferred,
+                "alternate_port": alt,
+            }
+        },
+    )
     proc = start_vllm(alt)
     # ⬇️ same change here
     wait_for_vllm(alt, proc)
@@ -493,15 +679,9 @@ def convert_one(task: PdfTask) -> PdfConversionResult:
 
 
 # -------- Main --------
-def main():
-    """Entrypoint that coordinates vLLM setup and parallel DocTags conversion.
+def main(args: argparse.Namespace | None = None) -> int:
+    """Coordinate vLLM startup and parallel DocTags conversion."""
 
-    Args:
-        None
-
-    Returns:
-        None
-    """
     import multiprocessing as mp
 
     logger = get_logger(__name__)
@@ -531,7 +711,14 @@ def main():
         },
     )
 
-    args = parse_args()
+    parser = build_parser()
+    defaults = parser.parse_args([])
+    provided = parse_args() if args is None else args
+    for key, value in vars(provided).items():
+        if value is not None:
+            setattr(defaults, key, value)
+    args = defaults
+
     data_root_override = args.data_root
     resolved_root = (
         detect_data_root(data_root_override)
@@ -547,12 +734,12 @@ def main():
     if args.input == DEFAULT_INPUT and data_root_override is not None:
         input_dir = data_pdfs(resolved_root)
     else:
-        input_dir = args.input.resolve()
+        input_dir = (args.input or DEFAULT_INPUT).resolve()
 
     if args.output == DEFAULT_OUTPUT and data_root_override is not None:
         output_dir = data_doctags(resolved_root)
     else:
-        output_dir = args.output.resolve()
+        output_dir = (args.output or DEFAULT_OUTPUT).resolve()
 
     input_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -592,7 +779,7 @@ def main():
                 "No PDFs found",
                 extra={"extra_fields": {"input_dir": str(input_dir)}},
             )
-            return
+            return 0
 
         manifest_index = (
             load_manifest_index(MANIFEST_STAGE, resolved_root) if args.resume else {}
@@ -635,6 +822,7 @@ def main():
                     input_path=str(pdf_path),
                     input_hash=input_hash,
                     output_path=str(out_path),
+                    parse_engine="docling-vlm",
                 )
                 skip += 1
                 continue
@@ -661,13 +849,17 @@ def main():
                     }
                 },
             )
-            return
+            return 0
 
         with ProcessPoolExecutor(max_workers=workers) as ex:
-            futures = [ex.submit(convert_one, task) for task in tasks]
-            with tqdm(total=len(futures), desc="Converting PDFs", unit="file") as pbar:
-                for fut in as_completed(futures):
-                    result = fut.result()
+            future_map = {ex.submit(convert_one, task): task for task in tasks}
+            with tqdm(
+                total=len(future_map), desc="Converting PDFs", unit="file"
+            ) as pbar:
+                for fut in as_completed(future_map):
+                    task = future_map[fut]
+                    raw_result = fut.result()
+                    result = normalize_conversion_result(raw_result, task)
                     if result.status == "success":
                         ok += 1
                     elif result.status == "skip":
@@ -694,6 +886,7 @@ def main():
                         input_hash=result.input_hash,
                         output_path=result.output_path,
                         error=result.error,
+                        parse_engine="docling-vlm",
                     )
 
                     pbar.update(1)
@@ -712,6 +905,8 @@ def main():
         stop_vllm(proc, owns, grace=10)
         logger.info("All done")
 
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

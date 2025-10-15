@@ -46,6 +46,14 @@ from DocsToKG.DocParsing._common import (
     manifest_append,
 )
 from DocsToKG.DocParsing.serializers import RichSerializerProvider
+from DocsToKG.DocParsing.schemas import (
+    CHUNK_SCHEMA_VERSION,
+    ChunkRow,
+    ProvenanceMetadata,
+    get_docling_version,
+)
+
+SOFT_BARRIER_MARGIN = 64
 
 SOFT_BARRIER_MARGIN = 64
 
@@ -110,6 +118,48 @@ def extract_refs_and_pages(chunk: BaseChunk) -> Tuple[List[str], List[int]]:
     return refs, sorted(pages)
 
 
+def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, int]:
+    """Infer image annotation flags and counts from chunk metadata and text."""
+
+    has_caption = False
+    has_classification = False
+    num_images = 0
+
+    try:
+        doc_items = getattr(chunk.meta, "doc_items", []) or []
+    except Exception:  # pragma: no cover - defensive catch
+        doc_items = []
+
+    for doc_item in doc_items:
+        picture = getattr(doc_item, "doc_item", doc_item)
+        flags = getattr(picture, "_docstokg_flags", None)
+        if isinstance(flags, dict):
+            has_caption = has_caption or bool(flags.get("has_image_captions"))
+            has_classification = has_classification or bool(
+                flags.get("has_image_classification")
+            )
+        if getattr(picture, "__class__", type(None)).__name__.lower().startswith("picture"):
+            num_images += 1
+
+    text_has_caption = any(
+        marker in text for marker in ("Figure caption:", "Picture description:", "SMILES:")
+    )
+    text_has_classification = "Picture type:" in text
+    has_caption = has_caption or text_has_caption
+    has_classification = has_classification or text_has_classification
+
+    if num_images == 0:
+        num_images = (
+            text.count("<!-- image -->")
+            + text.count("Figure caption:")
+            + text.count("Picture description:")
+        )
+    if num_images == 0 and (has_caption or has_classification):
+        num_images = 1
+
+    return has_caption, has_classification, num_images
+
+
 @dataclass
 class Rec:
     """Intermediate record tracking chunk text and provenance.
@@ -132,6 +182,9 @@ class Rec:
     src_idxs: List[int]
     refs: List[str]
     pages: List[int]
+    has_image_captions: bool = False
+    has_image_classification: bool = False
+    num_images: int = 0
 
 
 def merge_rec(a: Rec, b: Rec, tokenizer: HuggingFaceTokenizer) -> Rec:
@@ -149,7 +202,47 @@ def merge_rec(a: Rec, b: Rec, tokenizer: HuggingFaceTokenizer) -> Rec:
     n_tok = tokenizer.count_tokens(text=text)
     refs = a.refs + [r for r in b.refs if r not in a.refs]
     pages = sorted(set(a.pages).union(b.pages))
-    return Rec(text=text, n_tok=n_tok, src_idxs=a.src_idxs + b.src_idxs, refs=refs, pages=pages)
+    return Rec(
+        text=text,
+        n_tok=n_tok,
+        src_idxs=a.src_idxs + b.src_idxs,
+        refs=refs,
+        pages=pages,
+        has_image_captions=a.has_image_captions or b.has_image_captions,
+        has_image_classification=a.has_image_classification or b.has_image_classification,
+        num_images=a.num_images + b.num_images,
+    )
+
+
+# ---------- Topic-aware boundary detection ----------
+def is_structural_boundary(rec: Rec) -> bool:
+    """Detect whether a chunk begins with a structural heading or caption marker.
+
+    Args:
+        rec: Chunk record to inspect.
+
+    Returns:
+        ``True`` when ``rec.text`` starts with a heading indicator (``#``) or a
+        recognised caption prefix, otherwise ``False``.
+
+    Examples:
+        >>> is_structural_boundary(Rec(text="# Introduction", n_tok=2, src_idxs=[], refs=[], pages=[]))
+        True
+        >>> is_structural_boundary(Rec(text="Regular paragraph", n_tok=2, src_idxs=[], refs=[], pages=[]))
+        False
+    """
+
+    text = rec.text.lstrip()
+    if text.startswith("#"):
+        return True
+
+    caption_markers = (
+        "Figure caption:",
+        "Table:",
+        "Picture description:",
+        "<!-- image -->",
+    )
+    return any(text.startswith(marker) for marker in caption_markers)
 
 
 # ---------- Topic-aware boundary detection ----------
@@ -365,13 +458,11 @@ def coalesce_small_runs(
 
 
 # ---------- Main ----------
-def main():
-    """CLI driver that chunks DocTags files and enforces minimum token thresholds."""
+def build_parser() -> argparse.ArgumentParser:
+    """Construct an argument parser for the chunking pipeline."""
 
-    logger = get_logger(__name__)
-
-    ap = argparse.ArgumentParser()
-    ap.add_argument(
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
         "--data-root",
         type=Path,
         default=None,
@@ -380,27 +471,47 @@ def main():
             "$DOCSTOKG_DATA_ROOT."
         ),
     )
-    ap.add_argument("--in-dir", type=Path, default=DEFAULT_IN_DIR)
-    ap.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
-    ap.add_argument("--min-tokens", type=int, default=256)
-    ap.add_argument("--max-tokens", type=int, default=512)
-    ap.add_argument(
+    parser.add_argument("--in-dir", type=Path, default=DEFAULT_IN_DIR)
+    parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
+    parser.add_argument("--min-tokens", type=int, default=256)
+    parser.add_argument("--max-tokens", type=int, default=512)
+    parser.add_argument(
         "--tokenizer-model",
         type=str,
         default="Qwen/Qwen3-Embedding-4B",
         help="HuggingFace tokenizer model (default aligns with dense embedder)",
     )
-    ap.add_argument(
+    parser.add_argument(
         "--resume",
         action="store_true",
         help="Skip DocTags whose chunk outputs already exist with matching hash",
     )
-    ap.add_argument(
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Force reprocessing even when resume criteria are satisfied",
     )
-    args = ap.parse_args()
+    return parser
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse CLI arguments for standalone chunking execution."""
+
+    return build_parser().parse_args(argv)
+
+
+def main(args: argparse.Namespace | None = None) -> int:
+    """CLI driver that chunks DocTags files and enforces minimum token thresholds."""
+
+    logger = get_logger(__name__)
+
+    parser = build_parser()
+    defaults = parser.parse_args([])
+    provided = parse_args() if args is None else args
+    for key, value in vars(provided).items():
+        if value is not None:
+            setattr(defaults, key, value)
+    args = defaults
 
     data_root_override = args.data_root
     resolved_data_root = (
@@ -414,15 +525,29 @@ def main():
 
     data_manifests(resolved_data_root)
 
+    html_manifest_index = load_manifest_index("doctags-html", resolved_data_root)
+    pdf_manifest_index = load_manifest_index("doctags-pdf", resolved_data_root)
+    parse_engine_lookup = {
+        doc_id: entry.get("parse_engine", "docling-html")
+        for doc_id, entry in html_manifest_index.items()
+    }
+    parse_engine_lookup.update(
+        {
+            doc_id: entry.get("parse_engine", "docling-vlm")
+            for doc_id, entry in pdf_manifest_index.items()
+        }
+    )
+    docling_version = get_docling_version()
+
     in_dir = (
         data_doctags(resolved_data_root)
         if args.in_dir == DEFAULT_IN_DIR and data_root_override is not None
-        else args.in_dir
+        else (args.in_dir or DEFAULT_IN_DIR)
     )
     out_dir = (
         data_chunks(resolved_data_root)
         if args.out_dir == DEFAULT_OUT_DIR and data_root_override is not None
-        else args.out_dir
+        else (args.out_dir or DEFAULT_OUT_DIR)
     )
 
     logger.info(
@@ -446,14 +571,16 @@ def main():
             "No .doctags files found",
             extra={"extra_fields": {"input_dir": str(in_dir)}},
         )
-        return
+        return 0
 
     if args.force:
         logger.info("Force mode: reprocessing all DocTags files")
     elif args.resume:
         logger.info("Resume mode enabled: unchanged inputs will be skipped")
 
-    manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_data_root) if args.resume else {}
+    chunk_manifest_index = (
+        load_manifest_index(MANIFEST_STAGE, resolved_data_root) if args.resume else {}
+    )
 
     tokenizer_model = args.tokenizer_model
     logger.info(
@@ -482,7 +609,13 @@ def main():
         name = path.stem
         out_path = out_dir / f"{name}.chunks.jsonl"
         input_hash = compute_content_hash(path)
-        manifest_entry = manifest_index.get(rel_id)
+        manifest_entry = chunk_manifest_index.get(rel_id)
+        parse_engine = parse_engine_lookup.get(rel_id, "docling-html")
+        if rel_id not in parse_engine_lookup:
+            logger.debug(
+                "Parse engine defaulted to docling-html",
+                extra={"extra_fields": {"doc_id": rel_id}},
+            )
 
         if (
             args.resume
@@ -497,10 +630,11 @@ def main():
                 doc_id=rel_id,
                 status="skip",
                 duration_s=0.0,
-                schema_version="docparse/1.1.0",
+                schema_version=CHUNK_SCHEMA_VERSION,
                 input_path=str(path),
                 input_hash=input_hash,
                 output_path=str(out_path),
+                parse_engine=parse_engine,
             )
             continue
 
@@ -518,7 +652,21 @@ def main():
                 text = chunker.contextualize(ch)
                 n_tok = tokenizer.count_tokens(text=text)
                 refs, pages = extract_refs_and_pages(ch)
-                recs.append(Rec(text=text, n_tok=n_tok, src_idxs=[idx], refs=refs, pages=pages))
+                has_caption, has_classification, num_images = summarize_image_metadata(
+                    ch, text
+                )
+                recs.append(
+                    Rec(
+                        text=text,
+                        n_tok=n_tok,
+                        src_idxs=[idx],
+                        refs=refs,
+                        pages=pages,
+                        has_image_captions=has_caption,
+                        has_image_classification=has_classification,
+                        num_images=num_images,
+                    )
+                )
 
             # Stage 3: smart coalescence of contiguous small runs
             final_recs = coalesce_small_runs(
@@ -528,20 +676,30 @@ def main():
                 max_tokens=args.max_tokens,
             )
 
-            # Stage 4: write JSONL
-            with out_path.open("w", encoding="utf-8") as f:
+            # Stage 4: write JSONL with schema validation
+            with out_path.open("w", encoding="utf-8") as handle:
                 for cid, r in enumerate(final_recs):
-                    obj = {
-                        "doc_id": name,
-                        "source_path": str(path),
-                        "chunk_id": cid,
-                        "source_chunk_idxs": r.src_idxs,
-                        "num_tokens": r.n_tok,
-                        "text": r.text,
-                        "doc_items_refs": r.refs,
-                        "page_nos": r.pages,
-                    }
-                    f.write(json.dumps(obj, ensure_ascii=False) + "\n")
+                    provenance = ProvenanceMetadata(
+                        parse_engine=parse_engine,
+                        docling_version=docling_version,
+                        has_image_captions=r.has_image_captions,
+                        has_image_classification=r.has_image_classification,
+                        num_images=r.num_images,
+                    )
+                    row = ChunkRow(
+                        doc_id=name,
+                        source_path=str(path),
+                        chunk_id=cid,
+                        source_chunk_idxs=r.src_idxs,
+                        num_tokens=r.n_tok,
+                        text=r.text,
+                        doc_items_refs=r.refs,
+                        page_nos=r.pages,
+                        schema_version=CHUNK_SCHEMA_VERSION,
+                        provenance=provenance,
+                    )
+                    payload = row.model_dump(mode="json", exclude_none=True)
+                    handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
             duration = time.perf_counter() - start
             logger.info(
@@ -559,11 +717,12 @@ def main():
                 doc_id=rel_id,
                 status="success",
                 duration_s=round(duration, 3),
-                schema_version="docparse/1.1.0",
+                schema_version=CHUNK_SCHEMA_VERSION,
                 input_path=str(path),
                 input_hash=input_hash,
                 output_path=str(out_path),
                 chunk_count=len(final_recs),
+                parse_engine=parse_engine,
             )
         except Exception as exc:
             duration = time.perf_counter() - start
@@ -572,14 +731,17 @@ def main():
                 doc_id=rel_id,
                 status="failure",
                 duration_s=round(duration, 3),
-                schema_version="docparse/1.1.0",
+                schema_version=CHUNK_SCHEMA_VERSION,
                 input_path=str(path),
                 input_hash=input_hash,
                 output_path=str(out_path),
                 error=str(exc),
+                parse_engine=parse_engine,
             )
             raise
 
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

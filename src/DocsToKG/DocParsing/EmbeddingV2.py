@@ -656,10 +656,8 @@ def write_vectors(
 
     return len(uuids), splade_nnz, qwen_norms
 # ---- Main driver ----
-def main():
-    """CLI entrypoint for chunk UUID cleanup and embedding generation."""
-
-    logger = get_logger(__name__)
+def build_parser() -> argparse.ArgumentParser:
+    """Construct the CLI parser for the embedding pipeline."""
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -698,7 +696,27 @@ def main():
         action="store_true",
         help="Force reprocessing even when resume criteria are satisfied",
     )
-    args = parser.parse_args()
+    return parser
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse CLI arguments for standalone embedding execution."""
+
+    return build_parser().parse_args(argv)
+
+
+def main(args: argparse.Namespace | None = None) -> int:
+    """CLI entrypoint for chunk UUID cleanup and embedding generation."""
+
+    logger = get_logger(__name__)
+
+    parser = build_parser()
+    defaults = parser.parse_args([])
+    provided = parse_args() if args is None else args
+    for key, value in vars(provided).items():
+        if value is not None:
+            setattr(defaults, key, value)
+    args = defaults
 
     if args.batch_size_splade < 1 or args.batch_size_qwen < 1:
         raise ValueError("Batch sizes must be >= 1")
@@ -747,7 +765,7 @@ def main():
             "No chunk files found",
             extra={"extra_fields": {"chunks_dir": str(chunks_dir)}},
         )
-        return
+        return 0
 
     if args.force:
         logger.info("Force mode: reprocessing all chunk files")
@@ -770,7 +788,7 @@ def main():
     uuid_to_chunk, stats = process_pass_a(files, logger)
     if not uuid_to_chunk:
         logger.warning("No chunks found after Pass A")
-        return
+        return 0
 
     validator = SPLADEValidator()
     tracemalloc.start()
@@ -849,111 +867,6 @@ def main():
             output_path=str(out_path),
             vector_count=count,
         )
-        total_vectors += count
-        splade_nnz_all.extend(nnz)
-        qwen_norms_all.extend(norms)
-
-    _current, peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
-    elapsed_b = time.perf_counter() - pass_b_start
-
-    validator.report(logger)
-
-    zero_pct = (
-        100.0 * len([n for n in splade_nnz_all if n == 0]) / total_vectors
-        if total_vectors
-        else 0.0
-    )
-    avg_nnz = statistics.mean(splade_nnz_all) if splade_nnz_all else 0.0
-    median_nnz = statistics.median(splade_nnz_all) if splade_nnz_all else 0.0
-    avg_norm = statistics.mean(qwen_norms_all) if qwen_norms_all else 0.0
-    std_norm = (
-        statistics.pstdev(qwen_norms_all) if len(qwen_norms_all) > 1 else 0.0
-    )
-
-    logger.info(
-        "Embedding summary",
-        extra={
-            "extra_fields": {
-                "total_vectors": total_vectors,
-                "splade_avg_nnz": round(avg_nnz, 3),
-                "splade_median_nnz": round(median_nnz, 3),
-                "splade_zero_pct": round(zero_pct, 2),
-                "qwen_avg_norm": round(avg_norm, 4),
-                "qwen_std_norm": round(std_norm, 4),
-                "pass_b_seconds": round(elapsed_b, 3),
-            }
-        },
-    )
-    logger.info("Peak memory: %.2f GB", peak / 1024**3)
-
-    manifest_append(
-        stage="embeddings",
-        doc_id="__corpus__",
-        status="success",
-        duration_s=round(time.perf_counter() - overall_start, 3),
-        warnings=validator.zero_nnz_chunks[:10] if validator.zero_nnz_chunks else [],
-        schema_version="embeddings/1.0.0",
-        total_vectors=total_vectors,
-        splade_avg_nnz=avg_nnz,
-        splade_median_nnz=median_nnz,
-        splade_zero_pct=zero_pct,
-        qwen_avg_norm=avg_norm,
-        qwen_std_norm=std_norm,
-        peak_memory_gb=peak / 1024**3,
-    )
-
-    _current, peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
-    elapsed_b = time.perf_counter() - pass_b_start
-
-    validator.report(logger)
-
-    zero_pct = (
-        100.0 * len([n for n in splade_nnz_all if n == 0]) / total_vectors
-        if total_vectors
-        else 0.0
-    )
-    avg_nnz = statistics.mean(splade_nnz_all) if splade_nnz_all else 0.0
-    median_nnz = statistics.median(splade_nnz_all) if splade_nnz_all else 0.0
-    avg_norm = statistics.mean(qwen_norms_all) if qwen_norms_all else 0.0
-    std_norm = (
-        statistics.pstdev(qwen_norms_all) if len(qwen_norms_all) > 1 else 0.0
-    )
-
-    logger.info(
-        "Embedding summary",
-        extra={
-            "extra_fields": {
-                "total_vectors": total_vectors,
-                "splade_avg_nnz": round(avg_nnz, 3),
-                "splade_median_nnz": round(median_nnz, 3),
-                "splade_zero_pct": round(zero_pct, 2),
-                "qwen_avg_norm": round(avg_norm, 4),
-                "qwen_std_norm": round(std_norm, 4),
-                "pass_b_seconds": round(elapsed_b, 3),
-                "skipped_files": skipped_files,
-            }
-        },
-    )
-    logger.info("Peak memory: %.2f GB", peak / 1024**3)
-
-    manifest_append(
-        stage=MANIFEST_STAGE,
-        doc_id="__corpus__",
-        status="success",
-        duration_s=round(time.perf_counter() - overall_start, 3),
-        warnings=validator.zero_nnz_chunks[:10] if validator.zero_nnz_chunks else [],
-        schema_version="embeddings/1.0.0",
-        total_vectors=total_vectors,
-        splade_avg_nnz=avg_nnz,
-        splade_median_nnz=median_nnz,
-        splade_zero_pct=zero_pct,
-        qwen_avg_norm=avg_norm,
-        qwen_std_norm=std_norm,
-        peak_memory_gb=peak / 1024**3,
-        skipped_files=skipped_files,
-    )
 
     _current, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
@@ -1018,6 +931,8 @@ def main():
         },
     )
 
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
