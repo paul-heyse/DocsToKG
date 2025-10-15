@@ -28,6 +28,7 @@ pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
 from DocsToKG.ContentDownload import resolvers
+from DocsToKG.ContentDownload.resolvers.providers.openalex import OpenAlexResolver
 
 
 class MemoryLogger:
@@ -239,41 +240,105 @@ def test_pipeline_rate_limit_enforced(monkeypatch, tmp_path):
         assert pytest.approx(delay, rel=0.01) == 1.0
 
 
-def test_attempt_openalex_candidates_returns_tuple(monkeypatch, tmp_path):
+def test_openalex_resolver_executes_first(tmp_path):
     artifact = make_artifact(tmp_path)
-    artifact.pdf_urls = ["https://example.com/html", "https://example.com/pdf"]
-    html_path = artifact.html_dir / "example.html"
-    html_path.parent.mkdir(parents=True, exist_ok=True)
+    artifact.pdf_urls = ["https://openalex.org/direct.pdf"]
 
-    outcomes = iter(
-        [
-            resolvers.DownloadOutcome(
-                classification="html",
-                path=str(html_path),
-                http_status=200,
-                content_type="text/html",
-                elapsed_ms=5.0,
-                error=None,
-            ),
-            resolvers.DownloadOutcome(
-                classification="pdf",
-                path=str(artifact.pdf_dir / "example.pdf"),
-                http_status=200,
-                content_type="application/pdf",
-                elapsed_ms=5.0,
-                error=None,
-            ),
-        ]
+    download_calls: List[str] = []
+
+    def downloader_fn(session, art, url, referer, timeout):
+        download_calls.append(url)
+        pdf_path = art.pdf_dir / "openalex.pdf"
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        pdf_path.write_bytes(b"%PDF")
+        return build_outcome("pdf", path=str(pdf_path))
+
+    fallback = StubResolver("fallback", [resolvers.ResolverResult(url="https://fallback.example/pdf")])
+    config = resolvers.ResolverConfig(
+        resolver_order=["openalex", "fallback"],
+        resolver_toggles={"openalex": True, "fallback": True},
     )
-
-    def fake_download(session, art, url, referer, timeout):
-        return next(outcomes)
-
-    monkeypatch.setattr(downloader, "download_candidate", fake_download)
     logger = MemoryLogger()
     metrics = resolvers.ResolverMetrics()
+    pipeline = resolvers.ResolverPipeline(
+        resolvers=[OpenAlexResolver(), fallback],
+        config=config,
+        download_func=downloader_fn,
+        logger=logger,
+        metrics=metrics,
+    )
     session = requests.Session()
-    result = downloader.attempt_openalex_candidates(session, artifact, logger, metrics)
-    assert result[0].classification == "pdf"
-    assert result[1] == "https://example.com/pdf"
-    assert artifact.metadata["openalex_html_paths"] == [str(html_path)]
+    result = pipeline.run(session, artifact)
+
+    assert result.success is True
+    assert result.resolver_name == "openalex"
+    assert download_calls == ["https://openalex.org/direct.pdf"]
+    assert [record.resolver_name for record in logger.records] == ["openalex"]
+    assert metrics.successes["openalex"] == 1
+
+
+def test_openalex_respects_rate_limit(monkeypatch, tmp_path):
+    artifact = make_artifact(tmp_path)
+    artifact.pdf_urls = ["https://openalex.org/pdf-one"]
+
+    timeline = [0.0, 0.4, 0.4, 1.2]
+
+    def fake_monotonic():
+        return timeline.pop(0)
+
+    sleeps: List[float] = []
+
+    def fake_sleep(duration):
+        sleeps.append(duration)
+
+    monkeypatch.setattr(resolvers.time, "monotonic", fake_monotonic)
+    monkeypatch.setattr(resolvers.time, "sleep", fake_sleep)
+
+    def downloader_fn(session, art, url, referer, timeout):
+        return build_outcome("pdf", path=str(art.pdf_dir / "result.pdf"))
+
+    config = resolvers.ResolverConfig(
+        resolver_order=["openalex"],
+        resolver_toggles={"openalex": True},
+        resolver_min_interval_s={"openalex": 0.8},
+    )
+    pipeline = resolvers.ResolverPipeline(
+        resolvers=[OpenAlexResolver()],
+        config=config,
+        download_func=downloader_fn,
+        logger=MemoryLogger(),
+    )
+    session = requests.Session()
+    pipeline.run(session, artifact)
+    pipeline.run(session, artifact)
+
+    assert sleeps and pytest.approx(sleeps[0], rel=0.05) == 0.8
+
+
+def test_pipeline_records_failed_urls(tmp_path):
+    artifact = make_artifact(tmp_path)
+    artifact.pdf_urls = ["https://openalex.org/broken.pdf"]
+
+    def downloader_fn(session, art, url, referer, timeout):
+        return build_outcome("http_error")
+
+    config = resolvers.ResolverConfig(
+        resolver_order=["openalex"],
+        resolver_toggles={"openalex": True},
+        max_attempts_per_work=1,
+    )
+    logger = MemoryLogger()
+    pipeline = resolvers.ResolverPipeline(
+        resolvers=[OpenAlexResolver()],
+        config=config,
+        download_func=downloader_fn,
+        logger=logger,
+    )
+    session = requests.Session()
+    result = pipeline.run(session, artifact)
+
+    assert result.success is False
+    assert result.failed_urls == ["https://openalex.org/broken.pdf"]
+    assert artifact.failed_pdf_urls == ["https://openalex.org/broken.pdf"]
+
+

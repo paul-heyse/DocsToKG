@@ -1,0 +1,19 @@
+{
+  "hits": {
+    "hits": [
+      {
+        "id": "7654321",
+        "doi": "10.5281/zenodo.7654321",
+        "files": [
+          {
+            "key": "data.csv",
+            "type": "csv",
+            "links": {
+              "self": "https://zenodo.org/api/files/xyz/data.csv"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

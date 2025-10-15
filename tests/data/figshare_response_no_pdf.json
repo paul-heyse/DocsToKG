@@ -1,0 +1,13 @@
+[
+  {
+    "id": 654321,
+    "doi": "10.6084/m9.figshare.654321",
+    "files": [
+      {
+        "id": 99999,
+        "name": "dataset.csv",
+        "download_url": "https://figshare.com/ndownloader/files/99999"
+      }
+    ]
+  }
+]
