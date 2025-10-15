@@ -490,3 +490,102 @@ No database/manifest schema changes required.
 
 5. **Should we add Dataverse resolver?**
    - **Deferred:** Lower priority; can add in future iteration if demand exists
+
+## Gap Analysis Resolution
+
+**Date:** October 15, 2025
+
+### Original Gaps Identified
+
+Initial proposal review identified several gaps requiring resolution before implementation:
+
+1. **Code Completeness:** Tasks used "copy from line X" without full implementations
+2. **Test Fixtures:** No concrete mock response data for external APIs
+3. **Error Handling:** Missing explicit error handling, logging, recovery strategies
+4. **Thread-Safety:** Concurrent execution mentioned but patterns not explicit
+5. **Configuration Validation:** New fields added without validation logic
+6. **Performance Benchmarks:** Performance mentioned but no benchmark implementation
+
+### Resolution Actions Taken
+
+#### 1. Complete Code Implementations (Tasks 1-20)
+
+**Resolution:** Replaced all "copy" instructions with full code blocks including:
+
+- Complete function signatures with all parameters
+- Full docstrings with args, returns, raises, examples
+- Thread-safety annotations
+- Example: `parse_retry_after_header()` now includes complete implementation with both integer and HTTP-date parsing
+
+#### 2. Comprehensive Test Fixtures (Tasks 8.5, 9.5)
+
+**Resolution:** Added realistic JSON fixtures for all external APIs:
+
+- `tests/data/zenodo_response_sample.json` - Complete Zenodo API response with PDF and non-PDF files
+- `tests/data/zenodo_response_empty.json` - Edge case: no matches
+- `tests/data/zenodo_response_no_pdf.json` - Edge case: only non-PDF files
+- `tests/data/figshare_response_sample.json` - Complete Figshare search response
+- `tests/data/figshare_response_multiple_pdf.json` - Edge case: multiple PDFs
+- All fixtures include realistic field names, types, and nested structures
+
+#### 3. Explicit Error Handling (Section 18: 5 tasks)
+
+**Resolution:** Added comprehensive error handling patterns:
+
+- HTTP timeout handling with specific error messages
+- Network error recovery with retry logic
+- Malformed JSON response handling with defensive type checking
+- Unexpected error logging without pipeline crash
+- Example pattern applied to all resolvers with try/except blocks for:
+  - `requests.Timeout`
+  - `requests.ConnectionError`
+  - `ValueError` (JSON parsing)
+  - `Exception` (unexpected errors)
+
+#### 4. Thread-Safety Documentation (Section 19: 4 tasks)
+
+**Resolution:** Added explicit thread-safety patterns:
+
+- Documented all shared state in `ResolverPipeline` class docstring
+- Added explicit lock patterns for rate limiting with atomic read-modify-write
+- Added thread-safety tests verifying rate limit enforcement under concurrency
+- Documented session thread-safety requirements with usage patterns
+- Lock acquisition pattern: `with self._lock:` guards `_last_invocation` updates
+
+#### 5. Configuration Validation (Task 7.5)
+
+**Resolution:** Added comprehensive `__post_init__()` validation:
+
+- `max_concurrent_resolvers`: Must be >= 1, warns if > 10
+- `timeout`: Must be positive for all resolver-specific overrides
+- `resolver_min_interval_s`: Must be non-negative
+- `max_attempts_per_work`: Must be >= 1
+- Cross-validation: Warns if enabled resolver count >> concurrency limit
+
+#### 6. Performance Benchmarking (Section 20: 4 tasks)
+
+**Resolution:** Added complete benchmark suite:
+
+- Sequential vs concurrent execution benchmark with timing assertions
+- HEAD pre-check overhead vs savings measurement
+- Retry backoff timing verification (expected: ~7s for 3 retries)
+- Memory usage benchmark for large batches (expect < 50MB for 1000 works)
+- All benchmarks include specific timing tolerances and assertions
+
+### Impact on Task Count
+
+- **Original:** 93 tasks
+- **After Gap Resolution:** 106 tasks (+13 tasks)
+- **New Sections:** 3 (Error Handling, Thread-Safety, Performance Benchmarking)
+
+### Implementation Readiness
+
+All gaps have been resolved with actionable, complete specifications:
+✅ No "copy from line X" instructions remain
+✅ All test fixtures include realistic data
+✅ All external API calls have error handling
+✅ All shared state documented with thread-safety patterns
+✅ All configuration fields have validation
+✅ All performance claims have verification benchmarks
+
+**Conclusion:** The proposal is now ready for unambiguous implementation by AI programming agents with high confidence in correctness and robustness.

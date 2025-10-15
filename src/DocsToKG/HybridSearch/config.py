@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
-from typing import Any, Dict, Literal
+from typing import Any, Dict, Literal, Optional
 
 
 @dataclass(frozen=True)
@@ -54,6 +54,8 @@ class DenseIndexConfig:
         ivfpq_use_precomputed: Use precomputed IVFPQ lookup tables (True default)
         ivfpq_float16_lut: Use float16 IVFPQ lookup tables when available (True default)
         multi_gpu_mode: Replica strategy for multi-GPU hosts ("single" default)
+        gpu_temp_memory_bytes: Optional temporary memory pool size for FAISS GPU ops
+        gpu_indices_32_bit: When True, store FAISS indices in 32-bit format to save VRAM
 
     Examples:
         >>> config = DenseIndexConfig(
@@ -75,6 +77,8 @@ class DenseIndexConfig:
     ivfpq_use_precomputed: bool = True
     ivfpq_float16_lut: bool = True
     multi_gpu_mode: Literal["single", "replicate"] = "single"
+    gpu_temp_memory_bytes: Optional[int] = None
+    gpu_indices_32_bit: bool = True
 
 
 @dataclass(frozen=True)

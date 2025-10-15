@@ -42,6 +42,7 @@ except Exception:  # pragma: no cover - handled downstream
 if TYPE_CHECKING:
     from .download_pyalex_pdfs import WorkArtifact
 
+from DocsToKG.ContentDownload.http import request_with_retries
 from DocsToKG.ContentDownload.utils import (
     dedupe,
     normalize_doi,
@@ -68,15 +69,6 @@ DEFAULT_RESOLVER_ORDER: List[str] = [
 _DEFAULT_RESOLVER_TOGGLES: Dict[str, bool] = {
     name: name not in {"openaire", "hal", "osf"} for name in DEFAULT_RESOLVER_ORDER
 }
-
-_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
-_DEFAULT_MAX_RETRIES = 2
-_DEFAULT_BACKOFF = 0.75
-
-
-def _sleep_backoff(attempt: int, base: float = _DEFAULT_BACKOFF) -> None:
-    time.sleep(base * (2**attempt) + random.random() * 0.1)
-
 
 def _headers_cache_key(headers: Dict[str, str]) -> Tuple[Tuple[str, str], ...]:
     return tuple(sorted((headers or {}).items()))
@@ -153,46 +145,6 @@ def _collect_candidate_urls(node: Any, results: List[str]) -> None:
     elif isinstance(node, str):
         if node.lower().startswith("http"):
             results.append(node)
-
-
-def _request_with_retries(
-    session: requests.Session,
-    method: str,
-    url: str,
-    *,
-    max_retries: int = _DEFAULT_MAX_RETRIES,
-    retry_statuses: Optional[Iterable[int]] = None,
-    **kwargs: Any,
-) -> requests.Response:
-    """Invoke `session.request` with exponential backoff on transient errors."""
-
-    statuses = set(retry_statuses or _TRANSIENT_STATUS_CODES)
-    last_exc: Optional[Exception] = None
-    for attempt in range(max_retries + 1):
-        try:
-            if hasattr(session, "request"):
-                response = session.request(method=method, url=url, **kwargs)
-            else:
-                request_func = getattr(session, method.lower(), None)
-                if request_func is None:
-                    raise AttributeError(f"Session missing '{method.lower()}' request method")
-                response = request_func(url, **kwargs)
-        except requests.RequestException as exc:  # pragma: no cover - network paths
-            last_exc = exc
-            if attempt >= max_retries:
-                raise
-            _sleep_backoff(attempt)
-            continue
-        except AttributeError:
-            raise
-
-        if response.status_code in statuses and attempt < max_retries:
-            _sleep_backoff(attempt)
-            continue
-        return response
-
-    assert last_exc is not None  # pragma: no cover - defensive
-    raise last_exc
 
 
 @dataclass
@@ -1196,7 +1148,7 @@ class LandingPageResolver:
             return
         for landing in artifact.landing_urls:
             try:
-                resp = _request_with_retries(
+                resp = request_with_retries(
                     session,
                     "get",
                     landing,
@@ -1341,7 +1293,7 @@ class PmcResolver:
         if not identifiers:
             return []
         try:
-            resp = _request_with_retries(
+            resp = request_with_retries(
                 session,
                 "get",
                 "https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/",
@@ -1401,7 +1353,7 @@ class PmcResolver:
             oa_url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id={pmcid}"
             fallback_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/pdf/"
             try:
-                resp = _request_with_retries(
+                resp = request_with_retries(
                     session,
                     "get",
                     oa_url,
@@ -1479,7 +1431,7 @@ class EuropePmcResolver:
         if not doi:
             return []
         try:
-            resp = _request_with_retries(
+            resp = request_with_retries(
                 session,
                 "get",
                 "https://www.ebi.ac.uk/europepmc/webservices/rest/search",
@@ -1552,7 +1504,7 @@ class CoreResolver:
         headers = dict(config.polite_headers)
         headers["Authorization"] = f"Bearer {config.core_api_key}"
         try:
-            resp = _request_with_retries(
+            resp = request_with_retries(
                 session,
                 "get",
                 "https://api.core.ac.uk/v3/search/works",
@@ -1630,7 +1582,7 @@ class DoajResolver:
         if config.doaj_api_key:
             headers["X-API-KEY"] = config.doaj_api_key
         try:
-            resp = _request_with_retries(
+            resp = request_with_retries(
                 session,
                 "get",
                 "https://doaj.org/api/v2/search/articles/",
@@ -1767,7 +1719,7 @@ class OpenAireResolver:
         if not doi:
             return []
         try:
-            resp = _request_with_retries(
+            resp = request_with_retries(
                 session,
                 "get",
                 "https://api.openaire.eu/search/publications",
@@ -1839,7 +1791,7 @@ class HalResolver:
         if not doi:
             return []
         try:
-            resp = _request_with_retries(
+            resp = request_with_retries(
                 session,
                 "get",
                 "https://api.archives-ouvertes.fr/search/",
@@ -1919,7 +1871,7 @@ class OsfResolver:
         if not doi:
             return []
         try:
-            resp = _request_with_retries(
+            resp = request_with_retries(
                 session,
                 "get",
                 "https://api.osf.io/v2/preprints/",
@@ -1998,7 +1950,7 @@ class WaybackResolver:
         """
         for original in artifact.failed_pdf_urls:
             try:
-                resp = _request_with_retries(
+                resp = request_with_retries(
                     session,
                     "get",
                     "https://archive.org/wayback/available",
