@@ -36,6 +36,14 @@ git checkout -b refine-docparsing-phase-1
 
 ## Phase 1: Legacy Script Quarantine
 
+- [ ] Task 1.1: Create legacy directory structure
+- [ ] Task 1.2: Move HTML converter to legacy with comprehensive shim
+- [ ] Task 1.3: Move PDF converter to legacy with comprehensive shim
+- [ ] Task 1.4: Create comprehensive unit tests for shims
+- [ ] Task 1.5: Update imports in tests that reference moved scripts
+- [ ] Task 1.6: Phase 1 completion checklist
+
+
 **Goal**: Move deprecated scripts to `legacy/` with backward-compatible shims
 
 ### Task 1.1: Create legacy directory structure
@@ -707,6 +715,13 @@ chmod +x scripts/validate_phase1.sh
 
 ## Phase 2: Test Scaffolding Cleanup
 
+- [ ] Task 2.1: Remove `_promote_simple_namespace_modules()` from chunker
+- [ ] Task 2.2: Move promotion helper to test utilities
+- [ ] Task 2.3: Delete duplicate `SOFT_BARRIER_MARGIN` constant
+- [ ] Task 2.4: Smoke test chunker functionality
+- [ ] Task 2.5: Phase 2 completion checklist
+
+
 **Goal**: Remove test-only code from production modules
 
 ### Task 2.1: Remove `_promote_simple_namespace_modules()` from chunker
@@ -1190,6 +1205,11 @@ echo "Next: Phase 3 - Atomic writes"
 
 ## Phase 3: Atomic Chunk & Vector Writes
 
+- [ ] Task 3.1: Replace chunker direct write with atomic write operation
+- [ ] Task 3.2: Replace embeddings direct write with atomic write operation
+- [ ] Task 3.3: Add crash recovery integration test suite
+
+
 **Goal**: Replace direct file writes with atomic write operations to prevent partial file corruption during crashes or interruptions.
 
 ### Task 3.1: Replace chunker direct write with atomic write operation
@@ -1339,6 +1359,9 @@ After creating the test suite:
 
 ## Phase 4: UTC Timestamp Correction
 
+- [ ] Task 4.1: Correct JSONFormatter timestamp behavior in common utilities
+
+
 **Goal**: Fix the JSON log formatter to emit true UTC timestamps rather than local time with UTC labels
 
 ### Task 4.1: Correct JSONFormatter timestamp behavior in common utilities
@@ -1403,6 +1426,11 @@ After implementation, you must verify that:
 ---
 
 ## Phase 5: Hash Algorithm Tagging
+
+- [ ] Task 5.1: Add environment variable override to content hash computation
+- [ ] Task 5.2: Add hash algorithm tag to chunker manifest entries
+- [ ] Task 5.3: Add hash algorithm tag to embeddings manifest entries
+
 
 **Goal**: Enable SHA-256 migration path while maintaining backward compatibility with existing SHA-1 hashes
 
@@ -1552,6 +1580,11 @@ Same validation steps as Task 5.2, but executed against the embeddings pipeline 
 ---
 
 ## Phase 6: Simplify CLI Argument Parsing
+
+- [ ] Task 6.1: Script 1: DocParsing/DoclingHybridChunkerPipelineWithMin.py
+- [ ] Task 6.2: Script 2: EmbeddingV2.py
+- [ ] Task 6.3: Script 3: run_docling_html_to_doctags_parallel.py (legacy)
+- [ ] Task 6.4: Script 4: run_docling_parallel_with_vllm_debug.py (legacy)
 
 **Goal**: Remove ~80 lines of argument merging boilerplate code across 4 scripts while preserving exact behavior
 
@@ -1894,6 +1927,14 @@ After completing all tasks:
 ---
 
 ## Phase 8: Remaining Enhancements
+
+- [ ] Task 8.1: De-hardcode model and cache directory paths
+- [ ] Task 8.2: Implement manifest sharding by stage
+- [ ] Task 8.3: Add vLLM service preflight telemetry to manifest
+- [ ] Task 8.4: Promote image flags to top-level chunk schema fields
+- [ ] Task 8.5: Add offline mode support for model loading
+- [ ] Task 8.6: Document SPLADE attention backend fallback behavior
+
 
 **Goal**: Complete remaining improvements including path configuration, manifest optimizations, schema enhancements, and offline mode support
 
