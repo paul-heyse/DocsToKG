@@ -1,0 +1,644 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DocParsing Pipeline Refactoring and Robustness Enhancements &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">DocParsing Pipeline Refactoring and Robustness Enhancements</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/openspec/changes/refactor-docparsing-pipeline/proposal.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="docparsing-pipeline-refactoring-and-robustness-enhancements">
+<h1>DocParsing Pipeline Refactoring and Robustness Enhancements<a class="headerlink" href="#docparsing-pipeline-refactoring-and-robustness-enhancements" title="Link to this heading"></a></h1>
+<section id="why">
+<h2>Why<a class="headerlink" href="#why" title="Link to this heading"></a></h2>
+<p>The current DocParsing pipeline (<code class="docutils literal notranslate"><span class="pre">src/DocsToKG/DocParsing</span></code>) implements a solid three-stage architecture (DocTags → Chunking → Embeddings) but suffers from scattered utilities, hard-coded paths, CUDA initialization risks in multiprocessing, potential OOM failures at scale, and insufficient validation. These issues create maintenance burden, reduce robustness, and make the system brittle under load or when configuration changes.</p>
+<p>This refactoring consolidates duplicated code, hardens error boundaries with explicit validation, enables streaming to handle large-scale datasets, and centralizes configuration—all while preserving the existing stage boundaries and avoiding coupling to upstream downloaders or downstream indexers.</p>
+</section>
+<section id="what-changes">
+<h2>What Changes<a class="headerlink" href="#what-changes" title="Link to this heading"></a></h2>
+<section id="code-organization-reduction">
+<h3>Code Organization &amp; Reduction<a class="headerlink" href="#code-organization-reduction" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>NEW</strong>: Create <code class="docutils literal notranslate"><span class="pre">_common.py</span></code> utility module with shared functions (path resolution, atomic writes, JSONL I/O, logging, batching, port detection)</p></li>
+<li><p><strong>NEW</strong>: Move serializers (<code class="docutils literal notranslate"><span class="pre">CaptionPlusAnnotationPictureSerializer</span></code>, <code class="docutils literal notranslate"><span class="pre">RichSerializerProvider</span></code>) to shared module</p></li>
+<li><p><strong>REFACTOR</strong>: Unify path handling across all scripts via <code class="docutils literal notranslate"><span class="pre">detect_data_root()</span></code> with <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_DATA_ROOT</span></code> env var support</p></li>
+<li><p><strong>REFACTOR</strong>: Replace hard-coded absolute paths with dynamic resolution in <code class="docutils literal notranslate"><span class="pre">DoclingHybridChunkerPipelineWithMin.py</span></code></p></li>
+<li><p><strong>REFACTOR</strong>: Consolidate HTML and PDF conversion CLIs into single <code class="docutils literal notranslate"><span class="pre">cli/doctags_convert.py</span></code> with <code class="docutils literal notranslate"><span class="pre">--mode</span></code> flag</p></li>
+</ul>
+</section>
+<section id="robustness-safety">
+<h3>Robustness &amp; Safety<a class="headerlink" href="#robustness-safety" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>FIX</strong>: Force multiprocessing start method to <code class="docutils literal notranslate"><span class="pre">spawn</span></code> in PDF conversion script to prevent CUDA re-initialization errors</p></li>
+<li><p><strong>NEW</strong>: Add Pydantic schema models for <code class="docutils literal notranslate"><span class="pre">ChunkRow</span></code> and <code class="docutils literal notranslate"><span class="pre">VectorRow</span></code> with validation</p></li>
+<li><p><strong>NEW</strong>: Implement schema versioning (e.g., <code class="docutils literal notranslate"><span class="pre">docparse/1.1.0</span></code>) in all JSONL outputs</p></li>
+<li><p><strong>NEW</strong>: Add invariant checks for embeddings (Qwen dimension assertions, SPLADE nnz validation, BM25 statistics)</p></li>
+<li><p><strong>NEW</strong>: Implement idempotent outputs with <code class="docutils literal notranslate"><span class="pre">.lock</span></code> sentinels to prevent race conditions</p></li>
+<li><p><strong>NEW</strong>: Add content-based hashing (<code class="docutils literal notranslate"><span class="pre">content_sha1</span></code>) for reproducibility verification</p></li>
+</ul>
+</section>
+<section id="scalability-memory-management">
+<h3>Scalability &amp; Memory Management<a class="headerlink" href="#scalability-memory-management" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>REFACTOR</strong>: Convert <code class="docutils literal notranslate"><span class="pre">EmbeddingV2.py</span></code> to two-pass streaming architecture:</p>
+<ul>
+<li><p>Pass A: UUID assignment + BM25 statistics (no text retention)</p></li>
+<li><p>Pass B: Batch-wise SPLADE/Qwen encoding with shard outputs</p></li>
+</ul>
+</li>
+<li><p><strong>NEW</strong>: Add <code class="docutils literal notranslate"><span class="pre">--batch-size-splade</span></code> and <code class="docutils literal notranslate"><span class="pre">--batch-size-qwen</span></code> configuration flags</p></li>
+<li><p><strong>NEW</strong>: Implement atomic shard merging for vector outputs</p></li>
+<li><p><strong>NEW</strong>: Add resume capability to skip already-processed files</p></li>
+</ul>
+</section>
+<section id="tokenization-alignment">
+<h3>Tokenization &amp; Alignment<a class="headerlink" href="#tokenization-alignment" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>NEW</strong>: Add <code class="docutils literal notranslate"><span class="pre">--tokenizer-model</span></code> flag to chunking script</p></li>
+<li><p><strong>NEW</strong>: Align chunk token counting with dense embedding model tokenizer (Qwen3-4B)</p></li>
+<li><p><strong>NEW</strong>: Provide calibration guidance for BERT vs Qwen tokenizer discrepancies</p></li>
+</ul>
+</section>
+<section id="chunking-enhancements">
+<h3>Chunking Enhancements<a class="headerlink" href="#chunking-enhancements" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>ENHANCE</strong>: Implement topic-aware boundary detection in <code class="docutils literal notranslate"><span class="pre">coalesce_small_runs()</span></code> to avoid merging across headings/captions</p></li>
+<li><p><strong>NEW</strong>: Add soft barrier rule: require merged size ≤ (max_tokens - 64) for structural boundaries</p></li>
+</ul>
+</section>
+<section id="logging-observability">
+<h3>Logging &amp; Observability<a class="headerlink" href="#logging-observability" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>NEW</strong>: Adopt structured logging with JSON formatter across all scripts</p></li>
+<li><p><strong>NEW</strong>: Create unified progress ledger at <code class="docutils literal notranslate"><span class="pre">Data/Manifests/docparse.manifest.jsonl</span></code></p></li>
+<li><p><strong>NEW</strong>: Record per-document metadata (stage, duration, warnings, schema_version)</p></li>
+<li><p><strong>NEW</strong>: Add per-row provenance enrichment (parse_engine, docling_version, image flags)</p></li>
+</ul>
+</section>
+<section id="vllm-server-management">
+<h3>vLLM Server Management<a class="headerlink" href="#vllm-server-management" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>ENHANCE</strong>: Add <code class="docutils literal notranslate"><span class="pre">--model</span></code>, <code class="docutils literal notranslate"><span class="pre">--served-model-name</span></code>, and <code class="docutils literal notranslate"><span class="pre">--gpu-memory-utilization</span></code> flags to PDF converter</p></li>
+<li><p><strong>NEW</strong>: Implement model validation before processing (verify served model in <code class="docutils literal notranslate"><span class="pre">/v1/models</span></code>)</p></li>
+<li><p><strong>ENHANCE</strong>: Strengthen health check to require non-empty models list for reuse</p></li>
+<li><p><strong>NEW</strong>: Add explicit lifecycle guards and error messages for server failures</p></li>
+</ul>
+</section>
+<section id="testing-quality">
+<h3>Testing &amp; Quality<a class="headerlink" href="#testing-quality" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>NEW</strong>: Add golden-path fixtures for deterministic chunk count validation</p></li>
+<li><p><strong>NEW</strong>: Create trip-wire CI tests for coalescer invariants, empty document handling, and embedding shape validation</p></li>
+<li><p><strong>NEW</strong>: Implement corpus summary reporting (N chunks, avgdl, median token length, SPLADE zero percentage)</p></li>
+</ul>
+</section>
+</section>
+<section id="impact">
+<h2>Impact<a class="headerlink" href="#impact" title="Link to this heading"></a></h2>
+<section id="affected-specs">
+<h3>Affected Specs<a class="headerlink" href="#affected-specs" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>NEW</strong>: <code class="docutils literal notranslate"><span class="pre">doc-parsing</span></code> (new capability specification)</p></li>
+</ul>
+</section>
+<section id="affected-code">
+<h3>Affected Code<a class="headerlink" href="#affected-code" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">src/DocsToKG/DocParsing/DoclingHybridChunkerPipelineWithMin.py</span></code> (path handling, tokenizer alignment, topic-aware coalescence)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">src/DocsToKG/DocParsing/EmbeddingV2.py</span></code> (streaming architecture, validation, batching)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">src/DocsToKG/DocParsing/run_docling_parallel_with_vllm_debug.py</span></code> (spawn safety, model validation, enhanced flags)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">src/DocsToKG/DocParsing/run_docling_html_to_doctags_parallel.py</span></code> (unified path handling, shared utilities)</p></li>
+<li><p><strong>NEW</strong>: <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/DocParsing/_common.py</span></code> (shared utilities module)</p></li>
+<li><p><strong>NEW</strong>: <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/DocParsing/cli/doctags_convert.py</span></code> (unified CLI entry point)</p></li>
+<li><p><strong>NEW</strong>: <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/DocParsing/cli/chunk_and_coalesce.py</span></code> (refactored chunking CLI)</p></li>
+<li><p><strong>NEW</strong>: <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/DocParsing/cli/embed_vectors.py</span></code> (refactored embedding CLI)</p></li>
+<li><p><strong>NEW</strong>: <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/DocParsing/serializers.py</span></code> (extracted serializers)</p></li>
+</ul>
+</section>
+<section id="data-files">
+<h3>Data Files<a class="headerlink" href="#data-files" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>NEW</strong>: <code class="docutils literal notranslate"><span class="pre">Data/Manifests/docparse.manifest.jsonl</span></code> (processing ledger)</p></li>
+<li><p><strong>MODIFIED</strong>: All chunk JSONL files (add schema_version, provenance fields)</p></li>
+<li><p><strong>MODIFIED</strong>: All vector JSONL files (add schema_version, model metadata)</p></li>
+</ul>
+</section>
+<section id="breaking-changes">
+<h3>Breaking Changes<a class="headerlink" href="#breaking-changes" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>NONE</strong> - All changes are backward-compatible; existing JSONL files remain readable</p></li>
+</ul>
+</section>
+<section id="dependencies">
+<h3>Dependencies<a class="headerlink" href="#dependencies" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>NEW</strong>: <code class="docutils literal notranslate"><span class="pre">pydantic</span></code> (for schema validation)</p></li>
+<li><p>Existing: <code class="docutils literal notranslate"><span class="pre">docling</span></code>, <code class="docutils literal notranslate"><span class="pre">docling-core</span></code>, <code class="docutils literal notranslate"><span class="pre">vllm</span></code>, <code class="docutils literal notranslate"><span class="pre">sentence-transformers</span></code>, <code class="docutils literal notranslate"><span class="pre">transformers</span></code>, <code class="docutils literal notranslate"><span class="pre">tqdm</span></code>, <code class="docutils literal notranslate"><span class="pre">requests</span></code></p></li>
+</ul>
+</section>
+</section>
+<section id="id1">
+<h2>Dependencies<a class="headerlink" href="#id1" title="Link to this heading"></a></h2>
+<section id="new-dependencies">
+<h3>New Dependencies<a class="headerlink" href="#new-dependencies" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>pydantic</strong> (&gt;=2.0, &lt;3.0): Required for schema validation</p>
+<ul>
+<li><p>Rationale: Industry-standard validation library, already transitive dependency via vLLM</p></li>
+<li><p>Risk: None - stable and well-maintained</p></li>
+<li><p>License: MIT</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="updated-dependencies">
+<h3>Updated Dependencies<a class="headerlink" href="#updated-dependencies" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>docling</strong>: Keep current version (&gt;=1.0)</p></li>
+<li><p><strong>docling-core</strong>: Keep current version (&gt;=1.0)</p></li>
+<li><p><strong>vllm</strong>: Keep current version (&gt;=0.3.0)</p></li>
+<li><p><strong>sentence-transformers</strong>: Keep current version</p></li>
+<li><p><strong>transformers</strong>: Keep current version</p></li>
+</ul>
+</section>
+<section id="system-dependencies">
+<h3>System Dependencies<a class="headerlink" href="#system-dependencies" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Python 3.9+ (tested on 3.9, 3.10, 3.11)</p></li>
+<li><p>CUDA 11.8+ for GPU operations</p></li>
+<li><p>32GB RAM minimum (64GB recommended for large corpora)</p></li>
+<li><p>1x A100 GPU (40GB) or equivalent</p></li>
+</ul>
+</section>
+</section>
+<section id="security-considerations">
+<h2>Security Considerations<a class="headerlink" href="#security-considerations" title="Link to this heading"></a></h2>
+<section id="data-privacy">
+<h3>Data Privacy<a class="headerlink" href="#data-privacy" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>No external API calls</strong>: All processing is local-first</p></li>
+<li><p><strong>No credential storage</strong>: No authentication required for pipeline</p></li>
+<li><p><strong>Manifest contains no PII</strong>: Only document IDs, not content</p></li>
+</ul>
+</section>
+<section id="input-validation">
+<h3>Input Validation<a class="headerlink" href="#input-validation" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Schema validation</strong>: Pydantic models enforce strict types</p></li>
+<li><p><strong>Path traversal protection</strong>: All file operations validate paths are within data root</p></li>
+<li><p><strong>JSONL injection</strong>: Line-by-line parsing prevents multiline injection</p></li>
+<li><p><strong>Size limits</strong>: Chunk token count capped at 100K (sanity check)</p></li>
+</ul>
+</section>
+<section id="process-isolation">
+<h3>Process Isolation<a class="headerlink" href="#process-isolation" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Multiprocessing spawn mode</strong>: Workers cannot access parent memory</p></li>
+<li><p><strong>Lock files include PID</strong>: Prevents accidental concurrent writes</p></li>
+<li><p><strong>Atomic writes</strong>: Tmp files prevent partial outputs</p></li>
+</ul>
+</section>
+<section id="logging-security">
+<h3>Logging Security<a class="headerlink" href="#logging-security" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>No sensitive data in logs</strong>: Model paths and file paths only</p></li>
+<li><p><strong>Redaction for credentials</strong>: If future auth added, credentials will be redacted</p></li>
+<li><p><strong>Structured logs</strong>: JSON format prevents log injection attacks</p></li>
+</ul>
+</section>
+</section>
+<section id="testing-strategy">
+<h2>Testing Strategy<a class="headerlink" href="#testing-strategy" title="Link to this heading"></a></h2>
+<section id="unit-tests">
+<h3>Unit Tests<a class="headerlink" href="#unit-tests" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Coverage Target</strong>: ≥90% for _common.py, ≥95% for schemas.py</p></li>
+<li><p><strong>Frameworks</strong>: pytest, pytest-cov, hypothesis (property-based testing)</p></li>
+<li><p><strong>Fixtures</strong>: Golden DocTags, chunks, vectors committed to git</p></li>
+<li><p><strong>Assertions</strong>: Deterministic outputs, schema compliance, invariant checks</p></li>
+</ul>
+</section>
+<section id="integration-tests">
+<h3>Integration Tests<a class="headerlink" href="#integration-tests" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Scope</strong>: Single-stage pipelines (DocTags→Chunks, Chunks→Vectors)</p></li>
+<li><p><strong>Test Data</strong>: Representative sample documents (HTML, PDF, multi-page)</p></li>
+<li><p><strong>Validations</strong>: Output file format, row counts, processing time</p></li>
+<li><p><strong>Error Scenarios</strong>: Malformed inputs, missing files, invalid configurations</p></li>
+</ul>
+</section>
+<section id="system-tests">
+<h3>System Tests<a class="headerlink" href="#system-tests" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Scope</strong>: Full end-to-end pipeline (PDF→DocTags→Chunks→Vectors)</p></li>
+<li><p><strong>Test Data</strong>: Small corpus (10 documents)</p></li>
+<li><p><strong>Validations</strong>: Manifest completeness, schema compliance, resource usage</p></li>
+<li><p><strong>Performance</strong>: Throughput meets minimum targets</p></li>
+</ul>
+</section>
+<section id="backward-compatibility-tests">
+<h3>Backward Compatibility Tests<a class="headerlink" href="#backward-compatibility-tests" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Old chunk files</strong>: Verify reading without schema_version field</p></li>
+<li><p><strong>Old vector files</strong>: Verify reading without provenance metadata</p></li>
+<li><p><strong>Schema migration</strong>: Verify adding schema_version to old files preserves data</p></li>
+</ul>
+</section>
+<section id="regression-tests">
+<h3>Regression Tests<a class="headerlink" href="#regression-tests" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Golden fixtures</strong>: Compare current outputs to committed expected outputs</p></li>
+<li><p><strong>Performance baselines</strong>: Ensure &lt;10% runtime regression, &lt;20% memory regression</p></li>
+<li><p><strong>Hash comparison</strong>: Verify deterministic outputs produce identical hashes</p></li>
+</ul>
+</section>
+</section>
+<section id="rollback-plan">
+<h2>Rollback Plan<a class="headerlink" href="#rollback-plan" title="Link to this heading"></a></h2>
+<section id="phase-by-phase-rollback">
+<h3>Phase-by-Phase Rollback<a class="headerlink" href="#phase-by-phase-rollback" title="Link to this heading"></a></h3>
+<p><strong>If Issues in Phase 1 (Infrastructure)</strong>:</p>
+<ul class="simple">
+<li><p>Delete new modules (_common.py, schemas.py, serializers.py)</p></li>
+<li><p>Revert to commit before refactoring started</p></li>
+<li><p>No impact on production - infrastructure not yet integrated</p></li>
+</ul>
+<p><strong>If Issues in Phase 2 (Script Refactoring)</strong>:</p>
+<ul class="simple">
+<li><p>Restore *_legacy.py scripts as primary</p></li>
+<li><p>Update documentation to point to legacy scripts</p></li>
+<li><p>New modules remain but unused</p></li>
+<li><p>Production continues with original scripts</p></li>
+</ul>
+<p><strong>If Issues in Phase 3 (Streaming Embeddings)</strong>:</p>
+<ul class="simple">
+<li><p>Revert EmbeddingV2.py to pre-refactor version</p></li>
+<li><p>Keep other refactorings (shared utilities, schemas)</p></li>
+<li><p>Partial benefit retained (code reduction, validation)</p></li>
+</ul>
+<p><strong>If Issues in Phase 4 (Unified CLI)</strong>:</p>
+<ul class="simple">
+<li><p>Remove cli/ directory</p></li>
+<li><p>Restore deprecation warnings in original scripts</p></li>
+<li><p>All backend functionality remains working</p></li>
+</ul>
+</section>
+<section id="rollback-triggers">
+<h3>Rollback Triggers<a class="headerlink" href="#rollback-triggers" title="Link to this heading"></a></h3>
+<p>Trigger rollback if:</p>
+<ul class="simple">
+<li><p><strong>Critical Bug</strong>: Data corruption, silent failures, incorrect embeddings</p></li>
+<li><p><strong>Performance Regression</strong>: &gt;20% slower than baseline</p></li>
+<li><p><strong>Resource Regression</strong>: &gt;50% more memory usage</p></li>
+<li><p><strong>Reliability Regression</strong>: Failure rate &gt;5% for previously working documents</p></li>
+</ul>
+</section>
+<section id="rollback-verification">
+<h3>Rollback Verification<a class="headerlink" href="#rollback-verification" title="Link to this heading"></a></h3>
+<p>After rollback:</p>
+<ul class="simple">
+<li><p>Run full test suite and verify all tests pass</p></li>
+<li><p>Process sample corpus and validate outputs match pre-refactor baselines</p></li>
+<li><p>Review manifest for failure patterns</p></li>
+<li><p>Update CHANGELOG with rollback details</p></li>
+</ul>
+</section>
+</section>
+<section id="success-criteria">
+<h2>Success Criteria<a class="headerlink" href="#success-criteria" title="Link to this heading"></a></h2>
+<section id="functional-criteria">
+<h3>Functional Criteria<a class="headerlink" href="#functional-criteria" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>✅ All 338 scenarios in spec.md pass validation</p></li>
+<li><p>✅ Zero regressions in existing functionality</p></li>
+<li><p>✅ All 184 implementation tasks completed</p></li>
+<li><p>✅ OpenSpec validation passes with –strict flag</p></li>
+</ul>
+</section>
+<section id="quality-criteria">
+<h3>Quality Criteria<a class="headerlink" href="#quality-criteria" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>✅ Test coverage: ≥90% for new modules</p></li>
+<li><p>✅ Documentation: All public APIs documented with examples</p></li>
+<li><p>✅ Code review: Approved by at least one reviewer</p></li>
+<li><p>✅ Linting: Passes flake8, mypy, black formatting</p></li>
+</ul>
+</section>
+<section id="performance-criteria">
+<h3>Performance Criteria<a class="headerlink" href="#performance-criteria" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>✅ Streaming embeddings use &lt;80% GPU memory</p></li>
+<li><p>✅ Zero CUDA re-initialization crashes in CI</p></li>
+<li><p>✅ Processing time within 10% of baseline</p></li>
+<li><p>✅ Chunking: ≥10 docs/min, Embeddings: ≥5 docs/min</p></li>
+</ul>
+</section>
+<section id="operational-criteria">
+<h3>Operational Criteria<a class="headerlink" href="#operational-criteria" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>✅ 100% of processing tracked in manifest</p></li>
+<li><p>✅ Manifest queries support monitoring workflows</p></li>
+<li><p>✅ Troubleshooting guide covers common error scenarios</p></li>
+<li><p>✅ CLI help text includes examples for all modes</p></li>
+</ul>
+</section>
+<section id="adoption-criteria">
+<h3>Adoption Criteria<a class="headerlink" href="#adoption-criteria" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>✅ Migration guide published and reviewed</p></li>
+<li><p>✅ Deprecation warnings in place for 1 release cycle</p></li>
+<li><p>✅ Zero user-reported issues with unified CLI</p></li>
+<li><p>✅ README updated with new architecture overview</p></li>
+</ul>
+</section>
+</section>
+<section id="timeline-estimates">
+<h2>Timeline Estimates<a class="headerlink" href="#timeline-estimates" title="Link to this heading"></a></h2>
+<section id="phase-1-infrastructure-5-days">
+<h3>Phase 1: Infrastructure (5 days)<a class="headerlink" href="#phase-1-infrastructure-5-days" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Day 1-2: _common.py, schemas.py implementation</p></li>
+<li><p>Day 3: serializers.py, unit tests</p></li>
+<li><p>Day 4-5: Integration testing, bug fixes</p></li>
+</ul>
+</section>
+<section id="phase-2-script-refactoring-5-days">
+<h3>Phase 2: Script Refactoring (5 days)<a class="headerlink" href="#phase-2-script-refactoring-5-days" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Day 1: Path handling updates, HTML script</p></li>
+<li><p>Day 2: PDF script, CUDA safety</p></li>
+<li><p>Day 3: Chunking script, topic-aware coalescence</p></li>
+<li><p>Day 4-5: Testing, legacy script wrappers</p></li>
+</ul>
+</section>
+<section id="phase-3-streaming-embeddings-7-days">
+<h3>Phase 3: Streaming Embeddings (7 days)<a class="headerlink" href="#phase-3-streaming-embeddings-7-days" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Day 1-2: Two-pass architecture implementation</p></li>
+<li><p>Day 3: Validation and invariant checks</p></li>
+<li><p>Day 4: Batch size configuration</p></li>
+<li><p>Day 5-6: Testing with large corpus</p></li>
+<li><p>Day 7: Performance tuning, documentation</p></li>
+</ul>
+</section>
+<section id="phase-4-unified-cli-cleanup-3-days">
+<h3>Phase 4: Unified CLI &amp; Cleanup (3 days)<a class="headerlink" href="#phase-4-unified-cli-cleanup-3-days" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Day 1: CLI implementation and testing</p></li>
+<li><p>Day 2: Documentation updates, examples</p></li>
+<li><p>Day 3: Final integration test, CHANGELOG</p></li>
+</ul>
+<p><strong>Total: 20 working days (4 weeks)</strong></p>
+</section>
+</section>
+<section id="post-deployment-plan">
+<h2>Post-Deployment Plan<a class="headerlink" href="#post-deployment-plan" title="Link to this heading"></a></h2>
+<section id="week-1-after-deploy">
+<h3>Week 1 After Deploy<a class="headerlink" href="#week-1-after-deploy" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Monitor manifest for failure patterns</p></li>
+<li><p>Review performance metrics daily</p></li>
+<li><p>Address any user-reported issues immediately</p></li>
+<li><p>Collect feedback on unified CLI</p></li>
+</ul>
+</section>
+<section id="week-2-4-after-deploy">
+<h3>Week 2-4 After Deploy<a class="headerlink" href="#week-2-4-after-deploy" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Optimize batch sizes based on real workloads</p></li>
+<li><p>Update troubleshooting guide with new scenarios</p></li>
+<li><p>Run full corpus through pipeline, validate results</p></li>
+<li><p>Prepare legacy script removal PR</p></li>
+</ul>
+</section>
+<section id="month-2-after-deploy">
+<h3>Month 2 After Deploy<a class="headerlink" href="#month-2-after-deploy" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Remove *_legacy.py scripts</p></li>
+<li><p>Archive change proposal to openspec/changes/archive/</p></li>
+<li><p>Update specs/ with final capability documentation</p></li>
+<li><p>Document lessons learned</p></li>
+</ul>
+</section>
+</section>
+<section id="communication-plan">
+<h2>Communication Plan<a class="headerlink" href="#communication-plan" title="Link to this heading"></a></h2>
+<section id="stakeholder-updates">
+<h3>Stakeholder Updates<a class="headerlink" href="#stakeholder-updates" title="Link to this heading"></a></h3>
+<p><strong>Before Implementation</strong>:</p>
+<ul class="simple">
+<li><p>Share proposal with team for review</p></li>
+<li><p>Present architecture decisions in team meeting</p></li>
+<li><p>Get approval for breaking changes (if any)</p></li>
+</ul>
+<p><strong>During Implementation</strong>:</p>
+<ul class="simple">
+<li><p>Daily standup updates on progress</p></li>
+<li><p>Flag blockers immediately</p></li>
+<li><p>Demo new features as completed</p></li>
+</ul>
+<p><strong>After Deployment</strong>:</p>
+<ul class="simple">
+<li><p>Send migration guide to users</p></li>
+<li><p>Announce unified CLI in release notes</p></li>
+<li><p>Offer training session for new workflows</p></li>
+</ul>
+</section>
+<section id="documentation-updates">
+<h3>Documentation Updates<a class="headerlink" href="#documentation-updates" title="Link to this heading"></a></h3>
+<p><strong>User-Facing</strong>:</p>
+<ul class="simple">
+<li><p>README.md: Architecture overview, quick start</p></li>
+<li><p>CLI help text: Examples and troubleshooting</p></li>
+<li><p>Migration guide: Old→New command mapping</p></li>
+</ul>
+<p><strong>Developer-Facing</strong>:</p>
+<ul class="simple">
+<li><p>CONTRIBUTING.md: How to add new processing stages</p></li>
+<li><p>Architecture diagrams: Stage boundaries, data flow</p></li>
+<li><p>API documentation: Function signatures, examples</p></li>
+</ul>
+</section>
+</section>
+<section id="risk-register">
+<h2>Risk Register<a class="headerlink" href="#risk-register" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Risk</p></th>
+<th class="head"><p>Probability</p></th>
+<th class="head"><p>Impact</p></th>
+<th class="head"><p>Mitigation</p></th>
+<th class="head"><p>Owner</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Pydantic version conflict</p></td>
+<td><p>Low</p></td>
+<td><p>Medium</p></td>
+<td><p>Pin version, test in CI</p></td>
+<td><p>Dev</p></td>
+</tr>
+<tr class="row-odd"><td><p>Performance regression</p></td>
+<td><p>Medium</p></td>
+<td><p>High</p></td>
+<td><p>Benchmark before/after</p></td>
+<td><p>Dev</p></td>
+</tr>
+<tr class="row-even"><td><p>Silent data corruption</p></td>
+<td><p>Low</p></td>
+<td><p>Critical</p></td>
+<td><p>Golden fixtures, hash checks</p></td>
+<td><p>QA</p></td>
+</tr>
+<tr class="row-odd"><td><p>vLLM API changes</p></td>
+<td><p>Low</p></td>
+<td><p>Medium</p></td>
+<td><p>Version pin, compatibility tests</p></td>
+<td><p>Dev</p></td>
+</tr>
+<tr class="row-even"><td><p>User adoption resistance</p></td>
+<td><p>Medium</p></td>
+<td><p>Low</p></td>
+<td><p>Clear migration guide, training</p></td>
+<td><p>PM</p></td>
+</tr>
+<tr class="row-odd"><td><p>Incomplete testing</p></td>
+<td><p>Medium</p></td>
+<td><p>High</p></td>
+<td><p>90% coverage target, CI enforcement</p></td>
+<td><p>QA</p></td>
+</tr>
+<tr class="row-even"><td><p>Documentation drift</p></td>
+<td><p>High</p></td>
+<td><p>Low</p></td>
+<td><p>Automated doc generation, reviews</p></td>
+<td><p>Dev</p></td>
+</tr>
+<tr class="row-odd"><td><p>Manifest schema changes</p></td>
+<td><p>Low</p></td>
+<td><p>Medium</p></td>
+<td><p>Version field, backward compat</p></td>
+<td><p>Dev</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="approvals-required">
+<h2>Approvals Required<a class="headerlink" href="#approvals-required" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>[ ] Technical Lead: Architecture design approval</p></li>
+<li><p>[ ] Data Team: Schema changes and backward compatibility</p></li>
+<li><p>[ ] Operations: Monitoring and alerting integration</p></li>
+<li><p>[ ] Product: Unified CLI UX and migration timeline</p></li>
+</ul>
+</section>
+<section id="questions-for-stakeholders">
+<h2>Questions for Stakeholders<a class="headerlink" href="#questions-for-stakeholders" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p><strong>Timeline</strong>: Is 4-week timeline acceptable or should it be compressed/extended?</p></li>
+<li><p><strong>Testing</strong>: Should we run production traffic against refactored pipeline in parallel before cutover?</p></li>
+<li><p><strong>Migration</strong>: Preference for hard cutover vs gradual rollout?</p></li>
+<li><p><strong>Monitoring</strong>: Existing monitoring infrastructure or should we use manifest-only approach?</p></li>
+<li><p><strong>Documentation</strong>: Preferred format for API docs (Sphinx, MkDocs, README-only)?</p></li>
+</ol>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

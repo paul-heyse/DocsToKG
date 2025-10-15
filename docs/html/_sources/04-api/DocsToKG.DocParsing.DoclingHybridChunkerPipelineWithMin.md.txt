@@ -1,0 +1,173 @@
+# 1. Module: DoclingHybridChunkerPipelineWithMin
+
+This reference documents the DocsToKG module ``DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin``.
+
+Docling Hybrid Chunker with Minimum Token Coalescence
+
+Transforms DocTags documents into chunked records while ensuring short runs of
+chunks are merged to satisfy minimum token thresholds required by downstream
+embedding pipelines.
+
+## 1. Functions
+
+### `find_doctags_files(in_dir)`
+
+Discover `.doctags` artifacts within a directory.
+
+Args:
+in_dir: Directory containing DocTags outputs.
+
+Returns:
+Sorted list of unique DocTags file paths.
+
+### `read_utf8(p)`
+
+Load text from disk using UTF-8 with replacement for invalid bytes.
+
+Args:
+p: Path to the text file.
+
+Returns:
+String contents of the file.
+
+### `build_doc(doc_name, doctags_text)`
+
+Construct a Docling document from serialized DocTags text.
+
+Args:
+doc_name: Human-readable document identifier for logging.
+doctags_text: Serialized DocTags payload.
+
+Returns:
+Loaded DoclingDocument ready for chunking.
+
+### `extract_refs_and_pages(chunk)`
+
+Collect self-references and page numbers associated with a chunk.
+
+Args:
+chunk: Chunk object produced by the hybrid chunker.
+
+Returns:
+Tuple containing a list of reference identifiers and sorted page numbers.
+
+Raises:
+None
+
+### `merge_rec(a, b, tokenizer)`
+
+Merge two chunk records, updating token counts and provenance metadata.
+
+Args:
+a: First record to merge.
+b: Second record to merge.
+tokenizer: Tokenizer used to recompute token counts for combined text.
+
+Returns:
+New `Rec` instance containing fused text, token counts, and metadata.
+
+### `coalesce_small_runs(records, tokenizer, min_tokens, max_tokens)`
+
+Merge contiguous short chunks until they satisfy minimum token thresholds.
+
+Args:
+records: Ordered list of chunk records to normalize.
+tokenizer: Tokenizer used to recompute token counts for merged chunks.
+min_tokens: Target minimum tokens per chunk after coalescing.
+max_tokens: Hard ceiling to avoid producing overly large chunks.
+
+Returns:
+New list of records where small runs are merged while preserving order.
+
+Note:
+Strategy:
+• Identify contiguous runs where every chunk has fewer than `min_tokens`.
+• Greedily pack neighbors within a run to exceed `min_tokens` without
+surpassing `max_tokens`.
+• Merge trailing fragments into adjacent groups when possible,
+preferring same-run neighbors to maintain topical cohesion.
+• Leave chunks outside small runs unchanged.
+
+### `main()`
+
+CLI driver that chunks DocTags files and enforces minimum token thresholds.
+
+Args:
+None
+
+Returns:
+None
+
+### `serialize(self)`
+
+Render picture metadata into Markdown-friendly text.
+
+Args:
+item: Picture element emitted by Docling.
+doc_serializer: Parent serializer responsible for post-processing.
+doc: Full Docling document containing the picture context.
+
+Returns:
+SerializationResult capturing the rendered string and provenance.
+
+### `get_serializer(self, doc)`
+
+Construct a ChunkingDocSerializer tailored for DocTags documents.
+
+Args:
+doc: Docling document that will be serialized into chunk text.
+
+Returns:
+Configured ChunkingDocSerializer instance.
+
+### `is_small(idx)`
+
+Return True when the chunk at `idx` is below the minimum token threshold.
+
+Args:
+idx: Index of the chunk under evaluation.
+
+Returns:
+True if the chunk length is less than `min_tokens`, else False.
+
+## 2. Classes
+
+### `CaptionPlusAnnotationPictureSerializer`
+
+Serialize picture items with captions and rich annotation metadata.
+
+Attributes:
+None
+
+Examples:
+>>> serializer = CaptionPlusAnnotationPictureSerializer()
+>>> isinstance(serializer, MarkdownPictureSerializer)
+True
+
+### `RichSerializerProvider`
+
+Provide a serializer that augments tables and pictures with Markdown.
+
+Attributes:
+None
+
+Examples:
+>>> provider = RichSerializerProvider()
+>>> isinstance(provider, ChunkingSerializerProvider)
+True
+
+### `Rec`
+
+Intermediate record tracking chunk text and provenance.
+
+Attributes:
+text: Chunk text content.
+n_tok: Token count computed by the tokenizer.
+src_idxs: Source chunk indices contributing to this record.
+refs: List of inline reference identifiers.
+pages: Page numbers associated with the chunk.
+
+Examples:
+>>> rec = Rec(text="Example", n_tok=5, src_idxs=[0], refs=[], pages=[1])
+>>> rec.n_tok
+5

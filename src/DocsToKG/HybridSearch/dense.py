@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import json
 import logging
-import os
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Sequence
 
@@ -146,7 +145,7 @@ class FaissIndexManager:
         Returns:
             Integer CUDA device ordinal used for FAISS kernels.
         """
-        return self._device
+        return int(getattr(self._config, "device", self._device))
 
     def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
         """Register a callback translating FAISS internal IDs to vector UUIDs.
@@ -290,17 +289,58 @@ class FaissIndexManager:
         Returns:
             Bytes object containing serialized index and vector cache.
         """
-        cpu_index = self._to_cpu(self._index)
-        index_bytes = faiss.serialize_index(cpu_index)
         payload = {
-            "mode": "native",
-            "index": base64.b64encode(index_bytes).decode("ascii"),
+            "mode": "vectors_only_v1",
+            "index_type": self._config.index_type,
             "vectors": {
                 vector_id: base64.b64encode(vector.tobytes()).decode("ascii")
                 for vector_id, vector in self._vectors.items()
             },
         }
         return json.dumps(payload).encode("utf-8")
+
+    def save(self, path: str) -> None:
+        """Persist the FAISS index to disk without CPU fallbacks.
+
+        Args:
+            path: Destination filepath for the serialized FAISS index.
+
+        Returns:
+            None
+
+        Raises:
+            RuntimeError: If the index has not been initialised.
+        """
+
+        if self._index is None:
+            raise RuntimeError("index is empty")
+        # NOTE: Current FAISS wheel lacks write_index hooks for GPU-backed ID maps; if a future
+        # rebuild exposes that functionality we can switch, but treat it as TBD for now.
+        serialized = self.serialize()
+        with open(path, "wb") as handle:
+            handle.write(serialized)
+
+    @classmethod
+    def load(cls, path: str, config: DenseIndexConfig, dim: int) -> "FaissIndexManager":
+        """Load a FAISS index from disk and ensure it resides on GPU.
+
+        Args:
+            path: Filesystem path pointing to a serialized FAISS index.
+            config: Dense index configuration used to rebuild runtime properties.
+            dim: Dimensionality of the vectors contained in the index.
+
+        Returns:
+            Instance of ``FaissIndexManager`` with GPU state initialised.
+
+        Raises:
+            RuntimeError: If the FAISS index cannot be read or promoted to GPU memory.
+        """
+
+        with open(path, "rb") as handle:
+            payload = handle.read()
+        manager = cls(dim=dim, config=config)
+        manager.restore(payload)
+        return manager
 
     def restore(self, payload: bytes) -> None:
         """Restore FAISS state from bytes produced by `serialize`.
@@ -319,17 +359,8 @@ class FaissIndexManager:
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise ValueError("Invalid FAISS payload") from exc
 
-        if data.get("mode") != "native":
-            raise ValueError("Unsupported FAISS payload mode")
+        mode = data.get("mode")
 
-        encoded = data.get("index")
-        if not isinstance(encoded, str):
-            raise ValueError("Invalid FAISS payload")
-
-        index_bytes = base64.b64decode(encoded.encode("ascii"))
-        cpu_index = faiss.deserialize_index(np.frombuffer(index_bytes, dtype=np.uint8))
-        self._index = self._maybe_to_gpu(cpu_index)
-        self._set_nprobe()
         vectors_blob = data.get("vectors", {})
         restored: Dict[str, np.ndarray] = {}
         if isinstance(vectors_blob, dict):
@@ -343,6 +374,39 @@ class FaissIndexManager:
                     raise ValueError("Invalid FAISS vector dimension in payload")
                 restored[vector_id] = vector.copy()
         self._vectors = restored
+
+        if mode == "native":
+            encoded = data.get("index")
+            if isinstance(encoded, str):
+                try:
+                    index_bytes = base64.b64decode(encoded.encode("ascii"))
+                    cpu_index = faiss.deserialize_index(np.frombuffer(index_bytes, dtype=np.uint8))
+                    self._index = self._maybe_to_gpu(cpu_index)
+                    self._set_nprobe()
+                    return
+                except Exception:
+                    logger.debug("Falling back to vector rebuild during restore", exc_info=True)
+
+        # Rebuild the GPU index directly from the stored vectors.
+        self._index = self._create_index()
+        self._pending_delete_ids.clear()
+        self._dirty_deletes = 0
+        self._needs_rebuild = False
+        if not restored:
+            self._set_nprobe()
+            return
+        vector_items = list(restored.items())
+        vector_ids = [item[0] for item in vector_items]
+        matrix = np.stack([item[1] for item in vector_items]).astype(np.float32, copy=False)
+        faiss.normalize_L2(matrix)
+        if hasattr(self._index, "is_trained") and not getattr(self._index, "is_trained"):
+            nlist = int(getattr(self._config, "nlist", 1024))
+            oversample = max(1, int(getattr(self._config, "oversample", 2)))
+            ntrain = min(matrix.shape[0], nlist * oversample)
+            self._index.train(matrix[:ntrain])
+        ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
+        self._index.add_with_ids(matrix, ids)
+        self._set_nprobe()
 
     def stats(self) -> Dict[str, float | str]:
         """Expose diagnostic metrics for monitoring.
@@ -393,7 +457,7 @@ class FaissIndexManager:
         if self._gpu_resources is None:
             raise RuntimeError("GPU resources must be initialised before index creation")
         metric = faiss.METRIC_INNER_PRODUCT
-        dev = int(self._device)
+        dev = int(self.device)
         index_type = self._config.index_type
 
         if index_type == "flat":
@@ -475,6 +539,17 @@ class FaissIndexManager:
         return index
 
     def replicate_to_all_gpus(self, index: "faiss.Index | None" = None) -> "faiss.Index":
+        """Replicate a FAISS index across every visible GPU device.
+
+        Args:
+            index: Optional FAISS index to clone; defaults to the actively managed index.
+
+        Returns:
+            FAISS index handle representing the replicated multi-GPU index.
+
+        Raises:
+            RuntimeError: If multi-GPU replication is unsupported or no index is available.
+        """
         if not hasattr(faiss, "index_cpu_to_all_gpus"):
             raise RuntimeError("FAISS build does not support multi-GPU replication")
         target = index or getattr(self, "_index", None)
@@ -508,7 +583,7 @@ class FaissIndexManager:
         self.init_gpu()
         if self._gpu_resources is None:
             raise RuntimeError("GPU resources are not initialised")
-        device = int(self._device)
+        device = int(self.device)
         try:
             if hasattr(faiss, "GpuClonerOptions"):
                 co = faiss.GpuClonerOptions()
@@ -646,18 +721,20 @@ class FaissIndexManager:
             int: GPU device identifier to use for FAISS operations.
         """
 
-        env_value = os.getenv("HYBRIDSEARCH_FAISS_DEVICE")
-        if env_value is not None:
-            try:
-                return int(env_value)
-            except ValueError:
-                logger.warning(
-                    "Invalid HYBRIDSEARCH_FAISS_DEVICE value '%s'; falling back to config",
-                    env_value,
-                )
         return int(getattr(config, "device", 0))
 
     def init_gpu(self) -> None:
+        """Initialise FAISS GPU resources in line with configuration settings.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            RuntimeError: If FAISS lacks GPU support or an unsuitable device is requested.
+        """
         if self._gpu_resources is not None:
             return
         if not hasattr(faiss, "StandardGpuResources"):
@@ -669,7 +746,7 @@ class FaissIndexManager:
                 num_gpus = int(faiss.get_num_gpus())
             except Exception as exc:  # pragma: no cover - hardware query failure
                 raise RuntimeError("Unable to enumerate FAISS GPUs") from exc
-            device = int(self._device)
+            device = int(self.device)
             if num_gpus <= device:
                 raise RuntimeError(
                     f"Requested GPU device {device} but only {num_gpus} device(s) visible"

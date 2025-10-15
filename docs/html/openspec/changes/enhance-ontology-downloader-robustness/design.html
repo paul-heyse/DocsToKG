@@ -1,0 +1,1148 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Design Document: Ontology Downloader Enhancements &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Design Document: Ontology Downloader Enhancements</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/openspec/changes/enhance-ontology-downloader-robustness/design.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="design-document-ontology-downloader-enhancements">
+<h1>Design Document: Ontology Downloader Enhancements<a class="headerlink" href="#design-document-ontology-downloader-enhancements" title="Link to this heading"></a></h1>
+<section id="context">
+<h2>Context<a class="headerlink" href="#context" title="Link to this heading"></a></h2>
+<p>The ontology downloader is a critical component of the DocsToKG pipeline responsible for fetching, validating, and caching ontology documents from multiple sources (OBO, OLS, BioPortal, SKOS, XBRL). The current implementation has proven functional but carries technical debt in configuration parsing, lacks hardening for production edge cases, and misses capabilities that would improve operational success rates.</p>
+<p>This enhancement initiative addresses 15 identified improvements across code quality, robustness, and capabilities without breaking existing workflows or requiring user migration.</p>
+<section id="stakeholders">
+<h3>Stakeholders<a class="headerlink" href="#stakeholders" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Pipeline Operators</strong>: Need reliable downloads, clear diagnostics, and graceful failure handling</p></li>
+<li><p><strong>Development Team</strong>: Need maintainable code, clear error messages, and testable components</p></li>
+<li><p><strong>End Users</strong>: Need fast, cached downloads with clear progress and error reporting</p></li>
+</ul>
+</section>
+<section id="constraints">
+<h3>Constraints<a class="headerlink" href="#constraints" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Backward Compatibility</strong>: Existing <code class="docutils literal notranslate"><span class="pre">sources.yaml</span></code> files and manifest.json files must continue working</p></li>
+<li><p><strong>Optional Dependencies</strong>: Cannot require new hard dependencies (fsspec, s3fs remain optional)</p></li>
+<li><p><strong>Cross-Platform</strong>: Must work on Linux, macOS, Windows with Python 3.9+</p></li>
+<li><p><strong>Performance</strong>: Cannot regress download or validation performance</p></li>
+</ul>
+</section>
+</section>
+<section id="goals-non-goals">
+<h2>Goals / Non-Goals<a class="headerlink" href="#goals-non-goals" title="Link to this heading"></a></h2>
+<section id="goals">
+<h3>Goals<a class="headerlink" href="#goals" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Reduce code maintenance burden by eliminating custom parsers and consolidating stubs</p></li>
+<li><p>Harden download security with better validation and safe archive handling</p></li>
+<li><p>Improve operational success rates with fallback resolvers and better rate limiting</p></li>
+<li><p>Enable team workflows with remote storage support</p></li>
+<li><p>Improve troubleshooting with diagnostic CLI commands</p></li>
+<li><p>Maintain 100% backward compatibility</p></li>
+</ol>
+</section>
+<section id="non-goals">
+<h3>Non-Goals<a class="headerlink" href="#non-goals" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Rewriting core download logic (existing implementation is solid)</p></li>
+<li><p>Changing resolver API contracts (keep protocol stable)</p></li>
+<li><p>Modifying manifest schema in breaking ways (only additions)</p></li>
+<li><p>Adding new required dependencies (keep them optional)</p></li>
+<li><p>Supporting non-Python configuration formats</p></li>
+</ol>
+</section>
+</section>
+<section id="decisions">
+<h2>Decisions<a class="headerlink" href="#decisions" title="Link to this heading"></a></h2>
+<section id="configuration-pydantic-v2-vs-custom-dataclasses">
+<h3>1. Configuration: Pydantic v2 vs. Custom Dataclasses<a class="headerlink" href="#configuration-pydantic-v2-vs-custom-dataclasses" title="Link to this heading"></a></h3>
+<p><strong>Decision</strong>: Migrate to Pydantic v2 models</p>
+<p><strong>Rationale</strong>:</p>
+<ul class="simple">
+<li><p>Eliminates ~150 lines of custom YAML fallback parser</p></li>
+<li><p>Provides superior validation with clear error messages</p></li>
+<li><p>Enables JSON Schema generation for documentation</p></li>
+<li><p>Handles environment variable merging elegantly</p></li>
+<li><p>Industry standard with excellent type inference support</p></li>
+</ul>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul class="simple">
+<li><p>Keep custom dataclasses: Maintains status quo but keeps maintenance burden</p></li>
+<li><p>Use attrs with cattrs: Less common, weaker ecosystem</p></li>
+<li><p>Use marshmallow: Heavier dependency, more verbose schemas</p></li>
+</ul>
+<p><strong>Implementation</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">Field</span><span class="p">,</span> <span class="n">field_validator</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">DownloadConfiguration</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">max_retries</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">timeout_sec</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">per_host_rate_limit</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;4/second&quot;</span><span class="p">,</span> <span class="n">pattern</span><span class="o">=</span><span class="sa">r</span><span class="s2">&quot;^\d+/(second|sec|s|minute|min|m|hour|h)$&quot;</span><span class="p">)</span>
+
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s1">&#39;per_host_rate_limit&#39;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate_rate_limit</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">v</span><span class="p">):</span>
+        <span class="c1"># Parse and validate rate limit format</span>
+        <span class="k">pass</span>
+</pre></div>
+</div>
+</section>
+<section id="optional-dependencies-centralized-module-vs-inline-stubs">
+<h3>2. Optional Dependencies: Centralized Module vs. Inline Stubs<a class="headerlink" href="#optional-dependencies-centralized-module-vs-inline-stubs" title="Link to this heading"></a></h3>
+<p><strong>Decision</strong>: Create centralized <code class="docutils literal notranslate"><span class="pre">optdeps.py</span></code> module</p>
+<p><strong>Rationale</strong>:</p>
+<ul class="simple">
+<li><p>Eliminates duplication across 3 modules (core, resolvers, validators)</p></li>
+<li><p>Single source of truth for optional dependency behavior</p></li>
+<li><p>Easier to test stub behavior in isolation</p></li>
+<li><p>Cleaner import statements in consuming modules</p></li>
+</ul>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul class="simple">
+<li><p>Keep inline stubs: Maintains status quo, higher duplication</p></li>
+<li><p>Use try/except at import sites: More scattered, harder to test</p></li>
+<li><p>Make all dependencies required: Breaks lightweight installations</p></li>
+</ul>
+<p><strong>Implementation</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># optdeps.py</span>
+<span class="n">_pystow</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_pystow</span><span class="p">():</span>
+    <span class="k">global</span> <span class="n">_pystow</span>
+    <span class="k">if</span> <span class="n">_pystow</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">pystow</span>
+            <span class="n">_pystow</span> <span class="o">=</span> <span class="n">pystow</span>
+        <span class="k">except</span> <span class="ne">ModuleNotFoundError</span><span class="p">:</span>
+            <span class="n">_pystow</span> <span class="o">=</span> <span class="n">_PystowFallback</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">_pystow</span>
+</pre></div>
+</div>
+</section>
+<section id="rate-limiting-per-host-vs-per-service">
+<h3>3. Rate Limiting: Per-Host vs. Per-Service<a class="headerlink" href="#rate-limiting-per-host-vs-per-service" title="Link to this heading"></a></h3>
+<p><strong>Decision</strong>: Support both per-host (default) and per-service (opt-in)</p>
+<p><strong>Rationale</strong>:</p>
+<ul class="simple">
+<li><p>Different services have different rate limit policies</p></li>
+<li><p>OBO PURLs, OLS API, BioPortal API all share hosts but need separate limits</p></li>
+<li><p>Backward compatible: default to per-host when service not specified</p></li>
+<li><p>Prevents one noisy service from starving others</p></li>
+</ul>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul class="simple">
+<li><p>Per-host only: Simpler but insufficient for multi-service hosts</p></li>
+<li><p>Per-service only: Breaks backward compatibility</p></li>
+<li><p>Global rate limit: Too coarse, would harm performance</p></li>
+</ul>
+<p><strong>Implementation</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># config.yaml</span>
+<span class="n">defaults</span><span class="p">:</span>
+  <span class="n">http</span><span class="p">:</span>
+    <span class="n">per_host_rate_limit</span><span class="p">:</span> <span class="s2">&quot;4/second&quot;</span>  <span class="c1"># fallback</span>
+    <span class="n">rate_limits</span><span class="p">:</span>
+      <span class="n">obo</span><span class="p">:</span> <span class="s2">&quot;2/second&quot;</span>
+      <span class="n">ols</span><span class="p">:</span> <span class="s2">&quot;5/second&quot;</span>
+      <span class="n">bioportal</span><span class="p">:</span> <span class="s2">&quot;1/second&quot;</span>
+
+<span class="c1"># download.py</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_bucket</span><span class="p">(</span><span class="n">host</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">service</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">config</span><span class="p">):</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">service</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">host</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">service</span> <span class="k">else</span> <span class="n">host</span>
+    <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_TOKEN_BUCKETS</span><span class="p">:</span>
+        <span class="n">rate</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">defaults</span><span class="o">.</span><span class="n">http</span><span class="o">.</span><span class="n">rate_limits</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">service</span><span class="p">)</span> <span class="ow">or</span> <span class="n">config</span><span class="o">.</span><span class="n">defaults</span><span class="o">.</span><span class="n">http</span><span class="o">.</span><span class="n">per_host_rate_limit</span>
+        <span class="n">_TOKEN_BUCKETS</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">TokenBucket</span><span class="p">(</span><span class="n">rate</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_TOKEN_BUCKETS</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+</pre></div>
+</div>
+</section>
+<section id="validator-isolation-subprocess-vs-separate-process-pool">
+<h3>4. Validator Isolation: Subprocess vs. Separate Process Pool<a class="headerlink" href="#validator-isolation-subprocess-vs-separate-process-pool" title="Link to this heading"></a></h3>
+<p><strong>Decision</strong>: Use subprocess.run for heavy validators (pronto, owlready2)</p>
+<p><strong>Rationale</strong>:</p>
+<ul class="simple">
+<li><p>Prevents memory fragmentation in long-lived batch processes</p></li>
+<li><p>Subprocess lifecycle matches validator execution scope</p></li>
+<li><p>Simpler than maintaining a separate process pool</p></li>
+<li><p>Compatible with existing timeout mechanisms</p></li>
+</ul>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul class="simple">
+<li><p>Keep in-process: Status quo, memory fragmentation issues</p></li>
+<li><p>Multiprocessing.Pool: Overkill, adds complexity for worker management</p></li>
+<li><p>Docker containers: Too heavy, requires container runtime</p></li>
+</ul>
+<p><strong>Implementation</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">_run_pronto_in_subprocess</span><span class="p">(</span><span class="n">file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+    <span class="n">script</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">import json</span>
+<span class="s2">from pronto import Ontology</span>
+<span class="s2">ontology = Ontology(&#39;</span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2">&#39;)</span>
+<span class="s2">result = </span><span class="se">{{</span><span class="s2">&quot;ok&quot;: True, &quot;terms&quot;: len(list(ontology.terms()))</span><span class="se">}}</span>
+<span class="s2">(Path(&#39;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">&#39;) / &#39;result.json&#39;).write_text(json.dumps(result))</span>
+<span class="s2">&quot;&quot;&quot;</span>
+    <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">,</span> <span class="s1">&#39;-c&#39;</span><span class="p">,</span> <span class="n">script</span><span class="p">],</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">((</span><span class="n">output_dir</span> <span class="o">/</span> <span class="s1">&#39;result.json&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+</pre></div>
+</div>
+</section>
+<section id="storage-backend-direct-fsspec-vs-abstraction-layer">
+<h3>5. Storage Backend: Direct fsspec vs. Abstraction Layer<a class="headerlink" href="#storage-backend-direct-fsspec-vs-abstraction-layer" title="Link to this heading"></a></h3>
+<p><strong>Decision</strong>: Create thin abstraction layer with Local and Fsspec backends</p>
+<p><strong>Rationale</strong>:</p>
+<ul class="simple">
+<li><p>Keeps fsspec optional (not everyone needs remote storage)</p></li>
+<li><p>Provides clean migration path from pystow</p></li>
+<li><p>Allows testing with mock backends</p></li>
+<li><p>Enables future backends (e.g., HTTP, GCS) without changing call sites</p></li>
+</ul>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul class="simple">
+<li><p>Direct fsspec everywhere: Makes it a hard dependency</p></li>
+<li><p>Keep pystow-only: Doesn’t solve team-wide cache problem</p></li>
+<li><p>Build custom S3 client: Reinventing wheels</p></li>
+</ul>
+<p><strong>Implementation</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">StorageBackend</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">read_manifest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ontology_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span> <span class="o">...</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">write_manifest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ontology_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">manifest</span><span class="p">:</span> <span class="n">Manifest</span><span class="p">):</span> <span class="o">...</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">read_artifact</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span> <span class="o">...</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">write_artifact</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">content</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">):</span> <span class="o">...</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">LocalStorageBackend</span><span class="p">:</span>
+    <span class="c1"># Wraps current pystow-based logic</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">FsspecStorageBackend</span><span class="p">:</span>
+    <span class="c1"># Uses fsspec for remote URLs</span>
+</pre></div>
+</div>
+</section>
+<section id="resolver-fallback-wrapper-vs-modified-fetch-one">
+<h3>6. Resolver Fallback: Wrapper vs. Modified fetch_one<a class="headerlink" href="#resolver-fallback-wrapper-vs-modified-fetch-one" title="Link to this heading"></a></h3>
+<p><strong>Decision</strong>: Create <code class="docutils literal notranslate"><span class="pre">FallbackResolver</span></code> wrapper class</p>
+<p><strong>Rationale</strong>:</p>
+<ul class="simple">
+<li><p>Cleaner separation of concerns</p></li>
+<li><p>Testable in isolation</p></li>
+<li><p>Doesn’t pollute fetch_one with retry logic</p></li>
+<li><p>Allows selective enable/disable via config</p></li>
+</ul>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul class="simple">
+<li><p>Modify fetch_one directly: Adds complexity to already-complex function</p></li>
+<li><p>Client-side retry: Pushes responsibility to callers</p></li>
+<li><p>No fallback: Status quo, lower success rates</p></li>
+</ul>
+<p><strong>Implementation</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">FallbackResolver</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resolvers</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">BaseResolver</span><span class="p">],</span> <span class="n">spec</span><span class="p">:</span> <span class="n">FetchSpec</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">ResolvedConfig</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resolvers</span> <span class="o">=</span> <span class="n">resolvers</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spec</span> <span class="o">=</span> <span class="n">spec</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">plan</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">logger</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FetchPlan</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">resolver</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">resolvers</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">resolver</span><span class="o">.</span><span class="n">plan</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">spec</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">,</span> <span class="n">logger</span><span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="n">ResolverError</span><span class="p">,</span> <span class="n">ConfigError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Resolver </span><span class="si">{</span><span class="n">resolver</span><span class="si">}</span><span class="s2"> failed, trying next: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="n">ResolverError</span><span class="p">(</span><span class="s2">&quot;All resolvers exhausted&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="license-normalization-inline-mapping-vs-external-spdx-library">
+<h3>7. License Normalization: Inline Mapping vs. External SPDX Library<a class="headerlink" href="#license-normalization-inline-mapping-vs-external-spdx-library" title="Link to this heading"></a></h3>
+<p><strong>Decision</strong>: Inline mapping table for common variants</p>
+<p><strong>Rationale</strong>:</p>
+<ul class="simple">
+<li><p>Limited set of licenses used in ontology domain</p></li>
+<li><p>Avoids dependency on full SPDX library</p></li>
+<li><p>Faster and more predictable</p></li>
+<li><p>Easy to extend for domain-specific variants</p></li>
+</ul>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul class="simple">
+<li><p>Use license-expression library: Heavyweight for simple use case</p></li>
+<li><p>Use spdx library: Overkill, slow parsing</p></li>
+<li><p>No normalization: Status quo, fragile string matching</p></li>
+</ul>
+<p><strong>Implementation</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">LICENSE_SPDX_MAPPING</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;CC-BY&quot;</span><span class="p">:</span> <span class="s2">&quot;CC-BY-4.0&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;CC BY 4.0&quot;</span><span class="p">:</span> <span class="s2">&quot;CC-BY-4.0&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;CC0&quot;</span><span class="p">:</span> <span class="s2">&quot;CC0-1.0&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Public Domain&quot;</span><span class="p">:</span> <span class="s2">&quot;CC0-1.0&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Apache&quot;</span><span class="p">:</span> <span class="s2">&quot;Apache-2.0&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Apache License 2.0&quot;</span><span class="p">:</span> <span class="s2">&quot;Apache-2.0&quot;</span><span class="p">,</span>
+    <span class="c1"># ... domain-specific variants</span>
+<span class="p">}</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_license_to_spdx</span><span class="p">(</span><span class="n">license_str</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">license_str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">normalized</span> <span class="o">=</span> <span class="n">LICENSE_SPDX_MAPPING</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">license_str</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+    <span class="k">return</span> <span class="n">normalized</span> <span class="ow">or</span> <span class="n">license_str</span>  <span class="c1"># Return original if no mapping</span>
+</pre></div>
+</div>
+</section>
+<section id="cli-commands-subcommands-vs-flags">
+<h3>8. CLI Commands: Subcommands vs. Flags<a class="headerlink" href="#cli-commands-subcommands-vs-flags" title="Link to this heading"></a></h3>
+<p><strong>Decision</strong>: Add plan and doctor as new subcommands</p>
+<p><strong>Rationale</strong>:</p>
+<ul class="simple">
+<li><p>Consistent with existing CLI structure (pull, show, validate)</p></li>
+<li><p>Clear command intent and help text</p></li>
+<li><p>Easier to add command-specific options later</p></li>
+<li><p>Standard argparse pattern</p></li>
+</ul>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul class="simple">
+<li><p>Flags on pull command: Clutters pull options, unclear semantics</p></li>
+<li><p>Separate scripts: Fragmented UX, harder to discover</p></li>
+<li><p>Interactive menu: Overkill for CLI tool</p></li>
+</ul>
+</section>
+</section>
+<section id="risks-trade-offs">
+<h2>Risks / Trade-offs<a class="headerlink" href="#risks-trade-offs" title="Link to this heading"></a></h2>
+<section id="risk-pydantic-v2-breaking-changes">
+<h3>Risk: Pydantic v2 Breaking Changes<a class="headerlink" href="#risk-pydantic-v2-breaking-changes" title="Link to this heading"></a></h3>
+<p><strong>Impact</strong>: Medium - Users on older Pydantic v1 installations may see conflicts
+<strong>Mitigation</strong>: Pin pydantic&gt;=2.0.0 in requirements, document upgrade path
+<strong>Likelihood</strong>: Low - Pydantic v2 has been stable since 2023</p>
+</section>
+<section id="risk-subprocess-overhead-for-validators">
+<h3>Risk: Subprocess Overhead for Validators<a class="headerlink" href="#risk-subprocess-overhead-for-validators" title="Link to this heading"></a></h3>
+<p><strong>Impact</strong>: Low - Slight performance overhead (process spawn)
+<strong>Mitigation</strong>: Only use subprocess for heavy validators (pronto, owlready2), keep rdflib in-process
+<strong>Likelihood</strong>: High - Overhead will occur but is acceptable trade-off for memory safety</p>
+</section>
+<section id="risk-fsspec-optional-dependency-confusion">
+<h3>Risk: fsspec Optional Dependency Confusion<a class="headerlink" href="#risk-fsspec-optional-dependency-confusion" title="Link to this heading"></a></h3>
+<p><strong>Impact</strong>: Low - Users may not realize they need fsspec for remote storage
+<strong>Mitigation</strong>: Clear error message when ONTOFETCH_STORAGE_URL set but fsspec missing
+<strong>Likelihood</strong>: Medium - Will affect users trying remote storage</p>
+</section>
+<section id="risk-backward-compatibility-edge-cases">
+<h3>Risk: Backward Compatibility Edge Cases<a class="headerlink" href="#risk-backward-compatibility-edge-cases" title="Link to this heading"></a></h3>
+<p><strong>Impact</strong>: Low - Existing manifest.json files with unexpected structure
+<strong>Mitigation</strong>: Thorough testing with real-world manifests, graceful field addition
+<strong>Likelihood</strong>: Low - Manifest schema is stable</p>
+</section>
+<section id="trade-off-complexity-vs-capability">
+<h3>Trade-off: Complexity vs. Capability<a class="headerlink" href="#trade-off-complexity-vs-capability" title="Link to this heading"></a></h3>
+<p>Adding 15 improvements increases overall code complexity. We mitigate by:</p>
+<ul class="simple">
+<li><p>Keeping each feature modular and independently testable</p></li>
+<li><p>Maintaining clear separation of concerns</p></li>
+<li><p>Documenting each feature thoroughly</p></li>
+<li><p>Making advanced features opt-in</p></li>
+</ul>
+</section>
+<section id="trade-off-performance-vs-safety">
+<h3>Trade-off: Performance vs. Safety<a class="headerlink" href="#trade-off-performance-vs-safety" title="Link to this heading"></a></h3>
+<p>Subprocess isolation adds overhead but prevents memory leaks. We mitigate by:</p>
+<ul class="simple">
+<li><p>Only using subprocess for validators known to leak (pronto, owlready2)</p></li>
+<li><p>Keeping fast validators (rdflib) in-process</p></li>
+<li><p>Caching subprocess results to avoid re-execution</p></li>
+</ul>
+</section>
+</section>
+<section id="migration-plan">
+<h2>Migration Plan<a class="headerlink" href="#migration-plan" title="Link to this heading"></a></h2>
+<section id="phase-1-internal-testing-week-1">
+<h3>Phase 1: Internal Testing (Week 1)<a class="headerlink" href="#phase-1-internal-testing-week-1" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Merge code changes to feature branch</p></li>
+<li><p>Run full test suite on CI (Linux/macOS/Windows)</p></li>
+<li><p>Test with representative sources.yaml files</p></li>
+<li><p>Benchmark performance against baseline</p></li>
+</ol>
+</section>
+<section id="phase-2-alpha-testing-week-2">
+<h3>Phase 2: Alpha Testing (Week 2)<a class="headerlink" href="#phase-2-alpha-testing-week-2" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Deploy to staging environment</p></li>
+<li><p>Run batch pull on 50+ real ontologies</p></li>
+<li><p>Monitor logs for Pydantic validation issues</p></li>
+<li><p>Monitor memory usage with subprocess validators</p></li>
+<li><p>Test new CLI commands (plan, doctor)</p></li>
+</ol>
+</section>
+<section id="phase-3-beta-release-week-3">
+<h3>Phase 3: Beta Release (Week 3)<a class="headerlink" href="#phase-3-beta-release-week-3" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Tag release candidate</p></li>
+<li><p>Deploy to production with canary group</p></li>
+<li><p>Monitor error rates and fallback resolver usage</p></li>
+<li><p>Collect user feedback on new features</p></li>
+</ol>
+</section>
+<section id="phase-4-general-availability-week-4">
+<h3>Phase 4: General Availability (Week 4)<a class="headerlink" href="#phase-4-general-availability-week-4" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Release to all users</p></li>
+<li><p>Update documentation</p></li>
+<li><p>Monitor adoption of new config options</p></li>
+<li><p>Provide support for migration issues</p></li>
+</ol>
+</section>
+<section id="rollback-plan">
+<h3>Rollback Plan<a class="headerlink" href="#rollback-plan" title="Link to this heading"></a></h3>
+<p>If critical issues discovered:</p>
+<ol class="arabic simple">
+<li><p>Revert to previous version via git tag</p></li>
+<li><p>Restore old configuration parsing if Pydantic causes issues</p></li>
+<li><p>Disable subprocess validators via config flag</p></li>
+<li><p>Document known issues and workarounds</p></li>
+</ol>
+</section>
+</section>
+<section id="open-questions">
+<h2>Open Questions<a class="headerlink" href="#open-questions" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p><strong>Q</strong>: Should we make rate limit parsing support decimal values (e.g., “0.5/second”)?
+<strong>A</strong>: Yes, useful for very slow APIs. Add float parsing to rate limit parser.</p></li>
+<li><p><strong>Q</strong>: Should doctor command auto-fix detected issues?
+<strong>A</strong>: No, only diagnose and suggest. Auto-fix is risky and surprising.</p></li>
+<li><p><strong>Q</strong>: Should we support multiple storage backends simultaneously?
+<strong>A</strong>: No, single backend per run. Users can switch via env var.</p></li>
+<li><p><strong>Q</strong>: Should fallback resolver be opt-out or opt-in?
+<strong>A</strong>: Opt-out (enabled by default). Users can disable via config flag if needed.</p></li>
+<li><p><strong>Q</strong>: Should we validate SPDX identifiers against official SPDX list?
+<strong>A</strong>: Not initially. Simple mapping sufficient for v1, can enhance later.</p></li>
+<li><p><strong>Q</strong>: Should tar extraction support encrypted archives?
+<strong>A</strong>: No, out of scope. Focus on safety, not advanced tar features.</p></li>
+<li><p><strong>Q</strong>: Should HEAD requests be retried with same backoff as GET?
+<strong>A</strong>: Yes, for consistency. But log separately to distinguish HEAD vs GET failures.</p></li>
+<li><p><strong>Q</strong>: Should we add telemetry for fallback success rates?
+<strong>A</strong>: Yes, via structured logging. No external telemetry service.</p></li>
+</ol>
+</section>
+<section id="testing-strategy">
+<h2>Testing Strategy<a class="headerlink" href="#testing-strategy" title="Link to this heading"></a></h2>
+<section id="unit-testing-approach">
+<h3>Unit Testing Approach<a class="headerlink" href="#unit-testing-approach" title="Link to this heading"></a></h3>
+<p><strong>Coverage Goals</strong>:</p>
+<ul class="simple">
+<li><p>Target: &gt;85% line coverage for all modified/new modules</p></li>
+<li><p>Critical paths (download, validation) require &gt;95% coverage</p></li>
+<li><p>All public APIs must have unit tests</p></li>
+</ul>
+<p><strong>Test Organization</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>tests/ontology_download/
+├── test_optdeps.py              # Optional dependency stubs
+├── test_cli_utils.py            # CLI formatting
+├── test_config_pydantic.py      # Pydantic models
+├── test_download_head.py        # HEAD request validation
+├── test_download_rate_limit.py  # Per-service rate limits
+├── test_download_security.py    # URL validation, archive safety
+├── test_validators_subprocess.py # Subprocess isolation
+├── test_normalization.py        # Deterministic TTL
+├── test_resolvers_fallback.py   # Fallback resolver
+├── test_resolvers_new.py        # LOV, Ontobee
+├── test_storage_backends.py     # fsspec storage
+└── test_cli_commands.py         # plan, doctor, dry-run
+</pre></div>
+</div>
+<p><strong>Test Data Requirements</strong>:</p>
+<ul class="simple">
+<li><p>Sample ontology files (10KB-1MB) for validation tests</p></li>
+<li><p>Malformed ontologies for error handling tests</p></li>
+<li><p>Mock archives (ZIP, tar.gz) with safe and unsafe paths</p></li>
+<li><p>Configuration files with valid/invalid schemas</p></li>
+</ul>
+<p><strong>Mocking Strategy</strong>:</p>
+<ul class="simple">
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">requests_mock</span></code> for HTTP interactions</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">pytest.monkeypatch</span></code> for filesystem operations</p></li>
+<li><p>Mock subprocess.run for validator isolation tests</p></li>
+<li><p>Use temporary directories (<code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tmp_path</span></code>) for file operations</p></li>
+</ul>
+</section>
+<section id="integration-testing">
+<h3>Integration Testing<a class="headerlink" href="#integration-testing" title="Link to this heading"></a></h3>
+<p><strong>End-to-End Scenarios</strong>:</p>
+<ol class="arabic simple">
+<li><p>Full download pipeline with all new features enabled</p></li>
+<li><p>Multi-resolver fallback with simulated failures</p></li>
+<li><p>Remote storage (S3) with mocked filesystem</p></li>
+<li><p>Batch pull with concurrent downloads and rate limiting</p></li>
+<li><p>Validation pipeline with subprocess isolation</p></li>
+</ol>
+<p><strong>Integration Test Fixtures</strong>:</p>
+<ul class="simple">
+<li><p>Real ontology samples (HP, EFO from OBO)</p></li>
+<li><p>Mock OLS/BioPortal API responses</p></li>
+<li><p>Test S3 bucket (localstack or moto)</p></li>
+</ul>
+<p><strong>Performance Benchmarks</strong>:</p>
+<ul class="simple">
+<li><p>Download 50 ontologies and compare time vs baseline</p></li>
+<li><p>Measure memory usage during batch validation</p></li>
+<li><p>Benchmark subprocess vs in-process validator overhead</p></li>
+<li><p>Validate config parsing time &lt;100ms</p></li>
+</ul>
+</section>
+<section id="regression-testing">
+<h3>Regression Testing<a class="headerlink" href="#regression-testing" title="Link to this heading"></a></h3>
+<p><strong>Backward Compatibility Tests</strong>:</p>
+<ul class="simple">
+<li><p>Existing sources.yaml files parse correctly</p></li>
+<li><p>Old manifest.json files readable with new code</p></li>
+<li><p>CLI commands work with existing data directories</p></li>
+<li><p>No API contract changes for programmatic usage</p></li>
+</ul>
+<p><strong>Upgrade Testing</strong>:</p>
+<ul class="simple">
+<li><p>Upgrade from previous version preserves data</p></li>
+<li><p>No data loss during Pydantic migration</p></li>
+<li><p>Environment variables still override config</p></li>
+</ul>
+</section>
+<section id="security-testing">
+<h3>Security Testing<a class="headerlink" href="#security-testing" title="Link to this heading"></a></h3>
+<p><strong>Threat Scenarios</strong>:</p>
+<ol class="arabic simple">
+<li><p>SSRF attempts with private IPs, localhost, cloud metadata URLs</p></li>
+<li><p>Path traversal in ZIP/tar archives</p></li>
+<li><p>IDN homograph attacks</p></li>
+<li><p>Compression bombs (ZIP/tar)</p></li>
+<li><p>XXE attacks in XML parsers</p></li>
+<li><p>Injection attacks in subprocess calls</p></li>
+</ol>
+<p><strong>Security Test Cases</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">test_ssrf_private_ip_blocked</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Test URL validation rejects private IP addresses.&quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="n">pytest</span><span class="o">.</span><span class="n">raises</span><span class="p">(</span><span class="n">ConfigError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc_info</span><span class="p">:</span>
+        <span class="n">validate_url_security</span><span class="p">(</span><span class="s2">&quot;https://192.168.1.1/ontology.owl&quot;</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="s2">&quot;private&quot;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc_info</span><span class="o">.</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_ssrf_localhost_blocked</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Test URL validation rejects localhost.&quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="n">pytest</span><span class="o">.</span><span class="n">raises</span><span class="p">(</span><span class="n">ConfigError</span><span class="p">):</span>
+        <span class="n">validate_url_security</span><span class="p">(</span><span class="s2">&quot;https://localhost/ontology.owl&quot;</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_ssrf_cloud_metadata_blocked</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Test URL validation rejects cloud metadata endpoints.&quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="n">pytest</span><span class="o">.</span><span class="n">raises</span><span class="p">(</span><span class="n">ConfigError</span><span class="p">):</span>
+        <span class="n">validate_url_security</span><span class="p">(</span><span class="s2">&quot;https://169.254.169.254/latest/meta-data/&quot;</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_zip_path_traversal_blocked</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Test ZIP extraction rejects path traversal.&quot;&quot;&quot;</span>
+    <span class="c1"># Create ZIP with member path ../../etc/passwd</span>
+    <span class="c1"># Attempt extraction</span>
+    <span class="c1"># Assert: raises ConfigError</span>
+</pre></div>
+</div>
+<p><strong>Fuzzing</strong>:</p>
+<ul class="simple">
+<li><p>Fuzz configuration parser with malformed YAML</p></li>
+<li><p>Fuzz URL validator with edge cases</p></li>
+<li><p>Fuzz archive extractors with malicious archives</p></li>
+</ul>
+</section>
+</section>
+<section id="security-model">
+<h2>Security Model<a class="headerlink" href="#security-model" title="Link to this heading"></a></h2>
+<section id="threat-model">
+<h3>Threat Model<a class="headerlink" href="#threat-model" title="Link to this heading"></a></h3>
+<p><strong>Assets</strong>:</p>
+<ul class="simple">
+<li><p>Downloaded ontology data (integrity, availability)</p></li>
+<li><p>System resources (CPU, memory, disk, network)</p></li>
+<li><p>Credentials (API keys for BioPortal, OLS)</p></li>
+<li><p>Host system (prevent arbitrary code execution, file access)</p></li>
+</ul>
+<p><strong>Threat Actors</strong>:</p>
+<ul class="simple">
+<li><p>Malicious ontology providers (supply chain attack)</p></li>
+<li><p>Compromised resolver APIs (serving malicious content)</p></li>
+<li><p>Internal misconfigurations (accidental exposure)</p></li>
+</ul>
+<p><strong>Attack Vectors</strong>:</p>
+<ol class="arabic simple">
+<li><p><strong>Server-Side Request Forgery (SSRF)</strong>: Attacker controls ontology URL, attempts to scan internal network</p></li>
+<li><p><strong>Path Traversal</strong>: Malicious archive extracts files outside intended directory</p></li>
+<li><p><strong>Denial of Service</strong>: Compression bombs, infinite archives, memory exhaustion</p></li>
+<li><p><strong>Code Injection</strong>: XXE in XML parsers, command injection in subprocess calls</p></li>
+<li><p><strong>Credential Theft</strong>: Log file exposure, error message leakage</p></li>
+</ol>
+</section>
+<section id="security-controls">
+<h3>Security Controls<a class="headerlink" href="#security-controls" title="Link to this heading"></a></h3>
+<p><strong>Authentication &amp; Authorization</strong>:</p>
+<ul class="simple">
+<li><p>API keys stored in pystow directory with restrictive permissions (0600)</p></li>
+<li><p>Keys never logged (masked with <em><strong>masked</strong></em>)</p></li>
+<li><p>Keys not passed via command line (only env vars or files)</p></li>
+</ul>
+<p><strong>Input Validation</strong>:</p>
+<ul class="simple">
+<li><p>All URLs validated before use (HTTPS only, no private IPs)</p></li>
+<li><p>Host allowlist support for restricted environments</p></li>
+<li><p>IDN punycode normalization</p></li>
+<li><p>Configuration schema validation (Pydantic)</p></li>
+<li><p>File size limits enforced early (HEAD request)</p></li>
+</ul>
+<p><strong>Secure Coding Practices</strong>:</p>
+<ul class="simple">
+<li><p>No shell=True in subprocess calls</p></li>
+<li><p>Path traversal checks before file operations</p></li>
+<li><p>Compression ratio limits</p></li>
+<li><p>Memory limits for parsers</p></li>
+<li><p>Timeouts on all network operations</p></li>
+</ul>
+<p><strong>Logging &amp; Monitoring</strong>:</p>
+<ul class="simple">
+<li><p>Sensitive data masked in logs</p></li>
+<li><p>Security events logged at WARNING level</p></li>
+<li><p>Structured logs enable SIEM integration</p></li>
+<li><p>Correlation IDs for attack tracking</p></li>
+</ul>
+<p><strong>Compliance</strong>:</p>
+<ul class="simple">
+<li><p>HTTPS certificate verification enabled (verify=True)</p></li>
+<li><p>Follows OWASP secure coding guidelines</p></li>
+<li><p>No hardcoded secrets</p></li>
+<li><p>Secure defaults (fail closed)</p></li>
+</ul>
+</section>
+</section>
+<section id="performance-optimization">
+<h2>Performance Optimization<a class="headerlink" href="#performance-optimization" title="Link to this heading"></a></h2>
+<section id="current-performance-baseline">
+<h3>Current Performance Baseline<a class="headerlink" href="#current-performance-baseline" title="Link to this heading"></a></h3>
+<p><strong>Measured Metrics</strong> (to establish before implementation):</p>
+<ul class="simple">
+<li><p>Average download time per ontology: ~X seconds</p></li>
+<li><p>Peak memory usage during batch: ~Y MB</p></li>
+<li><p>Config parsing time: ~Z ms</p></li>
+<li><p>Validation time per ontology: ~W seconds</p></li>
+</ul>
+</section>
+<section id="optimization-techniques">
+<h3>Optimization Techniques<a class="headerlink" href="#optimization-techniques" title="Link to this heading"></a></h3>
+<p><strong>1. Lazy Loading</strong>:</p>
+<ul class="simple">
+<li><p>Optional dependencies loaded on first use (not at import)</p></li>
+<li><p>Pystow initialized only when needed</p></li>
+<li><p>Validator imports deferred until validation requested</p></li>
+</ul>
+<p><strong>2. Caching</strong>:</p>
+<ul class="simple">
+<li><p>DNS resolution cached (already handled by requests)</p></li>
+<li><p>TokenBucket instances cached per host/service</p></li>
+<li><p>Pydantic model validation results cached where safe</p></li>
+</ul>
+<p><strong>3. Subprocess Optimization</strong>:</p>
+<ul class="simple">
+<li><p>Subprocess spawn overhead measured (~10-50ms acceptable)</p></li>
+<li><p>Reuse interpreter for multiple validations if beneficial</p></li>
+<li><p>JSON serialization for subprocess communication (faster than pickle)</p></li>
+</ul>
+<p><strong>4. Network Optimization</strong>:</p>
+<ul class="simple">
+<li><p>HEAD request used to avoid unnecessary downloads</p></li>
+<li><p>HTTP/2 connection reuse (via session)</p></li>
+<li><p>Chunked streaming (1MB chunks) for large files</p></li>
+<li><p>Conditional requests (ETag, Last-Modified)</p></li>
+</ul>
+<p><strong>5. I/O Optimization</strong>:</p>
+<ul class="simple">
+<li><p>Asynchronous writes where possible</p></li>
+<li><p>Buffered I/O for large files</p></li>
+<li><p>Compression for log rotation</p></li>
+</ul>
+<p><strong>6. Parallelization</strong>:</p>
+<ul class="simple">
+<li><p>Concurrent downloads (configurable workers)</p></li>
+<li><p>Independent validation tasks can run in parallel</p></li>
+<li><p>Per-service rate limits prevent bottlenecks</p></li>
+</ul>
+</section>
+<section id="performance-monitoring">
+<h3>Performance Monitoring<a class="headerlink" href="#performance-monitoring" title="Link to this heading"></a></h3>
+<p><strong>Instrumentation Points</strong>:</p>
+<ul class="simple">
+<li><p>Download start/end with elapsed time</p></li>
+<li><p>Validation start/end per validator</p></li>
+<li><p>Subprocess spawn/exit timing</p></li>
+<li><p>Memory usage samples (before/after heavy operations)</p></li>
+</ul>
+<p><strong>Metrics to Track</strong>:</p>
+<ul class="simple">
+<li><p>Downloads per second</p></li>
+<li><p>Average download time</p></li>
+<li><p>P95/P99 download latency</p></li>
+<li><p>Memory high-water mark</p></li>
+<li><p>Subprocess overhead percentage</p></li>
+<li><p>Config parsing time</p></li>
+<li><p>Fallback resolver success rate</p></li>
+</ul>
+</section>
+</section>
+<section id="standards-compliance">
+<h2>Standards Compliance<a class="headerlink" href="#standards-compliance" title="Link to this heading"></a></h2>
+<section id="http-standards-rfc-7230-7235">
+<h3>HTTP Standards (RFC 7230-7235)<a class="headerlink" href="#http-standards-rfc-7230-7235" title="Link to this heading"></a></h3>
+<p><strong>Compliance Requirements</strong>:</p>
+<ul class="simple">
+<li><p>Proper HTTP method usage (HEAD, GET)</p></li>
+<li><p>Standard headers (User-Agent, Accept, Authorization)</p></li>
+<li><p>Status code handling (2xx, 3xx, 4xx, 5xx)</p></li>
+<li><p>Connection reuse (Keep-Alive)</p></li>
+<li><p>Conditional requests (If-None-Match, If-Modified-Since)</p></li>
+</ul>
+<p><strong>Testing</strong>:</p>
+<ul class="simple">
+<li><p>Validate headers match RFC specifications</p></li>
+<li><p>Test redirect handling (301, 302, 307, 308)</p></li>
+<li><p>Verify timeout behavior matches RFC recommendations</p></li>
+</ul>
+</section>
+<section id="rdf-standards-w3c">
+<h3>RDF Standards (W3C)<a class="headerlink" href="#rdf-standards-w3c" title="Link to this heading"></a></h3>
+<p><strong>Compliance Requirements</strong>:</p>
+<ul class="simple">
+<li><p>Turtle serialization follows W3C Turtle spec</p></li>
+<li><p>RDF/XML parsing compatible with RDF 1.1</p></li>
+<li><p>Namespaces handled correctly</p></li>
+<li><p>Blank nodes serialized consistently</p></li>
+</ul>
+<p><strong>Testing</strong>:</p>
+<ul class="simple">
+<li><p>Validate output with RDF validators</p></li>
+<li><p>Test round-trip (parse → serialize → parse)</p></li>
+<li><p>Verify namespace preservation</p></li>
+</ul>
+</section>
+<section id="obo-format-standards">
+<h3>OBO Format Standards<a class="headerlink" href="#obo-format-standards" title="Link to this heading"></a></h3>
+<p><strong>Compliance Requirements</strong>:</p>
+<ul class="simple">
+<li><p>OBO format parsing follows spec</p></li>
+<li><p>OBO Graphs JSON matches schema</p></li>
+<li><p>Cross-references preserved</p></li>
+<li><p>Ontology metadata captured</p></li>
+</ul>
+<p><strong>Testing</strong>:</p>
+<ul class="simple">
+<li><p>Parse reference OBO files</p></li>
+<li><p>Validate against OBO format validator</p></li>
+<li><p>Check metadata extraction completeness</p></li>
+</ul>
+</section>
+<section id="security-standards">
+<h3>Security Standards<a class="headerlink" href="#security-standards" title="Link to this heading"></a></h3>
+<p><strong>OWASP Top 10 Coverage</strong>:</p>
+<ul class="simple">
+<li><p>Injection: Prevented via input validation, no shell=True</p></li>
+<li><p>Broken Authentication: Keys stored securely, never logged</p></li>
+<li><p>Sensitive Data Exposure: Masking in logs, restricted file permissions</p></li>
+<li><p>XXE: rdflib configured with safe defaults</p></li>
+<li><p>Security Misconfiguration: Secure defaults, explicit validation</p></li>
+<li><p>SSRF: URL validation, private IP blocking</p></li>
+</ul>
+<p><strong>TLS/SSL</strong>:</p>
+<ul class="simple">
+<li><p>TLS 1.2+ required</p></li>
+<li><p>Certificate validation enabled</p></li>
+<li><p>No insecure ciphers</p></li>
+</ul>
+</section>
+</section>
+<section id="error-handling-patterns">
+<h2>Error Handling Patterns<a class="headerlink" href="#error-handling-patterns" title="Link to this heading"></a></h2>
+<section id="error-classification">
+<h3>Error Classification<a class="headerlink" href="#error-classification" title="Link to this heading"></a></h3>
+<p><strong>Transient Errors</strong> (retry with backoff):</p>
+<ul class="simple">
+<li><p>Network timeouts</p></li>
+<li><p>HTTP 429 (rate limit), 503 (service unavailable)</p></li>
+<li><p>Connection resets</p></li>
+<li><p>DNS resolution failures</p></li>
+</ul>
+<p><strong>Permanent Errors</strong> (fail immediately):</p>
+<ul class="simple">
+<li><p>HTTP 404 (not found), 403 (forbidden), 401 (unauthorized)</p></li>
+<li><p>Invalid configuration</p></li>
+<li><p>Malformed URLs</p></li>
+<li><p>Missing required fields</p></li>
+</ul>
+<p><strong>Resource Errors</strong> (graceful degradation):</p>
+<ul class="simple">
+<li><p>Disk space exhausted</p></li>
+<li><p>Memory limits exceeded</p></li>
+<li><p>File permission denied</p></li>
+</ul>
+<p><strong>Validation Errors</strong> (log and continue):</p>
+<ul class="simple">
+<li><p>Parser failures</p></li>
+<li><p>Malformed ontologies</p></li>
+<li><p>Validation timeouts</p></li>
+</ul>
+</section>
+<section id="error-handling-strategy">
+<h3>Error Handling Strategy<a class="headerlink" href="#error-handling-strategy" title="Link to this heading"></a></h3>
+<p><strong>At Download Layer</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">try</span><span class="p">:</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">download_stream</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="k">except</span> <span class="n">ConfigError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="c1"># Permanent error, log and fail</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Download configuration error&quot;</span><span class="p">,</span> <span class="n">extra</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)})</span>
+    <span class="k">raise</span>
+<span class="k">except</span> <span class="n">requests</span><span class="o">.</span><span class="n">Timeout</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="c1"># Transient, retry with backoff</span>
+    <span class="k">if</span> <span class="n">attempt</span> <span class="o">&lt;</span> <span class="n">max_retries</span><span class="p">:</span>
+        <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">backoff_factor</span> <span class="o">*</span> <span class="p">(</span><span class="mi">2</span> <span class="o">**</span> <span class="n">attempt</span><span class="p">))</span>
+        <span class="k">continue</span>
+    <span class="k">raise</span>
+<span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="c1"># Resource error, check specific cause</span>
+    <span class="k">if</span> <span class="s2">&quot;No space left&quot;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span><span class="s2">&quot;Disk full&quot;</span><span class="p">,</span> <span class="n">extra</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;path&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">destination</span><span class="p">)})</span>
+        <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">raise</span>
+</pre></div>
+</div>
+<p><strong>At Validation Layer</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">try</span><span class="p">:</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">validate_rdflib</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="k">except</span> <span class="n">ValidationTimeout</span><span class="p">:</span>
+    <span class="c1"># Log timeout, record in manifest, continue</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Validation timeout&quot;</span><span class="p">,</span> <span class="n">extra</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;validator&quot;</span><span class="p">:</span> <span class="s2">&quot;rdflib&quot;</span><span class="p">})</span>
+    <span class="k">return</span> <span class="n">ValidationResult</span><span class="p">(</span><span class="n">ok</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">details</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="s2">&quot;timeout&quot;</span><span class="p">})</span>
+<span class="k">except</span> <span class="ne">MemoryError</span><span class="p">:</span>
+    <span class="c1"># Log memory issue, record in manifest, continue</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Memory limit exceeded&quot;</span><span class="p">,</span> <span class="n">extra</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;validator&quot;</span><span class="p">:</span> <span class="s2">&quot;rdflib&quot;</span><span class="p">})</span>
+    <span class="k">return</span> <span class="n">ValidationResult</span><span class="p">(</span><span class="n">ok</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">details</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="s2">&quot;memory&quot;</span><span class="p">})</span>
+<span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="c1"># Unexpected error, log full traceback, continue</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Validation error&quot;</span><span class="p">,</span> <span class="n">extra</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;validator&quot;</span><span class="p">:</span> <span class="s2">&quot;rdflib&quot;</span><span class="p">})</span>
+    <span class="k">return</span> <span class="n">ValidationResult</span><span class="p">(</span><span class="n">ok</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">details</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)})</span>
+</pre></div>
+</div>
+<p><strong>At Batch Layer</strong>:</p>
+<ul class="simple">
+<li><p>Collect errors for all ontologies</p></li>
+<li><p>Continue processing remaining items</p></li>
+<li><p>Report summary at end</p></li>
+<li><p>Return non-zero exit code if any failures</p></li>
+</ul>
+</section>
+<section id="error-messages">
+<h3>Error Messages<a class="headerlink" href="#error-messages" title="Link to this heading"></a></h3>
+<p><strong>Requirements</strong>:</p>
+<ul class="simple">
+<li><p>Clear description of what went wrong</p></li>
+<li><p>Context (URL, file, ontology ID)</p></li>
+<li><p>Actionable remediation steps</p></li>
+<li><p>No sensitive data (URLs ok, API keys not ok)</p></li>
+</ul>
+<p><strong>Examples</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Good</span><span class="p">:</span> <span class="s2">&quot;BioPortal API key not found. Configure at ~/.data/ontology-fetcher/configs/bioportal_api_key.txt&quot;</span>
+<span class="n">Bad</span><span class="p">:</span>  <span class="s2">&quot;API error&quot;</span>
+
+<span class="n">Good</span><span class="p">:</span> <span class="s2">&quot;File exceeds size limit: 6.2GB &gt; 5.0GB. Increase max_download_size_gb in config.&quot;</span>
+<span class="n">Bad</span><span class="p">:</span>  <span class="s2">&quot;File too large&quot;</span>
+
+<span class="n">Good</span><span class="p">:</span> <span class="s2">&quot;URL validation failed: host 192.168.1.1 is private. Set allowed_hosts to override.&quot;</span>
+<span class="n">Bad</span><span class="p">:</span>  <span class="s2">&quot;Invalid URL&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="scalability-and-future-proofing">
+<h2>Scalability and Future-Proofing<a class="headerlink" href="#scalability-and-future-proofing" title="Link to this heading"></a></h2>
+<section id="scalability-considerations">
+<h3>Scalability Considerations<a class="headerlink" href="#scalability-considerations" title="Link to this heading"></a></h3>
+<p><strong>Horizontal Scaling</strong>:</p>
+<ul class="simple">
+<li><p>Remote storage (S3) enables multiple workers sharing cache</p></li>
+<li><p>Stateless design (no global state) allows parallelization</p></li>
+<li><p>Independent per-ontology operations</p></li>
+</ul>
+<p><strong>Vertical Scaling</strong>:</p>
+<ul class="simple">
+<li><p>Configurable concurrent downloads</p></li>
+<li><p>Memory limits prevent resource exhaustion</p></li>
+<li><p>Subprocess isolation bounds memory growth</p></li>
+</ul>
+<p><strong>Data Volume</strong>:</p>
+<ul class="simple">
+<li><p>Designed for 100s-1000s of ontologies</p></li>
+<li><p>Streaming download for large files (&gt;1GB)</p></li>
+<li><p>Incremental validation (cache validation results)</p></li>
+</ul>
+</section>
+<section id="extensibility-points">
+<h3>Extensibility Points<a class="headerlink" href="#extensibility-points" title="Link to this heading"></a></h3>
+<p><strong>Adding New Resolvers</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MyResolver</span><span class="p">(</span><span class="n">BaseResolver</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">plan</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">spec</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">logger</span><span class="p">):</span>
+        <span class="c1"># Custom resolution logic</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_plan</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s2">&quot;...&quot;</span><span class="p">)</span>
+
+<span class="c1"># Register in resolvers.py</span>
+<span class="n">RESOLVERS</span><span class="p">[</span><span class="s2">&quot;my_resolver&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">MyResolver</span><span class="p">()</span>
+</pre></div>
+</div>
+<p><strong>Adding New Validators</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">validate_custom</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">logger</span><span class="p">):</span>
+    <span class="c1"># Custom validation logic</span>
+    <span class="k">return</span> <span class="n">ValidationResult</span><span class="p">(</span><span class="n">ok</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">details</span><span class="o">=</span><span class="p">{})</span>
+
+<span class="c1"># Register in validators.py</span>
+<span class="n">VALIDATORS</span><span class="p">[</span><span class="s2">&quot;custom&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">validate_custom</span>
+</pre></div>
+</div>
+<p><strong>Adding New Storage Backends</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MyStorageBackend</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">read_manifest</span><span class="p">(</span><span class="o">...</span><span class="p">):</span> <span class="o">...</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">write_manifest</span><span class="p">(</span><span class="o">...</span><span class="p">):</span> <span class="o">...</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">read_artifact</span><span class="p">(</span><span class="o">...</span><span class="p">):</span> <span class="o">...</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">write_artifact</span><span class="p">(</span><span class="o">...</span><span class="p">):</span> <span class="o">...</span>
+
+<span class="c1"># Use in core.py</span>
+<span class="k">if</span> <span class="n">STORAGE_URL</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;my://&quot;</span><span class="p">):</span>
+    <span class="n">storage</span> <span class="o">=</span> <span class="n">MyStorageBackend</span><span class="p">(</span><span class="n">STORAGE_URL</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="api-stability">
+<h3>API Stability<a class="headerlink" href="#api-stability" title="Link to this heading"></a></h3>
+<p><strong>Versioning</strong>:</p>
+<ul class="simple">
+<li><p>Public API (<code class="docutils literal notranslate"><span class="pre">fetch_one</span></code>, <code class="docutils literal notranslate"><span class="pre">fetch_all</span></code>) remains stable</p></li>
+<li><p>Internal APIs can change between minor versions</p></li>
+<li><p>Configuration schema follows semantic versioning</p></li>
+<li><p>Manifest format additions only (no removals)</p></li>
+</ul>
+<p><strong>Deprecation Policy</strong>:</p>
+<ul class="simple">
+<li><p>Deprecated features marked in docs for 2 minor versions</p></li>
+<li><p>Breaking changes only in major versions</p></li>
+<li><p>Migration guides provided for all breaking changes</p></li>
+</ul>
+</section>
+<section id="future-enhancements-out-of-scope">
+<h3>Future Enhancements (Out of Scope)<a class="headerlink" href="#future-enhancements-out-of-scope" title="Link to this heading"></a></h3>
+<p><strong>Not in This Change</strong>:</p>
+<ul class="simple">
+<li><p>GraphQL API for ontology search</p></li>
+<li><p>Web UI for configuration</p></li>
+<li><p>Automatic ontology discovery</p></li>
+<li><p>Ontology merging/alignment</p></li>
+<li><p>Semantic search over ontologies</p></li>
+<li><p>Real-time update subscriptions</p></li>
+</ul>
+<p><strong>Potential Future Work</strong>:</p>
+<ul class="simple">
+<li><p>Support for additional formats (JSON-LD, N-Triples)</p></li>
+<li><p>Ontology versioning and diff</p></li>
+<li><p>Dependency resolution (import chains)</p></li>
+<li><p>Quality metrics (completeness, consistency)</p></li>
+<li><p>Integration with ontology registries</p></li>
+</ul>
+</section>
+</section>
+<section id="user-feedback-and-continuous-improvement">
+<h2>User Feedback and Continuous Improvement<a class="headerlink" href="#user-feedback-and-continuous-improvement" title="Link to this heading"></a></h2>
+<section id="feedback-channels">
+<h3>Feedback Channels<a class="headerlink" href="#feedback-channels" title="Link to this heading"></a></h3>
+<p><strong>Issue Tracking</strong>:</p>
+<ul class="simple">
+<li><p>GitHub issues for bug reports</p></li>
+<li><p>Feature request template</p></li>
+<li><p>Bug report template with environment info</p></li>
+</ul>
+<p><strong>Telemetry</strong> (opt-in only):</p>
+<ul class="simple">
+<li><p>Anonymous usage statistics (ontology counts, resolver usage)</p></li>
+<li><p>Error rate by resolver</p></li>
+<li><p>Performance metrics (download speed, validation time)</p></li>
+<li><p><strong>Privacy</strong>: No ontology IDs, no URLs, no user data</p></li>
+</ul>
+<p><strong>Community Input</strong>:</p>
+<ul class="simple">
+<li><p>Monthly triage of GitHub issues</p></li>
+<li><p>Quarterly roadmap updates</p></li>
+<li><p>User surveys for feature prioritization</p></li>
+</ul>
+</section>
+<section id="continuous-improvement-process">
+<h3>Continuous Improvement Process<a class="headerlink" href="#continuous-improvement-process" title="Link to this heading"></a></h3>
+<p><strong>Performance Monitoring</strong>:</p>
+<ul class="simple">
+<li><p>Weekly review of CI performance benchmarks</p></li>
+<li><p>Alert on &gt;10% regression</p></li>
+<li><p>Track adoption of new features (plan, doctor commands)</p></li>
+</ul>
+<p><strong>Error Analysis</strong>:</p>
+<ul class="simple">
+<li><p>Monthly review of error logs</p></li>
+<li><p>Identify common failure patterns</p></li>
+<li><p>Improve error messages and documentation</p></li>
+</ul>
+<p><strong>Documentation Feedback</strong>:</p>
+<ul class="simple">
+<li><p>“Was this helpful?” on each doc page</p></li>
+<li><p>Track most-visited and least-visited pages</p></li>
+<li><p>Update FAQs based on support questions</p></li>
+</ul>
+<p><strong>Release Cadence</strong>:</p>
+<ul class="simple">
+<li><p>Patch releases: Monthly (bug fixes)</p></li>
+<li><p>Minor releases: Quarterly (new features)</p></li>
+<li><p>Major releases: Annually (breaking changes)</p></li>
+</ul>
+</section>
+</section>
+<section id="success-metrics">
+<h2>Success Metrics<a class="headerlink" href="#success-metrics" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p><strong>Code Quality</strong>:</p>
+<ul class="simple">
+<li><p>Lines of code reduced by ~150 (YAML parser removal)</p></li>
+<li><p>Test coverage maintained above 85%</p></li>
+<li><p>Cyclomatic complexity unchanged or improved</p></li>
+<li><p>Zero high-severity linter warnings</p></li>
+</ul>
+</li>
+<li><p><strong>Robustness</strong>:</p>
+<ul class="simple">
+<li><p>Download success rate increases by 5-10% (via fallback)</p></li>
+<li><p>Zero SSRF incidents (via hardened URL validation)</p></li>
+<li><p>Memory usage stable in batch operations (via subprocess isolation)</p></li>
+<li><p>Zero security vulnerabilities in dependency scan</p></li>
+</ul>
+</li>
+<li><p><strong>Usability</strong>:</p>
+<ul class="simple">
+<li><p>Doctor command used in &gt;20% of support cases</p></li>
+<li><p>Plan command used in &gt;10% of workflow development</p></li>
+<li><p>Remote storage adopted by &gt;5% of team installations</p></li>
+<li><p>Average support issue resolution time reduced by 25%</p></li>
+</ul>
+</li>
+<li><p><strong>Performance</strong>:</p>
+<ul class="simple">
+<li><p>Download performance within 5% of baseline</p></li>
+<li><p>Validation performance within 10% of baseline</p></li>
+<li><p>Config parsing &lt;100ms (Pydantic overhead acceptable)</p></li>
+<li><p>Subprocess overhead &lt;5% of total validation time</p></li>
+</ul>
+</li>
+<li><p><strong>Adoption</strong>:</p>
+<ul class="simple">
+<li><p>90% of users upgrade within 3 months</p></li>
+<li><p>Zero critical bugs reported within first month</p></li>
+<li><p>Positive feedback on new CLI commands (plan, doctor)</p></li>
+<li><p>Documentation viewed by 80% of users</p></li>
+</ul>
+</li>
+</ol>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

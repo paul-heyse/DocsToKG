@@ -1,0 +1,135 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Why &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/custom.css" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Why</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/openspec/changes/archive/2025-10-14-add-ontology-downloader/proposal.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="why">
+<h1>Why<a class="headerlink" href="#why" title="Link to this heading"></a></h1>
+<p>DocsToKG needs to ingest and process ontologies from diverse sources (OBO Library, OLS, BioPortal, SKOS registries, XBRL taxonomies) for knowledge graph construction. Currently, there is no systematic way to discover, download, validate, and normalize ontologies from these heterogeneous sources. Manual downloads are fragile, lack provenance tracking, and don’t handle format conversions or caching, creating bottlenecks for downstream processing pipelines.</p>
+</section>
+<section id="what-changes">
+<h1>What Changes<a class="headerlink" href="#what-changes" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Create a source-agnostic ontology download manager that resolves ontology identifiers (prefixes, acronyms, URLs) to downloadable artifacts using battle-tested Python libraries (Bioregistry, OAK, ols-client, ontoportal-client).</p></li>
+<li><p>Implement a resolver registry supporting OBO Library PURLs (via Bioregistry), OLS4 (via ols-client), BioPortal/OntoPortal (via ontoportal-client), direct SKOS/RDF URLs (via RDFLib), and XBRL taxonomies (via Arelle).</p></li>
+<li><p>Add robust download plumbing with ETag/Last-Modified conditional requests, SHA-256 verification, partial resume via Range headers, exponential backoff retry, and per-host rate limiting.</p></li>
+<li><p>Provide post-download validation and normalization using RDFLib (RDF/OWL parsing), Pronto (OBO/OWL validation), Owlready2 (OWL reasoning), optional ROBOT (conversions/QC), and Arelle (XBRL validation).</p></li>
+<li><p>Store original artifacts alongside normalized formats (Turtle, OBO Graph JSON) in versioned directories under pystow-managed paths (~/.data/ontology-fetcher) with comprehensive provenance manifests (URL, version, license, ETag, SHA-256, timestamps).</p></li>
+<li><p>Expose configuration via YAML (sources.yaml) for ontology specs, license allowlists, format preferences, resolver priorities, and HTTP parameters.</p></li>
+<li><p>Implement CLI (<code class="docutils literal notranslate"><span class="pre">ontofetch</span></code>) for pull/show/validate operations with structured logging (JSON) capturing status, retries, latencies, and validation outcomes.</p></li>
+<li><p>Cover resolver stack with unit tests (mocked resolvers), download tests (local HTTP server with resume/ETag support), parser tests (fixture ontologies), and integration smoke tests (nightly fetches of public ontologies).</p></li>
+</ul>
+</section>
+<section id="impact">
+<h1>Impact<a class="headerlink" href="#impact" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Affected specs: new <code class="docutils literal notranslate"><span class="pre">ontology-downloader</span></code> capability</p></li>
+<li><p>Affected code: new modules under <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/OntologyDownload/</span></code> (resolvers, download manager, validators, CLI)</p></li>
+<li><p>External dependencies: Bioregistry, oaklib, ols-client, ontoportal-client, RDFLib, Pronto, Owlready2, Arelle, pystow, pooch (all available via pip)</p></li>
+<li><p>Storage: pystow-managed directory at ~/.data/ontology-fetcher with cache/, ontologies/, logs/, configs/</p></li>
+<li><p>External services: OBO Library, OLS4, BioPortal/OntoPortal APIs, direct HTTP endpoints for SKOS/XBRL</p></li>
+</ul>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

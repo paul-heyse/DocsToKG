@@ -1,0 +1,242 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Setup Guide &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="1. Architecture Guide" href="../03-architecture/index.html" />
+    <link rel="prev" title="1. Overview" href="../01-overview/index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">1. Setup Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#overview">2. Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#prerequisites">3. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#installation">4. Installation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#clone-the-repository">1. Clone the Repository</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#create-a-virtual-environment">2. Create a Virtual Environment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#install-dependencies">3. Install Dependencies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configure-environment-variables">4. Configure Environment Variables</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#prepare-local-directories">5. Prepare Local Directories</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#verify-the-installation">6. Verify the Installation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#optional-build-sphinx-html-docs">7. Optional: Build Sphinx HTML Docs</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#next-steps">5. Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Setup Guide</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/02-setup/index.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="setup-guide">
+<h1>1. Setup Guide<a class="headerlink" href="#setup-guide" title="Link to this heading"></a></h1>
+<p>Follow this guide to configure DocsToKG on a local workstation or development server.</p>
+<section id="overview">
+<h2>2. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Provision a Python 3.12+ environment with optional CUDA support.</p></li>
+<li><p>Install project dependencies (core, GPU, documentation tooling).</p></li>
+<li><p>Configure environment variables and working directories.</p></li>
+<li><p>Run smoke checks to confirm the installation.</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2>3. Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Operating system</strong>: Linux or macOS preferred (Windows users should use WSL2).</p></li>
+<li><p><strong>Python</strong>: 3.12 or newer (see <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code>).</p></li>
+<li><p><strong>Memory</strong>: 16 GB RAM recommended for parsing and validation workloads.</p></li>
+<li><p><strong>GPU (optional)</strong>: CUDA 12.9+ for FAISS and PyTorch acceleration (required when installing <code class="docutils literal notranslate"><span class="pre">requirements.in</span></code>).</p></li>
+<li><p><strong>Git</strong>: 2.30 or newer.</p></li>
+</ul>
+<blockquote>
+<div><p>ℹ️  Direnv is supported via <code class="docutils literal notranslate"><span class="pre">.envrc</span></code>, but optional. Install with <code class="docutils literal notranslate"><span class="pre">brew</span> <span class="pre">install</span> <span class="pre">direnv</span></code> or follow instructions at <a class="reference external" href="https://direnv.net">direnv.net</a>.</p>
+</div></blockquote>
+</section>
+<section id="installation">
+<h2>4. Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h2>
+<section id="clone-the-repository">
+<h3>1. Clone the Repository<a class="headerlink" href="#clone-the-repository" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/paul-heyse/DocsToKG.git
+<span class="nb">cd</span><span class="w"> </span>DocsToKG
+</pre></div>
+</div>
+</section>
+<section id="create-a-virtual-environment">
+<h3>2. Create a Virtual Environment<a class="headerlink" href="#create-a-virtual-environment" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
+<span class="nb">source</span><span class="w"> </span>.venv/bin/activate<span class="w">  </span><span class="c1"># Windows: .venv\Scripts\activate</span>
+</pre></div>
+</div>
+<p>If you use direnv, run <code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">allow</span></code> after activation so <code class="docutils literal notranslate"><span class="pre">.envrc</span></code> can automatically load the environment next time.</p>
+</section>
+<section id="install-dependencies">
+<h3>3. Install Dependencies<a class="headerlink" href="#install-dependencies" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Core project dependencies (editable install for development)</span>
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+
+<span class="c1"># Optional GPU/ML stack (requires CUDA 12.9 toolchain)</span>
+pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.in
+</pre></div>
+</div>
+<p>Install documentation tooling when you plan to regenerate docs:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>docs/build/sphinx/requirements.txt
+</pre></div>
+</div>
+</section>
+<section id="configure-environment-variables">
+<h3>4. Configure Environment Variables<a class="headerlink" href="#configure-environment-variables" title="Link to this heading"></a></h3>
+<p>Create a <code class="docutils literal notranslate"><span class="pre">.env</span></code> file in the repository root (or export variables manually):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cat<span class="w"> </span>&gt;<span class="w"> </span>.env<span class="w"> </span><span class="s">&lt;&lt;&#39;EOF&#39;</span>
+<span class="s"># Storage locations</span>
+<span class="s">DOCSTOKG_DATA_ROOT=./Data</span>
+<span class="s">HYBRID_SEARCH_CONFIG=./config/hybrid_config.json</span>
+<span class="s">ONTOLOGY_FETCHER_CONFIG=./configs/sources.yaml</span>
+
+<span class="s"># Third-party credentials</span>
+<span class="s">PA_ALEX_KEY=your-pyalex-api-key</span>
+<span class="s">BIOPORTAL_API_KEY=optional-bioportal-token</span>
+<span class="s">EOF</span>
+</pre></div>
+</div>
+<p>Load the file with <code class="docutils literal notranslate"><span class="pre">source</span> <span class="pre">.env</span></code> or rely on direnv to ingest it automatically.</p>
+</section>
+<section id="prepare-local-directories">
+<h3>5. Prepare Local Directories<a class="headerlink" href="#prepare-local-directories" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>-p<span class="w"> </span>Data/DocTagsFiles<span class="w"> </span>Data/ChunkedDocTagFiles<span class="w"> </span>Data/Embeddings<span class="w"> </span>artifacts<span class="w"> </span>logs
+</pre></div>
+</div>
+<p>These directories store DocTags inputs, chunked outputs, embedding payloads, FAISS snapshots, and log output.</p>
+</section>
+<section id="verify-the-installation">
+<h3>6. Verify the Installation<a class="headerlink" href="#verify-the-installation" title="Link to this heading"></a></h3>
+<p>Run the automated test suite:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pytest<span class="w"> </span>-q
+</pre></div>
+</div>
+<p>Generate and validate documentation:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>docs/scripts/generate_api_docs.py
+python<span class="w"> </span>docs/scripts/validate_docs.py
+</pre></div>
+</div>
+<p>For asynchronous link checks (optional):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>docs/scripts/check_links.py<span class="w"> </span>--timeout<span class="w"> </span><span class="m">10</span>
+</pre></div>
+</div>
+</section>
+<section id="optional-build-sphinx-html-docs">
+<h3>7. Optional: Build Sphinx HTML Docs<a class="headerlink" href="#optional-build-sphinx-html-docs" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>docs/scripts/build_docs.py<span class="w"> </span>--format<span class="w"> </span>html
+open<span class="w"> </span>docs/build/_build/html/index.html<span class="w">  </span><span class="c1"># macOS</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="next-steps">
+<h2>5. Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Ingest sample documents using the content downloaders (<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload</span></code>).</p></li>
+<li><p>Convert assets into chunked DocTags and embeddings (<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing</span></code>).</p></li>
+<li><p>Populate a FAISS index and serve hybrid search queries (<code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch</span></code>).</p></li>
+</ul>
+<p>Refer to the <strong>Architecture Guide</strong> (<code class="docutils literal notranslate"><span class="pre">docs/03-architecture/index.md</span></code>) for subsystem details and the <strong>Operations Guide</strong> (<code class="docutils literal notranslate"><span class="pre">docs/06-operations/index.md</span></code>) for day-two workflows.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../01-overview/index.html" class="btn btn-neutral float-left" title="1. Overview" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../03-architecture/index.html" class="btn btn-neutral float-right" title="1. Architecture Guide" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

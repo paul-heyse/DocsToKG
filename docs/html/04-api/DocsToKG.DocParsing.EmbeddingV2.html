@@ -1,0 +1,294 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: EmbeddingV2 &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: EmbeddingV2</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.DocParsing.EmbeddingV2.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-embeddingv2">
+<h1>1. Module: EmbeddingV2<a class="headerlink" href="#module-embeddingv2" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.EmbeddingV2</span></code>.</p>
+<p>EmbedVectors.py</p>
+<ul class="simple">
+<li><p>Reads chunked JSONL from /home/paul/DocsToKG/Data/ChunkedDocTagFiles</p></li>
+<li><p>Ensures each chunk has a UUID (writes back to the same files)</p></li>
+<li><p>Emits vectors JSONL to /home/paul/DocsToKG/Data/Vectors</p></li>
+</ul>
+<p>Uses local HF cache at /home/paul/hf-cache/:</p>
+<ul class="simple">
+<li><p>Qwen3-Embedding-4B at   /home/paul/hf-cache/models/Qwen/Qwen3-Embedding-4B</p></li>
+<li><p>SPLADE-v3 at            /home/paul/hf-cache/models/naver/splade-v3</p></li>
+</ul>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="iter-chunk-files-d">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_chunk_files(d)</span></code><a class="headerlink" href="#iter-chunk-files-d" title="Link to this heading"></a></h3>
+<p>Enumerate chunked DocTags JSONL files in a directory.</p>
+<p>Args:
+d: Directory containing <code class="docutils literal notranslate"><span class="pre">*.chunks.jsonl</span></code> files.</p>
+<p>Returns:
+Sorted list of chunk file paths.</p>
+</section>
+<section id="load-rows-p">
+<h3><code class="docutils literal notranslate"><span class="pre">load_rows(p)</span></code><a class="headerlink" href="#load-rows-p" title="Link to this heading"></a></h3>
+<p>Load JSONL rows from disk into memory.</p>
+<p>Args:
+p: Path to the <code class="docutils literal notranslate"><span class="pre">.jsonl</span></code> file.</p>
+<p>Returns:
+List of dictionaries parsed from the file.</p>
+<p>Raises:
+json.JSONDecodeError: If a line contains malformed JSON.</p>
+</section>
+<section id="save-rows-p-rows">
+<h3><code class="docutils literal notranslate"><span class="pre">save_rows(p,</span> <span class="pre">rows)</span></code><a class="headerlink" href="#save-rows-p-rows" title="Link to this heading"></a></h3>
+<p>Persist JSONL rows to disk atomically using a temporary file.</p>
+<p>Args:
+p: Destination path for the chunk file.
+rows: Sequence of dictionaries to serialize.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="ensure-uuid-rows">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_uuid(rows)</span></code><a class="headerlink" href="#ensure-uuid-rows" title="Link to this heading"></a></h3>
+<p>Populate missing chunk UUIDs in-place.</p>
+<p>Args:
+rows: Chunk dictionaries that should include a <code class="docutils literal notranslate"><span class="pre">uuid</span></code> key.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="tokens-text">
+<h3><code class="docutils literal notranslate"><span class="pre">tokens(text)</span></code><a class="headerlink" href="#tokens-text" title="Link to this heading"></a></h3>
+<p>Tokenize normalized text for sparse retrieval features.</p>
+<p>Args:
+text: Input string to tokenize.</p>
+<p>Returns:
+Lowercased alphanumeric tokens extracted from the text.</p>
+</section>
+<section id="build-bm25-stats-chunks">
+<h3><code class="docutils literal notranslate"><span class="pre">build_bm25_stats(chunks)</span></code><a class="headerlink" href="#build-bm25-stats-chunks" title="Link to this heading"></a></h3>
+<p>Compute corpus statistics required for BM25 weighting.</p>
+<p>Args:
+chunks: Iterable of text chunks with identifiers.</p>
+<p>Returns:
+BM25Stats containing document frequency counts and average length.</p>
+</section>
+<section id="bm25-vector-text-stats-k1-b">
+<h3><code class="docutils literal notranslate"><span class="pre">bm25_vector(text,</span> <span class="pre">stats,</span> <span class="pre">k1,</span> <span class="pre">b)</span></code><a class="headerlink" href="#bm25-vector-text-stats-k1-b" title="Link to this heading"></a></h3>
+<p>Generate BM25 term weights for a chunk of text.</p>
+<p>Args:
+text: Chunk text to convert into a sparse representation.
+stats: Precomputed BM25 statistics for the corpus.
+k1: Term frequency saturation parameter.
+b: Length normalization parameter.</p>
+<p>Returns:
+Tuple of <code class="docutils literal notranslate"><span class="pre">(terms,</span> <span class="pre">weights)</span></code> describing the sparse vector.</p>
+</section>
+<section id="splade-encode-cfg-texts">
+<h3><code class="docutils literal notranslate"><span class="pre">splade_encode(cfg,</span> <span class="pre">texts)</span></code><a class="headerlink" href="#splade-encode-cfg-texts" title="Link to this heading"></a></h3>
+<p>Encode text with SPLADE to obtain sparse lexical vectors.</p>
+<p>Args:
+cfg: SPLADE configuration describing device, batch size, and cache.
+texts: Batch of input strings to encode.</p>
+<p>Returns:
+Tuple of token lists and weight lists aligned per input text.</p>
+</section>
+<section id="qwen-embed-cfg-texts">
+<h3><code class="docutils literal notranslate"><span class="pre">qwen_embed(cfg,</span> <span class="pre">texts)</span></code><a class="headerlink" href="#qwen-embed-cfg-texts" title="Link to this heading"></a></h3>
+<p>Produce dense embeddings using a local Qwen3 model served by vLLM.</p>
+<p>Args:
+cfg: Configuration describing model path, dtype, and batching.
+texts: Batch of documents to embed.</p>
+<p>Returns:
+List of embedding vectors, one per input text.</p>
+</section>
+<section id="main">
+<h3><code class="docutils literal notranslate"><span class="pre">main()</span></code><a class="headerlink" href="#main" title="Link to this heading"></a></h3>
+<p>CLI entrypoint for chunk UUID cleanup and embedding generation.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="chunk">
+<h3><code class="docutils literal notranslate"><span class="pre">Chunk</span></code><a class="headerlink" href="#chunk" title="Link to this heading"></a></h3>
+<p>Minimal representation of a DocTags chunk stored on disk.</p>
+<p>Attributes:
+uuid: Stable identifier for the chunk.
+text: Textual content extracted from the DocTags document.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>chunk = Chunk(uuid=”chunk-1”, text=”Hybrid search is powerful.”)
+chunk.uuid
+‘chunk-1’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="bm25stats">
+<h3><code class="docutils literal notranslate"><span class="pre">BM25Stats</span></code><a class="headerlink" href="#bm25stats" title="Link to this heading"></a></h3>
+<p>Corpus-wide statistics required for BM25 weighting.</p>
+<p>Attributes:
+N: Total number of documents (chunks) in the corpus.
+avgdl: Average document length in tokens.
+df: Document frequency per token.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>stats = BM25Stats(N=100, avgdl=120.5, df={“hybrid”: 5})
+stats.df[“hybrid”]
+5</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="spladecfg">
+<h3><code class="docutils literal notranslate"><span class="pre">SpladeCfg</span></code><a class="headerlink" href="#spladecfg" title="Link to this heading"></a></h3>
+<p>Runtime configuration for SPLADE sparse encoding.</p>
+<p>Attributes:
+model_dir: Path to the SPLADE model directory.
+device: Torch device identifier to run inference on.
+batch_size: Number of texts encoded per batch.
+cache_folder: Directory where transformer weights are cached.
+max_active_dims: Optional cap on active sparse dimensions.
+attn_impl: Preferred attention implementation override.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>cfg = SpladeCfg(batch_size=8, device=”cuda:1”)
+cfg.batch_size
+8</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="qwencfg">
+<h3><code class="docutils literal notranslate"><span class="pre">QwenCfg</span></code><a class="headerlink" href="#qwencfg" title="Link to this heading"></a></h3>
+<p>Configuration for generating dense embeddings with Qwen via vLLM.</p>
+<p>Attributes:
+model_dir: Path to the local Qwen model.
+dtype: Torch dtype used during inference.
+tp: Tensor parallelism degree.
+gpu_mem_util: Target GPU memory utilization for vLLM.
+batch_size: Number of texts processed per embedding batch.
+quantization: Optional quantization mode (e.g., <code class="docutils literal notranslate"><span class="pre">awq</span></code>).</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>cfg = QwenCfg(batch_size=64, tp=2)
+cfg.tp
+2</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,648 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ADDED Requirements &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/custom.css" />
+
+  
+      <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">ADDED Requirements</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../../_sources/openspec/changes/modularize-content-download-architecture/specs/content-download/spec.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="added-requirements">
+<h1>ADDED Requirements<a class="headerlink" href="#added-requirements" title="Link to this heading"></a></h1>
+<section id="requirement-unified-http-retry-infrastructure">
+<h2>Requirement: Unified HTTP Retry Infrastructure<a class="headerlink" href="#requirement-unified-http-retry-infrastructure" title="Link to this heading"></a></h2>
+<p>The Content Download module SHALL provide centralized HTTP request handling with exponential backoff and <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> header compliance.</p>
+<section id="scenario-successful-request-with-no-retries">
+<h3>Scenario: Successful request with no retries<a class="headerlink" href="#scenario-successful-request-with-no-retries" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a resolver requests a URL and receives HTTP 200 on first attempt</p></li>
+<li><p><strong>THEN</strong> the request completes immediately without retry delays</p></li>
+<li><p><strong>AND</strong> the response is returned to the caller</p></li>
+</ul>
+</section>
+<section id="scenario-transient-failure-with-exponential-backoff">
+<h3>Scenario: Transient failure with exponential backoff<a class="headerlink" href="#scenario-transient-failure-with-exponential-backoff" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a resolver requests a URL and receives HTTP 503 status code</p></li>
+<li><p><strong>AND</strong> the service is configured to retry on 503</p></li>
+<li><p><strong>THEN</strong> the request is retried with exponential backoff: <code class="docutils literal notranslate"><span class="pre">backoff_factor</span> <span class="pre">*</span> <span class="pre">(2</span> <span class="pre">**</span> <span class="pre">attempt)</span> <span class="pre">+</span> <span class="pre">jitter</span></code></p></li>
+<li><p><strong>AND</strong> a maximum of <code class="docutils literal notranslate"><span class="pre">max_retries</span></code> attempts are made before raising exception</p></li>
+</ul>
+</section>
+<section id="scenario-retry-after-header-compliance-integer-format">
+<h3>Scenario: Retry-After header compliance (integer format)<a class="headerlink" href="#scenario-retry-after-header-compliance-integer-format" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a resolver requests a URL and receives HTTP 429 with <code class="docutils literal notranslate"><span class="pre">Retry-After:</span> <span class="pre">5</span></code> header</p></li>
+<li><p><strong>AND</strong> <code class="docutils literal notranslate"><span class="pre">respect_retry_after=True</span></code> is configured</p></li>
+<li><p><strong>THEN</strong> the system waits 5 seconds before retrying</p></li>
+<li><p><strong>AND</strong> the wait time overrides default exponential backoff if longer</p></li>
+</ul>
+</section>
+<section id="scenario-retry-after-header-compliance-http-date-format">
+<h3>Scenario: Retry-After header compliance (HTTP-date format)<a class="headerlink" href="#scenario-retry-after-header-compliance-http-date-format" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a resolver requests a URL and receives HTTP 429 with <code class="docutils literal notranslate"><span class="pre">Retry-After:</span> <span class="pre">Wed,</span> <span class="pre">21</span> <span class="pre">Oct</span> <span class="pre">2025</span> <span class="pre">07:28:00</span> <span class="pre">GMT</span></code> header</p></li>
+<li><p><strong>AND</strong> <code class="docutils literal notranslate"><span class="pre">respect_retry_after=True</span></code> is configured</p></li>
+<li><p><strong>THEN</strong> the system computes delta seconds until specified time</p></li>
+<li><p><strong>AND</strong> waits the computed duration before retrying</p></li>
+</ul>
+</section>
+<section id="scenario-custom-retry-status-codes-per-resolver">
+<h3>Scenario: Custom retry status codes per resolver<a class="headerlink" href="#scenario-custom-retry-status-codes-per-resolver" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a resolver is configured with custom <code class="docutils literal notranslate"><span class="pre">retry_statuses={404,</span> <span class="pre">429}</span></code></p></li>
+<li><p><strong>AND</strong> the resolver requests a URL receiving HTTP 404</p></li>
+<li><p><strong>THEN</strong> the request is retried per configured backoff policy</p></li>
+<li><p><strong>AND</strong> other status codes (e.g., 500) are NOT retried</p></li>
+</ul>
+</section>
+<section id="scenario-exhausted-retry-attempts">
+<h3>Scenario: Exhausted retry attempts<a class="headerlink" href="#scenario-exhausted-retry-attempts" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a resolver exhausts all retry attempts without success</p></li>
+<li><p><strong>THEN</strong> the system raises <code class="docutils literal notranslate"><span class="pre">requests.RequestException</span></code> with details</p></li>
+<li><p><strong>AND</strong> logs the final attempt status for observability</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-conditional-request-abstraction">
+<h2>Requirement: Conditional Request Abstraction<a class="headerlink" href="#requirement-conditional-request-abstraction" title="Link to this heading"></a></h2>
+<p>The Content Download module SHALL provide reusable conditional request logic encapsulating ETag and If-Modified-Since semantics.</p>
+<section id="scenario-building-conditional-headers-from-prior-metadata">
+<h3>Scenario: Building conditional headers from prior metadata<a class="headerlink" href="#scenario-building-conditional-headers-from-prior-metadata" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a download has prior manifest entry with <code class="docutils literal notranslate"><span class="pre">etag=&quot;abc123&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">last_modified=&quot;Mon,</span> <span class="pre">01</span> <span class="pre">Jan</span> <span class="pre">2024</span> <span class="pre">00:00:00</span> <span class="pre">GMT&quot;</span></code></p></li>
+<li><p><strong>AND</strong> a new request is initiated for the same URL</p></li>
+<li><p><strong>THEN</strong> the system generates headers: <code class="docutils literal notranslate"><span class="pre">{&quot;If-None-Match&quot;:</span> <span class="pre">&quot;abc123&quot;,</span> <span class="pre">&quot;If-Modified-Since&quot;:</span> <span class="pre">&quot;Mon,</span> <span class="pre">01</span> <span class="pre">Jan</span> <span class="pre">2024</span> <span class="pre">00:00:00</span> <span class="pre">GMT&quot;}</span></code></p></li>
+<li><p><strong>AND</strong> includes these headers in the HTTP request</p></li>
+</ul>
+</section>
+<section id="scenario-http-304-not-modified-response">
+<h3>Scenario: HTTP 304 Not Modified response<a class="headerlink" href="#scenario-http-304-not-modified-response" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a conditional request receives HTTP 304 status code</p></li>
+<li><p><strong>AND</strong> prior metadata includes <code class="docutils literal notranslate"><span class="pre">path</span></code>, <code class="docutils literal notranslate"><span class="pre">sha256</span></code>, and <code class="docutils literal notranslate"><span class="pre">content_length</span></code></p></li>
+<li><p><strong>THEN</strong> the system returns <code class="docutils literal notranslate"><span class="pre">CachedResult</span></code> with all prior metadata preserved</p></li>
+<li><p><strong>AND</strong> no file download occurs (bandwidth saved)</p></li>
+</ul>
+</section>
+<section id="scenario-http-200-modified-response">
+<h3>Scenario: HTTP 200 Modified response<a class="headerlink" href="#scenario-http-200-modified-response" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a conditional request receives HTTP 200 status code</p></li>
+<li><p><strong>THEN</strong> the system returns <code class="docutils literal notranslate"><span class="pre">ModifiedResult</span></code> with new <code class="docutils literal notranslate"><span class="pre">etag</span></code> and <code class="docutils literal notranslate"><span class="pre">last_modified</span></code> from response headers</p></li>
+<li><p><strong>AND</strong> proceeds with full file download</p></li>
+</ul>
+</section>
+<section id="scenario-incomplete-prior-metadata-with-304-response">
+<h3>Scenario: Incomplete prior metadata with 304 response<a class="headerlink" href="#scenario-incomplete-prior-metadata-with-304-response" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a conditional request receives HTTP 304</p></li>
+<li><p><strong>AND</strong> prior metadata is missing required fields (<code class="docutils literal notranslate"><span class="pre">sha256</span></code> or <code class="docutils literal notranslate"><span class="pre">content_length</span></code>)</p></li>
+<li><p><strong>THEN</strong> the system raises <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> indicating incomplete cache entry</p></li>
+<li><p><strong>AND</strong> logs the error for debugging</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-modular-resolver-architecture">
+<h2>Requirement: Modular Resolver Architecture<a class="headerlink" href="#requirement-modular-resolver-architecture" title="Link to this heading"></a></h2>
+<p>The Content Download module SHALL organize resolver implementations into discrete provider modules enabling independent testing and extensibility.</p>
+<section id="scenario-backward-compatible-imports-after-refactoring">
+<h3>Scenario: Backward-compatible imports after refactoring<a class="headerlink" href="#scenario-backward-compatible-imports-after-refactoring" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> existing code imports <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers</span> <span class="pre">import</span> <span class="pre">ResolverPipeline</span></code></p></li>
+<li><p><strong>THEN</strong> the import succeeds without modification</p></li>
+<li><p><strong>AND</strong> the imported class maintains identical API behavior</p></li>
+</ul>
+</section>
+<section id="scenario-direct-submodule-imports">
+<h3>Scenario: Direct submodule imports<a class="headerlink" href="#scenario-direct-submodule-imports" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> new code imports <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.pipeline</span> <span class="pre">import</span> <span class="pre">ResolverPipeline</span></code></p></li>
+<li><p><strong>THEN</strong> the import succeeds and provides identical functionality</p></li>
+<li><p><strong>AND</strong> reduces coupling to internal module structure</p></li>
+</ul>
+</section>
+<section id="scenario-individual-resolver-testing">
+<h3>Scenario: Individual resolver testing<a class="headerlink" href="#scenario-individual-resolver-testing" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> tests import a single resolver: <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.resolvers.providers.unpaywall</span> <span class="pre">import</span> <span class="pre">UnpaywallResolver</span></code></p></li>
+<li><p><strong>THEN</strong> the resolver can be instantiated and tested in isolation</p></li>
+<li><p><strong>AND</strong> no pipeline or other resolver dependencies are loaded</p></li>
+</ul>
+</section>
+<section id="scenario-adding-custom-resolver-provider">
+<h3>Scenario: Adding custom resolver provider<a class="headerlink" href="#scenario-adding-custom-resolver-provider" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a developer creates new file <code class="docutils literal notranslate"><span class="pre">resolvers/providers/custom.py</span></code> with <code class="docutils literal notranslate"><span class="pre">CustomResolver</span></code> class</p></li>
+<li><p><strong>AND</strong> registers the resolver in <code class="docutils literal notranslate"><span class="pre">providers/__init__.py</span></code> default list</p></li>
+<li><p><strong>THEN</strong> the resolver is included in pipeline execution</p></li>
+<li><p><strong>AND</strong> respects standard configuration (timeouts, rate limits, toggles)</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-openalex-virtual-resolver-integration">
+<h2>Requirement: OpenAlex Virtual Resolver Integration<a class="headerlink" href="#requirement-openalex-virtual-resolver-integration" title="Link to this heading"></a></h2>
+<p>The Content Download module SHALL treat OpenAlex-provided URLs as a standard resolver (position 0) unifying rate-limiting, metrics, and logging.</p>
+<section id="scenario-openalex-resolver-executes-first-in-pipeline">
+<h3>Scenario: OpenAlex resolver executes first in pipeline<a class="headerlink" href="#scenario-openalex-resolver-executes-first-in-pipeline" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a work has both OpenAlex <code class="docutils literal notranslate"><span class="pre">pdf_urls</span></code> and external resolver candidates</p></li>
+<li><p><strong>AND</strong> the resolver pipeline begins execution</p></li>
+<li><p><strong>THEN</strong> the OpenAlexResolver yields URLs before any other resolver</p></li>
+<li><p><strong>AND</strong> early-stops on first PDF success per standard pipeline logic</p></li>
+</ul>
+</section>
+<section id="scenario-openalex-urls-respect-rate-limiting">
+<h3>Scenario: OpenAlex URLs respect rate limiting<a class="headerlink" href="#scenario-openalex-urls-respect-rate-limiting" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> OpenAlexResolver is configured with <code class="docutils literal notranslate"><span class="pre">resolver_min_interval_s:</span> <span class="pre">{openalex:</span> <span class="pre">0.5}</span></code></p></li>
+<li><p><strong>AND</strong> multiple works are processed sequentially</p></li>
+<li><p><strong>THEN</strong> the system enforces 0.5-second minimum interval between OpenAlex URL attempts</p></li>
+<li><p><strong>AND</strong> behaves identically to other resolver rate limits</p></li>
+</ul>
+</section>
+<section id="scenario-openalex-attempts-tracked-in-unified-metrics">
+<h3>Scenario: OpenAlex attempts tracked in unified metrics<a class="headerlink" href="#scenario-openalex-attempts-tracked-in-unified-metrics" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> OpenAlexResolver successfully downloads a PDF</p></li>
+<li><p><strong>THEN</strong> the attempt is recorded in <code class="docutils literal notranslate"><span class="pre">ResolverMetrics.attempts[&quot;openalex&quot;]</span></code></p></li>
+<li><p><strong>AND</strong> success is recorded in <code class="docutils literal notranslate"><span class="pre">ResolverMetrics.successes[&quot;openalex&quot;]</span></code></p></li>
+<li><p><strong>AND</strong> metrics are aggregated identically to other resolvers</p></li>
+</ul>
+</section>
+<section id="scenario-openalex-as-optional-resolver">
+<h3>Scenario: OpenAlex as optional resolver<a class="headerlink" href="#scenario-openalex-as-optional-resolver" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> configuration specifies <code class="docutils literal notranslate"><span class="pre">resolver_toggles:</span> <span class="pre">{openalex:</span> <span class="pre">false}</span></code></p></li>
+<li><p><strong>THEN</strong> OpenAlexResolver is skipped in pipeline execution</p></li>
+<li><p><strong>AND</strong> the pipeline proceeds to next enabled resolver (e.g., Unpaywall)</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-head-based-content-filtering">
+<h2>Requirement: HEAD-Based Content Filtering<a class="headerlink" href="#requirement-head-based-content-filtering" title="Link to this heading"></a></h2>
+<p>The Content Download module SHALL perform lightweight HEAD requests to filter non-PDF URLs before full download, reducing wasted bandwidth and attempts.</p>
+<section id="scenario-head-request-filters-html-landing-page">
+<h3>Scenario: HEAD request filters HTML landing page<a class="headerlink" href="#scenario-head-request-filters-html-landing-page" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a resolver yields a candidate URL</p></li>
+<li><p><strong>AND</strong> HEAD request returns <code class="docutils literal notranslate"><span class="pre">Content-Type:</span> <span class="pre">text/html</span></code></p></li>
+<li><p><strong>AND</strong> <code class="docutils literal notranslate"><span class="pre">enable_head_precheck=True</span></code> is configured</p></li>
+<li><p><strong>THEN</strong> the system skips full GET request for this URL</p></li>
+<li><p><strong>AND</strong> logs attempt with <code class="docutils literal notranslate"><span class="pre">reason=&quot;head-precheck-failed&quot;</span></code></p></li>
+</ul>
+</section>
+<section id="scenario-head-request-filters-zero-length-content">
+<h3>Scenario: HEAD request filters zero-length content<a class="headerlink" href="#scenario-head-request-filters-zero-length-content" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a resolver yields a candidate URL</p></li>
+<li><p><strong>AND</strong> HEAD request returns <code class="docutils literal notranslate"><span class="pre">Content-Length:</span> <span class="pre">0</span></code></p></li>
+<li><p><strong>THEN</strong> the system skips full GET request</p></li>
+<li><p><strong>AND</strong> records skip in metrics as <code class="docutils literal notranslate"><span class="pre">&quot;head-precheck-failed&quot;</span></code></p></li>
+</ul>
+</section>
+<section id="scenario-head-request-allows-pdf-content">
+<h3>Scenario: HEAD request allows PDF content<a class="headerlink" href="#scenario-head-request-allows-pdf-content" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a resolver yields a candidate URL</p></li>
+<li><p><strong>AND</strong> HEAD request returns <code class="docutils literal notranslate"><span class="pre">Content-Type:</span> <span class="pre">application/pdf</span></code> and <code class="docutils literal notranslate"><span class="pre">Content-Length:</span> <span class="pre">524288</span></code></p></li>
+<li><p><strong>THEN</strong> the system proceeds with full GET request</p></li>
+<li><p><strong>AND</strong> no pre-check skip is logged</p></li>
+</ul>
+</section>
+<section id="scenario-head-request-failure-allows-get-attempt">
+<h3>Scenario: HEAD request failure allows GET attempt<a class="headerlink" href="#scenario-head-request-failure-allows-get-attempt" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> HEAD request times out or returns 500 error</p></li>
+<li><p><strong>THEN</strong> the system proceeds with GET request anyway (defensive fallback)</p></li>
+<li><p><strong>AND</strong> does not mark URL as failed based solely on HEAD error</p></li>
+</ul>
+</section>
+<section id="scenario-per-resolver-head-pre-check-override">
+<h3>Scenario: Per-resolver HEAD pre-check override<a class="headerlink" href="#scenario-per-resolver-head-pre-check-override" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> global configuration sets <code class="docutils literal notranslate"><span class="pre">enable_head_precheck=True</span></code></p></li>
+<li><p><strong>AND</strong> resolver-specific override sets <code class="docutils literal notranslate"><span class="pre">resolver_head_precheck:</span> <span class="pre">{wayback:</span> <span class="pre">false}</span></code></p></li>
+<li><p><strong>AND</strong> Wayback resolver yields a URL</p></li>
+<li><p><strong>THEN</strong> the system skips HEAD pre-check for Wayback URLs only</p></li>
+<li><p><strong>AND</strong> performs HEAD pre-check for other resolvers</p></li>
+</ul>
+</section>
+<section id="scenario-disabled-head-pre-check">
+<h3>Scenario: Disabled HEAD pre-check<a class="headerlink" href="#scenario-disabled-head-pre-check" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> configuration sets <code class="docutils literal notranslate"><span class="pre">enable_head_precheck=False</span></code></p></li>
+<li><p><strong>THEN</strong> the system never performs HEAD requests</p></li>
+<li><p><strong>AND</strong> all candidate URLs proceed directly to GET</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-bounded-intra-work-concurrency">
+<h2>Requirement: Bounded Intra-Work Concurrency<a class="headerlink" href="#requirement-bounded-intra-work-concurrency" title="Link to this heading"></a></h2>
+<p>The Content Download module SHALL support concurrent execution of independent resolvers within a single work to reduce wall time while respecting per-resolver rate limits.</p>
+<section id="scenario-sequential-execution-default">
+<h3>Scenario: Sequential execution (default)<a class="headerlink" href="#scenario-sequential-execution-default" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> configuration sets <code class="docutils literal notranslate"><span class="pre">max_concurrent_resolvers=1</span></code></p></li>
+<li><p><strong>THEN</strong> resolvers execute sequentially in priority order</p></li>
+<li><p><strong>AND</strong> the next resolver starts only after the previous completes</p></li>
+<li><p><strong>AND</strong> behavior matches original sequential pipeline</p></li>
+</ul>
+</section>
+<section id="scenario-bounded-concurrent-execution">
+<h3>Scenario: Bounded concurrent execution<a class="headerlink" href="#scenario-bounded-concurrent-execution" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> configuration sets <code class="docutils literal notranslate"><span class="pre">max_concurrent_resolvers=3</span></code></p></li>
+<li><p><strong>AND</strong> 10 enabled resolvers exist for a work</p></li>
+<li><p><strong>THEN</strong> the system executes up to 3 resolvers concurrently</p></li>
+<li><p><strong>AND</strong> queues remaining resolvers until a worker becomes available</p></li>
+</ul>
+</section>
+<section id="scenario-rate-limits-enforced-during-concurrency">
+<h3>Scenario: Rate limits enforced during concurrency<a class="headerlink" href="#scenario-rate-limits-enforced-during-concurrency" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> configuration sets <code class="docutils literal notranslate"><span class="pre">max_concurrent_resolvers=3</span></code> and <code class="docutils literal notranslate"><span class="pre">resolver_min_interval_s:</span> <span class="pre">{unpaywall:</span> <span class="pre">1.0}</span></code></p></li>
+<li><p><strong>AND</strong> Unpaywall resolver is invoked concurrently with others</p></li>
+<li><p><strong>THEN</strong> the system enforces 1.0-second minimum interval between Unpaywall requests across all threads</p></li>
+<li><p><strong>AND</strong> uses thread-safe lock to coordinate rate limit tracking</p></li>
+</ul>
+</section>
+<section id="scenario-early-stop-on-first-pdf-during-concurrent-execution">
+<h3>Scenario: Early-stop on first PDF during concurrent execution<a class="headerlink" href="#scenario-early-stop-on-first-pdf-during-concurrent-execution" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> 3 resolvers execute concurrently for a work</p></li>
+<li><p><strong>AND</strong> resolver 2 successfully downloads a PDF</p></li>
+<li><p><strong>THEN</strong> the pipeline immediately returns success result</p></li>
+<li><p><strong>AND</strong> cancels remaining queued and in-progress resolvers</p></li>
+<li><p><strong>AND</strong> no additional download attempts occur</p></li>
+</ul>
+</section>
+<section id="scenario-resolver-failure-doesn-t-block-concurrent-execution">
+<h3>Scenario: Resolver failure doesn’t block concurrent execution<a class="headerlink" href="#scenario-resolver-failure-doesn-t-block-concurrent-execution" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> 3 resolvers execute concurrently</p></li>
+<li><p><strong>AND</strong> resolver 1 raises an exception</p></li>
+<li><p><strong>THEN</strong> the exception is logged but not propagated</p></li>
+<li><p><strong>AND</strong> resolvers 2 and 3 continue execution</p></li>
+<li><p><strong>AND</strong> the pipeline proceeds to next queued resolvers</p></li>
+</ul>
+</section>
+<section id="scenario-thread-safe-metrics-aggregation">
+<h3>Scenario: Thread-safe metrics aggregation<a class="headerlink" href="#scenario-thread-safe-metrics-aggregation" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> multiple resolvers execute concurrently</p></li>
+<li><p><strong>AND</strong> each records attempts and successes in <code class="docutils literal notranslate"><span class="pre">ResolverMetrics</span></code></p></li>
+<li><p><strong>THEN</strong> all metrics are aggregated without race conditions</p></li>
+<li><p><strong>AND</strong> final counts match total attempts across all threads</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-zenodo-resolver">
+<h2>Requirement: Zenodo Resolver<a class="headerlink" href="#requirement-zenodo-resolver" title="Link to this heading"></a></h2>
+<p>The Content Download module SHALL query the Zenodo REST API by DOI to retrieve PDF files hosted in the Zenodo open repository.</p>
+<section id="scenario-successful-zenodo-doi-query">
+<h3>Scenario: Successful Zenodo DOI query<a class="headerlink" href="#scenario-successful-zenodo-doi-query" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> an artifact has DOI “10.5281/zenodo.1234567”</p></li>
+<li><p><strong>AND</strong> Zenodo API returns matching record with PDF file</p></li>
+<li><p><strong>THEN</strong> ZenodoResolver yields PDF download URL from <code class="docutils literal notranslate"><span class="pre">files[*].links.self</span></code></p></li>
+<li><p><strong>AND</strong> includes metadata: <code class="docutils literal notranslate"><span class="pre">{&quot;source&quot;:</span> <span class="pre">&quot;zenodo&quot;,</span> <span class="pre">&quot;record_id&quot;:</span> <span class="pre">&quot;1234567&quot;,</span> <span class="pre">&quot;filename&quot;:</span> <span class="pre">&quot;paper.pdf&quot;}</span></code></p></li>
+</ul>
+</section>
+<section id="scenario-zenodo-query-with-multiple-files-filters-to-pdf">
+<h3>Scenario: Zenodo query with multiple files filters to PDF<a class="headerlink" href="#scenario-zenodo-query-with-multiple-files-filters-to-pdf" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> Zenodo API returns record with files: <code class="docutils literal notranslate"><span class="pre">[&quot;data.csv&quot;,</span> <span class="pre">&quot;paper.pdf&quot;,</span> <span class="pre">&quot;figures.zip&quot;]</span></code></p></li>
+<li><p><strong>THEN</strong> ZenodoResolver yields only <code class="docutils literal notranslate"><span class="pre">paper.pdf</span></code> download URL</p></li>
+<li><p><strong>AND</strong> skips non-PDF files</p></li>
+</ul>
+</section>
+<section id="scenario-zenodo-query-with-no-matching-records">
+<h3>Scenario: Zenodo query with no matching records<a class="headerlink" href="#scenario-zenodo-query-with-no-matching-records" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> Zenodo API returns empty <code class="docutils literal notranslate"><span class="pre">hits.hits</span></code> array</p></li>
+<li><p><strong>THEN</strong> ZenodoResolver yields no URLs</p></li>
+<li><p><strong>AND</strong> logs event with <code class="docutils literal notranslate"><span class="pre">event_reason=&quot;no-matches&quot;</span></code></p></li>
+</ul>
+</section>
+<section id="scenario-zenodo-api-http-error">
+<h3>Scenario: Zenodo API HTTP error<a class="headerlink" href="#scenario-zenodo-api-http-error" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> Zenodo API returns HTTP 404 or 500</p></li>
+<li><p><strong>THEN</strong> ZenodoResolver logs error event with status code</p></li>
+<li><p><strong>AND</strong> yields no URLs (resolver skipped)</p></li>
+</ul>
+</section>
+<section id="scenario-zenodo-resolver-priority">
+<h3>Scenario: Zenodo resolver priority<a class="headerlink" href="#scenario-zenodo-resolver-priority" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> default resolver order is configured</p></li>
+<li><p><strong>THEN</strong> ZenodoResolver executes after CoreResolver</p></li>
+<li><p><strong>AND</strong> executes before DoajResolver</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-figshare-resolver">
+<h2>Requirement: Figshare Resolver<a class="headerlink" href="#requirement-figshare-resolver" title="Link to this heading"></a></h2>
+<p>The Content Download module SHALL query the Figshare REST API by DOI to retrieve PDF files hosted in the Figshare repository.</p>
+<section id="scenario-successful-figshare-doi-search">
+<h3>Scenario: Successful Figshare DOI search<a class="headerlink" href="#scenario-successful-figshare-doi-search" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> an artifact has DOI “10.6084/m9.figshare.1234567”</p></li>
+<li><p><strong>AND</strong> Figshare API returns matching article with PDF file</p></li>
+<li><p><strong>THEN</strong> FigshareResolver yields PDF download URL from <code class="docutils literal notranslate"><span class="pre">files[*].download_url</span></code></p></li>
+<li><p><strong>AND</strong> includes metadata: <code class="docutils literal notranslate"><span class="pre">{&quot;source&quot;:</span> <span class="pre">&quot;figshare&quot;,</span> <span class="pre">&quot;article_id&quot;:</span> <span class="pre">&quot;1234567&quot;,</span> <span class="pre">&quot;filename&quot;:</span> <span class="pre">&quot;manuscript.pdf&quot;}</span></code></p></li>
+</ul>
+</section>
+<section id="scenario-figshare-search-with-multiple-files-filters-to-pdf">
+<h3>Scenario: Figshare search with multiple files filters to PDF<a class="headerlink" href="#scenario-figshare-search-with-multiple-files-filters-to-pdf" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> Figshare API returns article with files: <code class="docutils literal notranslate"><span class="pre">[&quot;dataset.csv&quot;,</span> <span class="pre">&quot;manuscript.pdf&quot;,</span> <span class="pre">&quot;supplement.docx&quot;]</span></code></p></li>
+<li><p><strong>THEN</strong> FigshareResolver yields only <code class="docutils literal notranslate"><span class="pre">manuscript.pdf</span></code> download URL</p></li>
+<li><p><strong>AND</strong> filters by <code class="docutils literal notranslate"><span class="pre">.pdf</span></code> extension</p></li>
+</ul>
+</section>
+<section id="scenario-figshare-search-with-no-results">
+<h3>Scenario: Figshare search with no results<a class="headerlink" href="#scenario-figshare-search-with-no-results" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> Figshare API returns empty articles array</p></li>
+<li><p><strong>THEN</strong> FigshareResolver yields no URLs</p></li>
+<li><p><strong>AND</strong> does not log error (valid empty result)</p></li>
+</ul>
+</section>
+<section id="scenario-figshare-api-http-error">
+<h3>Scenario: Figshare API HTTP error<a class="headerlink" href="#scenario-figshare-api-http-error" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> Figshare API returns HTTP 401 or 503</p></li>
+<li><p><strong>THEN</strong> FigshareResolver logs error event with status code</p></li>
+<li><p><strong>AND</strong> yields no URLs</p></li>
+</ul>
+</section>
+<section id="scenario-figshare-resolver-priority">
+<h3>Scenario: Figshare resolver priority<a class="headerlink" href="#scenario-figshare-resolver-priority" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> default resolver order is configured</p></li>
+<li><p><strong>THEN</strong> FigshareResolver executes after ZenodoResolver</p></li>
+<li><p><strong>AND</strong> executes before DoajResolver</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-complete-download-outcome-metadata">
+<h2>Requirement: Complete Download Outcome Metadata<a class="headerlink" href="#requirement-complete-download-outcome-metadata" title="Link to this heading"></a></h2>
+<p>The Content Download module SHALL populate all metadata fields in <code class="docutils literal notranslate"><span class="pre">DownloadOutcome</span></code> across every code path for uniform manifest schema.</p>
+<section id="scenario-successful-pdf-download-populates-all-fields">
+<h3>Scenario: Successful PDF download populates all fields<a class="headerlink" href="#scenario-successful-pdf-download-populates-all-fields" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a PDF is successfully downloaded and verified</p></li>
+<li><p><strong>THEN</strong> <code class="docutils literal notranslate"><span class="pre">DownloadOutcome</span></code> includes: <code class="docutils literal notranslate"><span class="pre">classification=&quot;pdf&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">path</span></code>, <code class="docutils literal notranslate"><span class="pre">http_status=200</span></code>, <code class="docutils literal notranslate"><span class="pre">content_type</span></code>, <code class="docutils literal notranslate"><span class="pre">elapsed_ms</span></code>, <code class="docutils literal notranslate"><span class="pre">sha256</span></code>, <code class="docutils literal notranslate"><span class="pre">content_length</span></code>, <code class="docutils literal notranslate"><span class="pre">etag</span></code>, <code class="docutils literal notranslate"><span class="pre">last_modified</span></code></p></li>
+<li><p><strong>AND</strong> no fields are omitted or undefined</p></li>
+</ul>
+</section>
+<section id="scenario-cached-304-response-preserves-prior-metadata">
+<h3>Scenario: Cached 304 response preserves prior metadata<a class="headerlink" href="#scenario-cached-304-response-preserves-prior-metadata" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> HTTP 304 Not Modified is received</p></li>
+<li><p><strong>THEN</strong> <code class="docutils literal notranslate"><span class="pre">DownloadOutcome</span></code> includes: <code class="docutils literal notranslate"><span class="pre">classification=&quot;cached&quot;</span></code>, prior <code class="docutils literal notranslate"><span class="pre">path</span></code>, <code class="docutils literal notranslate"><span class="pre">sha256</span></code>, <code class="docutils literal notranslate"><span class="pre">content_length</span></code>, <code class="docutils literal notranslate"><span class="pre">etag</span></code>, <code class="docutils literal notranslate"><span class="pre">last_modified</span></code></p></li>
+<li><p><strong>AND</strong> all prior metadata is preserved in outcome</p></li>
+</ul>
+</section>
+<section id="scenario-html-download-with-text-extraction">
+<h3>Scenario: HTML download with text extraction<a class="headerlink" href="#scenario-html-download-with-text-extraction" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> HTML content is downloaded and trafilatura extraction succeeds</p></li>
+<li><p><strong>THEN</strong> <code class="docutils literal notranslate"><span class="pre">DownloadOutcome</span></code> includes: <code class="docutils literal notranslate"><span class="pre">classification=&quot;html&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">path</span></code> (HTML file), <code class="docutils literal notranslate"><span class="pre">extracted_text_path</span></code> (TXT file), <code class="docutils literal notranslate"><span class="pre">sha256</span></code>, <code class="docutils literal notranslate"><span class="pre">content_length</span></code></p></li>
+<li><p><strong>AND</strong> both HTML and extracted text paths are populated</p></li>
+</ul>
+</section>
+<section id="scenario-http-error-populates-explicit-none-values">
+<h3>Scenario: HTTP error populates explicit None values<a class="headerlink" href="#scenario-http-error-populates-explicit-none-values" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> download fails with HTTP 404 or network error</p></li>
+<li><p><strong>THEN</strong> <code class="docutils literal notranslate"><span class="pre">DownloadOutcome</span></code> includes: <code class="docutils literal notranslate"><span class="pre">classification=&quot;http_error&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">path=None</span></code>, <code class="docutils literal notranslate"><span class="pre">sha256=None</span></code>, <code class="docutils literal notranslate"><span class="pre">content_length=None</span></code>, <code class="docutils literal notranslate"><span class="pre">etag=None</span></code>, <code class="docutils literal notranslate"><span class="pre">last_modified=None</span></code>, <code class="docutils literal notranslate"><span class="pre">error</span></code> (message)</p></li>
+<li><p><strong>AND</strong> missing fields are explicitly <code class="docutils literal notranslate"><span class="pre">None</span></code> rather than omitted</p></li>
+</ul>
+</section>
+<section id="scenario-dry-run-mode-populates-available-metadata">
+<h3>Scenario: Dry-run mode populates available metadata<a class="headerlink" href="#scenario-dry-run-mode-populates-available-metadata" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> download runs in <code class="docutils literal notranslate"><span class="pre">--dry-run</span></code> mode</p></li>
+<li><p><strong>AND</strong> HEAD request returns <code class="docutils literal notranslate"><span class="pre">ETag</span></code> and <code class="docutils literal notranslate"><span class="pre">Last-Modified</span></code> headers</p></li>
+<li><p><strong>THEN</strong> <code class="docutils literal notranslate"><span class="pre">DownloadOutcome</span></code> includes: classification, <code class="docutils literal notranslate"><span class="pre">etag</span></code>, <code class="docutils literal notranslate"><span class="pre">last_modified</span></code>, <code class="docutils literal notranslate"><span class="pre">path=None</span></code>, <code class="docutils literal notranslate"><span class="pre">sha256=None</span></code></p></li>
+<li><p><strong>AND</strong> unavailable fields (sha256, path) are explicitly <code class="docutils literal notranslate"><span class="pre">None</span></code></p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-resolver-wall-time-observability">
+<h2>Requirement: Resolver Wall Time Observability<a class="headerlink" href="#requirement-resolver-wall-time-observability" title="Link to this heading"></a></h2>
+<p>The Content Download module SHALL track and log total wall time spent in each resolver including rate-limit waits for performance analysis.</p>
+<section id="scenario-resolver-wall-time-includes-rate-limit-delays">
+<h3>Scenario: Resolver wall time includes rate-limit delays<a class="headerlink" href="#scenario-resolver-wall-time-includes-rate-limit-delays" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a resolver is rate-limited and waits 1.0 seconds before making request</p></li>
+<li><p><strong>AND</strong> the HTTP request takes 0.5 seconds</p></li>
+<li><p><strong>THEN</strong> <code class="docutils literal notranslate"><span class="pre">AttemptRecord.resolver_wall_time_ms</span></code> is approximately 1500ms</p></li>
+<li><p><strong>AND</strong> <code class="docutils literal notranslate"><span class="pre">AttemptRecord.elapsed_ms</span></code> is approximately 500ms (HTTP only)</p></li>
+</ul>
+</section>
+<section id="scenario-resolver-wall-time-in-jsonl-logs">
+<h3>Scenario: Resolver wall time in JSONL logs<a class="headerlink" href="#scenario-resolver-wall-time-in-jsonl-logs" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> an attempt is logged to JSONL</p></li>
+<li><p><strong>THEN</strong> the log entry includes field: <code class="docutils literal notranslate"><span class="pre">&quot;resolver_wall_time_ms&quot;:</span> <span class="pre">1523.4</span></code></p></li>
+<li><p><strong>AND</strong> field is present for all resolver attempts</p></li>
+</ul>
+</section>
+<section id="scenario-resolver-wall-time-in-csv-logs">
+<h3>Scenario: Resolver wall time in CSV logs<a class="headerlink" href="#scenario-resolver-wall-time-in-csv-logs" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> CSV logging is enabled</p></li>
+<li><p><strong>THEN</strong> CSV header includes column <code class="docutils literal notranslate"><span class="pre">resolver_wall_time_ms</span></code></p></li>
+<li><p><strong>AND</strong> each row populates the column with timing data</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-configuration-schema-extensions">
+<h2>Requirement: Configuration Schema Extensions<a class="headerlink" href="#requirement-configuration-schema-extensions" title="Link to this heading"></a></h2>
+<p>The Content Download module SHALL support new configuration options for advanced features while maintaining backward compatibility.</p>
+<section id="scenario-head-pre-check-configuration">
+<h3>Scenario: HEAD pre-check configuration<a class="headerlink" href="#scenario-head-pre-check-configuration" title="Link to this heading"></a></h3>
+<ul>
+<li><p><strong>WHEN</strong> configuration file includes:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">enable_head_precheck</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">resolver_head_precheck</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">wayback</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>THEN</strong> the system performs HEAD checks for all resolvers except Wayback</p></li>
+<li><p><strong>AND</strong> default remains <code class="docutils literal notranslate"><span class="pre">true</span></code> if not specified</p></li>
+</ul>
+</section>
+<section id="scenario-bounded-concurrency-configuration">
+<h3>Scenario: Bounded concurrency configuration<a class="headerlink" href="#scenario-bounded-concurrency-configuration" title="Link to this heading"></a></h3>
+<ul>
+<li><p><strong>WHEN</strong> configuration file includes:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">max_concurrent_resolvers</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>THEN</strong> the system executes up to 3 resolvers concurrently within a work</p></li>
+<li><p><strong>AND</strong> default remains <code class="docutils literal notranslate"><span class="pre">1</span></code> (sequential) if not specified</p></li>
+</ul>
+</section>
+<section id="scenario-invalid-concurrency-value-validation">
+<h3>Scenario: Invalid concurrency value validation<a class="headerlink" href="#scenario-invalid-concurrency-value-validation" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> configuration specifies <code class="docutils literal notranslate"><span class="pre">max_concurrent_resolvers:</span> <span class="pre">0</span></code></p></li>
+<li><p><strong>THEN</strong> the system raises <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> during config initialization</p></li>
+<li><p><strong>AND</strong> provides helpful error message</p></li>
+</ul>
+</section>
+<section id="scenario-backward-compatibility-with-existing-configs">
+<h3>Scenario: Backward compatibility with existing configs<a class="headerlink" href="#scenario-backward-compatibility-with-existing-configs" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> an existing configuration file lacks new fields</p></li>
+<li><p><strong>THEN</strong> the system applies default values for all new options</p></li>
+<li><p><strong>AND</strong> no configuration migration is required</p></li>
+</ul>
+</section>
+</section>
+<section id="requirement-developer-documentation-for-custom-resolvers">
+<h2>Requirement: Developer Documentation for Custom Resolvers<a class="headerlink" href="#requirement-developer-documentation-for-custom-resolvers" title="Link to this heading"></a></h2>
+<p>The Content Download module SHALL provide comprehensive documentation and templates enabling developers to add custom resolver providers.</p>
+<section id="scenario-resolver-template-availability">
+<h3>Scenario: Resolver template availability<a class="headerlink" href="#scenario-resolver-template-availability" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a developer reads <code class="docutils literal notranslate"><span class="pre">docs/adding-custom-resolvers.md</span></code></p></li>
+<li><p><strong>THEN</strong> the document includes complete resolver class template</p></li>
+<li><p><strong>AND</strong> includes registration instructions for <code class="docutils literal notranslate"><span class="pre">providers/__init__.py</span></code></p></li>
+</ul>
+</section>
+<section id="scenario-custom-resolver-follows-protocol">
+<h3>Scenario: Custom resolver follows protocol<a class="headerlink" href="#scenario-custom-resolver-follows-protocol" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>WHEN</strong> a custom resolver implements <code class="docutils literal notranslate"><span class="pre">name</span></code>, <code class="docutils literal notranslate"><span class="pre">is_enabled()</span></code>, and <code class="docutils literal notranslate"><span class="pre">iter_urls()</span></code> methods</p></li>
+<li><p><strong>AND</strong> is registered in default resolver list</p></li>
+<li><p><strong>THEN</strong> the resolver executes in pipeline with standard error handling</p></li>
+<li><p><strong>AND</strong> respects configuration (timeouts, rate limits, toggles)</p></li>
+</ul>
+</section>
+<section id="scenario-custom-resolver-configuration">
+<h3>Scenario: Custom resolver configuration<a class="headerlink" href="#scenario-custom-resolver-configuration" title="Link to this heading"></a></h3>
+<ul>
+<li><p><strong>WHEN</strong> a custom resolver named <code class="docutils literal notranslate"><span class="pre">&quot;custom&quot;</span></code> is added</p></li>
+<li><p><strong>THEN</strong> standard configuration applies:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">resolver_toggles</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">custom</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">resolver_min_interval_s</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">custom</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.5</span>
+<span class="nt">resolver_timeouts</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">custom</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15.0</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>AND</strong> no code changes needed for configuration support</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

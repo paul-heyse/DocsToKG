@@ -85,7 +85,7 @@ class DenseIndexConfig:
     gpu_temp_memory_bytes: Optional[int] = None
     gpu_indices_32_bit: bool = True
     expected_ntotal: int = 0
-    rebuild_delete_threshold: int = 0
+    rebuild_delete_threshold: int = 10000
     force_64bit_ids: bool = False
     interleaved_layout: bool = True
     flat_use_fp16: bool = False

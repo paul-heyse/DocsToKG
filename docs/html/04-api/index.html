@@ -1,0 +1,349 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. API Reference &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="1. Development Guide" href="../05-development/index.html" />
+    <link rel="prev" title="1. Architecture Guide" href="../03-architecture/index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">1. API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#base-endpoint">2. Base Endpoint</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#request-body">2.1 Request Body</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#response-body">2.2 Response Body</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#error-responses">2.3 Error Responses</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#pagination">3. Pagination</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#diagnostics">4. Diagnostics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#integrating-with-fastapi">5. Integrating with FastAPI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#local-service-usage-no-http">6. Local Service Usage (No HTTP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#related-resources">7. Related Resources</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. API Reference</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/index.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="api-reference">
+<h1>1. API Reference<a class="headerlink" href="#api-reference" title="Link to this heading"></a></h1>
+<p>DocsToKG exposes a single HTTP-style interface for hybrid search through the
+<code class="docutils literal notranslate"><span class="pre">HybridSearchAPI</span></code> class in <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.api</span></code>. This reference describes the
+request/response schema and shows how to integrate the API into a web service.</p>
+<blockquote>
+<div><p>ℹ️  DocsToKG does not ship a standalone web server. Use the snippets below to wrap <code class="docutils literal notranslate"><span class="pre">HybridSearchAPI</span></code> with your preferred framework (FastAPI, Flask, etc.).</p>
+</div></blockquote>
+<section id="base-endpoint">
+<h2>2. Base Endpoint<a class="headerlink" href="#base-endpoint" title="Link to this heading"></a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">POST</span> <span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">hybrid</span><span class="o">-</span><span class="n">search</span>
+<span class="n">Content</span><span class="o">-</span><span class="n">Type</span><span class="p">:</span> <span class="n">application</span><span class="o">/</span><span class="n">json</span>
+</pre></div>
+</div>
+<section id="request-body">
+<h3>2.1 Request Body<a class="headerlink" href="#request-body" title="Link to this heading"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Required</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">query</span></code></p></td>
+<td><p>string</p></td>
+<td><p>✅</p></td>
+<td><p>Natural language search query</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">namespace</span></code></p></td>
+<td><p>string</p></td>
+<td><p>❌</p></td>
+<td><p>Restrict search to a logical namespace</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">filters</span></code></p></td>
+<td><p>object</p></td>
+<td><p>❌</p></td>
+<td><p>Additional metadata filters (values can be scalars or lists)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">page_size</span></code></p></td>
+<td><p>integer</p></td>
+<td><p>❌</p></td>
+<td><p>Number of results to return (default <code class="docutils literal notranslate"><span class="pre">10</span></code>)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">cursor</span></code></p></td>
+<td><p>string</p></td>
+<td><p>❌</p></td>
+<td><p>Pagination cursor returned from a previous call</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">diversification</span></code></p></td>
+<td><p>boolean</p></td>
+<td><p>❌</p></td>
+<td><p>Enable Maximal Marginal Relevance (default <code class="docutils literal notranslate"><span class="pre">false</span></code>)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">diagnostics</span></code></p></td>
+<td><p>boolean</p></td>
+<td><p>❌</p></td>
+<td><p>Include per-signal scores (default <code class="docutils literal notranslate"><span class="pre">true</span></code>)</p></td>
+</tr>
+</tbody>
+</table>
+<p>Example request:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;query&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ontology alignment best practices&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;public&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;page_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;filters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;source&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;pyalex&quot;</span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;year&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;diversification&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="response-body">
+<h3>2.2 Response Body<a class="headerlink" href="#response-body" title="Link to this heading"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">results</span></code></p></td>
+<td><p>array</p></td>
+<td><p>Ranked hits, highest score first</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">next_cursor</span></code></p></td>
+<td><p>string | null</p></td>
+<td><p>Cursor for the next page (<code class="docutils literal notranslate"><span class="pre">null</span></code> when exhausted)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">total_candidates</span></code></p></td>
+<td><p>integer</p></td>
+<td><p>Number of candidates evaluated across retrieval stages</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">timings_ms</span></code></p></td>
+<td><p>object</p></td>
+<td><p>Per-stage latency diagnostics</p></td>
+</tr>
+</tbody>
+</table>
+<p>Each result contains:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;doc_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;whitepaper-001&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;chunk_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;5&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;public&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;score&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">23.41</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;fused_rank&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;text&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Hybrid search combines lexical and dense retrieval strategies...&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;highlights&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;hybrid&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;retrieval&quot;</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;provenance_offsets&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="mi">128</span><span class="p">,</span><span class="w"> </span><span class="mi">196</span><span class="p">]],</span>
+<span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Hybrid Search Strategies&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;authors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Doe, Jane&quot;</span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;year&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2024</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;diagnostics&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;bm25&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">12.34</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;splade&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">7.85</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;dense&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">3.22</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="error-responses">
+<h3>2.3 Error Responses<a class="headerlink" href="#error-responses" title="Link to this heading"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Status</p></th>
+<th class="head"><p>Body</p></th>
+<th class="head"><p>When it occurs</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">400</span> <span class="pre">Bad</span> <span class="pre">Request</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">{&quot;error&quot;:</span> <span class="pre">&quot;Invalid</span> <span class="pre">payload&quot;}</span></code></p></td>
+<td><p>Missing <code class="docutils literal notranslate"><span class="pre">query</span></code>, wrong types, or validation error</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">500</span> <span class="pre">Internal</span> <span class="pre">Server</span> <span class="pre">Error</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">{&quot;error&quot;:</span> <span class="pre">&quot;message&quot;}</span></code></p></td>
+<td><p>Unexpected exception while processing the request</p></td>
+</tr>
+</tbody>
+</table>
+<p>Validation failures raise <code class="docutils literal notranslate"><span class="pre">RequestValidationError</span></code> inside the service; the API layer converts them into <code class="docutils literal notranslate"><span class="pre">400</span></code> responses.</p>
+</section>
+</section>
+<section id="pagination">
+<h2>3. Pagination<a class="headerlink" href="#pagination" title="Link to this heading"></a></h2>
+<p>The API returns at most <code class="docutils literal notranslate"><span class="pre">page_size</span></code> results per call. When additional results are available, <code class="docutils literal notranslate"><span class="pre">next_cursor</span></code> is populated. Supply this value in the next request to continue pagination.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;query&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;hybrid retrieval&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;cursor&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;opaque-token-from-previous-response&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Cursor chains are stable across requests unless the underlying index changes significantly.
+Use <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.operations.verify_pagination</span></code> during integration tests to ensure
+continuity.</p>
+</section>
+<section id="diagnostics">
+<h2>4. Diagnostics<a class="headerlink" href="#diagnostics" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">timings_ms</span></code> contains latency measurements for each stage (BM25, SPLADE, FAISS, fusion) when
+observability is enabled. Per-result <code class="docutils literal notranslate"><span class="pre">diagnostics</span></code> expose individual signal scores, useful for
+ranking audits.</p>
+</section>
+<section id="integrating-with-fastapi">
+<h2>5. Integrating with FastAPI<a class="headerlink" href="#integrating-with-fastapi" title="Link to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">fastapi</span><span class="w"> </span><span class="kn">import</span> <span class="n">FastAPI</span><span class="p">,</span> <span class="n">HTTPException</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">HybridSearchAPI</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">my_project.hybrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_hybrid_service</span>  <span class="c1"># see docs/06-operations/index.md</span>
+
+<span class="n">app</span> <span class="o">=</span> <span class="n">FastAPI</span><span class="p">()</span>
+<span class="n">service</span> <span class="o">=</span> <span class="n">build_hybrid_service</span><span class="p">()</span>
+<span class="n">api</span> <span class="o">=</span> <span class="n">HybridSearchAPI</span><span class="p">(</span><span class="n">service</span><span class="p">)</span>
+
+<span class="nd">@app</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;/v1/hybrid-search&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">hybrid_search</span><span class="p">(</span><span class="n">payload</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+    <span class="n">status</span><span class="p">,</span> <span class="n">body</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">post_hybrid_search</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">status</span> <span class="o">!=</span> <span class="mi">200</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">HTTPException</span><span class="p">(</span><span class="n">status_code</span><span class="o">=</span><span class="n">status</span><span class="p">,</span> <span class="n">detail</span><span class="o">=</span><span class="n">body</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">body</span>
+</pre></div>
+</div>
+<p>Run locally with:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>uvicorn<span class="w"> </span>app:app<span class="w"> </span>--reload<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span>
+</pre></div>
+</div>
+<p>Then issue a request:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/v1/hybrid-search<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;query&quot;: &quot;knowledge graph embeddings&quot;, &quot;page_size&quot;: 5}&#39;</span>
+</pre></div>
+</div>
+</section>
+<section id="local-service-usage-no-http">
+<h2>6. Local Service Usage (No HTTP)<a class="headerlink" href="#local-service-usage-no-http" title="Link to this heading"></a></h2>
+<p>When embedding DocsToKG directly inside Python code, call the service layer once you have constructed it (see <code class="docutils literal notranslate"><span class="pre">docs/06-operations/index.md</span></code> for a full build walkthrough):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.retrieval</span><span class="w"> </span><span class="kn">import</span> <span class="n">HybridSearchRequest</span>
+
+<span class="n">service</span> <span class="o">=</span> <span class="n">build_hybrid_service</span><span class="p">()</span>
+<span class="n">request</span> <span class="o">=</span> <span class="n">HybridSearchRequest</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="s2">&quot;ontology mapping pipeline&quot;</span><span class="p">)</span>
+<span class="n">response</span> <span class="o">=</span> <span class="n">service</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Working examples of service assembly live in <code class="docutils literal notranslate"><span class="pre">tests/conftest.py</span></code> and <code class="docutils literal notranslate"><span class="pre">tests/test_hybrid_search.py</span></code>.</p>
+</section>
+<section id="related-resources">
+<h2>7. Related Resources<a class="headerlink" href="#related-resources" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">docs/06-operations/index.md</span></code> – Day-two operations and maintenance routines.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">docs/07-reference/api-integrations/index.md</span></code> – Integration best practices and CLI helpers.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tests/test_hybrid_search.py</span></code> – Example assertions covering the service layer.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../03-architecture/index.html" class="btn btn-neutral float-left" title="1. Architecture Guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../05-development/index.html" class="btn btn-neutral float-right" title="1. Development Guide" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,175 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Deployment Guide &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Deployment Guide</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/07-reference/deployment/index.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="deployment-guide">
+<h1>1. Deployment Guide<a class="headerlink" href="#deployment-guide" title="Link to this heading"></a></h1>
+<p>Use this reference when promoting DocsToKG from development to staging or production.</p>
+<section id="prerequisites">
+<h2>2. Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Python 3.12 runtime with virtual environment support</p></li>
+<li><p>Access to object storage for FAISS snapshots and ontology artifacts</p></li>
+<li><p>Credentials for upstream data sources (Pyalex, ontology APIs)</p></li>
+<li><p>Observability stack (Prometheus/OpenTelemetry) for metrics ingestion</p></li>
+</ul>
+</section>
+<section id="deployment-steps">
+<h2>3. Deployment Steps<a class="headerlink" href="#deployment-steps" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p><strong>Prepare Environment</strong></p>
+<ul class="simple">
+<li><p>Create isolated virtual environment.</p></li>
+<li><p>Install project dependencies: <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">-e</span> <span class="pre">.</span></code>.</p></li>
+<li><p>Install GPU wheels as needed: <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">-r</span> <span class="pre">requirements.in</span></code>.</p></li>
+</ul>
+</li>
+<li><p><strong>Seed Artifacts</strong></p>
+<ul class="simple">
+<li><p>Download required ontologies: <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.OntologyDownload.cli</span> <span class="pre">pull</span></code>.</p></li>
+<li><p>Build FAISS indexes using ingestion pipelines and <code class="docutils literal notranslate"><span class="pre">serialize_state</span></code>.</p></li>
+</ul>
+</li>
+<li><p><strong>Configure Runtime</strong></p>
+<ul class="simple">
+<li><p>Populate <code class="docutils literal notranslate"><span class="pre">config/hybrid_config.json</span></code> (see <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.config</span></code> models).</p></li>
+<li><p>Set environment variables: <code class="docutils literal notranslate"><span class="pre">HYBRID_SEARCH_CONFIG</span></code>, <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_DATA_ROOT</span></code>, etc.</p></li>
+</ul>
+</li>
+<li><p><strong>Launch Services</strong></p>
+<ul class="simple">
+<li><p>Start REST layer (FastAPI/uvicorn entrypoint if embedding into a service).</p></li>
+<li><p>Schedule ingestion jobs (cron, Airflow, or manual invocations).</p></li>
+</ul>
+</li>
+<li><p><strong>Validate</strong></p>
+<ul class="simple">
+<li><p>Run <code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">-m</span> <span class="pre">real_vectors</span> <span class="pre">--real-vectors</span></code>.</p></li>
+<li><p>Execute <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.HybridSearch.validation</span></code>.</p></li>
+<li><p>Perform smoke queries via REST API.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="rollback">
+<h2>4. Rollback<a class="headerlink" href="#rollback" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Restore previous FAISS snapshot via <code class="docutils literal notranslate"><span class="pre">restore_state</span></code>.</p></li>
+<li><p>Revert ontology store to prior manifest.</p></li>
+<li><p>Deploy prior configuration commit (git tag or release).</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">docs/hybrid_search_runbook.md</span></code> for detailed rollback actions.</p></li>
+</ul>
+</section>
+<section id="continuous-delivery-tips">
+<h2>5. Continuous Delivery Tips<a class="headerlink" href="#continuous-delivery-tips" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Store configuration and artifacts version numbers alongside releases.</p></li>
+<li><p>Automate documentation generation and attach outputs to release assets.</p></li>
+<li><p>Validate migrations (ontology schema changes, chunking tweaks) in staging before rolling forward.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

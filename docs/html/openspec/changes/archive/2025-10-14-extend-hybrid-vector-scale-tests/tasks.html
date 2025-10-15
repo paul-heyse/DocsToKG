@@ -1,0 +1,148 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Large-Scale Fixture Preparation &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/custom.css" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Large-Scale Fixture Preparation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/openspec/changes/archive/2025-10-14-extend-hybrid-vector-scale-tests/tasks.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="large-scale-fixture-preparation">
+<h1>1. Large-Scale Fixture Preparation<a class="headerlink" href="#large-scale-fixture-preparation" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 1.1 Sample ≥500 chunk/vector pairs from the real corpus covering at least three namespaces and multiple ACL combinations; capture sample metadata distribution for reference.</p></li>
+<li><p>[x] 1.2 Validate each sampled record (UUID presence, SPLADE token/weight parity, 2560-d vector norms, namespace/ACL fields) and persist the expanded fixture (chunks, vectors, manifest, query labels) with reproducible seed and file hashes.</p></li>
+<li><p>[x] 1.3 Author fixture README detailing regeneration steps, storage footprint, and CI usage; ensure the fixture can be streamed without loading entire files into memory.</p></li>
+</ul>
+</section>
+<section id="functional-correctness-testing">
+<h1>2. Functional &amp; Correctness Testing<a class="headerlink" href="#functional-correctness-testing" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 2.1 Extend data sanity checks to operate over the 500+ vector fixture and fail on schema/dimension violations or OpenSearch mapping mismatches.</p></li>
+<li><p>[x] 2.2 Implement high-volume CRUD + namespace isolation tests that exercise bulk upsert/update/delete, FAISS/OpenSearch parity (<code class="docutils literal notranslate"><span class="pre">ntotal</span></code>, record counts), and namespace filters returning exclusive results.</p></li>
+<li><p>[x] 2.3 Build dense FAISS correctness tests (self-hit &#64;1 ≥0.99, perturbation resilience, optional Flat-IP ground truth recall&#64;10 ≥0.95) using randomized samples from the large fixture.</p></li>
+<li><p>[x] 2.4 Add BM25 and SPLADE curated query suites (≥100 queries each) with hit-rate&#64;10 ≥0.8 acceptance thresholds; log per-query metrics for debugging.</p></li>
+<li><p>[x] 2.5 Construct pagination stability tests for OpenSearch PIT + <code class="docutils literal notranslate"><span class="pre">search_after</span></code> and FAISS page slicing, verifying repeatability and absence of overlap across multiple iterations.</p></li>
+<li><p>[x] 2.6 Implement hybrid fusion evaluation: compute RRF metrics (hit-rate&#64;k, MRR&#64;k, NDCG&#64;k) versus individual channels, execute MMR diversification (λ=0.6) and confirm ≥20% redundancy reduction with ≤2% absolute hit-rate loss.</p></li>
+<li><p>[x] 2.7 Extend result shaping assertions (collapse budget, cosine dedupe ≥0.98 threshold, highlight coverage, context token budgeting) using the scale dataset.</p></li>
+<li><p>[x] 2.8 Add regression coverage for ACL scenarios (role-scoped queries per namespace) ensuring forbidden namespaces return zero results and audit logs capture access attempts.</p></li>
+</ul>
+</section>
+<section id="operational-performance-and-stability-coverage">
+<h1>3. Operational, Performance, and Stability Coverage<a class="headerlink" href="#operational-performance-and-stability-coverage" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 3.1 Implement backup/restore parity tests that snapshot OpenSearch + serialize FAISS, restore into a clean environment, and compare result sets/score tolerances; log diff summaries.</p></li>
+<li><p>[x] 3.2 Add performance profiling harness to capture per-channel and end-to-end latency percentiles (P50/P95/P99), throughput vs concurrency curves, and GPU/OpenSearch resource telemetry; store CSV/JSON outputs.</p></li>
+<li><p>[x] 3.3 Introduce stability/determinism loops (repeat query batches ≥10 times, post-ingest churn replays) with assertions on ordering consistency and variance bounds.</p></li>
+<li><p>[x] 3.4 Execute calibration sweeps for FAISS (<code class="docutils literal notranslate"><span class="pre">nprobe</span></code>, PQ <code class="docutils literal notranslate"><span class="pre">M</span></code>/<code class="docutils literal notranslate"><span class="pre">nbits</span></code>), fusion score normalization strategies, and SPLADE token distributions; produce recommendation artifacts and guardrail alerts for drift (norm anomalies, zero-token docs).</p></li>
+</ul>
+</section>
+<section id="reporting-automation">
+<h1>4. Reporting &amp; Automation<a class="headerlink" href="#reporting-automation" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 4.1 Integrate all new checks into the validation harness with configurable acceptance thresholds and produce consolidated JSON + human-readable (markdown/HTML) reports summarizing each category.</p></li>
+<li><p>[x] 4.2 Persist per-test artifacts (metrics, logs, heatmaps) to a designated report directory with timestamped runs and attach thresholds used during execution.</p></li>
+<li><p>[x] 4.3 Create developer and CI entrypoints (CLI flags, scripts) to run synthetic-only, real-vector fast, and full-scale suites; document command usage.</p></li>
+<li><p>[x] 4.4 Configure CI/nightly jobs to execute the full-scale suite, collect artifacts, evaluate thresholds, and mark builds failed when any category falls below acceptance; integrate alerting for latency/recall regressions.</p></li>
+<li><p>[x] 4.5 Provide documentation for interpreting the scale report, updating thresholds, and extending the regression harness with new corpora or capabilities.</p></li>
+</ul>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

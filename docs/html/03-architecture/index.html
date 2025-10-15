@@ -1,0 +1,212 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Architecture Guide &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="1. API Reference" href="../04-api/index.html" />
+    <link rel="prev" title="1. Setup Guide" href="../02-setup/index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">1. Architecture Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#subsystem-overview">2. Subsystem Overview</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#content-acquisition-docstokg-contentdownload">1. Content Acquisition (<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload</span></code>)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#document-parsing-docstokg-docparsing">2. Document Parsing (<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing</span></code>)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#hybrid-search-docstokg-hybridsearch">3. Hybrid Search (<code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch</span></code>)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ontology-tooling-docstokg-ontologydownload">4. Ontology Tooling (<code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload</span></code>)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#knowledge-graph-vector-operations">5. Knowledge Graph &amp; Vector Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#data-flow">3. Data Flow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#key-integration-points">4. Key Integration Points</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Architecture Guide</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/03-architecture/index.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="architecture-guide">
+<h1>1. Architecture Guide<a class="headerlink" href="#architecture-guide" title="Link to this heading"></a></h1>
+<p>DocsToKG converts raw documents into searchable knowledge graph material using a pipeline
+of ingestion utilities, document parsers, ontology tooling, and a hybrid search engine.
+This guide explains the major subsystems, their responsibilities, and the data flow
+between them.</p>
+<div class="highlight-mermaid notranslate"><div class="highlight"><pre><span></span>graph TD
+    A[Source documents] --&gt;|Pyalex downloaders| B[ContentDownload]
+    B --&gt;|PDF / HTML assets| C[DocParsing]
+    C --&gt;|Chunks + embeddings| D[HybridSearch ingest]
+    D --&gt;|Dense vectors| E[FAISS]
+    D --&gt;|Sparse features| F[OpenSearch simulator]
+    E &amp; F --&gt;|Fusion| G[HybridSearch API]
+    H[OntologyDownload] --&gt;|Ontology metadata| D
+</pre></div>
+</div>
+<section id="subsystem-overview">
+<h2>2. Subsystem Overview<a class="headerlink" href="#subsystem-overview" title="Link to this heading"></a></h2>
+<section id="content-acquisition-docstokg-contentdownload">
+<h3>1. Content Acquisition (<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload</span></code>)<a class="headerlink" href="#content-acquisition-docstokg-contentdownload" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Fetches raw documents and metadata from upstream services (for example, Pyalex).</p></li>
+<li><p>Utilities live under <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/</span></code> with resolvers for source-specific logic.</p></li>
+<li><p>Outputs structured metadata and document artifacts to the <code class="docutils literal notranslate"><span class="pre">Data/</span></code> directory, ready for parsing.</p></li>
+</ul>
+</section>
+<section id="document-parsing-docstokg-docparsing">
+<h3>2. Document Parsing (<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing</span></code>)<a class="headerlink" href="#document-parsing-docstokg-docparsing" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Converts PDFs/HTML into DocTags and chunked Markdown using Docling.</p></li>
+<li><p>Pipelines such as <code class="docutils literal notranslate"><span class="pre">DoclingHybridChunkerPipelineWithMin.py</span></code> and <code class="docutils literal notranslate"><span class="pre">run_docling_html_to_doctags_parallel.py</span></code> normalise layout, extract captions, and produce chunk boundaries.</p></li>
+<li><p>Embedding scripts (<code class="docutils literal notranslate"><span class="pre">EmbeddingV2.py</span></code>) generate dense representations consumed by the hybrid search ingest layer.</p></li>
+<li><p>Chunk metadata includes provenance (pages, figure refs) used for highlights and diagnostics.</p></li>
+</ul>
+</section>
+<section id="hybrid-search-docstokg-hybridsearch">
+<h3>3. Hybrid Search (<code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch</span></code>)<a class="headerlink" href="#hybrid-search-docstokg-hybridsearch" title="Link to this heading"></a></h3>
+<p>Core packages in <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/HybridSearch/</span></code> provide:</p>
+<ul class="simple">
+<li><p><strong>Configuration</strong> (<code class="docutils literal notranslate"><span class="pre">config.py</span></code>): Dataclasses for chunking, dense indexing, fusion, and retrieval parameters. The <code class="docutils literal notranslate"><span class="pre">HybridSearchConfigManager</span></code> reloads configs at runtime.</p></li>
+<li><p><strong>Ingest &amp; Storage</strong> (<code class="docutils literal notranslate"><span class="pre">ingest.py</span></code>, <code class="docutils literal notranslate"><span class="pre">storage.py</span></code>): Orchestrate chunk ingestion, maintain FAISS snapshots, and manage the OpenSearch simulator used in tests.</p></li>
+<li><p><strong>Retrieval</strong> (<code class="docutils literal notranslate"><span class="pre">retrieval.py</span></code>): Implements <code class="docutils literal notranslate"><span class="pre">HybridSearchService</span></code> and <code class="docutils literal notranslate"><span class="pre">HybridSearchRequest/Response</span></code> models combining BM25, SPLADE, and FAISS scores.</p></li>
+<li><p><strong>Fusion</strong> (<code class="docutils literal notranslate"><span class="pre">fusion.py</span></code>): Applies Reciprocal Rank Fusion (RRF) and Maximal Marginal Relevance (MMR) for final ranking.</p></li>
+<li><p><strong>Observability</strong> (<code class="docutils literal notranslate"><span class="pre">observability.py</span></code>): Exposes metrics snapshots for monitoring and rebuild decisions.</p></li>
+<li><p><strong>API Layer</strong> (<code class="docutils literal notranslate"><span class="pre">api.py</span></code>): Wraps the service in an HTTP-style interface used by REST deployments.</p></li>
+</ul>
+<p>Dense vectors are stored in FAISS (GPU-capable via the scaffold in <code class="docutils literal notranslate"><span class="pre">docs/07-reference/faiss/</span></code>), while sparse signals are backed by an OpenSearch-compatible registry used for local testing.</p>
+</section>
+<section id="ontology-tooling-docstokg-ontologydownload">
+<h3>4. Ontology Tooling (<code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload</span></code>)<a class="headerlink" href="#ontology-tooling-docstokg-ontologydownload" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Command-line interface (<code class="docutils literal notranslate"><span class="pre">cli.py</span></code>) downloads ontologies from OBO, OLS, BioPortal, SKOS, and XBRL sources.</p></li>
+<li><p>Configurations (<code class="docutils literal notranslate"><span class="pre">config.py</span></code>) describe resolver options, licensing rules, and validation policies.</p></li>
+<li><p>Validators (<code class="docutils literal notranslate"><span class="pre">validators.py</span></code>) run rdflib, Pronto, Owlready2, ROBOT, and Arelle checks depending on flags.</p></li>
+<li><p>Stored data supports knowledge enrichment and schema alignment in downstream pipelines.</p></li>
+</ul>
+</section>
+<section id="knowledge-graph-vector-operations">
+<h3>5. Knowledge Graph &amp; Vector Operations<a class="headerlink" href="#knowledge-graph-vector-operations" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">VectorOperations/</span></code> package is reserved for future expansion of graph materialisation tasks.</p></li>
+<li><p>Hybrid search currently operates over chunked text; graph exports can be layered on top as ontology assets mature.</p></li>
+</ul>
+</section>
+</section>
+<section id="data-flow">
+<h2>3. Data Flow<a class="headerlink" href="#data-flow" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p><strong>Acquisition</strong>: Download raw documents and metadata (<code class="docutils literal notranslate"><span class="pre">ContentDownload</span></code> CLI or scheduled jobs).</p></li>
+<li><p><strong>Parsing</strong>: Use Docling pipelines to convert assets into DocTags, chunked Markdown, and embeddings (<code class="docutils literal notranslate"><span class="pre">DocParsing</span></code> scripts).</p></li>
+<li><p><strong>Indexing</strong>: Feed chunk payloads into <code class="docutils literal notranslate"><span class="pre">HybridSearch.ingest</span></code> to update FAISS and sparse stores.</p></li>
+<li><p><strong>Serving</strong>: Deploy <code class="docutils literal notranslate"><span class="pre">HybridSearchAPI</span></code> behind FastAPI or another HTTP framework, exposing <code class="docutils literal notranslate"><span class="pre">/v1/hybrid-search</span></code>.</p></li>
+<li><p><strong>Maintenance</strong>: Run ontology downloads and validation periodically to keep terminologies synchronised with search metadata.</p></li>
+<li><p><strong>Monitoring</strong>: Capture metrics from <code class="docutils literal notranslate"><span class="pre">HybridSearch.observability</span></code> and validation harnesses to detect drift.</p></li>
+</ol>
+</section>
+<section id="key-integration-points">
+<h2>4. Key Integration Points<a class="headerlink" href="#key-integration-points" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Config Files</strong>: <code class="docutils literal notranslate"><span class="pre">config/hybrid_config.json</span></code> (runtime toggles), ontology <code class="docutils literal notranslate"><span class="pre">sources.yaml</span></code>, environment variables documented in <code class="docutils literal notranslate"><span class="pre">docs/02-setup/index.md</span></code>.</p></li>
+<li><p><strong>Artifacts</strong>: FAISS snapshots, chunk registries, ontology manifests stored under configurable data roots.</p></li>
+<li><p><strong>Tests</strong>: <code class="docutils literal notranslate"><span class="pre">tests/</span></code> directory covers hybrid search, pipeline behaviour, ontology workflows, and CLI utilities.</p></li>
+<li><p><strong>Documentation</strong>: Generated API docs (<code class="docutils literal notranslate"><span class="pre">docs/04-api/</span></code>) mirror the structure above, while operations references provide day-two guidance.</p></li>
+</ul>
+<p>Refer to <code class="docutils literal notranslate"><span class="pre">docs/06-operations/index.md</span></code> for deployment practices and to <code class="docutils literal notranslate"><span class="pre">docs/07-reference/</span></code> for tuning, security, and troubleshooting guidance.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../02-setup/index.html" class="btn btn-neutral float-left" title="1. Setup Guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../04-api/index.html" class="btn btn-neutral float-right" title="1. API Reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

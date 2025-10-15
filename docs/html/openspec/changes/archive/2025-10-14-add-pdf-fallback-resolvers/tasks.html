@@ -1,0 +1,150 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. OpenAlex Intake &amp; Data Modeling &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/custom.css" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. OpenAlex Intake &amp; Data Modeling</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/openspec/changes/archive/2025-10-14-add-pdf-fallback-resolvers/tasks.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="openalex-intake-data-modeling">
+<h1>1. OpenAlex Intake &amp; Data Modeling<a class="headerlink" href="#openalex-intake-data-modeling" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 1.1 Update <code class="docutils literal notranslate"><span class="pre">download_pyalex_pdfs.build_query</span></code> (and any helper that wraps pyalex <code class="docutils literal notranslate"><span class="pre">Works</span></code>) to include a <code class="docutils literal notranslate"><span class="pre">select</span></code> clause that fetches <code class="docutils literal notranslate"><span class="pre">ids</span></code>, <code class="docutils literal notranslate"><span class="pre">locations.landing_page_url</span></code>, <code class="docutils literal notranslate"><span class="pre">locations.source.display_name</span></code>, <code class="docutils literal notranslate"><span class="pre">primary_location</span></code>, <code class="docutils literal notranslate"><span class="pre">best_oa_location</span></code>, and <code class="docutils literal notranslate"><span class="pre">open_access.oa_url</span></code> alongside the existing fields.</p></li>
+<li><p>[x] 1.2 Introduce a <code class="docutils literal notranslate"><span class="pre">WorkArtifact</span></code> (dataclass or typed dict) that normalizes the identifiers (DOI, PMID, PMCID, arXiv), landing-page URLs, OpenAlex-provided PDF URLs, and human-readable context (title, year, venue) so downstream resolvers and loggers can consume a stable shape.</p></li>
+<li><p>[x] 1.3 Thread the enriched <code class="docutils literal notranslate"><span class="pre">WorkArtifact</span></code> through the download loop, ensuring existing sniffing logic receives the same base file stem, and update any CSV logging helpers to read from this artifact instead of raw OpenAlex records.</p></li>
+<li><p>[x] 1.4 Capture the namespace keyed directories (<code class="docutils literal notranslate"><span class="pre">pdf</span></code>, <code class="docutils literal notranslate"><span class="pre">html</span></code>) in the artifact or config so resolvers know where to persist outputs without duplicating path logic.</p></li>
+</ul>
+</section>
+<section id="resolver-stack-implementation">
+<h1>2. Resolver Stack Implementation<a class="headerlink" href="#resolver-stack-implementation" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 2.1 Create a <code class="docutils literal notranslate"><span class="pre">resolvers/</span></code> module that defines a <code class="docutils literal notranslate"><span class="pre">Resolver</span></code> protocol (<code class="docutils literal notranslate"><span class="pre">name</span></code>, <code class="docutils literal notranslate"><span class="pre">is_enabled(config,</span> <span class="pre">artifact)</span></code>, <code class="docutils literal notranslate"><span class="pre">iter_urls(...)</span></code>) and central <code class="docutils literal notranslate"><span class="pre">ResolverPipeline</span></code> that enforces ordering, dedupes candidate URLs, applies referer headers when needed, and records attempt metadata.</p></li>
+<li><p>[x] 2.2 Implement <code class="docutils literal notranslate"><span class="pre">UnpaywallResolver</span></code> that requires a configured email, calls <code class="docutils literal notranslate"><span class="pre">/v2/&lt;doi&gt;</span></code>, extracts <code class="docutils literal notranslate"><span class="pre">best_oa_location.url_for_pdf</span></code> plus <code class="docutils literal notranslate"><span class="pre">oa_locations[].url_for_pdf</span></code>, applies polite rate limiting, and surfaces soft failures (e.g., HTTP 404) to the pipeline.</p></li>
+<li><p>[x] 2.3 Implement <code class="docutils literal notranslate"><span class="pre">CrossrefResolver</span></code> that hits <code class="docutils literal notranslate"><span class="pre">/works/&lt;doi&gt;</span></code> once per DOI, parses <code class="docutils literal notranslate"><span class="pre">message.link[]</span></code>, prioritizes <code class="docutils literal notranslate"><span class="pre">content-type</span> <span class="pre">==</span> <span class="pre">application/pdf</span></code>, and appends <code class="docutils literal notranslate"><span class="pre">content-version</span></code>/<code class="docutils literal notranslate"><span class="pre">intended-application</span></code> context to the attempt metadata.</p></li>
+<li><p>[x] 2.4 Implement <code class="docutils literal notranslate"><span class="pre">LandingPageResolver</span></code> that fetches each landing page with the shared HTTP session, parses <code class="docutils literal notranslate"><span class="pre">&lt;meta</span> <span class="pre">name=&quot;citation_pdf_url&quot;&gt;</span></code> and <code class="docutils literal notranslate"><span class="pre">&lt;link</span> <span class="pre">rel=&quot;alternate&quot;</span> <span class="pre">type=&quot;application/pdf&quot;&gt;</span></code> via <code class="docutils literal notranslate"><span class="pre">BeautifulSoup</span></code>, normalizes relative URLs, and returns at most one candidate per landing page to avoid combinatorial explosions.</p></li>
+<li><p>[x] 2.5 Implement repository resolvers: <code class="docutils literal notranslate"><span class="pre">ArxivResolver</span></code>, <code class="docutils literal notranslate"><span class="pre">PmcResolver</span></code>, <code class="docutils literal notranslate"><span class="pre">EuropePmcResolver</span></code>, <code class="docutils literal notranslate"><span class="pre">CoreResolver</span></code>, <code class="docutils literal notranslate"><span class="pre">DoajResolver</span></code>, and <code class="docutils literal notranslate"><span class="pre">SemanticScholarResolver</span></code>, each using official APIs/patterns, attaching necessary headers (e.g., API keys), and performing DOI/identifier normalization (e.g., stripping <code class="docutils literal notranslate"><span class="pre">arXiv:</span></code> prefixes, upper-casing <code class="docutils literal notranslate"><span class="pre">PMC</span></code>).</p></li>
+<li><p>[x] 2.6 Implement <code class="docutils literal notranslate"><span class="pre">WaybackResolver</span></code> that only fires when a previously-known PDF URL failed, calls the availability API, and returns archived URLs tagged with capture timestamp metadata.</p></li>
+<li><p>[x] 2.7 Ensure each resolver respects global timeout/backoff rules, reuses the shared <code class="docutils literal notranslate"><span class="pre">requests.Session</span></code>, and yields URLs in a generator-friendly fashion so the pipeline can short-circuit on the first confirmed PDF.</p></li>
+<li><p>[x] 2.8 Update the main download loop to call the pipeline after OpenAlex candidates, pass the artifact + configuration, reuse the existing <code class="docutils literal notranslate"><span class="pre">download_pdf</span></code> streaming helper, and emit resolver provenance (resolver name, URL, status) on every attempt.</p></li>
+</ul>
+</section>
+<section id="configuration-politeness-and-logging">
+<h1>3. Configuration, Politeness, and Logging<a class="headerlink" href="#configuration-politeness-and-logging" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 3.1 Introduce a <code class="docutils literal notranslate"><span class="pre">ResolverConfig</span></code> loader that reads a YAML file (default <code class="docutils literal notranslate"><span class="pre">resolver_config.yaml</span></code>) via PyYAML and surfaces per-resolver toggles, max attempts per work, global timeout, sleep jitter, and credential slots (<code class="docutils literal notranslate"><span class="pre">unpaywall_email</span></code>, <code class="docutils literal notranslate"><span class="pre">core_api_key</span></code>, <code class="docutils literal notranslate"><span class="pre">semantic_scholar_api_key</span></code>, <code class="docutils literal notranslate"><span class="pre">doaj_api_key</span></code>).</p></li>
+<li><p>[x] 3.2 Extend the CLI to accept <code class="docutils literal notranslate"><span class="pre">--resolver-config</span></code> (YAML path) plus individual overrides (<code class="docutils literal notranslate"><span class="pre">--unpaywall-email</span></code>, <code class="docutils literal notranslate"><span class="pre">--disable-resolver=core</span></code>) while keeping backward compatibility for existing flags; document environment variable fallbacks.</p></li>
+<li><p>[x] 3.3 Add polite-pool headers (<code class="docutils literal notranslate"><span class="pre">mailto</span></code>, <code class="docutils literal notranslate"><span class="pre">User-Agent</span></code>) and per-resolver rate policies (e.g., Unpaywall 1 QPS, Crossref back-off on 429) configurable via the new config.</p></li>
+<li><p>[x] 3.4 Augment the CSV log (and any JSONL output) with columns for <code class="docutils literal notranslate"><span class="pre">resolver_source</span></code>, <code class="docutils literal notranslate"><span class="pre">resolver_order</span></code>, <code class="docutils literal notranslate"><span class="pre">attempt_url</span></code>, <code class="docutils literal notranslate"><span class="pre">status</span></code>, <code class="docutils literal notranslate"><span class="pre">http_status</span></code>, <code class="docutils literal notranslate"><span class="pre">content_type</span></code>, and <code class="docutils literal notranslate"><span class="pre">elapsed_ms</span></code>, and ensure misses capture the reason (<code class="docutils literal notranslate"><span class="pre">no-doi</span></code>, <code class="docutils literal notranslate"><span class="pre">resolver-disabled</span></code>, <code class="docutils literal notranslate"><span class="pre">max-attempts-reached</span></code>).</p></li>
+<li><p>[x] 3.5 Emit structured INFO logs summarizing resolver success rate per run and aggregate counts (OpenAlex hits vs. each fallback source) to help calibrate the stack.</p></li>
+</ul>
+</section>
+<section id="validation-testing-and-operational-hardening">
+<h1>4. Validation, Testing, and Operational Hardening<a class="headerlink" href="#validation-testing-and-operational-hardening" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>[x] 4.1 Add unit tests for <code class="docutils literal notranslate"><span class="pre">classify_payload</span></code>, URL deduplication, resolver enable/disable logic, and ordering guarantees using pytest + <code class="docutils literal notranslate"><span class="pre">responses</span></code> (or <code class="docutils literal notranslate"><span class="pre">requests-mock</span></code>) to simulate HTTP interactions.</p></li>
+<li><p>[x] 4.2 Write resolver-specific tests that confirm metadata parsing (e.g., Unpaywall JSON, Crossref link filtering, landing-page HTML cases, PMC OA XML) and ensure each resolver stops emitting URLs when required fields are missing.</p></li>
+<li><p>[x] 4.3 Create an integration test fixture (JSONL or recorded responses) that drives the CLI against 3–5 synthetic works covering DOI-only, arXiv-only, PMC-only, and total miss scenarios, asserting outputs land in the correct directories and log rows match expectations.</p></li>
+<li><p>[x] 4.4 Document a manual smoke test checklist (e.g., run against 10 live DOIs with rate limit safe pacing, verify compliance headers, inspect logs) and attach it to the change artifacts for future operators.</p></li>
+<li><p>[x] 4.5 Establish metrics/alert expectations (e.g., acceptable resolver miss rate, HTTP error thresholds) and feed them into the ops documentation referenced by the change.</p></li>
+</ul>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

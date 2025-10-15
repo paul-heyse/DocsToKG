@@ -1,0 +1,436 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: types &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: types</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.HybridSearch.types.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-types">
+<h1>1. Module: types<a class="headerlink" href="#module-types" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.types</span></code>.</p>
+<p>Core typed structures for hybrid search components.</p>
+<p>This module defines the fundamental data structures used throughout the DocsToKG
+hybrid search system, including document inputs, chunk features, search requests,
+and result structures. These types ensure type safety and provide clear contracts
+for data exchange between system components.</p>
+<p>The types support both traditional text search (BM25) and modern dense retrieval
+methods, enabling seamless hybrid search capabilities across the platform.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Type-safe data structures for all search operations</p></li>
+<li><p>Immutable data classes for thread safety</p></li>
+<li><p>Comprehensive validation and error handling</p></li>
+<li><p>Support for both lexical and semantic search modalities</p></li>
+</ul>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="copy-self">
+<h3><code class="docutils literal notranslate"><span class="pre">copy(self)</span></code><a class="headerlink" href="#copy-self" title="Link to this heading"></a></h3>
+<p>Create a deep copy of the chunk features.</p>
+<p>This method creates independent copies of all feature data to prevent
+unintended mutations when features are shared across operations.</p>
+<p>Args:
+None</p>
+<p>Returns:
+New ChunkFeatures instance with copied data</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>original = ChunkFeatures(…)
+copy = original.copy()</p>
+<p class="rubric" id="modifications-to-copy-won-t-affect-original">Modifications to copy won’t affect original</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="passed-self">
+<h3><code class="docutils literal notranslate"><span class="pre">passed(self)</span></code><a class="headerlink" href="#passed-self" title="Link to this heading"></a></h3>
+<p>Check if all validation reports passed.</p>
+<p>Args:
+None</p>
+<p>Returns:
+True if all reports passed, False otherwise</p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="documentinput">
+<h3><code class="docutils literal notranslate"><span class="pre">DocumentInput</span></code><a class="headerlink" href="#documentinput" title="Link to this heading"></a></h3>
+<p>Pre-computed chunk and vector artifacts for a document.</p>
+<p>This class represents the processed state of a document after chunking
+and vector embedding generation. It serves as the input for indexing
+operations and provides metadata about the document’s processing state.</p>
+<p>Attributes:
+doc_id: Unique identifier for the document
+namespace: Logical grouping for the document (e.g., “research”, “news”)
+chunk_path: File system path to chunk data
+vector_path: File system path to vector embeddings
+metadata: Additional document metadata and processing information
+created_at: Timestamp when document was first processed
+updated_at: Timestamp of last modification</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>doc_input = DocumentInput(
+…     doc_id=”research_paper_123”,
+…     namespace=”academic”,
+…     chunk_path=Path(“chunks/doc_123.jsonl”),
+…     vector_path=Path(“vectors/doc_123.jsonl”),
+…     metadata={“title”: “AI Research Paper”, “author”: “Dr. Smith”}
+… )</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="chunkfeatures">
+<h3><code class="docutils literal notranslate"><span class="pre">ChunkFeatures</span></code><a class="headerlink" href="#chunkfeatures" title="Link to this heading"></a></h3>
+<p>Sparse and dense features computed for a document chunk.</p>
+<p>This class encapsulates the multiple feature representations computed
+for a document chunk, supporting both traditional lexical search (BM25)
+and modern semantic search (SPLADE, dense embeddings).</p>
+<p>Attributes:
+bm25_terms: BM25 term frequency mapping (term -&gt; weight)
+splade_weights: SPLADE sparse lexical and dense weights
+embedding: Dense vector embedding for semantic similarity</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>features = ChunkFeatures(
+…     bm25_terms={“machine”: 0.8, “learning”: 0.6},
+…     splade_weights={“neural”: 0.9, “network”: 0.7},
+…     embedding=np.random.rand(768).astype(np.float32)
+… )</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="chunkpayload">
+<h3><code class="docutils literal notranslate"><span class="pre">ChunkPayload</span></code><a class="headerlink" href="#chunkpayload" title="Link to this heading"></a></h3>
+<p>Fully materialized chunk stored in OpenSearch and FAISS.</p>
+<p>This class represents a document chunk that has been processed and indexed
+for both lexical and semantic search. It contains all the information
+needed for hybrid retrieval operations.</p>
+<p>Attributes:
+doc_id: Source document identifier
+chunk_id: Unique chunk identifier within the document
+vector_id: Corresponding vector identifier in FAISS
+namespace: Logical grouping for search scoping
+text: Original chunk text content
+metadata: Mutable mapping of persisted chunk metadata
+features: Hybrid feature representations associated with the chunk
+token_count: Number of tokens contained in the chunk text
+source_chunk_idxs: Original chunk indices contributing to this payload
+doc_items_refs: References to DocTags items that produced the chunk
+char_offset: Optional character span of the chunk in the source document</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>payload = ChunkPayload(
+…     doc_id=”doc-1”,
+…     chunk_id=”chunk-1”,
+…     vector_id=”vec-1”,
+…     namespace=”research”,
+…     text=”Hybrid search combines dense and sparse signals.”,
+…     metadata={“section”: “abstract”},
+…     features=ChunkFeatures(
+…         bm25_terms={“hybrid”: 0.9},
+…         splade_weights={“search”: 0.8},
+…         embedding=np.zeros(3, dtype=np.float32),
+…     ),
+…     token_count=12,
+…     source_chunk_idxs=[0],
+…     doc_items_refs=[“doc:0”],
+… )
+payload.namespace
+‘research’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="hybridsearchdiagnostics">
+<h3><code class="docutils literal notranslate"><span class="pre">HybridSearchDiagnostics</span></code><a class="headerlink" href="#hybridsearchdiagnostics" title="Link to this heading"></a></h3>
+<p>Per-channel diagnostics for a hybrid search result.</p>
+<p>This class provides detailed scoring information for each retrieval
+method (BM25, SPLADE, dense vectors) used in hybrid search, enabling
+analysis of individual method performance and result quality.</p>
+<p>Attributes:
+bm25_score: BM25 lexical similarity score (None if not used)
+splade_score: SPLADE sparse embedding score (None if not used)
+dense_score: Dense vector similarity score (None if not used)</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>diagnostics = HybridSearchDiagnostics(
+…     bm25_score=0.85,
+…     splade_score=0.92,
+…     dense_score=0.78
+… )</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="hybridsearchresult">
+<h3><code class="docutils literal notranslate"><span class="pre">HybridSearchResult</span></code><a class="headerlink" href="#hybridsearchresult" title="Link to this heading"></a></h3>
+<p>Output item returned to callers of the hybrid search service.</p>
+<p>This class represents a single result from hybrid search operations,
+containing the document content, metadata, and scoring information
+from all retrieval methods used in the search.</p>
+<p>Attributes:
+doc_id: Source document identifier
+chunk_id: Chunk identifier within the document
+namespace: Logical grouping for search scoping
+score: Final fused similarity score
+fused_rank: Position in the final result ranking
+text: Retrieved text content from the chunk
+highlights: Highlighted terms or phrases in the result
+provenance_offsets: Character offsets for result provenance
+diagnostics: Per-method scoring information
+metadata: Additional result metadata and context</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>result = HybridSearchResult(
+…     doc_id=”doc_123”,
+…     chunk_id=”chunk_456”,
+…     namespace=”research”,
+…     score=0.89,
+…     text=”Machine learning algorithms…”,
+…     highlights=[“machine learning”],
+…     diagnostics=HybridSearchDiagnostics(bm25_score=0.85)
+… )</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="hybridsearchrequest">
+<h3><code class="docutils literal notranslate"><span class="pre">HybridSearchRequest</span></code><a class="headerlink" href="#hybridsearchrequest" title="Link to this heading"></a></h3>
+<p>Validated request payload for <code class="docutils literal notranslate"><span class="pre">/v1/hybrid-search</span></code>.</p>
+<p>This class represents a validated hybrid search request containing
+all parameters needed for multi-modal document retrieval operations.</p>
+<p>Attributes:
+query: Natural language search query string
+namespace: Optional namespace for scoped search
+filters: Optional search filters as key-value pairs
+page_size: Maximum number of results to return
+cursor: Optional pagination cursor for continuation
+diversification: Whether to apply MMR diversification
+diagnostics: Whether to include per-method scoring information</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>request = HybridSearchRequest(
+…     query=”machine learning algorithms”,
+…     namespace=”research”,
+…     page_size=10,
+…     diversification=True
+… )</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="hybridsearchresponse">
+<h3><code class="docutils literal notranslate"><span class="pre">HybridSearchResponse</span></code><a class="headerlink" href="#hybridsearchresponse" title="Link to this heading"></a></h3>
+<p>Response envelope returned by the hybrid search API.</p>
+<p>This class encapsulates the complete response from hybrid search operations,
+including results, pagination information, and performance metrics.</p>
+<p>Attributes:
+results: Sequence of hybrid search results
+next_cursor: Optional cursor for pagination continuation
+total_candidates: Total number of candidates before filtering
+timings_ms: Performance timing information by operation</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>response = HybridSearchResponse(
+…     results=[result1, result2],
+…     next_cursor=”cursor_123”,
+…     total_candidates=150,
+…     timings_ms={“bm25”: 45, “fusion”: 12}
+… )</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="fusioncandidate">
+<h3><code class="docutils literal notranslate"><span class="pre">FusionCandidate</span></code><a class="headerlink" href="#fusioncandidate" title="Link to this heading"></a></h3>
+<p>Intermediate structure used by fusion pipeline.</p>
+<p>This class represents a candidate result during the fusion process,
+tracking which retrieval method produced it, its original score,
+and its position in the original ranking.</p>
+<p>Attributes:
+source: Name of the retrieval method that produced this candidate
+score: Original similarity score from the source method
+chunk: Full chunk payload with metadata and features
+rank: Original rank position from the source method</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>candidate = FusionCandidate(
+…     source=”bm25”,
+…     score=0.85,
+…     chunk=chunk_payload,
+…     rank=3
+… )</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="validationreport">
+<h3><code class="docutils literal notranslate"><span class="pre">ValidationReport</span></code><a class="headerlink" href="#validationreport" title="Link to this heading"></a></h3>
+<p>Structured output for the validation harness.</p>
+<p>This class represents the result of a single validation check,
+containing the check name, pass/fail status, and detailed results.</p>
+<p>Attributes:
+name: Name or identifier of the validation check
+passed: Boolean indicating if validation passed
+details: Additional information about the validation results</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>report = ValidationReport(
+…     name=”api_health_check”,
+…     passed=True,
+…     details={“response_time”: 45, “status_code”: 200}
+… )</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="validationsummary">
+<h3><code class="docutils literal notranslate"><span class="pre">ValidationSummary</span></code><a class="headerlink" href="#validationsummary" title="Link to this heading"></a></h3>
+<p>Aggregate of validation reports.</p>
+<p>This class provides a summary of multiple validation reports,
+including timing information and overall pass/fail status.</p>
+<p>Attributes:
+reports: Sequence of individual validation reports
+started_at: Timestamp when validation began
+completed_at: Timestamp when validation finished</p>
+<p>Properties:
+passed: Boolean indicating if all validations passed</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>summary = ValidationSummary(
+…     reports=[report1, report2],
+…     started_at=datetime.now(),
+…     completed_at=datetime.now()
+… )
+print(f”All validations passed: {summary.passed}”)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,1027 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Design Document: DocParsing Pipeline Refactoring &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Design Document: DocParsing Pipeline Refactoring</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/openspec/changes/refactor-docparsing-pipeline/design.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="design-document-docparsing-pipeline-refactoring">
+<h1>Design Document: DocParsing Pipeline Refactoring<a class="headerlink" href="#design-document-docparsing-pipeline-refactoring" title="Link to this heading"></a></h1>
+<section id="context">
+<h2>Context<a class="headerlink" href="#context" title="Link to this heading"></a></h2>
+<p>The DocParsing module implements a three-stage pipeline for converting scientific documents into searchable hybrid vectors:</p>
+<ol class="arabic simple">
+<li><p><strong>Stage 1: DocTags Conversion</strong> - HTML/PDF → DocTags format (via Docling)</p></li>
+<li><p><strong>Stage 2: Chunking</strong> - DocTags → token-normalized chunks with minimum size coalescence</p></li>
+<li><p><strong>Stage 3: Embedding</strong> - Chunks → hybrid vectors (BM25 + SPLADEv3 + Qwen3-4B dense)</p></li>
+</ol>
+<p>Current implementation has four standalone scripts with duplicated utilities, hard-coded paths, and limited error boundaries. The system works well for small-to-medium datasets but exhibits brittleness (CUDA crashes, OOM failures) and maintenance burden (scattered configuration, duplicated code).</p>
+<p><strong>Stakeholders</strong>: Data engineers running conversions, researchers needing reproducible embeddings, downstream indexing systems consuming JSONL outputs.</p>
+<p><strong>Constraints</strong>:</p>
+<ul class="simple">
+<li><p>Must preserve existing stage boundaries (DocTags ↔ Chunks ↔ Vectors)</p></li>
+<li><p>Cannot couple to upstream downloaders or downstream indexers</p></li>
+<li><p>Must maintain backward compatibility with existing JSONL consumers</p></li>
+<li><p>Local-first architecture: HuggingFace models cached at <code class="docutils literal notranslate"><span class="pre">/home/paul/hf-cache/</span></code></p></li>
+</ul>
+</section>
+<section id="goals-non-goals">
+<h2>Goals / Non-Goals<a class="headerlink" href="#goals-non-goals" title="Link to this heading"></a></h2>
+<section id="goals">
+<h3>Goals<a class="headerlink" href="#goals" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p><strong>Reduce code duplication</strong> - Consolidate path handling, I/O, logging, and utilities into shared module</p></li>
+<li><p><strong>Harden robustness</strong> - Add validation, error boundaries, and invariant checks to prevent silent failures</p></li>
+<li><p><strong>Enable scale</strong> - Stream embeddings to handle datasets exceeding GPU memory</p></li>
+<li><p><strong>Improve observability</strong> - Centralized structured logging and processing manifest</p></li>
+<li><p><strong>Unify configuration</strong> - Single source of truth for paths, models, and parameters</p></li>
+<li><p><strong>Maintain independence</strong> - Keep clean stage boundaries without upstream/downstream coupling</p></li>
+</ol>
+</section>
+<section id="non-goals">
+<h3>Non-Goals<a class="headerlink" href="#non-goals" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Not</strong> redesigning the chunking algorithm itself (HybridChunker from docling-core)</p></li>
+<li><p><strong>Not</strong> replacing the embedding models (SPLADE, Qwen remain as-is)</p></li>
+<li><p><strong>Not</strong> integrating with download orchestration or search indexing</p></li>
+<li><p><strong>Not</strong> adding distributed processing (remains single-machine, multi-GPU capable)</p></li>
+<li><p><strong>Not</strong> changing the JSONL output format (only adding optional fields)</p></li>
+</ul>
+</section>
+</section>
+<section id="decisions">
+<h2>Decisions<a class="headerlink" href="#decisions" title="Link to this heading"></a></h2>
+<section id="decision-1-shared-utilities-module-common-py">
+<h3>Decision 1: Shared Utilities Module (<code class="docutils literal notranslate"><span class="pre">_common.py</span></code>)<a class="headerlink" href="#decision-1-shared-utilities-module-common-py" title="Link to this heading"></a></h3>
+<p><strong>Choice</strong>: Create single <code class="docutils literal notranslate"><span class="pre">_common.py</span></code> with all cross-cutting functions.</p>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul class="simple">
+<li><p><strong>Option A</strong>: Leave utilities duplicated across scripts (status quo)</p>
+<ul>
+<li><p>❌ High maintenance burden, drift risk</p></li>
+</ul>
+</li>
+<li><p><strong>Option B</strong>: Create multiple utility modules by concern (paths, io, logging)</p>
+<ul>
+<li><p>❌ Over-engineering for current scale; hard to discover functions</p></li>
+</ul>
+</li>
+<li><p><strong>Option C</strong>: Single <code class="docutils literal notranslate"><span class="pre">_common.py</span></code> with clear function grouping ✅</p>
+<ul>
+<li><p>✅ Easy import, single place to look, minimal structure</p></li>
+</ul>
+</li>
+</ul>
+<p><strong>Rationale</strong>: Four scripts share 8+ utility functions. Single module reduces from ~120 duplicated LOC to ~60 shared LOC while improving discoverability.</p>
+</section>
+<section id="decision-2-two-pass-streaming-for-embeddings">
+<h3>Decision 2: Two-Pass Streaming for Embeddings<a class="headerlink" href="#decision-2-two-pass-streaming-for-embeddings" title="Link to this heading"></a></h3>
+<p><strong>Choice</strong>: Pass A = UUID + BM25 stats (no text), Pass B = batch encode → shard write.</p>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul class="simple">
+<li><p><strong>Option A</strong>: Load all chunks into memory (status quo)</p>
+<ul>
+<li><p>❌ OOM on datasets &gt;10K documents</p></li>
+</ul>
+</li>
+<li><p><strong>Option B</strong>: Fully streaming single-pass with on-disk BM25 index</p>
+<ul>
+<li><p>❌ Complexity; BM25 requires global statistics</p></li>
+</ul>
+</li>
+<li><p><strong>Option C</strong>: Two-pass streaming: first pass collects stats, second encodes in batches ✅</p>
+<ul>
+<li><p>✅ Bounded memory; simple implementation; enables resume</p></li>
+</ul>
+</li>
+</ul>
+<p><strong>Rationale</strong>: BM25 IDF calculation requires knowing document frequency across full corpus. Two passes separate global statistics (fast, memory-light) from encoding (GPU-heavy, streamable).</p>
+<p><strong>Implementation</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Pass A: Statistics</span>
+<span class="k">for</span> <span class="n">chunk_file</span> <span class="ow">in</span> <span class="n">chunk_files</span><span class="p">:</span>
+    <span class="n">rows</span> <span class="o">=</span> <span class="n">load_rows</span><span class="p">(</span><span class="n">chunk_file</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">:</span>
+        <span class="n">ensure_uuid</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+        <span class="n">accumulate_bm25_stats</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;text&#39;</span><span class="p">])</span>  <span class="c1"># no text retention</span>
+    <span class="n">save_rows</span><span class="p">(</span><span class="n">chunk_file</span><span class="p">,</span> <span class="n">rows</span><span class="p">)</span>
+
+<span class="c1"># Pass B: Encoding (per-file batches)</span>
+<span class="k">for</span> <span class="n">chunk_file</span> <span class="ow">in</span> <span class="n">chunk_files</span><span class="p">:</span>
+    <span class="n">rows</span> <span class="o">=</span> <span class="n">load_rows</span><span class="p">(</span><span class="n">chunk_file</span><span class="p">)</span>
+    <span class="n">texts</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span><span class="p">[</span><span class="s1">&#39;text&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">]</span>
+
+    <span class="c1"># Batch encode</span>
+    <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">Batcher</span><span class="p">(</span><span class="n">texts</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">):</span>
+        <span class="n">splade_vecs</span> <span class="o">=</span> <span class="n">encode_splade</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+        <span class="n">qwen_vecs</span> <span class="o">=</span> <span class="n">encode_qwen</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+        <span class="n">write_shard</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">splade_vecs</span><span class="p">,</span> <span class="n">qwen_vecs</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="decision-3-pydantic-schema-validation">
+<h3>Decision 3: Pydantic Schema Validation<a class="headerlink" href="#decision-3-pydantic-schema-validation" title="Link to this heading"></a></h3>
+<p><strong>Choice</strong>: Define <code class="docutils literal notranslate"><span class="pre">ChunkRow</span></code> and <code class="docutils literal notranslate"><span class="pre">VectorRow</span></code> Pydantic models; validate on write.</p>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul class="simple">
+<li><p><strong>Option A</strong>: No validation (status quo)</p>
+<ul>
+<li><p>❌ Silent schema drift, hard-to-debug errors downstream</p></li>
+</ul>
+</li>
+<li><p><strong>Option B</strong>: JSON Schema files with separate validator</p>
+<ul>
+<li><p>❌ Requires external tooling; not Python-native</p></li>
+</ul>
+</li>
+<li><p><strong>Option C</strong>: Pydantic models with inline validation ✅</p>
+<ul>
+<li><p>✅ Type-safe, auto-documentation, runtime validation</p></li>
+</ul>
+</li>
+</ul>
+<p><strong>Rationale</strong>: Pydantic is already in ecosystem (used by vLLM), provides excellent error messages, enables IDE autocomplete, and serves as living documentation.</p>
+<p><strong>Schema Versioning</strong>: Include <code class="docutils literal notranslate"><span class="pre">schema_version:</span> <span class="pre">str</span></code> field (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;docparse/1.1.0&quot;</span></code>) to track evolution. Downstream consumers check version for compatibility.</p>
+</section>
+<section id="decision-4-unified-cli-with-mode-selection">
+<h3>Decision 4: Unified CLI with Mode Selection<a class="headerlink" href="#decision-4-unified-cli-with-mode-selection" title="Link to this heading"></a></h3>
+<p><strong>Choice</strong>: Single <code class="docutils literal notranslate"><span class="pre">cli/doctags_convert.py</span></code> with <code class="docutils literal notranslate"><span class="pre">--mode</span> <span class="pre">pdf|html|auto</span></code>.</p>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul class="simple">
+<li><p><strong>Option A</strong>: Separate scripts (status quo)</p>
+<ul>
+<li><p>❌ Duplicated arg parsing, documentation, maintenance</p></li>
+</ul>
+</li>
+<li><p><strong>Option B</strong>: Delete HTML script, make PDF script support both</p>
+<ul>
+<li><p>❌ Mixes concerns; PDF script complex enough</p></li>
+</ul>
+</li>
+<li><p><strong>Option C</strong>: New unified CLI delegates to backend functions ✅</p>
+<ul>
+<li><p>✅ Single entry point, shared flags, backends remain testable</p></li>
+</ul>
+</li>
+</ul>
+<p><strong>Rationale</strong>: 80% of CLI logic is shared (workers, overwrite, paths, logging). Backend functions remain importable for testing; CLI layer is thin dispatcher.</p>
+</section>
+<section id="decision-5-spawn-multiprocessing-for-cuda-safety">
+<h3>Decision 5: Spawn Multiprocessing for CUDA Safety<a class="headerlink" href="#decision-5-spawn-multiprocessing-for-cuda-safety" title="Link to this heading"></a></h3>
+<p><strong>Choice</strong>: Enforce <code class="docutils literal notranslate"><span class="pre">multiprocessing.set_start_method('spawn')</span></code> in scripts using GPU workers.</p>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul class="simple">
+<li><p><strong>Option A</strong>: Use ‘fork’ (Linux default)</p>
+<ul>
+<li><p>❌ CUDA context cannot be forked; crashes workers</p></li>
+</ul>
+</li>
+<li><p><strong>Option B</strong>: Use ‘forkserver’</p>
+<ul>
+<li><p>❌ Adds complexity; not needed</p></li>
+</ul>
+</li>
+<li><p><strong>Option C</strong>: Use ‘spawn’ ✅</p>
+<ul>
+<li><p>✅ Safe for CUDA; works cross-platform; slight startup overhead acceptable</p></li>
+</ul>
+</li>
+</ul>
+<p><strong>Rationale</strong>: CUDA explicitly forbids forked processes. ‘spawn’ is the safe default for GPU workloads. Performance impact negligible (startup cost amortized over long-running conversions).</p>
+</section>
+<section id="decision-6-topic-aware-coalescence-with-soft-boundaries">
+<h3>Decision 6: Topic-Aware Coalescence with Soft Boundaries<a class="headerlink" href="#decision-6-topic-aware-coalescence-with-soft-boundaries" title="Link to this heading"></a></h3>
+<p><strong>Choice</strong>: Detect structural boundaries (headings, captions); apply relaxed merge constraint.</p>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul class="simple">
+<li><p><strong>Option A</strong>: Strict length-based merging (status quo)</p>
+<ul>
+<li><p>❌ Breaks topicality; merges unrelated sections</p></li>
+</ul>
+</li>
+<li><p><strong>Option B</strong>: Never merge across any boundary</p>
+<ul>
+<li><p>❌ Too conservative; leaves many small chunks</p></li>
+</ul>
+</li>
+<li><p><strong>Option C</strong>: Soft boundary: allow merge if fits within <code class="docutils literal notranslate"><span class="pre">(max_tokens</span> <span class="pre">-</span> <span class="pre">64)</span></code> ✅</p>
+<ul>
+<li><p>✅ Balances topicality with minimum size goals</p></li>
+</ul>
+</li>
+</ul>
+<p><strong>Rationale</strong>: Embeddings benefit from coherent chunks. 64-token buffer ensures merged chunk doesn’t become oversized. Heuristic detection (markdown headers, “Figure caption:”, “Table:”) is fast and effective.</p>
+<p><strong>Implementation</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">is_structural_boundary</span><span class="p">(</span><span class="n">rec</span><span class="p">:</span> <span class="n">Rec</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="n">text</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">text</span><span class="o">.</span><span class="n">lstrip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">text</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;#&#39;</span><span class="p">):</span>  <span class="c1"># Markdown heading</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">text</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">kw</span><span class="p">)</span> <span class="k">for</span> <span class="n">kw</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;Figure caption:&#39;</span><span class="p">,</span> <span class="s1">&#39;Table:&#39;</span><span class="p">]):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">return</span> <span class="kc">False</span>
+
+<span class="c1"># In coalesce_small_runs:</span>
+<span class="k">if</span> <span class="n">is_structural_boundary</span><span class="p">(</span><span class="n">records</span><span class="p">[</span><span class="n">k</span><span class="p">])</span> <span class="ow">and</span> <span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">n_tok</span> <span class="o">+</span> <span class="n">records</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">n_tok</span><span class="p">)</span> <span class="o">&gt;</span> <span class="p">(</span><span class="n">max_tokens</span> <span class="o">-</span> <span class="mi">64</span><span class="p">):</span>
+    <span class="k">break</span>  <span class="c1"># Don&#39;t merge across boundary</span>
+</pre></div>
+</div>
+</section>
+<section id="decision-7-manifest-based-progress-tracking">
+<h3>Decision 7: Manifest-Based Progress Tracking<a class="headerlink" href="#decision-7-manifest-based-progress-tracking" title="Link to this heading"></a></h3>
+<p><strong>Choice</strong>: Append JSON lines to <code class="docutils literal notranslate"><span class="pre">Data/Manifests/docparse.manifest.jsonl</span></code> at key milestones.</p>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul class="simple">
+<li><p><strong>Option A</strong>: No progress tracking (status quo)</p>
+<ul>
+<li><p>❌ Hard to audit, resume, or debug failures</p></li>
+</ul>
+</li>
+<li><p><strong>Option B</strong>: SQLite database</p>
+<ul>
+<li><p>❌ Adds dependency; requires schema migrations</p></li>
+</ul>
+</li>
+<li><p><strong>Option C</strong>: JSONL manifest ✅</p>
+<ul>
+<li><p>✅ Simple, appendable, human-readable, no schema lock-in</p></li>
+</ul>
+</li>
+</ul>
+<p><strong>Rationale</strong>: JSONL aligns with existing data formats, tools like <code class="docutils literal notranslate"><span class="pre">jq</span></code> make querying easy, and append-only writes are safe for parallel processing.</p>
+<p><strong>Schema</strong>:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2025-10-15T10:30:45Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;stage&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;doctags&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;doc_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;paper_123&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;success&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;duration_s&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">4.2</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;warnings&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;schema_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;docparse/1.1.0&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;parse_engine&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;docling-vlm&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;num_pages&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="risks-trade-offs">
+<h2>Risks / Trade-offs<a class="headerlink" href="#risks-trade-offs" title="Link to this heading"></a></h2>
+<section id="risk-1-pydantic-dependency-added">
+<h3>Risk 1: Pydantic Dependency Added<a class="headerlink" href="#risk-1-pydantic-dependency-added" title="Link to this heading"></a></h3>
+<p><strong>Mitigation</strong>: Pydantic is stable, widely-used, and already a transitive dependency via vLLM. Lock version in <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code>.</p>
+</section>
+<section id="risk-2-two-pass-streaming-doubles-i-o">
+<h3>Risk 2: Two-Pass Streaming Doubles I/O<a class="headerlink" href="#risk-2-two-pass-streaming-doubles-i-o" title="Link to this heading"></a></h3>
+<p><strong>Impact</strong>: Chunk files read twice (Pass A: stats, Pass B: encode).
+<strong>Mitigation</strong>: Files are small (&lt;10MB typical); SSD I/O negligible vs GPU encoding time. Benefit (bounded memory) outweighs cost.</p>
+</section>
+<section id="risk-3-breaking-changes-to-jsonl-format">
+<h3>Risk 3: Breaking Changes to JSONL Format<a class="headerlink" href="#risk-3-breaking-changes-to-jsonl-format" title="Link to this heading"></a></h3>
+<p><strong>Mitigation</strong>: Only <em>add</em> optional fields (<code class="docutils literal notranslate"><span class="pre">schema_version</span></code>, <code class="docutils literal notranslate"><span class="pre">provenance</span></code>). Existing consumers ignore unknown fields. Document schema evolution in manifest.</p>
+</section>
+<section id="risk-4-unified-cli-complexity">
+<h3>Risk 4: Unified CLI Complexity<a class="headerlink" href="#risk-4-unified-cli-complexity" title="Link to this heading"></a></h3>
+<p><strong>Mitigation</strong>: Keep CLI thin (arg parsing + dispatch); backend functions remain unchanged. Add integration tests for mode switching.</p>
+</section>
+<section id="risk-5-refactoring-introduces-regressions">
+<h3>Risk 5: Refactoring Introduces Regressions<a class="headerlink" href="#risk-5-refactoring-introduces-regressions" title="Link to this heading"></a></h3>
+<p><strong>Mitigation</strong>:</p>
+<ul class="simple">
+<li><p>Preserve original scripts as <code class="docutils literal notranslate"><span class="pre">*_legacy.py</span></code> during transition</p></li>
+<li><p>Add golden-path fixtures to lock expected outputs</p></li>
+<li><p>Run before/after hash comparison on sample dataset</p></li>
+</ul>
+</section>
+</section>
+<section id="migration-plan">
+<h2>Migration Plan<a class="headerlink" href="#migration-plan" title="Link to this heading"></a></h2>
+<section id="phase-1-infrastructure-week-1">
+<h3>Phase 1: Infrastructure (Week 1)<a class="headerlink" href="#phase-1-infrastructure-week-1" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Create <code class="docutils literal notranslate"><span class="pre">_common.py</span></code>, <code class="docutils literal notranslate"><span class="pre">schemas.py</span></code>, <code class="docutils literal notranslate"><span class="pre">serializers.py</span></code></p></li>
+<li><p>Add Pydantic to <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code></p></li>
+<li><p>Implement and test utility functions in isolation</p></li>
+<li><p>Create <code class="docutils literal notranslate"><span class="pre">Data/Manifests/</span></code> directory structure</p></li>
+</ol>
+</section>
+<section id="phase-2-refactor-existing-scripts-week-2">
+<h3>Phase 2: Refactor Existing Scripts (Week 2)<a class="headerlink" href="#phase-2-refactor-existing-scripts-week-2" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Update chunking script: shared paths, serializers, topic-aware coalescence</p></li>
+<li><p>Update HTML converter: shared utilities, logging</p></li>
+<li><p>Update PDF converter: spawn mode, model validation, enhanced flags</p></li>
+<li><p>Preserve original scripts as <code class="docutils literal notranslate"><span class="pre">*_legacy.py</span></code> with deprecation warnings</p></li>
+</ol>
+</section>
+<section id="phase-3-streaming-embeddings-week-3">
+<h3>Phase 3: Streaming Embeddings (Week 3)<a class="headerlink" href="#phase-3-streaming-embeddings-week-3" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Implement two-pass architecture in <code class="docutils literal notranslate"><span class="pre">EmbeddingV2.py</span></code></p></li>
+<li><p>Add batch-size flags and shard logic</p></li>
+<li><p>Add invariant checks and validation</p></li>
+<li><p>Test on full-scale dataset</p></li>
+</ol>
+</section>
+<section id="phase-4-unified-cli-cleanup-week-4">
+<h3>Phase 4: Unified CLI &amp; Cleanup (Week 4)<a class="headerlink" href="#phase-4-unified-cli-cleanup-week-4" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Implement <code class="docutils literal notranslate"><span class="pre">cli/doctags_convert.py</span></code> with mode dispatch</p></li>
+<li><p>Implement <code class="docutils literal notranslate"><span class="pre">cli/chunk_and_coalesce.py</span></code> wrapper</p></li>
+<li><p>Implement <code class="docutils literal notranslate"><span class="pre">cli/embed_vectors.py</span></code> wrapper</p></li>
+<li><p>Update documentation and README</p></li>
+<li><p>Delete <code class="docutils literal notranslate"><span class="pre">*_legacy.py</span></code> scripts</p></li>
+<li><p>Run full integration test suite</p></li>
+</ol>
+</section>
+<section id="rollback-strategy">
+<h3>Rollback Strategy<a class="headerlink" href="#rollback-strategy" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Keep original scripts available for 1 release cycle</p></li>
+<li><p>Manifest includes schema version for backward compatibility detection</p></li>
+<li><p>New features behind flags (<code class="docutils literal notranslate"><span class="pre">--use-legacy-chunking</span></code> escape hatch)</p></li>
+</ul>
+</section>
+</section>
+<section id="open-questions">
+<h2>Open Questions<a class="headerlink" href="#open-questions" title="Link to this heading"></a></h2>
+<section id="q1-should-we-add-distributed-processing-support">
+<h3>Q1: Should we add distributed processing support?<a class="headerlink" href="#q1-should-we-add-distributed-processing-support" title="Link to this heading"></a></h3>
+<p><strong>Decision</strong>: No, not in this change. Single-machine multi-GPU sufficient for current scale. Revisit if datasets exceed 100K documents.</p>
+</section>
+<section id="q2-should-qwen-embedding-dimension-be-configurable-mrl">
+<h3>Q2: Should Qwen embedding dimension be configurable (MRL)?<a class="headerlink" href="#q2-should-qwen-embedding-dimension-be-configurable-mrl" title="Link to this heading"></a></h3>
+<p><strong>Current</strong>: Hard-coded 2560-d output.
+<strong>Proposal</strong>: Add <code class="docutils literal notranslate"><span class="pre">--embedding-dimension</span></code> flag for MRL models (e.g., 256, 512, 1024).
+<strong>Resolution</strong>: Defer to separate change. Current default works; configurability adds complexity without proven need.</p>
+</section>
+<section id="q3-should-we-support-other-embedding-models-e-g-bge-e5">
+<h3>Q3: Should we support other embedding models (e.g., BGE, E5)?<a class="headerlink" href="#q3-should-we-support-other-embedding-models-e-g-bge-e5" title="Link to this heading"></a></h3>
+<p><strong>Decision</strong>: Not in this change. Keep model selection orthogonal. Current architecture allows swapping models via <code class="docutils literal notranslate"><span class="pre">--qwen-model-path</span></code> flag; validation logic remains generic (dimension check).</p>
+</section>
+<section id="q4-how-to-handle-schema-version-mismatches-in-downstream-consumers">
+<h3>Q4: How to handle schema version mismatches in downstream consumers?<a class="headerlink" href="#q4-how-to-handle-schema-version-mismatches-in-downstream-consumers" title="Link to this heading"></a></h3>
+<p><strong>Proposal</strong>: Consumers should:</p>
+<ol class="arabic simple">
+<li><p>Parse <code class="docutils literal notranslate"><span class="pre">schema_version</span></code> field</p></li>
+<li><p>Implement version-specific deserialization logic</p></li>
+<li><p>Fail fast on unknown versions with clear error message</p></li>
+</ol>
+<p><strong>Example</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">load_chunks</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">ChunkRow</span><span class="p">]:</span>
+    <span class="n">rows</span> <span class="o">=</span> <span class="n">jsonl_load</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">:</span>
+        <span class="n">version</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;schema_version&#39;</span><span class="p">,</span> <span class="s1">&#39;docparse/1.0.0&#39;</span><span class="p">)</span>  <span class="c1"># default for old files</span>
+        <span class="k">if</span> <span class="n">version</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;docparse/1.&#39;</span><span class="p">):</span>
+            <span class="k">yield</span> <span class="n">ChunkRow</span><span class="o">.</span><span class="n">parse_obj</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported schema version: </span><span class="si">{</span><span class="n">version</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="q5-should-manifest-be-queryable-via-cli-tool">
+<h3>Q5: Should manifest be queryable via CLI tool?<a class="headerlink" href="#q5-should-manifest-be-queryable-via-cli-tool" title="Link to this heading"></a></h3>
+<p><strong>Proposal</strong>: Add <code class="docutils literal notranslate"><span class="pre">scripts/query_manifest.py</span></code> with filters (stage, status, date range).
+<strong>Resolution</strong>: Defer to separate change. Users can use <code class="docutils literal notranslate"><span class="pre">jq</span></code> for now; dedicated tool adds value but not blocking.</p>
+</section>
+</section>
+<section id="success-metrics">
+<h2>Success Metrics<a class="headerlink" href="#success-metrics" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p><strong>Code Reduction</strong>: ≥100 lines removed via consolidation</p></li>
+<li><p><strong>Memory Usage</strong>: Embeddings stage uses &lt;80% GPU memory at all times (down from OOM failures)</p></li>
+<li><p><strong>Robustness</strong>: Zero CUDA re-initialization crashes in CI</p></li>
+<li><p><strong>Observability</strong>: 100% of processing tracked in manifest</p></li>
+<li><p><strong>Validation Coverage</strong>: 100% of JSONL rows pass Pydantic validation</p></li>
+<li><p><strong>Test Coverage</strong>: ≥85% coverage for new utility modules</p></li>
+<li><p><strong>Performance</strong>: End-to-end runtime within 5% of baseline (slight I/O overhead acceptable)</p></li>
+</ol>
+</section>
+<section id="references">
+<h2>References<a class="headerlink" href="#references" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Docling documentation: <a class="reference external" href="https://github.com/DS4SD/docling">https://github.com/DS4SD/docling</a></p></li>
+<li><p>vLLM multiprocessing guide: <a class="reference external" href="https://docs.vllm.ai/en/latest/">https://docs.vllm.ai/en/latest/</a></p></li>
+<li><p>Pydantic validation: <a class="reference external" href="https://docs.pydantic.dev/">https://docs.pydantic.dev/</a></p></li>
+<li><p>BM25 algorithm: Robertson &amp; Zaragoza (2009)</p></li>
+<li><p>SPLADE-v3: <a class="reference external" href="https://huggingface.co/naver/splade-v3">https://huggingface.co/naver/splade-v3</a></p></li>
+<li><p>Qwen3-Embedding: <a class="reference external" href="https://huggingface.co/Qwen/Qwen3-Embedding-4B">https://huggingface.co/Qwen/Qwen3-Embedding-4B</a></p></li>
+</ul>
+</section>
+<section id="error-handling-strategy">
+<h2>Error Handling Strategy<a class="headerlink" href="#error-handling-strategy" title="Link to this heading"></a></h2>
+<section id="error-classification">
+<h3>Error Classification<a class="headerlink" href="#error-classification" title="Link to this heading"></a></h3>
+<p>Errors are categorized into four severity levels with distinct handling strategies:</p>
+<ol class="arabic simple">
+<li><p><strong>Fatal Errors</strong> - Stop processing immediately, rollback partial writes</p>
+<ul class="simple">
+<li><p>Examples: CUDA re-initialization, invalid configuration, missing dependencies</p></li>
+<li><p>Action: Exit with non-zero code, log full stack trace, clean up resources</p></li>
+</ul>
+</li>
+<li><p><strong>Document-Level Errors</strong> - Skip document, continue pipeline</p>
+<ul class="simple">
+<li><p>Examples: Malformed DocTags, empty documents, validation failures</p></li>
+<li><p>Action: Log warning, write manifest entry with status=”failure”, continue</p></li>
+</ul>
+</li>
+<li><p><strong>Recoverable Errors</strong> - Retry with backoff, then skip</p>
+<ul class="simple">
+<li><p>Examples: Network timeouts, temporary file I/O errors</p></li>
+<li><p>Action: Retry up to 3 times with exponential backoff (1s, 2s, 4s)</p></li>
+</ul>
+</li>
+<li><p><strong>Warnings</strong> - Log but don’t fail</p>
+<ul class="simple">
+<li><p>Examples: Oversized chunks, missing optional fields, deprecated usage</p></li>
+<li><p>Action: Append to warnings list in manifest</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="error-code-conventions">
+<h3>Error Code Conventions<a class="headerlink" href="#error-code-conventions" title="Link to this heading"></a></h3>
+<p>Exit codes follow standard Unix conventions plus custom codes:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Code</p></th>
+<th class="head"><p>Meaning</p></th>
+<th class="head"><p>Example</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>Success</p></td>
+<td><p>All documents processed</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>General error</p></td>
+<td><p>Invalid arguments</p></td>
+</tr>
+<tr class="row-even"><td><p>2</p></td>
+<td><p>Configuration error</p></td>
+<td><p>Invalid parameter combination</p></td>
+</tr>
+<tr class="row-odd"><td><p>137</p></td>
+<td><p>OOM (128+9)</p></td>
+<td><p>CUDA out of memory</p></td>
+</tr>
+<tr class="row-even"><td><p>143</p></td>
+<td><p>SIGTERM (128+15)</p></td>
+<td><p>Graceful shutdown requested</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="exception-hierarchy">
+<h3>Exception Hierarchy<a class="headerlink" href="#exception-hierarchy" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">DocParsingError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base exception for DocParsing pipeline.&quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ConfigurationError</span><span class="p">(</span><span class="n">DocParsingError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Invalid configuration or arguments.&quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ValidationError</span><span class="p">(</span><span class="n">DocParsingError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Schema validation failed.&quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ProcessingError</span><span class="p">(</span><span class="n">DocParsingError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Document processing failed.&quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="performance-targets-and-benchmarks">
+<h2>Performance Targets and Benchmarks<a class="headerlink" href="#performance-targets-and-benchmarks" title="Link to this heading"></a></h2>
+<section id="throughput-targets">
+<h3>Throughput Targets<a class="headerlink" href="#throughput-targets" title="Link to this heading"></a></h3>
+<p>Based on empirical testing with representative documents:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Stage</p></th>
+<th class="head"><p>Target Throughput</p></th>
+<th class="head"><p>Hardware Requirement</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>HTML → DocTags</p></td>
+<td><p>30-50 docs/min</p></td>
+<td><p>12-core CPU</p></td>
+</tr>
+<tr class="row-odd"><td><p>PDF → DocTags (vLLM)</p></td>
+<td><p>5-10 docs/min</p></td>
+<td><p>1x A100 GPU</p></td>
+</tr>
+<tr class="row-even"><td><p>Chunking</p></td>
+<td><p>10-20 docs/min</p></td>
+<td><p>8-core CPU</p></td>
+</tr>
+<tr class="row-odd"><td><p>Embeddings (streaming)</p></td>
+<td><p>5-8 docs/min</p></td>
+<td><p>1x A100 GPU</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="memory-budgets">
+<h3>Memory Budgets<a class="headerlink" href="#memory-budgets" title="Link to this heading"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Component</p></th>
+<th class="head"><p>Max Memory</p></th>
+<th class="head"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Chunking</p></td>
+<td><p>&lt;4GB RAM</p></td>
+<td><p>Per-document processing</p></td>
+</tr>
+<tr class="row-odd"><td><p>SPLADE encoding</p></td>
+<td><p>&lt;6GB VRAM</p></td>
+<td><p>Batch size 32</p></td>
+</tr>
+<tr class="row-even"><td><p>Qwen encoding</p></td>
+<td><p>&lt;12GB VRAM</p></td>
+<td><p>Batch size 64</p></td>
+</tr>
+<tr class="row-odd"><td><p>BM25 statistics (Pass A)</p></td>
+<td><p>&lt;8GB RAM</p></td>
+<td><p>Scales with corpus size</p></td>
+</tr>
+<tr class="row-even"><td><p>Pass B streaming</p></td>
+<td><p>&lt;16GB RAM</p></td>
+<td><p>Bounded by batch size</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="performance-monitoring-points">
+<h3>Performance Monitoring Points<a class="headerlink" href="#performance-monitoring-points" title="Link to this heading"></a></h3>
+<p>Insert timing instrumentation at:</p>
+<ul class="simple">
+<li><p>Script entry/exit (total runtime)</p></li>
+<li><p>Per-document start/end (individual throughput)</p></li>
+<li><p>Model loading (initialization overhead)</p></li>
+<li><p>Batch encoding (GPU utilization)</p></li>
+<li><p>File I/O operations (disk bottlenecks)</p></li>
+</ul>
+</section>
+<section id="optimization-opportunities">
+<h3>Optimization Opportunities<a class="headerlink" href="#optimization-opportunities" title="Link to this heading"></a></h3>
+<p>If performance targets not met:</p>
+<ol class="arabic simple">
+<li><p><strong>Chunking bottleneck</strong>: Parallelize document-level processing (already implemented)</p></li>
+<li><p><strong>Embedding bottleneck</strong>: Increase batch size up to memory limit</p></li>
+<li><p><strong>I/O bottleneck</strong>: Use SSD storage, increase buffer sizes</p></li>
+<li><p><strong>vLLM bottleneck</strong>: Increase <code class="docutils literal notranslate"><span class="pre">--gpu-memory-utilization</span></code> or add tensor parallelism</p></li>
+</ol>
+</section>
+</section>
+<section id="operational-considerations">
+<h2>Operational Considerations<a class="headerlink" href="#operational-considerations" title="Link to this heading"></a></h2>
+<section id="deployment-patterns">
+<h3>Deployment Patterns<a class="headerlink" href="#deployment-patterns" title="Link to this heading"></a></h3>
+<p><strong>Single-Machine Setup</strong> (recommended baseline):</p>
+<ul class="simple">
+<li><p>Input: Local <code class="docutils literal notranslate"><span class="pre">Data/</span></code> directory</p></li>
+<li><p>Processing: Sequential stages with resume capability</p></li>
+<li><p>Output: Local JSONL files</p></li>
+<li><p>Monitoring: Tail manifest file</p></li>
+</ul>
+<p><strong>Distributed Setup</strong> (future):</p>
+<ul class="simple">
+<li><p>Input: Shared filesystem (NFS, S3)</p></li>
+<li><p>Processing: Multiple workers via job queue</p></li>
+<li><p>Output: Shared storage with advisory locking</p></li>
+<li><p>Monitoring: Centralized manifest aggregation</p></li>
+</ul>
+</section>
+<section id="capacity-planning">
+<h3>Capacity Planning<a class="headerlink" href="#capacity-planning" title="Link to this heading"></a></h3>
+<p>To process N documents:</p>
+<ol class="arabic simple">
+<li><p><strong>Estimate total time</strong>:</p>
+<ul class="simple">
+<li><p>DocTags: N / (throughput * worker_count)</p></li>
+<li><p>Chunking: N / throughput</p></li>
+<li><p>Embeddings: N / (throughput * gpu_count)</p></li>
+</ul>
+</li>
+<li><p><strong>Estimate storage</strong>:</p>
+<ul class="simple">
+<li><p>DocTags: ~200KB per document</p></li>
+<li><p>Chunks: ~100KB per document</p></li>
+<li><p>Vectors: ~500KB per document (BM25 + SPLADE + Qwen)</p></li>
+<li><p>Manifest: ~1KB per document</p></li>
+</ul>
+</li>
+<li><p><strong>Resource requirements</strong>:</p>
+<ul class="simple">
+<li><p>CPU: 16 cores recommended</p></li>
+<li><p>RAM: 32GB minimum</p></li>
+<li><p>GPU: 1x A100 (40GB) or 2x RTX 4090</p></li>
+<li><p>Disk: 1GB per 1000 documents</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="monitoring-and-alerting">
+<h3>Monitoring and Alerting<a class="headerlink" href="#monitoring-and-alerting" title="Link to this heading"></a></h3>
+<p><strong>Key Metrics to Track</strong>:</p>
+<ul class="simple">
+<li><p>Documents processed per stage (gauge)</p></li>
+<li><p>Processing rate (docs/min, rate)</p></li>
+<li><p>Failure rate by stage (percentage)</p></li>
+<li><p>Average duration per document (histogram)</p></li>
+<li><p>Peak memory usage (gauge)</p></li>
+<li><p>GPU utilization (percentage)</p></li>
+</ul>
+<p><strong>Alert Conditions</strong>:</p>
+<ul class="simple">
+<li><p>Failure rate &gt;5% in last hour → Warning</p></li>
+<li><p>Failure rate &gt;20% in last hour → Critical</p></li>
+<li><p>Processing stalled (no progress in 10 min) → Warning</p></li>
+<li><p>Disk usage &gt;90% → Warning</p></li>
+<li><p>GPU memory usage &gt;95% → Critical</p></li>
+</ul>
+<p><strong>Manifest Query Examples</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Failure rate in last hour</span>
+jq<span class="w"> </span>-r<span class="w"> </span><span class="s1">&#39;select(.timestamp &gt; &quot;&#39;</span><span class="k">$(</span>date<span class="w"> </span>-u<span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;1 hour ago&#39;</span><span class="w"> </span>-Iseconds<span class="k">)</span><span class="s1">&#39;&quot;) | select(.status==&quot;failure&quot;)&#39;</span><span class="w"> </span>manifest.jsonl<span class="w"> </span><span class="p">|</span><span class="w"> </span>wc<span class="w"> </span>-l
+
+<span class="c1"># Average duration by stage</span>
+jq<span class="w"> </span>-s<span class="w"> </span><span class="s1">&#39;group_by(.stage) | map({stage: .[0].stage, avg_duration: (map(.duration_s) | add / length)})&#39;</span><span class="w"> </span>manifest.jsonl
+
+<span class="c1"># Top error types</span>
+jq<span class="w"> </span>-r<span class="w"> </span><span class="s1">&#39;select(.status==&quot;failure&quot;) | .error&#39;</span><span class="w"> </span>manifest.jsonl<span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span><span class="p">|</span><span class="w"> </span>uniq<span class="w"> </span>-c<span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-rn<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-10
+</pre></div>
+</div>
+</section>
+<section id="maintenance-procedures">
+<h3>Maintenance Procedures<a class="headerlink" href="#maintenance-procedures" title="Link to this heading"></a></h3>
+<p><strong>Weekly Tasks</strong>:</p>
+<ul class="simple">
+<li><p>Review manifest for failure patterns</p></li>
+<li><p>Check disk usage, archive old files if needed</p></li>
+<li><p>Validate random sample of outputs</p></li>
+</ul>
+<p><strong>Monthly Tasks</strong>:</p>
+<ul class="simple">
+<li><p>Run full golden-path test suite</p></li>
+<li><p>Update performance baselines</p></li>
+<li><p>Review and optimize slow documents</p></li>
+</ul>
+<p><strong>Quarterly Tasks</strong>:</p>
+<ul class="simple">
+<li><p>Update dependencies (Docling, vLLM, transformers)</p></li>
+<li><p>Re-run tokenizer calibration on corpus</p></li>
+<li><p>Archive completed manifest entries</p></li>
+</ul>
+</section>
+<section id="disaster-recovery">
+<h3>Disaster Recovery<a class="headerlink" href="#disaster-recovery" title="Link to this heading"></a></h3>
+<p><strong>Data Loss Prevention</strong>:</p>
+<ul class="simple">
+<li><p>All writes are atomic (tmp → rename)</p></li>
+<li><p>Manifest is append-only (no corruption risk)</p></li>
+<li><p>Lock files prevent concurrent writes</p></li>
+<li><p>Resume capability enables restart from failure</p></li>
+</ul>
+<p><strong>Recovery Procedures</strong>:</p>
+<ol class="arabic simple">
+<li><p><strong>Partial file detected</strong>: Remove <code class="docutils literal notranslate"><span class="pre">.tmp</span></code> files, re-run with <code class="docutils literal notranslate"><span class="pre">--resume</span></code></p></li>
+<li><p><strong>Corrupted manifest</strong>: Split by valid JSON lines, rebuild</p></li>
+<li><p><strong>Stale lock files</strong>: Check PID, remove if process dead</p></li>
+<li><p><strong>Missing outputs</strong>: Query manifest for successful entries, compare with filesystem</p></li>
+</ol>
+</section>
+</section>
+<section id="testing-strategy">
+<h2>Testing Strategy<a class="headerlink" href="#testing-strategy" title="Link to this heading"></a></h2>
+<section id="test-pyramid">
+<h3>Test Pyramid<a class="headerlink" href="#test-pyramid" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p><strong>Unit Tests</strong> (fast, isolated):</p>
+<ul class="simple">
+<li><p>Utility functions (_common.py): 90% coverage</p></li>
+<li><p>Schema validation (schemas.py): 95% coverage</p></li>
+<li><p>Serializers: 85% coverage</p></li>
+<li><p>Target runtime: &lt;1 second total</p></li>
+</ul>
+</li>
+<li><p><strong>Integration Tests</strong> (moderate, end-to-end stage):</p>
+<ul class="simple">
+<li><p>Chunking with topic-aware coalescence</p></li>
+<li><p>Streaming embeddings (small corpus)</p></li>
+<li><p>vLLM lifecycle management</p></li>
+<li><p>Target runtime: &lt;30 seconds total</p></li>
+</ul>
+</li>
+<li><p><strong>System Tests</strong> (slow, full pipeline):</p>
+<ul class="simple">
+<li><p>Complete HTML → Vectors flow</p></li>
+<li><p>Complete PDF → Vectors flow</p></li>
+<li><p>Resume functionality</p></li>
+<li><p>Target runtime: &lt;5 minutes total</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="golden-fixtures">
+<h3>Golden Fixtures<a class="headerlink" href="#golden-fixtures" title="Link to this heading"></a></h3>
+<p>Requirements for golden test data:</p>
+<ul class="simple">
+<li><p><strong>sample.doctags</strong>: 5-page document with headings, figures, tables, captions</p></li>
+<li><p><strong>sample.chunks.jsonl</strong>: Expected chunks (deterministic tokenization)</p></li>
+<li><p><strong>sample.vectors.jsonl</strong>: Expected vectors (deterministic with fixed random seed)</p></li>
+<li><p>All committed to git for reproducibility</p></li>
+</ul>
+</section>
+<section id="property-based-testing">
+<h3>Property-Based Testing<a class="headerlink" href="#property-based-testing" title="Link to this heading"></a></h3>
+<p>Use Hypothesis library to test invariants:</p>
+<ul class="simple">
+<li><p><strong>Chunking</strong>: <code class="docutils literal notranslate"><span class="pre">min_tokens</span> <span class="pre">&lt;=</span> <span class="pre">chunk.num_tokens</span> <span class="pre">&lt;=</span> <span class="pre">max_tokens</span></code> (except last)</p></li>
+<li><p><strong>Coalescence</strong>: No adjacent small runs remain</p></li>
+<li><p><strong>BM25</strong>: <code class="docutils literal notranslate"><span class="pre">len(terms)</span> <span class="pre">==</span> <span class="pre">len(weights)</span></code></p></li>
+<li><p><strong>SPLADE</strong>: <code class="docutils literal notranslate"><span class="pre">all(w</span> <span class="pre">&gt;=</span> <span class="pre">0</span> <span class="pre">for</span> <span class="pre">w</span> <span class="pre">in</span> <span class="pre">weights)</span></code></p></li>
+</ul>
+</section>
+<section id="ci-cd-integration">
+<h3>CI/CD Integration<a class="headerlink" href="#ci-cd-integration" title="Link to this heading"></a></h3>
+<p>GitHub Actions workflow:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DocParsing Tests</span>
+<span class="nt">on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">push</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">pull_request</span><span class="p p-Indicator">]</span>
+<span class="nt">jobs</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">test</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+<span class="w">    </span><span class="nt">strategy</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">matrix</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">python-version</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">3.9</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3.10</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3.11</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v3</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Install dependencies</span>
+<span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pip install -e . &amp;&amp; pip install pytest pytest-cov hypothesis</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Run tests</span>
+<span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pytest tests/test_docparsing_*.py -v --cov=src/DocsToKG/DocParsing --cov-report=xml</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Upload coverage</span>
+<span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">codecov/codecov-action@v3</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="appendix-detailed-function-signatures">
+<h2>Appendix: Detailed Function Signatures<a class="headerlink" href="#appendix-detailed-function-signatures" title="Link to this heading"></a></h2>
+<section id="common-py">
+<h3>_common.py<a class="headerlink" href="#common-py" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">detect_data_root</span><span class="p">(</span><span class="n">start</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Locate DocsToKG Data directory via env var or ancestor scan.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">data_doctags</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return DocTagsFiles directory, creating if needed.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">data_chunks</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return ChunkedDocTagFiles directory, creating if needed.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">data_vectors</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return Vectors directory, creating if needed.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">data_manifests</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return Manifests directory, creating if needed.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">find_free_port</span><span class="p">(</span><span class="n">start</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8000</span><span class="p">,</span> <span class="n">span</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">32</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Find available TCP port on localhost.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="nd">@contextlib</span><span class="o">.</span><span class="n">contextmanager</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">atomic_write</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">TextIO</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Context manager for atomic file writes.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">iter_doctags</span><span class="p">(</span><span class="n">directory</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Yield all .doctags files in directory tree.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">iter_chunks</span><span class="p">(</span><span class="n">directory</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Yield all .chunks.jsonl files in directory.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">jsonl_load</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">skip_invalid</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">max_errors</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load JSONL file with optional error tolerance.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">jsonl_save</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">rows</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span> <span class="n">validate</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Save JSONL file atomically with optional validation.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_logger</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;INFO&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get configured logger with JSON formatting.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Batcher</span><span class="p">(</span><span class="n">Generic</span><span class="p">[</span><span class="n">T</span><span class="p">]):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Yield fixed-size batches from iterable.&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">iterable</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">T</span><span class="p">],</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span> <span class="o">...</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">T</span><span class="p">]]:</span> <span class="o">...</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">manifest_append</span><span class="p">(</span><span class="n">stage</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">doc_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">status</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> 
+                   <span class="n">duration_s</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">warnings</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                   <span class="n">error</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">schema_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+                   <span class="o">**</span><span class="n">metadata</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Append processing record to manifest.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">compute_content_hash</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">algorithm</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;sha1&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute file content hash for change detection.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="nd">@contextlib</span><span class="o">.</span><span class="n">contextmanager</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">acquire_lock</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">60.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">bool</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Acquire advisory lock on file.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+</section>
+<section id="schemas-py">
+<h3>schemas.py<a class="headerlink" href="#schemas-py" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">CHUNK_SCHEMA_VERSION</span> <span class="o">=</span> <span class="s2">&quot;docparse/1.1.0&quot;</span>
+<span class="n">VECTOR_SCHEMA_VERSION</span> <span class="o">=</span> <span class="s2">&quot;embeddings/1.0.0&quot;</span>
+<span class="n">COMPATIBLE_CHUNK_VERSIONS</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;docparse/1.0.0&quot;</span><span class="p">,</span> <span class="s2">&quot;docparse/1.1.0&quot;</span><span class="p">]</span>
+<span class="n">COMPATIBLE_VECTOR_VERSIONS</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;embeddings/1.0.0&quot;</span><span class="p">]</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ProvenanceMetadata</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">parse_engine</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1"># &quot;docling-html&quot; or &quot;docling-vlm&quot;</span>
+    <span class="n">docling_version</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">has_image_captions</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">has_image_classification</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">num_images</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ChunkRow</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">doc_id</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">source_path</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">chunk_id</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">source_chunk_idxs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+    <span class="n">num_tokens</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">text</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">doc_items_refs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">page_nos</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">schema_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">CHUNK_SCHEMA_VERSION</span>
+    <span class="n">provenance</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ProvenanceMetadata</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">uuid</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">BM25Vector</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">terms</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">weights</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>
+    <span class="n">k1</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.5</span>
+    <span class="n">b</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.75</span>
+    <span class="n">avgdl</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">N</span><span class="p">:</span> <span class="nb">int</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SPLADEVector</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">model_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;naver/splade-v3&quot;</span>
+    <span class="n">tokens</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">weights</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">DenseVector</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">model_id</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">vector</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>
+    <span class="n">dimension</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">VectorRow</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">UUID</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">BM25</span><span class="p">:</span> <span class="n">BM25Vector</span>
+    <span class="n">SPLADEv3</span><span class="p">:</span> <span class="n">SPLADEVector</span>
+    <span class="n">Qwen3_4B</span><span class="p">:</span> <span class="n">DenseVector</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">alias</span><span class="o">=</span><span class="s2">&quot;Qwen3-4B&quot;</span><span class="p">)</span>
+    <span class="n">model_metadata</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">schema_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">VECTOR_SCHEMA_VERSION</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_chunk_row</span><span class="p">(</span><span class="n">row</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ChunkRow</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate and parse chunk JSONL row.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_vector_row</span><span class="p">(</span><span class="n">row</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VectorRow</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate and parse vector JSONL row.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_docling_version</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Detect installed docling package version.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_schema_version</span><span class="p">(</span><span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">compatible_versions</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if schema version is compatible.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+<p>These function signatures serve as API contracts for implementation.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

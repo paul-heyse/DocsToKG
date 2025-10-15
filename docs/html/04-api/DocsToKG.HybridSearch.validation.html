@@ -1,0 +1,438 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: validation &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: validation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.HybridSearch.validation.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-validation">
+<h1>1. Module: validation<a class="headerlink" href="#module-validation" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.validation</span></code>.</p>
+<p>Automated validation harness for the hybrid search stack.</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="load-dataset-path">
+<h3><code class="docutils literal notranslate"><span class="pre">load_dataset(path)</span></code><a class="headerlink" href="#load-dataset-path" title="Link to this heading"></a></h3>
+<p>Load a JSONL dataset describing documents and queries.</p>
+<p>Args:
+path: Path to a JSONL file containing dataset entries.</p>
+<p>Returns:
+List of parsed dataset rows suitable for validation routines.</p>
+<p>Raises:
+FileNotFoundError: If the dataset file does not exist.
+json.JSONDecodeError: If any line contains invalid JSON.</p>
+</section>
+<section id="infer-embedding-dim-dataset">
+<h3><code class="docutils literal notranslate"><span class="pre">infer_embedding_dim(dataset)</span></code><a class="headerlink" href="#infer-embedding-dim-dataset" title="Link to this heading"></a></h3>
+<p>Infer dense embedding dimensionality from dataset vector artifacts.</p>
+<p>Args:
+dataset: Sequence of dataset entries containing vector metadata.</p>
+<p>Returns:
+Inferred embedding dimensionality, defaulting to 2560 when unknown.</p>
+</section>
+<section id="main-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">main(argv)</span></code><a class="headerlink" href="#main-argv" title="Link to this heading"></a></h3>
+<p>CLI entrypoint for running hybrid search validation suites.</p>
+<p>Args:
+argv: Optional list of command-line arguments overriding <code class="docutils literal notranslate"><span class="pre">sys.argv</span></code>.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="run-self-dataset-output-root">
+<h3><code class="docutils literal notranslate"><span class="pre">run(self,</span> <span class="pre">dataset,</span> <span class="pre">output_root)</span></code><a class="headerlink" href="#run-self-dataset-output-root" title="Link to this heading"></a></h3>
+<p>Execute standard validation against a dataset.</p>
+<p>Args:
+dataset: Loaded dataset entries containing document and query payloads.
+output_root: Optional directory where reports should be written.</p>
+<p>Returns:
+ValidationSummary capturing per-check reports.</p>
+</section>
+<section id="run-scale-self-dataset">
+<h3><code class="docutils literal notranslate"><span class="pre">run_scale(self,</span> <span class="pre">dataset)</span></code><a class="headerlink" href="#run-scale-self-dataset" title="Link to this heading"></a></h3>
+<p>Execute a comprehensive scale validation suite.</p>
+<p>Args:
+dataset: Dataset entries containing documents and queries.
+output_root: Optional directory for detailed metrics output.
+thresholds: Optional overrides for scale validation thresholds.
+query_sample_size: Number of queries sampled for specific checks.</p>
+<p>Returns:
+ValidationSummary with detailed per-check reports.</p>
+</section>
+<section id="to-document-self-payload">
+<h3><code class="docutils literal notranslate"><span class="pre">_to_document(self,</span> <span class="pre">payload)</span></code><a class="headerlink" href="#to-document-self-payload" title="Link to this heading"></a></h3>
+<p>Transform dataset document payload into a <code class="docutils literal notranslate"><span class="pre">DocumentInput</span></code>.</p>
+<p>Args:
+payload: Dataset document dictionary containing paths and metadata.</p>
+<p>Returns:
+Corresponding <code class="docutils literal notranslate"><span class="pre">DocumentInput</span></code> instance for ingestion.</p>
+</section>
+<section id="check-ingest-integrity-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_check_ingest_integrity(self)</span></code><a class="headerlink" href="#check-ingest-integrity-self" title="Link to this heading"></a></h3>
+<p>Verify that ingested chunks contain valid embeddings.</p>
+<p>Args:
+None</p>
+<p>Returns:
+ValidationReport describing integrity checks for ingested chunks.</p>
+</section>
+<section id="check-dense-self-hit-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_check_dense_self_hit(self)</span></code><a class="headerlink" href="#check-dense-self-hit-self" title="Link to this heading"></a></h3>
+<p>Ensure dense search returns each chunk as its own nearest neighbor.</p>
+<p>Args:
+None</p>
+<p>Returns:
+ValidationReport summarizing dense self-hit accuracy.</p>
+</section>
+<section id="check-sparse-relevance-self-dataset">
+<h3><code class="docutils literal notranslate"><span class="pre">_check_sparse_relevance(self,</span> <span class="pre">dataset)</span></code><a class="headerlink" href="#check-sparse-relevance-self-dataset" title="Link to this heading"></a></h3>
+<p>Check that sparse channels retrieve expected documents.</p>
+<p>Args:
+dataset: Dataset entries with expected relevance metadata.</p>
+<p>Returns:
+ValidationReport covering sparse channel relevance.</p>
+</section>
+<section id="check-namespace-filters-self-dataset">
+<h3><code class="docutils literal notranslate"><span class="pre">_check_namespace_filters(self,</span> <span class="pre">dataset)</span></code><a class="headerlink" href="#check-namespace-filters-self-dataset" title="Link to this heading"></a></h3>
+<p>Ensure namespace-constrained queries do not leak results.</p>
+<p>Args:
+dataset: Dataset entries containing namespace-constrained queries.</p>
+<p>Returns:
+ValidationReport indicating whether namespace isolation holds.</p>
+</section>
+<section id="check-pagination-self-dataset">
+<h3><code class="docutils literal notranslate"><span class="pre">_check_pagination(self,</span> <span class="pre">dataset)</span></code><a class="headerlink" href="#check-pagination-self-dataset" title="Link to this heading"></a></h3>
+<p>Verify pagination cursors do not create duplicate results.</p>
+<p>Args:
+dataset: Dataset entries providing queries for pagination tests.</p>
+<p>Returns:
+ValidationReport detailing pagination stability.</p>
+</section>
+<section id="check-highlights-self-dataset">
+<h3><code class="docutils literal notranslate"><span class="pre">_check_highlights(self,</span> <span class="pre">dataset)</span></code><a class="headerlink" href="#check-highlights-self-dataset" title="Link to this heading"></a></h3>
+<p>Assert that each result includes highlight snippets.</p>
+<p>Args:
+dataset: Dataset entries with queries to validate highlight generation.</p>
+<p>Returns:
+ValidationReport indicating highlight completeness.</p>
+</section>
+<section id="check-backup-restore-self-dataset">
+<h3><code class="docutils literal notranslate"><span class="pre">_check_backup_restore(self,</span> <span class="pre">dataset)</span></code><a class="headerlink" href="#check-backup-restore-self-dataset" title="Link to this heading"></a></h3>
+<p>Validate backup/restore by round-tripping the FAISS index.</p>
+<p>Args:
+dataset: Dataset entries used to verify consistency post-restore.</p>
+<p>Returns:
+ValidationReport capturing backup/restore status.</p>
+</section>
+<section id="request-for-query-self-query-page-size">
+<h3><code class="docutils literal notranslate"><span class="pre">_request_for_query(self,</span> <span class="pre">query,</span> <span class="pre">page_size)</span></code><a class="headerlink" href="#request-for-query-self-query-page-size" title="Link to this heading"></a></h3>
+<p>Construct a <code class="docutils literal notranslate"><span class="pre">HybridSearchRequest</span></code> for a dataset query payload.</p>
+<p>Args:
+query: Query payload from the dataset.
+page_size: Desired page size for generated requests.</p>
+<p>Returns:
+HybridSearchRequest ready for execution against the service.</p>
+</section>
+<section id="persist-reports-self-summary-output-root-calibration-details">
+<h3><code class="docutils literal notranslate"><span class="pre">_persist_reports(self,</span> <span class="pre">summary,</span> <span class="pre">output_root,</span> <span class="pre">calibration_details)</span></code><a class="headerlink" href="#persist-reports-self-summary-output-root-calibration-details" title="Link to this heading"></a></h3>
+<p>Persist validation summaries and detailed metrics to disk.</p>
+<p>Args:
+summary: Validation summary containing reports.
+output_root: Optional directory for storing artifacts.
+calibration_details: Optional calibration metrics to persist.
+extras: Optional mapping of additional metrics categories.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="collect-queries-self-dataset">
+<h3><code class="docutils literal notranslate"><span class="pre">_collect_queries(self,</span> <span class="pre">dataset)</span></code><a class="headerlink" href="#collect-queries-self-dataset" title="Link to this heading"></a></h3>
+<p>Collect (document, query) pairs from the dataset.</p>
+<p>Args:
+dataset: Loaded dataset entries containing documents and queries.</p>
+<p>Returns:
+List of tuples pairing document payloads with query payloads.</p>
+</section>
+<section id="sample-queries-self-dataset-sample-size-rng">
+<h3><code class="docutils literal notranslate"><span class="pre">_sample_queries(self,</span> <span class="pre">dataset,</span> <span class="pre">sample_size,</span> <span class="pre">rng)</span></code><a class="headerlink" href="#sample-queries-self-dataset-sample-size-rng" title="Link to this heading"></a></h3>
+<p>Sample a subset of (document, query) pairs for randomized checks.</p>
+<p>Args:
+dataset: Dataset entries containing documents and queries.
+sample_size: Maximum number of pairs to return.
+rng: Random generator used for sampling.</p>
+<p>Returns:
+List of sampled (document, query) pairs.</p>
+</section>
+<section id="scale-data-sanity-self-documents-dataset">
+<h3><code class="docutils literal notranslate"><span class="pre">_scale_data_sanity(self,</span> <span class="pre">documents,</span> <span class="pre">dataset)</span></code><a class="headerlink" href="#scale-data-sanity-self-documents-dataset" title="Link to this heading"></a></h3>
+<p>Validate that ingested corpus statistics look healthy.</p>
+<p>Args:
+documents: Document inputs ingested during the scale run.
+dataset: Dataset entries used for validation.</p>
+<p>Returns:
+ValidationReport summarizing data sanity findings.</p>
+</section>
+<section id="scale-crud-namespace-self-documents-dataset-inputs-by-doc-rng">
+<h3><code class="docutils literal notranslate"><span class="pre">_scale_crud_namespace(self,</span> <span class="pre">documents,</span> <span class="pre">dataset,</span> <span class="pre">inputs_by_doc,</span> <span class="pre">rng)</span></code><a class="headerlink" href="#scale-crud-namespace-self-documents-dataset-inputs-by-doc-rng" title="Link to this heading"></a></h3>
+<p>Exercise CRUD operations to ensure namespace isolation stays intact.</p>
+<p>Args:
+documents: Documents ingested for the validation run.
+dataset: Dataset entries providing queries for verification.
+inputs_by_doc: Mapping back to original document inputs.
+rng: Random generator used to select documents.</p>
+<p>Returns:
+ValidationReport describing CRUD and namespace violations if any.</p>
+</section>
+<section id="scale-dense-metrics-self-thresholds-rng">
+<h3><code class="docutils literal notranslate"><span class="pre">_scale_dense_metrics(self,</span> <span class="pre">thresholds,</span> <span class="pre">rng)</span></code><a class="headerlink" href="#scale-dense-metrics-self-thresholds-rng" title="Link to this heading"></a></h3>
+<p>Assess dense retrieval self-hit, perturbation, and recall metrics.</p>
+<p>Args:
+thresholds: Threshold values for dense metric success.
+rng: Random generator for selecting sample chunks.</p>
+<p>Returns:
+ValidationReport containing dense metric measurements.</p>
+</section>
+<section id="scale-channel-relevance-self-dataset-thresholds-rng-query-sample-size">
+<h3><code class="docutils literal notranslate"><span class="pre">_scale_channel_relevance(self,</span> <span class="pre">dataset,</span> <span class="pre">thresholds,</span> <span class="pre">rng,</span> <span class="pre">query_sample_size)</span></code><a class="headerlink" href="#scale-channel-relevance-self-dataset-thresholds-rng-query-sample-size" title="Link to this heading"></a></h3>
+<p>Measure top-10 relevance for each retrieval channel across sampled queries.</p>
+<p>Args:
+dataset: Dataset entries containing queries for evaluation.
+thresholds: Threshold mapping for hit-rate expectations.
+rng: Random generator used for sampling query pairs.
+query_sample_size: Number of query pairs sampled.</p>
+<p>Returns:
+ValidationReport capturing per-channel relevance metrics.</p>
+</section>
+<section id="scale-fusion-mmr-self-dataset-thresholds-rng-query-sample-size">
+<h3><code class="docutils literal notranslate"><span class="pre">_scale_fusion_mmr(self,</span> <span class="pre">dataset,</span> <span class="pre">thresholds,</span> <span class="pre">rng,</span> <span class="pre">query_sample_size)</span></code><a class="headerlink" href="#scale-fusion-mmr-self-dataset-thresholds-rng-query-sample-size" title="Link to this heading"></a></h3>
+<p>Evaluate diversification impact of MMR versus RRF on sampled queries.</p>
+<p>Args:
+dataset: Dataset entries containing documents and queries.
+thresholds: Diversification thresholds for redundancy and hit-rate deltas.
+rng: Random generator for sampling queries.
+query_sample_size: Number of query pairs to evaluate.</p>
+<p>Returns:
+ValidationReport detailing redundancy reduction and hit-rate deltas.</p>
+</section>
+<section id="scale-pagination-self-dataset-rng-sample-size">
+<h3><code class="docutils literal notranslate"><span class="pre">_scale_pagination(self,</span> <span class="pre">dataset,</span> <span class="pre">rng,</span> <span class="pre">sample_size)</span></code><a class="headerlink" href="#scale-pagination-self-dataset-rng-sample-size" title="Link to this heading"></a></h3>
+<p>Ensure page cursors generate disjoint result sets across pages.</p>
+<p>Args:
+dataset: Dataset entries containing documents and queries.
+rng: Random generator for sampling query pairs.
+sample_size: Number of queries to evaluate for pagination.</p>
+<p>Returns:
+ValidationReport indicating pagination overlap issues.</p>
+</section>
+<section id="scale-result-shaping-self-dataset-rng-sample-size">
+<h3><code class="docutils literal notranslate"><span class="pre">_scale_result_shaping(self,</span> <span class="pre">dataset,</span> <span class="pre">rng,</span> <span class="pre">sample_size)</span></code><a class="headerlink" href="#scale-result-shaping-self-dataset-rng-sample-size" title="Link to this heading"></a></h3>
+<p>Confirm per-document limits, deduping, and highlights behave as expected.</p>
+<p>Args:
+dataset: Dataset entries containing documents and queries.
+rng: Random generator used for sampling query pairs.
+sample_size: Number of sampled queries to evaluate.</p>
+<p>Returns:
+ValidationReport summarizing result shaping concerns.</p>
+</section>
+<section id="scale-backup-restore-self-dataset-rng-query-sample-size">
+<h3><code class="docutils literal notranslate"><span class="pre">_scale_backup_restore(self,</span> <span class="pre">dataset,</span> <span class="pre">rng,</span> <span class="pre">query_sample_size)</span></code><a class="headerlink" href="#scale-backup-restore-self-dataset-rng-query-sample-size" title="Link to this heading"></a></h3>
+<p>Validate snapshot/restore under randomized workloads.</p>
+<p>Args:
+dataset: Dataset entries with documents and queries.
+rng: Random generator for sampling queries.
+query_sample_size: Maximum number of query pairs to evaluate.</p>
+<p>Returns:
+ValidationReport highlighting snapshot mismatches, if any.</p>
+</section>
+<section id="scale-acl-self-dataset">
+<h3><code class="docutils literal notranslate"><span class="pre">_scale_acl(self,</span> <span class="pre">dataset)</span></code><a class="headerlink" href="#scale-acl-self-dataset" title="Link to this heading"></a></h3>
+<p>Ensure per-namespace ACL tags are enforced across queries.</p>
+<p>Args:
+dataset: Dataset entries providing documents and queries.</p>
+<p>Returns:
+ValidationReport listing ACL violations, if discovered.</p>
+</section>
+<section id="scale-performance-self-dataset-thresholds-rng-query-sample-size">
+<h3><code class="docutils literal notranslate"><span class="pre">_scale_performance(self,</span> <span class="pre">dataset,</span> <span class="pre">thresholds,</span> <span class="pre">rng,</span> <span class="pre">query_sample_size)</span></code><a class="headerlink" href="#scale-performance-self-dataset-thresholds-rng-query-sample-size" title="Link to this heading"></a></h3>
+<p>Benchmark latency and throughput against configured thresholds.</p>
+<p>Args:
+dataset: Dataset entries containing documents and queries.
+thresholds: Threshold values for latency and headroom metrics.
+rng: Random generator used for sampling query pairs.
+query_sample_size: Number of queries to sample for benchmarking.</p>
+<p>Returns:
+ValidationReport detailing performance metrics.</p>
+</section>
+<section id="run-calibration-self-dataset">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_calibration(self,</span> <span class="pre">dataset)</span></code><a class="headerlink" href="#run-calibration-self-dataset" title="Link to this heading"></a></h3>
+<p>Record calibration metrics (self-hit accuracy) across oversampling factors.</p>
+<p>Args:
+dataset: Dataset entries (unused, provided for symmetry).</p>
+<p>Returns:
+ValidationReport summarizing calibration accuracy per oversample setting.</p>
+</section>
+<section id="embeddings-for-results-self-results-chunk-lookup-limit">
+<h3><code class="docutils literal notranslate"><span class="pre">_embeddings_for_results(self,</span> <span class="pre">results,</span> <span class="pre">chunk_lookup,</span> <span class="pre">limit)</span></code><a class="headerlink" href="#embeddings-for-results-self-results-chunk-lookup-limit" title="Link to this heading"></a></h3>
+<p>Retrieve embeddings for the top-N results using a chunk lookup.</p>
+<p>Args:
+results: Search results from which embeddings are needed.
+chunk_lookup: Mapping from (doc_id, chunk_id) to stored payloads.
+limit: Maximum number of results to consider.</p>
+<p>Returns:
+List of embedding vectors associated with the results.</p>
+</section>
+<section id="average-pairwise-cos-self-embeddings">
+<h3><code class="docutils literal notranslate"><span class="pre">_average_pairwise_cos(self,</span> <span class="pre">embeddings)</span></code><a class="headerlink" href="#average-pairwise-cos-self-embeddings" title="Link to this heading"></a></h3>
+<p>Compute average pairwise cosine similarity for a set of embeddings.</p>
+<p>Args:
+embeddings: Sequence of embedding vectors.</p>
+<p>Returns:
+Mean pairwise cosine similarity, or 0.0 when insufficient points exist.</p>
+</section>
+<section id="percentile-self-values-percentile">
+<h3><code class="docutils literal notranslate"><span class="pre">_percentile(self,</span> <span class="pre">values,</span> <span class="pre">percentile)</span></code><a class="headerlink" href="#percentile-self-values-percentile" title="Link to this heading"></a></h3>
+<p>Return percentile value for a sequence; defaults to 0.0 when empty.</p>
+<p>Args:
+values: Sequence of numeric values.
+percentile: Desired percentile expressed as a value between 0 and 100.</p>
+<p>Returns:
+Percentile value cast to float, or 0.0 when the sequence is empty.</p>
+</section>
+<section id="scale-stability-self-dataset-inputs-by-doc-rng-query-sample-size">
+<h3><code class="docutils literal notranslate"><span class="pre">_scale_stability(self,</span> <span class="pre">dataset,</span> <span class="pre">inputs_by_doc,</span> <span class="pre">rng,</span> <span class="pre">query_sample_size)</span></code><a class="headerlink" href="#scale-stability-self-dataset-inputs-by-doc-rng-query-sample-size" title="Link to this heading"></a></h3>
+<p>Stress-test search stability under repeated queries and churn.</p>
+<p>Args:
+dataset: Dataset entries containing documents and queries.
+inputs_by_doc: Mapping of document IDs to ingestion inputs.
+rng: Random generator used for sampling queries and churn operations.
+query_sample_size: Number of queries to sample for stability checks.</p>
+<p>Returns:
+ValidationReport detailing stability mismatches.</p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="hybridsearchvalidator">
+<h3><code class="docutils literal notranslate"><span class="pre">HybridSearchValidator</span></code><a class="headerlink" href="#hybridsearchvalidator" title="Link to this heading"></a></h3>
+<p>Execute validation sweeps and persist reports.</p>
+<p>Attributes:
+_ingestion: Chunk ingestion pipeline used for preparing test data.
+_service: Hybrid search service under validation.
+_registry: Registry exposing ingested chunk metadata.
+_opensearch: OpenSearch simulator for lexical storage inspection.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>validator = HybridSearchValidator(
+…     ingestion=ChunkIngestionPipeline(…),  # doctest: +SKIP
+…     service=HybridSearchService(…),      # doctest: +SKIP
+…     registry=ChunkRegistry(),
+…     opensearch=OpenSearchSimulator(),
+… )
+isinstance(validator, HybridSearchValidator)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

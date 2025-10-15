@@ -1,0 +1,166 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: run_docling_html_to_doctags_parallel &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: run_docling_html_to_doctags_parallel</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.DocParsing.run_docling_html_to_doctags_parallel.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-run-docling-html-to-doctags-parallel">
+<h1>1. Module: run_docling_html_to_doctags_parallel<a class="headerlink" href="#module-run-docling-html-to-doctags-parallel" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.run_docling_html_to_doctags_parallel</span></code>.</p>
+<p>HTML → DocTags (parallel, CPU-only; no captioning/classification, no HF auth)</p>
+<ul class="simple">
+<li><p>Input : Data/HTML/ (recurses; excludes *.normalized.html)</p></li>
+<li><p>Output: Data/DocTagsFiles/&lt;mirrored_subdirs&gt;/*.doctags</p></li>
+</ul>
+<p>Example:
+python run_docling_html_to_doctags_parallel.py       –input  Data/HTML       –output Data/DocTagsFiles       –workers 12</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="get-converter">
+<h3><code class="docutils literal notranslate"><span class="pre">_get_converter()</span></code><a class="headerlink" href="#get-converter" title="Link to this heading"></a></h3>
+<p>Instantiate and cache a Docling HTML converter per worker process.</p>
+<p>Returns:
+DocumentConverter configured for HTML input, cached for reuse within
+the worker process.</p>
+</section>
+<section id="detect-data-root-start">
+<h3><code class="docutils literal notranslate"><span class="pre">detect_data_root(start)</span></code><a class="headerlink" href="#detect-data-root-start" title="Link to this heading"></a></h3>
+<p>Locate the DocsToKG <code class="docutils literal notranslate"><span class="pre">Data</span></code> directory relative to a starting path.</p>
+<p>Args:
+start: Directory from which to begin scanning for <code class="docutils literal notranslate"><span class="pre">Data/HTML</span></code>.</p>
+<p>Returns:
+Path pointing to the discovered <code class="docutils literal notranslate"><span class="pre">Data</span></code> directory, or <code class="docutils literal notranslate"><span class="pre">&lt;start&gt;/Data</span></code>
+when no ancestor contains the expected layout.</p>
+</section>
+<section id="list-htmls-root">
+<h3><code class="docutils literal notranslate"><span class="pre">list_htmls(root)</span></code><a class="headerlink" href="#list-htmls-root" title="Link to this heading"></a></h3>
+<p>Enumerate HTML-like files beneath a directory tree.</p>
+<p>Args:
+root: Directory whose subtree should be searched for HTML files.</p>
+<p>Returns:
+Sorted list of discovered HTML file paths excluding normalized outputs.</p>
+</section>
+<section id="convert-one-html-path-input-root-output-root-overwrite">
+<h3><code class="docutils literal notranslate"><span class="pre">convert_one(html_path,</span> <span class="pre">input_root,</span> <span class="pre">output_root,</span> <span class="pre">overwrite)</span></code><a class="headerlink" href="#convert-one-html-path-input-root-output-root-overwrite" title="Link to this heading"></a></h3>
+<p>Convert a single HTML file to DocTags, honoring overwrite semantics.</p>
+<p>Args:
+html_path: Path to the source HTML document.
+input_root: Root directory used to compute relative paths for logging.
+output_root: Base directory where generated <code class="docutils literal notranslate"><span class="pre">.doctags</span></code> files are stored.
+overwrite: Whether to replace existing outputs.</p>
+<p>Returns:
+Tuple of <code class="docutils literal notranslate"><span class="pre">(relative_path,</span> <span class="pre">status)</span></code> where status is <code class="docutils literal notranslate"><span class="pre">ok</span></code>, <code class="docutils literal notranslate"><span class="pre">skip</span></code>, or a
+<code class="docutils literal notranslate"><span class="pre">fail:&lt;reason&gt;</span></code> string describing an error condition.</p>
+</section>
+<section id="main">
+<h3><code class="docutils literal notranslate"><span class="pre">main()</span></code><a class="headerlink" href="#main" title="Link to this heading"></a></h3>
+<p>Entrypoint for parallel HTML-to-DocTags conversion across a dataset.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,250 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Overview &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="1. Setup Guide" href="../02-setup/index.html" />
+    <link rel="prev" title="DocsToKG Documentation" href="../index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">1. Overview</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#what-is-docstokg">2. What is DocsToKG?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#core-capabilities">3. Core Capabilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#content-acquisition-parsing">Content Acquisition &amp; Parsing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#hybrid-search">Hybrid Search</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ontology-integration">Ontology Integration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#architecture-overview">4. Architecture Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#key-components">5. Key Components</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#use-cases">6. Use Cases</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#research-academia">Research &amp; Academia</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#enterprise-knowledge-management">Enterprise Knowledge Management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#content-management">Content Management</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#technology-stack">7. Technology Stack</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#getting-started">8. Getting Started</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#project-status">9. Project Status</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Overview</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/01-overview/index.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="overview">
+<h1>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h1>
+<section id="what-is-docstokg">
+<h2>2. What is DocsToKG?<a class="headerlink" href="#what-is-docstokg" title="Link to this heading"></a></h2>
+<p>DocsToKG is a Python toolkit for turning raw documents into searchable, richly annotated
+knowledge artefacts. It combines document acquisition, Docling-based parsing, ontology
+enrichment, and a FAISS-backed hybrid search engine to surface relevant context for
+downstream applications.</p>
+</section>
+<section id="core-capabilities">
+<h2>3. Core Capabilities<a class="headerlink" href="#core-capabilities" title="Link to this heading"></a></h2>
+<section id="content-acquisition-parsing">
+<h3>Content Acquisition &amp; Parsing<a class="headerlink" href="#content-acquisition-parsing" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Download corpora and metadata from external sources (e.g., Pyalex) using the <code class="docutils literal notranslate"><span class="pre">ContentDownload</span></code> utilities.</p></li>
+<li><p>Convert PDFs and HTML into DocTags, chunked Markdown, and embeddings via <code class="docutils literal notranslate"><span class="pre">DocParsing</span></code> pipelines.</p></li>
+<li><p>Preserve provenance (page numbers, figure references, captions) for downstream quality checks.</p></li>
+</ul>
+</section>
+<section id="hybrid-search">
+<h3>Hybrid Search<a class="headerlink" href="#hybrid-search" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Fuse lexical (BM25), sparse (SPLADE), and dense (FAISS) retrieval signals for robust ranking.</p></li>
+<li><p>Support namespace-aware search, diagnostics, and cursor-based pagination.</p></li>
+<li><p>Expose programmatic APIs (<code class="docutils literal notranslate"><span class="pre">HybridSearchService</span></code>, <code class="docutils literal notranslate"><span class="pre">HybridSearchAPI</span></code>) for integration.</p></li>
+</ul>
+</section>
+<section id="ontology-integration">
+<h3>Ontology Integration<a class="headerlink" href="#ontology-integration" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Download, validate, and catalogue ontologies through the <code class="docutils literal notranslate"><span class="pre">OntologyDownload</span></code> CLI.</p></li>
+<li><p>Enrich document metadata using controlled vocabularies and reusable resolver logic.</p></li>
+<li><p>Keep terminologies current with automated validation and manifests.</p></li>
+</ul>
+</section>
+</section>
+<section id="architecture-overview">
+<h2>4. Architecture Overview<a class="headerlink" href="#architecture-overview" title="Link to this heading"></a></h2>
+<div class="highlight-mermaid notranslate"><div class="highlight"><pre><span></span>graph LR
+    A[Source documents] --&gt; B[ContentDownload]
+    B --&gt; C[DocParsing]
+    C --&gt; D[Embeddings &amp; chunk payloads]
+    D --&gt; E[HybridSearch ingest]
+    E --&gt; F[HybridSearch API &amp; service]
+    G[OntologyDownload] --&gt; E
+</pre></div>
+</div>
+</section>
+<section id="key-components">
+<h2>5. Key Components<a class="headerlink" href="#key-components" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>ContentDownload</strong> – Resolvers and utilities for fetching PDFs and metadata (e.g., Pyalex support).</p></li>
+<li><p><strong>DocParsing</strong> – Docling pipelines that chunk documents, extract captions, and generate embeddings.</p></li>
+<li><p><strong>HybridSearch</strong> – Retrieval service combining FAISS, BM25, and SPLADE with fusion, observability, and API layers.</p></li>
+<li><p><strong>OntologyDownload</strong> – CLI-driven ontology fetcher with validation pipelines and manifest management.</p></li>
+<li><p><strong>Documentation Tooling</strong> – Scripts under <code class="docutils literal notranslate"><span class="pre">docs/scripts/</span></code> to generate API docs, run validations, and build Sphinx sites.</p></li>
+</ul>
+</section>
+<section id="use-cases">
+<h2>6. Use Cases<a class="headerlink" href="#use-cases" title="Link to this heading"></a></h2>
+<section id="research-academia">
+<h3>Research &amp; Academia<a class="headerlink" href="#research-academia" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Literature review automation</p></li>
+<li><p>Cross-document concept linking</p></li>
+<li><p>Research trend analysis</p></li>
+</ul>
+</section>
+<section id="enterprise-knowledge-management">
+<h3>Enterprise Knowledge Management<a class="headerlink" href="#enterprise-knowledge-management" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Document discovery and retrieval</p></li>
+<li><p>Knowledge base construction</p></li>
+<li><p>Compliance and audit support</p></li>
+</ul>
+</section>
+<section id="content-management">
+<h3>Content Management<a class="headerlink" href="#content-management" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Editorial workflows for large publication archives</p></li>
+<li><p>Recommendation and summarisation pipelines</p></li>
+<li><p>Dataset curation with ontology alignment</p></li>
+</ul>
+</section>
+</section>
+<section id="technology-stack">
+<h2>7. Technology Stack<a class="headerlink" href="#technology-stack" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Language &amp; Runtime</strong>: Python ≥3.12, type hints enforced via <code class="docutils literal notranslate"><span class="pre">mypy</span> <span class="pre">--strict</span></code></p></li>
+<li><p><strong>Parsing &amp; NLP</strong>: Docling, Hugging Face Transformers, vLLM for accelerated inference</p></li>
+<li><p><strong>Retrieval</strong>: FAISS (dense), BM25/SPLADE simulators for sparse signals</p></li>
+<li><p><strong>Ontology &amp; RDF</strong>: <code class="docutils literal notranslate"><span class="pre">oaklib</span></code>, <code class="docutils literal notranslate"><span class="pre">ols-client</span></code>, <code class="docutils literal notranslate"><span class="pre">ontoportal-client</span></code>, <code class="docutils literal notranslate"><span class="pre">rdflib</span></code>, <code class="docutils literal notranslate"><span class="pre">owlready2</span></code>, <code class="docutils literal notranslate"><span class="pre">pronto</span></code>, <code class="docutils literal notranslate"><span class="pre">arelle</span></code></p></li>
+<li><p><strong>Tooling</strong>: Sphinx, Vale (optional), pytest, ruff, black</p></li>
+<li><p><strong>Automation Scripts</strong>: <code class="docutils literal notranslate"><span class="pre">docs/scripts/</span></code> orchestration, <code class="docutils literal notranslate"><span class="pre">tests/</span></code> for quality gates</p></li>
+</ul>
+</section>
+<section id="getting-started">
+<h2>8. Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading"></a></h2>
+<p>Ready to explore DocsToKG? Here’s your path:</p>
+<ol class="arabic simple">
+<li><p><strong><a class="reference internal" href="../02-setup/index.html"><span class="std std-doc">Setup Guide</span></a></strong> - Get the system running locally</p></li>
+<li><p><strong><a class="reference internal" href="../04-api/index.html"><span class="std std-doc">API Reference</span></a></strong> - Learn to integrate with the system</p></li>
+<li><p><strong><a class="reference internal" href="../03-architecture/index.html"><span class="std std-doc">Architecture Deep Dive</span></a></strong> - Understand the internals</p></li>
+<li><p><strong><a class="reference internal" href="../05-development/index.html"><span class="std std-doc">Development Guide</span></a></strong> - Contribute to the project</p></li>
+</ol>
+</section>
+<section id="project-status">
+<h2>9. Project Status<a class="headerlink" href="#project-status" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Current Version</strong>: 0.1.0</p></li>
+<li><p><strong>Development Phase</strong>: Active development</p></li>
+<li><p><strong>Documentation</strong>: Framework established with automated validation</p></li>
+<li><p><strong>Community</strong>: Contributions welcome via GitHub issues and pull requests</p></li>
+</ul>
+<p>For the latest updates, check our <a class="reference external" href="https://github.com/paul-heyse/DocsToKG">GitHub repository</a> or the <a class="reference internal" href="../05-development/index.html"><span class="std std-doc">Development Guide</span></a>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../index.html" class="btn btn-neutral float-left" title="DocsToKG Documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../02-setup/index.html" class="btn btn-neutral float-right" title="1. Setup Guide" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,205 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: http &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: http</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.ContentDownload.http.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-http">
+<h1>1. Module: http<a class="headerlink" href="#module-http" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.http</span></code>.</p>
+<p>Unified HTTP request utilities with retry and backoff support.</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="parse-retry-after-header-response">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_retry_after_header(response)</span></code><a class="headerlink" href="#parse-retry-after-header-response" title="Link to this heading"></a></h3>
+<p>Parse <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> header and return wait time in seconds.</p>
+<p>Args:
+response: HTTP response potentially containing <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> header.</p>
+<p>Returns:
+Float seconds to wait, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if header missing/invalid.</p>
+<p>Raises:
+None.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p class="rubric" id="integer-format">Integer format</p>
+<p>response = requests.Response()
+response.headers = {“Retry-After”: “5”}
+parse_retry_after_header(response)
+5.0</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p class="rubric" id="http-date-format">HTTP-date format</p>
+<p>response.headers = {“Retry-After”: “Wed, 21 Oct 2025 07:28:00 GMT”}
+isinstance(parse_retry_after_header(response), float)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="request-with-retries-session-method-url">
+<h3><code class="docutils literal notranslate"><span class="pre">request_with_retries(session,</span> <span class="pre">method,</span> <span class="pre">url)</span></code><a class="headerlink" href="#request-with-retries-session-method-url" title="Link to this heading"></a></h3>
+<p>Execute an HTTP request with exponential backoff and retry handling.</p>
+<p>Args:
+session: :class:<code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> used to execute the request.
+method: HTTP method such as <code class="docutils literal notranslate"><span class="pre">&quot;GET&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;HEAD&quot;</span></code>.
+url: Fully-qualified URL for the request.
+max_retries: Maximum number of retry attempts before returning the final
+response or raising an exception. Defaults to <code class="docutils literal notranslate"><span class="pre">3</span></code>.
+retry_statuses: Optional set of HTTP status codes that should trigger a
+retry. Defaults to <code class="docutils literal notranslate"><span class="pre">{429,</span> <span class="pre">500,</span> <span class="pre">502,</span> <span class="pre">503,</span> <span class="pre">504}</span></code>.
+backoff_factor: Base multiplier for exponential backoff delays.
+Defaults to <code class="docutils literal notranslate"><span class="pre">0.75</span></code> seconds.
+respect_retry_after: Whether to parse and obey <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> headers
+when provided by the server. Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.
+**kwargs: Additional keyword arguments forwarded directly to
+:meth:<code class="docutils literal notranslate"><span class="pre">requests.Session.request</span></code>.</p>
+<p>Returns:
+A :class:<code class="docutils literal notranslate"><span class="pre">requests.Response</span></code> instance on success. The caller is
+responsible for closing the response when streaming content.</p>
+<p>Raises:
+requests.RequestException: If all retry attempts fail due to network
+errors or the session raises an exception.</p>
+<p>Example:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>session = requests.Session()
+response = request_with_retries(session, “HEAD”, “https://example.org”)
+response.status_code  # doctest: +SKIP
+200
+with request_with_retries(
+…     session,
+…     “GET”,
+…     “https://example.org/resource”,
+…     stream=True,
+… ) as resp:  # doctest: +SKIP
+…     data = resp.content</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+<p>Thread Safety:
+The helper is thread-safe provided the supplied <code class="docutils literal notranslate"><span class="pre">session</span></code> can be used
+safely across threads. Standard :class:<code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> instances are
+generally safe for concurrent reads when configured with connection
+pooling adapters.</p>
+</section>
+<section id="request-func">
+<h3><code class="docutils literal notranslate"><span class="pre">request_func()</span></code><a class="headerlink" href="#request-func" title="Link to this heading"></a></h3>
+<p>Invoke the fallback HTTP method when <code class="docutils literal notranslate"><span class="pre">Session.request</span></code> is unavailable.</p>
+<p>Args:
+method: HTTP method name passed through for parity with <code class="docutils literal notranslate"><span class="pre">Session.request</span></code>.
+url: URL targeted by the outgoing request.
+**call_kwargs: Keyword arguments forwarded to the fallback method.</p>
+<p>Returns:
+<code class="docutils literal notranslate"><span class="pre">requests.Response</span></code> produced by the fallback invocation.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

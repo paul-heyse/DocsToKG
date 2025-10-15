@@ -1,0 +1,272 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: DoclingHybridChunkerPipelineWithMin &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: DoclingHybridChunkerPipelineWithMin</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-doclinghybridchunkerpipelinewithmin">
+<h1>1. Module: DoclingHybridChunkerPipelineWithMin<a class="headerlink" href="#module-doclinghybridchunkerpipelinewithmin" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin</span></code>.</p>
+<p>Docling Hybrid Chunker with Minimum Token Coalescence</p>
+<p>Transforms DocTags documents into chunked records while ensuring short runs of
+chunks are merged to satisfy minimum token thresholds required by downstream
+embedding pipelines.</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="find-doctags-files-in-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">find_doctags_files(in_dir)</span></code><a class="headerlink" href="#find-doctags-files-in-dir" title="Link to this heading"></a></h3>
+<p>Discover <code class="docutils literal notranslate"><span class="pre">.doctags</span></code> artifacts within a directory.</p>
+<p>Args:
+in_dir: Directory containing DocTags outputs.</p>
+<p>Returns:
+Sorted list of unique DocTags file paths.</p>
+</section>
+<section id="read-utf8-p">
+<h3><code class="docutils literal notranslate"><span class="pre">read_utf8(p)</span></code><a class="headerlink" href="#read-utf8-p" title="Link to this heading"></a></h3>
+<p>Load text from disk using UTF-8 with replacement for invalid bytes.</p>
+<p>Args:
+p: Path to the text file.</p>
+<p>Returns:
+String contents of the file.</p>
+</section>
+<section id="build-doc-doc-name-doctags-text">
+<h3><code class="docutils literal notranslate"><span class="pre">build_doc(doc_name,</span> <span class="pre">doctags_text)</span></code><a class="headerlink" href="#build-doc-doc-name-doctags-text" title="Link to this heading"></a></h3>
+<p>Construct a Docling document from serialized DocTags text.</p>
+<p>Args:
+doc_name: Human-readable document identifier for logging.
+doctags_text: Serialized DocTags payload.</p>
+<p>Returns:
+Loaded DoclingDocument ready for chunking.</p>
+</section>
+<section id="extract-refs-and-pages-chunk">
+<h3><code class="docutils literal notranslate"><span class="pre">extract_refs_and_pages(chunk)</span></code><a class="headerlink" href="#extract-refs-and-pages-chunk" title="Link to this heading"></a></h3>
+<p>Collect self-references and page numbers associated with a chunk.</p>
+<p>Args:
+chunk: Chunk object produced by the hybrid chunker.</p>
+<p>Returns:
+Tuple containing a list of reference identifiers and sorted page numbers.</p>
+<p>Raises:
+None</p>
+</section>
+<section id="merge-rec-a-b-tokenizer">
+<h3><code class="docutils literal notranslate"><span class="pre">merge_rec(a,</span> <span class="pre">b,</span> <span class="pre">tokenizer)</span></code><a class="headerlink" href="#merge-rec-a-b-tokenizer" title="Link to this heading"></a></h3>
+<p>Merge two chunk records, updating token counts and provenance metadata.</p>
+<p>Args:
+a: First record to merge.
+b: Second record to merge.
+tokenizer: Tokenizer used to recompute token counts for combined text.</p>
+<p>Returns:
+New <code class="docutils literal notranslate"><span class="pre">Rec</span></code> instance containing fused text, token counts, and metadata.</p>
+</section>
+<section id="coalesce-small-runs-records-tokenizer-min-tokens-max-tokens">
+<h3><code class="docutils literal notranslate"><span class="pre">coalesce_small_runs(records,</span> <span class="pre">tokenizer,</span> <span class="pre">min_tokens,</span> <span class="pre">max_tokens)</span></code><a class="headerlink" href="#coalesce-small-runs-records-tokenizer-min-tokens-max-tokens" title="Link to this heading"></a></h3>
+<p>Merge contiguous short chunks until they satisfy minimum token thresholds.</p>
+<p>Args:
+records: Ordered list of chunk records to normalize.
+tokenizer: Tokenizer used to recompute token counts for merged chunks.
+min_tokens: Target minimum tokens per chunk after coalescing.
+max_tokens: Hard ceiling to avoid producing overly large chunks.</p>
+<p>Returns:
+New list of records where small runs are merged while preserving order.</p>
+<p>Note:
+Strategy:
+• Identify contiguous runs where every chunk has fewer than <code class="docutils literal notranslate"><span class="pre">min_tokens</span></code>.
+• Greedily pack neighbors within a run to exceed <code class="docutils literal notranslate"><span class="pre">min_tokens</span></code> without
+surpassing <code class="docutils literal notranslate"><span class="pre">max_tokens</span></code>.
+• Merge trailing fragments into adjacent groups when possible,
+preferring same-run neighbors to maintain topical cohesion.
+• Leave chunks outside small runs unchanged.</p>
+</section>
+<section id="main">
+<h3><code class="docutils literal notranslate"><span class="pre">main()</span></code><a class="headerlink" href="#main" title="Link to this heading"></a></h3>
+<p>CLI driver that chunks DocTags files and enforces minimum token thresholds.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+</section>
+<section id="serialize-self">
+<h3><code class="docutils literal notranslate"><span class="pre">serialize(self)</span></code><a class="headerlink" href="#serialize-self" title="Link to this heading"></a></h3>
+<p>Render picture metadata into Markdown-friendly text.</p>
+<p>Args:
+item: Picture element emitted by Docling.
+doc_serializer: Parent serializer responsible for post-processing.
+doc: Full Docling document containing the picture context.</p>
+<p>Returns:
+SerializationResult capturing the rendered string and provenance.</p>
+</section>
+<section id="get-serializer-self-doc">
+<h3><code class="docutils literal notranslate"><span class="pre">get_serializer(self,</span> <span class="pre">doc)</span></code><a class="headerlink" href="#get-serializer-self-doc" title="Link to this heading"></a></h3>
+<p>Construct a ChunkingDocSerializer tailored for DocTags documents.</p>
+<p>Args:
+doc: Docling document that will be serialized into chunk text.</p>
+<p>Returns:
+Configured ChunkingDocSerializer instance.</p>
+</section>
+<section id="is-small-idx">
+<h3><code class="docutils literal notranslate"><span class="pre">is_small(idx)</span></code><a class="headerlink" href="#is-small-idx" title="Link to this heading"></a></h3>
+<p>Return True when the chunk at <code class="docutils literal notranslate"><span class="pre">idx</span></code> is below the minimum token threshold.</p>
+<p>Args:
+idx: Index of the chunk under evaluation.</p>
+<p>Returns:
+True if the chunk length is less than <code class="docutils literal notranslate"><span class="pre">min_tokens</span></code>, else False.</p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="captionplusannotationpictureserializer">
+<h3><code class="docutils literal notranslate"><span class="pre">CaptionPlusAnnotationPictureSerializer</span></code><a class="headerlink" href="#captionplusannotationpictureserializer" title="Link to this heading"></a></h3>
+<p>Serialize picture items with captions and rich annotation metadata.</p>
+<p>Attributes:
+None</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>serializer = CaptionPlusAnnotationPictureSerializer()
+isinstance(serializer, MarkdownPictureSerializer)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="richserializerprovider">
+<h3><code class="docutils literal notranslate"><span class="pre">RichSerializerProvider</span></code><a class="headerlink" href="#richserializerprovider" title="Link to this heading"></a></h3>
+<p>Provide a serializer that augments tables and pictures with Markdown.</p>
+<p>Attributes:
+None</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>provider = RichSerializerProvider()
+isinstance(provider, ChunkingSerializerProvider)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="rec">
+<h3><code class="docutils literal notranslate"><span class="pre">Rec</span></code><a class="headerlink" href="#rec" title="Link to this heading"></a></h3>
+<p>Intermediate record tracking chunk text and provenance.</p>
+<p>Attributes:
+text: Chunk text content.
+n_tok: Token count computed by the tokenizer.
+src_idxs: Source chunk indices contributing to this record.
+refs: List of inline reference identifiers.
+pages: Page numbers associated with the chunk.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>rec = Rec(text=”Example”, n_tok=5, src_idxs=[0], refs=[], pages=[1])
+rec.n_tok
+5</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

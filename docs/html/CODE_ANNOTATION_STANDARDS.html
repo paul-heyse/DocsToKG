@@ -1,0 +1,550 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Code Annotation Standards for Auto-Generation &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/css/custom.css" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=8d563738"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Code Annotation Standards for Auto-Generation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/CODE_ANNOTATION_STANDARDS.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="code-annotation-standards-for-auto-generation">
+<h1>1. Code Annotation Standards for Auto-Generation<a class="headerlink" href="#code-annotation-standards-for-auto-generation" title="Link to this heading"></a></h1>
+<p>This document establishes standards for code annotations (comments and docstrings) that
+enable automated documentation generation. Following these standards ensures that the
+<code class="docutils literal notranslate"><span class="pre">generate_api_docs.py</span></code> script and Sphinx autodoc can extract meaningful, consistent
+documentation from your code.</p>
+<section id="philosophy">
+<h2>2. Philosophy<a class="headerlink" href="#philosophy" title="Link to this heading"></a></h2>
+<p><strong>Code annotations should:</strong></p>
+<ul class="simple">
+<li><p><strong>Enable AI agents</strong> to understand code functionality and requirements</p></li>
+<li><p><strong>Support automated documentation</strong> generation without manual intervention</p></li>
+<li><p><strong>Provide clear context</strong> for human developers and reviewers</p></li>
+<li><p><strong>Follow consistent patterns</strong> across the entire codebase</p></li>
+</ul>
+</section>
+<section id="general-principles">
+<h2>3. General Principles<a class="headerlink" href="#general-principles" title="Link to this heading"></a></h2>
+<section id="every-public-interface-needs-documentation">
+<h3>1. Every Public Interface Needs Documentation<a class="headerlink" href="#every-public-interface-needs-documentation" title="Link to this heading"></a></h3>
+<p>All public classes, functions, methods, and modules must have docstrings that explain:</p>
+<ul class="simple">
+<li><p><strong>Purpose</strong>: What this code does and why it exists</p></li>
+<li><p><strong>Usage</strong>: How to use it correctly</p></li>
+<li><p><strong>Parameters</strong>: What inputs are expected</p></li>
+<li><p><strong>Returns</strong>: What outputs are provided</p></li>
+<li><p><strong>Side Effects</strong>: Any external state changes or important behaviors</p></li>
+</ul>
+</section>
+<section id="documentation-first-development">
+<h3>2. Documentation-First Development<a class="headerlink" href="#documentation-first-development" title="Link to this heading"></a></h3>
+<p>Write documentation before implementing functionality:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">process_documents</span><span class="p">(</span><span class="n">document_ids</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ProcessingResult</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process multiple documents through the knowledge graph pipeline.</span>
+
+<span class="sd">    This function handles batch document processing, ensuring efficient</span>
+<span class="sd">    resource utilization and proper error handling for large document sets.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        document_ids: List of document identifiers to process</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Dictionary mapping document IDs to their processing results</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        DocumentProcessingError: If any document fails processing</span>
+<span class="sd">        ValidationError: If input parameters are invalid</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Implementation follows...</span>
+    <span class="k">pass</span>
+</pre></div>
+</div>
+</section>
+<section id="consistent-terminology">
+<h3>3. Consistent Terminology<a class="headerlink" href="#consistent-terminology" title="Link to this heading"></a></h3>
+<p>Use consistent terminology across all annotations:</p>
+<ul class="simple">
+<li><p>Use “document” consistently (not “file”, “record”, etc.)</p></li>
+<li><p>Use “process” for transformation operations</p></li>
+<li><p>Use “search” for retrieval operations</p></li>
+<li><p>Use “index” for vector storage structures</p></li>
+</ul>
+</section>
+</section>
+<section id="module-level-documentation">
+<h2>4. Module-Level Documentation<a class="headerlink" href="#module-level-documentation" title="Link to this heading"></a></h2>
+<p>Every Python module must start with a comprehensive docstring:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Document Processing Service</span>
+
+<span class="sd">This module provides comprehensive document processing capabilities for the</span>
+<span class="sd">DocsToKG system, including content extraction, metadata analysis, and</span>
+<span class="sd">knowledge graph construction.</span>
+
+<span class="sd">The service handles various document formats and integrates with the</span>
+<span class="sd">vector search and knowledge graph components to provide end-to-end</span>
+<span class="sd">document understanding.</span>
+
+<span class="sd">Key Features:</span>
+<span class="sd">- Multi-format document parsing (PDF, DOCX, TXT, HTML)</span>
+<span class="sd">- AI-powered content classification and entity extraction</span>
+<span class="sd">- Integration with Faiss vector indexing</span>
+<span class="sd">- Asynchronous processing for scalability</span>
+
+<span class="sd">Dependencies:</span>
+<span class="sd">- faiss: Vector similarity search</span>
+<span class="sd">- transformers: AI model inference</span>
+<span class="sd">- PyPDF2: PDF document parsing</span>
+<span class="sd">- python-docx: Word document parsing</span>
+
+<span class="sd">Usage:</span>
+<span class="sd">    from src.processing.document_service import DocumentProcessor</span>
+
+<span class="sd">    processor = DocumentProcessor()</span>
+<span class="sd">    result = await processor.process_document(&quot;doc_123&quot;)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="class-documentation">
+<h2>5. Class Documentation<a class="headerlink" href="#class-documentation" title="Link to this heading"></a></h2>
+<p>Classes must document their purpose, responsibilities, and key methods:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">DocumentProcessor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handles document processing pipeline from ingestion to knowledge graph.</span>
+
+<span class="sd">    This class orchestrates the complete document processing workflow:</span>
+<span class="sd">    1. Document validation and format detection</span>
+<span class="sd">    2. Content extraction and preprocessing</span>
+<span class="sd">    3. Entity recognition and relationship extraction</span>
+<span class="sd">    4. Vector embedding generation</span>
+<span class="sd">    5. Knowledge graph construction</span>
+
+<span class="sd">    The processor is designed to handle both individual documents and</span>
+<span class="sd">    batch processing scenarios, with built-in error handling and</span>
+<span class="sd">    progress tracking.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        config (ProcessingConfig): Configuration settings for processing</span>
+<span class="sd">        embedding_model (SentenceTransformer): Model for text embeddings</span>
+<span class="sd">        vector_index (FaissIndex): Vector similarity search index</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; processor = DocumentProcessor()</span>
+<span class="sd">        &gt;&gt;&gt; result = await processor.process_document(&quot;doc_123&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; print(f&quot;Processed {result.document_count} documents&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ProcessingConfig</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the document processor.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            config: Processing configuration. Uses defaults if None.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span> <span class="ow">or</span> <span class="n">ProcessingConfig</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">embedding_model</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Lazy initialization</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vector_index</span> <span class="o">=</span> <span class="kc">None</span>     <span class="c1"># Lazy initialization</span>
+</pre></div>
+</div>
+</section>
+<section id="function-and-method-documentation">
+<h2>6. Function and Method Documentation<a class="headerlink" href="#function-and-method-documentation" title="Link to this heading"></a></h2>
+<p>Functions must document parameters, return values, and behavior:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">extract_entities</span><span class="p">(</span>
+    <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">model</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span>
+    <span class="n">confidence_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.8</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Entity</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract named entities from document text using AI models.</span>
+
+<span class="sd">    This function uses pre-trained language models to identify and</span>
+<span class="sd">    classify named entities (people, organizations, locations, etc.)</span>
+<span class="sd">    within document content. The extracted entities are used for</span>
+<span class="sd">    knowledge graph construction and semantic search enhancement.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        text: The document text to analyze</span>
+<span class="sd">        model: Entity recognition model to use (&quot;default&quot;, &quot;spacy&quot;, &quot;transformers&quot;)</span>
+<span class="sd">        confidence_threshold: Minimum confidence score for entity extraction</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        List of extracted entities with their types and positions</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ModelLoadError: If the specified model cannot be loaded</span>
+<span class="sd">        ProcessingError: If entity extraction fails</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; entities = extract_entities(&quot;Apple Inc. was founded by Steve Jobs&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; print(f&quot;Found {len(entities)} entities&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; for entity in entities:</span>
+<span class="sd">        ...     print(f&quot;- {entity.text}: {entity.type}&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="parameter-documentation">
+<h2>7. Parameter Documentation<a class="headerlink" href="#parameter-documentation" title="Link to this heading"></a></h2>
+<p>Document all parameters with their types, purposes, and constraints:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">search_similar_documents</span><span class="p">(</span>
+    <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.7</span><span class="p">,</span>
+    <span class="n">filters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">include_metadata</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">SearchResult</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Search for documents similar to the given query.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        query: Natural language search query</span>
+<span class="sd">        limit: Maximum number of results to return (1-100)</span>
+<span class="sd">        threshold: Similarity threshold for results (0.0-1.0)</span>
+<span class="sd">        filters: Optional filters to apply to search results</span>
+<span class="sd">        include_metadata: Whether to include document metadata in results</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        List of search results ordered by similarity score</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="complex-type-documentation">
+<h2>8. Complex Type Documentation<a class="headerlink" href="#complex-type-documentation" title="Link to this heading"></a></h2>
+<p>For complex types, provide detailed explanations:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">build_knowledge_graph</span><span class="p">(</span>
+    <span class="n">entities</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Entity</span><span class="p">],</span>
+    <span class="n">relationships</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Relationship</span><span class="p">],</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">KnowledgeGraphConfig</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">KnowledgeGraph</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build a knowledge graph from extracted entities and relationships.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        entities: List of extracted named entities from documents</span>
+<span class="sd">        relationships: List of relationships between entities</span>
+<span class="sd">        config: Configuration for knowledge graph construction including:</span>
+<span class="sd">            - max_depth: Maximum relationship depth to include</span>
+<span class="sd">            - relationship_types: Types of relationships to include</span>
+<span class="sd">            - deduplication_strategy: How to handle duplicate entities</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Constructed knowledge graph ready for querying</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="exception-documentation">
+<h2>9. Exception Documentation<a class="headerlink" href="#exception-documentation" title="Link to this heading"></a></h2>
+<p>Document all exceptions that can be raised:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">authenticate_user</span><span class="p">(</span><span class="n">credentials</span><span class="p">:</span> <span class="n">UserCredentials</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">UserSession</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Authenticate a user and create a session.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        AuthenticationError: If credentials are invalid</span>
+<span class="sd">        AccountLockedError: If the user account is locked</span>
+<span class="sd">        SystemUnavailableError: If authentication service is down</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="class-method-documentation">
+<h2>10. Class Method Documentation<a class="headerlink" href="#class-method-documentation" title="Link to this heading"></a></h2>
+<p>Document all public methods, especially those that change object state:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">VectorIndex</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Manages vector similarity search operations using Faiss.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_documents</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">documents</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Document</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Add documents to the vector index.</span>
+
+<span class="sd">        This method processes documents, generates embeddings, and</span>
+<span class="sd">        adds them to the Faiss index for similarity search.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            documents: Documents to add to the index</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Number of documents successfully added</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            IndexError: If document format is incompatible</span>
+<span class="sd">            MemoryError: If insufficient memory for index expansion</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">search</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query_vector</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">k</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">SearchResult</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Search for similar vectors in the index.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            query_vector: Query vector for similarity search</span>
+<span class="sd">            k: Number of nearest neighbors to return</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            List of search results with similarity scores</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="property-documentation">
+<h2>11. Property Documentation<a class="headerlink" href="#property-documentation" title="Link to this heading"></a></h2>
+<p>Document properties that expose important state:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">DocumentProcessor</span><span class="p">:</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">processing_status</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProcessingStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Current processing status of the document pipeline.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Current status including active operations and queue length</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_status</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">supported_formats</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;List of document formats supported by this processor.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            List of supported MIME types and file extensions</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_supported_formats</span>
+</pre></div>
+</div>
+</section>
+<section id="magic-method-documentation">
+<h2>12. Magic Method Documentation<a class="headerlink" href="#magic-method-documentation" title="Link to this heading"></a></h2>
+<p>Document important magic methods:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">ProcessingConfig</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Initialize document processor with configuration.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        config: Processing configuration containing model settings,</span>
+<span class="sd">               performance parameters, and operational flags</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;String representation for debugging.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        String showing processor status and configuration summary</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="inline-comments">
+<h2>13. Inline Comments<a class="headerlink" href="#inline-comments" title="Link to this heading"></a></h2>
+<p>Use inline comments sparingly for complex logic:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">process_documents_batch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">documents</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Document</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">BatchResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process a batch of documents efficiently.</span>
+
+<span class="sd">    This method optimizes processing by:</span>
+<span class="sd">    1. Grouping similar documents together</span>
+<span class="sd">    2. Reusing model instances across documents</span>
+<span class="sd">    3. Parallelizing independent operations</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Group documents by processing requirements to optimize resource usage</span>
+    <span class="n">document_groups</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_group_documents_by_requirements</span><span class="p">(</span><span class="n">documents</span><span class="p">)</span>
+
+    <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">document_groups</span><span class="p">:</span>
+        <span class="c1"># Process each group with appropriate strategy</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">group</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># Single document - use standard processing</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_process_single_document</span><span class="p">(</span><span class="n">group</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Multiple documents - use batch processing</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_process_document_batch</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+
+        <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">BatchResult</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="constants-and-configuration-documentation">
+<h2>14. Constants and Configuration Documentation<a class="headerlink" href="#constants-and-configuration-documentation" title="Link to this heading"></a></h2>
+<p>Document important constants and configuration values:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Maximum number of documents that can be processed in a single batch</span>
+<span class="c1"># This limit prevents memory issues with very large document sets</span>
+<span class="n">MAX_BATCH_SIZE</span> <span class="o">=</span> <span class="mi">100</span>
+
+<span class="c1"># Default similarity threshold for search results</span>
+<span class="c1"># Values above this threshold are considered relevant matches</span>
+<span class="n">DEFAULT_SIMILARITY_THRESHOLD</span> <span class="o">=</span> <span class="mf">0.7</span>
+
+<span class="c1"># Supported document formats with their MIME types</span>
+<span class="n">SUPPORTED_FORMATS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;.pdf&#39;</span><span class="p">:</span> <span class="s1">&#39;application/pdf&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;.docx&#39;</span><span class="p">:</span> <span class="s1">&#39;application/vnd.openxmlformats-officedocument.wordprocessingml.document&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;.txt&#39;</span><span class="p">:</span> <span class="s1">&#39;text/plain&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;.html&#39;</span><span class="p">:</span> <span class="s1">&#39;text/html&#39;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="error-handling-documentation">
+<h2>15. Error Handling Documentation<a class="headerlink" href="#error-handling-documentation" title="Link to this heading"></a></h2>
+<p>Document error handling strategies:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">safe_document_processing</span><span class="p">(</span><span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ProcessingResult</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Safely process a document with comprehensive error handling.</span>
+
+<span class="sd">    This function wraps document processing with error handling for:</span>
+<span class="sd">    - File access errors (permissions, missing files)</span>
+<span class="sd">    - Format parsing errors (corrupted files, unsupported formats)</span>
+<span class="sd">    - Model inference errors (GPU memory, model loading failures)</span>
+<span class="sd">    - Network errors (external service dependencies)</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        document_id: Unique identifier for the document</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Processing result if successful, None if processing failed</span>
+
+<span class="sd">    Note:</span>
+<span class="sd">        Failed documents are logged but do not stop batch processing</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="integration-with-auto-generation">
+<h2>16. Integration with Auto-Generation<a class="headerlink" href="#integration-with-auto-generation" title="Link to this heading"></a></h2>
+<p>These annotation standards are designed to work seamlessly with:</p>
+<section id="generate-api-docs-py">
+<h3><code class="docutils literal notranslate"><span class="pre">generate_api_docs.py</span></code><a class="headerlink" href="#generate-api-docs-py" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Extracts module, class, and function documentation</p></li>
+<li><p>Generates Markdown API reference from docstrings</p></li>
+<li><p>Preserves parameter and return value information</p></li>
+</ul>
+</section>
+<section id="sphinx-autodoc">
+<h3>Sphinx Autodoc<a class="headerlink" href="#sphinx-autodoc" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Uses Google/NumPy style docstrings for HTML generation</p></li>
+<li><p>Links between related classes and functions</p></li>
+<li><p>Includes type hints in generated documentation</p></li>
+</ul>
+</section>
+<section id="ai-agent-understanding">
+<h3>AI Agent Understanding<a class="headerlink" href="#ai-agent-understanding" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Provides clear context for code comprehension</p></li>
+<li><p>Enables requirement extraction from docstrings</p></li>
+<li><p>Supports automated testing and validation</p></li>
+</ul>
+</section>
+</section>
+<section id="validation">
+<h2>17. Validation<a class="headerlink" href="#validation" title="Link to this heading"></a></h2>
+<p>All new code must pass documentation validation:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Check documentation completeness</span>
+python<span class="w"> </span>docs/scripts/validate_docs.py
+
+<span class="c1"># Generate API documentation to verify annotations work</span>
+python<span class="w"> </span>docs/scripts/generate_api_docs.py
+
+<span class="c1"># Build Sphinx docs to ensure compatibility</span>
+python<span class="w"> </span>docs/scripts/build_docs.py<span class="w"> </span>--format<span class="w"> </span>html
+</pre></div>
+</div>
+</section>
+<section id="examples">
+<h2>18. Examples<a class="headerlink" href="#examples" title="Link to this heading"></a></h2>
+<p>See the <code class="docutils literal notranslate"><span class="pre">docs/examples/</span></code> directory for complete code examples showing proper annotation patterns for different scenarios.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

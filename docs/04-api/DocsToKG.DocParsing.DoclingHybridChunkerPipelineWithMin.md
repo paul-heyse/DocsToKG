@@ -1,4 +1,6 @@
-# Module: DoclingHybridChunkerPipelineWithMin
+# 1. Module: DoclingHybridChunkerPipelineWithMin
+
+This reference documents the DocsToKG module ``DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin``.
 
 Docling Hybrid Chunker with Minimum Token Coalescence
 
@@ -6,7 +8,7 @@ Transforms DocTags documents into chunked records while ensuring short runs of
 chunks are merged to satisfy minimum token thresholds required by downstream
 embedding pipelines.
 
-## Functions
+## 1. Functions
 
 ### `read_utf8(p)`
 
@@ -96,7 +98,7 @@ idx: Index of the chunk under evaluation.
 Returns:
 True if the chunk length is less than `min_tokens`, else False.
 
-## Classes
+## 2. Classes
 
 ### `Rec`
 

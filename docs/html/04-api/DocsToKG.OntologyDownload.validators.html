@@ -1,0 +1,294 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: validators &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: validators</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.OntologyDownload.validators.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-validators">
+<h1>1. Module: validators<a class="headerlink" href="#module-validators" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.validators</span></code>.</p>
+<p>Ontology Validation Pipeline</p>
+<p>This module defines validators that run after ontology documents are fetched.
+Each validator parses the downloaded artifact, records structured results, and
+optionally emits normalized representations for downstream document processing.</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="log-memory-logger-validator-event">
+<h3><code class="docutils literal notranslate"><span class="pre">_log_memory(logger,</span> <span class="pre">validator,</span> <span class="pre">event)</span></code><a class="headerlink" href="#log-memory-logger-validator-event" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="write-validation-json-path-payload">
+<h3><code class="docutils literal notranslate"><span class="pre">_write_validation_json(path,</span> <span class="pre">payload)</span></code><a class="headerlink" href="#write-validation-json-path-payload" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="run-with-timeout-func-timeout-sec">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_with_timeout(func,</span> <span class="pre">timeout_sec)</span></code><a class="headerlink" href="#run-with-timeout-func-timeout-sec" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="prepare-xbrl-package-request-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">_prepare_xbrl_package(request,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#prepare-xbrl-package-request-logger" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="validate-rdflib-request-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_rdflib(request,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#validate-rdflib-request-logger" title="Link to this heading"></a></h3>
+<p>Parse ontologies with rdflib and optionally produce Turtle output.</p>
+<p>Args:
+request: Validation request describing the target ontology and output directories.
+logger: Logger adapter used for structured validation events.</p>
+<p>Returns:
+ValidationResult capturing success state, metadata, and generated files.</p>
+<p>Raises:
+ValidationTimeout: Propagated when parsing exceeds configured timeout.</p>
+</section>
+<section id="validate-pronto-request-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_pronto(request,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#validate-pronto-request-logger" title="Link to this heading"></a></h3>
+<p>Execute Pronto-based validation and emit OBO Graphs when requested.</p>
+<p>Args:
+request: Validation request describing ontology inputs and output directories.
+logger: Structured logger for recording warnings and failures.</p>
+<p>Returns:
+ValidationResult with parsed ontology statistics and generated artifacts.</p>
+<p>Raises:
+ValidationTimeout: Propagated when Pronto takes longer than allowed.</p>
+</section>
+<section id="validate-owlready2-request-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_owlready2(request,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#validate-owlready2-request-logger" title="Link to this heading"></a></h3>
+<p>Inspect ontologies with Owlready2 to count entities and catch parsing errors.</p>
+<p>Args:
+request: Validation request referencing the ontology to parse.
+logger: Logger for reporting failures or memory warnings.</p>
+<p>Returns:
+ValidationResult summarizing entity counts or failure details.</p>
+<p>Raises:
+None</p>
+</section>
+<section id="validate-robot-request-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_robot(request,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#validate-robot-request-logger" title="Link to this heading"></a></h3>
+<p>Run ROBOT CLI validation and conversion workflows when available.</p>
+<p>Args:
+request: Validation request detailing ontology paths and output locations.
+logger: Logger adapter for reporting warnings and CLI errors.</p>
+<p>Returns:
+ValidationResult describing generated outputs or encountered issues.</p>
+<p>Raises:
+None</p>
+</section>
+<section id="validate-arelle-request-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">validate_arelle(request,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#validate-arelle-request-logger" title="Link to this heading"></a></h3>
+<p>Validate XBRL ontologies with Arelle CLI if installed.</p>
+<p>Args:
+request: Validation request referencing the ontology under test.
+logger: Logger used to communicate validation progress and failures.</p>
+<p>Returns:
+ValidationResult indicating whether the validation completed and
+referencing any produced log files.</p>
+<p>Raises:
+None</p>
+</section>
+<section id="run-validators-requests-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">run_validators(requests,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#run-validators-requests-logger" title="Link to this heading"></a></h3>
+<p>Execute registered validators and aggregate their results.</p>
+<p>Args:
+requests: Iterable of validation requests that specify validators to run.
+logger: Logger adapter shared across validation executions.</p>
+<p>Returns:
+Mapping from validator name to the corresponding ValidationResult.</p>
+</section>
+<section id="to-dict-self">
+<h3><code class="docutils literal notranslate"><span class="pre">to_dict(self)</span></code><a class="headerlink" href="#to-dict-self" title="Link to this heading"></a></h3>
+<p>Represent the validation result as a JSON-serializable dict.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Dictionary with boolean status, detail payload, and output paths.</p>
+</section>
+<section id="parse">
+<h3><code class="docutils literal notranslate"><span class="pre">_parse()</span></code><a class="headerlink" href="#parse" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="load">
+<h3><code class="docutils literal notranslate"><span class="pre">_load()</span></code><a class="headerlink" href="#load" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="handler-signum-frame">
+<h3><code class="docutils literal notranslate"><span class="pre">_handler(signum,</span> <span class="pre">frame)</span></code><a class="headerlink" href="#handler-signum-frame" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="execute">
+<h3><code class="docutils literal notranslate"><span class="pre">_execute()</span></code><a class="headerlink" href="#execute" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="validationrequest">
+<h3><code class="docutils literal notranslate"><span class="pre">ValidationRequest</span></code><a class="headerlink" href="#validationrequest" title="Link to this heading"></a></h3>
+<p>Parameters describing a single validation task.</p>
+<p>Attributes:
+name: Identifier of the validator to execute.
+file_path: Path to the ontology document to inspect.
+normalized_dir: Directory used to write normalized artifacts.
+validation_dir: Directory for validator reports and logs.
+config: Resolved configuration that supplies timeout thresholds.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>from pathlib import Path
+from DocsToKG.OntologyDownload.config import ResolvedConfig
+req = ValidationRequest(
+…     name=”rdflib”,
+…     file_path=Path(“ontology.owl”),
+…     normalized_dir=Path(“normalized”),
+…     validation_dir=Path(“validation”),
+…     config=ResolvedConfig.from_defaults(),
+… )
+req.name
+‘rdflib’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="validationresult">
+<h3><code class="docutils literal notranslate"><span class="pre">ValidationResult</span></code><a class="headerlink" href="#validationresult" title="Link to this heading"></a></h3>
+<p>Outcome produced by a validator.</p>
+<p>Attributes:
+ok: Indicates whether the validator succeeded.
+details: Arbitrary metadata describing validator output.
+output_files: Generated files for downstream processing.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>result = ValidationResult(ok=True, details={“triples”: 10}, output_files=[“ontology.ttl”])
+result.ok
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="validationtimeout">
+<h3><code class="docutils literal notranslate"><span class="pre">ValidationTimeout</span></code><a class="headerlink" href="#validationtimeout" title="Link to this heading"></a></h3>
+<p>Raised when a validation task exceeds the configured timeout.</p>
+<p>Args:
+message: Optional description of the timeout condition.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>raise ValidationTimeout(“rdflib exceeded 60s”)
+Traceback (most recent call last):
+…
+ValidationTimeout: rdflib exceeded 60s</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="alarm">
+<h3><code class="docutils literal notranslate"><span class="pre">_Alarm</span></code><a class="headerlink" href="#alarm" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

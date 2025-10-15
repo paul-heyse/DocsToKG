@@ -1,0 +1,170 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. API Integrations &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. API Integrations</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/07-reference/api-integrations/index.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="api-integrations">
+<h1>1. API Integrations<a class="headerlink" href="#api-integrations" title="Link to this heading"></a></h1>
+<p>This section summarises the primary interfaces DocsToKG exposes and how to integrate
+them with downstream systems.</p>
+<section id="hybrid-search-rest-api">
+<h2>2. Hybrid Search REST API<a class="headerlink" href="#hybrid-search-rest-api" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Endpoint</strong>: <code class="docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/v1/hybrid-search</span></code></p></li>
+<li><p><strong>Implementation</strong>: <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.api.HybridSearchAPI</span></code></p></li>
+<li><p><strong>Payload</strong>:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">query</span></code> (string, required)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">namespace</span></code> (string, optional)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">filters</span></code> (object, optional)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">page_size</span></code> (int, default 10)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cursor</span></code> (string, optional pagination token)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">diversification</span></code> (bool) for MMR</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">diagnostics</span></code> (bool) to include per-signal scores</p></li>
+</ul>
+</li>
+<li><p><strong>Response</strong>: Ranked list containing document metadata, highlight spans, fused score
+diagnostics, and pagination cursor.</p></li>
+</ul>
+<p>Use the generated documentation in <code class="docutils literal notranslate"><span class="pre">docs/04-api/DocsToKG.HybridSearch.api.md</span></code> and <code class="docutils literal notranslate"><span class="pre">docs/04-api/DocsToKG.HybridSearch.retrieval.md</span></code> for attribute-level detail.</p>
+</section>
+<section id="python-service-layer">
+<h2>3. Python Service Layer<a class="headerlink" href="#python-service-layer" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">HybridSearchService</span></code> in <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.retrieval</span></code> exposes a <code class="docutils literal notranslate"><span class="pre">search</span></code> method
+returning strongly-typed response models (<code class="docutils literal notranslate"><span class="pre">HybridSearchResponse</span></code>, <code class="docutils literal notranslate"><span class="pre">HybridSearchResult</span></code>).
+Use this interface when embedding DocsToKG within other Python services.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.retrieval</span><span class="w"> </span><span class="kn">import</span> <span class="n">HybridSearchRequest</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">my_project.hybrid</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_hybrid_service</span>  <span class="c1"># assemble service per docs/06-operations/index.md</span>
+
+<span class="n">service</span> <span class="o">=</span> <span class="n">build_hybrid_service</span><span class="p">()</span>
+<span class="n">request</span> <span class="o">=</span> <span class="n">HybridSearchRequest</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="s2">&quot;ontology alignment best practices&quot;</span><span class="p">,</span> <span class="n">page_size</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="n">response</span> <span class="o">=</span> <span class="n">service</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">hit</span> <span class="ow">in</span> <span class="n">response</span><span class="o">.</span><span class="n">results</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">hit</span><span class="o">.</span><span class="n">doc_id</span><span class="p">,</span> <span class="n">hit</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="n">hit</span><span class="o">.</span><span class="n">highlights</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="cli-utilities">
+<h2>4. CLI Utilities<a class="headerlink" href="#cli-utilities" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.ContentDownload.download_pyalex_pdfs</span></code> – Batch download scholarly PDFs from the Pyalex API.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.DocParsing.run_docling_html_to_doctags_parallel</span></code> – Parallel HTML parsing into DocTags structures.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.OntologyDownload.cli</span> <span class="pre">pull</span></code> – Download and validate ontologies described in <code class="docutils literal notranslate"><span class="pre">sources.yaml</span></code>.</p></li>
+</ul>
+<p>Each CLI supports <code class="docutils literal notranslate"><span class="pre">--help</span></code> for flags and is documented in <code class="docutils literal notranslate"><span class="pre">docs/06-operations/index.md</span></code>.</p>
+</section>
+<section id="event-and-stream-hand-offs">
+<h2>5. Event and Stream Hand-offs<a class="headerlink" href="#event-and-stream-hand-offs" title="Link to this heading"></a></h2>
+<p>DocsToKG does not yet ship a streaming ingestion layer. When integrating with external
+systems:</p>
+<ol class="arabic simple">
+<li><p>Schedule ingestion jobs that populate the document registry and trigger chunk embedding.</p></li>
+<li><p>Publish HybridSearch responses to your messaging infrastructure if latency budgets require asynchronous processing.</p></li>
+<li><p>Use the observability utilities (<code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.observability</span></code>) to expose metrics for downstream alerting.</p></li>
+</ol>
+<p>See <code class="docutils literal notranslate"><span class="pre">docs/hybrid_search_runbook.md</span></code> for operational scenarios and rollback strategies.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

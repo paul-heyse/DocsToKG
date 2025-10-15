@@ -1,0 +1,487 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Development Guide &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="1. Operations Guide" href="../06-operations/index.html" />
+    <link rel="prev" title="1. API Reference" href="../04-api/index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">1. Development Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#getting-started-as-a-contributor">2. Getting Started as a Contributor</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#set-up-development-environment">1. Set Up Development Environment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#understand-the-codebase">2. Understand the Codebase</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#find-your-first-issue">3. Find Your First Issue</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#development-workflow">3. Development Workflow</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#branch-strategy">3.1 Branch Strategy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#documentation-first-development">3.2 Documentation-First Development</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#documentation-integration">3.3 Documentation Integration</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#pre-development-phase">Pre-Development Phase</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#during-development">During Development</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pre-submission-phase">Pre-Submission Phase</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#commit-conventions">4. Commit Conventions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pull-request-process">5. Pull Request Process</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#documentation-requirements-for-prs">5.1 Documentation Requirements for PRs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#code-review-process">5.2 Code Review Process</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#coding-standards">6. Coding Standards</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#python-standards">6.1 Python Standards</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#testing-standards">6.2 Testing Standards</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#documentation-contributions">7. Documentation Contributions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#improving-existing-documentation">7.1 Improving Existing Documentation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#adding-new-documentation">7.2 Adding New Documentation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#release-process">8. Release Process</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#version-management">8.1 Version Management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#release-checklist">8.2 Release Checklist</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#communication">9. Communication</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#development-discussions">9.1 Development Discussions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#getting-help">9.2 Getting Help</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#contributing-to-this-guide">9.3 Contributing to This Guide</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#recognition">10. Recognition</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#code-of-conduct">11. Code of Conduct</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Development Guide</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/05-development/index.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="development-guide">
+<h1>1. Development Guide<a class="headerlink" href="#development-guide" title="Link to this heading"></a></h1>
+<p>Welcome to the DocsToKG development community! This guide will help you contribute to the project effectively.</p>
+<section id="getting-started-as-a-contributor">
+<h2>2. Getting Started as a Contributor<a class="headerlink" href="#getting-started-as-a-contributor" title="Link to this heading"></a></h2>
+<section id="set-up-development-environment">
+<h3>1. Set Up Development Environment<a class="headerlink" href="#set-up-development-environment" title="Link to this heading"></a></h3>
+<p>Follow the <a class="reference internal" href="../02-setup/index.html"><span class="std std-doc">Setup Guide</span></a> to get your local environment running.</p>
+</section>
+<section id="understand-the-codebase">
+<h3>2. Understand the Codebase<a class="headerlink" href="#understand-the-codebase" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Start with the overview</strong>: Read <a class="reference internal" href="../03-architecture/index.html"><span class="std std-doc">Architecture Guide</span></a> to understand system components</p></li>
+<li><p><strong>Explore the API</strong>: Check <a class="reference internal" href="../04-api/index.html"><span class="std std-doc">API Reference</span></a> for integration points</p></li>
+<li><p><strong>Study key modules</strong>: Focus on <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload</span></code>, <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/DocParsing</span></code>, <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/HybridSearch</span></code>, and <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/OntologyDownload</span></code></p></li>
+</ul>
+</section>
+<section id="find-your-first-issue">
+<h3>3. Find Your First Issue<a class="headerlink" href="#find-your-first-issue" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Good First Issues</strong>: Look for issues labeled <code class="docutils literal notranslate"><span class="pre">good</span> <span class="pre">first</span> <span class="pre">issue</span></code> or <code class="docutils literal notranslate"><span class="pre">help</span> <span class="pre">wanted</span></code></p></li>
+<li><p><strong>Documentation</strong>: Help improve docs, add examples, or clarify explanations</p></li>
+<li><p><strong>Bug Fixes</strong>: Start with straightforward bug reports</p></li>
+<li><p><strong>Feature Requests</strong>: Pick features that align with your interests</p></li>
+</ul>
+</section>
+</section>
+<section id="development-workflow">
+<h2>3. Development Workflow<a class="headerlink" href="#development-workflow" title="Link to this heading"></a></h2>
+<section id="branch-strategy">
+<h3>3.1 Branch Strategy<a class="headerlink" href="#branch-strategy" title="Link to this heading"></a></h3>
+<p>We keep the branching model lightweight:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>main                         # Default branch
+└── feature/&lt;description&gt;    # Short-lived branches for changes
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Branch off <code class="docutils literal notranslate"><span class="pre">main</span></code> for every change (features, bug fixes, docs updates).</p></li>
+<li><p>Rebase or merge <code class="docutils literal notranslate"><span class="pre">main</span></code> regularly when working on longer efforts.</p></li>
+<li><p>Delete feature branches after merging to keep the repository tidy.</p></li>
+</ul>
+</section>
+<section id="documentation-first-development">
+<h3>3.2 Documentation-First Development<a class="headerlink" href="#documentation-first-development" title="Link to this heading"></a></h3>
+<p>DocsToKG follows a <strong>documentation-first development</strong> approach:</p>
+<ol class="arabic simple">
+<li><p><strong>Document requirements</strong> before implementation</p></li>
+<li><p><strong>Write API specifications</strong> for new endpoints</p></li>
+<li><p><strong>Create usage examples</strong> alongside code</p></li>
+<li><p><strong>Update documentation</strong> as features evolve</p></li>
+</ol>
+</section>
+<section id="documentation-integration">
+<h3>3.3 Documentation Integration<a class="headerlink" href="#documentation-integration" title="Link to this heading"></a></h3>
+<section id="pre-development-phase">
+<h4>Pre-Development Phase<a class="headerlink" href="#pre-development-phase" title="Link to this heading"></a></h4>
+<p><strong>Before starting implementation:</strong></p>
+<ul class="simple">
+<li><p>[ ] Document requirements in appropriate section</p></li>
+<li><p>[ ] Create API specifications for new endpoints</p></li>
+<li><p>[ ] Define data models and relationships</p></li>
+<li><p>[ ] Plan examples and use cases</p></li>
+</ul>
+</section>
+<section id="during-development">
+<h4>During Development<a class="headerlink" href="#during-development" title="Link to this heading"></a></h4>
+<p><strong>As you implement features:</strong></p>
+<ul class="simple">
+<li><p>[ ] Write comprehensive docstrings for all public interfaces</p></li>
+<li><p>[ ] Update documentation as functionality evolves</p></li>
+<li><p>[ ] Test documentation examples to ensure they work</p></li>
+<li><p>[ ] Validate changes using automated tools</p></li>
+</ul>
+</section>
+<section id="pre-submission-phase">
+<h4>Pre-Submission Phase<a class="headerlink" href="#pre-submission-phase" title="Link to this heading"></a></h4>
+<p><strong>Before submitting pull requests:</strong></p>
+<ul class="simple">
+<li><p>[ ] Run <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">docs/scripts/validate_code_annotations.py</span> <span class="pre">src/</span></code></p></li>
+<li><p>[ ] Run <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">docs/scripts/generate_api_docs.py</span></code> to update API docs</p></li>
+<li><p>[ ] Run <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">docs/scripts/validate_docs.py</span></code> for content validation</p></li>
+<li><p>[ ] Review changes using documentation checklist</p></li>
+</ul>
+</section>
+</section>
+</section>
+<section id="commit-conventions">
+<h2>4. Commit Conventions<a class="headerlink" href="#commit-conventions" title="Link to this heading"></a></h2>
+<p>Follow conventional commit format:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nb">type</span><span class="p">(</span><span class="n">scope</span><span class="p">):</span> <span class="n">description</span>
+
+<span class="p">[</span><span class="n">optional</span> <span class="n">body</span><span class="p">]</span>
+
+<span class="p">[</span><span class="n">optional</span> <span class="n">footer</span><span class="p">]</span>
+</pre></div>
+</div>
+<p><strong>Types</strong>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">feat</span></code>: New feature</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fix</span></code>: Bug fix</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">docs</span></code>: Documentation changes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">style</span></code>: Code style changes (formatting, etc.)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">refactor</span></code>: Code restructuring</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">test</span></code>: Test additions/modifications</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">chore</span></code>: Maintenance tasks</p></li>
+</ul>
+<p><strong>Examples</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">feat</span><span class="p">(</span><span class="n">api</span><span class="p">):</span> <span class="n">add</span> <span class="n">document</span> <span class="n">upload</span> <span class="n">endpoint</span>
+<span class="n">fix</span><span class="p">(</span><span class="n">search</span><span class="p">):</span> <span class="n">resolve</span> <span class="n">vector</span> <span class="n">index</span> <span class="n">corruption</span> <span class="n">issue</span>
+<span class="n">docs</span><span class="p">:</span> <span class="n">update</span> <span class="n">API</span> <span class="n">reference</span> <span class="k">with</span> <span class="n">new</span> <span class="n">endpoints</span>
+<span class="n">docs</span><span class="p">(</span><span class="n">api</span><span class="p">):</span> <span class="n">add</span> <span class="n">comprehensive</span> <span class="n">search</span> <span class="n">endpoint</span> <span class="n">documentation</span>
+<span class="n">docs</span><span class="p">(</span><span class="n">architecture</span><span class="p">):</span> <span class="n">update</span> <span class="n">component</span> <span class="n">diagram</span> <span class="k">for</span> <span class="n">new</span> <span class="n">service</span>
+</pre></div>
+</div>
+</section>
+<section id="pull-request-process">
+<h2>5. Pull Request Process<a class="headerlink" href="#pull-request-process" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p><strong>Create a branch</strong> from <code class="docutils literal notranslate"><span class="pre">main</span></code> with descriptive name (e.g., <code class="docutils literal notranslate"><span class="pre">feature/hybrid-metrics</span></code>)</p></li>
+<li><p><strong>Make your changes</strong> following coding standards</p></li>
+<li><p><strong>Write tests</strong> for new functionality</p></li>
+<li><p><strong>Update documentation</strong> for all user-facing changes</p></li>
+<li><p><strong>Validate documentation</strong> using automated tools</p></li>
+<li><p><strong>Run tests locally</strong> to ensure everything works</p></li>
+<li><p><strong>Submit PR</strong> with clear description and link to related issues</p></li>
+</ol>
+<section id="documentation-requirements-for-prs">
+<h3>5.1 Documentation Requirements for PRs<a class="headerlink" href="#documentation-requirements-for-prs" title="Link to this heading"></a></h3>
+<p><strong>For all code changes:</strong></p>
+<ul class="simple">
+<li><p>[ ] Update docstrings for modified public interfaces</p></li>
+<li><p>[ ] Add usage examples for new functionality</p></li>
+<li><p>[ ] Update API documentation for endpoint changes</p></li>
+<li><p>[ ] Run <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">docs/scripts/validate_code_annotations.py</span> <span class="pre">src/</span></code></p></li>
+<li><p>[ ] Run <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">docs/scripts/generate_api_docs.py</span></code></p></li>
+</ul>
+<p><strong>For new features:</strong></p>
+<ul class="simple">
+<li><p>[ ] Document requirements in appropriate section</p></li>
+<li><p>[ ] Create API specifications for new endpoints</p></li>
+<li><p>[ ] Add comprehensive usage examples</p></li>
+<li><p>[ ] Update architecture documentation if needed</p></li>
+</ul>
+<p><strong>For bug fixes:</strong></p>
+<ul class="simple">
+<li><p>[ ] Update troubleshooting documentation</p></li>
+<li><p>[ ] Add test cases for the fix</p></li>
+<li><p>[ ] Document workaround if applicable</p></li>
+</ul>
+</section>
+<section id="code-review-process">
+<h3>5.2 Code Review Process<a class="headerlink" href="#code-review-process" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Reviewers</strong>: At least one maintainer review required</p></li>
+<li><p><strong>CI Checks</strong>: All automated checks must pass</p></li>
+<li><p><strong>Testing</strong>: New features need test coverage</p></li>
+<li><p><strong>Documentation</strong>: Update docs for user-facing changes</p></li>
+</ul>
+</section>
+</section>
+<section id="coding-standards">
+<h2>6. Coding Standards<a class="headerlink" href="#coding-standards" title="Link to this heading"></a></h2>
+<section id="python-standards">
+<h3>6.1 Python Standards<a class="headerlink" href="#python-standards" title="Link to this heading"></a></h3>
+<p><strong>Formatting</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Format code</span>
+black<span class="w"> </span>src/<span class="w"> </span>tests/
+isort<span class="w"> </span>src/<span class="w"> </span>tests/
+
+<span class="c1"># Lint and type-check</span>
+ruff<span class="w"> </span>check<span class="w"> </span>src/<span class="w"> </span>tests/
+mypy<span class="w"> </span>src/<span class="w"> </span>--strict
+</pre></div>
+</div>
+<p><strong>Documentation</strong>:</p>
+<ul class="simple">
+<li><p>Use Google-style docstrings</p></li>
+<li><p>Include type hints for all function parameters and return values</p></li>
+<li><p>Document classes, methods, and modules comprehensively</p></li>
+</ul>
+<p><strong>Example</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">process_document</span><span class="p">(</span>
+    <span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">metadata</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProcessingResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Process a document through the ingestion pipeline.</span>
+
+<span class="sd">    This function handles the complete document processing workflow</span>
+<span class="sd">    including validation, content extraction, and knowledge graph</span>
+<span class="sd">    construction.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        document_id: Unique identifier for the document</span>
+<span class="sd">        metadata: Optional metadata to associate with document</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        ProcessingResult with status and any extracted entities</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        DocumentProcessingError: If processing fails</span>
+<span class="sd">        ValidationError: If document format is invalid</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="testing-standards">
+<h3>6.2 Testing Standards<a class="headerlink" href="#testing-standards" title="Link to this heading"></a></h3>
+<p><strong>Test Structure</strong>:</p>
+<ul class="simple">
+<li><p>Hybrid search suites: <code class="docutils literal notranslate"><span class="pre">tests/test_hybrid_search.py</span></code>, <code class="docutils literal notranslate"><span class="pre">tests/test_hybrid_search_real_vectors.py</span></code>, <code class="docutils literal notranslate"><span class="pre">tests/test_hybrid_search_scale.py</span></code></p></li>
+<li><p>Ontology tooling: <code class="docutils literal notranslate"><span class="pre">tests/ontology_download/</span></code> and <code class="docutils literal notranslate"><span class="pre">tests/test_resolver_pipeline.py</span></code></p></li>
+<li><p>Parsing and ingestion: <code class="docutils literal notranslate"><span class="pre">tests/test_pipeline_behaviour.py</span></code>, <code class="docutils literal notranslate"><span class="pre">tests/test_content_download_utils.py</span></code></p></li>
+<li><p>CLI coverage: <code class="docutils literal notranslate"><span class="pre">tests/test_cli.py</span></code>, <code class="docutils literal notranslate"><span class="pre">tests/test_download_utils.py</span></code></p></li>
+</ul>
+<p><strong>Test Coverage</strong>:</p>
+<ul class="simple">
+<li><p>Aim for &gt;80% coverage for new code</p></li>
+<li><p>Test both success and failure scenarios</p></li>
+<li><p>Use descriptive test names</p></li>
+</ul>
+<p><strong>Example Test</strong>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">test_hybrid_search_returns_results</span><span class="p">(</span><span class="n">hybrid_service</span><span class="p">,</span> <span class="n">seeded_chunk_fixture</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Hybrid search should return seeded document when query matches.&quot;&quot;&quot;</span>
+    <span class="n">request</span> <span class="o">=</span> <span class="n">HybridSearchRequest</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="s2">&quot;knowledge graph&quot;</span><span class="p">,</span> <span class="n">page_size</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">hybrid_service</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">response</span><span class="o">.</span><span class="n">results</span><span class="p">,</span> <span class="s2">&quot;Expected at least one result&quot;</span>
+    <span class="k">assert</span> <span class="n">response</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">doc_id</span> <span class="o">==</span> <span class="n">seeded_chunk_fixture</span><span class="o">.</span><span class="n">doc_id</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="documentation-contributions">
+<h2>7. Documentation Contributions<a class="headerlink" href="#documentation-contributions" title="Link to this heading"></a></h2>
+<section id="improving-existing-documentation">
+<h3>7.1 Improving Existing Documentation<a class="headerlink" href="#improving-existing-documentation" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p><strong>Identify gaps</strong>: Look for unclear explanations or missing information</p></li>
+<li><p><strong>Check style</strong>: Follow the <a class="reference internal" href="../STYLE_GUIDE.html"><span class="std std-doc">Style Guide</span></a></p></li>
+<li><p><strong>Test examples</strong>: Verify code examples work correctly</p></li>
+<li><p><strong>Update cross-references</strong>: Ensure links between documents work</p></li>
+</ol>
+</section>
+<section id="adding-new-documentation">
+<h3>7.2 Adding New Documentation<a class="headerlink" href="#adding-new-documentation" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p><strong>Use templates</strong>: Check <code class="docutils literal notranslate"><span class="pre">docs/templates/</span></code> for appropriate templates</p></li>
+<li><p><strong>Follow structure</strong>: Maintain consistent organization</p></li>
+<li><p><strong>Include examples</strong>: Provide practical examples when possible</p></li>
+<li><p><strong>Consider AI agents</strong>: Structure content for easy parsing</p></li>
+</ol>
+</section>
+</section>
+<section id="release-process">
+<h2>8. Release Process<a class="headerlink" href="#release-process" title="Link to this heading"></a></h2>
+<section id="version-management">
+<h3>8.1 Version Management<a class="headerlink" href="#version-management" title="Link to this heading"></a></h3>
+<p>We follow <a class="reference external" href="https://semver.org/">Semantic Versioning</a>:</p>
+<ul class="simple">
+<li><p><strong>Major</strong> (x.0.0): Breaking changes</p></li>
+<li><p><strong>Minor</strong> (x.y.0): New features, backward compatible</p></li>
+<li><p><strong>Patch</strong> (x.y.z): Bug fixes, no new features</p></li>
+</ul>
+</section>
+<section id="release-checklist">
+<h3>8.2 Release Checklist<a class="headerlink" href="#release-checklist" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] All tests pass (<code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">-q</span></code>, plus optional markers)</p></li>
+<li><p>[ ] Documentation regenerated and validated</p></li>
+<li><p>[ ] Version numbers bumped in <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code></p></li>
+<li><p>[ ] Release notes drafted (GitHub release or docs entry)</p></li>
+<li><p>[ ] FAISS and ontology snapshots archived for rollback</p></li>
+</ul>
+</section>
+</section>
+<section id="communication">
+<h2>9. Communication<a class="headerlink" href="#communication" title="Link to this heading"></a></h2>
+<section id="development-discussions">
+<h3>9.1 Development Discussions<a class="headerlink" href="#development-discussions" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>GitHub Issues</strong>: For bug reports and feature requests</p></li>
+<li><p><strong>GitHub Discussions</strong>: For questions and community discussions</p></li>
+</ul>
+</section>
+<section id="getting-help">
+<h3>9.2 Getting Help<a class="headerlink" href="#getting-help" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p><strong>Search existing issues</strong> and discussions first</p></li>
+<li><p><strong>Check documentation</strong> - your question might already be answered</p></li>
+<li><p><strong>Create a new issue</strong> with clear description and reproduction steps</p></li>
+<li><p><strong>Ask in discussions</strong> for general questions</p></li>
+</ol>
+</section>
+<section id="contributing-to-this-guide">
+<h3>9.3 Contributing to This Guide<a class="headerlink" href="#contributing-to-this-guide" title="Link to this heading"></a></h3>
+<p>This development guide itself can be improved! If you find:</p>
+<ul class="simple">
+<li><p>Unclear instructions</p></li>
+<li><p>Missing information</p></li>
+<li><p>Outdated processes</p></li>
+<li><p>Better examples</p></li>
+</ul>
+<p>Please contribute improvements through the same PR process.</p>
+</section>
+</section>
+<section id="recognition">
+<h2>10. Recognition<a class="headerlink" href="#recognition" title="Link to this heading"></a></h2>
+<p>Contributors are recognized through:</p>
+<ul class="simple">
+<li><p><strong>GitHub Contributors</strong> list</p></li>
+<li><p><strong>Release notes</strong> mentioning major contributors</p></li>
+<li><p><strong>Special badges</strong> for significant contributions</p></li>
+<li><p><strong>Community spotlight</strong> features</p></li>
+</ul>
+</section>
+<section id="code-of-conduct">
+<h2>11. Code of Conduct<a class="headerlink" href="#code-of-conduct" title="Link to this heading"></a></h2>
+<p>We follow the <a class="reference external" href="https://www.contributor-covenant.org/version/2/0/code_of_conduct/">Contributor Covenant Code of Conduct</a>. By participating, you agree to:</p>
+<ul class="simple">
+<li><p>Be respectful and inclusive</p></li>
+<li><p>Use welcoming and inclusive language</p></li>
+<li><p>Be collaborative</p></li>
+<li><p>Focus on what is best for the community</p></li>
+</ul>
+<p>Thank you for contributing to DocsToKG! 🚀</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../04-api/index.html" class="btn btn-neutral float-left" title="1. API Reference" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../06-operations/index.html" class="btn btn-neutral float-right" title="1. Operations Guide" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,327 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: resolvers &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: resolvers</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.OntologyDownload.resolvers.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-resolvers">
+<h1>1. Module: resolvers<a class="headerlink" href="#module-resolvers" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.resolvers</span></code>.</p>
+<p>Ontology Resolver Implementations</p>
+<p>This module defines resolver strategies that translate fetch specifications
+into concrete download plans. Resolvers integrate with services such as the
+OBO Library, OLS, and BioPortal to identify canonical document URLs for
+downloading ontology content.</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="execute-with-retry-self-func">
+<h3><code class="docutils literal notranslate"><span class="pre">_execute_with_retry(self,</span> <span class="pre">func)</span></code><a class="headerlink" href="#execute-with-retry-self-func" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="build-plan-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_build_plan(self)</span></code><a class="headerlink" href="#build-plan-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="plan-self-spec-config-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#plan-self-spec-config-logger" title="Link to this heading"></a></h3>
+<p>Resolve download URLs using Bioregistry-provided endpoints.</p>
+<p>Args:
+spec: Fetch specification describing the ontology to download.
+config: Global configuration with retry and timeout settings.
+logger: Logger adapter used to emit planning telemetry.</p>
+<p>Returns:
+FetchPlan pointing to the preferred download URL.</p>
+<p>Raises:
+ConfigError: If no download URL can be derived.</p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Discover download locations via the OLS API.</p>
+<p>Args:
+spec: Fetch specification containing ontology identifiers and extras.
+config: Resolved configuration that provides retry policies.
+logger: Logger adapter used for planner progress messages.</p>
+<p>Returns:
+FetchPlan describing the download URL, headers, and metadata.</p>
+<p>Raises:
+ConfigError: When the API rejects credentials or yields no URLs.</p>
+</section>
+<section id="load-api-key-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_load_api_key(self)</span></code><a class="headerlink" href="#load-api-key-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id2">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<p>Resolve BioPortal download URLs and authorization headers.</p>
+<p>Args:
+spec: Fetch specification with optional API extras like acronyms.
+config: Resolved configuration that governs HTTP retry behaviour.
+logger: Logger adapter for structured telemetry.</p>
+<p>Returns:
+FetchPlan containing the resolved download URL and headers.</p>
+<p>Raises:
+ConfigError: If authentication fails or no download link is available.</p>
+</section>
+<section id="id3">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<p>Return a fetch plan for explicitly provided SKOS URLs.</p>
+<p>Args:
+spec: Fetch specification containing the <code class="docutils literal notranslate"><span class="pre">extras.url</span></code> field.
+config: Resolved configuration (unused, included for API symmetry).
+logger: Logger adapter used to report resolved URL information.</p>
+<p>Returns:
+FetchPlan with the provided URL and appropriate media type.</p>
+<p>Raises:
+ConfigError: If the specification omits the required URL.</p>
+</section>
+<section id="id4">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<p>Return a fetch plan for XBRL ZIP archives provided via extras.</p>
+<p>Args:
+spec: Fetch specification containing the upstream download URL.
+config: Resolved configuration (unused, included for API compatibility).
+logger: Logger adapter for structured observability.</p>
+<p>Returns:
+FetchPlan referencing the specified ZIP archive.</p>
+<p>Raises:
+ConfigError: If the specification omits the required URL.</p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="fetchplan">
+<h3><code class="docutils literal notranslate"><span class="pre">FetchPlan</span></code><a class="headerlink" href="#fetchplan" title="Link to this heading"></a></h3>
+<p>Concrete plan output from a resolver.</p>
+<p>Attributes:
+url: Final URL from which to download the ontology document.
+headers: HTTP headers required by the upstream service.
+filename_hint: Optional filename recommended by the resolver.
+version: Version identifier derived from resolver metadata.
+license: License reported for the ontology.
+media_type: MIME type of the artifact when known.
+service: Logical service identifier used for rate limiting.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>plan = FetchPlan(
+…     url=”https://example.org/ontology.owl”,
+…     headers={“Accept”: “application/rdf+xml”},
+…     filename_hint=”ontology.owl”,
+…     version=”2024-01-01”,
+…     license=”CC-BY”,
+…     media_type=”application/rdf+xml”,
+…     service=”ols”,
+… )
+plan.service
+‘ols’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="baseresolver">
+<h3><code class="docutils literal notranslate"><span class="pre">BaseResolver</span></code><a class="headerlink" href="#baseresolver" title="Link to this heading"></a></h3>
+<p>Shared helpers for resolver implementations.</p>
+<p>Attributes:
+None</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>class DemoResolver(BaseResolver):
+…     def plan(self, spec, config, logger):
+…         return self._build_plan(url=”https://example.org/demo.owl”)
+…
+demo = DemoResolver()
+isinstance(demo._build_plan(url=”https://example.org”).url, str)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="oboresolver">
+<h3><code class="docutils literal notranslate"><span class="pre">OBOResolver</span></code><a class="headerlink" href="#oboresolver" title="Link to this heading"></a></h3>
+<p>Resolve ontologies hosted on the OBO Library using Bioregistry helpers.</p>
+<p>Attributes:
+None</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>resolver = OBOResolver()
+callable(getattr(resolver, “plan”))
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="olsresolver">
+<h3><code class="docutils literal notranslate"><span class="pre">OLSResolver</span></code><a class="headerlink" href="#olsresolver" title="Link to this heading"></a></h3>
+<p>Resolve ontologies from the Ontology Lookup Service (OLS4).</p>
+<p>Attributes:
+client: OLS client instance used to perform API calls.
+credentials_path: Path where the API token is expected.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>resolver = OLSResolver()
+resolver.credentials_path.name.endswith(“.txt”)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="bioportalresolver">
+<h3><code class="docutils literal notranslate"><span class="pre">BioPortalResolver</span></code><a class="headerlink" href="#bioportalresolver" title="Link to this heading"></a></h3>
+<p>Resolve ontologies using the BioPortal (OntoPortal) API.</p>
+<p>Attributes:
+client: BioPortal client used to query ontology metadata.
+api_key_path: Path on disk containing the API key.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>resolver = BioPortalResolver()
+resolver.api_key_path.suffix
+‘.txt’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="skosresolver">
+<h3><code class="docutils literal notranslate"><span class="pre">SKOSResolver</span></code><a class="headerlink" href="#skosresolver" title="Link to this heading"></a></h3>
+<p>Resolver for direct SKOS/RDF URLs.</p>
+<p>Attributes:
+None</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>resolver = SKOSResolver()
+callable(getattr(resolver, “plan”))
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="xbrlresolver">
+<h3><code class="docutils literal notranslate"><span class="pre">XBRLResolver</span></code><a class="headerlink" href="#xbrlresolver" title="Link to this heading"></a></h3>
+<p>Resolver for XBRL taxonomy packages.</p>
+<p>Attributes:
+None</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>resolver = XBRLResolver()
+callable(getattr(resolver, “plan”))
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

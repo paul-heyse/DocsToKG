@@ -1,0 +1,404 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: core &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: core</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.OntologyDownload.core.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-core">
+<h1>1. Module: core<a class="headerlink" href="#module-core" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.core</span></code>.</p>
+<p>Ontology Download Orchestration</p>
+<p>This module coordinates resolver planning, document downloading, validation,
+and manifest generation for ontology artifacts. It serves as the main entry
+point for fetching ontologies from configured sources and producing provenance
+metadata that downstream knowledge graph construction can rely upon.</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="read-manifest-manifest-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_read_manifest(manifest_path)</span></code><a class="headerlink" href="#read-manifest-manifest-path" title="Link to this heading"></a></h3>
+<p>Return previously recorded manifest data if a valid JSON file exists.</p>
+<p>Args:
+manifest_path: Filesystem path where the manifest is stored.</p>
+<p>Returns:
+Parsed manifest dictionary when available and valid, otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+</section>
+<section id="validate-manifest-manifest">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_manifest(manifest)</span></code><a class="headerlink" href="#validate-manifest-manifest" title="Link to this heading"></a></h3>
+<p>Check that a manifest instance satisfies structural and type requirements.</p>
+<p>Args:
+manifest: Manifest produced after a download completes.</p>
+<p>Raises:
+ConfigurationError: If required fields are missing or contain invalid types.</p>
+</section>
+<section id="write-manifest-manifest-path-manifest">
+<h3><code class="docutils literal notranslate"><span class="pre">_write_manifest(manifest_path,</span> <span class="pre">manifest)</span></code><a class="headerlink" href="#write-manifest-manifest-path-manifest" title="Link to this heading"></a></h3>
+<p>Persist a validated manifest to disk as JSON.</p>
+<p>Args:
+manifest_path: Destination path for the manifest file.
+manifest: Manifest describing the downloaded ontology artifact.</p>
+</section>
+<section id="build-destination-spec-plan-config">
+<h3><code class="docutils literal notranslate"><span class="pre">_build_destination(spec,</span> <span class="pre">plan,</span> <span class="pre">config)</span></code><a class="headerlink" href="#build-destination-spec-plan-config" title="Link to this heading"></a></h3>
+<p>Determine the output directory and filename for a download.</p>
+<p>Args:
+spec: Fetch specification identifying the ontology.
+plan: Resolver plan containing URL metadata and optional hints.
+config: Resolved configuration with storage layout parameters.</p>
+<p>Returns:
+Path where the raw ontology artifact should be written.</p>
+</section>
+<section id="ensure-license-allowed-plan-config-spec">
+<h3><code class="docutils literal notranslate"><span class="pre">_ensure_license_allowed(plan,</span> <span class="pre">config,</span> <span class="pre">spec)</span></code><a class="headerlink" href="#ensure-license-allowed-plan-config-spec" title="Link to this heading"></a></h3>
+<p>Confirm the ontology license is present in the configured allow list.</p>
+<p>Args:
+plan: Resolver plan returned for the ontology.
+config: Resolved configuration containing accepted licenses.
+spec: Fetch specification for contextual error reporting.</p>
+<p>Raises:
+ConfigurationError: If the plan’s license is not permitted.</p>
+</section>
+<section id="fetch-one-spec">
+<h3><code class="docutils literal notranslate"><span class="pre">fetch_one(spec)</span></code><a class="headerlink" href="#fetch-one-spec" title="Link to this heading"></a></h3>
+<p>Fetch and validate a single ontology described by <em>spec</em>.</p>
+<p>Args:
+spec: Fetch specification outlining resolver and target formats.
+config: Optional resolved configuration; defaults to library values.
+correlation_id: Identifier that groups log entries for observability.
+logger: Optional logger to reuse existing logging infrastructure.
+force: When True, ignore existing manifests and re-download artifacts.</p>
+<p>Returns:
+FetchResult capturing download metadata and produced artifacts.</p>
+<p>Raises:
+ResolverError: If the resolver cannot produce a viable fetch plan.
+OntologyDownloadError: If download or extraction steps fail.
+ConfigurationError: If manifest validation or license checks fail.</p>
+</section>
+<section id="fetch-all-specs">
+<h3><code class="docutils literal notranslate"><span class="pre">fetch_all(specs)</span></code><a class="headerlink" href="#fetch-all-specs" title="Link to this heading"></a></h3>
+<p>Fetch a sequence of ontologies sequentially.</p>
+<p>Args:
+specs: Iterable of fetch specifications to process.
+config: Optional resolved configuration shared across downloads.
+logger: Logger used to emit progress and error events.
+force: When True, skip manifest reuse and download everything again.</p>
+<p>Returns:
+List of FetchResult entries corresponding to completed downloads.</p>
+<p>Raises:
+OntologyDownloadError: Propagated when downloads fail and the pipeline
+is configured to stop on error.</p>
+</section>
+<section id="to-json-self">
+<h3><code class="docutils literal notranslate"><span class="pre">to_json(self)</span></code><a class="headerlink" href="#to-json-self" title="Link to this heading"></a></h3>
+<p>Serialize the manifest to a stable, human-readable JSON string.</p>
+<p>Args:
+None</p>
+<p>Returns:
+JSON document encoding the manifest metadata.</p>
+</section>
+<section id="plan-self-spec-config-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#plan-self-spec-config-logger" title="Link to this heading"></a></h3>
+<p>Return a FetchPlan describing how to obtain the ontology.</p>
+<p>Args:
+spec: Ontology fetch specification under consideration.
+config: Fully resolved configuration containing defaults.
+logger: Logger adapter scoped to the current fetch request.</p>
+<p>Returns:
+Concrete plan containing download URL, headers, and metadata.</p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="ontologydownloaderror">
+<h3><code class="docutils literal notranslate"><span class="pre">OntologyDownloadError</span></code><a class="headerlink" href="#ontologydownloaderror" title="Link to this heading"></a></h3>
+<p>Base exception for ontology download failures.</p>
+<p>Args:
+message: Description of the failure encountered.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>raise OntologyDownloadError(“unexpected error”)
+Traceback (most recent call last):
+…
+OntologyDownloadError: unexpected error</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="resolvererror">
+<h3><code class="docutils literal notranslate"><span class="pre">ResolverError</span></code><a class="headerlink" href="#resolvererror" title="Link to this heading"></a></h3>
+<p>Raised when resolver planning fails.</p>
+<p>Args:
+message: Description of the resolver failure.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>raise ResolverError(“resolver unavailable”)
+Traceback (most recent call last):
+…
+ResolverError: resolver unavailable</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="validationerror">
+<h3><code class="docutils literal notranslate"><span class="pre">ValidationError</span></code><a class="headerlink" href="#validationerror" title="Link to this heading"></a></h3>
+<p>Raised when validation encounters unrecoverable issues.</p>
+<p>Args:
+message: Human-readable description of the validation failure.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>raise ValidationError(“robot validator crashed”)
+Traceback (most recent call last):
+…
+ValidationError: robot validator crashed</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="configurationerror">
+<h3><code class="docutils literal notranslate"><span class="pre">ConfigurationError</span></code><a class="headerlink" href="#configurationerror" title="Link to this heading"></a></h3>
+<p>Raised when configuration or manifest validation fails.</p>
+<p>Args:
+message: Details about the configuration inconsistency.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>raise ConfigurationError(“manifest missing sha256”)
+Traceback (most recent call last):
+…
+ConfigurationError: manifest missing sha256</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="fetchspec">
+<h3><code class="docutils literal notranslate"><span class="pre">FetchSpec</span></code><a class="headerlink" href="#fetchspec" title="Link to this heading"></a></h3>
+<p>Specification describing a single ontology download.</p>
+<p>Attributes:
+id: Stable identifier for the ontology to fetch.
+resolver: Name of the resolver strategy used to locate resources.
+extras: Resolver-specific configuration overrides.
+target_formats: Normalized ontology formats that should be produced.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>spec = FetchSpec(id=”CHEBI”, resolver=”obo”, extras={}, target_formats=(“owl”,))
+spec.resolver
+‘obo’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="fetchresult">
+<h3><code class="docutils literal notranslate"><span class="pre">FetchResult</span></code><a class="headerlink" href="#fetchresult" title="Link to this heading"></a></h3>
+<p>Outcome of a single ontology fetch operation.</p>
+<p>Attributes:
+spec: Fetch specification that initiated the download.
+local_path: Path to the downloaded ontology document.
+status: Final download status (e.g., <code class="docutils literal notranslate"><span class="pre">success</span></code>, <code class="docutils literal notranslate"><span class="pre">skipped</span></code>).
+sha256: SHA-256 digest of the downloaded file.
+manifest_path: Path to the generated manifest JSON file.
+artifacts: Ancillary files produced during extraction or validation.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>from pathlib import Path
+spec = FetchSpec(id=”CHEBI”, resolver=”obo”, extras={}, target_formats=(“owl”,))
+result = FetchResult(
+…     spec=spec,
+…     local_path=Path(“CHEBI.owl”),
+…     status=”success”,
+…     sha256=”deadbeef”,
+…     manifest_path=Path(“manifest.json”),
+…     artifacts=(),
+… )
+result.status
+‘success’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="manifest">
+<h3><code class="docutils literal notranslate"><span class="pre">Manifest</span></code><a class="headerlink" href="#manifest" title="Link to this heading"></a></h3>
+<p>Provenance information for a downloaded ontology artifact.</p>
+<p>Attributes:
+id: Ontology identifier recorded in the manifest.
+resolver: Resolver used to retrieve the ontology.
+url: Final URL from which the ontology was fetched.
+filename: Local filename of the downloaded artifact.
+version: Resolver-reported ontology version, if available.
+license: License identifier associated with the ontology.
+status: Result status reported by the downloader.
+sha256: Hash of the downloaded artifact for integrity checking.
+etag: HTTP ETag returned by the upstream server, when provided.
+last_modified: Upstream last-modified timestamp, if supplied.
+downloaded_at: UTC timestamp of the completed download.
+target_formats: Desired conversion targets for normalization.
+validation: Mapping of validator names to their results.
+artifacts: Additional file paths generated during processing.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>manifest = Manifest(
+…     id=”CHEBI”,
+…     resolver=”obo”,
+…     url=”https://example.org/chebi.owl”,
+…     filename=”chebi.owl”,
+…     version=None,
+…     license=”CC-BY”,
+…     status=”success”,
+…     sha256=”deadbeef”,
+…     etag=None,
+…     last_modified=None,
+…     downloaded_at=”2024-01-01T00:00:00Z”,
+…     target_formats=(“owl”,),
+…     validation={},
+…     artifacts=(),
+… )
+manifest.resolver
+‘obo’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="resolver">
+<h3><code class="docutils literal notranslate"><span class="pre">Resolver</span></code><a class="headerlink" href="#resolver" title="Link to this heading"></a></h3>
+<p>Protocol describing resolver planning behaviour.</p>
+<p>Attributes:
+None</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>import logging
+spec = FetchSpec(id=”CHEBI”, resolver=”dummy”, extras={}, target_formats=(“owl”,))
+class DummyResolver:
+…     def plan(self, spec, config, logger):
+…         return FetchPlan(
+…             url=”https://example.org/chebi.owl”,
+…             headers={},
+…             filename_hint=”chebi.owl”,
+…             version=”v1”,
+…             license=”CC-BY”,
+…             media_type=”application/rdf+xml”,
+…         )
+…
+plan = DummyResolver().plan(spec, ResolvedConfig.from_defaults(), logging.getLogger(“test”))
+plan.url
+‘https://example.org/chebi.owl’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

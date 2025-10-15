@@ -1,0 +1,357 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Context &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/custom.css" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Context</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/openspec/changes/archive/2025-10-14-add-ontology-downloader/design.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="context">
+<h1>Context<a class="headerlink" href="#context" title="Link to this heading"></a></h1>
+<p>DocsToKG processes scientific documents and builds knowledge graphs from their content. Ontologies provide controlled vocabularies, taxonomies, and semantic relationships essential for entity recognition, concept linking, and knowledge graph quality. The project requires access to biomedical ontologies (GO, HP, UBERON, EFO, NCIT), legal/financial thesauri (EuroVoc, XBRL taxonomies), and domain-specific vocabularies from multiple sources (OBO Library, OLS, BioPortal, SKOS registries). Current workflows rely on manual downloads or ad-hoc scripts that lack caching, provenance, validation, and error recovery.</p>
+</section>
+<section id="goals-non-goals">
+<h1>Goals / Non-Goals<a class="headerlink" href="#goals-non-goals" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Goals:</p>
+<ul>
+<li><p>Automate discovery and download of ontologies from OBO Library, OLS, BioPortal, SKOS endpoints, and XBRL registries</p></li>
+<li><p>Provide robust HTTP handling with conditional requests (ETag/Last-Modified), resume support, checksums, retries, and rate limiting</p></li>
+<li><p>Validate downloaded artifacts using domain-appropriate parsers (RDFLib, Pronto, Owlready2, Arelle)</p></li>
+<li><p>Normalize ontologies to consistent formats (Turtle, OBO Graph JSON) while preserving originals</p></li>
+<li><p>Record comprehensive provenance (source URL, version, license, checksums, timestamps) in manifest files</p></li>
+<li><p>Expose declarative configuration (YAML) for ontology lists, resolver preferences, and HTTP policies</p></li>
+<li><p>Support idempotent operations (cached downloads, incremental updates)</p></li>
+<li><p>Enable observability through structured logs and validation reports</p></li>
+</ul>
+</li>
+<li><p>Non-Goals:</p>
+<ul>
+<li><p>Building ontology editors or reasoners (use existing tools: Protégé, HermiT, ELK)</p></li>
+<li><p>Implementing custom RDF stores or SPARQL endpoints (downstream systems handle storage)</p></li>
+<li><p>Supporting proprietary ontologies with restricted access beyond credential configuration</p></li>
+<li><p>Real-time ontology update notifications (polling-based updates suffice)</p></li>
+<li><p>GUI for ontology browsing (CLI and programmatic API only)</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="decisions">
+<h1>Decisions<a class="headerlink" href="#decisions" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Decision: <strong>Use battle-tested Python libraries instead of custom implementations</strong> for discovery (Bioregistry, OAK), access (ols-client, ontoportal-client), parsing (RDFLib, Pronto, Owlready2), and domain-specific validation (Arelle for XBRL, optional ROBOT for conversions).
+Alternatives: custom implementations would duplicate well-maintained community tools and increase maintenance burden. Rationale: leverages expertise and testing from OBO, EMBL-EBI, NCBO, and RDF communities.</p></li>
+<li><p>Decision: <strong>Adopt pystow for standardized data directories and secrets management</strong>, aligning with OAK and ontoportal-client conventions.
+Alternatives: custom directory structures would diverge from ecosystem conventions. Rationale: users get predictable paths (~/.data/ontology-fetcher), env-var overrides, and unified configuration with related tools.</p></li>
+<li><p>Decision: <strong>Use pooch (not cached_path) for download plumbing</strong> with hash verification, caching, and registry support.
+Alternatives: custom HTTP logic or cached_path. Rationale: pooch provides built-in SHA-256 verification, registry patterns, and cleaner API for our use case; cached_path is simpler but lacks hash verification features.</p></li>
+<li><p>Decision: <strong>Implement resolver registry pattern</strong> with protocol-based interfaces (<code class="docutils literal notranslate"><span class="pre">Resolver.plan(spec)</span> <span class="pre">→</span> <span class="pre">FetchPlan</span></code>) allowing independent resolvers for OBO, OLS, BioPortal, SKOS, and XBRL.
+Alternatives: monolithic resolver with conditional logic would be harder to test and extend. Rationale: enables per-source unit testing, clean addition of new sources, and isolated credential handling.</p></li>
+<li><p>Decision: <strong>Support format preferences and fallback chains</strong> (e.g., prefer OWL → OBO → RDF) per ontology, with first-available-wins semantics.
+Alternatives: hardcode single format per source. Rationale: some ontologies publish multiple serializations with varying quality; flexibility improves success rates.</p></li>
+<li><p>Decision: <strong>Store original artifacts and normalized versions separately</strong> in <code class="docutils literal notranslate"><span class="pre">original/</span></code> and <code class="docutils literal notranslate"><span class="pre">normalized/</span></code> subdirectories with validation reports in <code class="docutils literal notranslate"><span class="pre">validation/</span></code>.
+Alternatives: only normalized versions or single mixed directory. Rationale: preserves bit-exact originals for reproducibility while providing tooling-friendly normalized formats (Turtle) for downstream pipelines.</p></li>
+<li><p>Decision: <strong>Record comprehensive provenance in manifest.json</strong> including URL, resolver, version, license, ETag, Last-Modified, SHA-256, timestamps, and validation status.
+Alternatives: minimal metadata or external database. Rationale: self-contained manifests enable auditing, cache invalidation decisions, and offline reproducibility without external dependencies.</p></li>
+<li><p>Decision: <strong>Support ETag/Last-Modified conditional requests and HTTP Range resume</strong> for idempotent operations and efficient incremental updates.
+Alternatives: always redownload. Rationale: reduces bandwidth, respects rate limits, and enables graceful recovery from network interruptions.</p></li>
+<li><p>Decision: <strong>Implement exponential backoff retry (5 attempts, 0.5s base) and per-host rate limiting (4 req/sec default)</strong> to avoid overwhelming source services.
+Alternatives: no retry or unlimited rate. Rationale: improves reliability against transient failures while being a respectful HTTP client (follows robots.txt spirit).</p></li>
+<li><p>Decision: <strong>Use ols-client (not ebi-ols-client) for OLS4 access</strong> as specified by user requirements.
+Alternatives: ebi-ols-client or direct REST calls. Rationale: user preference stated explicitly; ols-client is actively maintained.</p></li>
+<li><p>Decision: <strong>Expose CLI via <code class="docutils literal notranslate"><span class="pre">ontofetch</span></code> command</strong> with subcommands (pull, show, validate) for both single-ontology and batch operations.
+Alternatives: Python API only or separate scripts. Rationale: CLI provides immediate usability for operators while Python API supports programmatic integration.</p></li>
+<li><p>Decision: <strong>Configure ontology lists and policies via sources.yaml</strong> with defaults section for global settings and per-ontology overrides.
+Alternatives: JSON, TOML, or code-based configuration. Rationale: YAML is human-friendly for lists, supports comments, and aligns with common DevOps practices.</p></li>
+<li><p>Decision: <strong>Validate using multiple parsers per format</strong> (RDFLib + Pronto for OWL/OBO) to catch format-specific issues and gather richer metadata.
+Alternatives: single parser per format. Rationale: different parsers catch different issues (RDFLib for RDF syntax, Pronto for OBO semantics, Owlready2 for reasoning); redundancy improves quality assurance.</p></li>
+<li><p>Decision: <strong>Make ROBOT integration optional</strong> (subprocess-based, only when installed) for conversions and QC reports.
+Alternatives: mandatory ROBOT or skip entirely. Rationale: ROBOT requires Java runtime and separate install; optional support maximizes compatibility while enabling power users to leverage OBO community’s QC tooling.</p></li>
+<li><p>Decision: <strong>Treat XBRL and RF2 (SNOMED) as native formats</strong> without forced conversion, using domain-specific tools (Arelle for XBRL, external Snowstorm/FHIR for RF2).
+Alternatives: force RDF conversion. Rationale: these formats have specialized semantics and tooling; premature conversion loses fidelity.</p></li>
+<li><p>Decision: <strong>Implement comprehensive error handling with specific exception types</strong> (OntologyDownloadError, ResolverError, ValidationError, ConfigurationError) and clear remediation messages.
+Alternatives: generic exceptions or error codes. Rationale: specific exceptions enable targeted catch blocks; remediation messages reduce support burden and enable self-service troubleshooting.</p></li>
+<li><p>Decision: <strong>Enforce HTTPS-only downloads with URL validation to prevent SSRF attacks</strong>, rejecting private IP ranges and validating schemes.
+Alternatives: allow all URLs, rely on external firewalls. Rationale: defense-in-depth security; prevents accidental or malicious downloads from internal services; aligns with security best practices.</p></li>
+<li><p>Decision: <strong>Mask sensitive data (API keys, tokens) in all logs</strong> using a centralized formatter that redacts before writing.
+Alternatives: trust developers to avoid logging secrets. Rationale: prevents credential leaks in log aggregators, bug reports, and stdout; complies with security auditing requirements.</p></li>
+<li><p>Decision: <strong>Implement configurable performance limits</strong> (timeouts, memory constraints, concurrent downloads, max file size) with sensible defaults.
+Alternatives: hardcode limits or unlimited. Rationale: different deployment environments have different constraints; configurability enables tuning without code changes; defaults prevent resource exhaustion.</p></li>
+<li><p>Decision: <strong>Use Python 3.9+ as minimum version</strong> for modern type hints (PEP 604 union syntax <code class="docutils literal notranslate"><span class="pre">str</span> <span class="pre">|</span> <span class="pre">None</span></code>), dict union operators, and improved asyncio.
+Alternatives: Python 3.7+ for broader compatibility. Rationale: DocsToKG codebase likely already uses 3.9+; modern syntax improves code readability; 3.7 reached EOL in June 2023.</p></li>
+<li><p>Decision: <strong>Support both Unix signal-based and Windows thread-based timeouts</strong> for parser operations to handle platform differences.
+Alternatives: Unix-only or no timeouts. Rationale: cross-platform support essential for development/deployment flexibility; timeouts prevent hung processes on malformed ontologies.</p></li>
+<li><p>Decision: <strong>Implement structured JSON logging with correlation IDs</strong> for batch operations to enable tracing and log aggregation.
+Alternatives: unstructured text logs. Rationale: structured logs parse easily in ELK/Splunk/CloudWatch; correlation IDs connect related operations across log entries; essential for debugging batch failures.</p></li>
+<li><p>Decision: <strong>Provide comprehensive CLI help with examples and init subcommand</strong> that generates annotated configuration templates.
+Alternatives: minimal help text, refer to external docs. Rationale: inline help reduces onboarding friction; examples show correct usage patterns; init command accelerates setup.</p></li>
+<li><p>Decision: <strong>Implement log rotation with compression and retention policies</strong> to prevent disk exhaustion from long-running deployments.
+Alternatives: unbounded log growth or external logrotate. Rationale: self-contained solution works across platforms; compression saves disk; retention policy prevents indefinite growth.</p></li>
+</ul>
+</section>
+<section id="architecture-overview">
+<h1>Architecture Overview<a class="headerlink" href="#architecture-overview" title="Link to this heading"></a></h1>
+<ul>
+<li><p><strong>Configuration Layer</strong>: YAML parser loads <code class="docutils literal notranslate"><span class="pre">sources.yaml</span></code> into structured config objects (FetchSpec list, defaults) with validation of required fields and allowlist checks.</p></li>
+<li><p><strong>Resolver Registry</strong>: Protocol-based registry maps resolver names (<code class="docutils literal notranslate"><span class="pre">obo</span></code>, <code class="docutils literal notranslate"><span class="pre">ols</span></code>, <code class="docutils literal notranslate"><span class="pre">bioportal</span></code>, <code class="docutils literal notranslate"><span class="pre">skos</span></code>, <code class="docutils literal notranslate"><span class="pre">xbrl</span></code>) to concrete implementations:</p>
+<ul class="simple">
+<li><p><strong>OBOResolver</strong>: uses Bioregistry functions (<code class="docutils literal notranslate"><span class="pre">get_owl_download</span></code>, <code class="docutils literal notranslate"><span class="pre">get_obo_download</span></code>, <code class="docutils literal notranslate"><span class="pre">get_rdf_download</span></code>) to resolve OBO Foundry prefixes to PURLs; falls back through format preferences.</p></li>
+<li><p><strong>OLSResolver</strong>: queries OLS4 API via ols-client to find ontology by ID/acronym and retrieve canonical artifact URL with version metadata.</p></li>
+<li><p><strong>BioPortalResolver</strong>: uses ontoportal-client to fetch ontology metadata and latest submission download URL; includes API key from pystow config in headers.</p></li>
+<li><p><strong>SKOSResolver</strong>: returns configured direct URL for SKOS thesauri (EuroVoc, ECB vocabularies); validation deferred to RDFLib.</p></li>
+<li><p><strong>XBRLResolver</strong>: returns configured ZIP URL for XBRL taxonomy packages; validation deferred to Arelle post-extraction.</p></li>
+</ul>
+</li>
+<li><p><strong>Download Manager</strong>: Wraps pooch for robust fetching with:</p>
+<ul class="simple">
+<li><p>Stream-to-<code class="docutils literal notranslate"><span class="pre">.part</span></code> file pattern to avoid corrupted partial downloads.</p></li>
+<li><p>ETag/Last-Modified conditional headers from previous manifest; on HTTP 304, returns cached status.</p></li>
+<li><p>Range request support for resume on connection interruption.</p></li>
+<li><p>SHA-256 computation on complete files; verification against known hashes when available.</p></li>
+<li><p>Exponential backoff retry with per-host rate limiting (token bucket).</p></li>
+<li><p>Structured logging of HTTP status, elapsed time, retry count, and final outcome.</p></li>
+</ul>
+</li>
+<li><p><strong>Validation Pipeline</strong>: Post-download, runs format-appropriate validators:</p>
+<ul class="simple">
+<li><p><strong>RDFLib</strong>: <code class="docutils literal notranslate"><span class="pre">Graph.parse()</span></code> for RDF/OWL/SKOS; records triple count or error; optionally serializes to normalized Turtle.</p></li>
+<li><p><strong>Pronto</strong>: <code class="docutils literal notranslate"><span class="pre">Ontology()</span></code> load for OBO/OWL; records term count, relationships, or error; optionally exports OBO Graph JSON.</p></li>
+<li><p><strong>Owlready2</strong>: <code class="docutils literal notranslate"><span class="pre">get_ontology().load()</span></code> for OWL; enables optional reasoning checks.</p></li>
+<li><p><strong>ROBOT</strong> (if installed): subprocess calls for <code class="docutils literal notranslate"><span class="pre">robot</span> <span class="pre">convert</span></code> (format conversions) and <code class="docutils literal notranslate"><span class="pre">robot</span> <span class="pre">report</span></code> (SPARQL-based QC); captures stdout/stderr and TSV reports.</p></li>
+<li><p><strong>Arelle</strong> (XBRL): loads taxonomy package, runs validation, records results as JSON.</p></li>
+<li><p>Results written to <code class="docutils literal notranslate"><span class="pre">validation/&lt;parser&gt;_parse.json</span></code> or <code class="docutils literal notranslate"><span class="pre">validation/robot_report.tsv</span></code>.</p></li>
+</ul>
+</li>
+<li><p><strong>Storage Layout</strong>: pystow-managed root (~/.data/ontology-fetcher) contains:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">configs</span><span class="o">/</span><span class="n">sources</span><span class="o">.</span><span class="n">yaml</span>        <span class="c1"># ontology specs</span>
+<span class="n">cache</span><span class="o">/</span>                      <span class="c1"># HTTP cache, ETags, partial downloads</span>
+<span class="n">logs</span><span class="o">/</span>                       <span class="c1"># structured JSON logs per run</span>
+<span class="n">ontologies</span><span class="o">/&lt;</span><span class="nb">id</span><span class="o">&gt;/&lt;</span><span class="n">version</span><span class="o">&gt;/</span>
+  <span class="n">original</span><span class="o">/</span>                 <span class="c1"># bit-exact downloaded files</span>
+  <span class="n">normalized</span><span class="o">/</span>               <span class="c1"># Turtle, OBO Graph JSON</span>
+  <span class="n">validation</span><span class="o">/</span>               <span class="c1"># parse results, QC reports</span>
+  <span class="n">manifest</span><span class="o">.</span><span class="n">json</span>             <span class="c1"># provenance metadata</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>CLI (<code class="docutils literal notranslate"><span class="pre">ontofetch</span></code>)</strong>: Command-line interface with subcommands:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ontofetch</span> <span class="pre">pull</span> <span class="pre">[--spec</span> <span class="pre">FILE</span> <span class="pre">|</span> <span class="pre">ID...]</span></code>: download ontologies; updates existing or fetches new.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ontofetch</span> <span class="pre">show</span> <span class="pre">ID</span> <span class="pre">[--versions]</span></code>: display manifest, versions, or validation status.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ontofetch</span> <span class="pre">validate</span> <span class="pre">ID[&#64;VERSION]</span> <span class="pre">[--robot]</span> <span class="pre">[--rdflib]</span> <span class="pre">[--pronto]</span></code>: re-run validators.</p></li>
+<li><p>Structured output (JSON for machine, formatted for human) based on <code class="docutils literal notranslate"><span class="pre">--json</span></code> flag.</p></li>
+</ul>
+</li>
+<li><p><strong>Observability</strong>: Structured JSON logs capture:</p>
+<ul class="simple">
+<li><p>Resolver: source, ID, resolver type, plan URL, planning time.</p></li>
+<li><p>Download: URL, status code, ETag, content length, SHA-256, elapsed time, retries, cache hit/miss.</p></li>
+<li><p>Validation: parser, outcome (success/failure), error messages, metrics (triples, terms).</p></li>
+<li><p>Aggregation: per-run summary with success/failure/cached counts, total bandwidth, total time.</p></li>
+</ul>
+</li>
+<li><p><strong>Error Handling</strong>: Comprehensive exception handling at each layer:</p>
+<ul class="simple">
+<li><p><strong>Custom Exceptions</strong>: OntologyDownloadError, ResolverError, ValidationError, ConfigurationError with descriptive messages and remediation guidance.</p></li>
+<li><p><strong>Retry Logic</strong>: Exponential backoff for transient failures (ConnectionError, Timeout, HTTP 503/429); permanent failures (401, 404) don’t retry.</p></li>
+<li><p><strong>Graceful Degradation</strong>: Batch operations continue after individual failures; partial progress preserved; failed items logged with details.</p></li>
+<li><p><strong>Resource Protection</strong>: Catch OSError for disk space, MemoryError for large files, PermissionError for directories; cleanup partial artifacts.</p></li>
+</ul>
+</li>
+<li><p><strong>Security Layer</strong>: Defense-in-depth protection against common threats:</p>
+<ul class="simple">
+<li><p><strong>URL Validation</strong>: validate_url_security() checks scheme (HTTPS preferred), resolves hostname to IP, rejects private ranges (RFC 1918, loopback, link-local).</p></li>
+<li><p><strong>TLS Verification</strong>: requests.get(verify=True) enforces certificate validation; catch SSLError with remediation message.</p></li>
+<li><p><strong>Filename Sanitization</strong>: sanitize_filename() strips path separators, leading dots, limits length to 255 chars; prevents directory traversal.</p></li>
+<li><p><strong>ZIP Safety</strong>: Check is_zipfile(), compressed/uncompressed ratio, member path validation before extraction; prevents ZIP bombs and path traversal.</p></li>
+<li><p><strong>Size Limits</strong>: Enforce max_download_size_gb before starting download; prevents disk exhaustion from unexpected large files.</p></li>
+<li><p><strong>Credential Protection</strong>: mask_sensitive_data() redacts API keys, tokens, passwords from all logs before writing.</p></li>
+</ul>
+</li>
+<li><p><strong>Performance Management</strong>: Configurable resource limits and optimization strategies:</p>
+<ul class="simple">
+<li><p><strong>Timeouts</strong>: Per-operation timeouts (30s API calls, 300s downloads, 60s parsers) prevent hung operations; platform-specific implementations.</p></li>
+<li><p><strong>Concurrency Control</strong>: ThreadPoolExecutor or asyncio with semaphore limits parallel downloads; respects per-host rate limiting.</p></li>
+<li><p><strong>Memory Limits</strong>: Skip memory-intensive operations (Owlready2 reasoning) for files &gt;500MB; catch MemoryError gracefully.</p></li>
+<li><p><strong>Streaming</strong>: Use iter_content(chunk_size=1MB) for downloads &gt;100MB; log progress every 10%; prevents memory exhaustion.</p></li>
+<li><p><strong>Rate Limiting</strong>: Token bucket algorithm per-host; configurable default 4 req/sec; prevents overwhelming source servers.</p></li>
+</ul>
+</li>
+<li><p><strong>Configuration System</strong>: Hierarchical configuration with validation and overrides:</p>
+<ul class="simple">
+<li><p><strong>Schema</strong>: Strongly-typed dataclasses (HTTPConfig, ValidationConfig, LoggingConfig, DefaultsConfig) with defaults.</p></li>
+<li><p><strong>Loading</strong>: Parse YAML, validate schema, merge per-ontology overrides with defaults.</p></li>
+<li><p><strong>Environment Overrides</strong>: ONTOFETCH_* env vars take precedence over file config; log overrides for transparency.</p></li>
+<li><p><strong>Validation</strong>: Check types, ranges, required fields; provide line numbers for YAML errors; fail fast on invalid config.</p></li>
+</ul>
+</li>
+<li><p><strong>Logging System</strong>: Multi-level structured logging with sensitive data protection:</p>
+<ul class="simple">
+<li><p><strong>Levels</strong>: DEBUG (verbose, HTTP details), INFO (operational events), WARNING (degraded but continuing), ERROR (failures).</p></li>
+<li><p><strong>Formatters</strong>: JSONFormatter for file (machine-readable), human-readable for console.</p></li>
+<li><p><strong>Rotation</strong>: RotatingFileHandler with size limit, compression of old logs, retention policy cleanup.</p></li>
+<li><p><strong>Correlation</strong>: generate_correlation_id() per batch operation; attach to all related log entries for tracing.</p></li>
+<li><p><strong>Sanitization</strong>: mask_sensitive_data() centrally redacts credentials before any output.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="risks-trade-offs">
+<h1>Risks / Trade-offs<a class="headerlink" href="#risks-trade-offs" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Risk: External service rate limits or transient failures during batch downloads. Mitigation: exponential backoff, per-host rate limiting, graceful failure recording in logs; operators can resume failed items.</p></li>
+<li><p>Risk: OLS, BioPortal, or other APIs change response formats or authentication. Mitigation: use well-maintained client libraries (ols-client, ontoportal-client) that abstract API details; monitor upstream releases for breaking changes.</p></li>
+<li><p>Risk: Large ontologies (SNOMED, NCIT, ChEBI) exhaust memory during parsing/reasoning. Mitigation: stream-based download, optional validation (skip reasoning for large files), document memory requirements per ontology class.</p></li>
+<li><p>Risk: License restrictions on some ontologies (SNOMED, LOINC) require explicit credentials or acceptance. Mitigation: fail closed with clear error messages when restricted ontologies lack credentials; document credential configuration in pystow paths.</p></li>
+<li><p>Risk: XBRL ZIP files may contain malicious paths (zip-slip vulnerability). Mitigation: use safe extraction with path validation (Python’s <code class="docutils literal notranslate"><span class="pre">zipfile</span></code> with <code class="docutils literal notranslate"><span class="pre">is_zipfile</span></code> check and member path filtering).</p></li>
+<li><p>Risk: ROBOT dependency on Java runtime may not be available. Mitigation: make ROBOT integration optional with runtime detection (<code class="docutils literal notranslate"><span class="pre">shutil.which('robot')</span></code>); skip conversion/QC steps if absent.</p></li>
+<li><p>Risk: Divergent tokenization between Pronto/RDFLib/Owlready2 on same OWL file. Mitigation: treat parsers as independent validators rather than requiring consensus; log discrepancies for manual review.</p></li>
+<li><p>Risk: Stale cached ontologies if ETag/Last-Modified not supported by source. Mitigation: allow force-refresh flag (<code class="docutils literal notranslate"><span class="pre">--force</span></code>) to bypass cache; document staleness detection limits.</p></li>
+<li><p>Risk: Configuration drift if sources.yaml manually edited without validation. Mitigation: validate YAML schema on load; provide <code class="docutils literal notranslate"><span class="pre">ontofetch</span> <span class="pre">config</span> <span class="pre">validate</span></code> command.</p></li>
+<li><p>Risk: Credential leakage via logs or error messages exposing API keys. Mitigation: implement centralized sensitive data masking in logging_config.py; apply to all log formatters before writing; test with grep for common secret patterns.</p></li>
+<li><p>Risk: SSRF attacks via malicious resolver responses pointing to internal services. Mitigation: validate all URLs before download with validate_url_security(); reject private IP ranges, localhost, link-local addresses; enforce HTTPS.</p></li>
+<li><p>Risk: ZIP bomb or path traversal attacks in XBRL taxonomy packages. Mitigation: check compressed/uncompressed size ratio before extraction; validate all ZIP member paths don’t contain “..” or start with “/”; extract to temp directory first.</p></li>
+<li><p>Risk: Unbounded resource consumption from missing timeouts or memory limits. Mitigation: enforce timeouts on all HTTP requests (30s API, 300s download) and parser operations (60s default); skip reasoning for files &gt;500MB; implement concurrent download limits.</p></li>
+<li><p>Risk: Parser hangs on malformed ontologies preventing batch completion. Mitigation: implement platform-specific timeouts (signal.alarm on Unix, threading.Timer on Windows); catch timeout exceptions, log error, continue with remaining ontologies.</p></li>
+<li><p>Risk: Log disk exhaustion in long-running deployments. Mitigation: implement RotatingFileHandler with size limits; compress old logs; delete after retention period (30 days default); make all thresholds configurable.</p></li>
+<li><p>Risk: Incompatible dependency versions causing runtime errors. Mitigation: pin minimum and maximum versions in requirements.txt (e.g., rdflib&gt;=7.0.0,&lt;8.0.0); test with both minimum and latest versions in CI; document known incompatibilities.</p></li>
+</ul>
+</section>
+<section id="migration-plan">
+<h1>Migration Plan<a class="headerlink" href="#migration-plan" title="Link to this heading"></a></h1>
+<ol class="arabic simple">
+<li><p>Scaffold module structure under <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/OntologyDownload/</span></code>: <code class="docutils literal notranslate"><span class="pre">core.py</span></code>, <code class="docutils literal notranslate"><span class="pre">resolvers.py</span></code>, <code class="docutils literal notranslate"><span class="pre">download.py</span></code>, <code class="docutils literal notranslate"><span class="pre">validators.py</span></code>, <code class="docutils literal notranslate"><span class="pre">config.py</span></code>, <code class="docutils literal notranslate"><span class="pre">logging_config.py</span></code>, <code class="docutils literal notranslate"><span class="pre">cli.py</span></code>.</p></li>
+<li><p>Install dependencies via <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code> or <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code> with version pins: <code class="docutils literal notranslate"><span class="pre">bioregistry&gt;=0.10.0</span></code>, <code class="docutils literal notranslate"><span class="pre">oaklib&gt;=0.5.0</span></code>, <code class="docutils literal notranslate"><span class="pre">ols-client&gt;=0.1.4</span></code>, <code class="docutils literal notranslate"><span class="pre">ontoportal-client&gt;=0.0.3</span></code>, <code class="docutils literal notranslate"><span class="pre">rdflib&gt;=7.0.0,&lt;8.0.0</span></code>, <code class="docutils literal notranslate"><span class="pre">pronto&gt;=2.5.0,&lt;3.0.0</span></code>, <code class="docutils literal notranslate"><span class="pre">owlready2&gt;=0.43</span></code>, <code class="docutils literal notranslate"><span class="pre">arelle&gt;=2.20.0</span></code>, <code class="docutils literal notranslate"><span class="pre">pystow&gt;=0.5.0</span></code>, <code class="docutils literal notranslate"><span class="pre">pooch&gt;=1.7.0</span></code>, <code class="docutils literal notranslate"><span class="pre">pyyaml&gt;=6.0,&lt;7.0</span></code>, <code class="docutils literal notranslate"><span class="pre">requests&gt;=2.28.0,&lt;3.0.0</span></code>.</p></li>
+<li><p>Implement core data models (FetchSpec, FetchPlan, FetchResult, Manifest) and resolver protocol; add custom exception classes.</p></li>
+<li><p>Implement configuration system with dataclass schemas (HTTPConfig, ValidationConfig, LoggingConfig) and YAML loading/validation.</p></li>
+<li><p>Implement security utilities: validate_url_security(), sanitize_filename(), mask_sensitive_data().</p></li>
+<li><p>Implement logging system: setup_logging(), JSONFormatter, generate_correlation_id(), rotation cleanup.</p></li>
+<li><p>Implement resolvers one at a time (OBO → OLS → BioPortal → SKOS → XBRL) with unit tests using mocked library responses; add error handling for 401/403/503.</p></li>
+<li><p>Build download manager with security validation, ETag/Range/SHA-256 logic, timeout handling, max file size enforcement; test with local HTTP server fixture.</p></li>
+<li><p>Implement validation pipeline with RDFLib, Pronto, Owlready2, ROBOT, Arelle; add platform-specific timeouts, memory limit checks, error handling; create test fixtures.</p></li>
+<li><p>Build pystow-based storage layer with directory creation, safe ZIP extraction, manifest read/write with validation results.</p></li>
+<li><p>Implement orchestration (fetch_one, fetch_all) with correlation IDs, graceful error handling, concurrency control.</p></li>
+<li><p>Implement CLI using argparse/Click with pull/show/validate/init subcommands; add –log-level, –json, –force flags; comprehensive –help text with examples.</p></li>
+<li><p>Add Python version check (3.9+), platform-specific timeout implementations, pathlib usage throughout.</p></li>
+<li><p>Create comprehensive test suite: resolver mocks, download manager with HTTP server fixture, security tests (SSRF, filename sanitization), configuration validation, error handling, concurrent downloads, log masking, platform compatibility.</p></li>
+<li><p>Create example <code class="docutils literal notranslate"><span class="pre">sources.yaml</span></code> with all resolver types and extensive inline comments; add <code class="docutils literal notranslate"><span class="pre">ontofetch</span> <span class="pre">init</span></code> command to generate it.</p></li>
+<li><p>Add integration smoke tests with real API calls (HP from OBO, EFO from OLS) and performance benchmarks.</p></li>
+<li><p>Document installation, configuration (all config fields, env var overrides, pystow paths), CLI usage, troubleshooting (with remediation steps), security considerations.</p></li>
+<li><p>Optional: Add <code class="docutils literal notranslate"><span class="pre">openspec</span> <span class="pre">archive</span></code> after deployment to move change to archive/ and create canonical spec in <code class="docutils literal notranslate"><span class="pre">openspec/specs/ontology-downloader/</span></code>.</p></li>
+</ol>
+</section>
+<section id="open-questions">
+<h1>Open Questions<a class="headerlink" href="#open-questions" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Should we support parallel downloads for batch operations, or serialize to respect global rate limits? <em>Proposal: support via concurrent_downloads config (default 1); add per-host tracking to rate limiter.</em></p></li>
+<li><p>What is the preferred handling for ontologies with multiple versions (keep all, prune old, configurable retention)? <em>Proposal: keep all by default; add optional version_retention_count config.</em></p></li>
+<li><p>Should validation failures block downstream processing, or just log warnings? <em>Proposal: log warnings, continue; add –strict mode that exits on validation failure.</em></p></li>
+<li><p>Do we need integration with OAK’s adapter system for post-download ontology querying, or keep downloader focused solely on acquisition? <em>Proposal: downloader only; users can use OAK separately on downloaded files.</em></p></li>
+<li><p>Should we expose programmatic Python API alongside CLI, or CLI-first with API added later? <em>Proposal: expose fetch_one/fetch_all in <strong>init</strong>.py from start; minimal overhead.</em></p></li>
+<li><p>What authentication patterns should we support for restricted ontologies (API keys in pystow, OAuth, certificate-based)? <em>Proposal: API keys via pystow initially; OAuth/certs if user demand emerges.</em></p></li>
+<li><p>What level of log detail should default INFO include (vs DEBUG)? <em>Proposal: INFO = operational milestones (download started/completed, validation outcome); DEBUG = HTTP headers, cache decisions, retry attempts.</em></p></li>
+<li><p>Should we implement automatic retry on checksum mismatch, or require manual intervention? <em>Proposal: automatic retry once (treat as cache corruption); alert if persists.</em></p></li>
+<li><p>What should be the behavior when disk space is low but not exhausted? <em>Proposal: check available space before large downloads; warn if &lt;10% free; block if &lt;1GB.</em></p></li>
+<li><p>Should concurrent downloads share bandwidth fairly, or first-come-first-served? <em>Proposal: ThreadPoolExecutor default (FCFS); document asyncio option for fairness-aware scheduling.</em></p></li>
+</ul>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
