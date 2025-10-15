@@ -168,6 +168,7 @@ def test_figshare_resolver_http_error(tmp_path):
     assert events[0].event == "error"
     assert events[0].event_reason == "http-error"
     assert events[0].http_status == 404
+    assert "Figshare API returned" in events[0].metadata["error_detail"]
 
 
 @responses.activate
@@ -191,6 +192,7 @@ def test_figshare_resolver_json_error(tmp_path):
 
     assert events[0].event == "error"
     assert events[0].event_reason == "json-error"
+    assert "content_preview" in events[0].metadata
 
 
 @responses.activate
@@ -213,7 +215,7 @@ def test_figshare_resolver_network_error(tmp_path):
 
     assert events[0].event == "error"
     assert events[0].event_reason == "request-error"
-    assert "boom" in events[0].metadata["message"]
+    assert "boom" in events[0].metadata["error"]
 
 
 def test_figshare_resolver_disabled_without_doi(tmp_path):

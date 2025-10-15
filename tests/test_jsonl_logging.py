@@ -27,10 +27,7 @@ import pytest
 pytest.importorskip("requests")
 pytest.importorskip("pyalex")
 
-from DocsToKG.ContentDownload.download_pyalex_pdfs import (
-    JsonlLogger,
-    ManifestEntry,
-)
+from DocsToKG.ContentDownload.download_pyalex_pdfs import JsonlLogger, ManifestEntry
 from DocsToKG.ContentDownload.resolvers import AttemptRecord
 from scripts.export_attempts_csv import export_attempts_jsonl_to_csv
 
@@ -53,6 +50,7 @@ def test_jsonl_logger_writes_valid_records(tmp_path: Path) -> None:
         sha256="deadbeef",
         content_length=1024,
         dry_run=False,
+        resolver_wall_time_ms=321.0,
     )
     logger.log_attempt(attempt)
 
@@ -88,6 +86,7 @@ def test_jsonl_logger_writes_valid_records(tmp_path: Path) -> None:
     attempt_record = parsed[0]
     assert attempt_record["metadata"] == {"source": "test"}
     assert attempt_record["sha256"] == "deadbeef"
+    assert attempt_record["resolver_wall_time_ms"] == 321.0
 
 
 def test_export_attempts_csv(tmp_path: Path) -> None:
@@ -107,6 +106,7 @@ def test_export_attempts_csv(tmp_path: Path) -> None:
         sha256=None,
         content_length=None,
         dry_run=True,
+        resolver_wall_time_ms=111.5,
     )
     logger.log_attempt(attempt)
     logger.close()
@@ -127,3 +127,4 @@ def test_export_attempts_csv(tmp_path: Path) -> None:
     assert row["status"] == "http_error"
     assert row["dry_run"] == "True"
     assert row["metadata"] == json.dumps({"status": 404}, sort_keys=True)
+    assert row["resolver_wall_time_ms"] == "111.5"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Iterable
 from urllib.parse import urljoin, urlparse
 
@@ -27,6 +28,9 @@ def _absolute_url(base: str, href: str) -> str:
     if parsed.scheme and parsed.netloc:
         return href
     return urljoin(base, href)
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class LandingPageResolver:
@@ -89,12 +93,45 @@ class LandingPageResolver:
                     headers=config.polite_headers,
                     timeout=config.get_timeout(self.name),
                 )
+            except requests.Timeout as exc:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="timeout",
+                    metadata={
+                        "landing": landing,
+                        "timeout": config.get_timeout(self.name),
+                        "error": str(exc),
+                    },
+                )
+                continue
+            except requests.ConnectionError as exc:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="connection-error",
+                    metadata={"landing": landing, "error": str(exc)},
+                )
+                continue
             except requests.RequestException as exc:  # pragma: no cover - network errors
                 yield ResolverResult(
                     url=None,
                     event="error",
                     event_reason="request-error",
-                    metadata={"landing": landing, "message": str(exc)},
+                    metadata={"landing": landing, "error": str(exc)},
+                )
+                continue
+            except Exception as exc:  # pragma: no cover - defensive
+                LOGGER.exception("Unexpected error scraping landing page")
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="unexpected-error",
+                    metadata={
+                        "landing": landing,
+                        "error": str(exc),
+                        "error_type": type(exc).__name__,
+                    },
                 )
                 continue
 
@@ -104,7 +141,10 @@ class LandingPageResolver:
                     event="error",
                     event_reason="http-error",
                     http_status=resp.status_code,
-                    metadata={"landing": landing},
+                    metadata={
+                        "landing": landing,
+                        "error_detail": f"Landing page returned {resp.status_code}",
+                    },
                 )
                 continue
 

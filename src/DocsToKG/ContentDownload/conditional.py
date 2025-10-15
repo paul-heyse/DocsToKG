@@ -115,12 +115,23 @@ class ConditionalRequestHelper:
         """
 
         if response.status_code == 304:
-            if (
-                self.prior_path is None
-                or self.prior_sha256 is None
-                or self.prior_content_length is None
-            ):
-                raise ValueError("304 response requires complete prior metadata")
+            missing_fields = []
+            if not self.prior_path:
+                missing_fields.append("path")
+            if not self.prior_sha256:
+                missing_fields.append("sha256")
+            if self.prior_content_length is None:
+                missing_fields.append("content_length")
+
+            if missing_fields:
+                raise ValueError(
+                    "HTTP 304 requires complete prior metadata. Missing: "
+                    + ", ".join(missing_fields)
+                    + ". This indicates a bug in manifest loading or caching logic."
+                )
+            assert self.prior_path is not None
+            assert self.prior_sha256 is not None
+            assert self.prior_content_length is not None
             return CachedResult(
                 path=self.prior_path,
                 sha256=self.prior_sha256,

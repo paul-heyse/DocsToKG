@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Iterable
 
-import requests
-
 from DocsToKG.ContentDownload.utils import dedupe
 
 from ..types import ResolverConfig, ResolverResult
@@ -58,9 +56,17 @@ class OpenAlexResolver:
             None
         """
 
-        candidates = list(artifact.pdf_urls)
+        candidates = list(dedupe(artifact.pdf_urls))
         if artifact.open_access_url:
             candidates.append(artifact.open_access_url)
+
+        if not candidates:
+            yield ResolverResult(
+                url=None,
+                event="skipped",
+                event_reason="no-openalex-urls",
+            )
+            return
 
         for url in dedupe(candidates):
             if not url:

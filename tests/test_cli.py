@@ -109,7 +109,9 @@ def test_main_writes_manifest_and_sets_mailto(monkeypatch, tmp_path):
     monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
 
     class StubPipeline:
-        def __init__(self, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **_):
+        def __init__(
+            self, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **_
+        ):
             self.logger = logger
             self.metrics = metrics
 

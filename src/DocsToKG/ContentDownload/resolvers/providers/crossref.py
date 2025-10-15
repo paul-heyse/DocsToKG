@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
 from urllib.parse import quote
@@ -15,6 +16,9 @@ from .unpaywall import _headers_cache_key
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=1000)
@@ -103,12 +107,37 @@ class CrossrefResolver:
                     timeout=config.get_timeout(self.name),
                     headers=headers,
                 )
-            except Exception as exc:  # pragma: no cover - unexpected session errors
+            except requests.Timeout as exc:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="timeout",
+                    metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
+                )
+                return
+            except requests.ConnectionError as exc:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="connection-error",
+                    metadata={"error": str(exc)},
+                )
+                return
+            except requests.RequestException as exc:
                 yield ResolverResult(
                     url=None,
                     event="error",
                     event_reason="request-error",
-                    metadata={"message": str(exc)},
+                    metadata={"error": str(exc)},
+                )
+                return
+            except Exception as exc:  # pragma: no cover - defensive
+                LOGGER.exception("Unexpected error in Crossref resolver")
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="unexpected-error",
+                    metadata={"error": str(exc), "error_type": type(exc).__name__},
                 )
                 return
 
@@ -119,16 +148,21 @@ class CrossrefResolver:
                     event="error",
                     event_reason="http-error",
                     http_status=status,
+                    metadata={"error_detail": f"Crossref API returned {status}"},
                 )
                 return
 
             try:
                 data = response.json()
-            except Exception:
+            except ValueError as json_err:
                 yield ResolverResult(
                     url=None,
                     event="error",
                     event_reason="json-error",
+                    metadata={
+                        "error_detail": str(json_err),
+                        "content_preview": response.text[:200] if hasattr(response, "text") else "",
+                    },
                 )
                 return
         else:
@@ -146,6 +180,7 @@ class CrossrefResolver:
                     event="error",
                     event_reason="http-error",
                     http_status=status,
+                    metadata={"error_detail": f"Crossref HTTPError: {status}"},
                 )
                 return
             except requests.RequestException as exc:  # pragma: no cover - network errors
@@ -153,14 +188,24 @@ class CrossrefResolver:
                     url=None,
                     event="error",
                     event_reason="request-error",
-                    metadata={"message": str(exc)},
+                    metadata={"error": str(exc)},
                 )
                 return
-            except ValueError:
+            except ValueError as json_err:
                 yield ResolverResult(
                     url=None,
                     event="error",
                     event_reason="json-error",
+                    metadata={"error_detail": str(json_err)},
+                )
+                return
+            except Exception as exc:  # pragma: no cover - defensive
+                LOGGER.exception("Unexpected cached request error in Crossref resolver")
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="unexpected-error",
+                    metadata={"error": str(exc), "error_type": type(exc).__name__},
                 )
                 return
 

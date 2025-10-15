@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Iterable
 
 import requests
@@ -13,6 +14,9 @@ from ..types import ResolverConfig, ResolverResult
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class ZenodoResolver:
@@ -60,6 +64,10 @@ class ZenodoResolver:
 
         Raises:
             None
+
+        Notes:
+            All HTTP calls honour per-resolver timeouts by delegating to
+            :meth:`ResolverConfig.get_timeout`.
         """
 
         doi = normalize_doi(artifact.doi)
@@ -76,12 +84,40 @@ class ZenodoResolver:
                 timeout=config.get_timeout(self.name),
                 headers=config.polite_headers,
             )
+        except requests.Timeout as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="timeout",
+                metadata={
+                    "timeout": config.get_timeout(self.name),
+                    "error": str(exc),
+                },
+            )
+            return
+        except requests.ConnectionError as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="connection-error",
+                metadata={"error": str(exc)},
+            )
+            return
         except requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
                 event_reason="request-error",
-                metadata={"message": str(exc)},
+                metadata={"error": str(exc)},
+            )
+            return
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.exception("Unexpected error contacting Zenodo API")
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="unexpected-error",
+                metadata={"error": str(exc), "error_type": type(exc).__name__},
             )
             return
 
@@ -91,25 +127,45 @@ class ZenodoResolver:
                 event="error",
                 event_reason="http-error",
                 http_status=response.status_code,
+                metadata={
+                    "error_detail": f"Zenodo API returned {response.status_code}",
+                },
             )
             return
 
         try:
             data = response.json()
-        except ValueError:
-            yield ResolverResult(url=None, event="error", event_reason="json-error")
+        except ValueError as json_err:
+            preview = response.text[:200] if hasattr(response, "text") else ""
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="json-error",
+                metadata={"error_detail": str(json_err), "content_preview": preview},
+            )
             return
 
         hits = data.get("hits", {})
-        hits_list = hits.get("hits", []) if isinstance(hits, dict) else []
+        if not isinstance(hits, dict):
+            LOGGER.warning("Zenodo API returned malformed hits payload: %s", type(hits).__name__)
+            return
+        hits_list = hits.get("hits", [])
+        if not isinstance(hits_list, list):
+            LOGGER.warning("Zenodo API returned malformed hits list: %s", type(hits_list).__name__)
+            return
         for record in hits_list or []:
             if not isinstance(record, dict):
+                LOGGER.warning("Skipping malformed Zenodo record: %r", record)
                 continue
             files = record.get("files", []) or []
             if not isinstance(files, list):
+                LOGGER.warning("Skipping Zenodo record with invalid files payload: %r", files)
                 continue
             for file_entry in files:
                 if not isinstance(file_entry, dict):
+                    LOGGER.warning(
+                        "Skipping non-dict Zenodo file entry in record %s", record.get("id")
+                    )
                     continue
                 file_type = (file_entry.get("type") or "").lower()
                 file_key = (file_entry.get("key") or "").lower()

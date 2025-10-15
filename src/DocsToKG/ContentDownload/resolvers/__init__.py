@@ -6,6 +6,7 @@ so existing integrations and tests can continue to monkeypatch ``requests`` or
 """
 
 import time as _time
+import warnings
 
 import requests as _requests
 
@@ -28,9 +29,7 @@ from .providers import (
     ZenodoResolver,
     default_resolvers,
 )
-from .types import (
-    DEFAULT_RESOLVER_ORDER as _DEFAULT_RESOLVER_ORDER,
-)
+from .types import DEFAULT_RESOLVER_ORDER as _DEFAULT_RESOLVER_ORDER
 from .types import (
     AttemptLogger,
     AttemptRecord,
@@ -46,6 +45,17 @@ from .types import (
 DEFAULT_RESOLVER_ORDER = _DEFAULT_RESOLVER_ORDER
 time = _time
 requests = _requests
+
+warnings.warn(
+    (
+        "Importing resolver classes from DocsToKG.ContentDownload.resolvers is "
+        "deprecated and will be removed in a future release. Import from the "
+        "explicit submodules (e.g. DocsToKG.ContentDownload.resolvers.pipeline) "
+        "instead."
+    ),
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 def clear_resolver_caches() -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Iterable
 
 import requests
@@ -12,6 +13,9 @@ from ..types import ResolverConfig, ResolverResult
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class WaybackResolver:
@@ -58,6 +62,10 @@ class WaybackResolver:
             Iterable of resolver results referencing archived snapshots.
         """
 
+        if not artifact.failed_pdf_urls:
+            yield ResolverResult(url=None, event="skipped", event_reason="no-failed-urls")
+            return
+
         for original in artifact.failed_pdf_urls:
             try:
                 resp = request_with_retries(
@@ -68,13 +76,68 @@ class WaybackResolver:
                     timeout=config.get_timeout(self.name),
                     headers=config.polite_headers,
                 )
-            except requests.RequestException:
+            except requests.Timeout as exc:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="timeout",
+                    metadata={
+                        "original": original,
+                        "timeout": config.get_timeout(self.name),
+                        "error": str(exc),
+                    },
+                )
+                continue
+            except requests.ConnectionError as exc:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="connection-error",
+                    metadata={"original": original, "error": str(exc)},
+                )
+                continue
+            except requests.RequestException as exc:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="request-error",
+                    metadata={"original": original, "error": str(exc)},
+                )
+                continue
+            except Exception as exc:  # pragma: no cover - defensive
+                LOGGER.exception("Unexpected Wayback resolver error")
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="unexpected-error",
+                    metadata={
+                        "original": original,
+                        "error": str(exc),
+                        "error_type": type(exc).__name__,
+                    },
+                )
                 continue
             if resp.status_code != 200:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="http-error",
+                    http_status=resp.status_code,
+                    metadata={
+                        "original": original,
+                        "error_detail": f"Wayback returned {resp.status_code}",
+                    },
+                )
                 continue
             try:
                 data = resp.json()
-            except ValueError:
+            except ValueError as json_err:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="json-error",
+                    metadata={"original": original, "error_detail": str(json_err)},
+                )
                 continue
             closest = (data.get("archived_snapshots") or {}).get("closest") or {}
             if closest.get("available") and closest.get("url"):

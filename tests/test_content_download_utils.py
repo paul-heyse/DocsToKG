@@ -16,12 +16,16 @@ Usage:
     pytest tests/test_content_download_utils.py
 """
 
-from DocsToKG.ContentDownload.utils import (
-    dedupe,
-    normalize_doi,
-    normalize_pmcid,
-    strip_prefix,
-)
+from typing import List
+
+import pytest
+
+hypothesis = pytest.importorskip("hypothesis")
+from hypothesis import strategies as st  # type: ignore
+
+given = hypothesis.given
+
+from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
 
 
 def test_normalize_doi_with_https_prefix() -> None:
@@ -62,3 +66,15 @@ def test_dedupe_preserves_order() -> None:
 
 def test_dedupe_filters_falsey_values() -> None:
     assert dedupe(["a", "", None, "a"]) == ["a"]
+
+
+@given(st.lists(st.text()))
+def test_dedupe_property(values: List[str]) -> None:
+    expected = []
+    seen = set()
+    for item in values:
+        if item and item not in seen:
+            expected.append(item)
+            seen.add(item)
+
+    assert dedupe(values) == expected

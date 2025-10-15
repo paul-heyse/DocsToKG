@@ -8,6 +8,12 @@ This module maintains backward compatibility by re-exporting legacy entry points
 so existing integrations and tests can continue to monkeypatch ``requests`` or
 ``time`` on the resolver namespace.
 
+.. note::
+   Importing from this facade now emits ``DeprecationWarning``. Prefer importing
+   from explicit submodules such as
+   ``DocsToKG.ContentDownload.resolvers.pipeline`` or
+   ``DocsToKG.ContentDownload.resolvers.types``.
+
 ## 1. Functions
 
 ### `clear_resolver_caches()`

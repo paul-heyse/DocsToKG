@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Tuple
 from urllib.parse import quote
@@ -15,6 +16,9 @@ from .unpaywall import _headers_cache_key
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=1000)
@@ -86,7 +90,8 @@ class SemanticScholarResolver:
 
         doi = normalize_doi(artifact.doi)
         if not doi:
-            return []
+            yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
+            return
         try:
             data = _fetch_semantic_scholar_data(
                 doi,
@@ -94,18 +99,69 @@ class SemanticScholarResolver:
                 config.get_timeout(self.name),
                 _headers_cache_key(config.polite_headers),
             )
-        except requests.HTTPError:
-            return []
-        except requests.RequestException:
-            return []
-        except ValueError:
-            return []
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response else None
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="http-error",
+                http_status=status,
+                metadata={"error_detail": f"Semantic Scholar HTTPError: {status}"},
+            )
+            return
+        except requests.Timeout as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="timeout",
+                metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
+            )
+            return
+        except requests.ConnectionError as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="connection-error",
+                metadata={"error": str(exc)},
+            )
+            return
+        except requests.RequestException as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="request-error",
+                metadata={"error": str(exc)},
+            )
+            return
+        except ValueError as json_err:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="json-error",
+                metadata={"error_detail": str(json_err)},
+            )
+            return
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.exception("Unexpected Semantic Scholar resolver error")
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="unexpected-error",
+                metadata={"error": str(exc), "error_type": type(exc).__name__},
+            )
+            return
 
         open_access = (data.get("openAccessPdf") or {}) if isinstance(data, dict) else {}
         url = open_access.get("url") if isinstance(open_access, dict) else None
         if url:
-            return [ResolverResult(url=url, metadata={"source": "semantic-scholar"})]
-        return []
+            yield ResolverResult(url=url, metadata={"source": "semantic-scholar"})
+        else:
+            yield ResolverResult(
+                url=None,
+                event="skipped",
+                event_reason="no-openaccess-pdf",
+                metadata={"doi": doi},
+            )
 
 
 __all__ = [

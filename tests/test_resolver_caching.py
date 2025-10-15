@@ -25,9 +25,7 @@ pytest.importorskip("requests")
 
 from DocsToKG.ContentDownload.resolvers import ResolverConfig, clear_resolver_caches
 from DocsToKG.ContentDownload.resolvers.providers.crossref import CrossrefResolver
-from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import (
-    SemanticScholarResolver,
-)
+from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import SemanticScholarResolver
 from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver
 
 

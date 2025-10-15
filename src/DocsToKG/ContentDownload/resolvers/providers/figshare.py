@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Iterable
 
 import requests
@@ -13,6 +14,9 @@ from ..types import ResolverConfig, ResolverResult
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class FigshareResolver:
@@ -60,6 +64,11 @@ class FigshareResolver:
 
         Raises:
             None
+
+        Notes:
+            Requests honour resolver-specific timeouts using
+            :meth:`ResolverConfig.get_timeout` and reuse
+            :func:`request_with_retries` for resilient execution.
         """
 
         doi = normalize_doi(artifact.doi)
@@ -83,12 +92,40 @@ class FigshareResolver:
                 timeout=config.get_timeout(self.name),
                 headers=headers,
             )
+        except requests.Timeout as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="timeout",
+                metadata={
+                    "timeout": config.get_timeout(self.name),
+                    "error": str(exc),
+                },
+            )
+            return
+        except requests.ConnectionError as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="connection-error",
+                metadata={"error": str(exc)},
+            )
+            return
         except requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
                 event_reason="request-error",
-                metadata={"message": str(exc)},
+                metadata={"error": str(exc)},
+            )
+            return
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.exception("Unexpected error in Figshare resolver")
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="unexpected-error",
+                metadata={"error": str(exc), "error_type": type(exc).__name__},
             )
             return
 
@@ -98,26 +135,41 @@ class FigshareResolver:
                 event="error",
                 event_reason="http-error",
                 http_status=response.status_code,
+                metadata={
+                    "error_detail": f"Figshare API returned {response.status_code}",
+                },
             )
             return
 
         try:
             articles = response.json()
-        except ValueError:
-            yield ResolverResult(url=None, event="error", event_reason="json-error")
+        except ValueError as json_err:
+            preview = response.text[:200] if hasattr(response, "text") else ""
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="json-error",
+                metadata={"error_detail": str(json_err), "content_preview": preview},
+            )
             return
 
         if not isinstance(articles, list):
+            LOGGER.warning(
+                "Figshare API returned non-list articles payload: %s", type(articles).__name__
+            )
             return
 
         for article in articles:
             if not isinstance(article, dict):
+                LOGGER.warning("Skipping malformed Figshare article: %r", article)
                 continue
             files = article.get("files", []) or []
             if not isinstance(files, list):
+                LOGGER.warning("Skipping Figshare article with invalid files payload: %r", files)
                 continue
             for file_entry in files:
                 if not isinstance(file_entry, dict):
+                    LOGGER.warning("Skipping non-dict Figshare file entry: %r", file_entry)
                     continue
                 filename = (file_entry.get("name") or "").lower()
                 download_url = file_entry.get("download_url")
