@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 
 pytest.importorskip("pydantic")
+pytest.importorskip("pydantic_settings")
 
 from DocsToKG.OntologyDownload import optdeps
 

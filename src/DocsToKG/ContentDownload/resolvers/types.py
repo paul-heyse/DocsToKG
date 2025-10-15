@@ -421,6 +421,7 @@ class ResolverMetrics:
     successes: Counter = field(default_factory=Counter)
     html: Counter = field(default_factory=Counter)
     skips: Counter = field(default_factory=Counter)
+    failures: Counter = field(default_factory=Counter)
 
     def record_attempt(self, resolver_name: str, outcome: DownloadOutcome) -> None:
         """Record a resolver attempt and update success/html counters.
@@ -453,6 +454,18 @@ class ResolverMetrics:
         key = f"{resolver_name}:{reason}"
         self.skips[key] += 1
 
+    def record_failure(self, resolver_name: str) -> None:
+        """Record a resolver failure occurrence.
+
+        Args:
+            resolver_name: Resolver that raised an exception during execution.
+
+        Returns:
+            None
+        """
+
+        self.failures[resolver_name] += 1
+
     def summary(self) -> Dict[str, Any]:
         """Return aggregated metrics summarizing resolver behaviour.
 
@@ -474,6 +487,7 @@ class ResolverMetrics:
             "successes": dict(self.successes),
             "html": dict(self.html),
             "skips": dict(self.skips),
+            "failures": dict(self.failures),
         }
 
 

@@ -259,3 +259,15 @@ def test_interpret_response_modified_extracts_headers() -> None:
     assert isinstance(result, ModifiedResult)
     assert result.etag == '"xyz"'
     assert result.last_modified == "Thu, 01 Jan 1970 00:00:00 GMT"
+
+
+def test_conditional_helper_rejects_negative_length() -> None:
+    with pytest.raises(ValueError):
+        ConditionalRequestHelper(prior_content_length=-1)
+
+
+def test_interpret_response_requires_response_shape() -> None:
+    helper = ConditionalRequestHelper()
+
+    with pytest.raises(TypeError):
+        helper.interpret_response(object())  # type: ignore[arg-type]

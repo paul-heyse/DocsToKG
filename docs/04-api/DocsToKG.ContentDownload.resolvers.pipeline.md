@@ -4,6 +4,10 @@ This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolver
 
 Resolver pipeline orchestration and execution logic.
 
+``ResolverPipeline`` coordinates sequential or bounded-concurrency execution of
+registered resolvers, applies per-resolver rate limits, performs HEAD
+pre-checks, and captures provider exceptions as structured events.
+
 ## 1. Functions
 
 ### `_callable_accepts_argument(func, name)`

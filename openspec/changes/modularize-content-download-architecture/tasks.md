@@ -1323,29 +1323,29 @@
 
 ## 14. Migration and Compatibility
 
-- [ ] 14.1 Create migration guide in `docs/migration-modularize-resolvers.md`
+- [x] 14.1 Create migration guide in `docs/migration-modularize-resolvers.md`
   - Document old import paths: `from DocsToKG.ContentDownload.resolvers import ResolverPipeline`
   - Document new import paths (recommended): `from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline`
   - Note that old paths continue working via re-exports
   - List new configuration options and defaults
 
-- [ ] 14.2 Add deprecation warnings for internal APIs (if any are exposed)
+- [x] 14.2 Add deprecation warnings for internal APIs (if any are exposed)
   - Add `warnings.warn()` for any deprecated internal functions
   - Document in CHANGELOG.md
 
-- [ ] 14.3 Verify backward compatibility with existing tests
+- [x] 14.3 Verify backward compatibility with existing tests
   - Run full test suite: `pytest tests/`
   - Ensure all existing tests pass without modification
   - Ensure no new import errors
 
 ## 15. Documentation
 
-- [ ] 15.1 Update main README.md
+- [x] 15.1 Update main README.md
   - Add section on new Zenodo and Figshare resolver support
   - Document bounded concurrency option
   - Document HEAD pre-check optimization
 
-- [ ] 15.2 Create developer guide for adding custom resolvers
+- [x] 15.2 Create developer guide for adding custom resolvers
   - Create `docs/adding-custom-resolvers.md`
   - Provide resolver template:
 
@@ -1363,57 +1363,57 @@
   - Document registration process in `providers/__init__.py`
   - Document configuration options (timeouts, rate limits, toggles)
 
-- [ ] 15.3 Update API documentation
+- [x] 15.3 Update API documentation
   - Regenerate Sphinx/MkDocs API docs if applicable
   - Ensure new modules appear in documentation
 
-- [ ] 15.4 Create architecture diagram
+- [x] 15.4 Create architecture diagram
   - Visualize resolver pipeline flow: Work → Pipeline → Resolvers → Download → Outcome
   - Show modular structure: `pipeline.py`, `types.py`, `providers/*`
   - Include in `docs/architecture.md`
 
 ## 16. Testing Coverage
 
-- [ ] 16.1 Achieve 95%+ branch coverage for new modules
+- [x] 16.1 Achieve 95%+ branch coverage for new modules
   - Run: `pytest --cov=src/DocsToKG/ContentDownload/http --cov-report=html`
   - Run: `pytest --cov=src/DocsToKG/ContentDownload/conditional --cov-report=html`
   - Run: `pytest --cov=src/DocsToKG/ContentDownload/resolvers --cov-report=html`
   - Review HTML report and add tests for uncovered branches
 
-- [ ] 16.2 Add missing edge case tests
+- [x] 16.2 Add missing edge case tests
   - Test `Retry-After` with date format (currently only integer tested)
   - Test HEAD pre-check with redirects (302 → 200)
   - Test concurrent execution with resolver exception handling
   - Test Zenodo/Figshare pagination (if implemented)
 
-- [ ] 16.3 Add property-based tests with `hypothesis`
+- [x] 16.3 Add property-based tests with `hypothesis`
   - Test `ConditionalRequestHelper` with arbitrary ETag/Last-Modified values
   - Test `request_with_retries` backoff timing properties
   - Test dedupe utility with various input sequences
 
 ## 17. Cleanup and Finalization
 
-- [ ] 17.1 Remove unused code from `download_pyalex_pdfs.py`
+- [x] 17.1 Remove unused code from `download_pyalex_pdfs.py`
   - Remove `attempt_openalex_candidates()` function (replaced by OpenAlexResolver)
   - Remove any dead code paths from refactoring
 
-- [ ] 17.2 Run linters and formatters
+- [x] 17.2 Run linters and formatters
   - Run: `black src/DocsToKG/ContentDownload/`
   - Run: `isort src/DocsToKG/ContentDownload/`
   - Run: `mypy src/DocsToKG/ContentDownload/` (if type checking enabled)
   - Fix any linter errors or warnings
 
-- [ ] 17.3 Update CHANGELOG.md
+- [x] 17.3 Update CHANGELOG.md
   - Add entry for modularization changes
   - List new features: Zenodo, Figshare, bounded concurrency, HEAD pre-check
   - Note backward compatibility maintained
 
-- [ ] 17.4 Verify all tasks complete and tests pass
+- [x] 17.4 Verify all tasks complete and tests pass
   - Run full test suite: `pytest tests/`
   - Verify no regressions
   - Verify new features work as expected
 
-- [ ] 17.5 Create summary of changes for pull request
+- [x] 17.5 Create summary of changes for pull request
   - List files created (13 new provider modules, 3 new utility modules)
   - List files modified (download_pyalex_pdfs.py, tests)
   - Document test coverage metrics
@@ -1421,7 +1421,7 @@
 
 ## 18. Error Handling Patterns (CRITICAL FOR ROBUSTNESS)
 
-- [ ] 18.1 Add explicit error handling to HTTP retry module
+- [x] 18.1 Add explicit error handling to HTTP retry module
 
   ```python
   # In http.py, add logging for retry attempts
@@ -1442,7 +1442,7 @@
           raise
   ```
 
-- [ ] 18.2 Add error handling to ConditionalRequestHelper
+- [x] 18.2 Add error handling to ConditionalRequestHelper
 
   ```python
   # In conditional.py, add validation
@@ -1468,7 +1468,7 @@
       return ModifiedResult(...)
   ```
 
-- [ ] 18.3 Add error handling to all resolver providers
+- [x] 18.3 Add error handling to all resolver providers
 
   ```python
   # Pattern to apply in each resolver's iter_urls() method

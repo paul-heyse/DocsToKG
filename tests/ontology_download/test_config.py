@@ -12,6 +12,7 @@ from typing import Dict
 import pytest
 
 pytest.importorskip("pydantic")
+pytest.importorskip("pydantic_settings")
 
 from pydantic import BaseModel, ValidationError
 

@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("transformers")
+
 SCRIPTS = [
     Path("src/DocsToKG/DocParsing/DoclingHybridChunkerPipelineWithMin.py"),
     Path("src/DocsToKG/DocParsing/run_docling_html_to_doctags_parallel.py"),
