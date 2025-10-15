@@ -131,7 +131,7 @@
  - [x] 4.2 Update `ResolverPipeline._respect_rate_limit()` to read `config.resolver_min_interval_s.get(resolver_name)`
  - [x] 4.3 In `load_resolver_config()` in `download_pyalex_pdfs.py`, add deprecation handling: if `resolver_rate_limits` in config_data and `resolver_min_interval_s` not in config_data, copy value and log warning "resolver_rate_limits deprecated, use resolver_min_interval_s"
  - [x] 4.4 Update `apply_config_overrides()` to handle both field names (old and new) for backward compatibility
-- [ ] 4.5 Update example resolver config YAML in docs/ to use `resolver_min_interval_s` with inline comment "# seconds between calls (e.g., 1.0 = max 1 QPS)"
+- [x] 4.5 Update example resolver config YAML in docs/ to use `resolver_min_interval_s` with inline comment "# seconds between calls (e.g., 1.0 = max 1 QPS)"
  - [x] 4.6 Update comment in `load_resolver_config()` where Unpaywall default is set: `# Unpaywall recommends 1 request per second`
 - [x] 4.7 Add test verifying deprecation warning is logged when old field name used
 
@@ -185,8 +185,8 @@
 
 ## 9. Parallel Execution with ThreadPoolExecutor
 
-- [ ] 9.1 In `download_pyalex_pdfs.py` argparse section (around line 700), add: `parser.add_argument('--workers', type=int, default=1, help='Number of parallel workers for processing works (default: 1 for sequential). Recommended: 3-5 for production.')`
-- [ ] 9.2 Before `main()` function, extract work processing logic into standalone function:
+- [x] 9.1 In `download_pyalex_pdfs.py` argparse section (around line 700), add: `parser.add_argument('--workers', type=int, default=1, help='Number of parallel workers for processing works (default: 1 for sequential). Recommended: 3-5 for production.')`
+- [x] 9.2 Before `main()` function, extract work processing logic into standalone function:
 
   ```python
   def process_one_work(
@@ -258,7 +258,7 @@
           return {"work_id": artifact.work_id, "status": "miss", "path": None}
   ```
 
-- [ ] 9.3 In `main()` function, replace the `for work in iterate_openalex(...)` loop (lines 835-945) with:
+- [x] 9.3 In `main()` function, replace the `for work in iterate_openalex(...)` loop (lines 835-945) with:
 
   ```python
   if args.workers == 1:
@@ -312,9 +312,9 @@
                   LOGGER.error(f"Worker failed for {work_id}: {exc}", exc_info=True)
   ```
 
-- [ ] 9.4 Delete old task 9.4 (merged into 9.3)
-- [ ] 9.5 Delete old task 9.5 (merged into 9.3)
-- [ ] 9.6 In `resolvers/__init__.py` `ResolverPipeline.__init__()` (around line 224), add import and lock initialization:
+- [x] 9.4 Delete old task 9.4 (merged into 9.3)
+- [x] 9.5 Delete old task 9.5 (merged into 9.3)
+- [x] 9.6 In `resolvers/__init__.py` `ResolverPipeline.__init__()` (around line 224), add import and lock initialization:
 
   ```python
   import threading
@@ -324,7 +324,7 @@
       self._lock = threading.Lock()  # ADD THIS
   ```
 
-- [ ] 9.7 In `ResolverPipeline._respect_rate_limit()` (around line 232), wrap dict access in lock:
+- [x] 9.7 In `ResolverPipeline._respect_rate_limit()` (around line 232), wrap dict access in lock:
 
   ```python
   def _respect_rate_limit(self, resolver_name: str) -> None:
@@ -344,8 +344,8 @@
           self._last_invocation[resolver_name] = time.monotonic()
   ```
 
-- [ ] 9.8 Delete old tasks 9.7 and 9.8 (merged into 9.6 and 9.7)
-- [ ] 9.9 Create `tests/test_parallel_execution.py`:
+- [x] 9.8 Delete old tasks 9.7 and 9.8 (merged into 9.6 and 9.7)
+- [x] 9.9 Create `tests/test_parallel_execution.py`:
 
   ```python
   import pytest
@@ -382,7 +382,7 @@
           assert interval >= 0.95, f"Interval {interval}s < 1.0s (rate limit violated)"
   ```
 
-- [ ] 9.10 Update `README.md` or `docs/` with section:
+- [x] 9.10 Update `README.md` or `docs/` with section:
 
   ```markdown
   ## Parallel Execution
@@ -407,60 +407,60 @@
 
 ## 10. Dry Run and Resume Modes
 
-- [ ] 10.1 Add CLI flag: `parser.add_argument('--dry-run', action='store_true', help='Measure resolver coverage without writing files')`
-- [ ] 10.2 Add CLI flag: `parser.add_argument('--resume-from', type=Path, default=None, help='Resume from manifest.jsonl, only process missed works')`
-- [ ] 10.3 In `main()`, if `args.resume_from`: read manifest.jsonl, collect set of work_ids with status 'success' or 'cached'
-- [ ] 10.4 In work iteration loop, if `args.resume_from` and `work_id in completed_work_ids`: skip with log message "Skipping work_id (already completed)"
-- [ ] 10.5 If `args.dry_run`: in `download_candidate()`, after classification, return immediately without writing file (but still compute metrics)
-- [ ] 10.6 Update logger to include `dry_run: bool` field in records
-- [ ] 10.7 In final summary, if `args.dry_run`: print "DRY RUN: no files written, resolver coverage: ..."
-- [ ] 10.8 Add test in `tests/test_dry_run.py` verifying no files written when --dry-run, but logs generated
-- [ ] 10.9 Add test in `tests/test_resume.py` verifying works in manifest are skipped on --resume-from
+- [x] 10.1 Add CLI flag: `parser.add_argument('--dry-run', action='store_true', help='Measure resolver coverage without writing files')`
+- [x] 10.2 Add CLI flag: `parser.add_argument('--resume-from', type=Path, default=None, help='Resume from manifest.jsonl, only process missed works')`
+- [x] 10.3 In `main()`, if `args.resume_from`: read manifest.jsonl, collect set of work_ids with status 'success' or 'cached'
+- [x] 10.4 In work iteration loop, if `args.resume_from` and `work_id in completed_work_ids`: skip with log message "Skipping work_id (already completed)"
+- [x] 10.5 If `args.dry_run`: in `download_candidate()`, after classification, return immediately without writing file (but still compute metrics)
+- [x] 10.6 Update logger to include `dry_run: bool` field in records
+- [x] 10.7 In final summary, if `args.dry_run`: print "DRY RUN: no files written, resolver coverage: ..."
+- [x] 10.8 Add test in `tests/test_dry_run.py` verifying no files written when --dry-run, but logs generated
+- [x] 10.9 Add test in `tests/test_resume.py` verifying works in manifest are skipped on --resume-from
 
 ## 11. HTML Text Extraction
 
-- [ ] 11.1 Add CLI flag: `parser.add_argument('--extract-html-text', action='store_true', help='Extract plaintext from HTML fallbacks (requires trafilatura)')`
-- [ ] 11.2 In `download_candidate()`, after writing HTML file, if `extract_html_text` flag: `try: import trafilatura; text = trafilatura.extract(html_content); except ImportError: log warning`
-- [ ] 11.3 If extraction succeeds, write text to `dest_path.with_suffix('.html.txt')`
-- [ ] 11.4 Add `extracted_text_path` field to DownloadOutcome
-- [ ] 11.5 Update manifest to include extracted_text_path
-- [ ] 11.6 Add trafilatura to optional dependencies in pyproject.toml: `[tool.poetry.group.extract]`
-- [ ] 11.7 Document in README: "For HTML text extraction: pip install trafilatura && use --extract-html-text"
-- [ ] 11.8 Add test in `tests/test_html_extraction.py` (requires trafilatura) verifying .html.txt created with plaintext
+- [x] 11.1 Add CLI flag: `parser.add_argument('--extract-html-text', action='store_true', help='Extract plaintext from HTML fallbacks (requires trafilatura)')`
+- [x] 11.2 In `download_candidate()`, after writing HTML file, if `extract_html_text` flag: `try: import trafilatura; text = trafilatura.extract(html_content); except ImportError: log warning`
+- [x] 11.3 If extraction succeeds, write text to `dest_path.with_suffix('.html.txt')`
+- [x] 11.4 Add `extracted_text_path` field to DownloadOutcome
+- [x] 11.5 Update manifest to include extracted_text_path
+- [x] 11.6 Add trafilatura to optional dependencies in pyproject.toml: `[tool.poetry.group.extract]`
+- [x] 11.7 Document in README: "For HTML text extraction: pip install trafilatura && use --extract-html-text"
+- [x] 11.8 Add test in `tests/test_html_extraction.py` (requires trafilatura) verifying .html.txt created with plaintext
 
 ## 12. Additional Resolvers
 
-- [ ] 12.1 In `resolvers/__init__.py`, create `OpenAireResolver` class following pattern: `name = "openaire"`, `is_enabled()` checks DOI, `iter_urls()` calls <https://api.openaire.eu/search/publications?doi=>... and parses bestlicense/instances
-- [ ] 12.2 Create `HalResolver` class: `name = "hal"`, checks DOI, calls <https://api.archives-ouvertes.fr/search/?q=doiId_s>:... and parses file_s field
-- [ ] 12.3 Create `OsfResolver` class: `name = "osf"`, checks DOI, calls <https://api.osf.io/v2/preprints/?filter[doi]=>... and parses links.download
-- [ ] 12.4 Add all three to `default_resolvers()` list
-- [ ] 12.5 Set all three to disabled by default in DEFAULT_RESOLVER_ORDER config: `resolver_toggles = {"openaire": False, "hal": False, "osf": False, ...}`
-- [ ] 12.6 Document in README: "Enable additional resolvers for EU OA / preprints: --enable-resolver openaire"
-- [ ] 12.7 Add unit tests for each resolver mocking API responses
+- [x] 12.1 In `resolvers/__init__.py`, create `OpenAireResolver` class following pattern: `name = "openaire"`, `is_enabled()` checks DOI, `iter_urls()` calls <https://api.openaire.eu/search/publications?doi=>... and parses bestlicense/instances
+- [x] 12.2 Create `HalResolver` class: `name = "hal"`, checks DOI, calls <https://api.archives-ouvertes.fr/search/?q=doiId_s>:... and parses file_s field
+- [x] 12.3 Create `OsfResolver` class: `name = "osf"`, checks DOI, calls <https://api.osf.io/v2/preprints/?filter[doi]=>... and parses links.download
+- [x] 12.4 Add all three to `default_resolvers()` list
+- [x] 12.5 Set all three to disabled by default in DEFAULT_RESOLVER_ORDER config: `resolver_toggles = {"openaire": False, "hal": False, "osf": False, ...}`
+- [x] 12.6 Document in README: "Enable additional resolvers for EU OA / preprints: --enable-resolver openaire"
+- [x] 12.7 Add unit tests for each resolver mocking API responses
 
 ## 13. Enhanced User-Agent for Crossref
 
-- [ ] 13.1 In `load_resolver_config()` where User-Agent is constructed, update format: `user_agent = f"DocsToKGDownloader/1.0 (+{config.mailto}; mailto:{config.mailto})"`
-- [ ] 13.2 Ensure mailto is included directly in UA string even if polite_headers already has separate mailto header
-- [ ] 13.3 Add test verifying User-Agent includes mailto in correct format
+- [x] 13.1 In `load_resolver_config()` where User-Agent is constructed, update format: `user_agent = f"DocsToKGDownloader/1.0 (+{config.mailto}; mailto:{config.mailto})"`
+- [x] 13.2 Ensure mailto is included directly in UA string even if polite_headers already has separate mailto header
+- [x] 13.3 Add test verifying User-Agent includes mailto in correct format
 
 ## 14. Testing Gaps
 
-- [ ] 14.1 Add test in `tests/test_edge_cases.py` for corrupt HTML with Content-Type: application/pdf, verify sniff overrides Content-Type
-- [ ] 14.2 Add test for Wayback resolver when `archived_snapshots.closest.available == False`, verify skip
-- [ ] 14.3 Add test verifying manifest and attempts have exactly one success row per saved PDF with matching work_id and path
-- [ ] 14.4 Add test for polite headers propagation: verify OpenAlex candidate attempts use same headers as pipeline
-- [ ] 14.5 Add test for retry budget exhaustion: mock 10 URLs all returning 503, verify max_attempts_per_work honored
+- [x] 14.1 Add test in `tests/test_edge_cases.py` for corrupt HTML with Content-Type: application/pdf, verify sniff overrides Content-Type
+- [x] 14.2 Add test for Wayback resolver when `archived_snapshots.closest.available == False`, verify skip
+- [x] 14.3 Add test verifying manifest and attempts have exactly one success row per saved PDF with matching work_id and path
+- [x] 14.4 Add test for polite headers propagation: verify OpenAlex candidate attempts use same headers as pipeline
+- [x] 14.5 Add test for retry budget exhaustion: mock 10 URLs all returning 503, verify max_attempts_per_work honored
 
 ## 15. Documentation and Migration
 
-- [ ] 15.1 Create MIGRATION.md in docs/ with sections: Config Changes (resolver_rate_limits → resolver_min_interval_s), Logging Changes (CSV → JSONL with export script), CLI Additions (--workers, --dry-run, --resume-from, --extract-html-text)
-- [ ] 15.2 Update README.md with new CLI flags examples and recommended --workers values
-- [ ] 15.3 Document rate limit semantics: "resolver_min_interval_s: 1.0 means minimum 1 second between calls (max ~1 QPS)"
-- [ ] 15.4 Add troubleshooting section for common issues: partial files (check .part), rate limit violations (reduce --workers), memory issues (reduce --workers)
-- [ ] 15.5 Document CSV export: "To convert JSONL to CSV: jq -r '[.timestamp, .work_id, ...] | @csv' attempts.jsonl > attempts.csv" or use scripts/export_attempts_csv.py
-- [ ] 15.6 Update docstrings in `download_candidate()`, `_make_session()`, `process_one_work()` with parameter descriptions and examples
-- [ ] 15.7 Add example resolver config YAML in docs/examples/ showing all new fields
+- [x] 15.1 Create MIGRATION.md in docs/ with sections: Config Changes (resolver_rate_limits → resolver_min_interval_s), Logging Changes (CSV → JSONL with export script), CLI Additions (--workers, --dry-run, --resume-from, --extract-html-text)
+- [x] 15.2 Update README.md with new CLI flags examples and recommended --workers values
+- [x] 15.3 Document rate limit semantics: "resolver_min_interval_s: 1.0 means minimum 1 second between calls (max ~1 QPS)"
+- [x] 15.4 Add troubleshooting section for common issues: partial files (check .part), rate limit violations (reduce --workers), memory issues (reduce --workers)
+- [x] 15.5 Document CSV export: "To convert JSONL to CSV: jq -r '[.timestamp, .work_id, ...] | @csv' attempts.jsonl > attempts.csv" or use scripts/export_attempts_csv.py
+- [x] 15.6 Update docstrings in `download_candidate()`, `_make_session()`, `process_one_work()` with parameter descriptions and examples
+- [x] 15.7 Add example resolver config YAML in docs/examples/ showing all new fields
 
 ## 16. End-to-End Validation
 

@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
+pytest.importorskip("requests")
 import requests
 
 responses = pytest.importorskip("responses")
@@ -228,6 +230,98 @@ def test_europe_pmc_resolver_http_error(tmp_path):
     )
     urls = list(resolvers.EuropePmcResolver().iter_urls(session, config, artifact))
     assert urls == []
+
+
+@responses.activate
+def test_openaire_resolver_collects_pdf_candidates(tmp_path):
+    session = requests.Session()
+    artifact = make_artifact(tmp_path)
+    config = build_config()
+    responses.add(
+        responses.GET,
+        "https://api.openaire.eu/search/publications",
+        json={
+            "response": {
+                "results": {
+                    "result": [
+                        {
+                            "metadata": {
+                                "instance": {
+                                    "url": "https://openaire.example/paper.pdf",
+                                    "extra": [
+                                        "https://openaire.example/ignore.txt",
+                                        "https://openaire.example/paper.pdf",
+                                    ],
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        status=200,
+    )
+
+    urls = [r.url for r in resolvers.OpenAireResolver().iter_urls(session, config, artifact)]
+    assert urls == ["https://openaire.example/paper.pdf"]
+
+
+@responses.activate
+def test_hal_resolver_uses_file_fields(tmp_path):
+    session = requests.Session()
+    artifact = make_artifact(tmp_path)
+    config = build_config()
+    responses.add(
+        responses.GET,
+        "https://api.archives-ouvertes.fr/search/",
+        json={
+            "response": {
+                "docs": [
+                    {
+                        "fileMain_s": "https://hal.archives-ouvertes.fr/fileMain.pdf",
+                        "file_s": [
+                            "https://hal.archives-ouvertes.fr/alternate.pdf",
+                            "https://hal.archives-ouvertes.fr/fileMain.pdf",
+                        ],
+                    }
+                ]
+            }
+        },
+        status=200,
+    )
+
+    urls = [r.url for r in resolvers.HalResolver().iter_urls(session, config, artifact)]
+    assert urls == [
+        "https://hal.archives-ouvertes.fr/fileMain.pdf",
+        "https://hal.archives-ouvertes.fr/alternate.pdf",
+    ]
+
+
+@responses.activate
+def test_osf_resolver_merges_download_links(tmp_path):
+    session = requests.Session()
+    artifact = make_artifact(tmp_path)
+    config = build_config()
+    responses.add(
+        responses.GET,
+        "https://api.osf.io/v2/preprints/",
+        json={
+            "data": [
+                {
+                    "links": {"download": "https://osf.io/download1"},
+                    "attributes": {
+                        "primary_file": {
+                            "links": {"download": "https://osf.io/download2"}
+                        }
+                    },
+                }
+            ]
+        },
+        status=200,
+    )
+
+    urls = [r.url for r in resolvers.OsfResolver().iter_urls(session, config, artifact)]
+    assert urls == ["https://osf.io/download1", "https://osf.io/download2"]
 
 
 @responses.activate

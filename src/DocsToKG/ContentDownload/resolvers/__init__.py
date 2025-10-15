@@ -709,37 +709,77 @@ class CrossrefResolver:
             )
             return
         email = config.mailto or config.unpaywall_email
-        try:
-            data = _fetch_crossref_data(
-                doi,
-                email,
-                config.get_timeout(self.name),
-                _headers_cache_key(config.polite_headers),
-            )
-        except requests.HTTPError as exc:
-            status = exc.response.status_code if exc.response else None
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="http-error",
-                http_status=status,
-            )
-            return
-        except requests.RequestException as exc:  # pragma: no cover - network errors
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="request-error",
-                metadata={"message": str(exc)},
-            )
-            return
-        except ValueError:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="json-error",
-            )
-            return
+        endpoint = f"https://api.crossref.org/works/{quote(doi)}"
+        params = {"mailto": email} if email else None
+        headers = dict(config.polite_headers)
+        if hasattr(session, "get"):
+            try:
+                response = session.get(
+                    endpoint,
+                    params=params,
+                    timeout=config.get_timeout(self.name),
+                    headers=headers,
+                )
+            except Exception as exc:  # pragma: no cover - unexpected session errors
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="request-error",
+                    metadata={"message": str(exc)},
+                )
+                return
+
+            status = getattr(response, "status_code", 200)
+            if status != 200:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="http-error",
+                    http_status=status,
+                )
+                return
+
+            try:
+                data = response.json()
+            except Exception:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="json-error",
+                )
+                return
+        else:
+            try:
+                data = _fetch_crossref_data(
+                    doi,
+                    email,
+                    config.get_timeout(self.name),
+                    _headers_cache_key(config.polite_headers),
+                )
+            except requests.HTTPError as exc:
+                status = exc.response.status_code if exc.response else None
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="http-error",
+                    http_status=status,
+                )
+                return
+            except requests.RequestException as exc:  # pragma: no cover - network errors
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="request-error",
+                    metadata={"message": str(exc)},
+                )
+                return
+            except ValueError:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="json-error",
+                )
+                return
 
         message = (data or {}).get("message") or {}
         links = message.get("link") or []

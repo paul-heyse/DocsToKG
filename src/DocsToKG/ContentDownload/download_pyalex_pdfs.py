@@ -106,13 +106,32 @@ def ensure_dir(path: Path) -> None:
 
 
 def _make_session(headers: Dict[str, str]) -> requests.Session:
-    """Create a retry-enabled :class:`requests.Session` with polite headers.
+    """Create a retry-enabled :class:`requests.Session` configured for polite crawling.
 
-    The session mounts an :class:`urllib3.util.retry.Retry` adapter that retries
-    transient HTTP failures (429/502/503/504) up to five times with
-    exponential backoff and `Retry-After` support. Callers should pass the
-    polite header set returned by :func:`load_resolver_config` so that each
-    worker advertises the required contact information.
+    Parameters
+    ----------
+    headers:
+        Header dictionary returned by :func:`load_resolver_config`. The mapping **must**
+        already include the project user agent and mailto contact address. The factory
+        copies the mapping before applying it to the outgoing session so tests may pass
+        mutable dictionaries without worrying about side effects.
+
+    Returns
+    -------
+    requests.Session
+        A session with exponential backoff retry behaviour suitable for resolver
+        traffic. Both ``http`` and ``https`` transports share the same
+        :class:`urllib3.util.retry.Retry` configuration.
+
+    Notes
+    -----
+    Each worker should call this helper to obtain an isolated session instance. Example
+    usage::
+
+        session = _make_session({"User-Agent": "DocsToKGDownloader/1.0", "mailto": "ops@example.org"})
+
+    Subsequent resolver requests automatically include the polite headers and retry
+    policy.
     """
 
     session = requests.Session()
@@ -347,6 +366,9 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
         Tuple containing:
             - Mapping of work_id -> url -> manifest payloads
             - Set of work IDs already completed
+
+    Raises:
+        json.JSONDecodeError: If the manifest contains invalid JSON.
     """
 
     per_work: Dict[str, Dict[str, Any]] = {}
@@ -491,17 +513,6 @@ class DownloadState(Enum):
     WRITING = "writing"
 
 
-def build_query(args: argparse.Namespace) -> Works:
-    """Build a pyalex Works query based on CLI arguments.
-
-    Args:
-        args: Parsed CLI arguments.
-
-    Returns:
-        Configured Works query object ready for iteration.
-    """
-
-
 def _build_download_outcome(
     *,
     artifact: WorkArtifact,
@@ -612,7 +623,14 @@ def _collect_location_urls(work: Dict[str, Any]) -> Dict[str, List[str]]:
 
 
 def build_query(args: argparse.Namespace) -> Works:
-    """Build a pyalex Works query based on CLI arguments."""
+    """Build a pyalex Works query based on CLI arguments.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Configured Works query object ready for iteration.
+    """
     query = Works()
     if args.topic_id:
         query = query.filter(topics={"id": args.topic_id})
@@ -720,18 +738,48 @@ def download_candidate(
     timeout: float,
     context: Optional[Dict[str, Any]] = None,
 ) -> DownloadOutcome:
-    """Download a single candidate URL and classify the outcome.
+    """Download a single candidate URL and classify the payload.
 
-    Args:
-        session: Prepared requests session with retry/backoff.
-        artifact: Work artifact being downloaded.
-        url: Candidate URL to fetch.
-        referer: Optional referer header value.
-        timeout: Request timeout in seconds.
-        context: Optional context including dry-run and previous manifest.
+    Parameters
+    ----------
+    session:
+        HTTP session produced by :func:`_make_session` or compatible object. The session
+        **must** provide ``head`` and ``get`` methods with the same semantics as
+        :mod:`requests`.
+    artifact:
+        Work metadata and output directory handles describing the current OpenAlex
+        record.
+    url:
+        Candidate download URL discovered by a resolver.
+    referer:
+        Optional referer header supplied by the resolver. ``None`` implies no referer
+        override.
+    timeout:
+        Per-request timeout in seconds.
+    context:
+        Execution context containing ``dry_run`` and ``extract_html_text`` flags plus a
+        ``previous`` manifest lookup for conditional requests.
 
-    Returns:
-        DownloadOutcome describing the attempt.
+    Returns
+    -------
+    DownloadOutcome
+        Structured download result used for manifest logging.
+
+    Examples
+    --------
+    A minimal invocation that honours ``--dry-run``::
+
+        outcome = download_candidate(
+            session,
+            artifact,
+            "https://example.org/paper.pdf",
+            referer=None,
+            timeout=30.0,
+            context={"dry_run": True, "extract_html_text": False, "previous": {}},
+        )
+
+    The returned outcome reports ``classification='pdf'`` yet ``path`` remains ``None``
+    because files are not materialised while running in dry-run mode.
     """
     context = context or {}
     headers: Dict[str, str] = {}
@@ -962,6 +1010,13 @@ def apply_config_overrides(
     data: Dict[str, Any],
     resolver_names: Sequence[str],
 ) -> None:
+    """Apply overrides from configuration data onto a ResolverConfig.
+
+    Args:
+        config: Resolver configuration object to mutate.
+        data: Mapping loaded from a configuration file.
+        resolver_names: Known resolver names to seed toggle defaults.
+    """
     for field_name in (
         "resolver_order",
         "resolver_toggles",
@@ -997,6 +1052,16 @@ def load_resolver_config(
     resolver_names: Sequence[str],
     resolver_order_override: Optional[List[str]] = None,
 ) -> ResolverConfig:
+    """Construct resolver configuration combining CLI, config files, and env vars.
+
+    Args:
+        args: Parsed CLI arguments.
+        resolver_names: Sequence of resolver names supported by the pipeline.
+        resolver_order_override: Optional override list for resolver order.
+
+    Returns:
+        Populated ResolverConfig instance.
+    """
     config = ResolverConfig()
     if args.resolver_config:
         config_data = read_resolver_config(Path(args.resolver_config))
@@ -1143,6 +1208,24 @@ def process_one_work(
     previous_lookup: Dict[str, Dict[str, Any]],
     resume_completed: Set[str],
 ) -> Dict[str, Any]:
+    """Process a single OpenAlex work through the resolver pipeline.
+
+    Args:
+        work: OpenAlex work payload from :func:`iterate_openalex`.
+        session: Requests session configured for resolver usage.
+        pdf_dir: Directory where PDF artefacts are written.
+        html_dir: Directory where HTML artefacts are written.
+        pipeline: Resolver pipeline orchestrating downstream resolvers.
+        logger: Structured attempt logger capturing manifest records.
+        metrics: Resolver metrics collector.
+        dry_run: When True, simulate downloads without writing files.
+        extract_html_text: Whether to extract plaintext from HTML artefacts.
+        previous_lookup: Mapping of work_id/URL to prior manifest entries.
+        resume_completed: Set of work IDs already processed in resume mode.
+
+    Returns:
+        Dictionary summarizing the outcome (saved/html_only/skipped flags).
+    """
     artifact = create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir)
 
     result = {"work_id": artifact.work_id, "saved": False, "html_only": False, "skipped": False}
@@ -1297,7 +1380,13 @@ def process_one_work(
     logger.log_manifest(entry)
     return result
 
+
 def main() -> None:
+    """CLI entrypoint for the OpenAlex PDF downloader.
+
+    Returns:
+        None
+    """
     logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(
         description="Download OpenAlex PDFs for a topic and year range with resolvers.",
@@ -1323,9 +1412,7 @@ def main() -> None:
     )
     parser.add_argument("--per-page", type=int, default=200, help="Results per page (1-200).")
     parser.add_argument("--max", type=int, default=None, help="Maximum works to process.")
-    parser.add_argument(
-        "--oa-only", action="store_true", help="Only consider open-access works."
-    )
+    parser.add_argument("--oa-only", action="store_true", help="Only consider open-access works.")
     parser.add_argument(
         "--sleep",
         type=float,
