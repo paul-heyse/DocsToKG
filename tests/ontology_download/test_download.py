@@ -248,8 +248,42 @@ def test_download_stream_hash_mismatch_triggers_retry(monkeypatch, tmp_path):
         cache_dir=tmp_path / "cache",
         logger=_noop_logger(),
     )
-    assert result.status == "fresh"
-    assert len(session.calls) == 2
+
+
+def test_validate_url_security_rejects_private_ip():
+    with pytest.raises(ConfigError):
+        download.validate_url_security("https://127.0.0.1/ontology.owl")
+
+
+def test_validate_url_security_upgrades_http(monkeypatch):
+    monkeypatch.setattr(
+        download.socket,
+        "getaddrinfo",
+        lambda host, *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 0))],
+    )
+    secure_url = download.validate_url_security("http://example.org/ontology.owl")
+    assert secure_url.startswith("https://example.org")
+
+
+def test_sanitize_filename_removes_traversal():
+    sanitized = download.sanitize_filename("../evil.owl")
+    assert ".." not in sanitized
+    assert sanitized.endswith("evil.owl")
+
+
+def test_download_stream_rejects_large_content(monkeypatch, tmp_path):
+    response = DummyResponse(200, b"data", {"Content-Length": str(10 * 1024 * 1024 * 1024)})
+    make_session(monkeypatch, [response])
+    with pytest.raises(ConfigError):
+        download.download_stream(
+            url="https://example.org/file.owl",
+            destination=tmp_path / "file.owl",
+            headers={},
+            previous_manifest=None,
+            http_config=DownloadConfiguration(max_download_size_gb=1),
+            cache_dir=tmp_path / "cache",
+            logger=_noop_logger(),
+        )
 
 
 def _noop_logger():

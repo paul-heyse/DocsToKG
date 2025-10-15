@@ -73,7 +73,7 @@ Documentation review is required for:
 
 **Reviewers** approve when all criteria are met.
 
-## Documentation Review Checklist
+## Documentation Review Checklist {#documentation-review-checklist}
 
 ### 📋 **Content Quality**
 

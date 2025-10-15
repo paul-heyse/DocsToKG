@@ -1,18 +1,39 @@
-"""Core orchestration for ontology downloads."""
+"""
+Ontology Download Orchestration
+
+This module coordinates resolver planning, document downloading, validation,
+and manifest generation for ontology artifacts. It serves as the main entry
+point for fetching ontologies from configured sources and producing provenance
+metadata that downstream knowledge graph construction can rely upon.
+"""
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Protocol, Sequence
 from urllib.parse import urlparse
 
-import pystow
+try:  # pragma: no cover - exercised in environments without pystow installed
+    import pystow  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - provides lightweight fallback for tests
+    class _PystowFallback:
+        """Minimal pystow replacement used when the dependency is absent."""
+
+        def __init__(self) -> None:
+            self._root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
+
+        def join(self, *segments: str) -> Path:
+            return self._root.joinpath(*segments)
+
+    pystow = _PystowFallback()  # type: ignore
 
 from .config import ConfigError, ResolvedConfig, ensure_python_version
 from .download import (
@@ -45,7 +66,14 @@ class ConfigurationError(OntologyDownloadError):
 
 @dataclass(slots=True)
 class FetchSpec:
-    """Specification describing a single ontology download."""
+    """Specification describing a single ontology download.
+
+    Attributes:
+        id: Stable identifier for the ontology to fetch.
+        resolver: Name of the resolver strategy used to locate resources.
+        extras: Resolver-specific configuration overrides.
+        target_formats: Normalized ontology formats that should be produced.
+    """
 
     id: str
     resolver: str
@@ -55,7 +83,16 @@ class FetchSpec:
 
 @dataclass(slots=True)
 class FetchResult:
-    """Outcome of a single ontology fetch operation."""
+    """Outcome of a single ontology fetch operation.
+
+    Attributes:
+        spec: Fetch specification that initiated the download.
+        local_path: Path to the downloaded ontology document.
+        status: Final download status (e.g., `success`, `skipped`).
+        sha256: SHA-256 digest of the downloaded file.
+        manifest_path: Path to the generated manifest JSON file.
+        artifacts: Ancillary files produced during extraction or validation.
+    """
 
     spec: FetchSpec
     local_path: Path
@@ -67,7 +104,24 @@ class FetchResult:
 
 @dataclass(slots=True)
 class Manifest:
-    """Provenance information for a downloaded ontology artifact."""
+    """Provenance information for a downloaded ontology artifact.
+
+    Attributes:
+        id: Ontology identifier recorded in the manifest.
+        resolver: Resolver used to retrieve the ontology.
+        url: Final URL from which the ontology was fetched.
+        filename: Local filename of the downloaded artifact.
+        version: Resolver-reported ontology version, if available.
+        license: License identifier associated with the ontology.
+        status: Result status reported by the downloader.
+        sha256: Hash of the downloaded artifact for integrity checking.
+        etag: HTTP ETag returned by the upstream server, when provided.
+        last_modified: Upstream last-modified timestamp, if supplied.
+        downloaded_at: UTC timestamp of the completed download.
+        target_formats: Desired conversion targets for normalization.
+        validation: Mapping of validator names to their results.
+        artifacts: Additional file paths generated during processing.
+    """
 
     id: str
     resolver: str
@@ -85,6 +139,14 @@ class Manifest:
     artifacts: Sequence[str]
 
     def to_json(self) -> str:
+        """Serialize the manifest to a stable, human-readable JSON string.
+
+        Args:
+            None
+
+        Returns:
+            JSON document encoding the manifest metadata.
+        """
         payload = {
             "id": self.id,
             "resolver": self.resolver,
@@ -108,7 +170,16 @@ class Resolver(Protocol):
     """Protocol describing resolver planning behaviour."""
 
     def plan(self, spec: FetchSpec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
-        """Return a FetchPlan describing how to obtain the ontology."""
+        """Return a FetchPlan describing how to obtain the ontology.
+
+        Args:
+            spec: Ontology fetch specification under consideration.
+            config: Fully resolved configuration containing defaults.
+            logger: Logger adapter scoped to the current fetch request.
+
+        Returns:
+            Concrete plan containing download URL, headers, and metadata.
+        """
 
 
 DATA_ROOT = pystow.join("ontology-fetcher")
@@ -118,7 +189,16 @@ LOG_DIR = DATA_ROOT / "logs"
 ONTOLOGY_DIR = DATA_ROOT / "ontologies"
 
 for directory in (CONFIG_DIR, CACHE_DIR, LOG_DIR, ONTOLOGY_DIR):
-    directory.mkdir(parents=True, exist_ok=True)
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except PermissionError as exc:  # pragma: no cover - dependent on environment
+        message = f"Permission denied writing to {directory}. Set PYSTOW_HOME env var"
+        logging.getLogger("DocsToKG.OntologyDownload").error(
+            "pystow directory permission error",
+            extra={"stage": "startup", "path": str(directory)},
+        )
+        print(message, file=sys.stderr)
+        raise SystemExit(1) from exc
 
 
 def _read_manifest(manifest_path: Path) -> Optional[dict]:
@@ -190,7 +270,23 @@ def fetch_one(
     logger: Optional[logging.Logger] = None,
     force: bool = False,
 ) -> FetchResult:
-    """Fetch and validate a single ontology described by *spec*."""
+    """Fetch and validate a single ontology described by *spec*.
+
+    Args:
+        spec: Fetch specification outlining resolver and target formats.
+        config: Optional resolved configuration; defaults to library values.
+        correlation_id: Identifier that groups log entries for observability.
+        logger: Optional logger to reuse existing logging infrastructure.
+        force: When True, ignore existing manifests and re-download artifacts.
+
+    Returns:
+        FetchResult capturing download metadata and produced artifacts.
+
+    Raises:
+        ResolverError: If the resolver cannot produce a viable fetch plan.
+        OntologyDownloadError: If download or extraction steps fail.
+        ConfigurationError: If manifest validation or license checks fail.
+    """
 
     ensure_python_version()
     active_config = config or ResolvedConfig.from_defaults()
@@ -351,51 +447,94 @@ def fetch_all(
     logger: Optional[logging.Logger] = None,
     force: bool = False,
 ) -> List[FetchResult]:
-    """Fetch a sequence of ontologies sequentially."""
+    """Fetch a sequence of ontologies sequentially.
+
+    Args:
+        specs: Iterable of fetch specifications to process.
+        config: Optional resolved configuration shared across downloads.
+        logger: Logger used to emit progress and error events.
+        force: When True, skip manifest reuse and download everything again.
+
+    Returns:
+        List of FetchResult entries corresponding to completed downloads.
+
+    Raises:
+        OntologyDownloadError: Propagated when downloads fail and the pipeline
+            is configured to stop on error.
+    """
 
     ensure_python_version()
     active_config = config or ResolvedConfig.from_defaults()
-    log = logger or setup_logging(active_config.defaults.logging)
+    if logger is not None:
+        log = logger
+    else:
+        candidate = logging.getLogger("DocsToKG.OntologyDownload")
+        if candidate.handlers:
+            log = candidate
+        else:
+            log = setup_logging(active_config.defaults.logging)
     correlation = generate_correlation_id()
     adapter = logging.LoggerAdapter(log, extra={"correlation_id": correlation})
 
     spec_list = list(specs)
     total = len(spec_list)
-    results: List[FetchResult] = []
-    for index, spec in enumerate(spec_list, start=1):
-        adapter.info(
-            "starting ontology fetch",
-            extra={
-                "stage": "start",
-                "ontology_id": spec.id,
-                "progress": {"current": index, "total": total},
-            },
-        )
-        try:
-            result = fetch_one(
+    if not spec_list:
+        return []
+
+    max_workers = max(1, active_config.defaults.http.concurrent_downloads)
+    adapter.info(
+        "starting batch",
+        extra={"stage": "batch", "progress": {"total": total}, "workers": max_workers},
+    )
+
+    results_map: Dict[int, FetchResult] = {}
+    futures: Dict[object, tuple[int, FetchSpec]] = {}
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for index, spec in enumerate(spec_list, start=1):
+            adapter.info(
+                "starting ontology fetch",
+                extra={
+                    "stage": "start",
+                    "ontology_id": spec.id,
+                    "progress": {"current": index, "total": total},
+                },
+            )
+            future = executor.submit(
+                fetch_one,
                 spec,
                 config=active_config,
                 correlation_id=correlation,
                 logger=log,
                 force=force,
             )
-            results.append(result)
-            adapter.info(
-                "progress update",
-                extra={
-                    "stage": "progress",
-                    "ontology_id": spec.id,
-                    "progress": {"current": index, "total": total},
-                },
-            )
-        except Exception as exc:  # pylint: disable=broad-except
-            adapter.error(
-                "ontology fetch failed",
-                extra={"stage": "error", "ontology_id": spec.id, "error": str(exc)},
-            )
-            if not active_config.defaults.continue_on_error:
-                raise
-    return results
+            futures[future] = (index, spec)
+
+        for future in as_completed(futures):
+            index, spec = futures[future]
+            try:
+                result = future.result()
+                results_map[index] = result
+                adapter.info(
+                    "progress update",
+                    extra={
+                        "stage": "progress",
+                        "ontology_id": spec.id,
+                        "progress": {"current": len(results_map), "total": total},
+                    },
+                )
+            except Exception as exc:  # pylint: disable=broad-except
+                adapter.error(
+                    "ontology fetch failed",
+                    extra={"stage": "error", "ontology_id": spec.id, "error": str(exc)},
+                )
+                if not active_config.defaults.continue_on_error:
+                    for pending in futures:
+                        pending.cancel()
+                    raise
+
+    ordered_results = [results_map[i] for i in sorted(results_map)]
+    return ordered_results
 
 
 __all__ = [

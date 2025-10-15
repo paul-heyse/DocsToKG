@@ -128,7 +128,7 @@ coverage_show_missing = True
 
 # Custom object types for cross-referencing
 rst_epilog = """
-.. _DocsToKG: https://github.com/yourorg/docstokg
+.. _DocsToKG: https://github.com/paul-heyse/DocsToKG
 .. _Faiss: https://faiss.ai/
 .. _OpenSpec: https://openspec.dev/
 """

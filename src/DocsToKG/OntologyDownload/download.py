@@ -1,4 +1,11 @@
-"""Download utilities for ontology retrieval."""
+"""
+Ontology Download Utilities
+
+This module houses secure download helpers that implement rate limiting,
+content validation, and resumable transfers for ontology documents. It works
+in concert with resolver planning to ensure that downloaded artifacts respect
+size limits and are safe for downstream document processing.
+"""
 
 from __future__ import annotations
 
@@ -17,14 +24,40 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import urlparse, urlunparse
 
+import psutil
 import pooch
 import requests
 
 from .config import ConfigError, DownloadConfiguration
 
 
+def _log_memory(logger: logging.Logger, event: str) -> None:
+    is_enabled = getattr(logger, "isEnabledFor", None)
+    if callable(is_enabled):
+        enabled = is_enabled(logging.DEBUG)
+    else:  # pragma: no cover - fallback for stub loggers
+        enabled = False
+    if not enabled:
+        return
+    process = psutil.Process()
+    memory_mb = process.memory_info().rss / (1024 ** 2)
+    logger.debug(
+        "memory usage",
+        extra={"stage": "download", "event": event, "memory_mb": round(memory_mb, 2)},
+    )
+
+
 @dataclass(slots=True)
 class DownloadResult:
+    """Result metadata for a completed download operation.
+
+    Attributes:
+        path: Final file path where the ontology document was stored.
+        status: Download status (`fresh`, `updated`, or `cached`).
+        sha256: SHA-256 checksum of the downloaded artifact.
+        etag: HTTP ETag returned by the upstream server, when available.
+        last_modified: Upstream last-modified header value if provided.
+    """
     path: Path
     status: str
     sha256: str
@@ -43,6 +76,14 @@ class TokenBucket:
         self.lock = threading.Lock()
 
     def consume(self, tokens: float = 1.0) -> None:
+        """Consume tokens from the bucket, sleeping until capacity is available.
+
+        Args:
+            tokens: Number of tokens required for the current download request.
+
+        Returns:
+            None
+        """
         while True:
             with self.lock:
                 now = time.monotonic()
@@ -60,7 +101,14 @@ _TOKEN_BUCKETS: Dict[str, TokenBucket] = {}
 
 
 def sanitize_filename(filename: str) -> str:
-    """Sanitize filenames to prevent directory traversal and unsafe characters."""
+    """Sanitize filenames to prevent directory traversal and unsafe characters.
+
+    Args:
+        filename: Candidate filename provided by an upstream service.
+
+    Returns:
+        Safe filename compatible with local filesystem storage.
+    """
 
     original = filename
     safe = filename.replace(os.sep, "_").replace("/", "_").replace("\\", "_")
@@ -77,7 +125,17 @@ def sanitize_filename(filename: str) -> str:
 
 
 def validate_url_security(url: str) -> str:
-    """Validate URLs to avoid SSRF and insecure schemes."""
+    """Validate URLs to avoid SSRF and insecure schemes.
+
+    Args:
+        url: URL returned by a resolver for ontology download.
+
+    Returns:
+        HTTPS URL safe for downstream download operations.
+
+    Raises:
+        ConfigError: If the URL uses an insecure scheme or resolves to private addresses.
+    """
 
     parsed = urlparse(url)
     logger = logging.getLogger("DocsToKG.OntologyDownload")
@@ -114,6 +172,14 @@ def validate_url_security(url: str) -> str:
 
 
 def sha256_file(path: Path) -> str:
+    """Compute the SHA-256 digest for the provided file.
+
+    Args:
+        path: Path to the file whose digest should be calculated.
+
+    Returns:
+        Hexadecimal SHA-256 checksum string.
+    """
     hasher = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1 << 20), b""):
@@ -122,7 +188,19 @@ def sha256_file(path: Path) -> str:
 
 
 def extract_zip_safe(zip_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None) -> List[Path]:
-    """Extract a ZIP archive while preventing path traversal."""
+    """Extract a ZIP archive while preventing path traversal.
+
+    Args:
+        zip_path: Path to the ZIP file to extract.
+        destination: Directory where extracted files should be stored.
+        logger: Optional logger for emitting extraction telemetry.
+
+    Returns:
+        List of extracted file paths.
+
+    Raises:
+        ConfigError: If the archive contains unsafe paths or is missing.
+    """
 
     if not zip_path.exists():
         raise ConfigError(f"ZIP archive not found: {zip_path}")
@@ -149,7 +227,7 @@ def extract_zip_safe(zip_path: Path, destination: Path, *, logger: Optional[logg
 
 
 class StreamingDownloader(pooch.HTTPDownloader):
-    """Custom downloader to support conditional requests and resume."""
+    """Custom downloader to support conditional requests, resume, and caching."""
 
     def __init__(
         self,
@@ -171,6 +249,20 @@ class StreamingDownloader(pooch.HTTPDownloader):
         self.response_last_modified: Optional[str] = None
 
     def __call__(self, url: str, output_file: str, pooch_logger: logging.Logger) -> None:  # type: ignore[override]
+        """Stream ontology content to disk while enforcing download policies.
+
+        Args:
+            url: Secure download URL resolved by the planner.
+            output_file: Temporary filename managed by pooch during download.
+            pooch_logger: Logger instance supplied by pooch (unused).
+
+        Raises:
+            ConfigError: If download limits are exceeded or filesystem errors occur.
+            requests.HTTPError: Propagated when HTTP status codes indicate failure.
+
+        Returns:
+            None
+        """
         manifest_headers: Dict[str, str] = {}
         if "etag" in self.previous_manifest:
             manifest_headers["If-None-Match"] = self.previous_manifest["etag"]
@@ -205,20 +297,32 @@ class StreamingDownloader(pooch.HTTPDownloader):
                         self.status = "updated"
                     response.raise_for_status()
                     length_header = response.headers.get("Content-Length")
+                    total_bytes: Optional[int] = None
+                    next_progress: Optional[float] = 0.1
                     if length_header:
+                        try:
+                            total_bytes = int(length_header)
+                        except ValueError:
+                            total_bytes = None
                         max_bytes = self.http_config.max_download_size_gb * (1024 ** 3)
-                        if int(length_header) > max_bytes:
+                        if total_bytes is not None and total_bytes > max_bytes:
                             self.logger.error(
                                 "file exceeds size limit",
                                 extra={
                                     "stage": "download",
-                                    "size": int(length_header),
+                                    "size": total_bytes,
                                     "limit": max_bytes,
                                 },
                             )
                             raise ConfigError(
-                                f"File size {int(length_header)} exceeds configured limit of {self.http_config.max_download_size_gb} GB"
+                                f"File size {total_bytes} exceeds configured limit of {self.http_config.max_download_size_gb} GB"
                             )
+                        if total_bytes:
+                            completed_fraction = resume_position / total_bytes
+                            if completed_fraction >= 1:
+                                next_progress = None
+                            else:
+                                next_progress = ((int(completed_fraction * 10)) + 1) / 10
                     self.response_etag = response.headers.get("ETag")
                     self.response_last_modified = response.headers.get("Last-Modified")
                     mode = "ab" if resume_position else "wb"
@@ -231,6 +335,23 @@ class StreamingDownloader(pooch.HTTPDownloader):
                                     continue
                                 fh.write(chunk)
                                 bytes_downloaded += len(chunk)
+                                if total_bytes and next_progress:
+                                    progress = bytes_downloaded / total_bytes
+                                    while next_progress and progress >= next_progress:
+                                        self.logger.info(
+                                            "download progress",
+                                            extra={
+                                                "stage": "download",
+                                                "status": "in-progress",
+                                                "progress": {
+                                                    "percent": round(min(progress, 1.0) * 100, 1)
+                                                },
+                                            },
+                                        )
+                                        next_progress += 0.1
+                                        if next_progress > 1:
+                                            next_progress = None
+                                            break
                                 if bytes_downloaded > self.http_config.max_download_size_gb * (1024 ** 3):
                                     self.logger.error(
                                         "download exceeded size limit",
@@ -282,12 +403,30 @@ def download_stream(
     cache_dir: Path,
     logger: logging.Logger,
 ) -> DownloadResult:
+    """Download ontology content with caching, retries, and hash validation.
+
+    Args:
+        url: URL of the ontology document to download.
+        destination: Target file path for the downloaded content.
+        headers: HTTP headers forwarded to the download request.
+        previous_manifest: Manifest metadata from a prior run, used for caching.
+        http_config: Download configuration containing timeouts and limits.
+        cache_dir: Directory where intermediary cached files are stored.
+        logger: Logger adapter for structured download telemetry.
+
+    Returns:
+        DownloadResult describing the final artifact and metadata.
+
+    Raises:
+        ConfigError: If validation fails, limits are exceeded, or HTTP errors occur.
+    """
     secure_url = validate_url_security(url)
     parsed = urlparse(secure_url)
     bucket = _get_bucket(parsed.hostname or "default", http_config)
     bucket.consume()
 
     start_time = time.monotonic()
+    _log_memory(logger, "before")
     downloader = StreamingDownloader(
         destination=destination,
         headers=headers,
@@ -330,6 +469,7 @@ def download_stream(
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(cached_path, destination)
         sha256 = sha256_file(destination)
+        _log_memory(logger, "after")
         return DownloadResult(
             path=destination,
             status="cached",
@@ -373,6 +513,7 @@ def download_stream(
             "sha256": sha256,
         },
     )
+    _log_memory(logger, "after")
     return DownloadResult(
         path=destination,
         status=downloader.status,

@@ -275,6 +275,18 @@ def _handle_config_validate(path: Path) -> dict:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    """Entry point for the ontology downloader CLI.
+
+    Args:
+        argv: Optional argument vector supplied for testing or scripting.
+
+    Returns:
+        Process exit code indicating success (`0`) or failure.
+
+    Raises:
+        ConfigError: If configuration files are invalid or unsafe to overwrite.
+        OntologyDownloadError: If download or validation operations fail.
+    """
     parser = _build_parser()
     args = parser.parse_args(argv)
     try:

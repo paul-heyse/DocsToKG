@@ -1,16 +1,39 @@
-"""Resolver implementations for locating ontology download URLs."""
+"""
+Ontology Resolver Implementations
+
+This module defines resolver strategies that translate fetch specifications
+into concrete download plans. Resolvers integrate with services such as the
+OBO Library, OLS, and BioPortal to identify canonical document URLs for
+downloading ontology content.
+"""
 
 from __future__ import annotations
 
 import logging
+import os
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, Optional
 
 from bioregistry import get_obo_download, get_owl_download, get_rdf_download
 from ols_client import OlsClient
 from ontoportal_client import BioPortalClient
-import pystow
+
+try:  # pragma: no cover - exercised in environments without pystow installed
+    import pystow  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - provides lightweight fallback for tests
+    class _PystowFallback:
+        """Minimal pystow replacement used when optional dependency is absent."""
+
+        def __init__(self) -> None:
+            self._root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
+
+        def join(self, *segments: str) -> Path:
+            return self._root.joinpath(*segments)
+
+    pystow = _PystowFallback()  # type: ignore
+
 import requests
 
 from .config import ConfigError, ResolvedConfig
@@ -18,6 +41,16 @@ from .config import ConfigError, ResolvedConfig
 
 @dataclass(slots=True)
 class FetchPlan:
+    """Concrete plan output from a resolver.
+
+    Attributes:
+        url: Final URL from which to download the ontology document.
+        headers: HTTP headers required by the upstream service.
+        filename_hint: Optional filename recommended by the resolver.
+        version: Version identifier derived from resolver metadata.
+        license: License reported for the ontology.
+        media_type: MIME type of the artifact when known.
+    """
     url: str
     headers: Dict[str, str]
     filename_hint: Optional[str]
@@ -27,6 +60,8 @@ class FetchPlan:
 
 
 class BaseResolver:
+    """Shared helpers for resolver implementations."""
+
     def _execute_with_retry(self, func, *, config: ResolvedConfig, logger: logging.Logger, name: str):
         attempts = 0
         max_attempts = max(1, config.defaults.http.max_retries)
@@ -73,6 +108,19 @@ class OBOResolver(BaseResolver):
     """Resolve ontologies hosted on the OBO Library using Bioregistry helpers."""
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Resolve download URLs using Bioregistry-provided endpoints.
+
+        Args:
+            spec: Fetch specification describing the ontology to download.
+            config: Global configuration with retry and timeout settings.
+            logger: Logger adapter used to emit planning telemetry.
+
+        Returns:
+            FetchPlan pointing to the preferred download URL.
+
+        Raises:
+            ConfigError: If no download URL can be derived.
+        """
         preferred_formats = list(spec.target_formats) or ["owl", "obo", "rdf"]
         for fmt in preferred_formats:
             if fmt == "owl":
@@ -98,6 +146,19 @@ class OLSResolver(BaseResolver):
         self.credentials_path = pystow.join("ontology-fetcher", "configs") / "ols_api_token.txt"
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Discover download locations via the OLS API.
+
+        Args:
+            spec: Fetch specification containing ontology identifiers and extras.
+            config: Resolved configuration that provides retry policies.
+            logger: Logger adapter used for planner progress messages.
+
+        Returns:
+            FetchPlan describing the download URL, headers, and metadata.
+
+        Raises:
+            ConfigError: When the API rejects credentials or yields no URLs.
+        """
         ontology_id = spec.id.lower()
         try:
             record = self._execute_with_retry(
@@ -165,6 +226,19 @@ class BioPortalResolver(BaseResolver):
         return None
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Resolve BioPortal download URLs and authorization headers.
+
+        Args:
+            spec: Fetch specification with optional API extras like acronyms.
+            config: Resolved configuration that governs HTTP retry behaviour.
+            logger: Logger adapter for structured telemetry.
+
+        Returns:
+            FetchPlan containing the resolved download URL and headers.
+
+        Raises:
+            ConfigError: If authentication fails or no download link is available.
+        """
         acronym = spec.extras.get("acronym", spec.id.upper())
         try:
             ontology = self._execute_with_retry(
@@ -215,6 +289,19 @@ class SKOSResolver(BaseResolver):
     """Resolver for direct SKOS/RDF URLs."""
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Return a fetch plan for explicitly provided SKOS URLs.
+
+        Args:
+            spec: Fetch specification containing the `extras.url` field.
+            config: Resolved configuration (unused, included for API symmetry).
+            logger: Logger adapter used to report resolved URL information.
+
+        Returns:
+            FetchPlan with the provided URL and appropriate media type.
+
+        Raises:
+            ConfigError: If the specification omits the required URL.
+        """
         url = spec.extras.get("url")
         if not url:
             raise ConfigError("SKOS resolver requires 'extras.url'")
@@ -229,6 +316,19 @@ class XBRLResolver(BaseResolver):
     """Resolver for XBRL taxonomy packages."""
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Return a fetch plan for XBRL ZIP archives provided via extras.
+
+        Args:
+            spec: Fetch specification containing the upstream download URL.
+            config: Resolved configuration (unused, included for API compatibility).
+            logger: Logger adapter for structured observability.
+
+        Returns:
+            FetchPlan referencing the specified ZIP archive.
+
+        Raises:
+            ConfigError: If the specification omits the required URL.
+        """
         url = spec.extras.get("url")
         if not url:
             raise ConfigError("XBRL resolver requires 'extras.url'")

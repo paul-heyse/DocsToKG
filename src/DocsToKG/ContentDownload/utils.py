@@ -7,7 +7,14 @@ from typing import List, Optional
 
 
 def normalize_doi(doi: Optional[str]) -> Optional[str]:
-    """Normalize DOI by stripping https://doi.org/ prefix and whitespace."""
+    """Normalize DOI identifiers by stripping prefixes and whitespace.
+
+    Args:
+        doi: Raw DOI string or URL provided by upstream metadata.
+
+    Returns:
+        Canonical DOI without protocol prefixes, or None when input is empty.
+    """
 
     if not doi:
         return None
@@ -18,7 +25,14 @@ def normalize_doi(doi: Optional[str]) -> Optional[str]:
 
 
 def normalize_pmcid(pmcid: Optional[str]) -> Optional[str]:
-    """Normalize PMCID ensuring a canonical PMC prefix."""
+    """Normalize PMCID values ensuring a canonical PMC prefix.
+
+    Args:
+        pmcid: PMCID string that may contain extraneous characters.
+
+    Returns:
+        Normalized PMCID including the `PMC` prefix, or None if parsing fails.
+    """
 
     if not pmcid:
         return None
@@ -30,7 +44,15 @@ def normalize_pmcid(pmcid: Optional[str]) -> Optional[str]:
 
 
 def strip_prefix(value: Optional[str], prefix: str) -> Optional[str]:
-    """Strip a case-insensitive prefix from ``value`` if present."""
+    """Strip a case-insensitive prefix from a string when present.
+
+    Args:
+        value: String that might contain the prefix.
+        prefix: Prefix to remove from the value.
+
+    Returns:
+        String without the prefix, or None if the value is empty.
+    """
 
     if not value:
         return None
@@ -41,7 +63,14 @@ def strip_prefix(value: Optional[str], prefix: str) -> Optional[str]:
 
 
 def dedupe(items: List[str]) -> List[str]:
-    """Remove duplicates while preserving the first occurrence order."""
+    """Remove duplicates while preserving the first occurrence order.
+
+    Args:
+        items: Sequence of string values that may contain duplicates.
+
+    Returns:
+        New list with duplicates removed while keeping original ordering.
+    """
 
     seen = set()
     result: List[str] = []
@@ -50,4 +79,3 @@ def dedupe(items: List[str]) -> List[str]:
             result.append(item)
             seen.add(item)
     return result
-

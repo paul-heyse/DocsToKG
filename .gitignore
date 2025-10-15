@@ -1,17 +1,125 @@
+# Virtual environments
 .venv/
-.pytest_cache/
+venv/
+env/
+ENV/
+
+# Python cache and compiled files
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+git-restore-mtime
+
+# Environment and configuration
 .env
 .envrc.local
-.ipynb_checkpoints/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.direnv/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
-.mypy_cache/
-Data/*
-!Data/HybridScaleFixture/
-!Data/HybridScaleFixture/**
-Models/
-.docling_artifacts/
-DocsToKG.code-workspace
+Thumbs.db
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Documentation build artifacts
+docs/build/
+docs/_build/
+*.docx
+*.pdf
+
+# Temporary files and logs
+tmp/
+*.tmp
+*.temp
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Data directories (except fixtures and config)
+Data/**
+Data/HybridScaleFixture/
+Data/HybridScaleFixture/**
+Data/ontology-fetcher/
+Data/ontology-fetcher/**
+reports/
+codex/
+
+# Large external dependencies (submodules)
 faiss/
 vllm/
+
+# Model and artifact storage
+Models/
+.docling_artifacts/
+
+# Workspace files
+*.code-workspace
+
+# OS-specific files
+.fuse_hidden*
+.directory
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.com.apple.timemachine.recover
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows-specific
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux-specific
+*~

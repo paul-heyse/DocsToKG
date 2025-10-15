@@ -41,8 +41,8 @@ credentials (if required) can be stored in `~/.data/ontology-fetcher/configs/ols
 | `accept_licenses` | list of strings | Allowed license identifiers. Downloads fail closed if a license is not listed. |
 | `normalize_to` | list of strings | Formats to produce in the normalization step (e.g., `ttl`, `obographs`). |
 | `prefer_source` | list of strings | Resolver preference order for ad-hoc downloads. |
-| `http` | mapping | HTTP behaviour (`max_retries`, `timeout_sec`, `backoff_factor`, `per_host_rate_limit`, `max_download_size_gb`). |
-| `validation` | mapping | Validation timeouts and limits (`parser_timeout_sec`, `skip_reasoning_if_size_mb`). |
+| `http` | mapping | HTTP behaviour (`max_retries`, `timeout_sec`, `download_timeout_sec`, `backoff_factor`, `per_host_rate_limit`, `max_download_size_gb`, `concurrent_downloads`). |
+| `validation` | mapping | Validation timeouts and limits (`parser_timeout_sec`, `max_memory_mb`, `skip_reasoning_if_size_mb`). |
 | `logging` | mapping | Structured logging configuration (`level`, `max_log_size_mb`, `retention_days`). |
 | `continue_on_error` | bool | Continue batch processing after an error (default `true`). |
 | `concurrent_downloads` | int | Future parallelism control (currently informational). |
@@ -58,7 +58,7 @@ Each entry in `ontologies` must provide at least an `id`. Optional keys include 
 ```yaml
 defaults:
   accept_licenses: ["CC-BY-4.0", "CC0-1.0", "OGL-UK-3.0"]
-  normalize_to: ["ttl"]
+  normalize_to: ["ttl", "obographs"]
   prefer_source: ["obo", "ols", "bioportal", "direct"]
   http:
     max_retries: 5
@@ -67,9 +67,11 @@ defaults:
     backoff_factor: 0.5
     per_host_rate_limit: "4/second"
     max_download_size_gb: 5
+    concurrent_downloads: 2
   validation:
-    skip_reasoning_if_size_mb: 500
     parser_timeout_sec: 60
+    max_memory_mb: 2048
+    skip_reasoning_if_size_mb: 500
   logging:
     level: "INFO"
     max_log_size_mb: 100
@@ -80,6 +82,9 @@ ontologies:
   - id: hp
     resolver: obo
     target_formats: [owl, obo]
+  - id: efo
+    resolver: ols
+    target_formats: [owl]
   - id: ncit
     resolver: bioportal
     extras:
@@ -87,8 +92,20 @@ ontologies:
   - id: eurovoc
     resolver: skos
     extras:
-      url: https://op.europa.eu/o/opportal-service/euvoc-download-handler?cellarURI=http%3A%2F%2Fpublications.europa.eu%2Fresource%2Fauthority%2Feurovoc
+      url: https://op.europa.eu/o/opportal-service/euvoc-download-handler?cellarURI=http%3A%2F%2Fpublications.europa.eu%2Fresource%2Feurovoc
+  - id: ifrs
+    resolver: xbrl
+    extras:
+      url: https://example.org/ifrs-taxonomy.zip
 ```
+
+When a resolver requires additional hints, populate the `extras` mapping:
+
+| Resolver | Required extras | Example |
+| --- | --- | --- |
+| `bioportal` | `acronym` (defaults to uppercase `id` if omitted) | `acronym: NCIT` |
+| `skos` | `url` pointing directly to the SKOS/RDF download | `url: https://.../eurovoc.ttl` |
+| `xbrl` | `url` pointing to the taxonomy ZIP archive | `url: https://example.org/ifrs-taxonomy.zip` |
 
 ## CLI Usage
 
@@ -107,8 +124,9 @@ ontofetch show hp --versions
 # Re-run validators on an existing download
 ontofetch validate hp --json --rdflib --pronto
 
-# Validate configuration files
+# Validate configuration files (long-form and shortcut)
 ontofetch config validate --spec ./sources.yaml --json
+ontofetch config-validate --spec ./sources.yaml
 ```
 
 All subcommands accept `--json` for machine-readable output and `--log-level` to adjust verbosity.
@@ -134,6 +152,7 @@ ROBOT conversions require a Java runtime and the `robot` CLI in `PATH`.
 | `No space left on device` | Free disk space under the configured cache directory. Partial `.part` files are cleaned automatically. |
 | Validation memory errors | Increase available memory or disable heavy validators using CLI flags (e.g., `--no-robot`). |
 | Rate-limit warnings | Reduce concurrency or adjust `per_host_rate_limit` in configuration. |
+| `Permission denied writing to` | Set `PYSTOW_HOME` to a writable directory and retry. |
 
 ## Storage Layout & Manifest Schema
 

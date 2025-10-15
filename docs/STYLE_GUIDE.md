@@ -57,7 +57,7 @@ def example_function(param: str) -> bool:
 
 ### Links and References
 
-- Use descriptive link text: `[OpenSpec Documentation](openspec/)`
+- Use descriptive link text: `[OpenSpec Instructions](../openspec/AGENTS.md)`
 - Create anchors for internal links: `## Section Title {#section-title}`
 - Reference requirements by ID when possible
 
@@ -121,28 +121,30 @@ The Vector Search Service handles similarity search operations using Faiss.
 
 ## Prerequisites
 Before starting, ensure you have:
-- Python 3.8 or higher
+- Python 3.12 or higher
 - Git for version control
-- 8GB RAM minimum
+- 16GB RAM recommended for parsing workloads
 
 ## Installation Steps
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourorg/docstokg.git
-   cd docstokg
+   git clone https://github.com/paul-heyse/DocsToKG.git
+   cd DocsToKG
    ```
 
 2. **Set up virtual environment**
 
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
 3. **Install dependencies**
 
    ```bash
-   pip install -r requirements.txt
+   pip install -e .
+   pip install -r requirements.in                      # optional GPU stack
+   pip install -r docs/build/sphinx/requirements.txt   # documentation tooling
    ```
 
 ## Verification
@@ -150,7 +152,7 @@ Before starting, ensure you have:
 Run tests to verify installation:
 
 ```bash
-pytest tests/ -v
+pytest -q
 ```
 
 ```

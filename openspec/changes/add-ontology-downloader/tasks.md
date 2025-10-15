@@ -158,10 +158,16 @@
 - [x] 10.6 Test per-host rate limiting enforcement
 - [x] 10.7 Write parser tests using mini-ontology fixtures (RDFLib, Pronto, Owlready2)
 - [x] 10.8 Test ROBOT integration with optional runtime detection
+
+
 - [x] 10.9 Test Arelle XBRL validation with minimal taxonomy package
 - [x] 10.10 Write integration smoke test: fetch PATO (OBO), BFO (OLS), verify manifests and validation outputs
 - [x] 10.11 Add configuration validation tests (schema checks, invalid YAML)
 - [x] 10.12 Test safe ZIP extraction with malicious paths (zip-slip guard)
+- [x] 10.13 Provide lightweight fallbacks/mocks for optional dependencies so pytest runs without external packages.
+- [x] 10.14 Add download security test coverage for automatic HTTP→HTTPS upgrades.
+- [x] 10.15 Extend logging tests to verify JSON output structure and masking behaviour.
+- [x] 10.16 Refresh documentation examples for OLS, SKOS, and XBRL resolvers.
 
 ## 11. Documentation
 
@@ -198,7 +204,7 @@
 - [x] 13.7 In download.py, implement checksum verification: after download, if sha256_file(path) != expected_hash (from manifest or registry), log error with both hashes, delete file, retry as cache miss
 - [x] 13.8 Add timeout handling: wrap resolver API calls with requests.get(..., timeout=30); catch Timeout exception, log "API timeout after 30s", retry with exponential backoff
 - [x] 13.9 In validators.py, catch MemoryError during Owlready2 parsing of large files; log "Memory limit exceeded parsing <id>. Consider skipping reasoning"; write error to validation JSON without crashing
-- [ ] 13.10 Add permission error handling: catch PermissionError when creating pystow directories; log "Permission denied writing to <path>. Set PYSTOW_HOME env var"; exit code 1
+- [x] 13.10 Add permission error handling: catch PermissionError when creating pystow directories; log "Permission denied writing to <path>. Set PYSTOW_HOME env var"; exit code 1
 
 ## 14. Security Implementation
 
@@ -219,7 +225,7 @@
   - Replaces values with "***masked***"
   - Returns sanitized record
 - [x] 14.5 In download.py, enforce max file size: check Content-Length header before download; if > config.http.max_download_size_gb * 1024³, log error "File exceeds max_download_size: <size> > <limit>", skip download
-- [ ] 14.6 In validators.py for XBRL, before ZIP extraction:
+- [x] 14.6 In validators.py for XBRL, before ZIP extraction:
   - Call zipfile.is_zipfile() to verify
   - Check compressed vs uncompressed size ratio (<10x)
   - Validate all member paths don't contain ".." or start with "/"
@@ -229,7 +235,7 @@
 
 ## 15. Performance and Resource Management
 
-- [ ] 15.1 In config.py, add performance-related config schema fields:
+- [x] 15.1 In config.py, add performance-related config schema fields:
 
   ```python
   http:
@@ -242,23 +248,23 @@
     skip_reasoning_if_size_mb: int = 500
   ```
 
-- [ ] 15.2 In download.py, use requests.get(url, stream=True, timeout=config.http.download_timeout_sec); iterate with iter_content(chunk_size=1024*1024); log progress every 10%
-- [ ] 15.3 In orchestration (core.py fetch_all()), implement concurrency:
+- [x] 15.2 In download.py, use requests.get(url, stream=True, timeout=config.http.download_timeout_sec); iterate with iter_content(chunk_size=1024*1024); log progress every 10%
+- [x] 15.3 In orchestration (core.py fetch_all()), implement concurrency:
   - Use ThreadPoolExecutor(max_workers=config.http.concurrent_downloads)
   - Or asyncio with semaphore for async HTTP
   - Ensure rate limiting still applies per-host
-- [ ] 15.4 In validators.py, before running Owlready2 reasoning:
+- [x] 15.4 In validators.py, before running Owlready2 reasoning:
   - Check file size with path.stat().st_size
   - If > config.validation.skip_reasoning_if_size_mb * 1024², log "Skipping reasoning for large file", set reasoning=False
-- [ ] 15.5 In validators.py, implement parser timeout using:
+- [x] 15.5 In validators.py, implement parser timeout using:
   - On Unix: signal.alarm(config.validation.parser_timeout_sec) before parse, signal.alarm(0) after, handle signal.SIGALRM
   - On Windows: threading.Timer to interrupt after timeout
   - Catch timeout, log "Parser timeout after <N>s", write error to validation JSON
-- [ ] 15.6 Add memory profiling imports: import psutil; log current process memory usage before/after large operations if --debug flag set
+- [x] 15.6 Add memory profiling imports: import psutil; log current process memory usage before/after large operations if --debug flag set
 
 ## 16. Enhanced Configuration
 
-- [ ] 16.1 In config.py, define complete ConfigSchema dataclass with all fields:
+- [x] 16.1 In config.py, define complete ConfigSchema dataclass with all fields:
 
   ```python
   @dataclass
@@ -298,27 +304,27 @@
   - ONTOFETCH_TIMEOUT_SEC -> defaults.http.timeout_sec
   - ONTOFETCH_LOG_LEVEL -> defaults.logging.level
   - Log "Config overridden by env var: <key>=<value>" for each override
-- [ ] 16.3 In config.py validate_config(), check:
+- [x] 16.3 In config.py validate_config(), check:
   - defaults.http.max_retries is int >= 0
   - defaults.http.timeout_sec is int > 0
   - defaults.logging.level in ["DEBUG", "INFO", "WARNING", "ERROR"]
   - Each ontology has required fields: id, resolver
   - BioPortal resolver has extras.acronym
   - Raise ValueError with descriptive message for violations
-- [ ] 16.4 In config.py, implement merge_defaults(ontology_spec, defaults) that:
+- [x] 16.4 In config.py, implement merge_defaults(ontology_spec, defaults) that:
   - Copies defaults as base
   - Overlays ontology-specific extras.timeout_sec, etc.
   - Returns merged FetchSpec
-- [ ] 16.5 Add --config-validate subcommand in CLI that loads sources.yaml, runs validate_config(), prints "Configuration valid" or errors
+- [x] 16.5 Add --config-validate subcommand in CLI that loads sources.yaml, runs validate_config(), prints "Configuration valid" or errors
 
 ## 17. Enhanced Logging System
 
-- [ ] 17.1 In logging_config.py, create setup_logging(level: str, log_dir: Path) that:
+- [x] 17.1 In logging_config.py, create setup_logging(level: str, log_dir: Path) that:
   - Creates RotatingFileHandler for logs/ontofetch_<date>.jsonl with maxBytes=config.logging.max_log_size_mb * 1024²
   - Creates console StreamHandler for human-readable output
   - Sets file handler to JSON formatter, console to human-readable
   - Sets log level from config (DEBUG/INFO/WARNING/ERROR)
-- [ ] 17.2 In logging_config.py, create JSONFormatter(logging.Formatter):
+- [x] 17.2 In logging_config.py, create JSONFormatter(logging.Formatter):
 
   ```python
   def format(self, record: logging.LogRecord) -> str:
@@ -335,14 +341,14 @@
       return json.dumps(log_obj)
   ```
 
-- [ ] 17.3 In logging_config.py, implement generate_correlation_id() -> str using uuid.uuid4().hex[:12]
-- [ ] 17.4 In orchestration fetch_all(), generate correlation_id once, attach to all log records via logging.LoggerAdapter or extra={'correlation_id': ...}
-- [ ] 17.5 In logging_config.py, implement log rotation cleanup: on startup, scan logs/ for files older than config.logging.retention_days, compress with gzip, delete if compressed >retention_days
-- [ ] 17.6 Ensure all log calls include structured fields: logger.info("message", extra={'stage': 'download', 'ontology_id': id, 'elapsed_ms': elapsed})
+- [x] 17.3 In logging_config.py, implement generate_correlation_id() -> str using uuid.uuid4().hex[:12]
+- [x] 17.4 In orchestration fetch_all(), generate correlation_id once, attach to all log records via logging.LoggerAdapter or extra={'correlation_id': ...}
+- [x] 17.5 In logging_config.py, implement log rotation cleanup: on startup, scan logs/ for files older than config.logging.retention_days, compress with gzip, delete if compressed >retention_days
+- [x] 17.6 Ensure all log calls include structured fields: logger.info("message", extra={'stage': 'download', 'ontology_id': id, 'elapsed_ms': elapsed})
 
 ## 18. Cross-Platform Compatibility
 
-- [ ] 18.1 In core.py or cli.py startup, add Python version check:
+- [x] 18.1 In core.py or cli.py startup, add Python version check:
 
   ```python
   import sys
@@ -351,8 +357,8 @@
       sys.exit(1)
   ```
 
-- [ ] 18.2 Use pathlib.Path throughout for all path operations (no os.path.join or string concatenation)
-- [ ] 18.3 In validators.py, implement platform-specific timeout:
+- [x] 18.2 Use pathlib.Path throughout for all path operations (no os.path.join or string concatenation)
+- [x] 18.3 In validators.py, implement platform-specific timeout:
 
   ```python
   import platform
@@ -368,7 +374,7 @@
       timer.start()
   ```
 
-- [ ] 18.4 In requirements.txt, specify minimum versions explicitly:
+- [x] 18.4 In requirements.txt, specify minimum versions explicitly:
 
   ```
   rdflib>=7.0.0,<8.0.0
@@ -379,11 +385,11 @@
   pyyaml>=6.0,<7.0
   ```
 
-- [ ] 18.5 Test on all three platforms (Linux, macOS, Windows) in CI if available, or document platform-specific quirks in docs/
+- [x] 18.5 Test on all three platforms (Linux, macOS, Windows) in CI if available, or document platform-specific quirks in docs/
 
 ## 19. User Documentation and Help
 
-- [ ] 19.1 In cli.py, add comprehensive --help text for main command:
+- [x] 19.1 In cli.py, add comprehensive --help text for main command:
 
   ```
   Usage: ontofetch [OPTIONS] COMMAND [ARGS]...
@@ -401,7 +407,7 @@
     init      Create example sources.yaml configuration
   ```
 
-- [ ] 19.2 Add --help for each subcommand with examples:
+- [x] 19.2 Add --help for each subcommand with examples:
 
   ```
   ontofetch pull --help
@@ -417,27 +423,27 @@
       ontofetch pull ncit --resolver bioportal --force  # Force refresh
   ```
 
-- [ ] 19.3 Enhance error messages with remediation in all exception handlers:
+- [x] 19.3 Enhance error messages with remediation in all exception handlers:
   - BioPortal 401: "BioPortal API key required. Get key from <https://bioportal.bioontology.org/account>, then configure: echo 'YOUR_KEY' > ~/.config/pystow/ontology-fetcher/bioportal_api_key.txt"
   - Permission error: "Cannot write to <path>. Try: export PYSTOW_HOME=/path/to/writable/directory"
   - Network error: "Network connection failed. Check internet connection and firewall settings."
-- [ ] 19.4 Create `ontofetch init` subcommand that writes example sources.yaml to current directory with extensive inline comments explaining each field
-- [ ] 19.5 In README.md or docs/, add troubleshooting section:
+- [x] 19.4 Create `ontofetch init` subcommand that writes example sources.yaml to current directory with extensive inline comments explaining each field
+- [x] 19.5 In README.md or docs/, add troubleshooting section:
   - "Rate limit exceeded" -> increase backoff_factor or reduce concurrent_downloads
   - "Memory error on large ontology" -> increase max_memory_mb or skip reasoning
   - "ROBOT not found" -> install with: brew install robot (macOS) or download from <https://github.com/ontodev/robot/releases>
-- [ ] 19.6 Add configuration schema documentation showing all fields, defaults, and examples for each resolver type
-- [ ] 19.7 For YAML parse errors, use python-yaml's line number from exception: "Error in sources.yaml line <N>: <message>"
+- [x] 19.6 Add configuration schema documentation showing all fields, defaults, and examples for each resolver type
+- [x] 19.7 For YAML parse errors, use python-yaml's line number from exception: "Error in sources.yaml line <N>: <message>"
 
 ## 20. Additional Testing for New Requirements
 
-- [ ] 20.1 Test error handling: write tests that mock ConnectionError, Timeout, HTTP 503, verify retry logic and exponential backoff timing
-- [ ] 20.2 Test security: attempt downloads from http://, private IPs (127.0.0.1), verify rejection; test filename sanitization with "../evil.owl"
-- [ ] 20.3 Test configuration: load sources.yaml with invalid values (max_retries="many"), verify ValueError with line number
-- [ ] 20.4 Test environment overrides: set ONTOFETCH_MAX_RETRIES=10, verify config uses 10 not file value
-- [ ] 20.5 Test logging: verify mask_sensitive_data() replaces "Authorization: apikey ABC123" with "***masked***"
-- [ ] 20.6 Test correlation IDs: run batch with 3 ontologies, verify all log entries for one ontology share same correlation_id
-- [ ] 20.7 Test platform compatibility: run on Windows VM if available, verify pathlib paths work, threading.Timer timeout works
-- [ ] 20.8 Test CLI help: capture stdout from `ontofetch --help`, verify contains all subcommands and options
-- [ ] 20.9 Test concurrent downloads: configure concurrent_downloads=3, batch 10 ontologies, verify only 3 run in parallel
-- [ ] 20.10 Test performance limits: mock file with Content-Length > max_download_size_gb, verify rejection before download starts
+- [x] 20.1 Test error handling: write tests that mock ConnectionError, Timeout, HTTP 503, verify retry logic and exponential backoff timing
+- [x] 20.2 Test security: attempt downloads from http://, private IPs (127.0.0.1), verify rejection; test filename sanitization with "../evil.owl"
+- [x] 20.3 Test configuration: load sources.yaml with invalid values (max_retries="many"), verify ValueError with line number
+- [x] 20.4 Test environment overrides: set ONTOFETCH_MAX_RETRIES=10, verify config uses 10 not file value
+- [x] 20.5 Test logging: verify mask_sensitive_data() replaces "Authorization: apikey ABC123" with "***masked***"
+- [x] 20.6 Test correlation IDs: run batch with 3 ontologies, verify all log entries for one ontology share same correlation_id
+- [x] 20.7 Test platform compatibility: run on Windows VM if available, verify pathlib paths work, threading.Timer timeout works
+- [x] 20.8 Test CLI help: capture stdout from `ontofetch --help`, verify contains all subcommands and options
+- [x] 20.9 Test concurrent downloads: configure concurrent_downloads=3, batch 10 ontologies, verify only 3 run in parallel
+- [x] 20.10 Test performance limits: mock file with Content-Length > max_download_size_gb, verify rejection before download starts
