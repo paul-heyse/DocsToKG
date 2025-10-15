@@ -2,6 +2,42 @@
 
 ## ADDED Requirements
 
+### Requirement: Manifest Schema Validation
+
+The system SHALL define and enforce JSON Schema for manifest structure enabling validation of manifest integrity, detecting corruption, and supporting future schema evolution.
+
+#### Scenario: Valid manifest passes schema validation
+
+- **WHEN** a manifest file is read from storage
+- **AND** manifest schema validation is enabled
+- **THEN** the system SHALL validate manifest structure against JSON Schema
+- **AND** valid manifests SHALL be accepted without error
+- **AND** processing SHALL continue normally
+
+#### Scenario: Invalid manifest detected by schema validation
+
+- **WHEN** a manifest file contains missing required field
+- **AND** schema validation is performed
+- **THEN** the system SHALL raise validation error with descriptive message
+- **AND** error message SHALL indicate which field is missing
+- **AND** processing SHALL fail cleanly with actionable error
+
+#### Scenario: Schema version enables future evolution
+
+- **WHEN** a new manifest is generated
+- **THEN** the manifest SHALL include schema_version field with current version
+- **AND** schema version SHALL be recorded for all new manifests
+- **AND** manifest readers SHALL handle manifests with different schema versions appropriately
+
+#### Scenario: Schema validation integrated with diagnostics
+
+- **WHEN** doctor command is executed
+- **THEN** system SHALL verify manifest schema is valid JSON Schema
+- **AND** system SHALL test sample manifest against schema when available
+- **AND** any schema issues SHALL be reported in diagnostic output
+
+## ADDED Requirements
+
 ### Requirement: Automatic Resolver Fallback on Download Failure
 
 The system SHALL automatically attempt alternative resolvers when the primary resolver download fails due to retryable errors, without requiring manual configuration changes or operator intervention.

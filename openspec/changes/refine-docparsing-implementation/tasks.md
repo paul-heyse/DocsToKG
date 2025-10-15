@@ -36,10 +36,18 @@ git checkout -b refine-docparsing-phase-1
 
 ## Phase 1: Legacy Script Quarantine
 
+- [ ] Task 1.1: Create legacy directory structure
+- [ ] Task 1.2: Move HTML converter to legacy with comprehensive shim
+- [ ] Task 1.3: Move PDF converter to legacy with comprehensive shim
+- [ ] Task 1.4: Create comprehensive unit tests for shims
+- [ ] Task 1.5: Update imports in tests that reference moved scripts
+- [ ] Task 1.6: Phase 1 completion checklist
+
+
 **Goal**: Move deprecated scripts to `legacy/` with backward-compatible shims
 
 ### Task 1.1: Create legacy directory structure
-- [ ] Task 1.1: Create legacy directory structure
+- [x] Task 1.1: Create legacy directory structure
 
 **What**: Create dedicated `legacy/` subdirectory for deprecated scripts
 
@@ -88,7 +96,7 @@ python -c "from DocsToKG.DocParsing import legacy; print('✓ Package importable
 ---
 
 ### Task 1.2: Move HTML converter to legacy with comprehensive shim
-- [ ] Task 1.2: Move HTML converter to legacy with comprehensive shim
+- [x] Task 1.2: Move HTML converter to legacy with comprehensive shim
 
 **What**: Relocate HTML converter to `legacy/` and create forwarding shim
 
@@ -242,7 +250,7 @@ python -c "from DocsToKG.DocParsing.legacy import run_docling_html_to_doctags_pa
 ---
 
 ### Task 1.3: Move PDF converter to legacy with comprehensive shim
-- [ ] Task 1.3: Move PDF converter to legacy with comprehensive shim
+- [x] Task 1.3: Move PDF converter to legacy with comprehensive shim
 
 **What**: Relocate PDF converter to `legacy/` and create forwarding shim
 
@@ -357,7 +365,7 @@ chmod +x src/DocsToKG/DocParsing/run_docling_parallel_with_vllm_debug.py
 ---
 
 ### Task 1.4: Create comprehensive unit tests for shims
-- [ ] Task 1.4: Create comprehensive unit tests for shims
+- [x] Task 1.4: Create comprehensive unit tests for shims
 
 **What**: Add test suite verifying shim behavior
 
@@ -559,7 +567,7 @@ tests/test_docparsing_legacy_shims.py::TestLegacyModuleAccess::test_legacy_packa
 ---
 
 ### Task 1.5: Update imports in tests that reference moved scripts
-- [ ] Task 1.5: Update imports in tests that reference moved scripts
+- [x] Task 1.5: Update imports in tests that reference moved scripts
 
 **What**: Fix any existing tests that import the moved scripts
 
@@ -629,7 +637,7 @@ pytest tests/ -k "docparsing or docling" -v
 ---
 
 ### Task 1.6: Phase 1 completion checklist
-- [ ] Task 1.6: Phase 1 completion checklist
+- [x] Task 1.6: Phase 1 completion checklist
 
 **Run all validations**:
 
@@ -707,10 +715,17 @@ chmod +x scripts/validate_phase1.sh
 
 ## Phase 2: Test Scaffolding Cleanup
 
+- [ ] Task 2.1: Remove `_promote_simple_namespace_modules()` from chunker
+- [ ] Task 2.2: Move promotion helper to test utilities
+- [ ] Task 2.3: Delete duplicate `SOFT_BARRIER_MARGIN` constant
+- [ ] Task 2.4: Smoke test chunker functionality
+- [ ] Task 2.5: Phase 2 completion checklist
+
+
 **Goal**: Remove test-only code from production modules
 
 ### Task 2.1: Remove `_promote_simple_namespace_modules()` from chunker
-- [ ] Task 2.1: Remove `_promote_simple_namespace_modules()` from chunker
+- [x] Task 2.1: Remove `_promote_simple_namespace_modules()` from chunker
 
 **What**: Delete Hypothesis test helper from production code
 
@@ -799,7 +814,7 @@ python -c "from DocsToKG.DocParsing import DoclingHybridChunkerPipelineWithMin; 
 ---
 
 ### Task 2.2: Move promotion helper to test utilities
-- [ ] Task 2.2: Move promotion helper to test utilities
+- [x] Task 2.2: Move promotion helper to test utilities
 
 **What**: Extract function to test-only module for Hypothesis compatibility
 
@@ -1030,7 +1045,7 @@ pytest tests/test_stubs.py -q && echo "✓ Tests pass" || exit 1
 ---
 
 ### Task 2.3: Delete duplicate `SOFT_BARRIER_MARGIN` constant
-- [ ] Task 2.3: Delete duplicate `SOFT_BARRIER_MARGIN` constant
+- [x] Task 2.3: Delete duplicate `SOFT_BARRIER_MARGIN` constant
 
 **What**: Remove second declaration of `SOFT_BARRIER_MARGIN` (line 80)
 
@@ -1097,7 +1112,7 @@ python -m py_compile src/DocsToKG/DocParsing/DoclingHybridChunkerPipelineWithMin
 ---
 
 ### Task 2.4: Smoke test chunker functionality
-- [ ] Task 2.4: Smoke test chunker functionality
+- [x] Task 2.4: Smoke test chunker functionality
 
 **What**: Verify chunker still works after modifications
 
@@ -1142,7 +1157,7 @@ print('✓ SOFT_BARRIER_MARGIN = 64')
 ---
 
 ### Task 2.5: Phase 2 completion checklist
-- [ ] Task 2.5: Phase 2 completion checklist
+- [x] Task 2.5: Phase 2 completion checklist
 
 ```bash
 #!/bin/bash
@@ -1190,10 +1205,15 @@ echo "Next: Phase 3 - Atomic writes"
 
 ## Phase 3: Atomic Chunk & Vector Writes
 
+- [ ] Task 3.1: Replace chunker direct write with atomic write operation
+- [ ] Task 3.2: Replace embeddings direct write with atomic write operation
+- [ ] Task 3.3: Add crash recovery integration test suite
+
+
 **Goal**: Replace direct file writes with atomic write operations to prevent partial file corruption during crashes or interruptions.
 
 ### Task 3.1: Replace chunker direct write with atomic write operation
-- [ ] Task 3.1: Replace chunker direct write with atomic write operation
+- [x] Task 3.1: Replace chunker direct write with atomic write operation
 
 **Functional Requirements**:
 
@@ -1228,7 +1248,7 @@ After implementation, verify that:
 ---
 
 ### Task 3.2: Replace embeddings direct write with atomic write operation
-- [ ] Task 3.2: Replace embeddings direct write with atomic write operation
+- [x] Task 3.2: Replace embeddings direct write with atomic write operation
 
 **Functional Requirements**:
 
@@ -1264,7 +1284,7 @@ After implementation, verify that:
 ---
 
 ### Task 3.3: Add crash recovery integration test suite
-- [ ] Task 3.3: Add crash recovery integration test suite
+- [x] Task 3.3: Add crash recovery integration test suite
 
 **Functional Requirements**:
 
@@ -1339,10 +1359,13 @@ After creating the test suite:
 
 ## Phase 4: UTC Timestamp Correction
 
+- [ ] Task 4.1: Correct JSONFormatter timestamp behavior in common utilities
+
+
 **Goal**: Fix the JSON log formatter to emit true UTC timestamps rather than local time with UTC labels
 
 ### Task 4.1: Correct JSONFormatter timestamp behavior in common utilities
-- [ ] Task 4.1: Correct JSONFormatter timestamp behavior in common utilities
+- [x] Task 4.1: Correct JSONFormatter timestamp behavior in common utilities
 
 **Functional Requirements**:
 
@@ -1404,10 +1427,15 @@ After implementation, you must verify that:
 
 ## Phase 5: Hash Algorithm Tagging
 
+- [ ] Task 5.1: Add environment variable override to content hash computation
+- [ ] Task 5.2: Add hash algorithm tag to chunker manifest entries
+- [ ] Task 5.3: Add hash algorithm tag to embeddings manifest entries
+
+
 **Goal**: Enable SHA-256 migration path while maintaining backward compatibility with existing SHA-1 hashes
 
 ### Task 5.1: Add environment variable override to content hash computation
-- [ ] Task 5.1: Add environment variable override to content hash computation
+- [x] Task 5.1: Add environment variable override to content hash computation
 
 **Functional Requirements**:
 
@@ -1468,7 +1496,7 @@ After implementation:
 ---
 
 ### Task 5.2: Add hash algorithm tag to chunker manifest entries
-- [ ] Task 5.2: Add hash algorithm tag to chunker manifest entries
+- [x] Task 5.2: Add hash algorithm tag to chunker manifest entries
 
 **Functional Requirements**:
 
@@ -1523,7 +1551,7 @@ After implementation:
 ---
 
 ### Task 5.3: Add hash algorithm tag to embeddings manifest entries
-- [ ] Task 5.3: Add hash algorithm tag to embeddings manifest entries
+- [x] Task 5.3: Add hash algorithm tag to embeddings manifest entries
 
 **Functional Requirements**:
 
@@ -1552,6 +1580,11 @@ Same validation steps as Task 5.2, but executed against the embeddings pipeline 
 ---
 
 ## Phase 6: Simplify CLI Argument Parsing
+
+- [ ] Task 6.1: Script 1: DocParsing/DoclingHybridChunkerPipelineWithMin.py
+- [ ] Task 6.2: Script 2: EmbeddingV2.py
+- [ ] Task 6.3: Script 3: run_docling_html_to_doctags_parallel.py (legacy)
+- [ ] Task 6.4: Script 4: run_docling_parallel_with_vllm_debug.py (legacy)
 
 **Goal**: Remove ~80 lines of argument merging boilerplate code across 4 scripts while preserving exact behavior
 
@@ -1895,6 +1928,14 @@ After completing all tasks:
 
 ## Phase 8: Remaining Enhancements
 
+- [ ] Task 8.1: De-hardcode model and cache directory paths
+- [ ] Task 8.2: Implement manifest sharding by stage
+- [ ] Task 8.3: Add vLLM service preflight telemetry to manifest
+- [ ] Task 8.4: Promote image flags to top-level chunk schema fields
+- [ ] Task 8.5: Add offline mode support for model loading
+- [ ] Task 8.6: Document SPLADE attention backend fallback behavior
+
+
 **Goal**: Complete remaining improvements including path configuration, manifest optimizations, schema enhancements, and offline mode support
 
 ### Task 8.1: De-hardcode model and cache directory paths
@@ -2160,7 +2201,7 @@ The embeddings pipeline loads SPLADE and Qwen models from HuggingFace. By defaul
 ---
 
 ### Task 8.6: Document SPLADE attention backend fallback behavior
-- [ ] Task 8.6: Document SPLADE attention backend fallback behavior
+- [x] Task 8.6: Document SPLADE attention backend fallback behavior
 
 **Functional Requirements**:
 
