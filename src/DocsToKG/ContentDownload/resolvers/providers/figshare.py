@@ -18,6 +18,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 LOGGER = logging.getLogger(__name__)
 
+
 class FigshareResolver:
     """Resolve Figshare repository metadata into download URLs.
 
@@ -91,12 +92,40 @@ class FigshareResolver:
                 timeout=config.get_timeout(self.name),
                 headers=headers,
             )
+        except requests.Timeout as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="timeout",
+                metadata={
+                    "timeout": config.get_timeout(self.name),
+                    "error": str(exc),
+                },
+            )
+            return
+        except requests.ConnectionError as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="connection-error",
+                metadata={"error": str(exc)},
+            )
+            return
         except requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
                 event_reason="request-error",
-                metadata={"message": str(exc)},
+                metadata={"error": str(exc)},
+            )
+            return
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.exception("Unexpected error in Figshare resolver")
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="unexpected-error",
+                metadata={"error": str(exc), "error_type": type(exc).__name__},
             )
             return
 
@@ -106,13 +135,22 @@ class FigshareResolver:
                 event="error",
                 event_reason="http-error",
                 http_status=response.status_code,
+                metadata={
+                    "error_detail": f"Figshare API returned {response.status_code}",
+                },
             )
             return
 
         try:
             articles = response.json()
-        except ValueError:
-            yield ResolverResult(url=None, event="error", event_reason="json-error")
+        except ValueError as json_err:
+            preview = response.text[:200] if hasattr(response, "text") else ""
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="json-error",
+                metadata={"error_detail": str(json_err), "content_preview": preview},
+            )
             return
 
         if not isinstance(articles, list):

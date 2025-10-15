@@ -73,3 +73,10 @@ Dense vectors are stored in FAISS (GPU-capable via the scaffold in `docs/07-refe
 - **Documentation**: Generated API docs (`docs/04-api/`) mirror the structure above, while operations references provide day-two guidance.
 
 Refer to `docs/06-operations/index.md` for deployment practices and to `docs/07-reference/` for tuning, security, and troubleshooting guidance.
+
+## 5. Content Download Resolver Architecture
+
+The modular resolver architecture is documented in
+[`content-download-resolver-architecture.md`](content-download-resolver-architecture.md),
+including a Mermaid diagram that traces work artefacts through the pipeline,
+conditional request helper, logging, and metrics subsystems.

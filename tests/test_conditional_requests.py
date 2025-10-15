@@ -26,6 +26,11 @@ from typing import Any, Dict, Optional
 
 import pytest
 
+hypothesis = pytest.importorskip("hypothesis")
+from hypothesis import strategies as st  # type: ignore
+
+given = hypothesis.given
+
 from DocsToKG.ContentDownload.conditional import (
     CachedResult,
     ConditionalRequestHelper,
@@ -259,3 +264,68 @@ def test_interpret_response_modified_extracts_headers() -> None:
     assert isinstance(result, ModifiedResult)
     assert result.etag == '"xyz"'
     assert result.last_modified == "Thu, 01 Jan 1970 00:00:00 GMT"
+
+
+def test_interpret_response_missing_metadata_lists_fields() -> None:
+    helper = ConditionalRequestHelper(prior_etag="tag-only")
+    response = _make_helper_response(304)
+
+    with pytest.raises(ValueError) as excinfo:
+        helper.interpret_response(response)  # type: ignore[arg-type]
+
+    message = str(excinfo.value)
+    assert "path" in message
+    assert "sha256" in message
+    assert "content_length" in message
+
+
+@given(
+    etag=st.one_of(st.none(), st.text(min_size=1)),
+    last_modified=st.one_of(st.none(), st.text(min_size=1)),
+)
+def test_build_headers_property(etag: Optional[str], last_modified: Optional[str]) -> None:
+    helper = ConditionalRequestHelper(prior_etag=etag, prior_last_modified=last_modified)
+    headers = helper.build_headers()
+
+    if etag:
+        assert headers["If-None-Match"] == etag
+    else:
+        assert "If-None-Match" not in headers
+
+    if last_modified:
+        assert headers["If-Modified-Since"] == last_modified
+    else:
+        assert "If-Modified-Since" not in headers
+
+
+@given(
+    path=st.text(min_size=1),
+    sha=st.text(min_size=1),
+    size=st.integers(min_value=1, max_value=10_000),
+)
+def test_interpret_response_cached_property(path: str, sha: str, size: int) -> None:
+    helper = ConditionalRequestHelper(
+        prior_path=path,
+        prior_sha256=sha,
+        prior_content_length=size,
+        prior_etag="etag",
+        prior_last_modified="Mon, 01 Jan 2024 00:00:00 GMT",
+    )
+    response = _make_helper_response(304)
+
+    result = helper.interpret_response(response)  # type: ignore[arg-type]
+
+    assert isinstance(result, CachedResult)
+    assert result.path == path
+    assert result.sha256 == sha
+    assert result.content_length == size
+def test_conditional_helper_rejects_negative_length() -> None:
+    with pytest.raises(ValueError):
+        ConditionalRequestHelper(prior_content_length=-1)
+
+
+def test_interpret_response_requires_response_shape() -> None:
+    helper = ConditionalRequestHelper()
+
+    with pytest.raises(TypeError):
+        helper.interpret_response(object())  # type: ignore[arg-type]

@@ -1,0 +1,88 @@
+"""Property-based tests covering retry logic and conditional helpers."""
+
+from __future__ import annotations
+
+from typing import List
+from unittest.mock import Mock, patch
+
+import requests
+from hypothesis import given
+from hypothesis import strategies as st
+
+from DocsToKG.ContentDownload.conditional import ConditionalRequestHelper
+from DocsToKG.ContentDownload.http import request_with_retries
+from DocsToKG.ContentDownload.utils import dedupe
+
+
+@given(
+    etag=st.one_of(st.none(), st.text(max_size=20)),
+    last_modified=st.one_of(st.none(), st.text(max_size=30)),
+)
+def test_conditional_request_helper_build_headers(etag, last_modified):
+    helper = ConditionalRequestHelper(
+        prior_etag=etag,
+        prior_last_modified=last_modified,
+    )
+
+    headers = helper.build_headers()
+
+    if etag:
+        assert headers["If-None-Match"] == etag
+    else:
+        assert "If-None-Match" not in headers
+
+    if last_modified:
+        assert headers["If-Modified-Since"] == last_modified
+    else:
+        assert "If-Modified-Since" not in headers
+
+
+@given(st.lists(st.sampled_from([429, 500, 502, 503, 504]), max_size=4))
+def test_request_with_retries_backoff_sequence(status_codes: List[int]) -> None:
+    responses = [
+        Mock(spec=requests.Response, status_code=code, headers={}) for code in status_codes
+    ]
+    responses.append(Mock(spec=requests.Response, status_code=200, headers={}))
+
+    session = Mock(spec=requests.Session)
+    session.request.side_effect = responses
+
+    with (
+        patch("DocsToKG.ContentDownload.http.random.random", return_value=0.0),
+        patch("DocsToKG.ContentDownload.http.time.sleep") as mock_sleep,
+    ):
+        result = request_with_retries(
+            session,
+            "GET",
+            "https://example.org/property",
+            max_retries=len(status_codes),
+            backoff_factor=0.2,
+            respect_retry_after=False,
+        )
+
+    assert result.status_code == 200
+    expected_delays = [0.2 * (2**idx) for idx in range(len(status_codes))]
+    observed_delays = [entry.args[0] for entry in mock_sleep.call_args_list]
+    assert observed_delays == expected_delays
+
+
+@given(st.lists(st.text(max_size=10)))
+def test_dedupe_preserves_first_occurrence(values: List[str]) -> None:
+    result = dedupe(values)
+
+    # Ensure all retained elements are unique and in the same order as first seen.
+    seen = set()
+    indices = []
+    for item in result:
+        assert item not in seen
+        seen.add(item)
+        indices.append(values.index(item))
+
+    assert indices == sorted(indices)
+
+    # Ensure removing falsy entries matches reference behaviour.
+    expected = []
+    for item in values:
+        if item and item not in expected:
+            expected.append(item)
+    assert result == expected

@@ -40,12 +40,7 @@ from DocsToKG.ContentDownload.resolvers import (
     clear_resolver_caches,
     default_resolvers,
 )
-from DocsToKG.ContentDownload.utils import (
-    dedupe,
-    normalize_doi,
-    normalize_pmcid,
-    strip_prefix,
-)
+from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
 
 MAX_SNIFF_BYTES = 64 * 1024
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
@@ -149,12 +144,6 @@ def _make_session(headers: Dict[str, str]) -> requests.Session:
         session.mount("http://", adapter)
         session.mount("https://", adapter)
     return session
-
-
-def _make_session_for_worker(headers: Dict[str, str]) -> requests.Session:
-    """Factory helper for per-worker sessions."""
-
-    return _make_session(headers)
 
 
 @dataclass
@@ -1750,7 +1739,7 @@ def main() -> None:
     def _session_factory() -> requests.Session:
         """Build a fresh requests session configured with polite headers."""
 
-        return _make_session_for_worker(config.polite_headers)
+        return _make_session(config.polite_headers)
 
     processed = 0
     saved = 0

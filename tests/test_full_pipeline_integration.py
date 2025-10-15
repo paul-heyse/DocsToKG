@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from types import MethodType
 from pathlib import Path
 from typing import List
 
@@ -54,6 +55,8 @@ def test_pipeline_executes_resolvers_in_expected_order(monkeypatch: pytest.Monke
     artifact = _make_artifact(tmp_path)
     artifact.pdf_dir.mkdir(parents=True, exist_ok=True)
     artifact.html_dir.mkdir(parents=True, exist_ok=True)
+    artifact.pdf_urls = ["https://openalex.example/preprint.pdf"]
+    artifact.open_access_url = "https://openalex.example/oa.pdf"
 
     resolvers = default_resolvers()
     call_order: List[str] = []
@@ -66,9 +69,17 @@ def test_pipeline_executes_resolvers_in_expected_order(monkeypatch: pytest.Monke
         return _stub
 
     for resolver in resolvers:
-        monkeypatch.setattr(resolver, "iter_urls", _make_stub(resolver.name))
+        monkeypatch.setattr(
+            resolver,
+            "iter_urls",
+            MethodType(_make_stub(resolver.name), resolver),
+        )
 
-    config = ResolverConfig(enable_head_precheck=False)
+    config = ResolverConfig(
+        enable_head_precheck=False,
+        unpaywall_email="ci@example.org",
+        core_api_key="token",
+    )
     logger = MemoryLogger([])
     metrics = ResolverMetrics()
 
@@ -131,6 +142,7 @@ def test_real_network_download(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     metrics = ResolverMetrics()
     logger = MemoryLogger([])
 
+    from DocsToKG.ContentDownload.download_pyalex_pdfs import _make_session, download_candidate
     from DocsToKG.ContentDownload.download_pyalex_pdfs import download_candidate, _make_session
 
     session = _make_session({"User-Agent": "DocsToKG-Test/1.0"})

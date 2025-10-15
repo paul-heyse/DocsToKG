@@ -28,9 +28,6 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 # Third-party imports
-from sentence_transformers import (
-    SparseEncoder,
-)  # loads from local dir if given (cache_folder supported)
 from tqdm import tqdm
 
 from DocsToKG.DocParsing._common import (
@@ -48,10 +45,26 @@ from DocsToKG.DocParsing._common import (
     manifest_append,
 )
 from DocsToKG.DocParsing.schemas import BM25Vector, DenseVector, SPLADEVector, VectorRow
-from vllm import (
-    LLM,
-    PoolingParams,
-)  # PoolingParams(dimensions=...) selects output dim if model supports MRL
+
+try:  # Optional dependency used for SPLADE sparse embeddings
+    from sentence_transformers import (
+        SparseEncoder,
+    )  # loads from local dir if given (cache_folder supported)
+    _SENTENCE_TRANSFORMERS_IMPORT_ERROR: Exception | None = None
+except Exception as exc:  # pragma: no cover - exercised via tests with stubs
+    SparseEncoder = None  # type: ignore[assignment]
+    _SENTENCE_TRANSFORMERS_IMPORT_ERROR = exc
+
+try:  # Optional dependency used for Qwen dense embeddings
+    from vllm import (
+        LLM,
+        PoolingParams,
+    )  # PoolingParams(dimensions=...) selects output dim if model supports MRL
+    _VLLM_IMPORT_ERROR: Exception | None = None
+except Exception as exc:  # pragma: no cover - exercised via tests with stubs
+    LLM = None  # type: ignore[assignment]
+    PoolingParams = None  # type: ignore[assignment]
+    _VLLM_IMPORT_ERROR = exc
 
 # ---- Fixed locations ----
 HF_HOME = Path("/home/paul/hf-cache")
@@ -69,6 +82,41 @@ os.environ.setdefault("HF_HOME", str(HF_HOME))
 os.environ.setdefault("HF_HUB_CACHE", str(HF_HOME / "hub"))
 os.environ.setdefault("TRANSFORMERS_CACHE", str(HF_HOME / "transformers"))
 os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", str(MODEL_ROOT))
+
+
+def _missing_splade_dependency_message() -> str:
+    """Return a human-readable installation hint for SPLADE extras."""
+
+    return (
+        "Optional dependency 'sentence-transformers' is required for SPLADE "
+        "embeddings. Install it with `pip install sentence-transformers` or "
+        "disable SPLADE generation."
+    )
+
+
+def _missing_qwen_dependency_message() -> str:
+    """Return a human-readable installation hint for Qwen/vLLM extras."""
+
+    return (
+        "Optional dependency 'vllm' is required for Qwen dense embeddings. "
+        "Install it with `pip install vllm` and ensure GPU drivers are "
+        "available before running the embedding pipeline."
+    )
+
+
+def _ensure_splade_dependencies() -> None:
+    """Validate that SPLADE optional dependencies are importable."""
+
+    if SparseEncoder is None:
+        raise ImportError(_missing_splade_dependency_message()) from _SENTENCE_TRANSFORMERS_IMPORT_ERROR
+
+
+def _ensure_qwen_dependencies() -> None:
+    """Validate that Qwen/vLLM optional dependencies are importable."""
+
+    if LLM is None or PoolingParams is None:
+        raise ImportError(_missing_qwen_dependency_message()) from _VLLM_IMPORT_ERROR
+
 
 # ---- simple tokenizer for BM25 ----
 
@@ -348,6 +396,8 @@ def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
         ImportError: If required SPLADE dependencies are unavailable.
     """
 
+    _ensure_splade_dependencies()
+
     key = (str(cfg.model_dir), cfg.device, cfg.attn_impl, cfg.max_active_dims)
     if key in _SPLADE_ENCODER_CACHE:
         return _SPLADE_ENCODER_CACHE[key]
@@ -491,6 +541,8 @@ def qwen_embed(
     Returns:
         List of embedding vectors, one per input text.
     """
+    _ensure_qwen_dependencies()
+
     effective_batch = batch_size or cfg.batch_size
     llm = LLM(
         model=str(cfg.model_dir),  # local path
@@ -862,6 +914,13 @@ def main(args: argparse.Namespace | None = None) -> int:
         raise ValueError("Batch sizes must be >= 1")
 
     overall_start = time.perf_counter()
+
+    try:
+        _ensure_splade_dependencies()
+        _ensure_qwen_dependencies()
+    except ImportError as exc:
+        logger.error("Embedding dependencies unavailable: %s", exc)
+        raise
 
     data_root_override = args.data_root
     resolved_root = (

@@ -315,6 +315,14 @@ class ResolverPipeline:
 
             for result in resolver.iter_urls(session, self.config, artifact):
                 wall_ms = (time.monotonic() - resolver_start) * 1000.0
+            results, wall_ms = self._collect_resolver_results(
+                resolver_name,
+                resolver,
+                session,
+                artifact,
+            )
+
+            for result in results:
                 pipeline_result = self._process_result(
                     session,
                     artifact,
@@ -530,14 +538,13 @@ class ResolverPipeline:
         """
 
         results: List[ResolverResult] = []
+        self._respect_rate_limit(resolver_name)
         start = time.monotonic()
         try:
-            self._respect_rate_limit(resolver_name)
-            with self._lock:
-                self._last_invocation[resolver_name] = time.monotonic()
             for result in resolver.iter_urls(session, self.config, artifact):
                 results.append(result)
         except Exception as exc:
+            self.metrics.record_failure(resolver_name)
             results.append(
                 ResolverResult(
                     url=None,

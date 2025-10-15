@@ -37,9 +37,7 @@ from DocsToKG.ContentDownload.resolvers.providers.landing_page import LandingPag
 from DocsToKG.ContentDownload.resolvers.providers.openaire import OpenAireResolver
 from DocsToKG.ContentDownload.resolvers.providers.osf import OsfResolver
 from DocsToKG.ContentDownload.resolvers.providers.pmc import PmcResolver
-from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import (
-    SemanticScholarResolver,
-)
+from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import SemanticScholarResolver
 from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver
 from DocsToKG.ContentDownload.resolvers.providers.wayback import WaybackResolver
 
@@ -398,8 +396,12 @@ def test_core_resolver_handles_failure(tmp_path):
     artifact = make_artifact(tmp_path)
     config = build_config(core_api_key="abc123")
     responses.add(responses.GET, "https://api.core.ac.uk/v3/search/works", status=500)
-    urls = list(CoreResolver().iter_urls(session, config, artifact))
-    assert urls == []
+    events = [
+        result for result in CoreResolver().iter_urls(session, config, artifact) if result.is_event
+    ]
+    assert events[0].event_reason == "http-error"
+    assert events[0].http_status == 500
+    assert "CORE API returned" in events[0].metadata["error_detail"]
 
 
 @responses.activate
@@ -434,8 +436,12 @@ def test_doaj_resolver_handles_error(tmp_path):
     artifact = make_artifact(tmp_path)
     config = build_config()
     responses.add(responses.GET, "https://doaj.org/api/v2/search/articles/", status=429)
-    urls = list(DoajResolver().iter_urls(session, config, artifact))
-    assert urls == []
+    events = [
+        result for result in DoajResolver().iter_urls(session, config, artifact) if result.is_event
+    ]
+    assert events[0].event_reason == "http-error"
+    assert events[0].http_status == 429
+    assert "DOAJ API returned" in events[0].metadata["error_detail"]
 
 
 @responses.activate
@@ -449,7 +455,10 @@ def test_semantic_scholar_resolver_handles_error(tmp_path):
         status=500,
     )
     results = list(SemanticScholarResolver().iter_urls(session, config, artifact))
-    assert results == []
+    error = next(result for result in results if result.is_event)
+    assert error.event_reason == "http-error"
+    assert error.http_status == 500
+    assert "Semantic Scholar HTTPError" in error.metadata["error_detail"]
 
 
 @responses.activate

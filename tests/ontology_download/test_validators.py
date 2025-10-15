@@ -29,6 +29,7 @@ from types import SimpleNamespace
 import pytest
 
 pytest.importorskip("pydantic")
+pytest.importorskip("pydantic_settings")
 
 from DocsToKG.OntologyDownload.config import DefaultsConfiguration, ResolvedConfig
 from DocsToKG.OntologyDownload.validators import (

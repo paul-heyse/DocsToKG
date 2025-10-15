@@ -28,11 +28,7 @@ pytest.importorskip("pyalex")
 
 import requests
 
-from DocsToKG.ContentDownload.download_pyalex_pdfs import (
-    WorkArtifact,
-    classify_payload,
-    ensure_dir,
-)
+from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact, classify_payload, ensure_dir
 from DocsToKG.ContentDownload.resolvers import (
     AttemptRecord,
     DownloadOutcome,
@@ -158,6 +154,37 @@ def test_pipeline_stops_on_first_success(tmp_path):
     assert metrics.successes["resolver_b"] == 1
 
 
+def test_pipeline_records_resolver_exception(tmp_path):
+    artifact = build_artifact(tmp_path)
+
+    class ExplodingResolver:
+        name = "exploder"
+
+        def is_enabled(self, config, art):  # noqa: D401
+            return True
+
+        def iter_urls(self, session, config, art):  # noqa: D401
+            raise RuntimeError("boom")
+
+    def fake_download(session, artifact, url, referer, timeout):  # pragma: no cover - not reached
+        return DownloadOutcome(
+            "pdf", str(artifact.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0
+        )
+
+    resolver = ExplodingResolver()
+    config = ResolverConfig(resolver_order=["exploder"], resolver_toggles={"exploder": True})
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+    pipeline = ResolverPipeline([resolver], config, fake_download, logger, metrics)
+    session = DummySession({})
+
+    result = pipeline.run(session, artifact)
+
+    assert result.success is False
+    assert any(record.reason == "resolver-exception" for record in logger.records)
+    assert metrics.failures["exploder"] == 1
+
+
 def test_unpaywall_resolver_extracts_candidates(tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = UnpaywallResolver()
@@ -191,6 +218,57 @@ def test_landing_page_resolver_meta_parsing(tmp_path, monkeypatch):
     config = ResolverConfig()
     results = list(resolver.iter_urls(session, config, artifact))
     assert results[0].url == "https://example.com/files/paper.pdf"
+
+
+def test_head_precheck_allows_redirect(monkeypatch, tmp_path):
+    artifact = build_artifact(tmp_path)
+    resolver = StubResolver("stub", ["https://example.org/file.pdf"])
+    config = ResolverConfig(
+        resolver_order=["stub"], resolver_toggles={"stub": True}, enable_head_precheck=True
+    )
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+
+    def download_func(session, artifact, url, referer, timeout):  # pragma: no cover - not used
+        return DownloadOutcome(classification="http_error", http_status=404, elapsed_ms=1.0)
+
+    pipeline = ResolverPipeline(
+        resolvers=[resolver],
+        config=config,
+        download_func=download_func,
+        logger=logger,
+        metrics=metrics,
+    )
+
+    class _HeadResponse:
+        def __init__(self, status_code: int, headers: Dict[str, str]):
+            self.status_code = status_code
+            self.headers = headers
+
+        def close(self) -> None:
+            return None
+
+    def fake_head(session, method, url, **kwargs):
+        assert method == "HEAD"
+        assert kwargs["allow_redirects"] is True
+        return _HeadResponse(302, {"Content-Type": "application/pdf", "Content-Length": "1234"})
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.pipeline.request_with_retries",
+        fake_head,
+    )
+
+    assert pipeline._head_precheck_url(object(), "https://example.org/file.pdf", timeout=5.0)
+
+    def fake_html(session, method, url, **kwargs):
+        return _HeadResponse(200, {"Content-Type": "text/html", "Content-Length": "128"})
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.pipeline.request_with_retries",
+        fake_html,
+    )
+
+    assert not pipeline._head_precheck_url(object(), "https://example.org/file.pdf", timeout=5.0)
 
 
 def test_cli_integration_happy_path(monkeypatch, tmp_path):
@@ -431,6 +509,36 @@ def test_head_precheck_allows_pdf(monkeypatch, tmp_path):
     assert download_calls == ["https://example.org/pdf"]
 
 
+def test_head_precheck_allows_redirect_to_pdf(monkeypatch, tmp_path):
+    artifact = build_artifact(tmp_path)
+    resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
+    config = ResolverConfig(resolver_order=["stub"], resolver_toggles={"stub": True})
+    logger = ListLogger()
+    download_calls: List[str] = []
+
+    def fake_download(session, art, url, referer, timeout):
+        download_calls.append(url)
+        return DownloadOutcome("pdf", str(art.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0)
+
+    def fake_request(session, method, url, **kwargs):
+        return DummyHeadResponse(
+            status_code=302,
+            headers={"Content-Type": "application/pdf", "Location": "https://example.org/pdf"},
+        )
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.http.request_with_retries",
+        fake_request,
+    )
+
+    pipeline = ResolverPipeline([resolver], config, fake_download, logger, ResolverMetrics())
+    session = requests.Session()
+    result = pipeline.run(session, artifact)
+
+    assert result.success is True
+    assert download_calls == ["https://example.org/pdf"]
+
+
 def test_head_precheck_failure_allows_download(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
@@ -483,9 +591,7 @@ def test_head_precheck_respects_global_disable(monkeypatch, tmp_path):
         download_calls.append(url)
         return DownloadOutcome("pdf", str(art.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0)
 
-    pipeline = ResolverPipeline(
-        [resolver], config, fake_download, logger, ResolverMetrics()
-    )
+    pipeline = ResolverPipeline([resolver], config, fake_download, logger, ResolverMetrics())
     session = requests.Session()
     pipeline.run(session, artifact)
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import TYPE_CHECKING, Iterable, List
 from urllib.parse import urljoin, urlparse
@@ -24,6 +25,9 @@ def _absolute_url(base: str, href: str) -> str:
     if parsed.scheme and parsed.netloc:
         return href
     return urljoin(base, href)
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class PmcResolver:
@@ -83,13 +87,25 @@ class PmcResolver:
                 timeout=config.get_timeout(self.name),
                 headers=config.polite_headers,
             )
-        except requests.RequestException:
+        except requests.Timeout as exc:
+            LOGGER.debug("PMC ID lookup timed out: %s", exc)
+            return []
+        except requests.ConnectionError as exc:
+            LOGGER.debug("PMC ID lookup connection error: %s", exc)
+            return []
+        except requests.RequestException as exc:
+            LOGGER.debug("PMC ID lookup request error: %s", exc)
+            return []
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.exception("Unexpected error looking up PMC IDs")
             return []
         if resp.status_code != 200:
+            LOGGER.debug("PMC ID lookup HTTP error status: %s", resp.status_code)
             return []
         try:
             data = resp.json()
-        except ValueError:
+        except ValueError as json_err:
+            LOGGER.debug("PMC ID lookup JSON error: %s", json_err)
             return []
         results: List[str] = []
         for record in data.get("records", []) or []:
@@ -127,6 +143,10 @@ class PmcResolver:
         if not pmcids:
             pmcids.extend(self._lookup_pmcids(session, identifiers, config))
 
+        if not pmcids:
+            yield ResolverResult(url=None, event="skipped", event_reason="no-pmcid")
+            return
+
         for pmcid in dedupe(pmcids):
             oa_url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id={pmcid}"
             fallback_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/pdf/"
@@ -138,13 +158,70 @@ class PmcResolver:
                     timeout=config.get_timeout(self.name),
                     headers=config.polite_headers,
                 )
-            except requests.RequestException:
+            except requests.Timeout as exc:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="timeout",
+                    metadata={
+                        "pmcid": pmcid,
+                        "timeout": config.get_timeout(self.name),
+                        "error": str(exc),
+                    },
+                )
+                yield ResolverResult(
+                    url=fallback_url,
+                    metadata={"pmcid": pmcid, "source": "pdf-fallback"},
+                )
+                continue
+            except requests.ConnectionError as exc:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="connection-error",
+                    metadata={"pmcid": pmcid, "error": str(exc)},
+                )
+                yield ResolverResult(
+                    url=fallback_url,
+                    metadata={"pmcid": pmcid, "source": "pdf-fallback"},
+                )
+                continue
+            except requests.RequestException as exc:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="request-error",
+                    metadata={"pmcid": pmcid, "error": str(exc)},
+                )
+                yield ResolverResult(
+                    url=fallback_url,
+                    metadata={"pmcid": pmcid, "source": "pdf-fallback"},
+                )
+                continue
+            except Exception as exc:  # pragma: no cover - defensive
+                LOGGER.exception("Unexpected PMC OA lookup error")
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="unexpected-error",
+                    metadata={"pmcid": pmcid, "error": str(exc), "error_type": type(exc).__name__},
+                )
                 yield ResolverResult(
                     url=fallback_url,
                     metadata={"pmcid": pmcid, "source": "pdf-fallback"},
                 )
                 continue
             if resp.status_code != 200:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="http-error",
+                    http_status=resp.status_code,
+                    metadata={
+                        "pmcid": pmcid,
+                        "error_detail": f"OA endpoint returned {resp.status_code}",
+                    },
+                )
                 yield ResolverResult(
                     url=fallback_url,
                     metadata={"pmcid": pmcid, "source": "pdf-fallback"},

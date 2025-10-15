@@ -38,9 +38,7 @@ if VENV_ROOT.exists():
             f"`{venv_prefix}/bin/python -m pytest`."
         )
 
-    site_packages_candidates = sorted(
-        (VENV_ROOT / "lib").glob("python*/site-packages")
-    )
+    site_packages_candidates = sorted((VENV_ROOT / "lib").glob("python*/site-packages"))
     for site_packages in site_packages_candidates:
         site_path = str(site_packages)
         if site_packages.exists() and site_path not in sys.path:

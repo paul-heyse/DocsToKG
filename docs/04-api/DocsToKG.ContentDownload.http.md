@@ -4,6 +4,9 @@ This reference documents the DocsToKG module ``DocsToKG.ContentDownload.http``.
 
 Unified HTTP request utilities with retry and backoff support.
 
+The module logs retry attempts and timeout exhaustion using the
+``DocsToKG.ContentDownload.http`` logger to aid troubleshooting.
+
 ## 1. Functions
 
 ### `parse_retry_after_header(response)`
@@ -57,6 +60,12 @@ responsible for closing the response when streaming content.
 Raises:
 requests.RequestException: If all retry attempts fail due to network
 errors or the session raises an exception.
+
+Notes:
+- Emits debug logs on each retry attempt and warns when retries are
+  exhausted for a request.
+- Distinguishes timeout and connection failures when surfacing
+  ``requests.RequestException`` errors.
 
 Example:
 >>> session = requests.Session()

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterable
 
-import requests
-
 from DocsToKG.ContentDownload.utils import strip_prefix
 
 from ..types import ResolverConfig, ResolverResult
@@ -60,14 +58,13 @@ class ArxivResolver:
 
         arxiv_id = artifact.arxiv_id
         if not arxiv_id:
-            return []
+            yield ResolverResult(url=None, event="skipped", event_reason="no-arxiv-id")
+            return
         arxiv_id = strip_prefix(arxiv_id, "arxiv:")
-        return [
-            ResolverResult(
-                url=f"https://arxiv.org/pdf/{arxiv_id}.pdf",
-                metadata={"identifier": arxiv_id},
-            )
-        ]
+        yield ResolverResult(
+            url=f"https://arxiv.org/pdf/{arxiv_id}.pdf",
+            metadata={"identifier": arxiv_id},
+        )
 
 
 __all__ = ["ArxivResolver"]

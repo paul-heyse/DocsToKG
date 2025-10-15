@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING, Iterable, List
 
 import requests
@@ -28,6 +29,9 @@ def _collect_candidate_urls(node: object, results: List[str]) -> None:
     elif isinstance(node, str):
         if node.lower().startswith("http"):
             results.append(node)
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class OpenAireResolver:
@@ -76,7 +80,8 @@ class OpenAireResolver:
 
         doi = normalize_doi(artifact.doi)
         if not doi:
-            return []
+            yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
+            return
         try:
             resp = request_with_retries(
                 session,
@@ -86,17 +91,71 @@ class OpenAireResolver:
                 headers=config.polite_headers,
                 timeout=config.get_timeout(self.name),
             )
-        except requests.RequestException:
-            return []
+        except requests.Timeout as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="timeout",
+                metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
+            )
+            return
+        except requests.ConnectionError as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="connection-error",
+                metadata={"error": str(exc)},
+            )
+            return
+        except requests.RequestException as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="request-error",
+                metadata={"error": str(exc)},
+            )
+            return
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.exception("Unexpected error in OpenAIRE resolver")
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="unexpected-error",
+                metadata={"error": str(exc), "error_type": type(exc).__name__},
+            )
+            return
         if resp.status_code != 200:
-            return []
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="http-error",
+                http_status=resp.status_code,
+                metadata={"error_detail": f"OpenAIRE API returned {resp.status_code}"},
+            )
+            return
         try:
             data = resp.json()
         except ValueError:
             try:
                 data = json.loads(resp.text)
-            except ValueError:
-                return []
+            except ValueError as json_err:
+                preview = resp.text[:200] if hasattr(resp, "text") else ""
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="json-error",
+                    metadata={"error_detail": str(json_err), "content_preview": preview},
+                )
+                return
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.exception("Unexpected JSON error in OpenAIRE resolver")
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="unexpected-error",
+                metadata={"error": str(exc), "error_type": type(exc).__name__},
+            )
+            return
         results: List[str] = []
         _collect_candidate_urls(data, results)
         for url in dedupe(results):

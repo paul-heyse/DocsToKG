@@ -285,6 +285,12 @@ Change 'modularize-content-download-architecture' is valid
 - **Conflicts with:** None
 - **Follow-up:** Consider adding Dataverse resolver in future iteration
 
+## Final QA Status (Implementation Complete)
+
+- ✅ `pytest tests -q` (optional dependencies `pyalex`, `faiss`, `transformers` auto-skip when unavailable) — validates resolver order, rate limiting, and documentation-driven fixtures under modular pipeline. 
+- ℹ️ Known warnings: legacy compatibility shims for `DocsToKG.ContentDownload.resolvers.time`/`requests` and unregistered `pytest.mark.integration`; both retained intentionally for downstream users during migration.
+- 🔍 Manual verification: OpenAlex, CORE, Zenodo, and concurrency tests patched with `MethodType`-bound stubs to mirror legacy semantics while exercising new modular code paths.
+
 ## Contact
 
 For questions or clarifications about this change proposal, please contact the Content Download module maintainers.
@@ -381,3 +387,14 @@ The OpenSpec change proposal is now **implementation-ready** for AI programming 
 **Validation Status:** ✅ Passed strict validation
 **Estimated Implementation Time:** 2-3 weeks for 106 tasks
 **Confidence Level:** High - ready for autonomous AI agent execution
+
+## Implementation Summary (November 2025)
+
+- Added `docs/migration-modularize-resolvers.md`, `docs/adding-custom-resolvers.md`, and
+  `docs/03-architecture/content-download-resolver-architecture.md` to guide adopters.
+- Updated `README.md`, API references, and the new `CHANGELOG.md` with Zenodo/Figshare support,
+  concurrency controls, and HEAD pre-check documentation.
+- Hardened HTTP retry logic, conditional request validation, and every resolver provider with
+  structured error events and metadata-rich logging.
+- Expanded automated coverage with redirect-aware HEAD pre-check tests, concurrency resilience
+  checks, and Hypothesis property tests for conditional headers, retry parsing, and deduplication.
