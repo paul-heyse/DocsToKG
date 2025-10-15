@@ -16,12 +16,13 @@ import os
 import re
 import shutil
 import socket
+import tarfile
 import threading
 import time
 import unicodedata
 import zipfile
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Dict, List, Optional
 from urllib.parse import ParseResult, urlparse, urlunparse
 
@@ -294,10 +295,80 @@ def sha256_file(path: Path) -> str:
     return hasher.hexdigest()
 
 
+_MAX_COMPRESSION_RATIO = 10.0
+
+
+def _validate_member_path(member_name: str) -> Path:
+    """Validate archive member paths to prevent traversal attacks.
+
+    Args:
+        member_name: Path declared within the archive.
+
+    Returns:
+        Sanitised relative path safe for extraction on the local filesystem.
+
+    Raises:
+        ConfigError: If the member path is absolute or contains traversal segments.
+    """
+
+    normalized = member_name.replace("\\", "/")
+    relative = PurePosixPath(normalized)
+    if relative.is_absolute():
+        raise ConfigError(f"Unsafe absolute path detected in archive: {member_name}")
+    if not relative.parts:
+        raise ConfigError(f"Empty path detected in archive: {member_name}")
+    if any(part in {"", ".", ".."} for part in relative.parts):
+        raise ConfigError(f"Unsafe path detected in archive: {member_name}")
+    return Path(*relative.parts)
+
+
+def _check_compression_ratio(
+    *,
+    total_uncompressed: int,
+    compressed_size: int,
+    archive: Path,
+    logger: Optional[logging.Logger],
+    archive_type: str,
+) -> None:
+    """Ensure compressed archives do not expand beyond the permitted ratio.
+
+    Args:
+        total_uncompressed: Sum of file sizes within the archive.
+        compressed_size: Archive file size on disk (or sum of compressed entries).
+        archive: Path to the archive on disk.
+        logger: Optional logger for emitting diagnostic messages.
+        archive_type: Human readable label for error messages (ZIP/TAR).
+
+    Raises:
+        ConfigError: If the archive exceeds the allowed expansion ratio.
+    """
+
+    if compressed_size <= 0:
+        return
+    ratio = total_uncompressed / float(compressed_size)
+    if ratio > _MAX_COMPRESSION_RATIO:
+        if logger:
+            logger.error(
+                "archive compression ratio too high",
+                extra={
+                    "stage": "extract",
+                    "archive": str(archive),
+                    "ratio": round(ratio, 2),
+                    "compressed_bytes": compressed_size,
+                    "uncompressed_bytes": total_uncompressed,
+                    "limit": _MAX_COMPRESSION_RATIO,
+                },
+            )
+        raise ConfigError(
+            f"{archive_type} archive {archive} expands to {total_uncompressed} bytes, "
+            f"exceeding {_MAX_COMPRESSION_RATIO}:1 compression ratio"
+        )
+
+
 def extract_zip_safe(
     zip_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None
 ) -> List[Path]:
-    """Extract a ZIP archive while preventing path traversal.
+    """Extract a ZIP archive while preventing traversal and compression bombs.
 
     Args:
         zip_path: Path to the ZIP file to extract.
@@ -308,7 +379,7 @@ def extract_zip_safe(
         List of extracted file paths.
 
     Raises:
-        ConfigError: If the archive contains unsafe paths or is missing.
+        ConfigError: If the archive contains unsafe paths, compression bombs, or is missing.
     """
 
     if not zip_path.exists():
@@ -316,14 +387,33 @@ def extract_zip_safe(
     destination.mkdir(parents=True, exist_ok=True)
     extracted: List[Path] = []
     with zipfile.ZipFile(zip_path) as archive:
-        for member in archive.infolist():
-            member_path = Path(member.filename)
-            if member_path.is_absolute() or ".." in member_path.parts:
-                raise ConfigError(f"Unsafe path detected in archive: {member.filename}")
-            target_path = destination / member_path
-            target_path.parent.mkdir(parents=True, exist_ok=True)
+        members = archive.infolist()
+        safe_members: List[tuple[zipfile.ZipInfo, Path]] = []
+        total_uncompressed = 0
+        for member in members:
+            member_path = _validate_member_path(member.filename)
             if member.is_dir():
+                safe_members.append((member, member_path))
                 continue
+            total_uncompressed += int(member.file_size)
+            safe_members.append((member, member_path))
+        compressed_size = max(
+            zip_path.stat().st_size,
+            sum(int(member.compress_size) for member in members) or 0,
+        )
+        _check_compression_ratio(
+            total_uncompressed=total_uncompressed,
+            compressed_size=compressed_size,
+            archive=zip_path,
+            logger=logger,
+            archive_type="ZIP",
+        )
+        for member, member_path in safe_members:
+            target_path = destination / member_path
+            if member.is_dir():
+                target_path.mkdir(parents=True, exist_ok=True)
+                continue
+            target_path.parent.mkdir(parents=True, exist_ok=True)
             with archive.open(member, "r") as source, target_path.open("wb") as target:
                 shutil.copyfileobj(source, target)
             extracted.append(target_path)
@@ -331,6 +421,79 @@ def extract_zip_safe(
         logger.info(
             "extracted zip archive",
             extra={"stage": "extract", "archive": str(zip_path), "files": len(extracted)},
+        )
+    return extracted
+
+
+def extract_tar_safe(
+    tar_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None
+) -> List[Path]:
+    """Safely extract tar archives with traversal and compression checks.
+
+    Args:
+        tar_path: Path to the tar archive (tar, tar.gz, tar.xz).
+        destination: Directory where extracted files should be stored.
+        logger: Optional logger for emitting extraction telemetry.
+
+    Returns:
+        List of extracted file paths.
+
+    Raises:
+        ConfigError: If the archive is missing, unsafe, or exceeds compression limits.
+    """
+
+    if not tar_path.exists():
+        raise ConfigError(f"TAR archive not found: {tar_path}")
+    destination.mkdir(parents=True, exist_ok=True)
+    extracted: List[Path] = []
+    try:
+        with tarfile.open(tar_path, mode="r:*") as archive:
+            members = archive.getmembers()
+            safe_members: List[tuple[tarfile.TarInfo, Path]] = []
+            total_uncompressed = 0
+            for member in members:
+                member_path = _validate_member_path(member.name)
+                if member.isdir():
+                    safe_members.append((member, member_path))
+                    continue
+                if member.islnk() or member.issym():
+                    raise ConfigError(f"Unsafe link detected in archive: {member.name}")
+                if member.isdev():
+                    raise ConfigError(
+                        f"Unsupported special file detected in archive: {member.name}"
+                    )
+                if not member.isfile():
+                    raise ConfigError(
+                        f"Unsupported tar member type encountered: {member.name}"
+                    )
+                total_uncompressed += int(member.size)
+                safe_members.append((member, member_path))
+            compressed_size = tar_path.stat().st_size
+            _check_compression_ratio(
+                total_uncompressed=total_uncompressed,
+                compressed_size=compressed_size,
+                archive=tar_path,
+                logger=logger,
+                archive_type="TAR",
+            )
+            for member, member_path in safe_members:
+                if member.isdir():
+                    (destination / member_path).mkdir(parents=True, exist_ok=True)
+                    continue
+                target_path = destination / member_path
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                extracted_file = archive.extractfile(member)
+                if extracted_file is None:
+                    raise ConfigError(f"Failed to extract member: {member.name}")
+                with extracted_file as source, target_path.open("wb") as target:
+                    shutil.copyfileobj(source, target)
+                extracted.append(target_path)
+    except tarfile.TarError as exc:
+        raise ConfigError(f"Failed to extract tar archive {tar_path}: {exc}") from exc
+    if logger:
+        logger.info(
+            "extracted tar archive",
+            extra={"stage": "extract", "archive": str(tar_path), "files": len(extracted)},
         )
     return extracted
 

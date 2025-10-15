@@ -20,6 +20,7 @@ Usage:
 
 import io
 import logging
+import tarfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -417,6 +418,86 @@ def test_extract_zip_rejects_absolute(tmp_path):
         zf.writestr("/absolute/path.txt", "data")
     with pytest.raises(download.ConfigError):
         download.extract_zip_safe(archive, tmp_path / "out")
+
+
+def test_extract_zip_detects_compression_bomb(tmp_path):
+    archive = tmp_path / "bomb.zip"
+    with download.zipfile.ZipFile(
+        archive, "w", compression=download.zipfile.ZIP_DEFLATED
+    ) as zf:
+        zf.writestr("large.txt", b"0" * (11 * 1024 * 1024))
+
+    with pytest.raises(download.ConfigError) as exc_info:
+        download.extract_zip_safe(archive, tmp_path / "zip_out")
+
+    assert "compression ratio" in str(exc_info.value)
+
+
+def _make_tarfile(path: Path, entries: list[tuple[tarfile.TarInfo, bytes | None]]) -> None:
+    with tarfile.open(path, "w:gz") as tf:
+        for member, data in entries:
+            fileobj = io.BytesIO(data) if data is not None else None
+            tf.addfile(member, fileobj)
+
+
+def test_extract_tar_safe(tmp_path):
+    archive = tmp_path / "archive.tar.gz"
+    info = tarfile.TarInfo("folder/file.txt")
+    data = b"payload"
+    info.size = len(data)
+    _make_tarfile(archive, [(info, data)])
+
+    extracted = download.extract_tar_safe(archive, tmp_path / "tar_out")
+
+    assert (tmp_path / "tar_out" / "folder" / "file.txt").read_bytes() == data
+    assert extracted
+
+
+def test_extract_tar_rejects_traversal(tmp_path):
+    archive = tmp_path / "bad_traversal.tar.gz"
+    info = tarfile.TarInfo("../evil.txt")
+    payload = b"evil"
+    info.size = len(payload)
+    _make_tarfile(archive, [(info, payload)])
+
+    with pytest.raises(download.ConfigError):
+        download.extract_tar_safe(archive, tmp_path / "out")
+
+
+def test_extract_tar_rejects_absolute(tmp_path):
+    archive = tmp_path / "bad_absolute.tar.gz"
+    info = tarfile.TarInfo("/abs/path.txt")
+    data = b"absolute"
+    info.size = len(data)
+    _make_tarfile(archive, [(info, data)])
+
+    with pytest.raises(download.ConfigError):
+        download.extract_tar_safe(archive, tmp_path / "out")
+
+
+def test_extract_tar_rejects_symlink(tmp_path):
+    archive = tmp_path / "bad_symlink.tar.gz"
+    info = tarfile.TarInfo("link")
+    info.type = tarfile.SYMTYPE
+    info.linkname = "target"
+    info.size = 0
+    _make_tarfile(archive, [(info, None)])
+
+    with pytest.raises(download.ConfigError):
+        download.extract_tar_safe(archive, tmp_path / "out")
+
+
+def test_extract_tar_detects_compression_bomb(tmp_path):
+    archive = tmp_path / "bomb.tar.gz"
+    info = tarfile.TarInfo("large.bin")
+    payload = b"0" * (11 * 1024 * 1024)
+    info.size = len(payload)
+    _make_tarfile(archive, [(info, payload)])
+
+    with pytest.raises(download.ConfigError) as exc_info:
+        download.extract_tar_safe(archive, tmp_path / "out")
+
+    assert "compression ratio" in str(exc_info.value)
 
 
 def test_download_stream_http_error(monkeypatch, tmp_path):

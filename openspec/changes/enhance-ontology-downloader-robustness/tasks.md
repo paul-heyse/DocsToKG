@@ -2013,12 +2013,62 @@ def test_validate_media_type_disabled():
 - [x] All updated tests pass locally.
 - [x] Code coverage includes new helper paths.
 
+### 2.4 Safe Tar Archive Extraction
+
+#### 2.4.1 Add secure tar extraction helper
+
+**Objective**: Provide `extract_tar_safe()` that prevents tar-slip attacks, link tricks, and compression bombs.
+
+**Implementation**:
+
+- Implement `extract_tar_safe()` alongside `_validate_member_path()` to normalise member names.
+- Reject symlinks, hardlinks, device nodes, and unsupported member types prior to extraction.
+- Apply shared compression ratio enforcement before writing files to disk and log extraction summaries.
+
+**Acceptance Criteria**:
+
+- [x] Tar members with traversal or absolute paths raise `ConfigError` before touching disk.
+- [x] Symlinks, hardlinks, and special files are rejected with clear error messaging.
+- [x] Compression ratio guard aborts archives that would expand beyond 10:1.
+
+#### 2.4.2 Extend ZIP extraction safeguards
+
+**Objective**: Apply the same path validation and compression ratio guard to ZIP archives.
+
+**Implementation**:
+
+- Share `_validate_member_path()` for both ZIP and TAR extraction routines.
+- Enforce compression ratio limits using `_check_compression_ratio()` prior to streaming member contents.
+- Preserve structured logging for successful ZIP extraction events.
+
+**Acceptance Criteria**:
+
+- [x] ZIP extraction refuses traversal, absolute, or empty paths.
+- [x] Compression bombs exceeding 10:1 ratio trigger `ConfigError`.
+- [x] Logging continues to report archive extraction outcomes.
+
+#### 2.4.3 Add archive safety unit coverage
+
+**Objective**: Ensure regression coverage for ZIP/TAR traversal and compression protections.
+
+**Implementation**:
+
+- Add tests covering safe tar extraction, traversal rejection, absolute path rejection, symlink blocking, and compression bomb detection.
+- Add tests verifying ZIP compression bomb detection and successful extraction paths.
+- Reuse helper factory to generate gzipped tar archives within the test suite.
+
+**Acceptance Criteria**:
+
+- [x] New tests fail if archive safeguards regress.
+- [x] Test suite validates both positive and negative tar scenarios.
+- [x] Compression bomb rejection is asserted for ZIP and TAR archives.
+
 ---
 
 ## Task Completion Tracking
 
 **Foundation (1.1-1.4)**: 27/52 tasks complete
-**Robustness Downloads (2.1-2.4)**: 12/27 tasks complete
+**Robustness Downloads (2.1-2.4)**: 15/27 tasks complete
 **Robustness Validation (3.1-3.4)**: 0/21 tasks complete
 **Capabilities (4.1-5.2)**: 0/32 tasks complete
 **Storage (6.1)**: 0/10 tasks complete
@@ -2026,7 +2076,7 @@ def test_validate_media_type_disabled():
 **Testing (8.1-8.5)**: 0/30 tasks complete
 **Deployment (9.1-9.3)**: 0/13 tasks complete
 
-**Total**: 39/198 tasks complete (19.7%)
+**Total**: 42/198 tasks complete (21.2%)
 
 ## Notes for AI Programming Agents
 
