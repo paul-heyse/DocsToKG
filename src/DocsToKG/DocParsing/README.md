@@ -78,6 +78,7 @@ include:
 | `DOCSTOKG_DATA_ROOT` | Overrides automatic data-root detection for all stages. |
 | `DOCLING_CUDA_USE_FLASH_ATTENTION2` | Enables Flash Attention optimizations within Docling VLM workers. |
 | `DOCLING_ARTIFACTS_PATH` | Custom cache directory for Docling-rendered artifacts (bitmaps, intermediate assets). |
+| `DOCSTOKG_HASH_ALG` | Forces content hashing algorithm (`sha1` default, set to `sha256`, `sha512`, etc. when compliance requires). Changing this invalidates resume caches created with a different algorithm. |
 
 ## Schema Versioning Strategy
 
