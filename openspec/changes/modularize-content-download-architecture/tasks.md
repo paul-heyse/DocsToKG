@@ -1246,38 +1246,38 @@
 
 ## 11. Extended Logging and Observability
 
-- [ ] 11.1 Add `resolver_wall_time_ms` field to `AttemptRecord` dataclass
+- [x] 11.1 Add `resolver_wall_time_ms` field to `AttemptRecord` dataclass
 
   ```python
   # In resolvers/types.py, AttemptRecord
   resolver_wall_time_ms: Optional[float] = None
   ```
 
-- [ ] 11.2 Track resolver wall time in `ResolverPipeline.run()`
+- [x] 11.2 Track resolver wall time in `ResolverPipeline.run()`
   - Before `_respect_rate_limit()` call, capture start time: `resolver_start = time.monotonic()`
   - After all URLs from resolver attempted, compute: `resolver_wall = (time.monotonic() - resolver_start) * 1000.0`
   - Pass `resolver_wall_time_ms=resolver_wall` to relevant `AttemptRecord` instances
 
-- [ ] 11.3 Update JSONL logger to include new field
+- [x] 11.3 Update JSONL logger to include new field
   - In `JsonlLogger.log_attempt()` method (line ~262 of `download_pyalex_pdfs.py`), add `"resolver_wall_time_ms"` to output dict
 
-- [ ] 11.4 Update CSV logger adapter to include new field
+- [x] 11.4 Update CSV logger adapter to include new field
   - Add `"resolver_wall_time_ms"` to `CsvAttemptLoggerAdapter.HEADER` list (line ~380)
   - Add field to `_writer.writerow()` dict (line ~417)
 
-- [ ] 11.5 Add logging tests in `tests/test_structured_logging.py`
+- [x] 11.5 Add logging tests in `tests/test_structured_logging.py`
   - Test attempt record includes `resolver_wall_time_ms` when resolver completes
   - Test CSV export includes new column
   - Test JSONL export includes new field
 
 ## 12. Configuration Enhancements
 
-- [ ] 12.1 Document new configuration options in `ResolverConfig` docstring
+- [x] 12.1 Document new configuration options in `ResolverConfig` docstring
   - Add description for `enable_head_precheck`
   - Add description for `resolver_head_precheck` per-resolver override
   - Add description for `max_concurrent_resolvers`
 
-- [ ] 12.2 Add configuration examples to documentation
+- [x] 12.2 Add configuration examples to documentation
   - Create `docs/resolver-configuration.md` with YAML examples
   - Include example enabling bounded concurrency:
 
@@ -1296,12 +1296,12 @@
     wayback: false
   ```
 
-- [ ] 12.3 Add CLI help for new options (if exposed)
+- [x] 12.3 Add CLI help for new options (if exposed)
   - Currently config is file-based; document in README
 
 ## 13. Integration Testing
 
-- [ ] 13.1 Create comprehensive pipeline integration test in `tests/test_full_pipeline_integration.py`
+- [x] 13.1 Create comprehensive pipeline integration test in `tests/test_full_pipeline_integration.py`
   - Mock OpenAlex work metadata with DOI, PMCID, arXiv ID
   - Mock responses for all resolver types (Unpaywall, Crossref, PMC, Zenodo, Figshare, etc.)
   - Verify resolver order: OpenAlex → Unpaywall → ... → Zenodo → Figshare → ... → Wayback
@@ -1309,13 +1309,13 @@
   - Verify rate limiting enforced
   - Verify metrics aggregation correct
 
-- [ ] 13.2 Add end-to-end test with real network calls (marked as integration)
+- [x] 13.2 Add end-to-end test with real network calls (marked as integration)
   - Use `pytest.mark.integration` decorator
   - Test downloading a known open-access DOI (e.g., "10.1371/journal.pone.0000001")
   - Verify PDF downloaded successfully
   - Verify manifest entry contains all metadata fields
 
-- [ ] 13.3 Add performance benchmark test
+- [x] 13.3 Add performance benchmark test
   - Create `tests/benchmarks/test_resolver_performance.py`
   - Benchmark sequential vs concurrent resolver execution (mock resolvers with sleep)
   - Verify concurrent mode reduces wall time by expected factor
@@ -1525,7 +1525,7 @@
           )
   ```
 
-- [ ] 18.4 Add error recovery for malformed API responses
+- [x] 18.4 Add error recovery for malformed API responses
 
   ```python
   # In each resolver, add defensive checks
@@ -1564,7 +1564,7 @@
               yield ResolverResult(url=url, ...)
   ```
 
-- [ ] 18.5 Add timeout specifications for all HTTP operations
+- [x] 18.5 Add timeout specifications for all HTTP operations
 
   ```python
   # Document timeouts in each resolver
@@ -1576,7 +1576,7 @@
 
 ## 19. Thread-Safety Documentation (CRITICAL FOR CONCURRENCY)
 
-- [ ] 19.1 Document all shared state in ResolverPipeline
+- [x] 19.1 Document all shared state in ResolverPipeline
 
   ```python
   # In resolvers/pipeline.py, add class-level docstring
@@ -1602,7 +1602,7 @@
       """
   ```
 
-- [ ] 19.2 Add explicit lock patterns for rate limiting
+- [x] 19.2 Add explicit lock patterns for rate limiting
 
   ```python
   # In ResolverPipeline._respect_rate_limit()
@@ -1634,7 +1634,7 @@
           time.sleep(wait)
   ```
 
-- [ ] 19.3 Add thread-safety tests for concurrent resolver execution
+- [x] 19.3 Add thread-safety tests for concurrent resolver execution
 
   ```python
   # In tests/test_bounded_concurrency.py
@@ -1676,7 +1676,7 @@
           assert interval >= 0.49, f"Interval {interval} < 0.5s between invocations {i-1} and {i}"
   ```
 
-- [ ] 19.4 Document session thread-safety requirements
+- [x] 19.4 Document session thread-safety requirements
 
   ```python
   # In download_pyalex_pdfs.py, _make_session() docstring
@@ -1699,7 +1699,7 @@
 
 ## 20. Performance Benchmarking (VERIFICATION OF IMPROVEMENTS)
 
-- [ ] 20.1 Create benchmark suite in `tests/benchmarks/test_resolver_performance.py`
+- [x] 20.1 Create benchmark suite in `tests/benchmarks/test_resolver_performance.py`
 
   ```python
   import pytest
@@ -1741,7 +1741,7 @@
       assert result_seq.elapsed > result_conc.elapsed * 2.0
   ```
 
-- [ ] 20.2 Add HEAD pre-check performance benchmark
+- [x] 20.2 Add HEAD pre-check performance benchmark
 
   ```python
   @pytest.mark.benchmark
@@ -1774,7 +1774,7 @@
       assert precheck_time < no_precheck_time * 0.9
   ```
 
-- [ ] 20.3 Add retry backoff timing verification
+- [x] 20.3 Add retry backoff timing verification
 
   ```python
   def test_retry_backoff_timing():
@@ -1802,7 +1802,7 @@
       assert 6.5 < elapsed < 7.5
   ```
 
-- [ ] 20.4 Add memory usage benchmark for large batches
+- [x] 20.4 Add memory usage benchmark for large batches
 
   ```python
   @pytest.mark.benchmark

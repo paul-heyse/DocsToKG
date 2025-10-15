@@ -37,6 +37,44 @@ from .optdeps import get_pystow
 pystow = get_pystow()
 
 
+def normalize_license_to_spdx(value: Optional[str]) -> Optional[str]:
+    """Normalize common license strings to canonical SPDX identifiers."""
+
+    if value is None:
+        return None
+    cleaned = " ".join(value.strip().split())
+    if not cleaned:
+        return None
+    lower = cleaned.lower()
+    replacements = {
+        "cc-by": "CC-BY-4.0",
+        "cc by": "CC-BY-4.0",
+        "cc-by-4.0": "CC-BY-4.0",
+        "cc by 4.0": "CC-BY-4.0",
+        "creative commons attribution": "CC-BY-4.0",
+        "creative commons attribution 4.0": "CC-BY-4.0",
+        "cc0": "CC0-1.0",
+        "cc-0": "CC0-1.0",
+        "cc0-1.0": "CC0-1.0",
+        "creative commons zero": "CC0-1.0",
+        "public domain": "CC0-1.0",
+        "apache": "Apache-2.0",
+        "apache 2": "Apache-2.0",
+        "apache 2.0": "Apache-2.0",
+        "apache license": "Apache-2.0",
+        "apache license 2.0": "Apache-2.0",
+    }
+    if lower in replacements:
+        return replacements[lower]
+    if lower.startswith("cc-by") and "4" in lower:
+        return "CC-BY-4.0"
+    if lower.startswith("cc0") or "public domain" in lower or "cc-0" in lower:
+        return "CC0-1.0"
+    if "apache" in lower and "2" in lower:
+        return "Apache-2.0"
+    return cleaned
+
+
 @dataclass(slots=True)
 class FetchPlan:
     """Concrete plan output from a resolver.
@@ -159,12 +197,13 @@ class BaseResolver:
         Returns:
             FetchPlan capturing resolver metadata.
         """
+        normalized_license = normalize_license_to_spdx(license)
         return FetchPlan(
             url=url,
             headers=headers or {},
             filename_hint=filename_hint,
             version=version,
-            license=license,
+            license=normalized_license,
             media_type=media_type,
             service=service,
         )
@@ -524,4 +563,5 @@ __all__ = [
     "SKOSResolver",
     "XBRLResolver",
     "RESOLVERS",
+    "normalize_license_to_spdx",
 ]

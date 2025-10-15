@@ -96,6 +96,9 @@ python -m DocsToKG.ContentDownload.download_pyalex_pdfs --workers 3 --topic "onc
 - ``--resume-from <manifest.jsonl>``: skip works already recorded as successful.
 - ``--extract-html-text``: save plaintext alongside HTML fallbacks (requires ``trafilatura``).
 - ``--enable-resolver openaire`` (and ``hal``/``osf``): opt into additional EU/preprint resolvers.
+- ``--resolver-config config.yaml``: load advanced options such as
+  ``max_concurrent_resolvers`` and ``resolver_head_precheck`` (see
+  ``docs/resolver-configuration.md``).
 
 ### Troubleshooting Content Downloads
 

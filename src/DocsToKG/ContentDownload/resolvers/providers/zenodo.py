@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Iterable
 
 import requests
@@ -14,6 +15,8 @@ from ..types import ResolverConfig, ResolverResult
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
+
+LOGGER = logging.getLogger(__name__)
 
 class ZenodoResolver:
     """Resolve Zenodo records into downloadable open-access PDF URLs.
@@ -60,6 +63,10 @@ class ZenodoResolver:
 
         Raises:
             None
+
+        Notes:
+            All HTTP calls honour per-resolver timeouts by delegating to
+            :meth:`ResolverConfig.get_timeout`.
         """
 
         doi = normalize_doi(artifact.doi)
@@ -101,15 +108,30 @@ class ZenodoResolver:
             return
 
         hits = data.get("hits", {})
-        hits_list = hits.get("hits", []) if isinstance(hits, dict) else []
+        if not isinstance(hits, dict):
+            LOGGER.warning(
+                "Zenodo API returned malformed hits payload: %s", type(hits).__name__
+            )
+            return
+        hits_list = hits.get("hits", [])
+        if not isinstance(hits_list, list):
+            LOGGER.warning(
+                "Zenodo API returned malformed hits list: %s", type(hits_list).__name__
+            )
+            return
         for record in hits_list or []:
             if not isinstance(record, dict):
+                LOGGER.warning("Skipping malformed Zenodo record: %r", record)
                 continue
             files = record.get("files", []) or []
             if not isinstance(files, list):
+                LOGGER.warning("Skipping Zenodo record with invalid files payload: %r", files)
                 continue
             for file_entry in files:
                 if not isinstance(file_entry, dict):
+                    LOGGER.warning(
+                        "Skipping non-dict Zenodo file entry in record %s", record.get("id")
+                    )
                     continue
                 file_type = (file_entry.get("type") or "").lower()
                 file_key = (file_entry.get("key") or "").lower()
