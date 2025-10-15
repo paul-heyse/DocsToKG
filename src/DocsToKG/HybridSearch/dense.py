@@ -620,8 +620,10 @@ class FaissIndexManager:
             )
         try:
             return faiss.index_gpu_to_cpu(index)
-        except Exception:
-            return index
+        except Exception as exc:  # pragma: no cover - hardware specific failure
+            raise RuntimeError(
+                f"Unable to transfer FAISS index from GPU to CPU for serialization: {exc}"
+            ) from exc
 
     def _set_nprobe(self) -> None:
         index = getattr(self, "_index", None)
