@@ -6,6 +6,7 @@ import io
 import logging
 import sys
 import textwrap
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict
 
@@ -144,6 +145,37 @@ def test_download_config_normalizes_allowed_hosts() -> None:
     assert "example.org" in exact
     assert "example.com" in suffixes
     assert "xn--mnchen-3ya.example.org" in exact
+
+
+def test_download_config_polite_headers_defaults() -> None:
+    """Polite HTTP headers should include defaults and tracing identifiers."""
+
+    config = DownloadConfiguration(polite_headers={})
+    headers = config.polite_http_headers(
+        correlation_id="corr123",
+        timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc),
+    )
+
+    assert headers["User-Agent"].startswith("DocsToKG-OntologyDownloader/1.0")
+    assert headers["X-Request-ID"].startswith("corr123-20240101T000000Z")
+    assert "From" not in headers
+
+
+def test_download_config_polite_headers_custom_values() -> None:
+    """Configured polite headers should override defaults and promote mailto."""
+
+    config = DownloadConfiguration(
+        polite_headers={
+            "User-Agent": "CustomAgent/1.0",
+            "mailto": "team@example.org",
+        }
+    )
+
+    headers = config.polite_http_headers(request_id="custom", timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc))
+
+    assert headers["User-Agent"] == "CustomAgent/1.0"
+    assert headers["From"] == "team@example.org"
+    assert headers["X-Request-ID"] == "custom"
 
 
 def test_defaults_config_pydantic() -> None:

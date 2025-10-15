@@ -29,6 +29,8 @@ from __future__ import annotations
 import logging
 import re
 import sys
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -242,6 +244,11 @@ class DownloadConfiguration(BaseModel):
     validate_media_type: bool = Field(default=True)
     rate_limits: Dict[str, str] = Field(default_factory=dict)
     allowed_hosts: Optional[List[str]] = Field(default=None)
+    polite_headers: Dict[str, str] = Field(
+        default_factory=lambda: {
+            "User-Agent": "DocsToKG-OntologyDownloader/1.0 (+https://github.com/allenai/DocsToKG)",
+        }
+    )
 
     @field_validator("rate_limits")
     @classmethod
@@ -368,6 +375,37 @@ class DownloadConfiguration(BaseModel):
             return None
 
         return exact, suffixes
+
+    def polite_http_headers(
+        self,
+        *,
+        correlation_id: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timestamp: Optional[datetime] = None,
+    ) -> Dict[str, str]:
+        """Return polite HTTP headers suitable for resolver API calls."""
+
+        headers: Dict[str, str] = {
+            str(key): str(value)
+            for key, value in (self.polite_headers or {}).items()
+            if str(value).strip()
+        }
+
+        if not any(key.lower() == "user-agent" for key in headers):
+            headers["User-Agent"] = (
+                "DocsToKG-OntologyDownloader/1.0 (+https://github.com/allenai/DocsToKG)"
+            )
+
+        moment = timestamp or datetime.now(timezone.utc)
+        if request_id is None:
+            seed = correlation_id or uuid.uuid4().hex[:12]
+            request_id = f"{seed}-{moment.strftime('%Y%m%dT%H%M%SZ')}"
+        headers.setdefault("X-Request-ID", request_id)
+
+        if "From" not in headers and "mailto" in headers:
+            headers.setdefault("From", headers["mailto"])
+
+        return headers
 
     model_config = {
         "frozen": False,
