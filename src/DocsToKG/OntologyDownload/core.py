@@ -461,7 +461,7 @@ def fetch_one(
     )
 
     download_config = active_config.defaults.http
-    secure_url = validate_url_security(plan.url)
+    secure_url = validate_url_security(plan.url, download_config)
     try:
         result = download_stream(
             url=secure_url,
