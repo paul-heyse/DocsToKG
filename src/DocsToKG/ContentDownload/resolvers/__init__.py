@@ -206,6 +206,9 @@ class ResolverResult:
         event: Optional event label (e.g., ``"error"`` or ``"skipped"``).
         event_reason: Human-readable reason describing the event.
         http_status: HTTP status associated with the event, when available.
+
+    Examples:
+        >>> ResolverResult(url="https://example.org/file.pdf", metadata={"resolver": "core"})
     """
 
     url: Optional[str]
@@ -311,6 +314,18 @@ class AttemptRecord:
         sha256: SHA-256 digest of downloaded content, when available.
         content_length: Size of the downloaded content in bytes.
         dry_run: Flag indicating whether the attempt occurred in dry-run mode.
+
+    Examples:
+        >>> AttemptRecord(
+        ...     work_id="W1",
+        ...     resolver_name="unpaywall",
+        ...     resolver_order=1,
+        ...     url="https://example.org/pdf",
+        ...     status="pdf",
+        ...     http_status=200,
+        ...     content_type="application/pdf",
+        ...     elapsed_ms=120.5,
+        ... )
     """
     work_id: str
     resolver_name: str
@@ -328,7 +343,18 @@ class AttemptRecord:
 
 
 class AttemptLogger(Protocol):
-    """Protocol for logging resolver attempts."""
+    """Protocol for logging resolver attempts.
+
+    Examples:
+        >>> class Collector:
+        ...     def __init__(self):
+        ...         self.records = []
+        ...     def log(self, record: AttemptRecord) -> None:
+        ...         self.records.append(record)
+        >>> collector = Collector()
+        >>> isinstance(collector, AttemptLogger)
+        True
+    """
 
     def log(self, record: AttemptRecord) -> None:
         """Log a resolver attempt.
@@ -343,7 +369,25 @@ class AttemptLogger(Protocol):
 
 @dataclass
 class DownloadOutcome:
-    """Outcome of a resolver download attempt."""
+    """Outcome of a resolver download attempt.
+
+    Attributes:
+        classification: Classification label describing the outcome (e.g., 'pdf').
+        path: Local filesystem path to the stored artifact.
+        http_status: HTTP status code when available.
+        content_type: Content type reported by the server.
+        elapsed_ms: Time spent downloading in milliseconds.
+        error: Optional error string describing failures.
+        sha256: SHA-256 digest of the downloaded content.
+        content_length: Size of the downloaded content in bytes.
+        etag: HTTP ETag header value when provided.
+        last_modified: HTTP Last-Modified timestamp.
+        extracted_text_path: Optional path to extracted text artefacts.
+
+    Examples:
+        >>> DownloadOutcome(classification="pdf", path="pdfs/sample.pdf", http_status=200,
+        ...                 content_type="application/pdf", elapsed_ms=150.0)
+    """
     classification: str
     path: Optional[str]
     http_status: Optional[int]
@@ -380,6 +424,9 @@ class PipelineResult:
         outcome: Download outcome associated with the result.
         html_paths: Collected HTML artefacts from the pipeline.
         reason: Optional reason string explaining failures.
+
+    Examples:
+        >>> PipelineResult(success=True, resolver_name="unpaywall", url="https://example")
     """
     success: bool
     resolver_name: Optional[str] = None
@@ -431,6 +478,8 @@ class Resolver(Protocol):
         Returns:
             Iterable[ResolverResult]: Stream of download candidates or events.
         """
+
+    # Example implementations appear in the concrete resolver classes below.
 
 
 @dataclass

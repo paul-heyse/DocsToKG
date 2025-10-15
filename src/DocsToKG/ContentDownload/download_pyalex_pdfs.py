@@ -541,7 +541,11 @@ def classify_payload(head_bytes: bytes, content_type: str, url: str) -> Optional
         url: Source URL of the payload.
 
     Returns:
-        Classification string or None when unknown.
+        Optional[str]: Classification string or ``None`` when unknown.
+
+    Raises:
+        UnicodeDecodeError: If payload sniffing encounters invalid encoding when
+            decoding the tail of the file (rare; captured by fallback logic).
     """
 
     ctype = (content_type or "").lower()
@@ -588,6 +592,24 @@ class WorkArtifact:
         html_dir: Directory where HTML assets are stored.
         failed_pdf_urls: URLs that failed during resolution.
         metadata: Arbitrary metadata collected during processing.
+
+    Examples:
+        >>> artifact = WorkArtifact(
+        ...     work_id="W123",
+        ...     title="Sample Work",
+        ...     publication_year=2024,
+        ...     doi="10.1234/example",
+        ...     pmid=None,
+        ...     pmcid=None,
+        ...     arxiv_id=None,
+        ...     landing_urls=["https://example.org"],
+        ...     pdf_urls=[],
+        ...     open_access_url=None,
+        ...     source_display_names=["Example Source"],
+        ...     base_stem="2024__Sample_Work__W123",
+        ...     pdf_dir=Path("pdfs"),
+        ...     html_dir=Path("html"),
+        ... )
     """
 
     work_id: str
@@ -612,7 +634,16 @@ class WorkArtifact:
 
 
 class DownloadState(Enum):
-    """State machine for streaming downloads."""
+    """State machine for streaming downloads.
+
+    Attributes:
+        PENDING: Payload type is being sniffed.
+        WRITING: Payload bytes are being streamed to disk.
+
+    Examples:
+        >>> DownloadState.PENDING is DownloadState.WRITING
+        False
+    """
 
     PENDING = "pending"
     WRITING = "writing"
@@ -797,6 +828,9 @@ def create_artifact(work: Dict[str, Any], pdf_dir: Path, html_dir: Path) -> Work
 
     Returns:
         WorkArtifact describing the work and candidate URLs.
+
+    Raises:
+        KeyError: If required identifiers are missing from the work payload.
     """
     work_id = (work.get("id") or "W").rsplit("/", 1)[-1]
     title = work.get("title") or work.get("display_name") or ""
