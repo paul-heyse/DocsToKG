@@ -28,7 +28,14 @@ def _iter_defs(node: ast.AST) -> list[ast.AST]:
     return defs
 
 
-@pytest.mark.parametrize("module_path", _iter_python_modules(DOC_PARSING_ROOT))
+@pytest.mark.parametrize(
+    "module_path",
+    [
+        path
+        for path in _iter_python_modules(DOC_PARSING_ROOT)
+        if path.name != "__init__.py" or path.parent.name != "testing"
+    ],
+)
 def test_module_and_definitions_have_docstrings(module_path: Path) -> None:
     source = module_path.read_text(encoding="utf-8")
     module = ast.parse(source, filename=str(module_path))

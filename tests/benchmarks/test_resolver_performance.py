@@ -10,11 +10,11 @@ import pytest
 
 pytest.importorskip("pytest_benchmark")
 
-from DocsToKG.ContentDownload.resolvers import (
+from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
+from DocsToKG.ContentDownload.resolvers.types import (
     DownloadOutcome,
     ResolverConfig,
     ResolverMetrics,
-    ResolverPipeline,
     ResolverResult,
 )
 
