@@ -26,6 +26,11 @@ from pyalex import config as oa_config
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from DocsToKG.ContentDownload.conditional import (
+    CachedResult,
+    ConditionalRequestHelper,
+    ModifiedResult,
+)
 from DocsToKG.ContentDownload.http import request_with_retries
 from DocsToKG.ContentDownload.resolvers import (
     AttemptRecord,
@@ -956,10 +961,14 @@ def download_candidate(
     previous_sha = previous.get("sha256")
     previous_length = previous.get("content_length")
 
-    if previous_etag:
-        headers["If-None-Match"] = previous_etag
-    if previous_last_modified:
-        headers["If-Modified-Since"] = previous_last_modified
+    cond_helper = ConditionalRequestHelper(
+        prior_etag=previous_etag,
+        prior_last_modified=previous_last_modified,
+        prior_sha256=previous_sha,
+        prior_content_length=previous_length,
+        prior_path=existing_path,
+    )
+    headers.update(cond_helper.build_headers())
 
     start = time.monotonic()
     content_type_hint = ""
@@ -995,16 +1004,19 @@ def download_candidate(
         ) as response:
             elapsed_ms = (time.monotonic() - start) * 1000.0
             if response.status_code == 304:
+                cached = cond_helper.interpret_response(response)
+                if not isinstance(cached, CachedResult):  # pragma: no cover - defensive
+                    raise TypeError("Expected CachedResult for 304 response")
                 return DownloadOutcome(
                     classification="cached",
-                    path=existing_path,
+                    path=cached.path,
                     http_status=response.status_code,
                     content_type=response.headers.get("Content-Type") or content_type_hint,
                     elapsed_ms=elapsed_ms,
-                    sha256=previous_sha,
-                    content_length=previous_length,
-                    etag=previous_etag,
-                    last_modified=previous_last_modified,
+                    sha256=cached.sha256,
+                    content_length=cached.content_length,
+                    etag=cached.etag,
+                    last_modified=cached.last_modified,
                 )
 
             if response.status_code != 200:
@@ -1015,6 +1027,8 @@ def download_candidate(
                     content_type=response.headers.get("Content-Type"),
                     elapsed_ms=elapsed_ms,
                 )
+
+            modified_result: ModifiedResult = cond_helper.interpret_response(response)
 
             content_type = response.headers.get("Content-Type") or content_type_hint
             sniff_buffer = bytearray()
@@ -1075,8 +1089,8 @@ def download_candidate(
                     flagged_unknown=flagged_unknown,
                     sha256=None,
                     content_length=None,
-                    etag=response.headers.get("ETag") or previous_etag,
-                    last_modified=response.headers.get("Last-Modified") or previous_last_modified,
+                    etag=modified_result.etag,
+                    last_modified=modified_result.last_modified,
                     extracted_text_path=None,
                     dry_run=True,
                 )
@@ -1129,8 +1143,8 @@ def download_candidate(
                 flagged_unknown=flagged_unknown,
                 sha256=sha256,
                 content_length=content_length,
-                etag=response.headers.get("ETag"),
-                last_modified=response.headers.get("Last-Modified"),
+                etag=modified_result.etag,
+                last_modified=modified_result.last_modified,
                 extracted_text_path=extracted_text_path,
                 dry_run=False,
             )

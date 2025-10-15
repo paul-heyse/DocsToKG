@@ -325,11 +325,11 @@
 
 ## 2. Conditional Request Helper
 
-- [ ] 2.1 Create `src/DocsToKG/ContentDownload/conditional.py` module skeleton
+- [x] 2.1 Create `src/DocsToKG/ContentDownload/conditional.py` module skeleton
   - Import `dataclass`, `Optional`, `Dict`, `requests`
   - Add module docstring: "Conditional HTTP request helpers for ETag and Last-Modified caching."
 
-- [ ] 2.2 Define `CachedResult` dataclass
+- [x] 2.2 Define `CachedResult` dataclass
 
   ```python
   @dataclass
@@ -342,7 +342,7 @@
       last_modified: Optional[str]
   ```
 
-- [ ] 2.3 Define `ModifiedResult` dataclass
+- [x] 2.3 Define `ModifiedResult` dataclass
 
   ```python
   @dataclass
@@ -352,7 +352,7 @@
       last_modified: Optional[str]
   ```
 
-- [ ] 2.4 Implement `ConditionalRequestHelper` class initialization
+- [x] 2.4 Implement `ConditionalRequestHelper` class initialization
 
   ```python
   class ConditionalRequestHelper:
@@ -371,7 +371,7 @@
           self.prior_path = prior_path
   ```
 
-- [ ] 2.5 Implement `build_headers()` method
+- [x] 2.5 Implement `build_headers()` method
 
   ```python
   def build_headers(self) -> Dict[str, str]:
@@ -384,7 +384,7 @@
       return headers
   ```
 
-- [ ] 2.6 Implement `interpret_response()` method
+- [x] 2.6 Implement `interpret_response()` method
 
   ```python
   def interpret_response(
@@ -407,13 +407,13 @@
       )
   ```
 
-- [ ] 2.7 Update `download_candidate()` in `download_pyalex_pdfs.py` to use helper
+- [x] 2.7 Update `download_candidate()` in `download_pyalex_pdfs.py` to use helper
   - Import `ConditionalRequestHelper`, `CachedResult`, `ModifiedResult`
   - At line ~950, create helper instance: `cond_helper = ConditionalRequestHelper(prior_etag=previous_etag, ...)`
   - Replace manual header building (lines ~958-961) with `headers.update(cond_helper.build_headers())`
   - Replace 304 handling block (lines ~988-999) with: `result = cond_helper.interpret_response(response); if isinstance(result, CachedResult): return DownloadOutcome(...)`
 
-- [ ] 2.8 Add unit tests in `tests/test_conditional_requests.py`
+- [x] 2.8 Add unit tests in `tests/test_conditional_requests.py`
   - Test `build_headers()` with no prior data (empty dict)
   - Test `build_headers()` with ETag only
   - Test `build_headers()` with Last-Modified only
