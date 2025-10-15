@@ -38,6 +38,7 @@ class FetchPlan:
         version: Version identifier derived from resolver metadata.
         license: License reported for the ontology.
         media_type: MIME type of the artifact when known.
+        service: Logical service identifier used for rate limiting.
 
     Examples:
         >>> plan = FetchPlan(
@@ -47,9 +48,10 @@ class FetchPlan:
         ...     version="2024-01-01",
         ...     license="CC-BY",
         ...     media_type="application/rdf+xml",
+        ...     service="ols",
         ... )
-        >>> plan.version
-        '2024-01-01'
+        >>> plan.service
+        'ols'
     """
 
     url: str
@@ -58,6 +60,7 @@ class FetchPlan:
     version: Optional[str]
     license: Optional[str]
     media_type: Optional[str]
+    service: Optional[str] = None
 
 
 class BaseResolver:
@@ -116,6 +119,7 @@ class BaseResolver:
         version: Optional[str] = None,
         license: Optional[str] = None,
         media_type: Optional[str] = None,
+        service: Optional[str] = None,
     ) -> FetchPlan:
         return FetchPlan(
             url=url,
@@ -124,6 +128,7 @@ class BaseResolver:
             version=version,
             license=license,
             media_type=media_type,
+            service=service,
         )
 
 
@@ -172,7 +177,11 @@ class OBOResolver(BaseResolver):
                         "url": url,
                     },
                 )
-                return self._build_plan(url=url, media_type="application/rdf+xml")
+                return self._build_plan(
+                    url=url,
+                    media_type="application/rdf+xml",
+                    service=spec.resolver,
+                )
         raise ConfigError(f"No download link found via Bioregistry for {spec.id}")
 
 
@@ -263,7 +272,11 @@ class OLSResolver(BaseResolver):
             extra={"stage": "plan", "resolver": "ols", "ontology_id": spec.id, "url": download_url},
         )
         return self._build_plan(
-            url=download_url, filename_hint=filename, version=version, license=license_value
+            url=download_url,
+            filename_hint=filename,
+            version=version,
+            license=license_value,
+            service=spec.resolver,
         )
 
 
@@ -359,7 +372,11 @@ class BioPortalResolver(BaseResolver):
             },
         )
         return self._build_plan(
-            url=download_url, headers=headers, version=version, license=license_value
+            url=download_url,
+            headers=headers,
+            version=version,
+            license=license_value,
+            service=spec.resolver,
         )
 
 
@@ -396,7 +413,11 @@ class SKOSResolver(BaseResolver):
             "resolved download url",
             extra={"stage": "plan", "resolver": "skos", "ontology_id": spec.id, "url": url},
         )
-        return self._build_plan(url=url, media_type="text/turtle")
+        return self._build_plan(
+            url=url,
+            media_type="text/turtle",
+            service=spec.resolver,
+        )
 
 
 class XBRLResolver(BaseResolver):
@@ -432,7 +453,11 @@ class XBRLResolver(BaseResolver):
             "resolved download url",
             extra={"stage": "plan", "resolver": "xbrl", "ontology_id": spec.id, "url": url},
         )
-        return self._build_plan(url=url, media_type="application/zip")
+        return self._build_plan(
+            url=url,
+            media_type="application/zip",
+            service=spec.resolver,
+        )
 
 
 RESOLVERS = {

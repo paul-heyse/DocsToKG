@@ -61,9 +61,17 @@ List of extracted file paths.
 Raises:
 ConfigError: If the archive contains unsafe paths or is missing.
 
-### `_get_bucket(host, http_config)`
+### `_get_bucket(host, http_config, service=None)`
 
-*No documentation available.*
+Return (and cache) a token bucket enforcing rate limits for a host/service pair.
+
+Args:
+host: Hostname derived from the download URL.
+http_config: Download configuration containing rate limit definitions.
+service: Optional logical service identifier (e.g., ``"ols"``).
+
+Returns:
+TokenBucket configured with the appropriate requests-per-second value.
 
 ### `download_stream()`
 
@@ -77,6 +85,8 @@ previous_manifest: Manifest metadata from a prior run, used for caching.
 http_config: Download configuration containing timeouts and limits.
 cache_dir: Directory where intermediary cached files are stored.
 logger: Logger adapter for structured download telemetry.
+expected_media_type: Expected Content-Type for validation, if known.
+service: Logical service identifier used for rate limiting.
 
 Returns:
 DownloadResult describing the final artifact and metadata.
@@ -130,7 +140,7 @@ Examples:
 
 ### `TokenBucket`
 
-Simple token bucket implementation for per-host rate limiting.
+Simple token bucket implementation for per-host and per-service rate limiting.
 
 Attributes:
 rate: Token replenishment rate per second.

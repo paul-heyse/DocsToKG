@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Sequence
 
+from .cli_utils import format_table, format_validation_summary
 from .config import ConfigError, ResolvedConfig, load_config, validate_config
 from .core import (
     CONFIG_DIR,
@@ -97,6 +98,7 @@ EXAMPLE_SOURCES_YAML = """# Example configuration for ontology downloader\ndefau
     backoff_factor: 0.5
     per_host_rate_limit: "4/second"
     max_download_size_gb: 5
+    validate_media_type: true
   validation:
     skip_reasoning_if_size_mb: 500
     parser_timeout_sec: 60
@@ -138,36 +140,6 @@ def _results_to_dict(result: FetchResult) -> dict:
         "manifest": str(result.manifest_path),
         "artifacts": list(result.artifacts),
     }
-
-
-def _format_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
-    widths = [len(header) for header in headers]
-    for row in rows:
-        for idx, cell in enumerate(row):
-            widths[idx] = max(widths[idx], len(cell))
-
-    def _format_row(values: Sequence[str]) -> str:
-        return " | ".join(value.ljust(widths[idx]) for idx, value in enumerate(values))
-
-    line = "-+-".join("-" * width for width in widths)
-    output = [_format_row(headers), line]
-    output.extend(_format_row(row) for row in rows)
-    return "\n".join(output)
-
-
-def _format_validation_summary(results: dict) -> str:
-    rows: List[Sequence[str]] = []
-    for name, payload in results.items():
-        status = "ok" if payload.get("ok") else "error"
-        details = payload.get("details", {})
-        message = ""
-        if isinstance(details, dict):
-            if "error" in details:
-                message = str(details["error"])
-            elif details:
-                message = ", ".join(f"{k}={v}" for k, v in details.items())
-        rows.append((name, status, message))
-    return _format_table(("validator", "status", "details"), rows)
 
 
 def _ensure_manifest_path(ontology_id: str, version: Optional[str]) -> Path:
@@ -310,7 +282,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 sys.stdout.write("\n")
             else:
                 if results:
-                    table = _format_table(
+                    table = format_table(
                         ("id", "resolver", "status", "sha256", "file"),
                         [
                             (
@@ -343,7 +315,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 json.dump(summary, sys.stdout, indent=2)
                 sys.stdout.write("\n")
             else:
-                print(_format_validation_summary(summary))
+                print(format_validation_summary(summary))
         elif args.command == "init":
             _handle_init(args.path)
         elif args.command == "config" and args.config_command == "validate":

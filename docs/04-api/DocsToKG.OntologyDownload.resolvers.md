@@ -15,7 +15,19 @@ downloading ontology content.
 
 ### `_build_plan(self)`
 
-*No documentation available.*
+Create a FetchPlan instance with resolver metadata and service identifier.
+
+Args:
+url: Final download URL returned by the resolver.
+headers: Optional HTTP headers required by the upstream service.
+filename_hint: Suggested filename derived from resolver metadata.
+version: Optional ontology version string.
+license: Optional license text supplied by the service.
+media_type: Optional MIME type describing the artifact.
+service: Optional logical service identifier for rate limiting.
+
+Returns:
+FetchPlan populated with the provided metadata.
 
 ### `plan(self, spec, config, logger)`
 
@@ -119,6 +131,7 @@ filename_hint: Optional filename recommended by the resolver.
 version: Version identifier derived from resolver metadata.
 license: License reported for the ontology.
 media_type: MIME type of the artifact when known.
+service: Logical service identifier used for rate limiting (e.g., ``"ols"``).
 
 Examples:
 >>> plan = FetchPlan(
@@ -128,9 +141,10 @@ Examples:
 ...     version="2024-01-01",
 ...     license="CC-BY",
 ...     media_type="application/rdf+xml",
+...     service="ols",
 ... )
->>> plan.version
-'2024-01-01'
+>>> plan.service
+'ols'
 
 ### `BaseResolver`
 

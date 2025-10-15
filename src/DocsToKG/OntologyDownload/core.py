@@ -443,6 +443,11 @@ def fetch_one(
 
     _ensure_license_allowed(plan, active_config, spec)
 
+    if plan.service:
+        adapter.extra["service"] = plan.service
+    else:
+        adapter.extra.pop("service", None)
+
     destination = _build_destination(spec, plan, active_config)
     manifest_path = destination.parent.parent / "manifest.json"
     previous_manifest = None if force else _read_manifest(manifest_path)
@@ -468,6 +473,8 @@ def fetch_one(
             http_config=download_config,
             cache_dir=CACHE_DIR,
             logger=adapter,
+            expected_media_type=plan.media_type,
+            service=plan.service,
         )
     except ConfigError as exc:
         raise OntologyDownloadError(f"Download failed for '{spec.id}': {exc}") from exc
