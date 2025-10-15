@@ -602,11 +602,11 @@
 
 ## 4. Path Handling Refactoring
 
-- [ ] 4.1 Update `DoclingHybridChunkerPipelineWithMin.py` imports
+- [x] 4.1 Update `DoclingHybridChunkerPipelineWithMin.py` imports
   - Add: `from DocsToKG.DocParsing._common import detect_data_root, data_doctags, data_chunks`
   - Remove local path discovery code
 
-- [ ] 4.2 Replace DEFAULT_IN_DIR and DEFAULT_OUT_DIR
+- [x] 4.2 Replace DEFAULT_IN_DIR and DEFAULT_OUT_DIR
   - **Before**:
 
     ```python
@@ -622,16 +622,16 @@
     DEFAULT_OUT_DIR = data_chunks()
     ```
 
-- [ ] 4.3 Update `run_docling_html_to_doctags_parallel.py`
+- [x] 4.3 Update `run_docling_html_to_doctags_parallel.py`
   - Replace `detect_data_root` function (lines 52-65) with import: `from DocsToKG.DocParsing._common import detect_data_root`
   - Update all references to use imported version
 
-- [ ] 4.4 Update `run_docling_parallel_with_vllm_debug.py`
+- [x] 4.4 Update `run_docling_parallel_with_vllm_debug.py`
   - Replace `find_data_root` function (lines 28-45) with import
   - Replace `find_free_port` function (lines 163-178) with import from `_common`
   - Update DEFAULT_INPUT and DEFAULT_OUTPUT to use `data_pdfs()` and `data_doctags()`
 
-- [ ] 4.5 Update `EmbeddingV2.py` to remove hardcoded paths
+- [x] 4.5 Update `EmbeddingV2.py` to remove hardcoded paths
   - **Before**:
 
     ```python
@@ -649,7 +649,7 @@
 
   - Update argparse defaults to use these
 
-- [ ] 4.6 Add --data-root CLI flag to all scripts
+- [x] 4.6 Add --data-root CLI flag to all scripts
   - **Implementation for each script**:
 
     ```python
@@ -663,7 +663,7 @@
 
   - Pass this value to path resolution functions: `data_chunks(args.data_root)`
 
-- [ ] 4.7 Validate path refactoring with integration test
+- [x] 4.7 Validate path refactoring with integration test
   - Create test script that:
     1. Sets DOCSTOKG_DATA_ROOT to temp directory
     2. Runs each script with --help to verify imports work
@@ -672,7 +672,7 @@
 
 ## 5. CUDA Safety for Multiprocessing
 
-- [ ] 5.1 Add spawn mode enforcement to `run_docling_parallel_with_vllm_debug.py`
+- [x] 5.1 Add spawn mode enforcement to `run_docling_parallel_with_vllm_debug.py`
   - **Location**: At the very beginning of `main()` function (before line 449)
   - **Implementation**:
 
@@ -696,12 +696,12 @@
         # ... rest of main() ...
     ```
 
-- [ ] 5.2 Verify HTML script already has spawn mode
+- [x] 5.2 Verify HTML script already has spawn mode
   - Check `run_docling_html_to_doctags_parallel.py` line 133-136
   - Ensure try-except wrapper is present
   - Confirm it sets spawn mode
 
-- [ ] 5.3 Add diagnostic logging
+- [x] 5.3 Add diagnostic logging
   - After spawn mode is set, log: `logger.info(f"Multiprocessing method: {mp.get_start_method()}, CPU count: {os.cpu_count()}")`
 
 - [ ] 5.4 Add unit test for spawn verification

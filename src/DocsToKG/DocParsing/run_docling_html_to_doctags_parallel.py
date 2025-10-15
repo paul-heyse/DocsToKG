@@ -19,6 +19,11 @@ from typing import List, Tuple
 
 from tqdm import tqdm
 
+from DocsToKG.DocParsing._common import data_doctags, data_html, detect_data_root
+
+DEFAULT_INPUT_DIR = data_html()
+DEFAULT_OUTPUT_DIR = data_doctags()
+
 # keep numeric libs polite; also ensure nothing touches CUDA by mistake
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
@@ -47,22 +52,6 @@ def _get_converter() -> DocumentConverter:
             format_options={InputFormat.HTML: HTMLFormatOption(backend=HTMLDocumentBackend)}
         )
     return _CONVERTER
-
-
-def detect_data_root(start: Path) -> Path:
-    """Locate the DocsToKG `Data` directory relative to a starting path.
-
-    Args:
-        start: Directory from which to begin scanning for `Data/HTML`.
-
-    Returns:
-        Path pointing to the discovered `Data` directory, or `<start>/Data`
-        when no ancestor contains the expected layout.
-    """
-    for anc in (start, *start.parents):
-        if (anc / "Data" / "HTML").is_dir():
-            return anc / "Data"
-    return start / "Data"
 
 
 def list_htmls(root: Path) -> List[Path]:
@@ -135,16 +124,27 @@ def main():
     except RuntimeError:
         pass  # already set
 
-    ENV_DATA_ROOT = os.getenv("DOCSTOKG_DATA_ROOT")
-    script_dir = Path(__file__).resolve().parent
-    data_root = Path(ENV_DATA_ROOT) if ENV_DATA_ROOT else detect_data_root(script_dir)
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--input", type=Path, default=data_root / "HTML", help="Folder with HTML files (recurses)"
+        "--data-root",
+        type=Path,
+        default=None,
+        help=(
+            "Override DocsToKG Data directory. Defaults to auto-detection or "
+            "$DOCSTOKG_DATA_ROOT."
+        ),
     )
     parser.add_argument(
-        "--output", type=Path, default=data_root / "DocTagsFiles", help="Destination for .doctags"
+        "--input",
+        type=Path,
+        default=DEFAULT_INPUT_DIR,
+        help="Folder with HTML files (recurses)",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_OUTPUT_DIR,
+        help="Destination for .doctags",
     )
     parser.add_argument(
         "--workers", type=int, default=max(1, (os.cpu_count() or 8) - 1), help="Parallel workers"
@@ -154,8 +154,22 @@ def main():
     )
     args = parser.parse_args()
 
-    input_dir: Path = args.input.resolve()
-    output_dir: Path = args.output.resolve()
+    data_root_override = args.data_root
+    resolved_root = (
+        detect_data_root(data_root_override)
+        if data_root_override is not None
+        else detect_data_root()
+    )
+
+    if args.input == DEFAULT_INPUT_DIR and data_root_override is not None:
+        input_dir: Path = data_html(resolved_root)
+    else:
+        input_dir = args.input.resolve()
+
+    if args.output == DEFAULT_OUTPUT_DIR and data_root_override is not None:
+        output_dir: Path = data_doctags(resolved_root)
+    else:
+        output_dir = args.output.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Input : {input_dir}")

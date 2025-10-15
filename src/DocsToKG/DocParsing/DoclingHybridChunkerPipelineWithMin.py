@@ -13,7 +13,7 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import List, Tuple
 
 # Third-party imports
 from docling_core.transforms.chunker.base import BaseChunk
@@ -22,8 +22,19 @@ from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTok
 from docling_core.types.doc.document import DoclingDocument, DocTagsDocument
 from transformers import AutoTokenizer
 
-from DocsToKG.DocParsing._common import data_chunks, data_doctags, iter_doctags
+from DocsToKG.DocParsing._common import (
+    data_chunks,
+    data_doctags,
+    detect_data_root,
+    get_logger,
+    iter_doctags,
+)
 from DocsToKG.DocParsing.serializers import RichSerializerProvider
+
+# ---------- Defaults ----------
+DEFAULT_DATA_ROOT = detect_data_root()
+DEFAULT_IN_DIR = data_doctags(DEFAULT_DATA_ROOT)
+DEFAULT_OUT_DIR = data_chunks(DEFAULT_DATA_ROOT)
 
 # ---------- Helpers ----------
 def read_utf8(p: Path) -> str:
@@ -241,27 +252,65 @@ def coalesce_small_runs(
 
 # ---------- Main ----------
 def main():
-    """CLI driver that chunks DocTags files and enforces minimum token thresholds.
+    """CLI driver that chunks DocTags files and enforces minimum token thresholds."""
 
-    Args:
-        None
+    logger = get_logger(__name__)
 
-    Returns:
-        None
-    """
     ap = argparse.ArgumentParser()
-    ap.add_argument("--in-dir", type=Path, default=data_doctags())
-    ap.add_argument("--out-dir", type=Path, default=data_chunks())
+    ap.add_argument(
+        "--data-root",
+        type=Path,
+        default=None,
+        help=(
+            "Override DocsToKG Data directory. Defaults to auto-detection or "
+            "$DOCSTOKG_DATA_ROOT."
+        ),
+    )
+    ap.add_argument("--in-dir", type=Path, default=DEFAULT_IN_DIR)
+    ap.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     ap.add_argument("--min-tokens", type=int, default=256)
     ap.add_argument("--max-tokens", type=int, default=512)
     args = ap.parse_args()
 
-    in_dir, out_dir = args.in_dir, args.out_dir
+    data_root_override = args.data_root
+    resolved_data_root = (
+        detect_data_root(data_root_override)
+        if data_root_override is not None
+        else DEFAULT_DATA_ROOT
+    )
+
+    in_dir = (
+        data_doctags(resolved_data_root)
+        if args.in_dir == DEFAULT_IN_DIR and data_root_override is not None
+        else args.in_dir
+    )
+    out_dir = (
+        data_chunks(resolved_data_root)
+        if args.out_dir == DEFAULT_OUT_DIR and data_root_override is not None
+        else args.out_dir
+    )
+
+    logger.info(
+        "Chunking configuration",
+        extra={
+            "extra_fields": {
+                "data_root": str(resolved_data_root),
+                "input_dir": str(in_dir),
+                "output_dir": str(out_dir),
+                "min_tokens": args.min_tokens,
+                "max_tokens": args.max_tokens,
+            }
+        },
+    )
+
     out_dir.mkdir(parents=True, exist_ok=True)
 
     files = list(iter_doctags(in_dir))
     if not files:
-        print(f"[WARN] No *.doctags files found in {in_dir}")
+        logger.warning(
+            "No .doctags files found",
+            extra={"extra_fields": {"input_dir": str(in_dir)}},
+        )
         return
 
     # Tokenizer (BERT family) → 512 cap applied to contextualized text
@@ -314,7 +363,16 @@ def main():
                     "page_nos": r.pages,
                 }
                 f.write(json.dumps(obj, ensure_ascii=False) + "\n")
-        print(f"[OK] {name}: {len(final_recs)} chunks  →  {out_path.name}")
+        logger.info(
+            "Chunk file written",
+            extra={
+                "extra_fields": {
+                    "doc_id": name,
+                    "chunks": len(final_recs),
+                    "output_file": out_path.name,
+                }
+            },
+        )
 
 
 if __name__ == "__main__":

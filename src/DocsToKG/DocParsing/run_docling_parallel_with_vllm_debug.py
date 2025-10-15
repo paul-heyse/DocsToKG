@@ -23,55 +23,47 @@ from typing import List, Optional, Tuple
 import requests
 from tqdm import tqdm
 
+from DocsToKG.DocParsing._common import (
+    data_doctags,
+    data_pdfs,
+    detect_data_root,
+    find_free_port,
+    get_logger,
+)
+
 
 # -------- Paths --------
-def find_data_root(start: Path) -> Path:
-    """Locate the DocsToKG data directory starting from a filesystem path.
-
-    Args:
-        start: Directory to begin searching from; ancestors are inspected as well.
-
-    Returns:
-        Path pointing to a directory that contains the expected `PDFs` subdirectory.
-        Falls back to `<start>/Data` when no ancestor contains the structure.
-    """
-    start = (
-        start.resolve()
-    )  # normalize before walking upward  # docs: pathlib.resolve()  :contentReference[oaicite:1]{index=1}
-    for anc in (start, *start.parents):
-        candidate = anc / "Data"
-        if (candidate / "PDFs").is_dir():
-            return candidate
-    return start / "Data"
+DEFAULT_DATA_ROOT = detect_data_root()
+DEFAULT_INPUT = data_pdfs(DEFAULT_DATA_ROOT)
+DEFAULT_OUTPUT = data_doctags(DEFAULT_DATA_ROOT)
 
 
-# Optional: env override
-ENV_DATA_ROOT = os.getenv(
-    "DOCSTOKG_DATA_ROOT"
-)  # set to /home/paul/DocsToKG/src/DocsToKG/Data if you like  :contentReference[oaicite:2]{index=2}
+def parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for the DocTags conversion pipeline."""
 
-# Compute defaults
-SCRIPT_DIR = Path(__file__).resolve().parent
-DEFAULT_DATA_ROOT = Path(ENV_DATA_ROOT) if ENV_DATA_ROOT else find_data_root(SCRIPT_DIR)
-DEFAULT_INPUT = DEFAULT_DATA_ROOT / "PDFs"
-DEFAULT_OUTPUT = DEFAULT_DATA_ROOT / "DocTagsFiles"
-
-# CLI (still allows explicit overrides)
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--input", type=Path, default=DEFAULT_INPUT, help="Folder with PDFs (recurses)."
-)
-parser.add_argument(
-    "--output", type=Path, default=DEFAULT_OUTPUT, help="Folder for Doctags output."
-)
-args = parser.parse_args()
-
-INPUT_DIR = args.input
-OUTPUT_DIR = args.output
-
-print(f"Resolved Data root: {DEFAULT_DATA_ROOT}")
-print(f"Input : {INPUT_DIR}")
-print(f"Output: {OUTPUT_DIR}")
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--data-root",
+        type=Path,
+        default=None,
+        help=(
+            "Override DocsToKG Data directory. Defaults to auto-detection or "
+            "$DOCSTOKG_DATA_ROOT."
+        ),
+    )
+    parser.add_argument(
+        "--input",
+        type=Path,
+        default=DEFAULT_INPUT,
+        help="Folder with PDFs (recurses).",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_OUTPUT,
+        help="Folder for Doctags output.",
+    )
+    return parser.parse_args()
 
 MODEL_PATH = "/home/paul/hf-cache/granite-docling-258M"  # local untied snapshot
 
@@ -158,24 +150,6 @@ def probe_metrics(port: int, timeout=2.5) -> Tuple[bool, Optional[int]]:
         return (r.status_code == 200), r.status_code
     except Exception:
         return (False, None)
-
-
-def find_free_port(start: int, span: int = PORT_SCAN_SPAN) -> int:
-    """Find an available TCP port, scanning forwards from a starting point.
-
-    Args:
-        start: First port number to test.
-        span: Maximum number of sequential ports to probe for availability.
-
-    Returns:
-        Available port number suitable for binding a local server.
-    """
-    for p in range(start, start + span):
-        if port_is_free(p):
-            return p
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]  # bind-to-0 to get a free ephemeral port
 
 
 def stream_logs(proc: sp.Popen, prefix="[vLLM] "):
@@ -446,27 +420,98 @@ def main():
     Returns:
         None
     """
-    print(f"Input : {INPUT_DIR}")
-    print(f"Output: {OUTPUT_DIR}")
-    if ARTIFACTS:
-        print(f"Artifacts cache: {ARTIFACTS}")
+    import multiprocessing as mp
 
-    INPUT_DIR.mkdir(parents=True, exist_ok=True)
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Ensure/launch vLLM
-    print("Ensuring vLLM server...")
-    port, proc, owns = ensure_vllm(PREFERRED_PORT)
-    print(f"Using vLLM on port {port} (owns_process={owns})")
+    logger = get_logger(__name__)
 
     try:
-        pdfs = list_pdfs(INPUT_DIR)
+        mp.set_start_method("spawn", force=True)
+        logger.info("Multiprocessing start method set to 'spawn' for CUDA safety")
+    except RuntimeError:
+        current_method = mp.get_start_method()
+        if current_method != "spawn":
+            logger.warning(
+                "Could not force spawn mode; current method is '%s'. CUDA operations in workers may fail.",
+                current_method,
+            )
+    logger.info(
+        "Multiprocessing method: %s, CPU count: %s",
+        mp.get_start_method(),
+        os.cpu_count(),
+    )
+    logger.info(
+        "Multiprocessing method established",
+        extra={
+            "extra_fields": {
+                "start_method": mp.get_start_method(),
+                "cpu_count": os.cpu_count(),
+            }
+        },
+    )
+
+    args = parse_args()
+    data_root_override = args.data_root
+    resolved_root = (
+        detect_data_root(data_root_override)
+        if data_root_override is not None
+        else DEFAULT_DATA_ROOT
+    )
+
+    if args.input == DEFAULT_INPUT and data_root_override is not None:
+        input_dir = data_pdfs(resolved_root)
+    else:
+        input_dir = args.input.resolve()
+
+    if args.output == DEFAULT_OUTPUT and data_root_override is not None:
+        output_dir = data_doctags(resolved_root)
+    else:
+        output_dir = args.output.resolve()
+
+    input_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info(
+        "I/O configuration",
+        extra={
+            "extra_fields": {
+                "data_root": str(resolved_root),
+                "input_dir": str(input_dir),
+                "output_dir": str(output_dir),
+                "artifacts_cache": ARTIFACTS or "",
+            }
+        },
+    )
+
+    port, proc, owns = ensure_vllm(PREFERRED_PORT)
+    logger.info(
+        "vLLM server ready",
+        extra={
+            "extra_fields": {
+                "port": port,
+                "owns_process": owns,
+            }
+        },
+    )
+
+    try:
+        pdfs = list_pdfs(input_dir)
         if not pdfs:
-            print("No PDFs found. Exiting.")
+            logger.warning(
+                "No PDFs found",
+                extra={"extra_fields": {"input_dir": str(input_dir)}},
+            )
             return
 
-        print(f"Found {len(pdfs)} PDFs. Launching {DEFAULT_WORKERS} workers...")
-        tasks = [(p, OUTPUT_DIR, port) for p in pdfs]
+        logger.info(
+            "Launching workers",
+            extra={
+                "extra_fields": {
+                    "pdf_count": len(pdfs),
+                    "workers": DEFAULT_WORKERS,
+                }
+            },
+        )
+        tasks = [(p, output_dir, port) for p in pdfs]
         ok = fail = skip = 0
         with ProcessPoolExecutor(max_workers=DEFAULT_WORKERS) as ex:
             futures = [ex.submit(convert_one, t) for t in tasks]
@@ -479,13 +524,30 @@ def main():
                         skip += 1
                     else:
                         fail += 1
-                        print(f"[FAIL] {name}: {status}")
+                        logger.error(
+                            "Conversion failed",
+                            extra={
+                                "extra_fields": {
+                                    "doc_id": name,
+                                    "status": status,
+                                }
+                            },
+                        )
                     pbar.update(1)
 
-        print(f"\nDone. ok={ok}, skip={skip}, fail={fail}")
+        logger.info(
+            "Conversion summary",
+            extra={
+                "extra_fields": {
+                    "ok": ok,
+                    "skip": skip,
+                    "fail": fail,
+                }
+            },
+        )
     finally:
         stop_vllm(proc, owns, grace=10)
-        print("All done.")
+        logger.info("All done")
 
 
 if __name__ == "__main__":
