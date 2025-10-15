@@ -104,6 +104,10 @@ def test_chunk_and_embed_cli_with_dependency_stubs(
 
     assert any(row["stage"] == "chunks" and row["status"] == "success" for row in chunk_rows)
     assert any(row["stage"] == "embeddings" and row["status"] == "success" for row in embed_rows)
+    for rows in (chunk_rows, embed_rows):
+        for row in rows:
+            if "input_hash" in row:
+                assert row["hash_alg"] == "sha1"
 
 
 def test_embedding_dependency_guard_message(monkeypatch: pytest.MonkeyPatch) -> None:
