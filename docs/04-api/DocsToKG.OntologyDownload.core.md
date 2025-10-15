@@ -11,23 +11,55 @@ metadata that downstream knowledge graph construction can rely upon.
 
 ### `_read_manifest(manifest_path)`
 
-*No documentation available.*
+Return previously recorded manifest data if a valid JSON file exists.
+
+Args:
+manifest_path: Filesystem path where the manifest is stored.
+
+Returns:
+Parsed manifest dictionary when available and valid, otherwise ``None``.
 
 ### `_validate_manifest(manifest)`
 
-*No documentation available.*
+Check that a manifest instance satisfies structural and type requirements.
+
+Args:
+manifest: Manifest produced after a download completes.
+
+Raises:
+ConfigurationError: If required fields are missing or contain invalid types.
 
 ### `_write_manifest(manifest_path, manifest)`
 
-*No documentation available.*
+Persist a validated manifest to disk as JSON.
+
+Args:
+manifest_path: Destination path for the manifest file.
+manifest: Manifest describing the downloaded ontology artifact.
 
 ### `_build_destination(spec, plan, config)`
 
-*No documentation available.*
+Determine the output directory and filename for a download.
+
+Args:
+spec: Fetch specification identifying the ontology.
+plan: Resolver plan containing URL metadata and optional hints.
+config: Resolved configuration with storage layout parameters.
+
+Returns:
+Path where the raw ontology artifact should be written.
 
 ### `_ensure_license_allowed(plan, config, spec)`
 
-*No documentation available.*
+Confirm the ontology license is present in the configured allow list.
+
+Args:
+plan: Resolver plan returned for the ontology.
+config: Resolved configuration containing accepted licenses.
+spec: Fetch specification for contextual error reporting.
+
+Raises:
+ConfigurationError: If the plan's license is not permitted.
 
 ### `fetch_one(spec)`
 

@@ -319,6 +319,14 @@ for directory in (CONFIG_DIR, CACHE_DIR, LOG_DIR, ONTOLOGY_DIR):
 
 
 def _read_manifest(manifest_path: Path) -> Optional[dict]:
+    """Return previously recorded manifest data if a valid JSON file exists.
+
+    Args:
+        manifest_path: Filesystem path where the manifest is stored.
+
+    Returns:
+        Parsed manifest dictionary when available and valid, otherwise ``None``.
+    """
     if not manifest_path.exists():
         return None
     try:
@@ -328,6 +336,14 @@ def _read_manifest(manifest_path: Path) -> Optional[dict]:
 
 
 def _validate_manifest(manifest: Manifest) -> None:
+    """Check that a manifest instance satisfies structural and type requirements.
+
+    Args:
+        manifest: Manifest produced after a download completes.
+
+    Raises:
+        ConfigurationError: If required fields are missing or contain invalid types.
+    """
     required_fields = [
         "id",
         "resolver",
@@ -353,11 +369,27 @@ def _validate_manifest(manifest: Manifest) -> None:
 
 
 def _write_manifest(manifest_path: Path, manifest: Manifest) -> None:
+    """Persist a validated manifest to disk as JSON.
+
+    Args:
+        manifest_path: Destination path for the manifest file.
+        manifest: Manifest describing the downloaded ontology artifact.
+    """
     _validate_manifest(manifest)
     manifest_path.write_text(manifest.to_json())
 
 
 def _build_destination(spec: FetchSpec, plan: FetchPlan, config: ResolvedConfig) -> Path:
+    """Determine the output directory and filename for a download.
+
+    Args:
+        spec: Fetch specification identifying the ontology.
+        plan: Resolver plan containing URL metadata and optional hints.
+        config: Resolved configuration with storage layout parameters.
+
+    Returns:
+        Path where the raw ontology artifact should be written.
+    """
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     version = plan.version or timestamp
     base_dir = ONTOLOGY_DIR / sanitize_filename(spec.id) / sanitize_filename(version)
@@ -370,6 +402,16 @@ def _build_destination(spec: FetchSpec, plan: FetchPlan, config: ResolvedConfig)
 
 
 def _ensure_license_allowed(plan: FetchPlan, config: ResolvedConfig, spec: FetchSpec) -> None:
+    """Confirm the ontology license is present in the configured allow list.
+
+    Args:
+        plan: Resolver plan returned for the ontology.
+        config: Resolved configuration containing accepted licenses.
+        spec: Fetch specification for contextual error reporting.
+
+    Raises:
+        ConfigurationError: If the plan's license is not permitted.
+    """
     allowed = set(config.defaults.accept_licenses)
     if not allowed or plan.license is None:
         return
