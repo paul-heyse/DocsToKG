@@ -223,11 +223,18 @@ class FaissIndexManager:
             np.stack([self._ensure_dim(vec) for vec in vectors]), dtype=np.float32
         )
         faiss.normalize_L2(matrix)
-        if hasattr(self._index, "is_trained") and not getattr(self._index, "is_trained"):
+        base = self._index.index if hasattr(self._index, "index") else self._index
+        train_target = base
+        if hasattr(faiss, "downcast_index"):
+            try:
+                train_target = faiss.downcast_index(base)
+            except Exception:
+                train_target = base
+        if hasattr(train_target, "is_trained") and not getattr(train_target, "is_trained"):
             nlist = int(getattr(self._config, "nlist", 1024))
             oversample = max(1, int(getattr(self._config, "oversample", 2)))
             ntrain = min(matrix.shape[0], nlist * oversample)
-            self._index.train(matrix[:ntrain])
+            train_target.train(matrix[:ntrain])
         ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
         self._index.add_with_ids(matrix, ids)
         self._pending_delete_ids.clear()
@@ -250,8 +257,25 @@ class FaissIndexManager:
         ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
         for vector_id in vector_ids:
             self._vectors.pop(vector_id, None)
-        self._remove_ids(ids)
-        self._flush_pending_deletes(force=False)
+        self.remove_ids(ids, force_flush=True)
+
+    def remove_ids(self, ids: np.ndarray, *, force_flush: bool = False) -> int:
+        """Remove vectors by FAISS integer identifiers with optional batching.
+
+        Args:
+            ids: Array of FAISS internal identifiers to remove.
+            force_flush: When True, rebuild immediately instead of batching.
+
+        Returns:
+            Number of identifiers scheduled for removal.
+        """
+
+        ids64 = np.asarray(ids, dtype=np.int64)
+        if ids64.size == 0:
+            return 0
+        self._remove_ids(ids64)
+        self._flush_pending_deletes(force=force_flush)
+        return int(ids64.size)
 
     def search(self, query: np.ndarray, top_k: int) -> List[FaissSearchResult]:
         """Execute a cosine-similarity search returning the best `top_k` results.
@@ -399,11 +423,18 @@ class FaissIndexManager:
         vector_ids = [item[0] for item in vector_items]
         matrix = np.stack([item[1] for item in vector_items]).astype(np.float32, copy=False)
         faiss.normalize_L2(matrix)
-        if hasattr(self._index, "is_trained") and not getattr(self._index, "is_trained"):
+        base_index = self._index.index if hasattr(self._index, "index") else self._index
+        train_target = base_index
+        if hasattr(faiss, "downcast_index"):
+            try:
+                train_target = faiss.downcast_index(base_index)
+            except Exception:
+                train_target = base_index
+        if hasattr(train_target, "is_trained") and not getattr(train_target, "is_trained"):
             nlist = int(getattr(self._config, "nlist", 1024))
             oversample = max(1, int(getattr(self._config, "oversample", 2)))
             ntrain = min(matrix.shape[0], nlist * oversample)
-            self._index.train(matrix[:ntrain])
+            train_target.train(matrix[:ntrain])
         ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
         self._index.add_with_ids(matrix, ids)
         self._set_nprobe()
@@ -434,6 +465,7 @@ class FaissIndexManager:
             "multi_gpu_mode": self._multi_gpu_mode,
             "gpu_indices_32_bit": bool(self._indices_32_bit and not self._force_64bit_ids),
             "gpu_device": str(getattr(self._config, "device", 0)),
+            "device": str(getattr(self._config, "device", 0)),
         }
         if self._temp_memory_bytes is not None:
             stats["gpu_temp_memory_bytes"] = float(self._temp_memory_bytes)
@@ -442,6 +474,7 @@ class FaissIndexManager:
             device = self._detect_device(self._index)
             if device is not None:
                 stats["gpu_device"] = str(device)
+                stats["device"] = str(device)
                 resources = self._gpu_resources
                 if resources is not None and hasattr(resources, "getMemoryInfo"):
                     free, total = resources.getMemoryInfo(device)
@@ -471,7 +504,14 @@ class FaissIndexManager:
                 base = faiss.GpuIndexFlatIP(self._gpu_resources, self._dim)
             index: "faiss.Index" = faiss.IndexIDMap2(base)
         elif index_type == "ivf_flat":
-            quantizer = faiss.GpuIndexFlatIP(self._gpu_resources, self._dim)
+            q_cfg = faiss.GpuIndexFlatConfig() if hasattr(faiss, "GpuIndexFlatConfig") else None
+            if q_cfg is not None:
+                q_cfg.device = dev
+                if hasattr(q_cfg, "useFloat16"):
+                    q_cfg.useFloat16 = bool(getattr(self._config, "flat_use_fp16", False))
+                quantizer = faiss.GpuIndexFlatIP(self._gpu_resources, self._dim, q_cfg)
+            else:
+                quantizer = faiss.GpuIndexFlatIP(self._gpu_resources, self._dim)
             cfg = faiss.GpuIndexIVFFlatConfig() if hasattr(faiss, "GpuIndexIVFFlatConfig") else None
             if cfg is not None:
                 cfg.device = dev
@@ -494,6 +534,7 @@ class FaissIndexManager:
                     metric,
                 )
             base.nprobe = int(self._config.nprobe)
+            setattr(base, "_quantizer_ref", quantizer)
             index = faiss.IndexIDMap2(base)
         elif index_type == "ivf_pq":
             cfg = faiss.GpuIndexIVFPQConfig() if hasattr(faiss, "GpuIndexIVFPQConfig") else None

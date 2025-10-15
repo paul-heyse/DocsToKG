@@ -1,8 +1,13 @@
 """Resolver pipeline and provider implementations.
 
-This module maintains backward compatibility by re-exporting all public APIs.
-New code should import from submodules (pipeline, types, providers) directly.
+This module maintains backward compatibility by re-exporting legacy entry points
+so existing integrations and tests can continue to monkeypatch ``requests`` or
+``time`` on the resolver namespace.
 """
+
+import time as _time
+
+import requests as _requests
 
 from .pipeline import ResolverPipeline
 from .providers import (
@@ -37,6 +42,8 @@ from .types import (
 )
 
 DEFAULT_RESOLVER_ORDER = _DEFAULT_RESOLVER_ORDER
+time = _time
+requests = _requests
 
 
 def clear_resolver_caches() -> None:
@@ -85,4 +92,6 @@ __all__ = [
     "SemanticScholarResolver",
     "UnpaywallResolver",
     "WaybackResolver",
+    "time",
+    "requests",
 ]
