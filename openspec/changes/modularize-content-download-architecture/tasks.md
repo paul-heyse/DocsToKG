@@ -5,12 +5,51 @@
   - Add module docstring: "Unified HTTP request utilities with retry and backoff support."
 
 - [ ] 1.2 Implement `parse_retry_after_header(response: requests.Response) -> Optional[float]` function
-  - Parse `Retry-After` header returning seconds as float
-  - Handle both integer (delta-seconds) and HTTP-date formats
-  - Return `None` if header missing or unparseable
-  - Add docstring with examples
+
+  ```python
+  from email.utils import parsedate_to_datetime
+  from datetime import datetime, timezone
+
+  def parse_retry_after_header(response: requests.Response) -> Optional[float]:
+      """Parse Retry-After header and return wait time in seconds.
+
+      Args:
+          response: HTTP response potentially containing Retry-After header
+
+      Returns:
+          Float seconds to wait, or None if header missing/invalid
+
+      Examples:
+          >>> # Integer format
+          >>> parse_retry_after_header(response_with_header("5"))
+          5.0
+
+          >>> # HTTP-date format
+          >>> parse_retry_after_header(response_with_header("Wed, 21 Oct 2025 07:28:00 GMT"))
+          3600.5  # seconds until that time
+      """
+      retry_after = response.headers.get("Retry-After")
+      if not retry_after:
+          return None
+
+      # Try parsing as integer (delta-seconds)
+      try:
+          return float(retry_after)
+      except ValueError:
+          pass
+
+      # Try parsing as HTTP-date
+      try:
+          target_time = parsedate_to_datetime(retry_after)
+          now = datetime.now(timezone.utc)
+          delta = (target_time - now).total_seconds()
+          return max(0.0, delta)  # Never return negative
+      except (ValueError, TypeError, OverflowError):
+          return None
+  ```
 
 - [ ] 1.3 Implement `request_with_retries()` function with signature:
+
   ```python
   def request_with_retries(
       session: requests.Session,
@@ -26,12 +65,86 @@
   ```
 
 - [ ] 1.4 Implement retry loop logic in `request_with_retries()`
-  - Default `retry_statuses` to `{429, 500, 502, 503, 504}` if None
-  - Attempt request up to `max_retries + 1` times
-  - On retry-eligible status code, parse `Retry-After` if `respect_retry_after=True`
-  - Use exponential backoff: `backoff_factor * (2 ** attempt_num) + random.random() * 0.1`
-  - Override backoff with `Retry-After` value when present and larger
-  - Re-raise `requests.RequestException` on final retry exhaustion
+
+  ```python
+  def request_with_retries(
+      session: requests.Session,
+      method: str,
+      url: str,
+      *,
+      max_retries: int = 3,
+      retry_statuses: Optional[Set[int]] = None,
+      backoff_factor: float = 0.75,
+      respect_retry_after: bool = True,
+      **kwargs: Any,
+  ) -> requests.Response:
+      """Execute HTTP request with exponential backoff and Retry-After support.
+
+      Args:
+          session: requests.Session instance for executing requests
+          method: HTTP method (GET, HEAD, POST, etc.)
+          url: Target URL
+          max_retries: Maximum number of retry attempts (default: 3)
+          retry_statuses: Set of status codes triggering retry (default: {429,500,502,503,504})
+          backoff_factor: Exponential backoff multiplier (default: 0.75)
+          respect_retry_after: Parse and obey Retry-After headers (default: True)
+          **kwargs: Additional arguments passed to session.request()
+
+      Returns:
+          Response object on success
+
+      Raises:
+          requests.RequestException: On final retry exhaustion or non-retryable error
+
+      Thread Safety:
+          This function is thread-safe if the provided session is thread-safe.
+          requests.Session is thread-safe for reads but not writes; for concurrent
+          use, pass a session with connection pooling enabled.
+      """
+      if retry_statuses is None:
+          retry_statuses = {429, 500, 502, 503, 504}
+
+      last_exception: Optional[Exception] = None
+
+      for attempt in range(max_retries + 1):
+          try:
+              response = session.request(method=method, url=url, **kwargs)
+
+              # Success or non-retryable status
+              if response.status_code not in retry_statuses:
+                  return response
+
+              # Final attempt exhausted
+              if attempt >= max_retries:
+                  return response
+
+              # Calculate backoff delay
+              base_delay = backoff_factor * (2 ** attempt)
+              jitter = random.random() * 0.1
+              delay = base_delay + jitter
+
+              # Override with Retry-After if present and longer
+              if respect_retry_after:
+                  retry_after_delay = parse_retry_after_header(response)
+                  if retry_after_delay is not None and retry_after_delay > delay:
+                      delay = retry_after_delay
+
+              time.sleep(delay)
+
+          except requests.RequestException as exc:
+              last_exception = exc
+              if attempt >= max_retries:
+                  raise
+
+              # Exponential backoff on request exceptions too
+              delay = backoff_factor * (2 ** attempt) + random.random() * 0.1
+              time.sleep(delay)
+
+      # Should never reach here, but defensive
+      if last_exception:
+          raise last_exception
+      raise requests.RequestException(f"Exhausted {max_retries} retries for {method} {url}")
+  ```
 
 - [ ] 1.5 Add comprehensive docstring to `request_with_retries()`
   - Document all parameters with types and defaults
@@ -51,12 +164,164 @@
   - Update `_sleep_backoff()` references to use backoff logic from `http.request_with_retries()`
 
 - [ ] 1.8 Add unit tests in `tests/test_http_retry.py`
-  - Test successful request (no retries)
-  - Test transient 503 with exponential backoff (verify timing)
-  - Test `Retry-After` header compliance (integer and date formats)
-  - Test exhausted retries raising exception
-  - Test custom `retry_statuses` parameter
-  - Test `respect_retry_after=False` ignoring header
+
+  ```python
+  import time
+  from unittest.mock import Mock, patch
+  import pytest
+  import requests
+  from DocsToKG.ContentDownload.http import request_with_retries, parse_retry_after_header
+
+  def test_successful_request_no_retries():
+      """Verify successful request completes immediately without retries."""
+      session = Mock(spec=requests.Session)
+      response = Mock(status_code=200)
+      session.request.return_value = response
+
+      result = request_with_retries(session, "GET", "https://example.org/test")
+
+      assert result.status_code == 200
+      assert session.request.call_count == 1
+
+  def test_transient_503_with_exponential_backoff():
+      """Verify exponential backoff timing for transient 503 errors."""
+      session = Mock(spec=requests.Session)
+      response_503 = Mock(status_code=503, headers={})
+      response_200 = Mock(status_code=200)
+      session.request.side_effect = [response_503, response_503, response_200]
+
+      start = time.monotonic()
+      result = request_with_retries(
+          session, "GET", "https://example.org/test",
+          max_retries=3, backoff_factor=0.5
+      )
+      elapsed = time.monotonic() - start
+
+      assert result.status_code == 200
+      assert session.request.call_count == 3
+      # First backoff: ~0.5 * (2^0) = 0.5s, second: ~0.5 * (2^1) = 1.0s
+      # Total minimum: ~1.5s (allowing for jitter and overhead)
+      assert elapsed >= 1.4 and elapsed < 2.5
+
+  def test_retry_after_integer_format():
+      """Verify Retry-After header with integer seconds is respected."""
+      session = Mock(spec=requests.Session)
+      response_429 = Mock(status_code=429, headers={"Retry-After": "3"})
+      response_200 = Mock(status_code=200)
+      session.request.side_effect = [response_429, response_200]
+
+      start = time.monotonic()
+      result = request_with_retries(
+          session, "GET", "https://example.org/test",
+          max_retries=2, backoff_factor=0.5
+      )
+      elapsed = time.monotonic() - start
+
+      assert result.status_code == 200
+      assert elapsed >= 2.9  # Should wait ~3 seconds
+
+  def test_retry_after_http_date_format():
+      """Verify Retry-After header with HTTP-date format is respected."""
+      from datetime import datetime, timezone, timedelta
+      future_time = datetime.now(timezone.utc) + timedelta(seconds=2)
+      http_date = future_time.strftime("%a, %d %b %Y %H:%M:%S GMT")
+
+      session = Mock(spec=requests.Session)
+      response_429 = Mock(status_code=429, headers={"Retry-After": http_date})
+      response_200 = Mock(status_code=200)
+      session.request.side_effect = [response_429, response_200]
+
+      start = time.monotonic()
+      result = request_with_retries(
+          session, "GET", "https://example.org/test",
+          max_retries=2
+      )
+      elapsed = time.monotonic() - start
+
+      assert result.status_code == 200
+      assert elapsed >= 1.9 and elapsed < 3.0
+
+  def test_exhausted_retries_returns_final_response():
+      """Verify exhausted retries returns the final failed response."""
+      session = Mock(spec=requests.Session)
+      response_503 = Mock(status_code=503, headers={})
+      session.request.return_value = response_503
+
+      result = request_with_retries(
+          session, "GET", "https://example.org/test",
+          max_retries=2, backoff_factor=0.1
+      )
+
+      assert result.status_code == 503
+      assert session.request.call_count == 3  # Initial + 2 retries
+
+  def test_custom_retry_statuses():
+      """Verify custom retry_statuses parameter controls retry behavior."""
+      session = Mock(spec=requests.Session)
+      response_404 = Mock(status_code=404, headers={})
+      response_200 = Mock(status_code=200)
+      session.request.side_effect = [response_404, response_200]
+
+      # 404 normally not retried, but we configure it
+      result = request_with_retries(
+          session, "GET", "https://example.org/test",
+          retry_statuses={404, 503},
+          max_retries=2, backoff_factor=0.1
+      )
+
+      assert result.status_code == 200
+      assert session.request.call_count == 2
+
+  def test_respect_retry_after_false():
+      """Verify respect_retry_after=False ignores Retry-After header."""
+      session = Mock(spec=requests.Session)
+      response_429 = Mock(status_code=429, headers={"Retry-After": "10"})
+      response_200 = Mock(status_code=200)
+      session.request.side_effect = [response_429, response_200]
+
+      start = time.monotonic()
+      result = request_with_retries(
+          session, "GET", "https://example.org/test",
+          respect_retry_after=False,
+          max_retries=2, backoff_factor=0.1
+      )
+      elapsed = time.monotonic() - start
+
+      assert result.status_code == 200
+      # Should use exponential backoff (~0.1s), not Retry-After (10s)
+      assert elapsed < 1.0
+
+  def test_request_exception_retry():
+      """Verify requests.RequestException triggers retry with backoff."""
+      session = Mock(spec=requests.Session)
+      response_200 = Mock(status_code=200)
+      session.request.side_effect = [
+          requests.Timeout("Connection timeout"),
+          requests.ConnectionError("Connection refused"),
+          response_200
+      ]
+
+      result = request_with_retries(
+          session, "GET", "https://example.org/test",
+          max_retries=3, backoff_factor=0.1
+      )
+
+      assert result.status_code == 200
+      assert session.request.call_count == 3
+
+  def test_request_exception_exhausted():
+      """Verify exhausted retries on exception raises the exception."""
+      session = Mock(spec=requests.Session)
+      session.request.side_effect = requests.Timeout("Persistent timeout")
+
+      with pytest.raises(requests.Timeout):
+          request_with_retries(
+              session, "GET", "https://example.org/test",
+              max_retries=2, backoff_factor=0.1
+          )
+
+      assert session.request.call_count == 3
+  ```
 
 ## 2. Conditional Request Helper
 
@@ -65,6 +330,7 @@
   - Add module docstring: "Conditional HTTP request helpers for ETag and Last-Modified caching."
 
 - [ ] 2.2 Define `CachedResult` dataclass
+
   ```python
   @dataclass
   class CachedResult:
@@ -77,6 +343,7 @@
   ```
 
 - [ ] 2.3 Define `ModifiedResult` dataclass
+
   ```python
   @dataclass
   class ModifiedResult:
@@ -86,6 +353,7 @@
   ```
 
 - [ ] 2.4 Implement `ConditionalRequestHelper` class initialization
+
   ```python
   class ConditionalRequestHelper:
       def __init__(
@@ -104,6 +372,7 @@
   ```
 
 - [ ] 2.5 Implement `build_headers()` method
+
   ```python
   def build_headers(self) -> Dict[str, str]:
       """Generate conditional request headers from prior metadata."""
@@ -116,6 +385,7 @@
   ```
 
 - [ ] 2.6 Implement `interpret_response()` method
+
   ```python
   def interpret_response(
       self, response: requests.Response
@@ -186,16 +456,17 @@
   - Ensure all type references point to `types` module
 
 - [ ] 3.5 Create `src/DocsToKG/ContentDownload/resolvers/providers/__init__.py` with registry
+
   ```python
   """Resolver provider implementations and registry."""
   from typing import List
   from ..types import Resolver
-  
+
   def default_resolvers() -> List[Resolver]:
       """Return default resolver instances in priority order."""
       # Will be populated in subsequent tasks
       return []
-  
+
   __all__ = ["default_resolvers"]
   ```
 
@@ -268,6 +539,7 @@
   - Add module docstring: "Internet Archive Wayback Machine fallback resolver."
 
 - [ ] 4.14 Update `resolvers/providers/__init__.py` with complete registry
+
   ```python
   from .unpaywall import UnpaywallResolver
   from .crossref import CrossrefResolver
@@ -282,7 +554,7 @@
   from .hal import HalResolver
   from .osf import OsfResolver
   from .wayback import WaybackResolver
-  
+
   def default_resolvers():
       return [
           UnpaywallResolver(),
@@ -302,13 +574,14 @@
   ```
 
 - [ ] 4.15 Create `src/DocsToKG/ContentDownload/resolvers/__init__.py` with backward-compatible exports
+
   ```python
   """Resolver pipeline and provider implementations.
-  
+
   This module maintains backward compatibility by re-exporting all public APIs.
   New code should import from submodules (pipeline, types, providers) directly.
   """
-  
+
   from .types import (
       AttemptLogger,
       AttemptRecord,
@@ -321,14 +594,14 @@
   )
   from .pipeline import ResolverPipeline
   from .providers import default_resolvers
-  
+
   # Preserve legacy exports
   DEFAULT_RESOLVER_ORDER = [
       "unpaywall", "crossref", "landing_page", "arxiv", "pmc",
       "europe_pmc", "core", "doaj", "semantic_scholar",
       "openaire", "hal", "osf", "wayback",
   ]
-  
+
   def clear_resolver_caches():
       """Clear resolver-level LRU caches."""
       from .providers.unpaywall import _fetch_unpaywall_data
@@ -337,7 +610,7 @@
       _fetch_unpaywall_data.cache_clear()
       _fetch_crossref_data.cache_clear()
       _fetch_semantic_scholar_data.cache_clear()
-  
+
   __all__ = [
       "AttemptRecord", "AttemptLogger", "DownloadOutcome",
       "PipelineResult", "Resolver", "ResolverConfig",
@@ -355,28 +628,29 @@
 ## 5. OpenAlex Virtual Resolver
 
 - [ ] 5.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/openalex.py`
+
   ```python
   """OpenAlex direct URL resolver (position 0 in pipeline)."""
   from typing import Iterable
   import requests
   from ..types import Resolver, ResolverConfig, ResolverResult
   from DocsToKG.ContentDownload.utils import dedupe
-  
+
   class OpenAlexResolver:
       """Resolver for PDF URLs directly provided by OpenAlex metadata."""
-      
+
       name = "openalex"
-      
+
       def is_enabled(self, config: ResolverConfig, artifact) -> bool:
           """Enable when artifact has pdf_urls or open_access_url."""
           return bool(artifact.pdf_urls or artifact.open_access_url)
-      
+
       def iter_urls(self, session: requests.Session, config: ResolverConfig, artifact) -> Iterable[ResolverResult]:
           """Yield all PDF URLs from OpenAlex work metadata."""
           candidates = list(artifact.pdf_urls)
           if artifact.open_access_url:
               candidates.append(artifact.open_access_url)
-          
+
           for url in dedupe(candidates):
               if url:
                   yield ResolverResult(
@@ -411,6 +685,7 @@
 ## 6. HEAD-Based Content Filtering
 
 - [ ] 6.1 Add `enable_head_precheck` field to `ResolverConfig` dataclass
+
   ```python
   # In resolvers/types.py, ResolverConfig class
   enable_head_precheck: bool = True
@@ -418,6 +693,7 @@
   ```
 
 - [ ] 6.2 Implement HEAD pre-check helper in `resolvers/pipeline.py`
+
   ```python
   def _should_attempt_head_check(
       self, resolver_name: str
@@ -427,7 +703,7 @@
       if resolver_name in self.config.resolver_head_precheck:
           return self.config.resolver_head_precheck[resolver_name]
       return self.config.enable_head_precheck
-  
+
   def _head_precheck_url(
       self, session: requests.Session, url: str, timeout: float
   ) -> bool:
@@ -441,16 +717,16 @@
           )
           if response.status_code not in {200, 302, 304}:
               return False
-          
+
           content_type = response.headers.get("Content-Type", "").lower()
           content_length = response.headers.get("Content-Length", "")
-          
+
           # Skip obvious HTML or empty responses
           if "text/html" in content_type:
               return False
           if content_length == "0":
               return False
-          
+
           return True
       except Exception:
           # On HEAD failure, allow GET attempt anyway
@@ -459,6 +735,7 @@
 
 - [ ] 6.3 Integrate HEAD pre-check into pipeline URL iteration (in `ResolverPipeline.run()`)
   - After `result.url` extraction (line ~756), add:
+
   ```python
   if self._should_attempt_head_check(resolver_name):
       if not self._head_precheck_url(session, url, self.config.get_timeout(resolver_name)):
@@ -485,6 +762,7 @@
 ## 7. Bounded Intra-Work Concurrency
 
 - [ ] 7.1 Add concurrency fields to `ResolverConfig` dataclass
+
   ```python
   # In resolvers/types.py
   max_concurrent_resolvers: int = 1  # Sequential by default
@@ -497,25 +775,26 @@
 - [ ] 7.3 Implement concurrent resolver execution in `ResolverPipeline.run()`
   - At start of method, check `if self.config.max_concurrent_resolvers == 1:` to use existing sequential path
   - For concurrent mode (`> 1`), implement:
+
   ```python
   from concurrent.futures import ThreadPoolExecutor, as_completed
-  
+
   with ThreadPoolExecutor(max_workers=self.config.max_concurrent_resolvers) as executor:
       futures_map = {}
-      
+
       for order_index, resolver_name in enumerate(self.config.resolver_order, start=1):
           # ... existing is_enabled checks ...
-          
+
           def _resolver_task(res_name, res_instance, order_idx):
               self._respect_rate_limit(res_name)
               results = []
               for result in res_instance.iter_urls(session, self.config, artifact):
                   results.append((res_name, order_idx, result))
               return results
-          
+
           future = executor.submit(_resolver_task, resolver_name, resolver, order_index)
           futures_map[future] = (resolver_name, order_index)
-      
+
       for future in as_completed(futures_map):
           resolver_name, order_index = futures_map[future]
           for result in future.result():
@@ -530,12 +809,54 @@
   - Verify `self.logger.log()` calls are thread-safe (they are, since file writes use OS-level locks)
 
 - [ ] 7.5 Add configuration validation
-  - In `ResolverConfig.__post_init__()`, add:
+
   ```python
-  if self.max_concurrent_resolvers < 1:
-      raise ValueError("max_concurrent_resolvers must be >= 1")
-  if self.max_concurrent_resolvers > 10:
-      warnings.warn("max_concurrent_resolvers > 10 may violate rate limits")
+  # In resolvers/types.py, add to ResolverConfig class
+  import warnings
+
+  def __post_init__(self) -> None:
+      """Validate configuration fields and apply defaults."""
+
+      # Validate concurrency settings
+      if self.max_concurrent_resolvers < 1:
+          raise ValueError(
+              f"max_concurrent_resolvers must be >= 1, got {self.max_concurrent_resolvers}"
+          )
+      if self.max_concurrent_resolvers > 10:
+          warnings.warn(
+              f"max_concurrent_resolvers={self.max_concurrent_resolvers} > 10 may "
+              f"violate rate limits. Ensure resolver_min_interval_s is configured "
+              f"appropriately for all resolvers.",
+              UserWarning,
+              stacklevel=2
+          )
+
+      # Validate timeout values
+      if self.timeout <= 0:
+          raise ValueError(f"timeout must be positive, got {self.timeout}")
+      for resolver_name, timeout_val in self.resolver_timeouts.items():
+          if timeout_val <= 0:
+              raise ValueError(
+                  f"resolver_timeouts['{resolver_name}'] must be positive, got {timeout_val}"
+              )
+
+      # Validate rate limit values
+      for resolver_name, interval in self.resolver_min_interval_s.items():
+          if interval < 0:
+              raise ValueError(
+                  f"resolver_min_interval_s['{resolver_name}'] must be non-negative, got {interval}"
+              )
+
+      # Apply legacy rate_limits if present
+      if self.resolver_rate_limits:
+          for name, value in self.resolver_rate_limits.items():
+              self.resolver_min_interval_s.setdefault(name, value)
+
+      # Validate max_attempts_per_work
+      if self.max_attempts_per_work < 1:
+          raise ValueError(
+              f"max_attempts_per_work must be >= 1, got {self.max_attempts_per_work}"
+          )
   ```
 
 - [ ] 7.6 Add concurrent execution tests in `tests/test_bounded_concurrency.py`
@@ -549,6 +870,7 @@
 ## 8. Zenodo Resolver
 
 - [ ] 8.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/zenodo.py`
+
   ```python
   """Zenodo repository resolver for DOI-indexed research outputs."""
   from typing import Iterable
@@ -557,16 +879,16 @@
   from ..types import Resolver, ResolverConfig, ResolverResult
   from DocsToKG.ContentDownload.utils import normalize_doi
   from DocsToKG.ContentDownload.http import request_with_retries
-  
+
   class ZenodoResolver:
       """Resolver for Zenodo open access repository."""
-      
+
       name = "zenodo"
-      
+
       def is_enabled(self, config: ResolverConfig, artifact) -> bool:
           """Enable when artifact has a DOI."""
           return artifact.doi is not None
-      
+
       def iter_urls(
           self, session: requests.Session, config: ResolverConfig, artifact
       ) -> Iterable[ResolverResult]:
@@ -577,7 +899,7 @@
                   url=None, event="skipped", event_reason="no-doi"
               )
               return
-          
+
           try:
               response = request_with_retries(
                   session,
@@ -595,7 +917,7 @@
                   metadata={"message": str(exc)},
               )
               return
-          
+
           if response.status_code != 200:
               yield ResolverResult(
                   url=None,
@@ -604,7 +926,7 @@
                   http_status=response.status_code,
               )
               return
-          
+
           try:
               data = response.json()
           except ValueError:
@@ -612,12 +934,12 @@
                   url=None, event="error", event_reason="json-error"
               )
               return
-          
+
           for record in data.get("hits", {}).get("hits", []):
               for file_entry in record.get("files", []):
                   file_type = (file_entry.get("type") or "").lower()
                   file_key = (file_entry.get("key") or "").lower()
-                  
+
                   if file_type == "pdf" or file_key.endswith(".pdf"):
                       url = file_entry.get("links", {}).get("self")
                       if url:
@@ -648,12 +970,84 @@
   - Use `responses` library for mock HTTP fixtures
 
 - [ ] 8.5 Add test fixture for Zenodo API response
-  - Create `tests/data/zenodo_response_sample.json` with realistic API response
-  - Include record with PDF file and non-PDF files
+
+  ```python
+  # Create tests/data/zenodo_response_sample.json
+  {
+    "hits": {
+      "hits": [
+        {
+          "id": "1234567",
+          "doi": "10.5281/zenodo.1234567",
+          "metadata": {
+            "title": "Sample Research Data",
+            "publication_date": "2024-01-15",
+            "creators": [{"name": "Researcher, Jane"}]
+          },
+          "files": [
+            {
+              "key": "dataset.csv",
+              "type": "csv",
+              "size": 1048576,
+              "links": {
+                "self": "https://zenodo.org/api/files/abc123/dataset.csv"
+              }
+            },
+            {
+              "key": "paper.pdf",
+              "type": "pdf",
+              "size": 524288,
+              "links": {
+                "self": "https://zenodo.org/api/files/abc123/paper.pdf"
+              }
+            },
+            {
+              "key": "figures.zip",
+              "type": "zip",
+              "size": 2097152,
+              "links": {
+                "self": "https://zenodo.org/api/files/abc123/figures.zip"
+              }
+            }
+          ]
+        }
+      ],
+      "total": 1
+    }
+  }
+
+  # Also create tests/data/zenodo_response_no_pdf.json for edge case
+  {
+    "hits": {
+      "hits": [
+        {
+          "id": "7654321",
+          "doi": "10.5281/zenodo.7654321",
+          "files": [
+            {
+              "key": "data.csv",
+              "type": "csv",
+              "links": {"self": "https://zenodo.org/api/files/xyz/data.csv"}
+            }
+          ]
+        }
+      ]
+    }
+  }
+
+  # Also create tests/data/zenodo_response_empty.json
+  {
+    "hits": {
+      "hits": [],
+      "total": 0
+    }
+  }
+  ```
 
 ## 9. Figshare Resolver
 
 - [ ] 9.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/figshare.py`
+
   ```python
   """Figshare repository resolver for DOI-indexed research outputs."""
   from typing import Iterable
@@ -661,16 +1055,16 @@
   from ..types import Resolver, ResolverConfig, ResolverResult
   from DocsToKG.ContentDownload.utils import normalize_doi
   from DocsToKG.ContentDownload.http import request_with_retries
-  
+
   class FigshareResolver:
       """Resolver for Figshare repository."""
-      
+
       name = "figshare"
-      
+
       def is_enabled(self, config: ResolverConfig, artifact) -> bool:
           """Enable when artifact has a DOI."""
           return artifact.doi is not None
-      
+
       def iter_urls(
           self, session: requests.Session, config: ResolverConfig, artifact
       ) -> Iterable[ResolverResult]:
@@ -681,7 +1075,7 @@
                   url=None, event="skipped", event_reason="no-doi"
               )
               return
-          
+
           try:
               response = request_with_retries(
                   session,
@@ -703,7 +1097,7 @@
                   metadata={"message": str(exc)},
               )
               return
-          
+
           if response.status_code != 200:
               yield ResolverResult(
                   url=None,
@@ -712,7 +1106,7 @@
                   http_status=response.status_code,
               )
               return
-          
+
           try:
               articles = response.json()
           except ValueError:
@@ -720,12 +1114,12 @@
                   url=None, event="error", event_reason="json-error"
               )
               return
-          
+
           for article in articles:
               for file_entry in article.get("files", []):
                   filename = (file_entry.get("name") or "").lower()
                   download_url = file_entry.get("download_url")
-                  
+
                   if filename.endswith(".pdf") and download_url:
                       yield ResolverResult(
                           url=download_url,
@@ -754,8 +1148,78 @@
   - Use `responses` library for mock HTTP fixtures
 
 - [ ] 9.5 Add test fixture for Figshare API response
-  - Create `tests/data/figshare_response_sample.json` with realistic search response
-  - Include article with PDF file and non-PDF files
+
+  ```python
+  # Create tests/data/figshare_response_sample.json
+  [
+    {
+      "id": 123456,
+      "title": "Research Article Dataset",
+      "doi": "10.6084/m9.figshare.123456",
+      "url": "https://figshare.com/articles/dataset/123456",
+      "published_date": "2024-01-20T10:30:00Z",
+      "files": [
+        {
+          "id": 45678,
+          "name": "manuscript.pdf",
+          "size": 1048576,
+          "is_link_only": false,
+          "download_url": "https://figshare.com/ndownloader/files/45678",
+          "computed_md5": "abc123def456"
+        },
+        {
+          "id": 45679,
+          "name": "supplementary_data.xlsx",
+          "size": 524288,
+          "download_url": "https://figshare.com/ndownloader/files/45679"
+        },
+        {
+          "id": 45680,
+          "name": "figures.pptx",
+          "size": 2097152,
+          "download_url": "https://figshare.com/ndownloader/files/45680"
+        }
+      ]
+    }
+  ]
+
+  # Also create tests/data/figshare_response_no_pdf.json
+  [
+    {
+      "id": 654321,
+      "doi": "10.6084/m9.figshare.654321",
+      "files": [
+        {
+          "id": 99999,
+          "name": "dataset.csv",
+          "download_url": "https://figshare.com/ndownloader/files/99999"
+        }
+      ]
+    }
+  ]
+
+  # Also create tests/data/figshare_response_empty.json
+  []
+
+  # Also create tests/data/figshare_response_multiple_pdf.json
+  [
+    {
+      "id": 111111,
+      "files": [
+        {
+          "id": 1,
+          "name": "main_article.pdf",
+          "download_url": "https://figshare.com/ndownloader/files/1"
+        },
+        {
+          "id": 2,
+          "name": "supplementary.pdf",
+          "download_url": "https://figshare.com/ndownloader/files/2"
+        }
+      ]
+    }
+  ]
+  ```
 
 ## 10. DownloadOutcome Completeness
 
@@ -783,6 +1247,7 @@
 ## 11. Extended Logging and Observability
 
 - [ ] 11.1 Add `resolver_wall_time_ms` field to `AttemptRecord` dataclass
+
   ```python
   # In resolvers/types.py, AttemptRecord
   resolver_wall_time_ms: Optional[float] = None
@@ -815,13 +1280,16 @@
 - [ ] 12.2 Add configuration examples to documentation
   - Create `docs/resolver-configuration.md` with YAML examples
   - Include example enabling bounded concurrency:
+
   ```yaml
   max_concurrent_resolvers: 3
   resolver_min_interval_s:
     unpaywall: 1.0
     crossref: 0.5
   ```
+
   - Include example disabling HEAD pre-check for specific resolvers:
+
   ```yaml
   enable_head_precheck: true
   resolver_head_precheck:
@@ -880,16 +1348,18 @@
 - [ ] 15.2 Create developer guide for adding custom resolvers
   - Create `docs/adding-custom-resolvers.md`
   - Provide resolver template:
+
   ```python
   class MyResolver:
       name = "my_resolver"
-      
+
       def is_enabled(self, config, artifact):
           return True  # or conditional logic
-      
+
       def iter_urls(self, session, config, artifact):
           yield ResolverResult(url="https://example.org/file.pdf")
   ```
+
   - Document registration process in `providers/__init__.py`
   - Document configuration options (timeouts, rate limits, toggles)
 
@@ -949,3 +1419,412 @@
   - Document test coverage metrics
   - Include performance benchmarks (wall-time improvements)
 
+## 18. Error Handling Patterns (CRITICAL FOR ROBUSTNESS)
+
+- [ ] 18.1 Add explicit error handling to HTTP retry module
+
+  ```python
+  # In http.py, add logging for retry attempts
+  import logging
+
+  LOGGER = logging.getLogger("DocsToKG.ContentDownload.http")
+
+  # Inside request_with_retries():
+  except requests.RequestException as exc:
+      LOGGER.debug(
+          f"Request {method} {url} failed (attempt {attempt + 1}/{max_retries + 1}): {exc}"
+      )
+      last_exception = exc
+      if attempt >= max_retries:
+          LOGGER.warning(
+              f"Exhausted {max_retries} retries for {method} {url}: {exc}"
+          )
+          raise
+  ```
+
+- [ ] 18.2 Add error handling to ConditionalRequestHelper
+
+  ```python
+  # In conditional.py, add validation
+  def interpret_response(self, response: requests.Response):
+      if response.status_code == 304:
+          # Validate we have complete prior metadata
+          missing_fields = []
+          if not self.prior_path:
+              missing_fields.append("path")
+          if not self.prior_sha256:
+              missing_fields.append("sha256")
+          if self.prior_content_length is None:
+              missing_fields.append("content_length")
+
+          if missing_fields:
+              raise ValueError(
+                  f"HTTP 304 requires complete prior metadata. Missing: {', '.join(missing_fields)}. "
+                  f"This indicates a bug in manifest loading or caching logic."
+              )
+
+          return CachedResult(...)
+
+      return ModifiedResult(...)
+  ```
+
+- [ ] 18.3 Add error handling to all resolver providers
+
+  ```python
+  # Pattern to apply in each resolver's iter_urls() method
+  def iter_urls(self, session, config, artifact):
+      try:
+          # API call logic
+          response = request_with_retries(...)
+
+          if response.status_code != 200:
+              yield ResolverResult(
+                  url=None,
+                  event="error",
+                  event_reason="http-error",
+                  http_status=response.status_code,
+                  metadata={"error_detail": f"API returned {response.status_code}"}
+              )
+              return
+
+          try:
+              data = response.json()
+          except ValueError as json_err:
+              yield ResolverResult(
+                  url=None,
+                  event="error",
+                  event_reason="json-error",
+                  metadata={"error_detail": str(json_err), "content_preview": response.text[:200]}
+              )
+              return
+
+          # Process data...
+
+      except requests.Timeout as timeout_err:
+          yield ResolverResult(
+              url=None,
+              event="error",
+              event_reason="timeout",
+              metadata={"timeout": config.get_timeout(self.name), "error": str(timeout_err)}
+          )
+      except requests.ConnectionError as conn_err:
+          yield ResolverResult(
+              url=None,
+              event="error",
+              event_reason="connection-error",
+              metadata={"error": str(conn_err)}
+          )
+      except Exception as unexpected_err:
+          # Log unexpected errors but don't crash pipeline
+          LOGGER.exception(f"Unexpected error in {self.name} resolver")
+          yield ResolverResult(
+              url=None,
+              event="error",
+              event_reason="unexpected-error",
+              metadata={"error_type": type(unexpected_err).__name__, "error": str(unexpected_err)}
+          )
+  ```
+
+- [ ] 18.4 Add error recovery for malformed API responses
+
+  ```python
+  # In each resolver, add defensive checks
+  def iter_urls(self, session, config, artifact):
+      # ... after getting JSON data ...
+
+      # Zenodo example:
+      hits = data.get("hits", {})
+      if not isinstance(hits, dict):
+          LOGGER.warning(f"Zenodo API returned malformed hits (expected dict, got {type(hits)})")
+          return
+
+      hits_list = hits.get("hits", [])
+      if not isinstance(hits_list, list):
+          LOGGER.warning(f"Zenodo API returned malformed hits.hits (expected list, got {type(hits_list)})")
+          return
+
+      for record in hits_list:
+          if not isinstance(record, dict):
+              LOGGER.warning(f"Skipping malformed Zenodo record: {type(record)}")
+              continue
+
+          files = record.get("files", [])
+          if not isinstance(files, list):
+              LOGGER.warning(f"Skipping record with malformed files field")
+              continue
+
+          for file_entry in files:
+              if not isinstance(file_entry, dict):
+                  continue
+
+              url = file_entry.get("links", {}).get("self") if isinstance(file_entry.get("links"), dict) else None
+              if not url or not isinstance(url, str):
+                  continue
+
+              yield ResolverResult(url=url, ...)
+  ```
+
+- [ ] 18.5 Add timeout specifications for all HTTP operations
+
+  ```python
+  # Document timeouts in each resolver
+  # Default: config.get_timeout(self.name) which defaults to 30s
+  # HEAD requests: min(timeout, 5.0) for fast pre-checks
+  # API requests: full timeout (30s)
+  # Download GET requests: full timeout (30s) but stream=True prevents timeout on large files
+  ```
+
+## 19. Thread-Safety Documentation (CRITICAL FOR CONCURRENCY)
+
+- [ ] 19.1 Document all shared state in ResolverPipeline
+
+  ```python
+  # In resolvers/pipeline.py, add class-level docstring
+  class ResolverPipeline:
+      """Orchestrates resolver execution with rate limiting and metrics.
+
+      Thread Safety:
+          This class is designed for concurrent execution when max_concurrent_resolvers > 1.
+          Thread-safe components:
+          - _last_invocation: Protected by _lock
+          - _lock: threading.Lock ensures atomic rate-limit tracking
+          - metrics: ResolverMetrics uses thread-safe Counter internally
+          - logger: File writes are atomic at OS level
+
+          Thread-unsafe components (avoid concurrent modification):
+          - config: Read-only after initialization, safe for concurrent reads
+          - _resolver_map: Read-only after initialization, safe for concurrent reads
+
+          Session sharing:
+          - requests.Session is thread-safe for reads (concurrent GET/HEAD)
+          - Session write methods (e.g., mount, headers update) must not be called concurrently
+          - Worker threads receive pre-configured session, no writes performed
+      """
+  ```
+
+- [ ] 19.2 Add explicit lock patterns for rate limiting
+
+  ```python
+  # In ResolverPipeline._respect_rate_limit()
+  def _respect_rate_limit(self, resolver_name: str) -> None:
+      """Enforce minimum interval between resolver calls (thread-safe).
+
+      Thread Safety:
+          Uses self._lock to ensure atomic read-modify-write of _last_invocation.
+          Multiple threads may wait on the same resolver; lock ensures only one
+          proceeds at minimum interval.
+      """
+      limit = self.config.resolver_min_interval_s.get(resolver_name)
+      if not limit:
+          limit = self.config.resolver_rate_limits.get(resolver_name)
+      if not limit:
+          return
+
+      wait = 0.0
+      with self._lock:  # CRITICAL: Atomic read-modify-write
+          last = self._last_invocation[resolver_name]
+          now = time.monotonic()
+          delta = now - last
+          if delta < limit:
+              wait = limit - delta
+          # Reserve next slot immediately while holding lock
+          self._last_invocation[resolver_name] = now + wait
+
+      if wait > 0:
+          time.sleep(wait)
+  ```
+
+- [ ] 19.3 Add thread-safety tests for concurrent resolver execution
+
+  ```python
+  # In tests/test_bounded_concurrency.py
+  import threading
+  from collections import Counter
+
+  def test_rate_limit_enforced_concurrently():
+      """Verify rate limits enforced with multiple concurrent threads."""
+      config = ResolverConfig(
+          max_concurrent_resolvers=3,
+          resolver_min_interval_s={"test_resolver": 0.5}
+      )
+
+      # Track invocation times
+      invocations = []
+      lock = threading.Lock()
+
+      class TimingResolver:
+          name = "test_resolver"
+          def is_enabled(self, config, artifact):
+              return True
+          def iter_urls(self, session, config, artifact):
+              with lock:
+                  invocations.append(time.monotonic())
+              yield ResolverResult(url="https://example.org/test.pdf")
+
+      pipeline = ResolverPipeline([TimingResolver()], config, ...)
+
+      # Run 10 works concurrently (should enforce 0.5s interval)
+      works = [create_mock_work(f"W{i}") for i in range(10)]
+      with ThreadPoolExecutor(max_workers=3) as executor:
+          futures = [executor.submit(pipeline.run, session, work) for work in works]
+          [f.result() for f in futures]
+
+      # Verify minimum intervals
+      sorted_times = sorted(invocations)
+      for i in range(1, len(sorted_times)):
+          interval = sorted_times[i] - sorted_times[i-1]
+          assert interval >= 0.49, f"Interval {interval} < 0.5s between invocations {i-1} and {i}"
+  ```
+
+- [ ] 19.4 Document session thread-safety requirements
+
+  ```python
+  # In download_pyalex_pdfs.py, _make_session() docstring
+  def _make_session(headers: Dict[str, str]) -> requests.Session:
+      """Create a retry-enabled requests.Session for polite crawling.
+
+      Thread Safety:
+          The returned session is thread-safe for concurrent requests (GET/HEAD)
+          but NOT for configuration changes. Do not call session.mount(),
+          session.headers.update(), or session.close() from multiple threads.
+
+          Usage Pattern:
+          - Sequential mode: One session shared across works
+          - Concurrent mode: One session per worker thread (created in worker)
+
+          The HTTPAdapter with connection pooling is thread-safe and manages
+          connection reuse across concurrent requests.
+      """
+  ```
+
+## 20. Performance Benchmarking (VERIFICATION OF IMPROVEMENTS)
+
+- [ ] 20.1 Create benchmark suite in `tests/benchmarks/test_resolver_performance.py`
+
+  ```python
+  import pytest
+  from time import time
+  from unittest.mock import Mock
+
+  @pytest.mark.benchmark
+  def test_sequential_vs_concurrent_execution(benchmark):
+      """Benchmark wall-time improvement from concurrent execution."""
+      # Setup: 10 slow resolvers (0.5s each)
+      resolvers = [create_slow_resolver(f"resolver_{i}", delay=0.5) for i in range(10)]
+
+      # Sequential config
+      config_seq = ResolverConfig(max_concurrent_resolvers=1)
+      pipeline_seq = ResolverPipeline(resolvers, config_seq, ...)
+
+      # Concurrent config
+      config_conc = ResolverConfig(max_concurrent_resolvers=3)
+      pipeline_conc = ResolverPipeline(resolvers, config_conc, ...)
+
+      work = create_mock_work("W123")
+
+      # Benchmark sequential
+      def run_sequential():
+          return pipeline_seq.run(mock_session(), work)
+
+      # Benchmark concurrent
+      def run_concurrent():
+          return pipeline_conc.run(mock_session(), work)
+
+      # Run benchmarks
+      result_seq = benchmark(run_sequential)
+      result_conc = benchmark(run_concurrent)
+
+      # Verify concurrency provides speedup
+      # Sequential: 10 resolvers × 0.5s = ~5s
+      # Concurrent (3 workers): ~2s (ceil(10/3) × 0.5s)
+      # Allow 20% overhead for thread coordination
+      assert result_seq.elapsed > result_conc.elapsed * 2.0
+  ```
+
+- [ ] 20.2 Add HEAD pre-check performance benchmark
+
+  ```python
+  @pytest.mark.benchmark
+  def test_head_precheck_overhead_vs_savings():
+      """Measure HEAD pre-check overhead vs savings from filtered GETs."""
+      # Scenario: 100 URLs, 15% are HTML (wasted without HEAD check)
+      urls = [
+          ("https://example.org/paper{}.pdf".format(i), "application/pdf", 1048576)
+          for i in range(85)
+      ] + [
+          ("https://example.org/landing{}.html".format(i), "text/html", 8192)
+          for i in range(15)
+      ]
+
+      # Without HEAD pre-check: All 100 URLs download
+      start = time()
+      for url, content_type, size in urls:
+          mock_download(url, size)  # Simulates full GET
+      no_precheck_time = time() - start
+
+      # With HEAD pre-check: 100 HEADs + 85 GETs
+      start = time()
+      for url, content_type, size in urls:
+          head_result = mock_head(url, content_type)  # Fast HEAD
+          if "html" not in head_result:
+              mock_download(url, size)  # Only download non-HTML
+      precheck_time = time() - start
+
+      # HEAD check should save time by avoiding 15 large HTML downloads
+      assert precheck_time < no_precheck_time * 0.9
+  ```
+
+- [ ] 20.3 Add retry backoff timing verification
+
+  ```python
+  def test_retry_backoff_timing():
+      """Verify exponential backoff timing matches specification."""
+      session = Mock()
+      session.request.side_effect = [
+          Mock(status_code=503, headers={}),
+          Mock(status_code=503, headers={}),
+          Mock(status_code=503, headers={}),
+          Mock(status_code=200)
+      ]
+
+      start = time()
+      result = request_with_retries(
+          session, "GET", "https://example.org/test",
+          max_retries=3, backoff_factor=1.0
+      )
+      elapsed = time() - start
+
+      # Expected delays:
+      # Attempt 0: 1.0 * (2^0) = 1.0s
+      # Attempt 1: 1.0 * (2^1) = 2.0s
+      # Attempt 2: 1.0 * (2^2) = 4.0s
+      # Total: ~7.0s (plus jitter ±0.3s)
+      assert 6.5 < elapsed < 7.5
+  ```
+
+- [ ] 20.4 Add memory usage benchmark for large batches
+
+  ```python
+  @pytest.mark.benchmark
+  @pytest.mark.memory
+  def test_memory_usage_large_batch():
+      """Verify memory stays bounded for large work batches."""
+      import tracemalloc
+
+      tracemalloc.start()
+      baseline = tracemalloc.get_traced_memory()[0]
+
+      # Process 1000 works
+      works = [create_mock_work(f"W{i}") for i in range(1000)]
+      for work in works:
+          pipeline.run(session, work)
+
+      peak = tracemalloc.get_traced_memory()[1]
+      tracemalloc.stop()
+
+      memory_growth = (peak - baseline) / 1024 / 1024  # MB
+
+      # Memory should not grow linearly with work count
+      # Expect < 50MB for 1000 works (50KB/work)
+      assert memory_growth < 50.0, f"Memory grew {memory_growth:.1f} MB for 1000 works"
+  ```
