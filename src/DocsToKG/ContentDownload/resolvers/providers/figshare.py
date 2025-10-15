@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Iterable
 
 import requests
@@ -14,6 +15,8 @@ from ..types import ResolverConfig, ResolverResult
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
+
+LOGGER = logging.getLogger(__name__)
 
 class FigshareResolver:
     """Resolve Figshare repository metadata into download URLs.
@@ -60,6 +63,11 @@ class FigshareResolver:
 
         Raises:
             None
+
+        Notes:
+            Requests honour resolver-specific timeouts using
+            :meth:`ResolverConfig.get_timeout` and reuse
+            :func:`request_with_retries` for resilient execution.
         """
 
         doi = normalize_doi(artifact.doi)
@@ -108,16 +116,22 @@ class FigshareResolver:
             return
 
         if not isinstance(articles, list):
+            LOGGER.warning(
+                "Figshare API returned non-list articles payload: %s", type(articles).__name__
+            )
             return
 
         for article in articles:
             if not isinstance(article, dict):
+                LOGGER.warning("Skipping malformed Figshare article: %r", article)
                 continue
             files = article.get("files", []) or []
             if not isinstance(files, list):
+                LOGGER.warning("Skipping Figshare article with invalid files payload: %r", files)
                 continue
             for file_entry in files:
                 if not isinstance(file_entry, dict):
+                    LOGGER.warning("Skipping non-dict Figshare file entry: %r", file_entry)
                     continue
                 filename = (file_entry.get("name") or "").lower()
                 download_url = file_entry.get("download_url")
