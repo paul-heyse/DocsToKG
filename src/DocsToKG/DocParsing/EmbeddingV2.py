@@ -59,7 +59,14 @@ from DocsToKG.DocParsing._common import (
     manifest_append,
     resolve_hash_algorithm,
 )
-from DocsToKG.DocParsing.schemas import BM25Vector, DenseVector, SPLADEVector, VectorRow
+from DocsToKG.DocParsing.schemas import (
+    BM25Vector,
+    COMPATIBLE_CHUNK_VERSIONS,
+    DenseVector,
+    SPLADEVector,
+    VectorRow,
+    validate_schema_version,
+)
 
 try:  # Optional dependency used for SPLADE sparse embeddings
     from sentence_transformers import (
@@ -83,6 +90,44 @@ except Exception as exc:  # pragma: no cover - exercised via tests with stubs
     PoolingParams = None  # type: ignore[assignment]
     _VLLM_IMPORT_ERROR = exc
 
+# ---- Cache / model path resolution ----
+
+
+def _resolve_hf_home() -> Path:
+    """Return the HuggingFace cache directory honoring environment settings."""
+
+    env_override = os.getenv("HF_HOME")
+    if env_override:
+        return Path(env_override).expanduser().resolve()
+    xdg_cache = os.getenv("XDG_CACHE_HOME")
+    if xdg_cache:
+        return (Path(xdg_cache).expanduser() / "huggingface").resolve()
+    return (Path.home() / ".cache" / "huggingface").resolve()
+
+
+def _resolve_with_env(env_var: str, default: Path) -> Path:
+    """Resolve ``env_var`` to a path when provided, otherwise return ``default``."""
+
+    override = os.getenv(env_var)
+    if override:
+        return Path(override).expanduser().resolve()
+    return default
+
+
+def _resolve_cli_path(value: Optional[Path], default: Path) -> Path:
+    """Resolve CLI-provided ``value`` to an absolute path with ``default`` fallback."""
+
+    if value is not None:
+        return Path(value).expanduser().resolve()
+    return default
+
+
+HF_HOME = _resolve_hf_home()
+MODEL_ROOT = _resolve_with_env("DOCSTOKG_MODEL_ROOT", HF_HOME)
+QWEN_DIR = _resolve_with_env(
+    "DOCSTOKG_QWEN_DIR", MODEL_ROOT / "Qwen" / "Qwen3-Embedding-4B"
+)
+SPLADE_DIR = _resolve_with_env("DOCSTOKG_SPLADE_DIR", MODEL_ROOT / "naver" / "splade-v3")
 # ---- Fixed locations ----
 
 
@@ -146,6 +191,7 @@ os.environ.setdefault("HF_HOME", str(HF_HOME))
 os.environ.setdefault("HF_HUB_CACHE", str(HF_HOME / "hub"))
 os.environ.setdefault("TRANSFORMERS_CACHE", str(HF_HOME / "transformers"))
 os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", str(MODEL_ROOT))
+os.environ.setdefault("DOCSTOKG_MODEL_ROOT", str(MODEL_ROOT))
 
 
 def _missing_splade_dependency_message() -> str:
@@ -217,6 +263,18 @@ def ensure_uuid(rows: List[dict]) -> bool:
             row["uuid"] = str(uuid.uuid4())
             updated = True
     return updated
+
+
+def ensure_chunk_schema(rows: Sequence[dict], source: Path) -> None:
+    """Assert that chunk rows declare a compatible schema version."""
+
+    for index, row in enumerate(rows, start=1):
+        validate_schema_version(
+            row.get("schema_version"),
+            COMPATIBLE_CHUNK_VERSIONS,
+            kind="chunk",
+            source=f"{source}:{index}",
+        )
 
 
 def tokens(text: str) -> List[str]:
@@ -661,7 +719,7 @@ def process_pass_a(files: Sequence[Path], logger) -> BM25Stats:
         logger: Logger used for structured progress output.
 
     Returns:
-        Aggregated BM25 statistics across all processed chunk rows.
+        Aggregated BM25 statistics for the supplied chunk corpus.
 
     Raises:
         ValueError: Propagated when chunk rows are missing required fields.
@@ -673,6 +731,7 @@ def process_pass_a(files: Sequence[Path], logger) -> BM25Stats:
         rows = jsonl_load(chunk_file)
         if not rows:
             continue
+        ensure_chunk_schema(rows, chunk_file)
         if ensure_uuid(rows):
             jsonl_save(chunk_file, rows)
         for row in rows:
@@ -721,7 +780,10 @@ def process_chunk_file_vectors(
     if not rows:
         logger.warning("Chunk file empty", extra={"extra_fields": {"chunk_file": str(chunk_file)}})
         return 0, [], []
+    ensure_chunk_schema(rows, chunk_file)
 
+    uuids = [row["uuid"] for row in rows]
+    texts = [row.get("text", "") for row in rows]
     uuids: List[str] = []
     texts: List[str] = []
     for row in rows:
@@ -943,6 +1005,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Override SPLADE model directory (CLI > $DOCSTOKG_SPLADE_DIR > "
+            f"{SPLADE_DIR})."
             "model root/naver/splade-v3)."
         ),
     )
@@ -966,6 +1029,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Override Qwen model directory (CLI > $DOCSTOKG_QWEN_DIR > "
+            f"{QWEN_DIR})."
             "model root/Qwen/Qwen3-Embedding-4B)."
         ),
     )
@@ -1077,10 +1141,28 @@ def main(args: argparse.Namespace | None = None) -> int:
     args.splade_model_dir = splade_model_dir
     args.qwen_model_dir = qwen_model_dir
 
+    splade_model_dir = _resolve_cli_path(args.splade_model_dir, SPLADE_DIR)
+    qwen_model_dir = _resolve_cli_path(args.qwen_model_dir, QWEN_DIR)
+
     if args.batch_size_splade < 1 or args.batch_size_qwen < 1:
         raise ValueError("Batch sizes must be >= 1")
 
     overall_start = time.perf_counter()
+
+    if args.offline:
+        os.environ["TRANSFORMERS_OFFLINE"] = "1"
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
+        logger.info("Offline mode enabled: expecting local caches only")
+        missing_models = [
+            (label, path)
+            for label, path in (("SPLADE", splade_model_dir), ("Qwen", qwen_model_dir))
+            if not path.exists() or not path.is_dir()
+        ]
+        if missing_models:
+            missing_desc = ", ".join(f"{label} model at {path}" for label, path in missing_models)
+            raise FileNotFoundError(
+                "Offline mode requires local model directories. Missing: " + missing_desc
+            )
 
     try:
         _ensure_splade_dependencies()
@@ -1123,6 +1205,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "vectors_dir": str(out_dir),
                 "splade_model_dir": str(splade_model_dir),
                 "qwen_model_dir": str(qwen_model_dir),
+                "offline": args.offline,
                 "offline": offline_mode,
             }
         },
@@ -1148,6 +1231,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         batch_size=args.batch_size_splade,
         max_active_dims=args.splade_max_active_dims,
         attn_impl=attn_impl,
+        cache_folder=MODEL_ROOT,
     )
     args.qwen_cfg = QwenCfg(
         model_dir=qwen_model_dir,
@@ -1158,6 +1242,7 @@ def main(args: argparse.Namespace | None = None) -> int:
     )
 
     stats = process_pass_a(files, logger)
+    if stats.N == 0:
     if not stats.N:
         logger.warning("No chunks found after Pass A")
         return 0
