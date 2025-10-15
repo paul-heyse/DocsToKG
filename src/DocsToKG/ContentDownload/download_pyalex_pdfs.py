@@ -26,6 +26,7 @@ from pyalex import config as oa_config
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from DocsToKG.ContentDownload.http import request_with_retries
 from DocsToKG.ContentDownload.resolvers import (
     AttemptRecord,
     DownloadOutcome,
@@ -966,18 +967,26 @@ def download_candidate(
         head_headers = dict(headers)
         head_headers.pop("If-None-Match", None)
         head_headers.pop("If-Modified-Since", None)
-        with contextlib.suppress(requests.RequestException):
-            head = session.head(
+        try:
+            head = request_with_retries(
+                session,
+                "HEAD",
                 url,
+                max_retries=1,
                 allow_redirects=True,
                 timeout=timeout,
                 headers=head_headers,
             )
+        except requests.RequestException:
+            head = None
+        else:
             if head.status_code < 400:
                 content_type_hint = head.headers.get("Content-Type", "") or ""
             head.close()
 
-        with session.get(
+        with request_with_retries(
+            session,
+            "GET",
             url,
             stream=True,
             allow_redirects=True,
