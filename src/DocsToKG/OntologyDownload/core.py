@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Protocol, Sequence
@@ -147,6 +148,124 @@ class FetchResult:
     artifacts: Sequence[str]
 
 
+def _plan_with_fallback(
+    spec: FetchSpec,
+    config: ResolvedConfig,
+    adapter: logging.LoggerAdapter,
+) -> tuple[FetchPlan, FetchSpec]:
+    """Resolve a fetch plan using resolver fallback when configured."""
+
+    fallback_enabled = getattr(config.defaults, "resolver_fallback_enabled", True)
+    prefer_order = list(config.defaults.prefer_source)
+
+    attempt_names: List[str] = []
+    if spec.resolver:
+        attempt_names.append(spec.resolver)
+    if fallback_enabled:
+        for resolver_name in prefer_order:
+            if resolver_name not in attempt_names:
+                attempt_names.append(resolver_name)
+
+    errors: List[str] = []
+    attempted_valid_resolver = False
+
+    for attempt_index, resolver_name in enumerate(attempt_names, start=1):
+        resolver_impl = RESOLVERS.get(resolver_name)
+        if resolver_impl is None:
+            adapter.warning(
+                "resolver unavailable",
+                extra={
+                    "stage": "plan",
+                    "resolver": resolver_name,
+                    "attempt": attempt_index,
+                    "outcome": "missing",
+                },
+            )
+            errors.append(f"{resolver_name}: unavailable")
+            continue
+
+        attempted_valid_resolver = True
+        attempt_spec = replace(spec, resolver=resolver_name)
+        adapter.info(
+            "resolver attempt",
+            extra={
+                "stage": "plan",
+                "resolver": resolver_name,
+                "attempt": attempt_index,
+                "fallback": fallback_enabled,
+            },
+        )
+        try:
+            plan = resolver_impl.plan(attempt_spec, config, adapter)
+        except ResolverError as exc:  # pragma: no cover - defensive
+            message = str(exc)
+            adapter.warning(
+                "resolver failed",
+                extra={
+                    "stage": "plan",
+                    "resolver": resolver_name,
+                    "attempt": attempt_index,
+                    "error": message,
+                },
+            )
+            errors.append(f"{resolver_name}: {message}")
+            if not fallback_enabled:
+                break
+            continue
+        except ConfigError as exc:
+            message = str(exc)
+            adapter.warning(
+                "resolver failed",
+                extra={
+                    "stage": "plan",
+                    "resolver": resolver_name,
+                    "attempt": attempt_index,
+                    "error": message,
+                },
+            )
+            errors.append(f"{resolver_name}: {message}")
+            if not fallback_enabled:
+                break
+            continue
+        except Exception as exc:  # pylint: disable=broad-except
+            message = str(exc)
+            adapter.error(
+                "resolver unexpected error",
+                extra={
+                    "stage": "plan",
+                    "resolver": resolver_name,
+                    "attempt": attempt_index,
+                    "error": message,
+                },
+            )
+            errors.append(f"{resolver_name}: {message}")
+            if not fallback_enabled:
+                break
+            continue
+
+        adapter.info(
+            "resolver success",
+            extra={
+                "stage": "plan",
+                "resolver": resolver_name,
+                "attempt": attempt_index,
+                "outcome": "success",
+            },
+        )
+        return plan, attempt_spec
+
+    if not attempted_valid_resolver:
+        raise ResolverError(
+            f"Unknown resolver '{spec.resolver}' for ontology '{spec.id}'"
+        )
+
+    if errors:
+        raise ResolverError(
+            f"All resolvers exhausted for ontology '{spec.id}': " + "; ".join(errors)
+        )
+    raise ResolverError(f"All resolvers exhausted for ontology '{spec.id}'")
+
+
 @dataclass(slots=True)
 class Manifest:
     """Provenance information for a downloaded ontology artifact.
@@ -166,6 +285,7 @@ class Manifest:
         target_formats: Desired conversion targets for normalization.
         validation: Mapping of validator names to their results.
         artifacts: Additional file paths generated during processing.
+        normalized_sha256: SHA-256 hash of canonical normalized output when available.
 
     Examples:
         >>> manifest = Manifest(
@@ -202,6 +322,7 @@ class Manifest:
     target_formats: Sequence[str]
     validation: Dict[str, ValidationResult]
     artifacts: Sequence[str]
+    normalized_sha256: Optional[str] = None
 
     def to_json(self) -> str:
         """Serialize the manifest to a stable, human-readable JSON string.
@@ -228,6 +349,8 @@ class Manifest:
             "validation": {name: result.to_dict() for name, result in self.validation.items()},
             "artifacts": list(self.artifacts),
         }
+        if self.normalized_sha256 is not None:
+            payload["normalized_sha256"] = self.normalized_sha256
         return json.dumps(payload, indent=2, sort_keys=True)
 
 
@@ -336,6 +459,10 @@ def _validate_manifest(manifest: Manifest) -> None:
     for item in manifest.artifacts:
         if not isinstance(item, str):
             raise ConfigurationError("Manifest artifacts must contain only string paths")
+    if manifest.normalized_sha256 is not None and not isinstance(
+        manifest.normalized_sha256, str
+    ):
+        raise ConfigurationError("Manifest normalized_sha256 must be a string")
 
 
 def _write_manifest(manifest_path: Path, manifest: Manifest) -> None:
@@ -371,7 +498,48 @@ def _build_destination(spec: FetchSpec, plan: FetchPlan, config: ResolvedConfig)
     return base_dir / "original" / filename
 
 
-def _ensure_license_allowed(plan: FetchPlan, config: ResolvedConfig, spec: FetchSpec) -> None:
+def _license_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.lower())
+
+
+_LICENSE_SYNONYMS = {
+    "ccby": "CC-BY-4.0",
+    "ccby4": "CC-BY-4.0",
+    "ccby40": "CC-BY-4.0",
+    "creativecommonsattribution": "CC-BY-4.0",
+    "creativecommonsattribution40": "CC-BY-4.0",
+    "cc0": "CC0-1.0",
+    "cc01": "CC0-1.0",
+    "cc010": "CC0-1.0",
+    "publicdomain": "CC0-1.0",
+    "apache": "Apache-2.0",
+    "apache2": "Apache-2.0",
+    "apache20": "Apache-2.0",
+    "apachelicense": "Apache-2.0",
+    "apachelicense2": "Apache-2.0",
+    "apachelicense20": "Apache-2.0",
+    "apachelicenseversion20": "Apache-2.0",
+}
+
+for _canonical in ("CC-BY-4.0", "CC0-1.0", "Apache-2.0"):
+    _LICENSE_SYNONYMS[_license_key(_canonical)] = _canonical
+
+
+def normalize_license_to_spdx(license_value: Optional[str]) -> Optional[str]:
+    """Normalize resolver license strings to canonical SPDX identifiers."""
+
+    if license_value is None:
+        return None
+    stripped = license_value.strip()
+    if not stripped:
+        return None
+    canonical = _LICENSE_SYNONYMS.get(_license_key(stripped))
+    return canonical or stripped
+
+
+def _ensure_license_allowed(
+    plan: FetchPlan, config: ResolvedConfig, spec: FetchSpec
+) -> Optional[str]:
     """Confirm the ontology license is present in the configured allow list.
 
     Args:
@@ -383,12 +551,18 @@ def _ensure_license_allowed(plan: FetchPlan, config: ResolvedConfig, spec: Fetch
         ConfigurationError: If the plan's license is not permitted.
     """
     allowed = set(config.defaults.accept_licenses)
-    if not allowed or plan.license is None:
-        return
-    if plan.license not in allowed:
+    normalized_allowed = {
+        normalize_license_to_spdx(entry) for entry in allowed if entry
+    }
+    normalized_allowed = {entry for entry in normalized_allowed if entry}
+    normalized_license = normalize_license_to_spdx(plan.license)
+    if not normalized_allowed or normalized_license is None:
+        return normalized_license
+    if normalized_license not in normalized_allowed:
         raise ConfigurationError(
             f"License '{plan.license}' for ontology '{spec.id}' is not in the allowlist: {sorted(allowed)}"
         )
+    return normalized_license
 
 
 def fetch_one(
@@ -419,10 +593,6 @@ def fetch_one(
 
     ensure_python_version()
     active_config = config or ResolvedConfig.from_defaults()
-    resolver = RESOLVERS.get(spec.resolver)
-    if resolver is None:
-        raise ResolverError(f"Unknown resolver '{spec.resolver}' for ontology '{spec.id}'")
-
     log = logger or setup_logging(active_config.defaults.logging)
     correlation = correlation_id or generate_correlation_id()
     adapter = logging.LoggerAdapter(
@@ -430,16 +600,10 @@ def fetch_one(
     )
     adapter.info("planning fetch", extra={"stage": "plan"})
 
-    try:
-        plan = resolver.plan(spec, active_config, adapter)
-    except ConfigError as exc:
-        raise ResolverError(
-            f"Resolver '{spec.resolver}' failed for ontology '{spec.id}': {exc}"
-        ) from exc
-    except Exception as exc:  # pylint: disable=broad-except
-        raise ResolverError(f"Unexpected resolver failure for ontology '{spec.id}': {exc}") from exc
+    plan, spec = _plan_with_fallback(spec, active_config, adapter)
+    adapter.extra["resolver"] = spec.resolver
 
-    _ensure_license_allowed(plan, active_config, spec)
+    normalized_license = _ensure_license_allowed(plan, active_config, spec)
 
     if plan.service:
         adapter.extra["service"] = plan.service
@@ -461,7 +625,7 @@ def fetch_one(
     )
 
     download_config = active_config.defaults.http
-    secure_url = validate_url_security(plan.url)
+    secure_url = validate_url_security(plan.url, download_config)
     try:
         result = download_stream(
             url=secure_url,
@@ -543,13 +707,22 @@ def fetch_one(
 
     validation_results = run_validators(validation_requests, adapter)
 
+    normalized_sha256: Optional[str] = None
+    rdflib_result = validation_results.get("rdflib")
+    if rdflib_result and isinstance(rdflib_result.details, dict):
+        candidate_hash = rdflib_result.details.get("normalized_sha256")
+        if isinstance(candidate_hash, str) and candidate_hash:
+            normalized_sha256 = candidate_hash
+
+    manifest_license = normalized_license or plan.license
+
     manifest = Manifest(
         id=spec.id,
         resolver=spec.resolver,
         url=secure_url,
         filename=destination.name,
         version=plan.version,
-        license=plan.license,
+        license=manifest_license,
         status=result.status,
         sha256=result.sha256,
         etag=result.etag,
@@ -558,6 +731,7 @@ def fetch_one(
         target_formats=spec.target_formats,
         validation=validation_results,
         artifacts=artifacts,
+        normalized_sha256=normalized_sha256,
     )
     _write_manifest(manifest_path, manifest)
     adapter.info(

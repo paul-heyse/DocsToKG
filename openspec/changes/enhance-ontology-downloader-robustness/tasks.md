@@ -1963,20 +1963,155 @@ def test_validate_media_type_disabled():
 - [x] API docs mention `service` usage in fetch plans and download rate limiting.
 - [x] New and existing tests pass validating per-service rate limiting.
 
+### 2.3 Harden URL Validation with Allowlist and IDN Safety
+
+#### 2.3.1 Implement punycode normalization and homograph detection
+
+**Objective**: Ensure URL validation normalizes IDN hosts to punycode and rejects suspicious homograph attempts.
+
+**Implementation**:
+
+- Add `_enforce_idn_safety()` helper in `download.py` to reject invisible Unicode characters and mixed-script labels.
+- Normalize hosts via `.encode("idna").decode("ascii")` before DNS resolution and token bucket lookups.
+- Rebuild URL netloc with normalized hostname while preserving IPv6 bracket notation.
+
+**Acceptance Criteria**:
+
+- [x] IDN hosts such as `münchen.example.org` convert to `xn--mnchen-3ya.example.org` before resolution.
+- [x] Mixed-script homographs (Latin + Cyrillic) raise `ConfigError` prior to any network access.
+- [x] IPv4 and IPv6 literals remain supported after normalization.
+
+#### 2.3.2 Enforce optional host allowlist during validation
+
+**Objective**: Respect `DownloadConfiguration.allowed_hosts` for SSRF mitigation.
+
+**Implementation**:
+
+- Add `DownloadConfiguration.normalized_allowed_hosts()` returning exact and wildcard punycoded hostnames.
+- Update `validate_url_security()` to accept the HTTP configuration and enforce allowlist matches (including `*.example.org` support).
+- Ensure both `core.fetch_one()` and `download_stream()` pass the active HTTP configuration into the validator.
+
+**Acceptance Criteria**:
+
+- [x] URLs to hosts not present in `allowed_hosts` raise `ConfigError`.
+- [x] Wildcard entries such as `*.example.org` permit subdomains.
+- [x] Allowlist lookups occur prior to DNS resolution.
+
+#### 2.3.3 Expand unit tests for URL security features
+
+**Objective**: Cover new allowlist and IDN scenarios with deterministic unit tests.
+
+**Implementation**:
+
+- Add tests in `tests/ontology_download/test_download.py` for allowlist success/failure, punycode normalization, wildcard handling, and mixed-script rejection.
+- Extend `tests/ontology_download/test_config.py` to verify allowlist normalization helper output.
+- Monkeypatch DNS resolution in tests to avoid external lookups and assert normalized hostnames used.
+
+**Acceptance Criteria**:
+
+- [x] Added tests fail on regressions of allowlist enforcement or IDN handling.
+- [x] All updated tests pass locally.
+- [x] Code coverage includes new helper paths.
+
+### 2.4 Safe Tar Archive Extraction
+
+#### 2.4.1 Add secure tar extraction helper
+
+**Objective**: Provide `extract_tar_safe()` that prevents tar-slip attacks, link tricks, and compression bombs.
+
+**Implementation**:
+
+- Implement `extract_tar_safe()` alongside `_validate_member_path()` to normalise member names.
+- Reject symlinks, hardlinks, device nodes, and unsupported member types prior to extraction.
+- Apply shared compression ratio enforcement before writing files to disk and log extraction summaries.
+
+**Acceptance Criteria**:
+
+- [x] Tar members with traversal or absolute paths raise `ConfigError` before touching disk.
+- [x] Symlinks, hardlinks, and special files are rejected with clear error messaging.
+- [x] Compression ratio guard aborts archives that would expand beyond 10:1.
+
+#### 2.4.2 Extend ZIP extraction safeguards
+
+**Objective**: Apply the same path validation and compression ratio guard to ZIP archives.
+
+**Implementation**:
+
+- Share `_validate_member_path()` for both ZIP and TAR extraction routines.
+- Enforce compression ratio limits using `_check_compression_ratio()` prior to streaming member contents.
+- Preserve structured logging for successful ZIP extraction events.
+
+**Acceptance Criteria**:
+
+- [x] ZIP extraction refuses traversal, absolute, or empty paths.
+- [x] Compression bombs exceeding 10:1 ratio trigger `ConfigError`.
+- [x] Logging continues to report archive extraction outcomes.
+
+#### 2.4.3 Add archive safety unit coverage
+
+**Objective**: Ensure regression coverage for ZIP/TAR traversal and compression protections.
+
+**Implementation**:
+
+- Add tests covering safe tar extraction, traversal rejection, absolute path rejection, symlink blocking, and compression bomb detection.
+- Add tests verifying ZIP compression bomb detection and successful extraction paths.
+- Reuse helper factory to generate gzipped tar archives within the test suite.
+
+**Acceptance Criteria**:
+
+- [x] New tests fail if archive safeguards regress.
+- [x] Test suite validates both positive and negative tar scenarios.
+- [x] Compression bomb rejection is asserted for ZIP and TAR archives.
+
+---
+
+### 3.1 Deterministic TTL Normalization
+
+- [x] Implement canonical Turtle serialization in `validate_rdflib`, sorting prefixes and triples and computing a normalized SHA-256 hash.
+- [x] Record the canonical hash in validation results and propagate it into manifests for downstream consumers.
+- [x] Add unit coverage exercising canonical ordering, hash stability, and manifest persistence.
+
+### 3.2 Subprocess Validator Isolation
+
+- [x] Execute Pronto and Owlready2 validators via a dedicated subprocess worker module with JSON-based IPC and timeout handling.
+- [x] Integrate the worker helper into validator functions while preserving logging semantics and fallback behaviour.
+- [x] Expand validator tests to mock subprocess execution, covering success, error, and skip scenarios.
+
+### 3.3 SPDX License Normalization
+
+- [x] Normalize resolver-reported license strings to SPDX identifiers prior to allowlist checks.
+- [x] Persist normalized licenses in manifests and expose the canonical value through fetch results.
+- [x] Add integration tests verifying alias acceptance and manifest output when alternate license spellings are provided.
+
+### 4.1 Automatic Resolver Fallback
+
+- [x] Added `_plan_with_fallback()` in `core.fetch_one()` to iterate configured resolvers with structured logging and manifest updates when fallback succeeds.
+- [x] Introduced configuration toggle `resolver_fallback_enabled` with integration coverage for both enabled and disabled scenarios.
+
+### 4.2 Polite API Headers
+
+- [x] Extended `DownloadConfiguration` with `polite_headers` plus helpers to emit default User-Agent and correlation-based X-Request-ID values.
+- [x] Applied polite headers across OLS and BioPortal clients and exposed configuration defaults with new unit tests.
+
+### 4.3 LOV and Ontobee Resolvers
+
+- [x] Implemented `LOVResolver` with error handling for unavailable metadata and media type inference, including resolver unit coverage.
+- [x] Added `OntobeeResolver` for format-aware PURL generation with validation of OBO prefixes and per-format MIME types.
+
 ---
 
 ## Task Completion Tracking
 
 **Foundation (1.1-1.4)**: 27/52 tasks complete
-**Robustness Downloads (2.1-2.4)**: 9/24 tasks complete
-**Robustness Validation (3.1-3.4)**: 0/21 tasks complete
-**Capabilities (4.1-5.2)**: 0/32 tasks complete
+**Robustness Downloads (2.1-2.4)**: 15/27 tasks complete
+**Robustness Validation (3.1-3.4)**: 9/21 tasks complete
+**Capabilities (4.1-5.2)**: 6/32 tasks complete
 **Storage (6.1)**: 0/10 tasks complete
 **CLI (7.1-7.3)**: 0/13 tasks complete
 **Testing (8.1-8.5)**: 0/30 tasks complete
 **Deployment (9.1-9.3)**: 0/13 tasks complete
 
-**Total**: 36/195 tasks complete (18.5%)
+**Total**: 57/198 tasks complete (28.8%)
 
 ## Notes for AI Programming Agents
 

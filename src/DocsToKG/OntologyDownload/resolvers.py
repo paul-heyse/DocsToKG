@@ -10,6 +10,7 @@ downloading ontology content.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from dataclasses import dataclass
 from typing import Dict, Optional
@@ -129,6 +130,36 @@ class BaseResolver:
             service=service,
         )
 
+    def _build_polite_headers(
+        self, config: ResolvedConfig, logger: logging.Logger
+    ) -> Dict[str, str]:
+        """Construct polite headers for outbound resolver HTTP requests."""
+
+        extra = getattr(logger, "extra", {})
+        correlation_id = extra.get("correlation_id") if isinstance(extra, dict) else None
+        return config.defaults.http.build_polite_headers(correlation_id)
+
+    def _apply_polite_headers(self, client: object, headers: Dict[str, str]) -> None:
+        """Attach polite headers to resolver client sessions when possible."""
+
+        if not headers:
+            return
+        session = getattr(client, "session", None)
+        if session is not None and hasattr(session, "headers"):
+            try:
+                session.headers.update(headers)
+            except Exception:  # pragma: no cover - defensive against exotic clients
+                pass
+        client_headers = getattr(client, "headers", None)
+        if isinstance(client_headers, dict):
+            client_headers.update(headers)
+        setter = getattr(client, "set_headers", None)
+        if callable(setter):
+            try:
+                setter(headers)
+            except Exception:  # pragma: no cover - defensive
+                pass
+
 
 class OBOResolver(BaseResolver):
     """Resolve ontologies hosted on the OBO Library using Bioregistry helpers.
@@ -214,6 +245,8 @@ class OLSResolver(BaseResolver):
         Raises:
             ConfigError: When the API rejects credentials or yields no URLs.
         """
+        polite_headers = self._build_polite_headers(config, logger)
+        self._apply_polite_headers(self.client, polite_headers)
         ontology_id = spec.id.lower()
         try:
             record = self._execute_with_retry(
@@ -315,6 +348,8 @@ class BioPortalResolver(BaseResolver):
         Raises:
             ConfigError: If authentication fails or no download link is available.
         """
+        polite_headers = self._build_polite_headers(config, logger)
+        self._apply_polite_headers(self.client, polite_headers)
         acronym = spec.extras.get("acronym", spec.id.upper())
         try:
             ontology = self._execute_with_retry(
@@ -360,6 +395,8 @@ class BioPortalResolver(BaseResolver):
         api_key = self._load_api_key()
         if api_key:
             headers["Authorization"] = f"apikey {api_key}"
+        if polite_headers:
+            headers.update(polite_headers)
         logger.info(
             "resolved download url",
             extra={
@@ -374,6 +411,135 @@ class BioPortalResolver(BaseResolver):
             headers=headers,
             version=version,
             license=license_value,
+            service=spec.resolver,
+        )
+
+
+class LOVResolver(BaseResolver):
+    """Resolve vocabularies from the Linked Open Vocabularies API."""
+
+    API_URL = "https://lov.linkeddata.es/dataset/lov/api/v2/vocabulary/info"
+
+    def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Retrieve vocabulary metadata from LOV and construct a FetchPlan."""
+
+        polite_headers = self._build_polite_headers(config, logger)
+        timeout = config.defaults.http.timeout_sec
+        extras = spec.extras or {}
+        params: Dict[str, str] = {}
+        uri = extras.get("uri")
+        vocab = extras.get("vocab") or extras.get("prefix") or spec.id
+        if uri:
+            params["uri"] = str(uri)
+        elif vocab:
+            params["vocab"] = str(vocab)
+        else:
+            raise ConfigError("LOV resolver requires 'extras.uri' or ontology identifier")
+
+        def _fetch_metadata():
+            response = requests.get(
+                self.API_URL,
+                params=params,
+                headers=polite_headers,
+                timeout=timeout,
+            )
+            response.raise_for_status()
+            return response.json()
+
+        try:
+            payload = self._execute_with_retry(
+                _fetch_metadata, config=config, logger=logger, name="lov"
+            )
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            raise ConfigError(f"LOV API error {status}: {exc}") from exc
+        except requests.RequestException as exc:
+            raise ConfigError(f"LOV API request failed: {exc}") from exc
+        except ValueError as exc:
+            raise ConfigError(f"LOV API returned invalid JSON: {exc}") from exc
+
+        versions = payload.get("versions") if isinstance(payload, dict) else None
+        if not versions or not isinstance(versions, list):
+            raise ConfigError("LOV API response missing versions list")
+        latest = versions[0]
+        if not isinstance(latest, dict):
+            raise ConfigError("LOV API response malformed for versions entry")
+        download_url = latest.get("fileURL")
+        if not download_url:
+            raise ConfigError("LOV API response missing fileURL for latest version")
+        version = latest.get("name") or latest.get("issued")
+        license_value = (
+            payload.get("license")
+            or latest.get("licence")
+            or latest.get("license")
+        )
+
+        media_type = "text/turtle"
+        lowered_url = download_url.lower()
+        if lowered_url.endswith(".rdf") or lowered_url.endswith(".owl"):
+            media_type = "application/rdf+xml"
+        elif lowered_url.endswith(".obo"):
+            media_type = "text/plain"
+
+        logger.info(
+            "resolved download url",
+            extra={
+                "stage": "plan",
+                "resolver": "lov",
+                "ontology_id": spec.id,
+                "url": download_url,
+            },
+        )
+        return self._build_plan(
+            url=download_url,
+            version=version,
+            license=license_value,
+            media_type=media_type,
+            service=spec.resolver,
+        )
+
+
+class OntobeeResolver(BaseResolver):
+    """Construct PURLs for Ontobee-hosted OBO ontologies."""
+
+    _PREFIX_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]+$")
+    _MEDIA_TYPES = {
+        "owl": "application/rdf+xml",
+        "obo": "text/plain",
+        "ttl": "text/turtle",
+    }
+
+    def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Generate Ontobee download URL respecting preferred formats."""
+
+        prefix = spec.id.lower()
+        if not self._PREFIX_PATTERN.fullmatch(prefix):
+            raise ConfigError(
+                "Ontobee resolver requires ontology identifiers using OBO prefix format"
+            )
+
+        preferred_formats = [fmt.lower() for fmt in spec.target_formats] or ["owl", "obo", "ttl"]
+        extension = "owl"
+        for candidate in preferred_formats:
+            normalized = "owl" if candidate == "rdf" else candidate
+            if normalized in self._MEDIA_TYPES:
+                extension = normalized
+                break
+
+        url = f"http://purl.obolibrary.org/obo/{prefix}.{extension}"
+        media_type = self._MEDIA_TYPES.get(extension, "application/rdf+xml")
+        logger.info(
+            "resolved download url",
+            extra={
+                "stage": "plan",
+                "resolver": "ontobee",
+                "ontology_id": spec.id,
+                "url": url,
+            },
+        )
+        return self._build_plan(
+            url=url,
+            media_type=media_type,
             service=spec.resolver,
         )
 
@@ -463,6 +629,8 @@ RESOLVERS = {
     "bioregistry": OBOResolver(),
     "ols": OLSResolver(),
     "bioportal": BioPortalResolver(),
+    "lov": LOVResolver(),
+    "ontobee": OntobeeResolver(),
     "skos": SKOSResolver(),
     "xbrl": XBRLResolver(),
 }
@@ -473,6 +641,8 @@ __all__ = [
     "OBOResolver",
     "OLSResolver",
     "BioPortalResolver",
+    "LOVResolver",
+    "OntobeeResolver",
     "SKOSResolver",
     "XBRLResolver",
     "RESOLVERS",

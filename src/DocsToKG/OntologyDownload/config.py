@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 import sys
+import time
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -16,6 +17,8 @@ from typing import (
     MutableMapping,
     Optional,
     Sequence,
+    Set,
+    Tuple,
 )
 
 try:  # pragma: no cover - dependency check
@@ -216,6 +219,10 @@ class DownloadConfiguration(BaseModel):
     validate_media_type: bool = Field(default=True)
     rate_limits: Dict[str, str] = Field(default_factory=dict)
     allowed_hosts: Optional[List[str]] = Field(default=None)
+    polite_headers: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Optional polite HTTP headers for resolver API requests.",
+    )
 
     @field_validator("rate_limits")
     @classmethod
@@ -295,6 +302,81 @@ class DownloadConfiguration(BaseModel):
             return value / 3600.0
         return None
 
+    def normalized_allowed_hosts(self) -> Optional[Tuple[Set[str], Set[str]]]:
+        """Return allowlist entries normalized to lowercase punycode labels.
+
+        Returns:
+            Tuple of (exact hostnames, wildcard suffixes) when entries exist,
+            otherwise ``None`` if no valid allowlist entries are configured.
+
+        Raises:
+            ValueError: If any configured hostname cannot be converted to punycode.
+        """
+
+        if not self.allowed_hosts:
+            return None
+
+        exact: Set[str] = set()
+        suffixes: Set[str] = set()
+
+        for entry in self.allowed_hosts:
+            candidate = entry.strip()
+            if not candidate:
+                continue
+
+            wildcard = False
+            if candidate.startswith("*."):
+                wildcard = True
+                candidate = candidate[2:]
+            elif candidate.startswith("."):
+                wildcard = True
+                candidate = candidate[1:]
+
+            try:
+                normalized = candidate.encode("idna").decode("ascii").lower()
+            except UnicodeError as exc:
+                raise ValueError(f"Invalid hostname in allowlist: {entry}") from exc
+
+            if wildcard:
+                suffixes.add(normalized)
+            else:
+                exact.add(normalized)
+
+        if not exact and not suffixes:
+            return None
+
+        return exact, suffixes
+
+    def build_polite_headers(self, correlation_id: Optional[str] = None) -> Dict[str, str]:
+        """Construct polite HTTP headers for resolver API calls.
+
+        Args:
+            correlation_id: Optional identifier used to inject structured
+                ``X-Request-ID`` header values.
+
+        Returns:
+            Mapping of HTTP headers suitable for resolver metadata requests.
+        """
+
+        headers: Dict[str, str] = {
+            key: value
+            for key, value in self.polite_headers.items()
+            if isinstance(key, str) and value
+        }
+
+        user_agent = headers.get("User-Agent") or "DocsToKG-OntologyDownloader/1.0"
+        headers["User-Agent"] = user_agent
+
+        timestamp = int(time.time() * 1000)
+        request_id = headers.get("X-Request-ID")
+        if correlation_id:
+            request_id = f"{correlation_id}-{timestamp}"
+        elif not request_id:
+            request_id = f"ontofetch-{timestamp}"
+        headers["X-Request-ID"] = request_id
+
+        return headers
+
     model_config = {
         "frozen": False,
         "validate_assignment": True,
@@ -341,6 +423,10 @@ class DefaultsConfig(BaseModel):
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
     logging: LoggingConfiguration = Field(default_factory=LoggingConfiguration)
     continue_on_error: bool = Field(default=True)
+    resolver_fallback_enabled: bool = Field(
+        default=True,
+        description="Enable automatic resolver fallback when planning downloads.",
+    )
 
     @field_validator("prefer_source")
     @classmethod

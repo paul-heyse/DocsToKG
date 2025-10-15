@@ -131,6 +131,42 @@ def test_download_config_allowed_hosts() -> None:
     assert "purl.obolibrary.org" in config.allowed_hosts
 
 
+def test_download_config_normalizes_allowed_hosts() -> None:
+    """normalized_allowed_hosts should return punycoded hostnames."""
+
+    config = DownloadConfiguration(
+        allowed_hosts=["Example.org", "*.Example.com", " münchen.example.org "]
+    )
+
+    normalized = config.normalized_allowed_hosts()
+    assert normalized is not None
+    exact, suffixes = normalized
+    assert "example.org" in exact
+    assert "example.com" in suffixes
+    assert "xn--mnchen-3ya.example.org" in exact
+
+
+def test_download_config_polite_headers_defaults() -> None:
+    """Polite headers should provide defaults when not configured."""
+
+    config = DownloadConfiguration()
+    headers = config.build_polite_headers(correlation_id="corr-123")
+    assert headers["User-Agent"].startswith("DocsToKG-OntologyDownloader/")
+    assert headers["X-Request-ID"].startswith("corr-123-")
+
+
+def test_download_config_polite_headers_overrides() -> None:
+    """Configured polite headers should be preserved and augmented."""
+
+    config = DownloadConfiguration(
+        polite_headers={"User-Agent": "Custom/1.0", "From": "ops@example.org"}
+    )
+    headers = config.build_polite_headers()
+    assert headers["User-Agent"] == "Custom/1.0"
+    assert headers["From"] == "ops@example.org"
+    assert headers["X-Request-ID"].startswith("ontofetch-")
+
+
 def test_defaults_config_pydantic() -> None:
     """DefaultsConfig should inherit from BaseModel for Pydantic features."""
 
