@@ -19,6 +19,7 @@ Usage:
 """
 
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -31,6 +32,7 @@ import requests
 
 from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact, classify_payload, ensure_dir
 from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
+from DocsToKG.ContentDownload.resolvers import pipeline as pipeline_module
 from DocsToKG.ContentDownload.resolvers.types import (
     AttemptRecord,
     DownloadOutcome,
@@ -908,3 +910,137 @@ def test_pipeline_concurrent_execution(tmp_path):
 
     assert result.success is True
     assert result.resolver_name in {"a", "b"}
+
+
+def test_pipeline_global_deduplication_skips_repeat_urls(tmp_path):
+    artifact = build_artifact(tmp_path)
+    artifact.metadata["target_url"] = "https://example.org/shared.pdf"
+    alt_pdf_dir = tmp_path / "pdf-second"
+    alt_html_dir = tmp_path / "html-second"
+    artifact_second = replace(
+        artifact,
+        work_id="W124",
+        base_stem="example-two",
+        pdf_dir=alt_pdf_dir,
+        html_dir=alt_html_dir,
+    )
+
+    class StaticResolver(StubResolver):
+        def __init__(self) -> None:
+            super().__init__("static", [ResolverResult(url="https://example.org/shared.pdf")])
+
+    resolver = StaticResolver()
+    config = ResolverConfig(resolver_order=["static"], resolver_toggles={"static": True})
+    config.enable_head_precheck = False
+    config.enable_global_url_dedup = True
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+    download_calls: List[str] = []
+
+    def download_pdf(session, art, url, referer, timeout):
+        ensure_dir(art.pdf_dir)
+        path = art.pdf_dir / f"{art.base_stem}.pdf"
+        download_calls.append(art.work_id)
+        return DownloadOutcome(
+            "pdf",
+            path=str(path),
+            http_status=200,
+            content_type="application/pdf",
+            elapsed_ms=1.0,
+        )
+
+    pipeline = ResolverPipeline([resolver], config, download_pdf, logger, metrics)
+    result_first = pipeline.run(DummySession({}), artifact)
+    result_second = pipeline.run(DummySession({}), artifact_second)
+
+    assert result_first.success is True
+    assert result_second.success is False
+    assert download_calls == [artifact.work_id]
+    assert any(record.reason == "duplicate-url-global" for record in logger.records)
+    assert metrics.skips["static:duplicate-url-global"] == 1
+
+
+def test_pipeline_domain_rate_limiting_enforces_interval(monkeypatch, tmp_path):
+    class FakeClock:
+        def __init__(self) -> None:
+            self.now = 0.0
+            self.sleeps: List[float] = []
+
+        def monotonic(self) -> float:
+            return self.now
+
+        def sleep(self, duration: float) -> None:
+            self.sleeps.append(duration)
+            self.now += duration
+
+    fake = FakeClock()
+    monkeypatch.setattr(pipeline_module.time, "monotonic", fake.monotonic)
+    monkeypatch.setattr(pipeline_module.time, "sleep", fake.sleep)
+
+    artifact = replace(
+        build_artifact(tmp_path),
+        metadata={"target_url": "https://example.org/shared.pdf"},
+    )
+    second = replace(
+        artifact,
+        work_id="W125",
+        base_stem="example-two",
+        pdf_dir=tmp_path / "pdf-second",
+        html_dir=tmp_path / "html-second",
+        metadata={"target_url": "https://example.org/shared.pdf"},
+    )
+    third = replace(
+        artifact,
+        work_id="W126",
+        base_stem="example-three",
+        pdf_dir=tmp_path / "pdf-third",
+        html_dir=tmp_path / "html-third",
+        metadata={"target_url": "https://other.org/alt.pdf"},
+    )
+
+    class DynamicResolver:
+        name = "dynamic"
+
+        def is_enabled(self, config, art):
+            return True
+
+        def iter_urls(self, session, config, art):
+            yield ResolverResult(url=art.metadata["target_url"])
+
+    config = ResolverConfig(resolver_order=["dynamic"], resolver_toggles={"dynamic": True})
+    config.enable_head_precheck = False
+    config.domain_min_interval_s = {"example.org": 0.5}
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+    download_calls: List[str] = []
+
+    def download_pdf(session, art, url, referer, timeout):
+        ensure_dir(art.pdf_dir)
+        download_calls.append(url)
+        return DownloadOutcome(
+            "pdf",
+            path=str(art.pdf_dir / f"{art.base_stem}.pdf"),
+            http_status=200,
+            content_type="application/pdf",
+            elapsed_ms=1.0,
+        )
+
+    pipeline = ResolverPipeline([DynamicResolver()], config, download_pdf, logger, metrics)
+
+    first = pipeline.run(DummySession({}), artifact)
+    fake.now += 0.1
+    second_result = pipeline.run(DummySession({}), second)
+    fake.now += 0.2
+    third_result = pipeline.run(DummySession({}), third)
+
+    assert first.success is True
+    assert second_result.success is True
+    assert third_result.success is True
+    assert download_calls == [
+        "https://example.org/shared.pdf",
+        "https://example.org/shared.pdf",
+        "https://other.org/alt.pdf",
+    ]
+    assert fake.sleeps
+    assert fake.sleeps[0] == pytest.approx(0.4, rel=0.05)
+    assert len(fake.sleeps) == 1
