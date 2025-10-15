@@ -8,16 +8,6 @@ embedding pipelines.
 
 ## Functions
 
-### `find_doctags_files(in_dir)`
-
-Discover `.doctags` artifacts within a directory.
-
-Args:
-in_dir: Directory containing DocTags outputs.
-
-Returns:
-Sorted list of unique DocTags file paths.
-
 ### `read_utf8(p)`
 
 Load text from disk using UTF-8 with replacement for invalid bytes.
@@ -96,28 +86,6 @@ None
 Returns:
 None
 
-### `serialize(self)`
-
-Render picture metadata into Markdown-friendly text.
-
-Args:
-item: Picture element emitted by Docling.
-doc_serializer: Parent serializer responsible for post-processing.
-doc: Full Docling document containing the picture context.
-
-Returns:
-SerializationResult capturing the rendered string and provenance.
-
-### `get_serializer(self, doc)`
-
-Construct a ChunkingDocSerializer tailored for DocTags documents.
-
-Args:
-doc: Docling document that will be serialized into chunk text.
-
-Returns:
-Configured ChunkingDocSerializer instance.
-
 ### `is_small(idx)`
 
 Return True when the chunk at `idx` is below the minimum token threshold.
@@ -129,30 +97,6 @@ Returns:
 True if the chunk length is less than `min_tokens`, else False.
 
 ## Classes
-
-### `CaptionPlusAnnotationPictureSerializer`
-
-Serialize picture items with captions and rich annotation metadata.
-
-Attributes:
-None
-
-Examples:
->>> serializer = CaptionPlusAnnotationPictureSerializer()
->>> isinstance(serializer, MarkdownPictureSerializer)
-True
-
-### `RichSerializerProvider`
-
-Provide a serializer that augments tables and pictures with Markdown.
-
-Attributes:
-None
-
-Examples:
->>> provider = RichSerializerProvider()
->>> isinstance(provider, ChunkingSerializerProvider)
-True
 
 ### `Rec`
 
