@@ -95,9 +95,7 @@ def apply_mmr_diversification(
     selected_indices: List[int] = []
     if resources is None:
         raise RuntimeError("GPU resources are required for MMR diversification")
-    sims_all = pairwise_inner_products(
-        embeddings, device=int(device), resources=resources
-    )
+    sims_all = pairwise_inner_products(embeddings, device=int(device), resources=resources)
 
     while candidate_indices and len(selected_indices) < top_k:
         best_idx: int | None = None

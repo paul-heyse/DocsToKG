@@ -79,74 +79,54 @@
   <section id="module-cli-utils">
 <h1>1. Module: cli_utils<a class="headerlink" href="#module-cli-utils" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.cli_utils</span></code>.</p>
-<p>CLI Formatting Helpers</p>
-<p>This module contains lightweight formatting utilities used by the ontology
-downloader CLI. The helpers focus on producing human-friendly tables and
-summaries while remaining dependency-free so they can run in constrained
-environments such as CI workflows or air-gapped deployments.</p>
-<p>Key Features:</p>
-<ul class="simple">
-<li><p>ASCII table rendering for deterministic console output</p></li>
-<li><p>Validation summary formatting that mirrors structured JSON payloads</p></li>
-<li><p>Status-aware formatting that highlights validator outcomes consistently</p></li>
-<li><p>Utilities designed for reuse across multiple CLI subcommands</p></li>
-</ul>
-<p>Usage:
-from DocsToKG.OntologyDownload.cli_utils import format_table</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>print(format_table([&quot;Name&quot;, &quot;Status&quot;], [[&quot;hp&quot;, &quot;ok&quot;]]))
-</pre></div>
-</div>
+<p>Formatting helpers supporting the ontology downloader CLI.</p>
+<p>The CLI surfaces tabular summaries for resolver planning, download batches,
+and validator health. These helpers convert rich planner and downloader
+objects into aligned ASCII tables so operators can quickly scan fallback
+chains, concurrency overrides, and validation diagnostics highlighted in the
+refactored ontology download specification.</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="format-table-headers-rows">
 <h3><code class="docutils literal notranslate"><span class="pre">format_table(headers,</span> <span class="pre">rows)</span></code><a class="headerlink" href="#format-table-headers-rows" title="Link to this heading"></a></h3>
-<p>Format tabular data as an ASCII table.</p>
+<p>Render an ASCII table with padded columns and header separator.</p>
 <p>Args:
-headers: Ordered column header strings.
-rows: Iterable of rows where each row is a sequence of cell strings.</p>
+headers: Ordered column headers rendered on the first row.
+rows: Row data that should be left-aligned within the computed widths.</p>
 <p>Returns:
-A string containing the formatted table with aligned columns.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>print(format_table([“Name”, “Status”], [[“hp”, “success”], [“efo”, “cached”]]))
-Name | Status
-—–+——–
-hp   | success
-efo  | cached</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
+Multiline string containing the table body and separator.</p>
+</section>
+<section id="format-plan-rows-plans">
+<h3><code class="docutils literal notranslate"><span class="pre">format_plan_rows(plans)</span></code><a class="headerlink" href="#format-plan-rows-plans" title="Link to this heading"></a></h3>
+<p>Convert planner output into table rows.</p>
+<p>Args:
+plans: Iterable of planned fetch results capturing resolver metadata.</p>
+<p>Returns:
+List of tuples <code class="docutils literal notranslate"><span class="pre">(id,</span> <span class="pre">resolver,</span> <span class="pre">service,</span> <span class="pre">media_type,</span> <span class="pre">url)</span></code> ready to
+pass to :func:<code class="docutils literal notranslate"><span class="pre">format_table</span></code>.</p>
+</section>
+<section id="format-results-table-results">
+<h3><code class="docutils literal notranslate"><span class="pre">format_results_table(results)</span></code><a class="headerlink" href="#format-results-table-results" title="Link to this heading"></a></h3>
+<p>Render download results as a table summarizing outcome and location.</p>
+<p>Args:
+results: Iterable of :class:<code class="docutils literal notranslate"><span class="pre">~DocsToKG.OntologyDownload.core.FetchResult</span></code>
+objects produced by the <code class="docutils literal notranslate"><span class="pre">pull</span></code> command.</p>
+<p>Returns:
+ASCII table summarising ontology id, resolver choice, status, checksum,
+and final file path.</p>
 </section>
 <section id="format-validation-summary-results">
 <h3><code class="docutils literal notranslate"><span class="pre">format_validation_summary(results)</span></code><a class="headerlink" href="#format-validation-summary-results" title="Link to this heading"></a></h3>
-<p>Format validator results as a status table.</p>
+<p>Summarise validator outcomes in a compact status table.</p>
 <p>Args:
 results: Mapping of validator name to dictionaries containing <code class="docutils literal notranslate"><span class="pre">ok</span></code> and
-<code class="docutils literal notranslate"><span class="pre">details</span></code> keys describing the validator outcome.</p>
+<code class="docutils literal notranslate"><span class="pre">details</span></code> fields returned by the validation pipeline.</p>
 <p>Returns:
-A formatted table with validator names, status, and detail summaries.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>summary = {“rdflib”: {“ok”: True, “details”: {“triples”: 100}}}
-print(format_validation_summary(summary))
-validator | status | details
-———-+——–+———
-rdflib    | ok     | triples=100</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
+ASCII table listing validator name, status, and condensed detail string.</p>
 </section>
 <section id="format-row-values">
 <h3><code class="docutils literal notranslate"><span class="pre">_format_row(values)</span></code><a class="headerlink" href="#format-row-values" title="Link to this heading"></a></h3>
-<p>Render a single table row with padded column widths.</p>
-<p>Args:
-values: Ordered cell values corresponding to the table headers.</p>
-<p>Returns:
-String containing the formatted row.</p>
+<p><em>No documentation available.</em></p>
 </section>
 </section>
 </section>

@@ -1,12 +1,11 @@
-"""
-Ontology Download Utilities
+"""Ontology download utilities.
 
-This module houses secure download helpers that implement per-host and
-per-service rate limiting, Content-Type and size validation via preliminary
-HEAD requests, internationalized domain name hardening, and resumable
-transfers for ontology documents. It works in concert with resolver planning
-to ensure that downloaded artifacts respect size limits, host allowlists, and
-are safe for downstream processing, including guarded archive extraction.
+This module exposes the hardened download primitives used by the refactored
+pipeline. Features include per-host and per-service rate limiting, polite
+header construction, manifest-aware caching, resilient streaming downloads with
+HTTP fallback classification, and centralized archive extraction with traversal
+and compression-bomb protection. These helpers back the automatic resolver
+fallback and streaming normalization workflows defined in the openspec.
 """
 
 from __future__ import annotations
@@ -90,6 +89,11 @@ class DownloadFailure(ConfigError):
     Attributes:
         status_code: Optional HTTP status code returned by the upstream service.
         retryable: Whether the failure is safe to retry with an alternate resolver.
+
+    Examples:
+        >>> raise DownloadFailure("Unavailable", status_code=503, retryable=True)
+        Traceback (most recent call last):
+        DownloadFailure: Unavailable
     """
 
     def __init__(
@@ -189,6 +193,8 @@ for canonical, aliases in _RDF_ALIAS_GROUPS.items():
     for alias in aliases:
         RDF_MIME_ALIASES.add(alias)
         RDF_MIME_FORMAT_LABELS[alias] = label
+
+
 def sanitize_filename(filename: str) -> str:
     """Sanitize filenames to prevent directory traversal and unsafe characters.
 
@@ -582,7 +588,19 @@ _TAR_SUFFIXES = (".tar", ".tar.gz", ".tgz", ".tar.xz", ".txz", ".tar.bz2", ".tbz
 def extract_archive_safe(
     archive_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None
 ) -> List[Path]:
-    """Extract archives by dispatching to the appropriate safe handler."""
+    """Extract archives by dispatching to the appropriate safe handler.
+
+    Args:
+        archive_path: Path to the archive on disk.
+        destination: Directory where files should be extracted.
+        logger: Optional logger receiving structured extraction telemetry.
+
+    Returns:
+        List of paths extracted from the archive in the order processed.
+
+    Raises:
+        ConfigError: If the archive format is unsupported or extraction fails.
+    """
 
     lower_name = archive_path.name.lower()
     if lower_name.endswith(".zip"):
@@ -1073,9 +1091,7 @@ def download_stream(
                 "status_code": status_code,
             },
         )
-        raise DownloadFailure(
-            message, status_code=status_code, retryable=retryable
-        ) from exc
+        raise DownloadFailure(message, status_code=status_code, retryable=retryable) from exc
     except (
         requests.ConnectionError,
         requests.Timeout,

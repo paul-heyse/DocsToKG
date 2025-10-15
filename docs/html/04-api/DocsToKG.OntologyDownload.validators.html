@@ -79,27 +79,12 @@
   <section id="module-validators">
 <h1>1. Module: validators<a class="headerlink" href="#module-validators" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.validators</span></code>.</p>
-<p>Ontology Validation Pipeline</p>
-<p>This module implements the post-download validation workflow that verifies
-ontology integrity, generates normalized artifacts, and captures structured
-telemetry for DocsToKG. Validators can leverage optional dependencies such as
-rdflib, Pronto, Owlready2, ROBOT, and Arelle while falling back gracefully
-when utilities are absent.</p>
-<p>Key Features:</p>
-<ul class="simple">
-<li><p>Uniform :class:<code class="docutils literal notranslate"><span class="pre">ValidationRequest</span></code> / :class:<code class="docutils literal notranslate"><span class="pre">ValidationResult</span></code> data model</p></li>
-<li><p>Timeout and memory instrumentation for resource-intensive validators</p></li>
-<li><p>JSON reporting helpers compatible with automated documentation generation</p></li>
-<li><p>Pluggable registry enabling selective validator execution</p></li>
-<li><p>Canonical Turtle normalization with deterministic SHA-256 hashing</p></li>
-<li><p>Subprocess isolation for memory-intensive Pronto and Owlready2 validators</p></li>
-</ul>
-<p>Usage:
-from DocsToKG.OntologyDownload.validators import run_validators</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>results = run_validators(requests, logger)
-print(results[&quot;rdflib&quot;].details)
-</pre></div>
-</div>
+<p>Ontology validation pipeline.</p>
+<p>This module implements the post-download workflow that verifies ontologies,
+normalizes output, and collects structured telemetry for DocsToKG. Validators
+support streaming normalization for large ontologies, deterministic hashing for
+manifest fingerprints, and optional dependency fallbacks for tools such as
+rdflib, Pronto, Owlready2, ROBOT, and Arelle.</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="log-memory-logger-validator-event">
@@ -121,12 +106,45 @@ payload: Mapping containing validation results.</p>
 <p>Returns:
 None</p>
 </section>
+<section id="python-merge-sort-source-destination">
+<h3><code class="docutils literal notranslate"><span class="pre">_python_merge_sort(source,</span> <span class="pre">destination)</span></code><a class="headerlink" href="#python-merge-sort-source-destination" title="Link to this heading"></a></h3>
+<p>Sort an N-Triples file using a disk-backed merge strategy.</p>
+</section>
+<section id="sort-nt-source-destination">
+<h3><code class="docutils literal notranslate"><span class="pre">_sort_nt(source,</span> <span class="pre">destination)</span></code><a class="headerlink" href="#sort-nt-source-destination" title="Link to this heading"></a></h3>
+<p>Sort N-Triples using platform sort when available with Python fallback.</p>
+</section>
+<section id="normalize-streaming-source-path-output-path">
+<h3><code class="docutils literal notranslate"><span class="pre">normalize_streaming(source_path,</span> <span class="pre">output_path)</span></code><a class="headerlink" href="#normalize-streaming-source-path-output-path" title="Link to this heading"></a></h3>
+<p>Normalize an ontology file using streaming disk-backed sorting.</p>
+</section>
+<section id="term-to-string-term-namespace-manager">
+<h3><code class="docutils literal notranslate"><span class="pre">_term_to_string(term,</span> <span class="pre">namespace_manager)</span></code><a class="headerlink" href="#term-to-string-term-namespace-manager" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="canonicalize-turtle-graph">
 <h3><code class="docutils literal notranslate"><span class="pre">_canonicalize_turtle(graph)</span></code><a class="headerlink" href="#canonicalize-turtle-graph" title="Link to this heading"></a></h3>
 <p>Return canonical Turtle output with sorted prefixes and triples.</p>
 <p>The canonical form mirrors the ontology downloader specification by sorting
 prefixes lexicographically and emitting triples ordered by subject,
 predicate, and object so downstream hashing yields deterministic values.</p>
+</section>
+<section id="canonicalize-blank-nodes-line-line-mapping">
+<h3><code class="docutils literal notranslate"><span class="pre">_canonicalize_blank_nodes_line(line,</span> <span class="pre">mapping)</span></code><a class="headerlink" href="#canonicalize-blank-nodes-line-line-mapping" title="Link to this heading"></a></h3>
+<p>Replace blank node identifiers with deterministic sequential labels.</p>
+</section>
+<section id="sort-triple-file-source-destination">
+<h3><code class="docutils literal notranslate"><span class="pre">_sort_triple_file(source,</span> <span class="pre">destination)</span></code><a class="headerlink" href="#sort-triple-file-source-destination" title="Link to this heading"></a></h3>
+<p>Sort serialized triple lines using platform sort when available.</p>
+</section>
+<section id="normalize-streaming-source">
+<h3><code class="docutils literal notranslate"><span class="pre">normalize_streaming(source)</span></code><a class="headerlink" href="#normalize-streaming-source" title="Link to this heading"></a></h3>
+<p>Normalize ontologies using external sort to ensure deterministic output.</p>
+<p>The streaming path serializes triples to a temporary file, leverages the
+platform <code class="docutils literal notranslate"><span class="pre">sort</span></code> utility (when available) to order the triples
+lexicographically, and streams the sorted output while computing the
+canonical SHA-256 hash. Callers may supply an <code class="docutils literal notranslate"><span class="pre">output_path</span></code> to persist the
+normalized Turtle document without storing the entire content in memory.</p>
 </section>
 <section id="run-validator-subprocess-name-payload">
 <h3><code class="docutils literal notranslate"><span class="pre">_run_validator_subprocess(name,</span> <span class="pre">payload)</span></code><a class="headerlink" href="#run-validator-subprocess-name-payload" title="Link to this heading"></a></h3>
@@ -232,13 +250,17 @@ None</p>
 <p>Returns:
 Dictionary with boolean status, detail payload, and output paths.</p>
 </section>
-<section id="term-to-string-term">
-<h3><code class="docutils literal notranslate"><span class="pre">_term_to_string(term)</span></code><a class="headerlink" href="#term-to-string-term" title="Link to this heading"></a></h3>
+<section id="replace-match">
+<h3><code class="docutils literal notranslate"><span class="pre">_replace(match)</span></code><a class="headerlink" href="#replace-match" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 <section id="parse">
 <h3><code class="docutils literal notranslate"><span class="pre">_parse()</span></code><a class="headerlink" href="#parse" title="Link to this heading"></a></h3>
 <p>Parse the ontology with rdflib to populate the graph object.</p>
+</section>
+<section id="write-data">
+<h3><code class="docutils literal notranslate"><span class="pre">_write(data)</span></code><a class="headerlink" href="#write-data" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="handler-signum-frame">
 <h3><code class="docutils literal notranslate"><span class="pre">_handler(signum,</span> <span class="pre">frame)</span></code><a class="headerlink" href="#handler-signum-frame" title="Link to this heading"></a></h3>

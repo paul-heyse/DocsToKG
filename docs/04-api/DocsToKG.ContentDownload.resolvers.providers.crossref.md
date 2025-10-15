@@ -5,8 +5,9 @@ This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolver
 Crossref Resolver Provider
 
 This module integrates with the Crossref metadata API to surface direct and
-publisher-hosted PDF links for scholarly works. It uses polite rate limiting
-and caching strategies to comply with Crossref service guidelines.
+publisher-hosted PDF links for scholarly works. It uses polite rate limiting,
+centralised retry handling, and caching strategies to comply with Crossref
+service guidelines.
 
 Key Features:
 - Cached metadata retrieval with header normalisation for polite access.

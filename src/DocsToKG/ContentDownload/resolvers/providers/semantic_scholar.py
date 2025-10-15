@@ -122,12 +122,12 @@ class SemanticScholarResolver:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
             return
         try:
-                data = _fetch_semantic_scholar_data(
-                    doi,
-                    config.semantic_scholar_api_key,
-                    config.get_timeout(self.name),
-                    headers_cache_key(config.polite_headers),
-                )
+            data = _fetch_semantic_scholar_data(
+                doi,
+                config.semantic_scholar_api_key,
+                config.get_timeout(self.name),
+                headers_cache_key(config.polite_headers),
+            )
         except requests.HTTPError as exc:
             status = getattr(exc.response, "status_code", None)
             detail = status if status is not None else "unknown"

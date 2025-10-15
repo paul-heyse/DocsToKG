@@ -80,15 +80,11 @@
 <h1>1. Module: optdeps<a class="headerlink" href="#module-optdeps" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.optdeps</span></code>.</p>
 <p>Centralized optional dependency management with fallback stubs.</p>
-<p>This module exposes helper functions that return optional third-party
-dependencies used across the ontology downloader. When a dependency is not
-installed in the current environment the helpers return lightweight stub
-implementations that provide just enough behaviour for tests and basic
-execution paths. The approach keeps optional dependencies truly optional
-while avoiding scattered try/except blocks throughout the codebase, and
-provides centralized fallbacks for pystow (path management), rdflib
-(canonical Turtle support), pronto, and owlready2 as described in the
-robust ontology downloader specification.</p>
+<p>The refactored ontology downloader relies on optional tooling for streaming
+normalization, diagnostics, and validator subprocesses. These helpers expose
+consistent access points that return either the real modules or lightweight
+stubs, ensuring features like ROBOT health checks, Pronto/Owlready2 validation,
+and filesystem abstractions work even in minimal test environments.</p>
 <p>Examples:
 &gt;&gt;&gt; from DocsToKG.OntologyDownload.optdeps import get_pystow
 &gt;&gt;&gt; pystow = get_pystow()

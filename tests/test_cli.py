@@ -20,8 +20,11 @@ Usage:
 
 from __future__ import annotations
 
+import logging
 import json
 import sys
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -48,25 +51,24 @@ def test_read_resolver_config_yaml_requires_pyyaml(monkeypatch, tmp_path):
 
 
 def test_load_resolver_config_applies_mailto():
-    args = type(
-        "Args",
-        (),
-        {
-            "resolver_config": None,
-            "unpaywall_email": None,
-            "core_api_key": None,
-            "semantic_scholar_api_key": None,
-            "doaj_api_key": None,
-            "max_resolver_attempts": None,
-            "resolver_timeout": None,
-            "disable_resolver": [],
-            "mailto": "team@example.org",
-            "resolver_order": None,
-            "concurrent_resolvers": None,
-            "head_precheck": None,
-            "accept": None,
-        },
-    )()
+    args = SimpleNamespace(
+        resolver_config=None,
+        unpaywall_email=None,
+        core_api_key=None,
+        semantic_scholar_api_key=None,
+        doaj_api_key=None,
+        max_resolver_attempts=None,
+        resolver_timeout=None,
+        disable_resolver=[],
+        mailto="team@example.org",
+        resolver_order=None,
+        concurrent_resolvers=None,
+        head_precheck=None,
+        accept=None,
+        enable_resolver=[],
+        global_url_dedup=None,
+        domain_min_interval=[],
+    )
     config = downloader.load_resolver_config(args, ["alpha", "beta", "gamma"], ["beta"])
     assert config.mailto == "team@example.org"
     assert "mailto:team@example.org" in config.polite_headers["User-Agent"]

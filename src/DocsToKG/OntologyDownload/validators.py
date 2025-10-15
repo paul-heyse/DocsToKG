@@ -1,25 +1,10 @@
-"""
-Ontology Validation Pipeline
+"""Ontology validation pipeline.
 
-This module implements the post-download validation workflow that verifies
-ontology integrity, generates normalized artifacts, and captures structured
-telemetry for DocsToKG. Validators can leverage optional dependencies such as
-rdflib, Pronto, Owlready2, ROBOT, and Arelle while falling back gracefully
-when utilities are absent.
-
-Key Features:
-- Uniform :class:`ValidationRequest` / :class:`ValidationResult` data model
-- Timeout and memory instrumentation for resource-intensive validators
-- JSON reporting helpers compatible with automated documentation generation
-- Pluggable registry enabling selective validator execution
-- Canonical Turtle normalization with deterministic SHA-256 hashing
-- Subprocess isolation for memory-intensive Pronto and Owlready2 validators
-
-Usage:
-    from DocsToKG.OntologyDownload.validators import run_validators
-
-    results = run_validators(requests, logger)
-    print(results[\"rdflib\"].details)
+This module implements the post-download workflow that verifies ontologies,
+normalizes output, and collects structured telemetry for DocsToKG. Validators
+support streaming normalization for large ontologies, deterministic hashing for
+manifest fingerprints, and optional dependency fallbacks for tools such as
+rdflib, Pronto, Owlready2, ROBOT, and Arelle.
 """
 
 from __future__ import annotations
@@ -258,6 +243,8 @@ def normalize_streaming(
                 if writer is not None:
                     writer.write(chunk)
         return hasher.hexdigest()
+
+
 def _term_to_string(term, namespace_manager) -> str:
     formatter = getattr(term, "n3", None)
     if callable(formatter):
@@ -428,10 +415,14 @@ def normalize_streaming(
                 if prefix_map and has_triples:
                     _write(b"\n")
                 if has_triples:
-                    canonical_first = _canonicalize_blank_nodes_line(first_line.rstrip("\n"), bnode_map)
+                    canonical_first = _canonicalize_blank_nodes_line(
+                        first_line.rstrip("\n"), bnode_map
+                    )
                     _write(canonical_first.encode("utf-8") + b"\n")
                     for raw_line in handle:
-                        canonical_line = _canonicalize_blank_nodes_line(raw_line.rstrip("\n"), bnode_map)
+                        canonical_line = _canonicalize_blank_nodes_line(
+                            raw_line.rstrip("\n"), bnode_map
+                        )
                         _write(canonical_line.encode("utf-8") + b"\n")
         finally:
             if writer:
@@ -692,9 +683,7 @@ def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> Valid
         if "ttl" in request.config.defaults.normalize_to:
             request.normalized_dir.mkdir(parents=True, exist_ok=True)
             normalized_path = request.normalized_dir / (request.file_path.stem + ".ttl")
-            threshold_mb = (
-                request.config.defaults.validation.streaming_normalization_threshold_mb
-            )
+            threshold_mb = request.config.defaults.validation.streaming_normalization_threshold_mb
             file_size = request.file_path.stat().st_size
             use_streaming = file_size >= threshold_mb * (1024**2)
             if use_streaming:

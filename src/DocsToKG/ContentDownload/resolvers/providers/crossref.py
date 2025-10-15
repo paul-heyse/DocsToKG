@@ -43,7 +43,7 @@ LOGGER = logging.getLogger(__name__)
 @lru_cache(maxsize=1000)
 def _fetch_crossref_data(
     doi: str,
-   mailto: Optional[str],
+    mailto: Optional[str],
     timeout: float,
     headers_key: Tuple[Tuple[str, str], ...],
 ) -> Dict[str, Any]:
@@ -194,7 +194,11 @@ class CrossrefResolver:
                 if response is not None:
                     data = response.json()
             except ValueError as json_err:
-                preview = response.text[:200] if response is not None and hasattr(response, "text") else ""
+                preview = (
+                    response.text[:200]
+                    if response is not None and hasattr(response, "text")
+                    else ""
+                )
                 if response is not None:
                     response.close()
                 yield ResolverResult(

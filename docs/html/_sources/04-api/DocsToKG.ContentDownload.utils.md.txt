@@ -10,12 +10,13 @@ scholarly identifiers such as DOIs, PMCIDs, and arXiv IDs while also providing
 lightweight string manipulation helpers used during manifest generation.
 
 Key Features:
-- Normalisation of DOI, PMCID, and arXiv identifiers from heterogeneous sources.
+- Normalisation of DOI, PMCID, and arXiv identifiers from heterogeneous sources
+  including common URL and ``doi:`` prefixes.
 - Prefix stripping for resolver-specific metadata cleaning.
 - Duplicate removal while preserving original ordering.
 
 Usage:
-    from DocsToKG.ContentDownload import utils
+from DocsToKG.ContentDownload import utils
 
     doi = utils.normalize_doi("https://doi.org/10.1234/example")
     pmcid = utils.normalize_pmcid("PMC12345")
@@ -24,13 +25,21 @@ Usage:
 
 ### `normalize_doi(doi)`
 
-Normalize DOI identifiers by stripping prefixes and whitespace.
+Normalize DOI identifiers by stripping common prefixes and whitespace.
 
 Args:
 doi: Raw DOI string or URL provided by upstream metadata.
 
 Returns:
 Canonical DOI without protocol prefixes, or None when input is empty.
+
+Supported prefixes:
+
+- ``https://doi.org/``
+- ``http://doi.org/``
+- ``https://dx.doi.org/``
+- ``http://dx.doi.org/``
+- ``doi:``
 
 ### `normalize_pmcid(pmcid)`
 

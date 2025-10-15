@@ -17,7 +17,9 @@ chunker_manifest_log: List[dict] = []
 embeddings_manifest_log: List[dict] = []
 
 
-def _stub_module(name: str, *, package: bool = False, attrs: Dict[str, object] | None = None) -> ModuleType:
+def _stub_module(
+    name: str, *, package: bool = False, attrs: Dict[str, object] | None = None
+) -> ModuleType:
     """Create a lightweight module stub registered in ``sys.modules``."""
 
     module = ModuleType(name)
@@ -35,7 +37,10 @@ _stub_module("docling_core", package=True)
 _stub_module("docling_core.transforms", package=True)
 _stub_module("docling_core.transforms.chunker", package=True)
 _stub_module("docling_core.transforms.chunker.base", attrs={"BaseChunk": type("BaseChunk", (), {})})
-_stub_module("docling_core.transforms.chunker.hybrid_chunker", attrs={"HybridChunker": type("HybridChunker", (), {})})
+_stub_module(
+    "docling_core.transforms.chunker.hybrid_chunker",
+    attrs={"HybridChunker": type("HybridChunker", (), {})},
+)
 _stub_module(
     "docling_core.transforms.chunker.tokenizer",
     package=True,
@@ -76,7 +81,9 @@ from DocsToKG.DocParsing._common import jsonl_load
 class DummyTokenizer:
     """Lightweight tokenizer stub returning whitespace token counts."""
 
-    def __init__(self, tokenizer: object, max_tokens: int) -> None:  # pragma: no cover - signature parity
+    def __init__(
+        self, tokenizer: object, max_tokens: int
+    ) -> None:  # pragma: no cover - signature parity
         self.max_tokens = max_tokens
 
     def count_tokens(self, text: str) -> int:
@@ -86,7 +93,9 @@ class DummyTokenizer:
 class DummyHybridChunker:
     """HybridChunker replacement that emits deterministic chunk texts."""
 
-    def __init__(self, tokenizer: DummyTokenizer, merge_peers: bool, serializer_provider: object) -> None:
+    def __init__(
+        self, tokenizer: DummyTokenizer, merge_peers: bool, serializer_provider: object
+    ) -> None:
         self._texts: Dict[str, List[str]] = {}
 
     def prime(self, mapping: Dict[str, List[str]]) -> None:
@@ -106,7 +115,9 @@ def configure_chunker_stubs(
 ) -> None:
     """Patch chunker module dependencies with lightweight test doubles."""
 
-    monkeypatch.setattr(chunker, "AutoTokenizer", SimpleNamespace(from_pretrained=lambda *_, **__: object()))
+    monkeypatch.setattr(
+        chunker, "AutoTokenizer", SimpleNamespace(from_pretrained=lambda *_, **__: object())
+    )
     monkeypatch.setattr(chunker, "HuggingFaceTokenizer", DummyTokenizer)
 
     class DummyProvenance:
@@ -121,7 +132,9 @@ def configure_chunker_stubs(
                 payload["provenance"] = provenance.data
             self.data = payload
 
-        def model_dump(self, mode: str = "json", exclude_none: bool = True):  # pragma: no cover - passthrough
+        def model_dump(
+            self, mode: str = "json", exclude_none: bool = True
+        ):  # pragma: no cover - passthrough
             return self.data
 
     monkeypatch.setattr(chunker, "ProvenanceMetadata", DummyProvenance)
@@ -172,6 +185,7 @@ def crashing_atomic_write(module, crash_on_write: int):
     @contextmanager
     def wrapper(path):
         with original(path) as handle:
+
             class Crashy:
                 def __init__(self, inner):
                     self._inner = inner

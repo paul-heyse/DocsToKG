@@ -13,6 +13,7 @@ Usage:
 """
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -35,7 +36,7 @@ class DocumentationGenerator:
             print(f"❌ Script not found: {script_path}")
             return False
 
-        cmd = [str(script_path)]
+        cmd = [sys.executable, str(script_path)]
         if args:
             cmd.extend(args)
 
@@ -119,6 +120,30 @@ class DocumentationGenerator:
         return success
 
 
+def _maybe_reexec_inside_venv(project_root: Path) -> None:
+    """Re-execute the script using the project virtual environment if available."""
+
+    # Skip when already inside a virtual environment or when re-entry has been attempted.
+    if sys.prefix != sys.base_prefix or os.environ.get("DOCS_GENERATOR_IN_VENV") == "1":
+        return
+
+    venv_root = project_root / ".venv"
+    if os.name == "nt":
+        candidate = venv_root / "Scripts" / "python.exe"
+    else:
+        candidate = venv_root / "bin" / "python"
+
+    if not candidate.exists():
+        return
+
+    print(f"♻️  Re-executing documentation generator inside {venv_root} ...")
+    env = os.environ.copy()
+    env["DOCS_GENERATOR_IN_VENV"] = "1"
+    script_path = str(Path(__file__).resolve())
+    args = [str(candidate), script_path, *sys.argv[1:]]
+    os.execvpe(str(candidate), args, env)
+
+
 def main():
     """Main entry point for documentation generation."""
     parser = argparse.ArgumentParser(description="Generate DocsToKG documentation")
@@ -134,8 +159,13 @@ def main():
 
     args = parser.parse_args()
 
+    project_root = Path(args.project_root)
+
+    # Ensure we execute within the project virtual environment when available.
+    _maybe_reexec_inside_venv(project_root)
+
     # Create generator instance
-    generator = DocumentationGenerator(args.project_root)
+    generator = DocumentationGenerator(project_root=str(project_root))
 
     # Run the requested operation
     success = False

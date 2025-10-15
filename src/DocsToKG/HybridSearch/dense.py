@@ -646,9 +646,7 @@ class FaissIndexManager:
                     co.indicesOptions = faiss.INDICES_32_BIT
                 promoted = faiss.index_cpu_to_gpu(self._gpu_resources, device, index, co)
                 return (
-                    self.distribute_to_all_gpus(
-                        promoted, shard=self._multi_gpu_mode == "shard"
-                    )
+                    self.distribute_to_all_gpus(promoted, shard=self._multi_gpu_mode == "shard")
                     if self._multi_gpu_mode in ("replicate", "shard")
                     else promoted
                 )

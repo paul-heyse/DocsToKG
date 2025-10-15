@@ -79,11 +79,12 @@
   <section id="module-logging-config">
 <h1>1. Module: logging_config<a class="headerlink" href="#module-logging-config" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.logging_config</span></code>.</p>
-<p>Structured Logging Utilities</p>
-<p>This module centralizes structured logging setup for the ontology downloader
-subsystem. It provides helpers for masking sensitive fields, emitting JSON log
-records, managing correlation identifiers, and rolling log files to maintain a
-clean retention window.</p>
+<p>Structured logging utilities for the ontology downloader.</p>
+<p>The refactored downloader emits JSON logs with correlation identifiers so
+concurrent planning, streaming normalization, and resolver fallback attempts
+can be traced. This module wires log rotation, retention, masking, and
+correlation id helpers that are also surfaced through the enhanced <code class="docutils literal notranslate"><span class="pre">doctor</span></code>
+diagnostics command.</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="mask-sensitive-data-payload">

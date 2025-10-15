@@ -20,16 +20,6 @@ Usage:
 
 ## 1. Functions
 
-### `_headers_cache_key(headers)`
-
-Create a hashable cache key for polite header dictionaries.
-
-Args:
-headers: Mapping of header names to values used in Unpaywall requests.
-
-Returns:
-Tuple of key/value pairs sorted to ensure deterministic hashing.
-
 ### `_fetch_unpaywall_data(doi, email, timeout, headers_key)`
 
 Fetch Unpaywall metadata for ``doi`` using polite caching.

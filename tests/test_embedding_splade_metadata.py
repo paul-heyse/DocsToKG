@@ -59,6 +59,7 @@ def test_splade_attn_help_text_describes_fallbacks(
     monkeypatch.setitem(sys.modules, "vllm", vllm_stub)
 
     import DocsToKG.DocParsing.EmbeddingV2 as embed_module
+
     embed_module = importlib.reload(embed_module)
 
     parser = embed_module.build_parser()
@@ -327,9 +328,7 @@ def test_cli_model_dirs_override_environment(
     assert recorded["qwen"] == cli_qwen.resolve()
 
 
-def test_offline_requires_local_models(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_offline_requires_local_models(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Offline mode should fail fast when local models are absent."""
 
     embed_module = _reload_embedding_module(monkeypatch)
@@ -390,6 +389,8 @@ def test_pass_a_rejects_incompatible_chunk_schema(
 
     with pytest.raises(ValueError, match="Unsupported chunk schema_version"):
         embed_module.process_pass_a([chunk_file], logger)
+
+
 def _reload_embedding_module(monkeypatch: pytest.MonkeyPatch):
     """Reload EmbeddingV2 with lightweight optional dependency stubs."""
 
@@ -463,4 +464,3 @@ class _DummyVectorRow:
 
     def model_dump(self, by_alias: bool = True):
         return self.data
-

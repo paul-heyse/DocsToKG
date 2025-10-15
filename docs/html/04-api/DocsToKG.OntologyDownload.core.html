@@ -79,13 +79,27 @@
   <section id="module-core">
 <h1>1. Module: core<a class="headerlink" href="#module-core" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.core</span></code>.</p>
-<p>Ontology Download Orchestration</p>
-<p>This module coordinates resolver planning, document downloading, validation,
-and manifest generation for ontology artifacts. It serves as the main entry
-point for fetching ontologies from configured sources and producing provenance
-metadata that downstream knowledge graph construction can rely upon.</p>
+<p>Ontology download orchestration for DocsToKG.</p>
+<p>This module plans resolver candidates, enforces license allowlists, performs
+fallback-aware downloads, orchestrates streaming normalization, and writes
+schema-validated manifests with deterministic fingerprints. It aligns with the
+refactored ontology download specification by recording resolver attempt
+chains, honoring CLI concurrency overrides, and supporting batch operations for
+planning and pull commands.</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="coerce-datetime-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_coerce_datetime(value)</span></code><a class="headerlink" href="#coerce-datetime-value" title="Link to this heading"></a></h3>
+<p>Return timezone-aware datetime parsed from HTTP or ISO timestamp.</p>
+</section>
+<section id="normalize-timestamp-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_normalize_timestamp(value)</span></code><a class="headerlink" href="#normalize-timestamp-value" title="Link to this heading"></a></h3>
+<p>Return canonical ISO8601 string for HTTP timestamp headers.</p>
+</section>
+<section id="populate-plan-metadata-planned-config-adapter">
+<h3><code class="docutils literal notranslate"><span class="pre">_populate_plan_metadata(planned,</span> <span class="pre">config,</span> <span class="pre">adapter)</span></code><a class="headerlink" href="#populate-plan-metadata-planned-config-adapter" title="Link to this heading"></a></h3>
+<p>Augment planned fetch with HTTP metadata when available.</p>
+</section>
 <section id="read-manifest-manifest-path">
 <h3><code class="docutils literal notranslate"><span class="pre">_read_manifest(manifest_path)</span></code><a class="headerlink" href="#read-manifest-manifest-path" title="Link to this heading"></a></h3>
 <p>Return previously recorded manifest data if a valid JSON file exists.</p>
@@ -101,6 +115,14 @@ Parsed manifest dictionary when available and valid, otherwise <code class="docu
 manifest: Manifest produced after a download completes.</p>
 <p>Raises:
 ConfigurationError: If required fields are missing or contain invalid types.</p>
+</section>
+<section id="parse-last-modified-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_parse_last_modified(value)</span></code><a class="headerlink" href="#parse-last-modified-value" title="Link to this heading"></a></h3>
+<p>Return a timezone-aware datetime parsed from HTTP date headers.</p>
+</section>
+<section id="fetch-last-modified-plan-config-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">_fetch_last_modified(plan,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#fetch-last-modified-plan-config-logger" title="Link to this heading"></a></h3>
+<p>Probe the upstream plan URL for a Last-Modified header.</p>
 </section>
 <section id="write-manifest-manifest-path-manifest">
 <h3><code class="docutils literal notranslate"><span class="pre">_write_manifest(manifest_path,</span> <span class="pre">manifest)</span></code><a class="headerlink" href="#write-manifest-manifest-path-manifest" title="Link to this heading"></a></h3>
@@ -173,7 +195,8 @@ ConfigurationError: If licence checks reject the planned ontology.</p>
 <p>Args:
 specs: Iterable of fetch specifications to resolve.
 config: Optional resolved configuration reused across plans.
-logger: Logger instance used for annotation-aware logging.</p>
+logger: Logger instance used for annotation-aware logging.
+since: Optional cutoff date; plans older than this timestamp are filtered out.</p>
 <p>Returns:
 List of PlannedFetch entries describing each ontology plan.</p>
 <p>Raises:
@@ -340,6 +363,7 @@ result.status
 <h3><code class="docutils literal notranslate"><span class="pre">Manifest</span></code><a class="headerlink" href="#manifest" title="Link to this heading"></a></h3>
 <p>Provenance information for a downloaded ontology artifact.</p>
 <p>Attributes:
+schema_version: Manifest schema version identifier.
 id: Ontology identifier recorded in the manifest.
 resolver: Resolver used to retrieve the ontology.
 url: Final URL from which the ontology was fetched.
@@ -355,12 +379,14 @@ last_modified: Upstream last-modified timestamp, if supplied.
 downloaded_at: UTC timestamp of the completed download.
 target_formats: Desired conversion targets for normalization.
 validation: Mapping of validator names to their results.
-artifacts: Additional file paths generated during processing.</p>
+artifacts: Additional file paths generated during processing.
+resolver_attempts: Ordered record of resolver attempts during download.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>
 <div><blockquote>
 <div><p>manifest = Manifest(
+…     schema_version=”1.0”,
 …     id=”CHEBI”,
 …     resolver=”obo”,
 …     url=”https://example.org/chebi.owl”,
@@ -377,6 +403,7 @@ artifacts: Additional file paths generated during processing.</p>
 …     target_formats=(“owl”,),
 …     validation={},
 …     artifacts=(),
+…     resolver_attempts=(),
 … )
 manifest.resolver
 ‘obo’</p>
@@ -413,13 +440,42 @@ plan.url
 </div></blockquote>
 </div></blockquote>
 </section>
+<section id="resolvercandidate">
+<h3><code class="docutils literal notranslate"><span class="pre">ResolverCandidate</span></code><a class="headerlink" href="#resolvercandidate" title="Link to this heading"></a></h3>
+<p>Resolver plan captured for download-time fallback.</p>
+<p>Attributes:
+resolver: Name of the resolver that produced the plan.
+plan: Concrete :class:<code class="docutils literal notranslate"><span class="pre">FetchPlan</span></code> describing how to fetch the ontology.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>candidate = ResolverCandidate(
+…     resolver=”obo”,
+…     plan=FetchPlan(
+…         url=”https://example.org/hp.owl”,
+…         headers={},
+…         filename_hint=None,
+…         version=”2024-01-01”,
+…         license=”CC-BY”,
+…         media_type=”application/rdf+xml”,
+…         service=”obo”,
+…     ),
+… )
+candidate.resolver
+‘obo’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
 <section id="plannedfetch">
 <h3><code class="docutils literal notranslate"><span class="pre">PlannedFetch</span></code><a class="headerlink" href="#plannedfetch" title="Link to this heading"></a></h3>
 <p>Plan describing how an ontology would be fetched without side effects.</p>
 <p>Attributes:
 spec: Original fetch specification provided by the caller.
 resolver: Name of the resolver selected to satisfy the plan.
-plan: Concrete :class:<code class="docutils literal notranslate"><span class="pre">FetchPlan</span></code> generated by the resolver.</p>
+plan: Concrete :class:<code class="docutils literal notranslate"><span class="pre">FetchPlan</span></code> generated by the resolver.
+candidates: Ordered list of resolver candidates available for fallback.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>
@@ -434,6 +490,19 @@ plan: Concrete :class:<code class="docutils literal notranslate"><span class="pr
 …         version=”2024-01-01”,
 …         license=”CC-BY-4.0”,
 …         media_type=”application/rdf+xml”,
+…     ),
+…     candidates=(
+…         ResolverCandidate(
+…             resolver=”obo”,
+…             plan=FetchPlan(
+…                 url=”https://example.org/hp.owl”,
+…                 headers={},
+…                 filename_hint=”hp.owl”,
+…                 version=”2024-01-01”,
+…                 license=”CC-BY-4.0”,
+…                 media_type=”application/rdf+xml”,
+…             ),
+…         ),
 …     ),
 … )
 fetch_plan.resolver

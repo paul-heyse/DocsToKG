@@ -68,7 +68,9 @@ class _Handler(BaseHTTPRequestHandler):
             params = parse_qs(parsed.query)
             delay_ms = int(params.get("ms", ["100"])[0])
             time.sleep(delay_ms / 1000)
-        self._write(200, {"Content-Type": state.media_type, "Content-Length": str(len(state.payload))})
+        self._write(
+            200, {"Content-Type": state.media_type, "Content-Length": str(len(state.payload))}
+        )
 
     def do_GET(self) -> None:  # noqa: D401
         state = self.server.state
@@ -234,7 +236,9 @@ def _allow_local_addresses(monkeypatch):
     monkeypatch.setattr(download.requests, "Session", _LocalSession)
 
 
-def _download_to_tmp(url: str, tmp_path: Path, *, previous_manifest=None, validate_media: bool = False):
+def _download_to_tmp(
+    url: str, tmp_path: Path, *, previous_manifest=None, validate_media: bool = False
+):
     destination = tmp_path / f"download-{hash(url)}.owl"
     http_config = DownloadConfiguration(
         max_retries=2,
@@ -300,7 +304,9 @@ def test_head_mismatch_logs_warning(http_server, tmp_path):
     state.head_media_type = "text/plain"
     logger = _StubLogger()
     destination = tmp_path / "head.owl"
-    http_config = DownloadConfiguration(validate_media_type=True, allowed_hosts=["127.0.0.1", "localhost"])
+    http_config = DownloadConfiguration(
+        validate_media_type=True, allowed_hosts=["127.0.0.1", "localhost"]
+    )
     download.download_stream(
         url=f"{base_url}/head-mismatch",
         destination=destination,
@@ -441,7 +447,13 @@ def test_concurrent_hosts_do_not_block(monkeypatch, http_server, tmp_path):
 
     threads = [
         threading.Thread(target=_run, args=(f"{base_url}/concurrent", tmp_path / "same.owl")),
-        threading.Thread(target=_run, args=(f"{base_url.replace('127.0.0.1', 'localhost')}/concurrent", tmp_path / "other.owl")),
+        threading.Thread(
+            target=_run,
+            args=(
+                f"{base_url.replace('127.0.0.1', 'localhost')}/concurrent",
+                tmp_path / "other.owl",
+            ),
+        ),
     ]
     for thread in threads:
         thread.start()
@@ -450,4 +462,3 @@ def test_concurrent_hosts_do_not_block(monkeypatch, http_server, tmp_path):
 
     assert len(bucket_calls) == 2
     assert all(count == 1 for count in bucket_calls.values())
-

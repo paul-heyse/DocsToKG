@@ -95,15 +95,6 @@ embedding stage.
 </div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="promote-simple-namespace-modules">
-<h3><code class="docutils literal notranslate"><span class="pre">_promote_simple_namespace_modules()</span></code><a class="headerlink" href="#promote-simple-namespace-modules" title="Link to this heading"></a></h3>
-<p>Convert any SimpleNamespace placeholders in sys.modules to real modules.</p>
-<p>Some tests install lightweight SimpleNamespace stubs into sys.modules for
-optional dependencies (for example <code class="docutils literal notranslate"><span class="pre">trafilatura</span></code>). Hypothesis’ internal
-providers assume module objects are hashable, which SimpleNamespace is not.
-Promoting the stubs to ModuleType instances preserves their attributes while
-restoring hashability, preventing spurious test failures.</p>
-</section>
 <section id="read-utf8-p">
 <h3><code class="docutils literal notranslate"><span class="pre">read_utf8(p)</span></code><a class="headerlink" href="#read-utf8-p" title="Link to this heading"></a></h3>
 <p>Load text from disk using UTF-8 with replacement for invalid bytes.</p>

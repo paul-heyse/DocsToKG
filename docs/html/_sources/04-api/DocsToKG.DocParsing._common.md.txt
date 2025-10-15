@@ -304,6 +304,10 @@ Examples:
 >>> tmp.read_text(encoding="utf-8").strip()
 '{"a": 1}'
 
+### `_manifest_filename(stage)`
+
+Return manifest filename for a given stage.
+
 ### `manifest_append(stage, doc_id, status)`
 
 Append a structured entry to the processing manifest.
@@ -329,6 +333,10 @@ Examples:
 >>> (data_manifests() / "docparse.manifest.jsonl").exists()
 True
 
+### `resolve_hash_algorithm(default)`
+
+Return the active content hash algorithm, honoring env overrides.
+
 ### `compute_content_hash(path, algorithm)`
 
 Compute a content hash for ``path`` using the requested algorithm.
@@ -336,6 +344,10 @@ Compute a content hash for ``path`` using the requested algorithm.
 Args:
 path: File whose contents should be hashed.
 algorithm: Hash algorithm name supported by :mod:`hashlib`.
+
+Notes:
+The ``DOCSTOKG_HASH_ALG`` environment variable overrides ``algorithm``
+when set, enabling fleet-wide hash changes without code edits.
 
 Returns:
 Hex digest string.

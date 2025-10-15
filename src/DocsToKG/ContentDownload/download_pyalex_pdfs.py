@@ -155,9 +155,7 @@ def _parse_domain_interval(value: str) -> Tuple[str, float]:
     """
 
     if "=" not in value:
-        raise argparse.ArgumentTypeError(
-            "domain interval must use the format domain=seconds"
-        )
+        raise argparse.ArgumentTypeError("domain interval must use the format domain=seconds")
     domain, interval = value.split("=", 1)
     domain = domain.strip().lower()
     if not domain:
@@ -169,9 +167,7 @@ def _parse_domain_interval(value: str) -> Tuple[str, float]:
             f"invalid interval for domain '{domain}': {interval}"
         ) from exc
     if seconds < 0:
-        raise argparse.ArgumentTypeError(
-            f"interval for domain '{domain}' must be non-negative"
-        )
+        raise argparse.ArgumentTypeError(f"interval for domain '{domain}' must be non-negative")
     return domain, seconds
 
 
@@ -284,7 +280,7 @@ class JsonlLogger:
         >>> logger = JsonlLogger(Path("logs/attempts.jsonl"))
         >>> logger.log_summary({"processed": 10})
         >>> logger.close()
-    
+
     The logger serialises records outside a thread lock and performs atomic
     writes under the lock, ensuring well-formed output even when multiple
     threads share the instance. It also implements the context manager protocol
@@ -449,7 +445,7 @@ class CsvAttemptLoggerAdapter:
         ...                                   url="https://example", status="pdf", http_status=200,
         ...                                   content_type="application/pdf", elapsed_ms=120.0))
         >>> adapter.close()
-    
+
     CSV writes are protected by a lock to ensure rows remain well formed when
     multiple worker threads log through the same adapter instance.
     """
@@ -1337,7 +1333,9 @@ def download_candidate(
                             if dry_run:
                                 break
                             default_suffix = ".html" if detected == "html" else ".pdf"
-                            suffix = _infer_suffix(url, content_type, disposition, detected, default_suffix)
+                            suffix = _infer_suffix(
+                                url, content_type, disposition, detected, default_suffix
+                            )
                             dest_dir = artifact.html_dir if detected == "html" else artifact.pdf_dir
                             dest_path = dest_dir / f"{artifact.base_stem}{suffix}"
                             ensure_dir(dest_path.parent)
@@ -2231,9 +2229,7 @@ def main() -> None:
                     encoding="utf-8",
                 )
             except Exception:
-                LOGGER.warning(
-                    "Failed to write metrics sidecar %s", metrics_path, exc_info=True
-                )
+                LOGGER.warning("Failed to write metrics sidecar %s", metrics_path, exc_info=True)
         finally:
             if csv_adapter is not None:
                 csv_adapter.close()

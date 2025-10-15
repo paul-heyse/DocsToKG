@@ -75,8 +75,8 @@ def test_streaming_matches_in_memory(tmp_path: Path) -> None:
     assert in_memory["normalized_sha256"]
     assert streaming["normalization_mode"] == "streaming"
     assert in_memory["normalization_mode"] == "in-memory"
-    normalized_in_memory = (tmp_path / "memory" / "normalized")
-    normalized_stream = (tmp_path / "stream" / "normalized")
+    normalized_in_memory = tmp_path / "memory" / "normalized"
+    normalized_stream = tmp_path / "stream" / "normalized"
     memory_files = list(normalized_in_memory.glob("*.ttl"))
     stream_files = list(normalized_stream.glob("*.ttl"))
     assert len(memory_files) == 1

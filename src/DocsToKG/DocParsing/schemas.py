@@ -323,9 +323,7 @@ class ChunkRow(BaseModel):
     )
     has_image_classification: Optional[bool] = Field(
         default=None,
-        description=(
-            "Convenience flag mirroring provenance.has_image_classification"
-        ),
+        description=("Convenience flag mirroring provenance.has_image_classification"),
     )
     num_images: Optional[int] = Field(
         default=None,
@@ -336,7 +334,17 @@ class ChunkRow(BaseModel):
     @field_validator("schema_version")
     @classmethod
     def _validate_schema_version(cls, value: str) -> str:
-        """Ensure chunk rows declare a supported schema identifier."""
+        """Ensure chunk rows declare a supported schema identifier.
+
+        Args:
+            value: Schema version string provided by the chunk payload.
+
+        Returns:
+            Validated schema version string.
+
+        Raises:
+            ValueError: If the supplied schema version is not compatible.
+        """
 
         return validate_schema_version(
             value,
@@ -554,7 +562,17 @@ class VectorRow(BaseModel):
     @field_validator("schema_version")
     @classmethod
     def _validate_schema_version(cls, value: str) -> str:
-        """Ensure vector rows declare a supported schema identifier."""
+        """Ensure vector rows declare a supported schema identifier.
+
+        Args:
+            value: Schema version string provided by the vector payload.
+
+        Returns:
+            Validated schema version string.
+
+        Raises:
+            ValueError: If the supplied schema version is not compatible.
+        """
 
         return validate_schema_version(
             value,
@@ -685,9 +703,7 @@ def validate_schema_version(
     if not version:
         location = f" from {source}" if source else ""
         expected = ", ".join(sorted(compatible_versions))
-        raise ValueError(
-            f"Missing {kind} schema_version{location}. Expected one of: {expected}"
-        )
+        raise ValueError(f"Missing {kind} schema_version{location}. Expected one of: {expected}")
     if version not in compatible_versions:
         location = f" in {source}" if source else ""
         expected = ", ".join(sorted(compatible_versions))

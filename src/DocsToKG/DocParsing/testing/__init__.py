@@ -139,7 +139,7 @@ def simulate_embedding_benchmark(
     naive_time = max(num_chunks * chunk_tokens / 52000.0, 0.05)
     naive_time_s = round(naive_time, 3)
     streaming_time_s = round(naive_time_s * 0.58, 3)
-    naive_peak_mb = round(num_chunks * dense_dim * 4 / (1024 ** 2), 2)
+    naive_peak_mb = round(num_chunks * dense_dim * 4 / (1024**2), 2)
     streaming_peak_mb = round(naive_peak_mb * 0.42, 2)
     return SyntheticBenchmarkResult(
         num_chunks=num_chunks,
@@ -244,7 +244,9 @@ def dependency_stubs(dense_dim: int = 2560) -> Iterator[None]:
         def __init__(self, *args, **kwargs) -> None:  # noqa: D401 - match signature
             self._dim = dense_dim
 
-        def embed(self, batch: Sequence[str], pooling_params: object | None = None) -> List[_StubEmbedding]:
+        def embed(
+            self, batch: Sequence[str], pooling_params: object | None = None
+        ) -> List[_StubEmbedding]:
             outputs: List[_StubEmbedding] = []
             for text in batch:
                 base = sum(ord(ch) for ch in text) % 997
@@ -319,9 +321,7 @@ def dependency_stubs(dense_dim: int = 2560) -> Iterator[None]:
                     result[key] = value.model_dump(*args, **kwargs)
                 elif isinstance(value, list):
                     result[key] = [
-                        item.model_dump(*args, **kwargs)
-                        if hasattr(item, "model_dump")
-                        else item
+                        item.model_dump(*args, **kwargs) if hasattr(item, "model_dump") else item
                         for item in value
                     ]
                 else:
@@ -373,7 +373,9 @@ def dependency_stubs(dense_dim: int = 2560) -> Iterator[None]:
             self.texts = list(texts)
 
         @classmethod
-        def from_doctags_and_image_pairs(cls, texts: Sequence[str], _pairs) -> "_StubDocTagsDocument":
+        def from_doctags_and_image_pairs(
+            cls, texts: Sequence[str], _pairs
+        ) -> "_StubDocTagsDocument":
             return cls(texts)
 
     class _StubDoclingDocument:
@@ -447,7 +449,9 @@ def dependency_stubs(dense_dim: int = 2560) -> Iterator[None]:
     doc_module.document = document_module
     document_module.DoclingDocument = _StubDoclingDocument
     document_module.DocTagsDocument = _StubDocTagsDocument
-    document_module.PictureClassificationData = type("PictureClassificationData", (), {"predicted_classes": []})
+    document_module.PictureClassificationData = type(
+        "PictureClassificationData", (), {"predicted_classes": []}
+    )
     document_module.PictureDescriptionData = type("PictureDescriptionData", (), {"text": ""})
     document_module.PictureMoleculeData = type("PictureMoleculeData", (), {"smi": ""})
 
@@ -468,7 +472,9 @@ def dependency_stubs(dense_dim: int = 2560) -> Iterator[None]:
             return text
 
     class _StubChunkingDocSerializer(_StubBaseDocSerializer):
-        def __init__(self, doc=None, table_serializer=None, picture_serializer=None, params=None) -> None:
+        def __init__(
+            self, doc=None, table_serializer=None, picture_serializer=None, params=None
+        ) -> None:
             self.doc = doc
             self.table_serializer = table_serializer
             self.picture_serializer = picture_serializer
@@ -484,7 +490,9 @@ def dependency_stubs(dense_dim: int = 2560) -> Iterator[None]:
     serializer_base.BaseDocSerializer = _StubBaseDocSerializer
     serializer_base.SerializationResult = _StubSerializationResult
 
-    def _create_ser_result(*, text: str, span_source: object | None = None) -> _StubSerializationResult:
+    def _create_ser_result(
+        *, text: str, span_source: object | None = None
+    ) -> _StubSerializationResult:
         return _StubSerializationResult(text=text, span_source=span_source)
 
     serializer_common.create_ser_result = _create_ser_result

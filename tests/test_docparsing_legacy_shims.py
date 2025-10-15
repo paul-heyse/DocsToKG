@@ -81,9 +81,7 @@ class TestHTMLShim:
 
         assert callable(main)
 
-    def test_emits_deprecation_warning_on_main(
-        self, stub_cli_module: types.ModuleType
-    ) -> None:
+    def test_emits_deprecation_warning_on_main(self, stub_cli_module: types.ModuleType) -> None:
         """HTML shim should emit DeprecationWarning when main() is called."""
         from DocsToKG.DocParsing.run_docling_html_to_doctags_parallel import main
 
@@ -130,9 +128,7 @@ class TestHTMLShim:
         assert "--workers" in call_args, "Missing --workers flag"
         assert result == 42
 
-    def test_preserves_existing_mode_flag(
-        self, stub_cli_module: types.ModuleType
-    ) -> None:
+    def test_preserves_existing_mode_flag(self, stub_cli_module: types.ModuleType) -> None:
         """HTML shim should not duplicate --mode if already present."""
         from DocsToKG.DocParsing.run_docling_html_to_doctags_parallel import main
 
@@ -161,9 +157,7 @@ class TestPDFShim:
 
         assert callable(main)
 
-    def test_emits_deprecation_warning(
-        self, stub_cli_module: types.ModuleType
-    ) -> None:
+    def test_emits_deprecation_warning(self, stub_cli_module: types.ModuleType) -> None:
         """PDF shim should emit DeprecationWarning."""
         from DocsToKG.DocParsing.run_docling_parallel_with_vllm_debug import main
 
@@ -175,9 +169,7 @@ class TestPDFShim:
         assert issubclass(warning_list[0].category, DeprecationWarning)
         assert "deprecated" in str(warning_list[0].message).lower()
 
-    def test_forwards_to_unified_cli_with_pdf_mode(
-        self, stub_cli_module: types.ModuleType
-    ) -> None:
+    def test_forwards_to_unified_cli_with_pdf_mode(self, stub_cli_module: types.ModuleType) -> None:
         """PDF shim should forward to unified CLI with --mode pdf."""
         from DocsToKG.DocParsing.run_docling_parallel_with_vllm_debug import main
 

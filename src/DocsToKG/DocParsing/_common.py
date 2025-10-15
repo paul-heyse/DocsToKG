@@ -579,9 +579,7 @@ def _manifest_filename(stage: str) -> str:
     """Return manifest filename for a given stage."""
 
     safe = stage.strip() or "all"
-    safe = "".join(
-        c if c.isalnum() or c in {"-", "_", "."} else "-" for c in safe
-    )
+    safe = "".join(c if c.isalnum() or c in {"-", "_", "."} else "-" for c in safe)
     return f"docparse.{safe}.manifest.jsonl"
 
 
@@ -643,7 +641,14 @@ def manifest_append(
 
 
 def resolve_hash_algorithm(default: str = "sha1") -> str:
-    """Return the active content hash algorithm, honoring env overrides."""
+    """Return the active content hash algorithm, honoring env overrides.
+
+    Args:
+        default: Fallback algorithm name to use when no override is present.
+
+    Returns:
+        Hash algorithm identifier resolved from ``DOCSTOKG_HASH_ALG`` or ``default``.
+    """
 
     env_override = os.getenv("DOCSTOKG_HASH_ALG")
     return env_override.strip() if env_override else default

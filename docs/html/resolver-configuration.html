@@ -95,6 +95,13 @@ limit:</p>
 </div>
 <p>The example above allows up to three resolvers to run simultaneously while
 respecting Unpaywall and Crossref rate limits.</p>
+<p>At the CLI level the downloader exposes matching controls:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.download_pyalex_pdfs<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--concurrent-resolvers<span class="w"> </span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--head-precheck<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--accept<span class="w"> </span><span class="s2">&quot;application/pdf,text/html;q=0.9&quot;</span>
+</pre></div>
+</div>
 </section>
 <section id="tuning-head-pre-checks">
 <h2>2. Tuning HEAD Pre-checks<a class="headerlink" href="#tuning-head-pre-checks" title="Link to this heading"></a></h2>
@@ -108,6 +115,45 @@ specific providers while leaving the feature enabled globally:</p>
 </div>
 <p>Resolvers omitted from <code class="docutils literal notranslate"><span class="pre">resolver_head_precheck</span></code> inherit the global
 <code class="docutils literal notranslate"><span class="pre">enable_head_precheck</span></code> value.</p>
+</section>
+<section id="enabling-global-url-deduplication">
+<h2>3. Enabling Global URL Deduplication<a class="headerlink" href="#enabling-global-url-deduplication" title="Link to this heading"></a></h2>
+<p>Large topic crawls often surface the same PDF across multiple works. When the
+<code class="docutils literal notranslate"><span class="pre">enable_global_url_dedup</span></code> flag is set the pipeline records URLs in a
+process-wide set and skips repeat downloads with a <code class="docutils literal notranslate"><span class="pre">duplicate-url-global</span></code>
+reason. Operators can enable the feature either in configuration files:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">enable_global_url_dedup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</pre></div>
+</div>
+<p>or ad-hoc via the CLI:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.download_pyalex_pdfs<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--topic<span class="w"> </span><span class="s2">&quot;knowledge graphs&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--year-start<span class="w"> </span><span class="m">2020</span><span class="w"> </span>--year-end<span class="w"> </span><span class="m">2023</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--global-url-dedup
+</pre></div>
+</div>
+<p>The feature remains disabled by default to preserve legacy behaviour.</p>
+</section>
+<section id="configuring-domain-level-rate-limiting">
+<h2>4. Configuring Domain-Level Rate Limiting<a class="headerlink" href="#configuring-domain-level-rate-limiting" title="Link to this heading"></a></h2>
+<p>Some publishers share infrastructure across multiple resolvers. The
+<code class="docutils literal notranslate"><span class="pre">domain_min_interval_s</span></code> mapping enforces minimum spacing between requests to a
+hostname regardless of the originating resolver. Configure the interval in
+seconds per domain:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">domain_min_interval_s</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">example.org</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.75</span>
+<span class="w">  </span><span class="nt">publisher.edu</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.5</span>
+</pre></div>
+</div>
+<p>CLI runs can supply the same information with repeated
+<code class="docutils literal notranslate"><span class="pre">--domain-min-interval</span></code> flags. Domains are matched case-insensitively:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.download_pyalex_pdfs<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--domain-min-interval<span class="w"> </span>example.org<span class="o">=</span><span class="m">0</span>.5<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--domain-min-interval<span class="w"> </span>publisher.edu<span class="o">=</span><span class="m">1</span>.5
+</pre></div>
+</div>
+<p>Domain-level limits complement existing resolver-level throttles and are
+particularly helpful when multiple providers resolve to the same host.</p>
 </section>
 </section>
 

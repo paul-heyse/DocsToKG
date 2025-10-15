@@ -79,24 +79,12 @@
   <section id="module-resolvers">
 <h1>1. Module: resolvers<a class="headerlink" href="#module-resolvers" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.resolvers</span></code>.</p>
-<p>Ontology Resolver Implementations</p>
-<p>This module defines the resolver strategies that convert download
-specifications into actionable fetch plans. Each resolver encapsulates the
-API integration, polite header management, and metadata extraction necessary
-to interact with external services such as the OBO Library, OLS, BioPortal,
-Linked Open Vocabularies (LOV), Ontobee, and SKOS/XBRL endpoints.</p>
-<p>Key Features:</p>
-<ul class="simple">
-<li><p>Shared retry/backoff helpers for consistent API resilience</p></li>
-<li><p>Resolver-specific metadata extraction (version, license, media type) with SPDX normalization</p></li>
-<li><p>Support for additional services through the pluggable <code class="docutils literal notranslate"><span class="pre">RESOLVERS</span></code> map</p></li>
-</ul>
-<p>Usage:
-from DocsToKG.OntologyDownload.resolvers import RESOLVERS</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = RESOLVERS[&quot;obo&quot;]
-plan = resolver.plan(spec, config, logger)
-</pre></div>
-</div>
+<p>Ontology resolver implementations.</p>
+<p>This module defines the strategies that translate planner specifications into
+actionable fetch plans. Each resolver applies polite headers, unified retry
+logic, SPDX-normalized licensing, and service-specific rate limits while
+participating in the automatic fallback chains described in the ontology
+download refactor. New resolvers can be registered through the <code class="docutils literal notranslate"><span class="pre">RESOLVERS</span></code> map.</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="normalize-license-to-spdx-value">
@@ -109,6 +97,10 @@ value: Raw license string returned by a resolver (may be <code class="docutils l
 <p>Returns:
 Canonical SPDX identifier when a mapping is known, otherwise the
 cleaned original value or <code class="docutils literal notranslate"><span class="pre">None</span></code> when the input is empty.</p>
+</section>
+<section id="get-service-bucket-service-config">
+<h3><code class="docutils literal notranslate"><span class="pre">_get_service_bucket(service,</span> <span class="pre">config)</span></code><a class="headerlink" href="#get-service-bucket-service-config" title="Link to this heading"></a></h3>
+<p>Return a token bucket for resolver API requests respecting rate limits.</p>
 </section>
 <section id="execute-with-retry-self-func">
 <h3><code class="docutils literal notranslate"><span class="pre">_execute_with_retry(self,</span> <span class="pre">func)</span></code><a class="headerlink" href="#execute-with-retry-self-func" title="Link to this heading"></a></h3>
@@ -262,6 +254,18 @@ logger: Logger adapter for structured telemetry.</p>
 FetchPlan pointing to an Ontobee-hosted download URL.</p>
 <p>Raises:
 ConfigError: If the ontology identifier is invalid.</p>
+</section>
+<section id="retryable-exc">
+<h3><code class="docutils literal notranslate"><span class="pre">_retryable(exc)</span></code><a class="headerlink" href="#retryable-exc" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="on-retry-attempt-exc-sleep-time">
+<h3><code class="docutils literal notranslate"><span class="pre">_on_retry(attempt,</span> <span class="pre">exc,</span> <span class="pre">sleep_time)</span></code><a class="headerlink" href="#on-retry-attempt-exc-sleep-time" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="invoke">
+<h3><code class="docutils literal notranslate"><span class="pre">_invoke()</span></code><a class="headerlink" href="#invoke" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 </section>
 <section id="classes">

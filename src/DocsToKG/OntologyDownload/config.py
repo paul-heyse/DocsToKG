@@ -1,29 +1,11 @@
-"""
-Ontology Downloader Configuration
+"""Ontology downloader configuration utilities.
 
-This module centralizes configuration schema definitions, environment
-overrides, and YAML parsing for DocsToKG's ontology downloader. It builds on
-Pydantic v2 models to provide strong validation, type-safe defaults, automatic
-JSON Schema generation, and runtime mutability where operational overrides are
-required.
-
-Key Features:
-- Declarative Pydantic models for HTTP, validation, and logging settings
-- YAML loading with structural validation and friendly error messages
-- Environment variable overrides merged via :class:`pydantic_settings.BaseSettings`
-- JSON Schema export for documentation and validation tooling
-- Utilities to merge defaults with ad-hoc fetch specifications
-
-Dependencies:
-- PyYAML for configuration parsing
-- pydantic and pydantic-settings for model validation
-
-Usage:
-    from DocsToKG.OntologyDownload.config import load_config
-
-    resolved = load_config(Path(\"sources.yaml\"))
-    for spec in resolved.specs:
-        print(spec.id)
+This module defines the Pydantic models and helpers that drive manifest schema
+validation, concurrency defaults, rate limit enforcement, and the CLI override
+surface introduced in the ontology download refactor. Configuration can be
+loaded from YAML, augmented with environment overrides, exported as JSON Schema
+for diagnostics, and merged with ad-hoc CLI specifications for planning or
+download commands.
 """
 
 from __future__ import annotations

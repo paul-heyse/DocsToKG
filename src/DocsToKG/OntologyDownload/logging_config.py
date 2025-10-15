@@ -1,10 +1,10 @@
-"""
-Structured Logging Utilities
+"""Structured logging utilities for the ontology downloader.
 
-This module centralizes structured logging setup for the ontology downloader
-subsystem. It provides helpers for masking sensitive fields, emitting JSON log
-records, managing correlation identifiers, and rolling log files to maintain a
-clean retention window.
+The refactored downloader emits JSON logs with correlation identifiers so
+concurrent planning, streaming normalization, and resolver fallback attempts
+can be traced. This module wires log rotation, retention, masking, and
+correlation id helpers that are also surfaced through the enhanced `doctor`
+diagnostics command.
 """
 
 from __future__ import annotations

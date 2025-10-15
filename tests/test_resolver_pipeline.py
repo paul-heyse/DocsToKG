@@ -877,7 +877,13 @@ def test_pipeline_ignores_empty_url(tmp_path):
     logger = ListLogger()
     metrics = ResolverMetrics()
 
-    pipeline = ResolverPipeline([resolver], config, lambda *a, **k: DownloadOutcome("html", None, 200, "text/html", 1.0), logger, metrics)
+    pipeline = ResolverPipeline(
+        [resolver],
+        config,
+        lambda *a, **k: DownloadOutcome("html", None, 200, "text/html", 1.0),
+        logger,
+        metrics,
+    )
     result = pipeline.run(DummySession({}), artifact)
 
     assert result.success is False

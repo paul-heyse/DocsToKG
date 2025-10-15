@@ -93,52 +93,25 @@ except Exception as exc:  # pragma: no cover - exercised via tests with stubs
 # ---- Cache / model path resolution ----
 
 
-def _resolve_hf_home() -> Path:
-    """Return the HuggingFace cache directory honoring environment settings."""
-
-    env_override = os.getenv("HF_HOME")
-    if env_override:
-        return Path(env_override).expanduser().resolve()
-    xdg_cache = os.getenv("XDG_CACHE_HOME")
-    if xdg_cache:
-        return (Path(xdg_cache).expanduser() / "huggingface").resolve()
-    return (Path.home() / ".cache" / "huggingface").resolve()
-
-
-def _resolve_with_env(env_var: str, default: Path) -> Path:
-    """Resolve ``env_var`` to a path when provided, otherwise return ``default``."""
-
-    override = os.getenv(env_var)
-    if override:
-        return Path(override).expanduser().resolve()
-    return default
-
-
-def _resolve_cli_path(value: Optional[Path], default: Path) -> Path:
-    """Resolve CLI-provided ``value`` to an absolute path with ``default`` fallback."""
-
-    if value is not None:
-        return Path(value).expanduser().resolve()
-    return default
-
-
-HF_HOME = _resolve_hf_home()
-MODEL_ROOT = _resolve_with_env("DOCSTOKG_MODEL_ROOT", HF_HOME)
-QWEN_DIR = _resolve_with_env(
-    "DOCSTOKG_QWEN_DIR", MODEL_ROOT / "Qwen" / "Qwen3-Embedding-4B"
-)
-SPLADE_DIR = _resolve_with_env("DOCSTOKG_SPLADE_DIR", MODEL_ROOT / "naver" / "splade-v3")
-# ---- Fixed locations ----
-
-
 def _expand_path(path: str | Path) -> Path:
-    """Return ``path`` expanded to an absolute :class:`Path`."""
+    """Return ``path`` expanded to an absolute :class:`Path`.
+
+    Args:
+        path: Candidate filesystem path supplied as string or :class:`Path`.
+
+    Returns:
+        Absolute path with user home and environment variables resolved.
+    """
 
     return Path(path).expanduser().resolve()
 
 
 def _resolve_hf_home() -> Path:
-    """Determine the HuggingFace cache directory respecting ``HF_HOME``."""
+    """Determine the HuggingFace cache directory respecting ``HF_HOME``.
+
+    Returns:
+        Absolute path to the HuggingFace cache directory.
+    """
 
     env = os.getenv("HF_HOME")
     if env:
@@ -147,21 +120,42 @@ def _resolve_hf_home() -> Path:
 
 
 def _resolve_model_root(hf_home: Path) -> Path:
-    """Resolve DocsToKG model root with ``DOCSTOKG_MODEL_ROOT`` override."""
+    """Resolve DocsToKG model root with ``DOCSTOKG_MODEL_ROOT`` override.
+
+    Args:
+        hf_home: Base HuggingFace cache directory.
+
+    Returns:
+        Absolute path representing the DocsToKG model root.
+    """
 
     env = os.getenv("DOCSTOKG_MODEL_ROOT")
     return _expand_path(env) if env else hf_home
 
 
 def _resolve_qwen_dir(model_root: Path) -> Path:
-    """Resolve Qwen model directory with ``DOCSTOKG_QWEN_DIR`` override."""
+    """Resolve Qwen model directory with ``DOCSTOKG_QWEN_DIR`` override.
+
+    Args:
+        model_root: Base directory housing DocsToKG models.
+
+    Returns:
+        Absolute path to the Qwen embedding model directory.
+    """
 
     env = os.getenv("DOCSTOKG_QWEN_DIR")
     return _expand_path(env) if env else model_root / "Qwen" / "Qwen3-Embedding-4B"
 
 
 def _resolve_splade_dir(model_root: Path) -> Path:
-    """Resolve SPLADE model directory with ``DOCSTOKG_SPLADE_DIR`` override."""
+    """Resolve SPLADE model directory with ``DOCSTOKG_SPLADE_DIR`` override.
+
+    Args:
+        model_root: Base directory housing DocsToKG models.
+
+    Returns:
+        Absolute path to the SPLADE model directory.
+    """
 
     env = os.getenv("DOCSTOKG_SPLADE_DIR")
     return _expand_path(env) if env else model_root / "naver" / "splade-v3"
@@ -174,11 +168,35 @@ SPLADE_DIR = _expand_path(_resolve_splade_dir(MODEL_ROOT))
 
 
 def _expand_optional(path: Optional[Path]) -> Optional[Path]:
-    """Expand optional :class:`Path` values to absolutes when provided."""
+    """Expand optional :class:`Path` values to absolutes when provided.
+
+    Args:
+        path: Optional path reference supplied by the caller.
+
+    Returns:
+        ``None`` when ``path`` is ``None``; otherwise the expanded absolute path.
+    """
 
     if path is None:
         return None
     return path.expanduser().resolve()
+
+
+def _resolve_cli_path(value: Optional[Path], default: Path) -> Path:
+    """Resolve a CLI-provided path, falling back to ``default`` when omitted.
+
+    Args:
+        value: Optional user-supplied path.
+        default: Fallback path used when ``value`` is absent.
+
+    Returns:
+        Absolute path derived from ``value`` or ``default``.
+    """
+
+    if path is None:
+        return None
+    return path.expanduser().resolve()
+
 
 DEFAULT_DATA_ROOT = detect_data_root()
 DEFAULT_CHUNKS_DIR = data_chunks(DEFAULT_DATA_ROOT)
@@ -1125,9 +1143,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         os.environ["TRANSFORMERS_OFFLINE"] = "1"
         missing_paths = []
         if not splade_model_dir.exists():
-            missing_paths.append(
-                f"SPLADE model directory missing: {splade_model_dir}"
-            )
+            missing_paths.append(f"SPLADE model directory missing: {splade_model_dir}")
         if not qwen_model_dir.exists():
             missing_paths.append(
                 "Qwen model directory not found: "

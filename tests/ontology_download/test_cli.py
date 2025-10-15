@@ -351,27 +351,6 @@ def test_cli_plan_applies_concurrency_overrides(monkeypatch, stub_logger):
 def test_cli_plan_since_filters(monkeypatch, stub_logger, capsys):
     recent_plan = FetchPlan(
         url="https://example.org/new.owl",
-def test_cli_plan_diff_json(monkeypatch, stub_logger, tmp_path, capsys):
-    baseline_path = tmp_path / "baseline.json"
-    baseline_payload = [
-        {
-            "id": "hp",
-            "resolver": "obo",
-            "url": "https://example.org/old.owl",
-            "version": "2023",
-            "license": "CC-BY",
-            "media_type": "application/rdf+xml",
-            "service": "obo",
-            "last_modified": "2023-01-01T00:00:00Z",
-            "size_bytes": 128,
-        }
-    ]
-    baseline_path.write_text(json.dumps(baseline_payload))
-
-    plan = FetchPlan(
-63
-
-        url="https://example.org/hp.owl",
         headers={},
         filename_hint=None,
         version="2024",
@@ -394,66 +373,81 @@ def test_cli_plan_diff_json(monkeypatch, stub_logger, tmp_path, capsys):
             resolver="obo",
             plan=recent_plan,
             candidates=(ResolverCandidate(resolver="obo", plan=recent_plan),),
+            metadata={"last_modified": "2024-05-02T00:00:00Z"},
         ),
         PlannedFetch(
             spec=FetchSpec(id="old", resolver="obo", extras={}, target_formats=["owl"]),
             resolver="obo",
             plan=old_plan,
             candidates=(ResolverCandidate(resolver="obo", plan=old_plan),),
+            metadata={"last_modified": "2023-01-01T00:00:00Z"},
         ),
     ]
 
-    monkeypatch.setattr(cli, "plan_all", lambda specs, config: plans)
+    monkeypatch.setattr(cli, "plan_all", lambda specs, config: list(plans))
+    monkeypatch.setattr(cli, "_collect_plan_metadata", lambda plans, config: None)
     monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
-
-    responses = {
-        "https://example.org/new.owl": _FakeResponse(
-            {"Last-Modified": "Wed, 01 May 2024 00:00:00 GMT"}
-        ),
-        "https://example.org/old.owl": _FakeResponse(
-            {"Last-Modified": "Sun, 01 Jan 2023 00:00:00 GMT"}
-        ),
-    }
-
-    def _head(url, headers=None, timeout=None, allow_redirects=None):
-        return responses[url]
-
-    monkeypatch.setattr(cli.requests, "head", _head, raising=False)
     monkeypatch.setattr(
         cli.ResolvedConfig,
         "from_defaults",
         classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfig(), specs=())),
     )
 
-    assert (
-        cli.main(["plan", "new", "old", "--since", "2024-05-01", "--json"]) == 0
-    )
+    assert cli.main(["plan", "new", "old", "--since", "2024-05-01", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert len(payload) == 1
     assert payload[0]["id"] == "new"
 
 
-def test_cli_plan_diff_reports_changes(monkeypatch, stub_logger, tmp_path, capsys):
-        last_modified="2024-01-01T00:00:00Z",
-        content_length=256,
+def test_cli_plan_diff_reports_changes_json(monkeypatch, stub_logger, tmp_path, capsys):
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "hp",
+                    "resolver": "obo",
+                    "url": "https://example.org/old.owl",
+                    "version": "2023",
+                    "license": "CC-BY",
+                    "media_type": "application/rdf+xml",
+                    "service": "obo",
+                    "last_modified": "2023-01-01T00:00:00Z",
+                    "content_length": 128,
+                }
+            ]
+        )
+    )
+
+    current_plan = FetchPlan(
+        url="https://example.org/hp.owl",
+        headers={},
+        filename_hint=None,
+        version="2024",
+        license="CC-BY",
+        media_type="application/rdf+xml",
+        service="obo",
     )
     planned = PlannedFetch(
         spec=FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"]),
         resolver="obo",
-        plan=plan,
-        candidates=(ResolverCandidate(resolver="obo", plan=plan),),
-        last_modified="2024-01-01T00:00:00Z",
-        size=256,
+        plan=current_plan,
+        candidates=(ResolverCandidate(resolver="obo", plan=current_plan),),
+        metadata={"last_modified": "2024-01-01T00:00:00Z", "content_length": 256},
     )
 
-    monkeypatch.setattr(
-        cli,
-        "plan_all",
-        lambda specs, *, config=None, since=None: [planned],
-    )
+    monkeypatch.setattr(cli, "plan_all", lambda specs, config, since=None: [planned])
+    monkeypatch.setattr(cli, "_collect_plan_metadata", lambda plans, config: None)
     monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    monkeypatch.setattr(
+        cli.ResolvedConfig,
+        "from_defaults",
+        classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfig(), specs=())),
+    )
 
-    exit_code = cli.main(["plan", "diff", "--baseline", str(baseline_path), "--json"])
+    exit_code = cli.main(
+        ["plan", "diff", "hp", "--baseline", str(baseline_path), "--json"]
+    )
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["added"] == []
@@ -462,23 +456,26 @@ def test_cli_plan_diff_reports_changes(monkeypatch, stub_logger, tmp_path, capsy
     assert "version" in payload["modified"][0]["changes"]
 
 
-def test_cli_plan_diff_text(monkeypatch, stub_logger, tmp_path, capsys):
+def test_cli_plan_diff_text_summary(monkeypatch, stub_logger, tmp_path, capsys):
     baseline_path = tmp_path / "baseline.json"
     baseline_path.write_text(
-        json.dumps([
-            {
-                "id": "hp",
-                "resolver": "obo",
-                "url": "https://example.org/old.owl",
-                "version": "2023",
-                "license": "CC-BY",
-                "media_type": "application/rdf+xml",
-                "service": "obo",
-            }
-        ])
+        json.dumps(
+            [
+                {
+                    "id": "hp",
+                    "resolver": "obo",
+                    "url": "https://example.org/old.owl",
+                    "version": "2023-01-01",
+                    "license": "CC-BY",
+                    "media_type": "application/rdf+xml",
+                    "service": "obo",
+                    "content_length": 1024,
+                }
+            ]
+        )
     )
 
-    plan = FetchPlan(
+    current_plan = FetchPlan(
         url="https://example.org/hp.owl",
         headers={},
         filename_hint=None,
@@ -490,56 +487,29 @@ def test_cli_plan_diff_text(monkeypatch, stub_logger, tmp_path, capsys):
     planned = PlannedFetch(
         spec=FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"]),
         resolver="obo",
-        plan=plan,
-        candidates=(ResolverCandidate(resolver="obo", plan=plan),),
+        plan=current_plan,
+        candidates=(ResolverCandidate(resolver="obo", plan=current_plan),),
+        metadata={"last_modified": "2024-05-01T00:00:00Z", "content_length": 2048},
     )
 
-    baseline_path = tmp_path / "baseline.json"
-    baseline_path.write_text(
-        json.dumps(
-            [
-                {
-                    "id": "hp",
-                    "resolver": "obo",
-                    "url": "https://example.org/hp.owl",
-                    "version": "2024-04-01",
-                    "license": "CC-BY",
-                    "media_type": "application/rdf+xml",
-                    "service": "obo",
-                    "headers": {},
-                    "content_length": 1024,
-                }
-            ]
-        )
-    )
-
-    monkeypatch.setattr(cli, "plan_all", lambda specs, config: [planned])
-    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
-    monkeypatch.setattr(
-        cli.requests,
-        "head",
-        lambda url, headers=None, timeout=None, allow_redirects=None: _FakeResponse(
-            {"Last-Modified": "Wed, 01 May 2024 00:00:00 GMT", "Content-Length": "2048"}
-        ),
-        raising=False,
-    )
-    monkeypatch.setattr(
-def test_cli_plan_applies_concurrency_overrides(monkeypatch, stub_logger):
-    captured = {}
-
-    def _fake_plan_all(specs, config):
-        captured["plans"] = config.defaults.http.concurrent_plans
-        captured["downloads"] = config.defaults.http.concurrent_downloads
-        captured["hosts"] = list(config.defaults.http.allowed_hosts or [])
-        return []
-
-    monkeypatch.setattr(cli, "plan_all", _fake_plan_all)
+    monkeypatch.setattr(cli, "plan_all", lambda specs, config, since=None: [planned])
+    monkeypatch.setattr(cli, "_collect_plan_metadata", lambda plans, config: None)
     monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
     monkeypatch.setattr(
         cli.ResolvedConfig,
         "from_defaults",
         classmethod(lambda cls: ResolvedConfig(defaults=DefaultsConfig(), specs=())),
     )
+
+    assert (
+        cli.main(
+            ["plan", "diff", "hp", "--baseline", str(baseline_path)]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert "~ hp" in output
+    assert "https://example.org/hp.owl" in output
 
     assert (
         cli.main(["plan", "diff", "--baseline", str(baseline_path), "--json"]) == 0

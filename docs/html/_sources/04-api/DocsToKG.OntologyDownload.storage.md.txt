@@ -4,72 +4,110 @@ This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.storage
 
 Storage backends for ontology artifacts.
 
-This module centralizes access to ontology storage locations, supporting both
-the default local filesystem layout (managed via :mod:`pystow`) and optional
-remote backends powered by :mod:`fsspec`. Callers interact with the storage
-backend abstractly, allowing the downloader to mirror versioned ontology
-artifacts to remote object stores while maintaining a local working copy for
-streaming and validation.
+The refactored ontology downloader expects durable, versioned storage that can
+support dry-run planning, streaming normalization, and version pruning. This
+module centralizes local and optional remote (fsspec) storage implementations,
+ensuring that metadata such as latest version markers and reclaimed space
+reports remain consistent with the openspec storage management requirements.
 
 ## 1. Functions
 
 ### `_safe_identifiers(ontology_id, version)`
 
-Return sanitized identifiers suitable for filesystem usage.
+Return identifiers sanitized for filesystem usage.
+
+### `_directory_size(path)`
+
+Return the total size in bytes for all regular files under ``path``.
 
 ### `get_storage_backend()`
 
-Instantiate the appropriate storage backend based on environment settings.
-
-Args:
-None
-
-Returns:
-StorageBackend implementation bound to either local or remote storage.
+Instantiate the storage backend based on environment configuration.
 
 ### `prepare_version(self, ontology_id, version)`
 
-Return a local directory prepared for the given ontology/version.
+Return a working directory prepared for the given ontology version.
 
 Args:
-ontology_id: Stable ontology identifier requested by the caller.
-version: Canonical version string resolved for the ontology.
+ontology_id: Identifier of the ontology being downloaded.
+version: Version string representing the in-flight download.
 
 Returns:
-Path pointing to a base directory containing all working sub-folders.
+Path to a freshly prepared directory tree ready for population.
 
 ### `ensure_local_version(self, ontology_id, version)`
 
-Ensure the specified version exists locally, syncing from remote if needed.
+Ensure the requested version is present locally and return its path.
 
 Args:
-ontology_id: Ontology identifier whose artefacts are required.
-version: Version string that must be present locally.
+ontology_id: Identifier whose version must be present.
+version: Version string that should exist on local storage.
 
 Returns:
-Path to the local directory where the ontology version resides.
+Path to the local directory containing the requested version.
 
 ### `available_versions(self, ontology_id)`
 
-Return sorted list of available versions from storage.
+Return sorted version identifiers currently stored for an ontology.
 
 Args:
-ontology_id: Ontology identifier to inspect.
+ontology_id: Identifier whose known versions are requested.
 
 Returns:
-Sorted list of version strings available to the backend.
+Sorted list of version strings recognised by the backend.
+
+### `available_ontologies(self)`
+
+Return sorted ontology identifiers known to the backend.
+
+Returns:
+Alphabetically sorted list of ontology identifiers the backend can
+service.
 
 ### `finalize_version(self, ontology_id, version, local_dir)`
 
-Persist local version directory to remote storage when applicable.
+Persist the working directory after validation succeeds.
 
 Args:
-ontology_id: Ontology identifier that completed processing.
-version: Version string corresponding to the processed ontology.
-local_dir: Local directory tree ready for publication.
+ontology_id: Identifier of the ontology that completed processing.
+version: Version string associated with the finalized artifacts.
+local_dir: Directory containing the validated ontology payload.
 
 Returns:
-None
+None.
+
+### `version_path(self, ontology_id, version)`
+
+Return the canonical storage path for ``ontology_id``/``version``.
+
+Args:
+ontology_id: Identifier of the ontology being queried.
+version: Version string for which a canonical path is needed.
+
+Returns:
+Path pointing to the storage location for the requested version.
+
+### `delete_version(self, ontology_id, version)`
+
+Delete a stored version returning the number of bytes reclaimed.
+
+Args:
+ontology_id: Identifier whose version should be removed.
+version: Version string targeted for deletion.
+
+Returns:
+Number of bytes reclaimed by removing the stored version.
+
+### `set_latest_version(self, ontology_id, version)`
+
+Update the latest version marker for operators and CLI tooling.
+
+Args:
+ontology_id: Identifier whose latest marker requires updating.
+version: Version string to record as the active release.
+
+Returns:
+None.
 
 ### `_version_dir(self, ontology_id, version)`
 
@@ -77,7 +115,7 @@ None
 
 ### `prepare_version(self, ontology_id, version)`
 
-Create a local working directory structure for an ontology version.
+Create the working directory structure for a download run.
 
 Args:
 ontology_id: Identifier of the ontology being processed.
@@ -89,36 +127,79 @@ Path to the prepared base directory containing ``original``,
 
 ### `ensure_local_version(self, ontology_id, version)`
 
-Ensure a local directory exists for the requested ontology version.
+Ensure a local workspace exists for ``ontology_id``/``version``.
 
 Args:
-ontology_id: Identifier of the ontology being processed.
-version: Version string that should exist locally.
+ontology_id: Identifier whose workspace must exist.
+version: Version string that should map to a directory.
 
 Returns:
 Path to the local directory for the ontology version.
 
 ### `available_versions(self, ontology_id)`
 
-List versions already present on disk for an ontology.
+Return sorted versions already present for an ontology.
 
 Args:
-ontology_id: Identifier of the ontology whose versions are requested.
+ontology_id: Identifier whose stored versions should be listed.
 
 Returns:
-Sorted list of version strings discovered in the local store.
+Sorted list of version strings found under the storage root.
+
+### `available_ontologies(self)`
+
+Return ontology identifiers discovered under ``root``.
+
+Returns:
+Sorted list of ontology identifiers available locally.
 
 ### `finalize_version(self, ontology_id, version, local_dir)`
 
 Finalize a local version directory (no-op for purely local storage).
 
 Args:
-ontology_id: Identifier of the ontology that finished processing.
+ontology_id: Identifier that finished processing.
 version: Version string associated with the processed ontology.
-local_dir: Path to the local directory ready for consumption.
+local_dir: Directory containing the ready-to-serve ontology.
 
 Returns:
-None
+None.
+
+### `version_path(self, ontology_id, version)`
+
+Return the local storage directory for the requested version.
+
+Args:
+ontology_id: Identifier being queried.
+version: Version string whose storage path is needed.
+
+Returns:
+Path pointing to the stored ontology version.
+
+### `delete_version(self, ontology_id, version)`
+
+Delete a stored ontology version returning reclaimed bytes.
+
+Args:
+ontology_id: Identifier whose stored version should be removed.
+version: Version string targeted for deletion.
+
+Returns:
+Number of bytes reclaimed by removing the version directory.
+
+Raises:
+OSError: Propagated if filesystem deletion fails.
+
+### `set_latest_version(self, ontology_id, version)`
+
+Update symlink and marker file indicating the latest version.
+
+Args:
+ontology_id: Identifier whose latest marker should be updated.
+version: Version string to record as the latest processed build.
+
+Returns:
+None.
 
 ### `_remote_version_path(self, ontology_id, version)`
 
@@ -126,82 +207,53 @@ None
 
 ### `available_versions(self, ontology_id)`
 
-Return unique versions aggregated from local cache and remote storage.
+Return versions aggregated from local cache and remote storage.
 
-Args:
-ontology_id: Identifier of the ontology whose versions are requested.
+### `available_ontologies(self)`
 
-Returns:
-Sorted list of versions available either locally or remotely.
+Return ontology identifiers available locally or remotely.
 
 ### `ensure_local_version(self, ontology_id, version)`
 
-Mirror a remote ontology version into the local cache if necessary.
-
-Args:
-ontology_id: Identifier of the ontology being requested.
-version: Version string to ensure locally.
-
-Returns:
-Path to the local directory containing the requested version.
+Mirror a remote ontology version into the local cache when absent.
 
 ### `finalize_version(self, ontology_id, version, local_dir)`
 
-Upload the finalized local version directory to the remote store.
+Upload the finalized local directory to the remote store.
 
-Args:
-ontology_id: Identifier of the ontology ready for publication.
-version: Version string for the finalized ontology artifacts.
-local_dir: Local directory tree containing normalized outputs.
+### `delete_version(self, ontology_id, version)`
 
-Returns:
-None
+Delete both local and remote copies of a stored version.
 
 ## 2. Classes
 
 ### `StorageBackend`
 
-Protocol describing storage backend operations.
-
-Implementations may store data locally, mirror to remote backends, or both.
-Callers rely on the common interface to prepare working directories,
-enumerate versions, and finalize artefacts after downloads complete.
+Protocol describing the operations required by the downloader pipeline.
 
 Attributes:
-prepare_version: Callable producing a working directory path.
-ensure_local_version: Callable that guarantees a local working copy.
-available_versions: Callable returning stored version identifiers.
-finalize_version: Callable persisting local results to durable storage.
+root_path: Canonical base path that implementations expose for disk
+storage.  Remote-only backends can synthesize this attribute for
+instrumentation purposes.
 
 Examples:
->>> backend = LocalStorageBackend(Path("/tmp/ontologies"))
->>> isinstance(backend.available_versions("hp"), list)
-True
+>>> class MemoryBackend(StorageBackend):
+...     root_path = Path("/tmp")  # pragma: no cover - illustrative stub
+...     def prepare_version(self, ontology_id: str, version: str) -> Path:
+...         ...
 
 ### `LocalStorageBackend`
 
 Storage backend that keeps ontology artifacts on the local filesystem.
 
 Attributes:
-root: Root directory under which ontology artifacts are stored. Each
-ontology/version pair receives a dedicated subdirectory.
+root: Base directory that stores ontology versions grouped by identifier.
 
 Examples:
->>> backend = LocalStorageBackend(Path("/tmp/ontologies"))
->>> workspace = backend.prepare_version("hp", "2024-01-01")
->>> (workspace / "original").exists()
-True
+>>> backend = LocalStorageBackend(LOCAL_ONTOLOGY_DIR)
+>>> backend.available_ontologies()
+[]
 
 ### `FsspecStorageBackend`
 
-Storage backend that mirrors ontology artifacts to a remote location via fsspec.
-
-Attributes:
-fs: fsspec filesystem instance used for remote interactions.
-base_path: Root path within the remote filesystem where artefacts live.
-
-Examples:
->>> backend = FsspecStorageBackend("memory://ontologies")
-Traceback (most recent call last):
-...
-ConfigError: fsspec required for remote storage. Install it via 'pip install fsspec'.
+Hybrid storage backend that mirrors artifacts to an fsspec location.

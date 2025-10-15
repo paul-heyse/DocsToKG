@@ -302,9 +302,7 @@ def test_retry_after_header_prefers_longer_delay(mock_sleep: Mock) -> None:
 
 @patch("DocsToKG.ContentDownload.http.time.sleep")
 @patch("DocsToKG.ContentDownload.http.parse_retry_after_header")
-def test_respect_retry_after_false_skips_header(
-    mock_parse: Mock, mock_sleep: Mock
-) -> None:
+def test_respect_retry_after_false_skips_header(mock_parse: Mock, mock_sleep: Mock) -> None:
     """Ensure disabling respect_retry_after bypasses header parsing."""
 
     session = Mock(spec=requests.Session)

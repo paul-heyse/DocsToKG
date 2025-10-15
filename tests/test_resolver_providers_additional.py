@@ -649,9 +649,7 @@ def test_crossref_resolver_uses_central_retry_logic(monkeypatch, tmp_path) -> No
             self.calls.append(response.status_code)
             return response
 
-    monkeypatch.setattr(
-        "DocsToKG.ContentDownload.http.random.random", lambda: 0.0
-    )
+    monkeypatch.setattr("DocsToKG.ContentDownload.http.random.random", lambda: 0.0)
     sleep_calls: list[float] = []
     monkeypatch.setattr(
         "DocsToKG.ContentDownload.http.time.sleep", lambda delay: sleep_calls.append(delay)
@@ -705,9 +703,7 @@ def test_crossref_resolver_uses_central_retry_logic(monkeypatch, tmp_path) -> No
             self.calls.append(response.status_code)
             return response
 
-    monkeypatch.setattr(
-        "DocsToKG.ContentDownload.http.random.random", lambda: 0.0
-    )
+    monkeypatch.setattr("DocsToKG.ContentDownload.http.random.random", lambda: 0.0)
     sleep_calls: list[float] = []
     monkeypatch.setattr(
         "DocsToKG.ContentDownload.http.time.sleep", lambda delay: sleep_calls.append(delay)
@@ -1059,7 +1055,9 @@ def test_openaire_resolver_fallback_json_load(monkeypatch, tmp_path) -> None:
 
     monkeypatch.setattr(
         "DocsToKG.ContentDownload.resolvers.providers.openaire.request_with_retries",
-        lambda *args, **kwargs: _StubResponse(json_data=ValueError("bad"), text=json.dumps(payload)),
+        lambda *args, **kwargs: _StubResponse(
+            json_data=ValueError("bad"), text=json.dumps(payload)
+        ),
     )
 
     urls = [result.url for result in OpenAireResolver().iter_urls(Mock(), config, artifact)]
@@ -1098,9 +1096,7 @@ def test_osf_resolver_emits_urls(monkeypatch, tmp_path) -> None:
             {
                 "links": {"download": "https://osf.example/direct.pdf"},
                 "attributes": {
-                    "primary_file": {
-                        "links": {"download": "https://osf.example/primary.pdf"}
-                    }
+                    "primary_file": {"links": {"download": "https://osf.example/primary.pdf"}}
                 },
             }
         ]

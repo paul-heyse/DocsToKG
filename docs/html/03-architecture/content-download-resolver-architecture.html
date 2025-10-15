@@ -122,6 +122,56 @@ manifest metadata.</p></li>
 providers.</p></li>
 </ul>
 </section>
+<section id="metrics-sidecar-format">
+<h2>3. Metrics Sidecar Format<a class="headerlink" href="#metrics-sidecar-format" title="Link to this heading"></a></h2>
+<p>Successful runs emit a <code class="docutils literal notranslate"><span class="pre">&lt;manifest&gt;.metrics.json</span></code> file adjacent to the manifest
+JSONL stream. The document captures high-level counters for quick dashboard
+integration:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;processed&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">128</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;saved&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">74</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;html_only&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">19</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;skipped&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">35</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;resolvers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;attempts&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;unpaywall&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">80</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;crossref&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;successes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;unpaywall&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">55</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;crossref&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">18</span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;html&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;landing_page&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;skips&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;crossref:duplicate-url&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;failures&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;core&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Counters align with the manifest summary record, so existing parsers can
+compare totals.</p></li>
+<li><p>Additional keys may appear under <code class="docutils literal notranslate"><span class="pre">resolvers</span></code> in future releases; treat absent
+keys as zero.</p></li>
+<li><p>Files are indented and sorted for readability and deterministic diffs.</p></li>
+</ul>
+</section>
+<section id="streaming-hash-performance-benefits">
+<h2>4. Streaming Hash Performance Benefits<a class="headerlink" href="#streaming-hash-performance-benefits" title="Link to this heading"></a></h2>
+<p>Hashing and byte counting now occur during the initial write loop, eliminating
+the second disk scan that previously doubled I/O. Benchmarking a 128 MiB payload
+(<code class="docutils literal notranslate"><span class="pre">notes/streaming-hash-benchmark.md</span></code>) shows the streaming approach completing in
+~0.31 s versus 0.37 s for the legacy read-then-hash pattern—a 17 % reduction.
+Operators processing gigabyte-scale corpora should observe proportionally larger
+gains because disk seeks no longer dominate the tail of the pipeline.</p>
+</section>
+<section id="reliability-improvements">
+<h2>5. Reliability Improvements<a class="headerlink" href="#reliability-improvements" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>All HTTP adapters run with <code class="docutils literal notranslate"><span class="pre">max_retries=0</span></code>; retries are orchestrated entirely
+by <code class="docutils literal notranslate"><span class="pre">http.request_with_retries</span></code>, yielding deterministic attempt counts and
+consistent jittered backoff.</p></li>
+<li><p>Stub-server tests exercise 429, 5xx, and timeout scenarios to guarantee retry
+sequencing and respect for <code class="docutils literal notranslate"><span class="pre">Retry-After</span></code> guidance (<code class="docutils literal notranslate"><span class="pre">tests/test_download_retries.py</span></code>).</p></li>
+<li><p>Logging infrastructure applies per-instance locks to JSONL and CSV writers,
+ensuring multi-worker runs produce well-formed records (see
+<code class="docutils literal notranslate"><span class="pre">tests/test_jsonl_logging.py</span></code> for stress coverage).</p></li>
+</ul>
+</section>
 </section>
 
 

@@ -55,6 +55,7 @@ from DocsToKG.DocParsing.schemas import (
     get_docling_version,
 )
 from DocsToKG.DocParsing.serializers import RichSerializerProvider
+
 SOFT_BARRIER_MARGIN = 64
 
 # ---------- Defaults ----------

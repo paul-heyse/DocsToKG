@@ -301,9 +301,7 @@ def test_plan_one_respects_disabled_fallback(monkeypatch: pytest.MonkeyPatch) ->
         core.plan_one(spec, config=config)
 
 
-def test_fetch_one_download_fallback(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_fetch_one_download_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Download should fall back to the next resolver on retryable failure."""
 
     primary_plan = FetchPlan(

@@ -96,21 +96,23 @@ None: This helper does not raise exceptions.
 
 ### `validate_schema_version(version, compatible_versions)`
 
-Check if schema version is compatible.
+Ensure a schema version string is recognised.
 
 Args:
-version: Schema version string from JSONL row.
+version: Schema version string from a JSONL row.
 compatible_versions: List of accepted version identifiers.
+kind: Human-readable label describing the schema type.
+source: Optional context describing where the version originated.
 
 Returns:
-``True`` when the version is recognised, ``False`` otherwise.
+The validated schema version.
 
 Examples:
 >>> validate_schema_version("docparse/1.1.0", COMPATIBLE_CHUNK_VERSIONS)
-True
+'docparse/1.1.0'
 
 Raises:
-None: This validator does not raise exceptions.
+ValueError: If the schema version is missing or unsupported.
 
 ### `validate_parse_engine(cls, value)`
 
@@ -124,6 +126,10 @@ Validated parse engine string.
 
 Raises:
 ValueError: If the parser name is not recognised.
+
+### `_validate_schema_version(cls, value)`
+
+Ensure chunk rows declare a supported schema identifier.
 
 ### `validate_num_tokens(cls, value)`
 
@@ -202,6 +208,10 @@ The validated dense vector instance.
 
 Raises:
 ValueError: If the actual length differs from ``dimension``.
+
+### `_validate_schema_version(cls, value)`
+
+Ensure vector rows declare a supported schema identifier.
 
 ### `Field()`
 
@@ -313,6 +323,9 @@ page_nos: List of 1-based page numbers touched by the chunk.
 schema_version: Version identifier for the chunk schema.
 provenance: Optional provenance metadata describing parsing context.
 uuid: Optional stable identifier for the chunk.
+has_image_captions: Optional duplicate of provenance flag for convenience.
+has_image_classification: Optional duplicate of provenance flag for convenience.
+num_images: Optional duplicate of provenance image count for convenience.
 
 Examples:
 >>> chunk = ChunkRow(

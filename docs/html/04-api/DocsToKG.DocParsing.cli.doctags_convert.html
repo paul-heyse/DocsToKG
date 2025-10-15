@@ -135,11 +135,11 @@ overrides: Mapping of argument names to explicit override values.</p>
 <p>Returns:
 :class:<code class="docutils literal notranslate"><span class="pre">argparse.Namespace</span></code> with defaults populated and overrides applied.</p>
 </section>
-<section id="main-argv">
-<h3><code class="docutils literal notranslate"><span class="pre">main(argv)</span></code><a class="headerlink" href="#main-argv" title="Link to this heading"></a></h3>
+<section id="main-args">
+<h3><code class="docutils literal notranslate"><span class="pre">main(args)</span></code><a class="headerlink" href="#main-args" title="Link to this heading"></a></h3>
 <p>Dispatch conversion to the HTML or PDF backend based on requested mode.</p>
 <p>Args:
-argv: Optional CLI arguments; defaults to :data:<code class="docutils literal notranslate"><span class="pre">sys.argv</span></code> when omitted.</p>
+args: Either an :class:<code class="docutils literal notranslate"><span class="pre">argparse.Namespace</span></code>, a list of CLI arguments, or <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
 <p>Returns:
 Exit code from the selected conversion backend.</p>
 <p>Raises:

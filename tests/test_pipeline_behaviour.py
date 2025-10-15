@@ -269,9 +269,7 @@ def test_openalex_resolver_executes_first(tmp_path):
         pdf_path.write_bytes(b"%PDF")
         return build_outcome("pdf", path=str(pdf_path))
 
-    fallback = StubResolver(
-        "fallback", [ResolverResult(url="https://fallback.example/pdf")]
-    )
+    fallback = StubResolver("fallback", [ResolverResult(url="https://fallback.example/pdf")])
     config = ResolverConfig(
         resolver_order=["openalex", "fallback"],
         resolver_toggles={"openalex": True, "fallback": True},

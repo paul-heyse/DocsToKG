@@ -86,7 +86,8 @@ scholarly identifiers such as DOIs, PMCIDs, and arXiv IDs while also providing
 lightweight string manipulation helpers used during manifest generation.</p>
 <p>Key Features:</p>
 <ul class="simple">
-<li><p>Normalisation of DOI, PMCID, and arXiv identifiers from heterogeneous sources.</p></li>
+<li><p>Normalisation of DOI, PMCID, and arXiv identifiers from heterogeneous sources
+including common URL and <code class="docutils literal notranslate"><span class="pre">doi:</span></code> prefixes.</p></li>
 <li><p>Prefix stripping for resolver-specific metadata cleaning.</p></li>
 <li><p>Duplicate removal while preserving original ordering.</p></li>
 </ul>
@@ -100,11 +101,19 @@ pmcid = utils.normalize_pmcid(&quot;PMC12345&quot;)
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="normalize-doi-doi">
 <h3><code class="docutils literal notranslate"><span class="pre">normalize_doi(doi)</span></code><a class="headerlink" href="#normalize-doi-doi" title="Link to this heading"></a></h3>
-<p>Normalize DOI identifiers by stripping prefixes and whitespace.</p>
+<p>Normalize DOI identifiers by stripping common prefixes and whitespace.</p>
 <p>Args:
 doi: Raw DOI string or URL provided by upstream metadata.</p>
 <p>Returns:
 Canonical DOI without protocol prefixes, or None when input is empty.</p>
+<p>Supported prefixes:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">https://doi.org/</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">http://doi.org/</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">https://dx.doi.org/</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">http://dx.doi.org/</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">doi:</span></code></p></li>
+</ul>
 </section>
 <section id="normalize-pmcid-pmcid">
 <h3><code class="docutils literal notranslate"><span class="pre">normalize_pmcid(pmcid)</span></code><a class="headerlink" href="#normalize-pmcid-pmcid" title="Link to this heading"></a></h3>

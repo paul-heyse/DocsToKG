@@ -91,6 +91,7 @@ vector JSONL artefacts ready for downstream search.</p>
 <li><p>Stream SPLADE sparse encoding and Qwen dense embeddings from local caches</p></li>
 <li><p>Validate vector schemas, norms, and dimensions before writing outputs</p></li>
 <li><p>Record manifest metadata for observability and auditing</p></li>
+<li><p>Explain SPLADE attention backend fallbacks (auto→FlashAttention2→SDPA→eager)</p></li>
 </ul>
 <p>Usage:
 python -m DocsToKG.DocParsing.EmbeddingV2 –resume</p>
@@ -102,6 +103,42 @@ python -m DocsToKG.DocParsing.EmbeddingV2 –resume</p>
 </ul>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="resolve-hf-home">
+<h3><code class="docutils literal notranslate"><span class="pre">_resolve_hf_home()</span></code><a class="headerlink" href="#resolve-hf-home" title="Link to this heading"></a></h3>
+<p>Return the HuggingFace cache directory honoring environment settings.</p>
+</section>
+<section id="resolve-with-env-env-var-default">
+<h3><code class="docutils literal notranslate"><span class="pre">_resolve_with_env(env_var,</span> <span class="pre">default)</span></code><a class="headerlink" href="#resolve-with-env-env-var-default" title="Link to this heading"></a></h3>
+<p>Resolve <code class="docutils literal notranslate"><span class="pre">env_var</span></code> to a path when provided, otherwise return <code class="docutils literal notranslate"><span class="pre">default</span></code>.</p>
+</section>
+<section id="resolve-cli-path-value-default">
+<h3><code class="docutils literal notranslate"><span class="pre">_resolve_cli_path(value,</span> <span class="pre">default)</span></code><a class="headerlink" href="#resolve-cli-path-value-default" title="Link to this heading"></a></h3>
+<p>Resolve CLI-provided <code class="docutils literal notranslate"><span class="pre">value</span></code> to an absolute path with <code class="docutils literal notranslate"><span class="pre">default</span></code> fallback.</p>
+</section>
+<section id="expand-path-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_expand_path(path)</span></code><a class="headerlink" href="#expand-path-path" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">path</span></code> expanded to an absolute :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code>.</p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">_resolve_hf_home()</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Determine the HuggingFace cache directory respecting <code class="docutils literal notranslate"><span class="pre">HF_HOME</span></code>.</p>
+</section>
+<section id="resolve-model-root-hf-home">
+<h3><code class="docutils literal notranslate"><span class="pre">_resolve_model_root(hf_home)</span></code><a class="headerlink" href="#resolve-model-root-hf-home" title="Link to this heading"></a></h3>
+<p>Resolve DocsToKG model root with <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_MODEL_ROOT</span></code> override.</p>
+</section>
+<section id="resolve-qwen-dir-model-root">
+<h3><code class="docutils literal notranslate"><span class="pre">_resolve_qwen_dir(model_root)</span></code><a class="headerlink" href="#resolve-qwen-dir-model-root" title="Link to this heading"></a></h3>
+<p>Resolve Qwen model directory with <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_QWEN_DIR</span></code> override.</p>
+</section>
+<section id="resolve-splade-dir-model-root">
+<h3><code class="docutils literal notranslate"><span class="pre">_resolve_splade_dir(model_root)</span></code><a class="headerlink" href="#resolve-splade-dir-model-root" title="Link to this heading"></a></h3>
+<p>Resolve SPLADE model directory with <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_SPLADE_DIR</span></code> override.</p>
+</section>
+<section id="expand-optional-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_expand_optional(path)</span></code><a class="headerlink" href="#expand-optional-path" title="Link to this heading"></a></h3>
+<p>Expand optional :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code> values to absolutes when provided.</p>
+</section>
 <section id="missing-splade-dependency-message">
 <h3><code class="docutils literal notranslate"><span class="pre">_missing_splade_dependency_message()</span></code><a class="headerlink" href="#missing-splade-dependency-message" title="Link to this heading"></a></h3>
 <p>Return a human-readable installation hint for SPLADE extras.</p>
@@ -134,6 +171,10 @@ rows: Chunk dictionaries that should include a <code class="docutils literal not
 <p>Returns:
 True when at least one UUID was newly assigned; otherwise False.</p>
 </section>
+<section id="ensure-chunk-schema-rows-source">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_chunk_schema(rows,</span> <span class="pre">source)</span></code><a class="headerlink" href="#ensure-chunk-schema-rows-source" title="Link to this heading"></a></h3>
+<p>Assert that chunk rows declare a compatible schema version.</p>
+</section>
 <section id="tokens-text">
 <h3><code class="docutils literal notranslate"><span class="pre">tokens(text)</span></code><a class="headerlink" href="#tokens-text" title="Link to this heading"></a></h3>
 <p>Tokenize normalized text for sparse retrieval features.</p>
@@ -141,14 +182,6 @@ True when at least one UUID was newly assigned; otherwise False.</p>
 text: Input string to tokenize.</p>
 <p>Returns:
 Lowercased alphanumeric tokens extracted from the text.</p>
-</section>
-<section id="build-bm25-stats-chunks">
-<h3><code class="docutils literal notranslate"><span class="pre">build_bm25_stats(chunks)</span></code><a class="headerlink" href="#build-bm25-stats-chunks" title="Link to this heading"></a></h3>
-<p>Compute corpus statistics required for BM25 weighting.</p>
-<p>Args:
-chunks: Iterable of text chunks with identifiers.</p>
-<p>Returns:
-BM25Stats containing document frequency counts and average length.</p>
 </section>
 <section id="print-bm25-summary-stats">
 <h3><code class="docutils literal notranslate"><span class="pre">print_bm25_summary(stats)</span></code><a class="headerlink" href="#print-bm25-summary-stats" title="Link to this heading"></a></h3>
@@ -179,6 +212,10 @@ batch_size: Optional override for the encoding batch size.</p>
 <p>Returns:
 Tuple of token lists and weight lists aligned per input text.</p>
 </section>
+<section id="detect-splade-backend-encoder-requested">
+<h3><code class="docutils literal notranslate"><span class="pre">_detect_splade_backend(encoder,</span> <span class="pre">requested)</span></code><a class="headerlink" href="#detect-splade-backend-encoder-requested" title="Link to this heading"></a></h3>
+<p>Best-effort detection of the attention backend used by SPLADE.</p>
+</section>
 <section id="get-splade-encoder-cfg">
 <h3><code class="docutils literal notranslate"><span class="pre">_get_splade_encoder(cfg)</span></code><a class="headerlink" href="#get-splade-encoder-cfg" title="Link to this heading"></a></h3>
 <p>Retrieve (or create) a cached SPLADE encoder instance.</p>
@@ -189,6 +226,10 @@ Cached :class:<code class="docutils literal notranslate"><span class="pre">Spars
 <p>Raises:
 ValueError: If the encoder cannot be initialised with the supplied configuration.
 ImportError: If required SPLADE dependencies are unavailable.</p>
+</section>
+<section id="get-splade-backend-used-cfg">
+<h3><code class="docutils literal notranslate"><span class="pre">_get_splade_backend_used(cfg)</span></code><a class="headerlink" href="#get-splade-backend-used-cfg" title="Link to this heading"></a></h3>
+<p>Return the backend string recorded for a given SPLADE configuration.</p>
 </section>
 <section id="qwen-embed-cfg-texts-batch-size">
 <h3><code class="docutils literal notranslate"><span class="pre">qwen_embed(cfg,</span> <span class="pre">texts,</span> <span class="pre">batch_size)</span></code><a class="headerlink" href="#qwen-embed-cfg-texts-batch-size" title="Link to this heading"></a></h3>
@@ -207,16 +248,15 @@ List of embedding vectors, one per input text.</p>
 files: Sequence of chunk file paths to process.
 logger: Logger used for structured progress output.</p>
 <p>Returns:
-Tuple containing the UUID→Chunk index and aggregated BM25 statistics.</p>
+Aggregated BM25 statistics for the supplied chunk corpus.</p>
 <p>Raises:
 ValueError: Propagated when chunk rows are missing required fields.</p>
 </section>
-<section id="process-chunk-file-vectors-chunk-file-uuid-to-chunk-stats-args-validator-logger">
-<h3><code class="docutils literal notranslate"><span class="pre">process_chunk_file_vectors(chunk_file,</span> <span class="pre">uuid_to_chunk,</span> <span class="pre">stats,</span> <span class="pre">args,</span> <span class="pre">validator,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#process-chunk-file-vectors-chunk-file-uuid-to-chunk-stats-args-validator-logger" title="Link to this heading"></a></h3>
+<section id="process-chunk-file-vectors-chunk-file-stats-args-validator-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">process_chunk_file_vectors(chunk_file,</span> <span class="pre">stats,</span> <span class="pre">args,</span> <span class="pre">validator,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#process-chunk-file-vectors-chunk-file-stats-args-validator-logger" title="Link to this heading"></a></h3>
 <p>Generate vectors for a single chunk file and persist them to disk.</p>
 <p>Args:
 chunk_file: Chunk JSONL file to process.
-uuid_to_chunk: Mapping of chunk UUIDs to chunk metadata.
 stats: Precomputed BM25 statistics.
 args: Parsed CLI arguments with runtime configuration.
 validator: SPLADE validator for sparsity metrics.
@@ -316,24 +356,6 @@ None</p>
 </section>
 <section id="classes">
 <h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
-<section id="chunk">
-<h3><code class="docutils literal notranslate"><span class="pre">Chunk</span></code><a class="headerlink" href="#chunk" title="Link to this heading"></a></h3>
-<p>Minimal representation of a DocTags chunk stored on disk.</p>
-<p>Attributes:
-uuid: Stable identifier for the chunk.
-text: Textual content extracted from the DocTags document.
-doc_id: Identifier of the source document for manifest reporting.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>chunk = Chunk(uuid=”chunk-1”, text=”Hybrid search is powerful.”, doc_id=”doc”)
-chunk.uuid
-‘chunk-1’</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
 <section id="bm25stats">
 <h3><code class="docutils literal notranslate"><span class="pre">BM25Stats</span></code><a class="headerlink" href="#bm25stats" title="Link to this heading"></a></h3>
 <p>Corpus-wide statistics required for BM25 weighting.</p>

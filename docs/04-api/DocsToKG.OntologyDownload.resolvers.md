@@ -2,24 +2,13 @@
 
 This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.resolvers``.
 
-Ontology Resolver Implementations
+Ontology resolver implementations.
 
-This module defines the resolver strategies that convert download
-specifications into actionable fetch plans. Each resolver encapsulates the
-API integration, polite header management, and metadata extraction necessary
-to interact with external services such as the OBO Library, OLS, BioPortal,
-Linked Open Vocabularies (LOV), Ontobee, and SKOS/XBRL endpoints.
-
-Key Features:
-- Shared retry/backoff helpers for consistent API resilience
-- Resolver-specific metadata extraction (version, license, media type) with SPDX normalization
-- Support for additional services through the pluggable ``RESOLVERS`` map
-
-Usage:
-    from DocsToKG.OntologyDownload.resolvers import RESOLVERS
-
-    resolver = RESOLVERS["obo"]
-    plan = resolver.plan(spec, config, logger)
+This module defines the strategies that translate planner specifications into
+actionable fetch plans. Each resolver applies polite headers, unified retry
+logic, SPDX-normalized licensing, and service-specific rate limits while
+participating in the automatic fallback chains described in the ontology
+download refactor. New resolvers can be registered through the ``RESOLVERS`` map.
 
 ## 1. Functions
 
@@ -36,6 +25,10 @@ value: Raw license string returned by a resolver (may be ``None``).
 Returns:
 Canonical SPDX identifier when a mapping is known, otherwise the
 cleaned original value or ``None`` when the input is empty.
+
+### `_get_service_bucket(service, config)`
+
+Return a token bucket for resolver API requests respecting rate limits.
 
 ### `_execute_with_retry(self, func)`
 
@@ -223,6 +216,18 @@ FetchPlan pointing to an Ontobee-hosted download URL.
 
 Raises:
 ConfigError: If the ontology identifier is invalid.
+
+### `_retryable(exc)`
+
+*No documentation available.*
+
+### `_on_retry(attempt, exc, sleep_time)`
+
+*No documentation available.*
+
+### `_invoke()`
+
+*No documentation available.*
 
 ## 2. Classes
 

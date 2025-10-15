@@ -80,61 +80,94 @@
 <h1>1. Module: storage<a class="headerlink" href="#module-storage" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.storage</span></code>.</p>
 <p>Storage backends for ontology artifacts.</p>
-<p>This module centralizes access to ontology storage locations, supporting both
-the default local filesystem layout (managed via :mod:<code class="docutils literal notranslate"><span class="pre">pystow</span></code>) and optional
-remote backends powered by :mod:<code class="docutils literal notranslate"><span class="pre">fsspec</span></code>. Callers interact with the storage
-backend abstractly, allowing the downloader to mirror versioned ontology
-artifacts to remote object stores while maintaining a local working copy for
-streaming and validation.</p>
+<p>The refactored ontology downloader expects durable, versioned storage that can
+support dry-run planning, streaming normalization, and version pruning. This
+module centralizes local and optional remote (fsspec) storage implementations,
+ensuring that metadata such as latest version markers and reclaimed space
+reports remain consistent with the openspec storage management requirements.</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="safe-identifiers-ontology-id-version">
 <h3><code class="docutils literal notranslate"><span class="pre">_safe_identifiers(ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#safe-identifiers-ontology-id-version" title="Link to this heading"></a></h3>
-<p>Return sanitized identifiers suitable for filesystem usage.</p>
+<p>Return identifiers sanitized for filesystem usage.</p>
+</section>
+<section id="directory-size-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_directory_size(path)</span></code><a class="headerlink" href="#directory-size-path" title="Link to this heading"></a></h3>
+<p>Return the total size in bytes for all regular files under <code class="docutils literal notranslate"><span class="pre">path</span></code>.</p>
 </section>
 <section id="get-storage-backend">
 <h3><code class="docutils literal notranslate"><span class="pre">get_storage_backend()</span></code><a class="headerlink" href="#get-storage-backend" title="Link to this heading"></a></h3>
-<p>Instantiate the appropriate storage backend based on environment settings.</p>
-<p>Args:
-None</p>
-<p>Returns:
-StorageBackend implementation bound to either local or remote storage.</p>
+<p>Instantiate the storage backend based on environment configuration.</p>
 </section>
 <section id="prepare-version-self-ontology-id-version">
 <h3><code class="docutils literal notranslate"><span class="pre">prepare_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#prepare-version-self-ontology-id-version" title="Link to this heading"></a></h3>
-<p>Return a local directory prepared for the given ontology/version.</p>
+<p>Return a working directory prepared for the given ontology version.</p>
 <p>Args:
-ontology_id: Stable ontology identifier requested by the caller.
-version: Canonical version string resolved for the ontology.</p>
+ontology_id: Identifier of the ontology being downloaded.
+version: Version string representing the in-flight download.</p>
 <p>Returns:
-Path pointing to a base directory containing all working sub-folders.</p>
+Path to a freshly prepared directory tree ready for population.</p>
 </section>
 <section id="ensure-local-version-self-ontology-id-version">
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_local_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#ensure-local-version-self-ontology-id-version" title="Link to this heading"></a></h3>
-<p>Ensure the specified version exists locally, syncing from remote if needed.</p>
+<p>Ensure the requested version is present locally and return its path.</p>
 <p>Args:
-ontology_id: Ontology identifier whose artefacts are required.
-version: Version string that must be present locally.</p>
+ontology_id: Identifier whose version must be present.
+version: Version string that should exist on local storage.</p>
 <p>Returns:
-Path to the local directory where the ontology version resides.</p>
+Path to the local directory containing the requested version.</p>
 </section>
 <section id="available-versions-self-ontology-id">
 <h3><code class="docutils literal notranslate"><span class="pre">available_versions(self,</span> <span class="pre">ontology_id)</span></code><a class="headerlink" href="#available-versions-self-ontology-id" title="Link to this heading"></a></h3>
-<p>Return sorted list of available versions from storage.</p>
+<p>Return sorted version identifiers currently stored for an ontology.</p>
 <p>Args:
-ontology_id: Ontology identifier to inspect.</p>
+ontology_id: Identifier whose known versions are requested.</p>
 <p>Returns:
-Sorted list of version strings available to the backend.</p>
+Sorted list of version strings recognised by the backend.</p>
+</section>
+<section id="available-ontologies-self">
+<h3><code class="docutils literal notranslate"><span class="pre">available_ontologies(self)</span></code><a class="headerlink" href="#available-ontologies-self" title="Link to this heading"></a></h3>
+<p>Return sorted ontology identifiers known to the backend.</p>
+<p>Returns:
+Alphabetically sorted list of ontology identifiers the backend can
+service.</p>
 </section>
 <section id="finalize-version-self-ontology-id-version-local-dir">
 <h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#finalize-version-self-ontology-id-version-local-dir" title="Link to this heading"></a></h3>
-<p>Persist local version directory to remote storage when applicable.</p>
+<p>Persist the working directory after validation succeeds.</p>
 <p>Args:
-ontology_id: Ontology identifier that completed processing.
-version: Version string corresponding to the processed ontology.
-local_dir: Local directory tree ready for publication.</p>
+ontology_id: Identifier of the ontology that completed processing.
+version: Version string associated with the finalized artifacts.
+local_dir: Directory containing the validated ontology payload.</p>
 <p>Returns:
-None</p>
+None.</p>
+</section>
+<section id="version-path-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">version_path(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#version-path-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Return the canonical storage path for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>/<code class="docutils literal notranslate"><span class="pre">version</span></code>.</p>
+<p>Args:
+ontology_id: Identifier of the ontology being queried.
+version: Version string for which a canonical path is needed.</p>
+<p>Returns:
+Path pointing to the storage location for the requested version.</p>
+</section>
+<section id="delete-version-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">delete_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#delete-version-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Delete a stored version returning the number of bytes reclaimed.</p>
+<p>Args:
+ontology_id: Identifier whose version should be removed.
+version: Version string targeted for deletion.</p>
+<p>Returns:
+Number of bytes reclaimed by removing the stored version.</p>
+</section>
+<section id="set-latest-version-self-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">set_latest_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#set-latest-version-self-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Update the latest version marker for operators and CLI tooling.</p>
+<p>Args:
+ontology_id: Identifier whose latest marker requires updating.
+version: Version string to record as the active release.</p>
+<p>Returns:
+None.</p>
 </section>
 <section id="version-dir-self-ontology-id-version">
 <h3><code class="docutils literal notranslate"><span class="pre">_version_dir(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#version-dir-self-ontology-id-version" title="Link to this heading"></a></h3>
@@ -142,7 +175,7 @@ None</p>
 </section>
 <section id="id1">
 <h3><code class="docutils literal notranslate"><span class="pre">prepare_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
-<p>Create a local working directory structure for an ontology version.</p>
+<p>Create the working directory structure for a download run.</p>
 <p>Args:
 ontology_id: Identifier of the ontology being processed.
 version: Canonical version string for the ontology.</p>
@@ -152,83 +185,108 @@ Path to the prepared base directory containing <code class="docutils literal not
 </section>
 <section id="id2">
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_local_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
-<p>Ensure a local directory exists for the requested ontology version.</p>
+<p>Ensure a local workspace exists for <code class="docutils literal notranslate"><span class="pre">ontology_id</span></code>/<code class="docutils literal notranslate"><span class="pre">version</span></code>.</p>
 <p>Args:
-ontology_id: Identifier of the ontology being processed.
-version: Version string that should exist locally.</p>
+ontology_id: Identifier whose workspace must exist.
+version: Version string that should map to a directory.</p>
 <p>Returns:
 Path to the local directory for the ontology version.</p>
 </section>
 <section id="id3">
 <h3><code class="docutils literal notranslate"><span class="pre">available_versions(self,</span> <span class="pre">ontology_id)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
-<p>List versions already present on disk for an ontology.</p>
+<p>Return sorted versions already present for an ontology.</p>
 <p>Args:
-ontology_id: Identifier of the ontology whose versions are requested.</p>
+ontology_id: Identifier whose stored versions should be listed.</p>
 <p>Returns:
-Sorted list of version strings discovered in the local store.</p>
+Sorted list of version strings found under the storage root.</p>
 </section>
 <section id="id4">
-<h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<h3><code class="docutils literal notranslate"><span class="pre">available_ontologies(self)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<p>Return ontology identifiers discovered under <code class="docutils literal notranslate"><span class="pre">root</span></code>.</p>
+<p>Returns:
+Sorted list of ontology identifiers available locally.</p>
+</section>
+<section id="id5">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
 <p>Finalize a local version directory (no-op for purely local storage).</p>
 <p>Args:
-ontology_id: Identifier of the ontology that finished processing.
+ontology_id: Identifier that finished processing.
 version: Version string associated with the processed ontology.
-local_dir: Path to the local directory ready for consumption.</p>
+local_dir: Directory containing the ready-to-serve ontology.</p>
 <p>Returns:
-None</p>
+None.</p>
+</section>
+<section id="id6">
+<h3><code class="docutils literal notranslate"><span class="pre">version_path(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
+<p>Return the local storage directory for the requested version.</p>
+<p>Args:
+ontology_id: Identifier being queried.
+version: Version string whose storage path is needed.</p>
+<p>Returns:
+Path pointing to the stored ontology version.</p>
+</section>
+<section id="id7">
+<h3><code class="docutils literal notranslate"><span class="pre">delete_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
+<p>Delete a stored ontology version returning reclaimed bytes.</p>
+<p>Args:
+ontology_id: Identifier whose stored version should be removed.
+version: Version string targeted for deletion.</p>
+<p>Returns:
+Number of bytes reclaimed by removing the version directory.</p>
+<p>Raises:
+OSError: Propagated if filesystem deletion fails.</p>
+</section>
+<section id="id8">
+<h3><code class="docutils literal notranslate"><span class="pre">set_latest_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
+<p>Update symlink and marker file indicating the latest version.</p>
+<p>Args:
+ontology_id: Identifier whose latest marker should be updated.
+version: Version string to record as the latest processed build.</p>
+<p>Returns:
+None.</p>
 </section>
 <section id="remote-version-path-self-ontology-id-version">
 <h3><code class="docutils literal notranslate"><span class="pre">_remote_version_path(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#remote-version-path-self-ontology-id-version" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
-<section id="id5">
-<h3><code class="docutils literal notranslate"><span class="pre">available_versions(self,</span> <span class="pre">ontology_id)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
-<p>Return unique versions aggregated from local cache and remote storage.</p>
-<p>Args:
-ontology_id: Identifier of the ontology whose versions are requested.</p>
-<p>Returns:
-Sorted list of versions available either locally or remotely.</p>
+<section id="id9">
+<h3><code class="docutils literal notranslate"><span class="pre">available_versions(self,</span> <span class="pre">ontology_id)</span></code><a class="headerlink" href="#id9" title="Link to this heading"></a></h3>
+<p>Return versions aggregated from local cache and remote storage.</p>
 </section>
-<section id="id6">
-<h3><code class="docutils literal notranslate"><span class="pre">ensure_local_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
-<p>Mirror a remote ontology version into the local cache if necessary.</p>
-<p>Args:
-ontology_id: Identifier of the ontology being requested.
-version: Version string to ensure locally.</p>
-<p>Returns:
-Path to the local directory containing the requested version.</p>
+<section id="id10">
+<h3><code class="docutils literal notranslate"><span class="pre">available_ontologies(self)</span></code><a class="headerlink" href="#id10" title="Link to this heading"></a></h3>
+<p>Return ontology identifiers available locally or remotely.</p>
 </section>
-<section id="id7">
-<h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
-<p>Upload the finalized local version directory to the remote store.</p>
-<p>Args:
-ontology_id: Identifier of the ontology ready for publication.
-version: Version string for the finalized ontology artifacts.
-local_dir: Local directory tree containing normalized outputs.</p>
-<p>Returns:
-None</p>
+<section id="id11">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_local_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id11" title="Link to this heading"></a></h3>
+<p>Mirror a remote ontology version into the local cache when absent.</p>
+</section>
+<section id="id12">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version,</span> <span class="pre">local_dir)</span></code><a class="headerlink" href="#id12" title="Link to this heading"></a></h3>
+<p>Upload the finalized local directory to the remote store.</p>
+</section>
+<section id="id13">
+<h3><code class="docutils literal notranslate"><span class="pre">delete_version(self,</span> <span class="pre">ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#id13" title="Link to this heading"></a></h3>
+<p>Delete both local and remote copies of a stored version.</p>
 </section>
 </section>
 <section id="classes">
 <h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="storagebackend">
 <h3><code class="docutils literal notranslate"><span class="pre">StorageBackend</span></code><a class="headerlink" href="#storagebackend" title="Link to this heading"></a></h3>
-<p>Protocol describing storage backend operations.</p>
-<p>Implementations may store data locally, mirror to remote backends, or both.
-Callers rely on the common interface to prepare working directories,
-enumerate versions, and finalize artefacts after downloads complete.</p>
+<p>Protocol describing the operations required by the downloader pipeline.</p>
 <p>Attributes:
-prepare_version: Callable producing a working directory path.
-ensure_local_version: Callable that guarantees a local working copy.
-available_versions: Callable returning stored version identifiers.
-finalize_version: Callable persisting local results to durable storage.</p>
+root_path: Canonical base path that implementations expose for disk
+storage.  Remote-only backends can synthesize this attribute for
+instrumentation purposes.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>
 <div><blockquote>
-<div><p>backend = LocalStorageBackend(Path(“/tmp/ontologies”))
-isinstance(backend.available_versions(“hp”), list)
-True</p>
+<div><p>class MemoryBackend(StorageBackend):
+…     root_path = Path(“/tmp”)  # pragma: no cover - illustrative stub
+…     def prepare_version(self, ontology_id: str, version: str) -&gt; Path:
+…         …</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>
@@ -237,37 +295,21 @@ True</p>
 <h3><code class="docutils literal notranslate"><span class="pre">LocalStorageBackend</span></code><a class="headerlink" href="#localstoragebackend" title="Link to this heading"></a></h3>
 <p>Storage backend that keeps ontology artifacts on the local filesystem.</p>
 <p>Attributes:
-root: Root directory under which ontology artifacts are stored. Each
-ontology/version pair receives a dedicated subdirectory.</p>
+root: Base directory that stores ontology versions grouped by identifier.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>
 <div><blockquote>
-<div><p>backend = LocalStorageBackend(Path(“/tmp/ontologies”))
-workspace = backend.prepare_version(“hp”, “2024-01-01”)
-(workspace / “original”).exists()
-True</p>
+<div><p>backend = LocalStorageBackend(LOCAL_ONTOLOGY_DIR)
+backend.available_ontologies()
+[]</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>
 </section>
 <section id="fsspecstoragebackend">
 <h3><code class="docutils literal notranslate"><span class="pre">FsspecStorageBackend</span></code><a class="headerlink" href="#fsspecstoragebackend" title="Link to this heading"></a></h3>
-<p>Storage backend that mirrors ontology artifacts to a remote location via fsspec.</p>
-<p>Attributes:
-fs: fsspec filesystem instance used for remote interactions.
-base_path: Root path within the remote filesystem where artefacts live.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>backend = FsspecStorageBackend(“memory://ontologies”)
-Traceback (most recent call last):
-…
-ConfigError: fsspec required for remote storage. Install it via ‘pip install fsspec’.</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
+<p>Hybrid storage backend that mirrors artifacts to an fsspec location.</p>
 </section>
 </section>
 </section>

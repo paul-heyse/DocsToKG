@@ -1,10 +1,11 @@
-"""
-Ontology Download Orchestration
+"""Ontology download orchestration for DocsToKG.
 
-This module coordinates resolver planning, document downloading, validation,
-and manifest generation for ontology artifacts. It serves as the main entry
-point for fetching ontologies from configured sources and producing provenance
-metadata that downstream knowledge graph construction can rely upon.
+This module plans resolver candidates, enforces license allowlists, performs
+fallback-aware downloads, orchestrates streaming normalization, and writes
+schema-validated manifests with deterministic fingerprints. It aligns with the
+refactored ontology download specification by recording resolver attempt
+chains, honoring CLI concurrency overrides, and supporting batch operations for
+planning and pull commands.
 """
 
 from __future__ import annotations
@@ -511,7 +512,9 @@ def _populate_plan_metadata(
         planned.plan.last_modified = normalized or last_modified_value
 
     if planned.size is None:
-        content_length_value = headers_map.get("Content-Length") or headers_map.get("content-length")
+        content_length_value = headers_map.get("Content-Length") or headers_map.get(
+            "content-length"
+        )
         if content_length_value:
             try:
                 parsed_length = int(content_length_value)
@@ -599,7 +602,9 @@ def _parse_last_modified(value: Optional[str]) -> Optional[datetime]:
     return parsed.astimezone(timezone.utc)
 
 
-def _fetch_last_modified(plan: FetchPlan, config: ResolvedConfig, logger: logging.Logger) -> Optional[str]:
+def _fetch_last_modified(
+    plan: FetchPlan, config: ResolvedConfig, logger: logging.Logger
+) -> Optional[str]:
     """Probe the upstream plan URL for a Last-Modified header."""
 
     timeout = max(1, getattr(config.defaults.http, "timeout_sec", 30) or 30)
@@ -942,9 +947,7 @@ def fetch_one(
                     },
                 )
                 continue
-            raise OntologyDownloadError(
-                f"Download failed for '{pending_spec.id}': {exc}"
-            ) from exc
+            raise OntologyDownloadError(f"Download failed for '{pending_spec.id}': {exc}") from exc
 
         attempt_record["status"] = "success"
         resolver_attempts.append(attempt_record)
@@ -959,9 +962,7 @@ def fetch_one(
 
     if result is None or selected_candidate is None or effective_spec is None:
         if last_error is None:
-            raise OntologyDownloadError(
-                f"All resolver candidates failed for '{spec.id}'"
-            )
+            raise OntologyDownloadError(f"All resolver candidates failed for '{spec.id}'")
         if isinstance(last_error, ConfigurationError):
             raise last_error
         raise OntologyDownloadError(
@@ -1019,9 +1020,7 @@ def fetch_one(
     media_type = (plan.media_type or "").strip().lower()
     if media_type and media_type not in RDF_MIME_ALIASES:
         validation_requests = [
-            request
-            for request in validation_requests
-            if request.name not in {"rdflib", "robot"}
+            request for request in validation_requests if request.name not in {"rdflib", "robot"}
         ]
         adapter.info(
             "skipping rdf validators",
@@ -1165,7 +1164,6 @@ def plan_one(
     )
     _ensure_license_allowed(primary.plan, active_config, effective_spec)
     planned = PlannedFetch(
-    return PlannedFetch(
         spec=effective_spec,
         resolver=primary.resolver,
         plan=primary.plan,
@@ -1267,6 +1265,13 @@ def plan_all(
     filtered: List[PlannedFetch] = []
     for plan in ordered_plans:
         last_modified = plan.last_modified_at or _coerce_datetime(plan.last_modified)
+        if last_modified is None:
+            header = _fetch_last_modified(plan.plan, active_config, log)
+            if header:
+                plan.plan.last_modified = header
+                plan.last_modified = header
+                plan.last_modified_at = _coerce_datetime(header)
+                last_modified = plan.last_modified_at
         if last_modified and last_modified < since:
             adapter.info(
                 "plan filtered by since",
@@ -1280,31 +1285,6 @@ def plan_all(
             continue
         filtered.append(plan)
     return filtered
-                last_known = planned.last_modified or planned.plan.last_modified
-                last_dt = _parse_last_modified(last_known)
-                if since is not None and last_dt is None:
-                    header = _fetch_last_modified(planned.plan, active_config, log)
-                    if header:
-                        planned.plan.last_modified = header
-                        planned.last_modified = header
-                        last_dt = _parse_last_modified(header)
-                if since is not None and last_dt is not None and last_dt < since:
-                    adapter.info(
-                        "plan filtered by cutoff",
-                        extra={
-                            "stage": "plan",
-                            "ontology_id": planned.spec.id,
-                            "last_modified": planned.last_modified or planned.plan.last_modified,
-                            "since": since.isoformat(),
-                        },
-                    )
-                    continue
-                if planned.last_modified is None and planned.plan.last_modified is not None:
-                    planned.last_modified = planned.plan.last_modified
-                results[index] = planned
-
-    ordered_indices = sorted(results)
-    return [results[i] for i in ordered_indices]
 
 
 def fetch_all(

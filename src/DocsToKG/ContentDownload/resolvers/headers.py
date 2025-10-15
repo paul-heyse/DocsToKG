@@ -21,7 +21,9 @@ def headers_cache_key(headers: Dict[str, str]) -> Tuple[Tuple[str, str], ...]:
         sorted alphabetically for stable hashing.
     """
 
-    items: Iterable[Tuple[str, str]] = ((key.lower(), value) for key, value in (headers or {}).items())
+    items: Iterable[Tuple[str, str]] = (
+        (key.lower(), value) for key, value in (headers or {}).items()
+    )
     return tuple(sorted(items))
 
 

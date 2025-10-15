@@ -225,9 +225,7 @@ def test_retry_determinism_matches_request_with_retries(monkeypatch, http_server
     handler.statuses = [429, 429, 200]
     url = f"http://127.0.0.1:{server.server_address[1]}/rate-limited.pdf"
 
-    monkeypatch.setattr(
-        "DocsToKG.ContentDownload.http.random.random", lambda: 0.0
-    )
+    monkeypatch.setattr("DocsToKG.ContentDownload.http.random.random", lambda: 0.0)
 
     sleep_durations: list[float] = []
 

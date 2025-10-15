@@ -1,0 +1,123 @@
+# 1. Module: run_docling_html_to_doctags_parallel
+
+This reference documents the DocsToKG module ``DocsToKG.DocParsing.legacy.run_docling_html_to_doctags_parallel``.
+
+Parallel HTML → DocTags Conversion
+
+Executes Docling HTML conversions across multiple processes while tracking
+manifests, resume/force semantics, and advisory file locks. The script is used
+by the DocsToKG pipeline to transform raw HTML corpora into DocTags ready for
+chunking and embedding.
+
+Key Features:
+- Discover HTML inputs and emit DocTags with Docling exporters
+- Respect resume and force flags to avoid redundant reprocessing
+- Persist conversion outcomes to the DocParsing manifest for observability
+- Provide per-document timing metrics with tqdm progress indicators
+
+Usage:
+    python -m DocsToKG.DocParsing.run_docling_html_to_doctags_parallel --resume
+
+## 1. Functions
+
+### `build_parser()`
+
+Construct an argument parser for the HTML → DocTags converter.
+
+Args:
+None: Parser initialization does not require inputs.
+
+Returns:
+Configured :class:`argparse.ArgumentParser` instance.
+
+Raises:
+None
+
+### `parse_args(argv)`
+
+Parse command-line arguments for standalone execution.
+
+Args:
+argv: Optional CLI argument vector. When ``None`` the values from
+:data:`sys.argv` are used.
+
+Returns:
+Namespace containing parsed CLI options.
+
+Raises:
+SystemExit: Propagated if ``argparse`` detects invalid options.
+
+### `_get_converter()`
+
+Instantiate and cache a Docling HTML converter per worker process.
+
+Returns:
+DocumentConverter configured for HTML input, cached for reuse within
+the worker process.
+
+### `list_htmls(root)`
+
+Enumerate HTML-like files beneath a directory tree.
+
+Args:
+root: Directory whose subtree should be searched for HTML files.
+
+Returns:
+Sorted list of discovered HTML file paths excluding normalized outputs.
+
+### `convert_one(task)`
+
+Convert a single HTML file to DocTags, honoring overwrite semantics.
+
+Args:
+task: Conversion details including paths, hash, and overwrite policy.
+
+Returns:
+:class:`ConversionResult` capturing the conversion status.
+
+Raises:
+ValueError: Propagated when Docling validation fails prior to internal handling.
+
+### `main(args)`
+
+Entrypoint for parallel HTML-to-DocTags conversion across a dataset.
+
+Args:
+args: Optional pre-parsed CLI namespace to override command-line inputs.
+
+Returns:
+Process exit code, where ``0`` denotes success.
+
+## 2. Classes
+
+### `HtmlTask`
+
+Work item describing a single HTML conversion job.
+
+Attributes:
+html_path: Absolute path to the HTML file to be converted.
+relative_id: Relative identifier for manifest entries.
+output_path: Destination DocTags path.
+input_hash: Content hash used for resume detection.
+overwrite: Flag indicating whether existing outputs should be replaced.
+
+Examples:
+>>> HtmlTask(Path("/tmp/a.html"), "doc", Path("/tmp/doc.doctags"), "hash", False)
+HtmlTask(html_path=PosixPath('/tmp/a.html'), relative_id='doc', output_path=PosixPath('/tmp/doc.doctags'), input_hash='hash', overwrite=False)
+
+### `ConversionResult`
+
+Structured result emitted by worker processes.
+
+Attributes:
+doc_id: Document identifier matching manifest entries.
+status: Conversion outcome (``"success"``, ``"skip"``, or ``"failure"``).
+duration_s: Time in seconds spent converting.
+input_path: Source HTML path recorded for auditing.
+input_hash: Content hash captured prior to conversion.
+output_path: Destination DocTags path.
+error: Optional error detail for failures.
+
+Examples:
+>>> ConversionResult("doc", "success", 1.0, "in.html", "hash", "out.doctags")
+ConversionResult(doc_id='doc', status='success', duration_s=1.0, input_path='in.html', input_hash='hash', output_path='out.doctags', error=None)

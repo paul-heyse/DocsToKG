@@ -1,0 +1,226 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: run_docling_html_to_doctags_parallel &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: run_docling_html_to_doctags_parallel</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.DocParsing.legacy.run_docling_html_to_doctags_parallel.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-run-docling-html-to-doctags-parallel">
+<h1>1. Module: run_docling_html_to_doctags_parallel<a class="headerlink" href="#module-run-docling-html-to-doctags-parallel" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.legacy.run_docling_html_to_doctags_parallel</span></code>.</p>
+<p>Parallel HTML → DocTags Conversion</p>
+<p>Executes Docling HTML conversions across multiple processes while tracking
+manifests, resume/force semantics, and advisory file locks. The script is used
+by the DocsToKG pipeline to transform raw HTML corpora into DocTags ready for
+chunking and embedding.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Discover HTML inputs and emit DocTags with Docling exporters</p></li>
+<li><p>Respect resume and force flags to avoid redundant reprocessing</p></li>
+<li><p>Persist conversion outcomes to the DocParsing manifest for observability</p></li>
+<li><p>Provide per-document timing metrics with tqdm progress indicators</p></li>
+</ul>
+<p>Usage:
+python -m DocsToKG.DocParsing.run_docling_html_to_doctags_parallel –resume</p>
+<section id="functions">
+<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="build-parser">
+<h3><code class="docutils literal notranslate"><span class="pre">build_parser()</span></code><a class="headerlink" href="#build-parser" title="Link to this heading"></a></h3>
+<p>Construct an argument parser for the HTML → DocTags converter.</p>
+<p>Args:
+None: Parser initialization does not require inputs.</p>
+<p>Returns:
+Configured :class:<code class="docutils literal notranslate"><span class="pre">argparse.ArgumentParser</span></code> instance.</p>
+<p>Raises:
+None</p>
+</section>
+<section id="parse-args-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_args(argv)</span></code><a class="headerlink" href="#parse-args-argv" title="Link to this heading"></a></h3>
+<p>Parse command-line arguments for standalone execution.</p>
+<p>Args:
+argv: Optional CLI argument vector. When <code class="docutils literal notranslate"><span class="pre">None</span></code> the values from
+:data:<code class="docutils literal notranslate"><span class="pre">sys.argv</span></code> are used.</p>
+<p>Returns:
+Namespace containing parsed CLI options.</p>
+<p>Raises:
+SystemExit: Propagated if <code class="docutils literal notranslate"><span class="pre">argparse</span></code> detects invalid options.</p>
+</section>
+<section id="get-converter">
+<h3><code class="docutils literal notranslate"><span class="pre">_get_converter()</span></code><a class="headerlink" href="#get-converter" title="Link to this heading"></a></h3>
+<p>Instantiate and cache a Docling HTML converter per worker process.</p>
+<p>Returns:
+DocumentConverter configured for HTML input, cached for reuse within
+the worker process.</p>
+</section>
+<section id="list-htmls-root">
+<h3><code class="docutils literal notranslate"><span class="pre">list_htmls(root)</span></code><a class="headerlink" href="#list-htmls-root" title="Link to this heading"></a></h3>
+<p>Enumerate HTML-like files beneath a directory tree.</p>
+<p>Args:
+root: Directory whose subtree should be searched for HTML files.</p>
+<p>Returns:
+Sorted list of discovered HTML file paths excluding normalized outputs.</p>
+</section>
+<section id="convert-one-task">
+<h3><code class="docutils literal notranslate"><span class="pre">convert_one(task)</span></code><a class="headerlink" href="#convert-one-task" title="Link to this heading"></a></h3>
+<p>Convert a single HTML file to DocTags, honoring overwrite semantics.</p>
+<p>Args:
+task: Conversion details including paths, hash, and overwrite policy.</p>
+<p>Returns:
+:class:<code class="docutils literal notranslate"><span class="pre">ConversionResult</span></code> capturing the conversion status.</p>
+<p>Raises:
+ValueError: Propagated when Docling validation fails prior to internal handling.</p>
+</section>
+<section id="main-args">
+<h3><code class="docutils literal notranslate"><span class="pre">main(args)</span></code><a class="headerlink" href="#main-args" title="Link to this heading"></a></h3>
+<p>Entrypoint for parallel HTML-to-DocTags conversion across a dataset.</p>
+<p>Args:
+args: Optional pre-parsed CLI namespace to override command-line inputs.</p>
+<p>Returns:
+Process exit code, where <code class="docutils literal notranslate"><span class="pre">0</span></code> denotes success.</p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="htmltask">
+<h3><code class="docutils literal notranslate"><span class="pre">HtmlTask</span></code><a class="headerlink" href="#htmltask" title="Link to this heading"></a></h3>
+<p>Work item describing a single HTML conversion job.</p>
+<p>Attributes:
+html_path: Absolute path to the HTML file to be converted.
+relative_id: Relative identifier for manifest entries.
+output_path: Destination DocTags path.
+input_hash: Content hash used for resume detection.
+overwrite: Flag indicating whether existing outputs should be replaced.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>HtmlTask(Path(“/tmp/a.html”), “doc”, Path(“/tmp/doc.doctags”), “hash”, False)
+HtmlTask(html_path=PosixPath(‘/tmp/a.html’), relative_id=’doc’, output_path=PosixPath(‘/tmp/doc.doctags’), input_hash=’hash’, overwrite=False)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="conversionresult">
+<h3><code class="docutils literal notranslate"><span class="pre">ConversionResult</span></code><a class="headerlink" href="#conversionresult" title="Link to this heading"></a></h3>
+<p>Structured result emitted by worker processes.</p>
+<p>Attributes:
+doc_id: Document identifier matching manifest entries.
+status: Conversion outcome (<code class="docutils literal notranslate"><span class="pre">&quot;success&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;skip&quot;</span></code>, or <code class="docutils literal notranslate"><span class="pre">&quot;failure&quot;</span></code>).
+duration_s: Time in seconds spent converting.
+input_path: Source HTML path recorded for auditing.
+input_hash: Content hash captured prior to conversion.
+output_path: Destination DocTags path.
+error: Optional error detail for failures.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>ConversionResult(“doc”, “success”, 1.0, “in.html”, “hash”, “out.doctags”)
+ConversionResult(doc_id=’doc’, status=’success’, duration_s=1.0, input_path=’in.html’, input_hash=’hash’, output_path=’out.doctags’, error=None)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -178,7 +178,9 @@ def test_bioportal_resolver_contract(load_cassette, monkeypatch, resolved_config
     api_key_path.write_text(cassette["api_key"])
 
     resolver = resolvers.BioPortalResolver()
-    spec = FetchSpec(id="NCIT", resolver="bioportal", extras={"acronym": "NCIT"}, target_formats=["owl"])
+    spec = FetchSpec(
+        id="NCIT", resolver="bioportal", extras={"acronym": "NCIT"}, target_formats=["owl"]
+    )
     plan = resolver.plan(spec, resolved_config, logging.getLogger(__name__))
 
     assert plan.url == cassette["submission"]["download"]

@@ -119,9 +119,7 @@ class EuropePmcResolver:
             )
             return
         if resp.status_code != 200:
-            LOGGER.warning(
-                "Europe PMC API returned %s for DOI %s", resp.status_code, doi
-            )
+            LOGGER.warning("Europe PMC API returned %s for DOI %s", resp.status_code, doi)
             return
         try:
             data = resp.json()

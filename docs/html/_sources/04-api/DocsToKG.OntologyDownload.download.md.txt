@@ -2,14 +2,14 @@
 
 This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.download``.
 
-Ontology Download Utilities
+Ontology download utilities.
 
-This module houses secure download helpers that implement per-host and
-per-service rate limiting, Content-Type and size validation via preliminary
-HEAD requests, internationalized domain name hardening, and resumable
-transfers for ontology documents. It works in concert with resolver planning
-to ensure that downloaded artifacts respect size limits, host allowlists, and
-are safe for downstream processing, including guarded archive extraction.
+This module exposes the hardened download primitives used by the refactored
+pipeline. Features include per-host and per-service rate limiting, polite
+header construction, manifest-aware caching, resilient streaming downloads with
+HTTP fallback classification, and centralized archive extraction with traversal
+and compression-bomb protection. These helpers back the automatic resolver
+fallback and streaming normalization workflows defined in the openspec.
 
 ## 1. Functions
 
@@ -23,6 +23,10 @@ event: Short label describing the lifecycle point (e.g., ``before``).
 
 Returns:
 None
+
+### `_is_retryable_status(status_code)`
+
+*No documentation available.*
 
 ### `sanitize_filename(filename)`
 
@@ -143,6 +147,10 @@ List of extracted file paths.
 Raises:
 ConfigError: If the archive is missing, unsafe, or exceeds compression limits.
 
+### `extract_archive_safe(archive_path, destination)`
+
+Extract archives by dispatching to the appropriate safe handler.
+
 ### `_get_bucket(host, http_config, service)`
 
 Return a token bucket keyed by host and optional service name.
@@ -256,6 +264,14 @@ Examples:
 >>> result = DownloadResult(Path("ontology.owl"), "fresh", "deadbeef", None, None)
 >>> result.status
 'fresh'
+
+### `DownloadFailure`
+
+Raised when an HTTP download attempt fails.
+
+Attributes:
+status_code: Optional HTTP status code returned by the upstream service.
+retryable: Whether the failure is safe to retry with an alternate resolver.
 
 ### `TokenBucket`
 

@@ -79,32 +79,13 @@
   <section id="module-config">
 <h1>1. Module: config<a class="headerlink" href="#module-config" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.config</span></code>.</p>
-<p>Ontology Downloader Configuration</p>
-<p>This module centralizes configuration schema definitions, environment
-overrides, and YAML parsing for DocsToKG’s ontology downloader. It builds on
-Pydantic v2 models to provide strong validation, type-safe defaults, automatic
-JSON Schema generation, and runtime mutability where operational overrides are
-required.</p>
-<p>Key Features:</p>
-<ul class="simple">
-<li><p>Declarative Pydantic models for HTTP, validation, and logging settings</p></li>
-<li><p>YAML loading with structural validation and friendly error messages</p></li>
-<li><p>Environment variable overrides merged via :class:<code class="docutils literal notranslate"><span class="pre">pydantic_settings.BaseSettings</span></code></p></li>
-<li><p>JSON Schema export for documentation and validation tooling</p></li>
-<li><p>Utilities to merge defaults with ad-hoc fetch specifications</p></li>
-</ul>
-<p>Dependencies:</p>
-<ul class="simple">
-<li><p>PyYAML for configuration parsing</p></li>
-<li><p>pydantic and pydantic-settings for model validation</p></li>
-</ul>
-<p>Usage:
-from DocsToKG.OntologyDownload.config import load_config</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolved = load_config(Path(&quot;sources.yaml&quot;))
-for spec in resolved.specs:
-    print(spec.id)
-</pre></div>
-</div>
+<p>Ontology downloader configuration utilities.</p>
+<p>This module defines the Pydantic models and helpers that drive manifest schema
+validation, concurrency defaults, rate limit enforcement, and the CLI override
+surface introduced in the ontology download refactor. Configuration can be
+loaded from YAML, augmented with environment overrides, exported as JSON Schema
+for diagnostics, and merged with ad-hoc CLI specifications for planning or
+download commands.</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="ensure-python-version">
@@ -341,7 +322,8 @@ config.level
 <p>Attributes:
 parser_timeout_sec: Maximum runtime allowed for ontology parsing.
 max_memory_mb: Memory ceiling allocated to validation routines.
-skip_reasoning_if_size_mb: Threshold above which reasoning is skipped.</p>
+skip_reasoning_if_size_mb: Threshold above which reasoning is skipped.
+streaming_normalization_threshold_mb: File size threshold for streaming normalization.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>

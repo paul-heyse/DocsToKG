@@ -106,9 +106,7 @@ def test_validate_rdflib_success(ttl_file, tmp_path, config):
 def test_normalize_streaming_deterministic(tmp_path):
     source = Path("tests/ontology_download/fixtures/normalization/complex.ttl")
     golden = (
-        Path("tests/ontology_download/fixtures/normalization/complex.sha256")
-        .read_text()
-        .strip()
+        Path("tests/ontology_download/fixtures/normalization/complex.sha256").read_text().strip()
     )
     digests = []
     outputs = []
@@ -177,6 +175,7 @@ def test_normalize_streaming_edge_cases(tmp_path, config):
         request = make_request(path, tmp_path / f"{path.stem}-mem", config)
         result = validate_rdflib(request, _noop_logger())
         assert result.details["normalized_sha256"] == digest_stream
+
 
 def test_validate_pronto_success(obo_file, tmp_path, config):
     request = ValidationRequest("pronto", obo_file, tmp_path / "norm", tmp_path / "val", config)

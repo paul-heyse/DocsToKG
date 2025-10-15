@@ -89,14 +89,19 @@ custom resolver configuration, dry-run execution, and manifest resume logic.</p>
 <p>Key Features:</p>
 <ul class="simple">
 <li><p>Threaded resolver pipeline with conditional request caching.</p></li>
-<li><p>Structured JSONL/CSV logging including manifest entries and attempt metrics.</p></li>
-<li><p>Content sniffing utilities that differentiate PDF, HTML, and corrupt payloads.</p></li>
+<li><p>Thread-safe JSONL/CSV logging including manifest entries and attempt metrics.</p></li>
+<li><p>Streaming content hashing with corruption detection heuristics for PDFs.</p></li>
+<li><p>Centralised retry handling and polite header management for resolver requests.</p></li>
+<li><p>Single-request download path (no redundant HEAD probes) with classification via
+streamed sniff buffers.</p></li>
 <li><p>CLI flags for controlling topic selection, time ranges, resolver order, and
 polite crawling identifiers.</p></li>
+<li><p>Optional global URL deduplication and domain-level throttling controls for
+large-scale crawls.</p></li>
 </ul>
 <p>Dependencies:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">requests</span></code>, <code class="docutils literal notranslate"><span class="pre">urllib3</span></code>: HTTP communication and retry adapters.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">requests</span></code>: HTTP communication and connection pooling adapters.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">pyalex</span></code>: Query construction for OpenAlex works and topics.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload</span></code> submodules: Resolver pipeline orchestration,
 conditional caching, and shared utilities.</p></li>
@@ -140,18 +145,30 @@ None</p>
 <p>Raises:
 OSError: If the directory cannot be created because of permissions.</p>
 </section>
+<section id="parse-domain-interval-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_parse_domain_interval(value)</span></code><a class="headerlink" href="#parse-domain-interval-value" title="Link to this heading"></a></h3>
+<p>Parse <code class="docutils literal notranslate"><span class="pre">DOMAIN=SECONDS</span></code> CLI arguments for domain throttling.</p>
+<p>Args:
+value: Argument provided via <code class="docutils literal notranslate"><span class="pre">--domain-min-interval</span></code>.</p>
+<p>Returns:
+Tuple containing the normalized domain name and interval seconds.</p>
+<p>Raises:
+argparse.ArgumentTypeError: If the argument is malformed or negative.</p>
+</section>
 <section id="make-session-headers">
 <h3><code class="docutils literal notranslate"><span class="pre">_make_session(headers)</span></code><a class="headerlink" href="#make-session-headers" title="Link to this heading"></a></h3>
-<p>Create a retry-enabled :class:<code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> configured for polite crawling.</p>
+<p>Create a :class:<code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> configured for polite crawling.</p>
+<p>Adapter-level retries remain disabled so :func:<code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code> fully
+controls backoff, ensuring deterministic retry counts across the pipeline.</p>
 <p>Args:
 headers: Header dictionary returned by :func:<code class="docutils literal notranslate"><span class="pre">load_resolver_config</span></code>. The mapping
 must already include the project user agent and <code class="docutils literal notranslate"><span class="pre">mailto</span></code> contact address.
 A copy of the mapping is applied to the outgoing session so callers can
 reuse mutable dictionaries without side effects.</p>
 <p>Returns:
-requests.Session: Session with exponential backoff retry behaviour suitable
-for resolver traffic. Both <code class="docutils literal notranslate"><span class="pre">http</span></code> and <code class="docutils literal notranslate"><span class="pre">https</span></code> transports share the
-same :class:<code class="docutils literal notranslate"><span class="pre">urllib3.util.retry.Retry</span></code> configuration.</p>
+requests.Session: Session with connection pooling enabled and retries
+disabled at the adapter level so the application layer governs
+backoff behaviour.</p>
 <p>Notes:
 Each worker should call this helper to obtain an isolated session instance.
 Example:</p>
@@ -163,8 +180,8 @@ Example:</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>
-<p>The returned session is safe for concurrent <code class="docutils literal notranslate"><span class="pre">GET</span></code> and <code class="docutils literal notranslate"><span class="pre">HEAD</span></code> requests
-because :class:<code class="docutils literal notranslate"><span class="pre">requests.adapters.HTTPAdapter</span></code> manages a thread-safe connection
+<p>The returned session is safe for concurrent HTTP requests because
+:class:<code class="docutils literal notranslate"><span class="pre">requests.adapters.HTTPAdapter</span></code> manages a thread-safe connection
 pool. Avoid mutating shared session state (for example <code class="docutils literal notranslate"><span class="pre">session.headers.update</span></code>)
 once the session is handed to worker threads.</p>
 </section>
@@ -210,6 +227,33 @@ otherwise <code class="docutils literal notranslate"><span class="pre">None</spa
 UnicodeDecodeError: If heuristics attempt to decode malformed byte
 sequences while inspecting the payload prefix.</p>
 </section>
+<section id="extract-filename-from-disposition-disposition">
+<h3><code class="docutils literal notranslate"><span class="pre">_extract_filename_from_disposition(disposition)</span></code><a class="headerlink" href="#extract-filename-from-disposition-disposition" title="Link to this heading"></a></h3>
+<p>Return the filename component from a Content-Disposition header.</p>
+</section>
+<section id="infer-suffix-url-content-type-disposition-classification-default-suffix">
+<h3><code class="docutils literal notranslate"><span class="pre">_infer_suffix(url,</span> <span class="pre">content_type,</span> <span class="pre">disposition,</span> <span class="pre">classification,</span> <span class="pre">default_suffix)</span></code><a class="headerlink" href="#infer-suffix-url-content-type-disposition-classification-default-suffix" title="Link to this heading"></a></h3>
+<p>Infer a destination suffix from HTTP hints and classification heuristics.</p>
+<p>Args:
+url: Candidate download URL emitted by a resolver.
+content_type: Content-Type header returned by the response (if any).
+disposition: Raw Content-Disposition header for RFC 6266 parsing.
+classification: Downloader classification such as <code class="docutils literal notranslate"><span class="pre">&quot;pdf&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;html&quot;</span></code>.
+default_suffix: Fallback extension to use when no signals are present.</p>
+<p>Returns:
+Lowercase file suffix (including leading dot) chosen from the strongest
+available signal. Preference order is:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">filename*</span></code> / <code class="docutils literal notranslate"><span class="pre">filename</span></code> parameters in Content-Disposition.</p></li>
+<li><p>Content-Type heuristics (PDF/HTML).</p></li>
+<li><p>URL path suffix derived from :func:<code class="docutils literal notranslate"><span class="pre">urllib.parse.urlsplit</span></code>.</p></li>
+<li><p>Provided <code class="docutils literal notranslate"><span class="pre">default_suffix</span></code>.</p></li>
+</ol>
+</section>
+<section id="update-tail-buffer-buffer-chunk">
+<h3><code class="docutils literal notranslate"><span class="pre">_update_tail_buffer(buffer,</span> <span class="pre">chunk)</span></code><a class="headerlink" href="#update-tail-buffer-buffer-chunk" title="Link to this heading"></a></h3>
+<p>Maintain the trailing <code class="docutils literal notranslate"><span class="pre">limit</span></code> bytes of a streamed download.</p>
+</section>
 <section id="build-download-outcome">
 <h3><code class="docutils literal notranslate"><span class="pre">_build_download_outcome()</span></code><a class="headerlink" href="#build-download-outcome" title="Link to this heading"></a></h3>
 <p>Create a :class:<code class="docutils literal notranslate"><span class="pre">DownloadOutcome</span></code> applying PDF validation rules.</p>
@@ -228,6 +272,8 @@ content_length: Size of the payload in bytes, if known.
 etag: ETag header value supplied by the origin.
 last_modified: Last-Modified header value supplied by the origin.
 extracted_text_path: Optional path to extracted HTML text artefacts.
+tail_bytes: Trailing bytes captured from the streamed download for
+corruption detection heuristics.
 dry_run: Indicates whether this execution runs in dry-run mode.</p>
 <p>Returns:
 DownloadOutcome capturing the normalized classification and metadata.</p>
@@ -288,7 +334,8 @@ KeyError: If required identifiers are missing from the work payload.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">download_candidate(session,</span> <span class="pre">artifact,</span> <span class="pre">url,</span> <span class="pre">referer,</span> <span class="pre">timeout,</span> <span class="pre">context)</span></code><a class="headerlink" href="#download-candidate-session-artifact-url-referer-timeout-context" title="Link to this heading"></a></h3>
 <p>Download a single candidate URL and classify the payload.</p>
 <p>Args:
-session: HTTP session providing <code class="docutils literal notranslate"><span class="pre">head</span></code> and <code class="docutils literal notranslate"><span class="pre">get</span></code> methods.
+session: HTTP session capable of issuing retried requests via the
+centralised :func:<code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code> helper.
 artifact: Work metadata and output directory handles for the current record.
 url: Candidate download URL discovered by a resolver.
 referer: Optional referer header override provided by the resolver.
@@ -296,7 +343,8 @@ timeout: Per-request timeout in seconds.
 context: Execution context containing <code class="docutils literal notranslate"><span class="pre">dry_run</span></code>, <code class="docutils literal notranslate"><span class="pre">extract_html_text</span></code>,
 and <code class="docutils literal notranslate"><span class="pre">previous</span></code> manifest lookup data.</p>
 <p>Returns:
-DownloadOutcome describing the result of the download attempt.</p>
+DownloadOutcome describing the result of the download attempt including
+streaming hash metadata when available.</p>
 <p>Raises:
 OSError: If writing the downloaded payload to disk fails.
 TypeError: If conditional response parsing returns unexpected objects.</p>
@@ -429,6 +477,14 @@ self: Logger instance managing the JSONL file descriptor.</p>
 <p>Returns:
 None</p>
 </section>
+<section id="enter-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#enter-self" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">self</span></code> when used as a context manager.</p>
+</section>
+<section id="exit-self-exc-type-exc-tb">
+<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#exit-self-exc-type-exc-tb" title="Link to this heading"></a></h3>
+<p>Close the file handle on context manager exit.</p>
+</section>
 <section id="id1">
 <h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
 <p>Write an attempt record to both JSONL and CSV outputs.</p>
@@ -469,6 +525,14 @@ self: Adapter instance coordinating CSV and JSONL streams.</p>
 <p>Returns:
 None</p>
 </section>
+<section id="id6">
+<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">self</span></code> when used as a context manager.</p>
+</section>
+<section id="id7">
+<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
+<p>Close the CSV file handle on context manager exit.</p>
+</section>
 <section id="post-init-self">
 <h3><code class="docutils literal notranslate"><span class="pre">__post_init__(self)</span></code><a class="headerlink" href="#post-init-self" title="Link to this heading"></a></h3>
 <p>Define namespace mappings for output artefact directories.</p>
@@ -485,6 +549,10 @@ loc: Location dictionary as returned by OpenAlex (may be None).</p>
 </section>
 <section id="session-factory">
 <h3><code class="docutils literal notranslate"><span class="pre">_session_factory()</span></code><a class="headerlink" href="#session-factory" title="Link to this heading"></a></h3>
+<p>Build a fresh requests session configured with polite headers.</p>
+</section>
+<section id="id8">
+<h3><code class="docutils literal notranslate"><span class="pre">_session_factory()</span></code><a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
 <p>Build a fresh requests session configured with polite headers.</p>
 </section>
 <section id="record-result-res">
@@ -560,6 +628,10 @@ logger.close()</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>
+<p>The logger serialises records outside a thread lock and performs atomic
+writes under the lock, ensuring well-formed output even when multiple
+threads share the instance. It also implements the context manager protocol
+for deterministic resource cleanup.</p>
 </section>
 <section id="csvattemptloggeradapter">
 <h3><code class="docutils literal notranslate"><span class="pre">CsvAttemptLoggerAdapter</span></code><a class="headerlink" href="#csvattemptloggeradapter" title="Link to this heading"></a></h3>
@@ -580,6 +652,8 @@ adapter.close()</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>
+<p>CSV writes are protected by a lock to ensure rows remain well formed when
+multiple worker threads log through the same adapter instance.</p>
 </section>
 <section id="workartifact">
 <h3><code class="docutils literal notranslate"><span class="pre">WorkArtifact</span></code><a class="headerlink" href="#workartifact" title="Link to this heading"></a></h3>

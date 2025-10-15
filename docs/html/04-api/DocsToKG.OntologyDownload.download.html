@@ -79,13 +79,13 @@
   <section id="module-download">
 <h1>1. Module: download<a class="headerlink" href="#module-download" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.download</span></code>.</p>
-<p>Ontology Download Utilities</p>
-<p>This module houses secure download helpers that implement per-host and
-per-service rate limiting, Content-Type and size validation via preliminary
-HEAD requests, internationalized domain name hardening, and resumable
-transfers for ontology documents. It works in concert with resolver planning
-to ensure that downloaded artifacts respect size limits, host allowlists, and
-are safe for downstream processing, including guarded archive extraction.</p>
+<p>Ontology download utilities.</p>
+<p>This module exposes the hardened download primitives used by the refactored
+pipeline. Features include per-host and per-service rate limiting, polite
+header construction, manifest-aware caching, resilient streaming downloads with
+HTTP fallback classification, and centralized archive extraction with traversal
+and compression-bomb protection. These helpers back the automatic resolver
+fallback and streaming normalization workflows defined in the openspec.</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="log-memory-logger-event">
@@ -96,6 +96,10 @@ logger: Logger instance controlling verbosity for download telemetry.
 event: Short label describing the lifecycle point (e.g., <code class="docutils literal notranslate"><span class="pre">before</span></code>).</p>
 <p>Returns:
 None</p>
+</section>
+<section id="is-retryable-status-status-code">
+<h3><code class="docutils literal notranslate"><span class="pre">_is_retryable_status(status_code)</span></code><a class="headerlink" href="#is-retryable-status-status-code" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="sanitize-filename-filename">
 <h3><code class="docutils literal notranslate"><span class="pre">sanitize_filename(filename)</span></code><a class="headerlink" href="#sanitize-filename-filename" title="Link to this heading"></a></h3>
@@ -191,6 +195,10 @@ logger: Optional logger for emitting extraction telemetry.</p>
 List of extracted file paths.</p>
 <p>Raises:
 ConfigError: If the archive is missing, unsafe, or exceeds compression limits.</p>
+</section>
+<section id="extract-archive-safe-archive-path-destination">
+<h3><code class="docutils literal notranslate"><span class="pre">extract_archive_safe(archive_path,</span> <span class="pre">destination)</span></code><a class="headerlink" href="#extract-archive-safe-archive-path-destination" title="Link to this heading"></a></h3>
+<p>Extract archives by dispatching to the appropriate safe handler.</p>
 </section>
 <section id="get-bucket-host-http-config-service">
 <h3><code class="docutils literal notranslate"><span class="pre">_get_bucket(host,</span> <span class="pre">http_config,</span> <span class="pre">service)</span></code><a class="headerlink" href="#get-bucket-host-http-config-service" title="Link to this heading"></a></h3>
@@ -293,6 +301,13 @@ result.status
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>
+</section>
+<section id="downloadfailure">
+<h3><code class="docutils literal notranslate"><span class="pre">DownloadFailure</span></code><a class="headerlink" href="#downloadfailure" title="Link to this heading"></a></h3>
+<p>Raised when an HTTP download attempt fails.</p>
+<p>Attributes:
+status_code: Optional HTTP status code returned by the upstream service.
+retryable: Whether the failure is safe to retry with an alternate resolver.</p>
 </section>
 <section id="tokenbucket">
 <h3><code class="docutils literal notranslate"><span class="pre">TokenBucket</span></code><a class="headerlink" href="#tokenbucket" title="Link to this heading"></a></h3>

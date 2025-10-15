@@ -2,9 +2,9 @@
 
 This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.__init__``.
 
-Ontology Downloader Public API
+Ontology downloader public API.
 
-Expose the primary fetch utilities used by external callers to download,
-validate, and document ontology resources as part of the DocsToKG pipeline.
-The entry points wrap resolver planning, HEAD-validated downloads, canonical
-Turtle hashing, and manifest generation into a compact public API.
+Expose the primary fetch utilities used by external callers to plan resolver
+fallback chains, download ontologies with hardened validation, stream
+normalization, and emit schema-compliant manifests with deterministic
+fingerprints.

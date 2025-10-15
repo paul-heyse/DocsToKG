@@ -1,16 +1,24 @@
-"""Structured documentation for the DocParsing refinement requirements.
+"""
+DocsToKG DocParsing Refinement Requirement Registry.
 
-The ``refine-docparsing-implementation`` change spans multiple phases that are
-tracked in ``tasks.md`` and justified in ``design.md``.  This module provides a
-single source of truth for summarising the production-readiness requirements so
-that code annotations stay aligned with the specification while the technical
-work is executed in the main package under ``src/DocsToKG``.
+1. Context
+   The ``refine-docparsing-implementation`` change documents staged hardening
+   work for DocsToKG DocParsing, aligning specification deltas and design notes
+   while code evolves in ``src/DocsToKG``. Capturing this context in code keeps
+   automated documentation exports authoritative during the rollout.
 
-Each requirement summary is derived from the spec delta located at
-``openspec/changes/refine-docparsing-implementation/specs/doc-parsing/spec.md``.
-Maintaining these summaries in code enables tooling such as
-``generate_api_docs.py`` to surface high-level behaviour notes even before the
-implementation updates land.
+2. Source Material
+   Requirement details are drawn from
+   ``openspec/changes/refine-docparsing-implementation/specs/doc-parsing/spec.md``,
+   with supporting rationale in ``design.md`` and execution planning in
+   ``tasks.md``. Summaries stay synchronized with these files so reviews track
+   the latest intent.
+
+3. Automation Role
+   Tooling such as ``docs/scripts/generate_api_docs.py`` and Sphinx rely on
+   these docstrings to surface behaviour changes in DocsToKG documentation even
+   before implementation patches merge. Maintaining the registry here prevents
+   drift between specification and observable documentation.
 """
 
 from __future__ import annotations

@@ -13,13 +13,18 @@ custom resolver configuration, dry-run execution, and manifest resume logic.
 
 Key Features:
 - Threaded resolver pipeline with conditional request caching.
-- Structured JSONL/CSV logging including manifest entries and attempt metrics.
-- Content sniffing utilities that differentiate PDF, HTML, and corrupt payloads.
+- Thread-safe JSONL/CSV logging including manifest entries and attempt metrics.
+- Streaming content hashing with corruption detection heuristics for PDFs.
+- Centralised retry handling and polite header management for resolver requests.
+- Single-request download path (no redundant HEAD probes) with classification via
+  streamed sniff buffers.
 - CLI flags for controlling topic selection, time ranges, resolver order, and
   polite crawling identifiers.
+- Optional global URL deduplication and domain-level throttling controls for
+  large-scale crawls.
 
 Dependencies:
-- `requests`, `urllib3`: HTTP communication and retry adapters.
+- `requests`: HTTP communication and connection pooling adapters.
 - `pyalex`: Query construction for OpenAlex works and topics.
 - `DocsToKG.ContentDownload` submodules: Resolver pipeline orchestration,
   conditional caching, and shared utilities.
@@ -72,9 +77,25 @@ None
 Raises:
 OSError: If the directory cannot be created because of permissions.
 
+### `_parse_domain_interval(value)`
+
+Parse ``DOMAIN=SECONDS`` CLI arguments for domain throttling.
+
+Args:
+value: Argument provided via ``--domain-min-interval``.
+
+Returns:
+Tuple containing the normalized domain name and interval seconds.
+
+Raises:
+argparse.ArgumentTypeError: If the argument is malformed or negative.
+
 ### `_make_session(headers)`
 
-Create a retry-enabled :class:`requests.Session` configured for polite crawling.
+Create a :class:`requests.Session` configured for polite crawling.
+
+Adapter-level retries remain disabled so :func:`request_with_retries` fully
+controls backoff, ensuring deterministic retry counts across the pipeline.
 
 Args:
 headers: Header dictionary returned by :func:`load_resolver_config`. The mapping
@@ -83,9 +104,9 @@ A copy of the mapping is applied to the outgoing session so callers can
 reuse mutable dictionaries without side effects.
 
 Returns:
-requests.Session: Session with exponential backoff retry behaviour suitable
-for resolver traffic. Both ``http`` and ``https`` transports share the
-same :class:`urllib3.util.retry.Retry` configuration.
+requests.Session: Session with connection pooling enabled and retries
+disabled at the adapter level so the application layer governs
+backoff behaviour.
 
 Notes:
 Each worker should call this helper to obtain an isolated session instance.
@@ -94,8 +115,8 @@ Example:
 >>> _make_session({"User-Agent": "DocsToKGDownloader/1.0", "mailto": "ops@example.org"})  # doctest: +ELLIPSIS
 <requests.sessions.Session object at ...>
 
-The returned session is safe for concurrent ``GET`` and ``HEAD`` requests
-because :class:`requests.adapters.HTTPAdapter` manages a thread-safe connection
+The returned session is safe for concurrent HTTP requests because
+:class:`requests.adapters.HTTPAdapter` manages a thread-safe connection
 pool. Avoid mutating shared session state (for example ``session.headers.update``)
 once the session is handed to worker threads.
 
@@ -147,6 +168,34 @@ Raises:
 UnicodeDecodeError: If heuristics attempt to decode malformed byte
 sequences while inspecting the payload prefix.
 
+### `_extract_filename_from_disposition(disposition)`
+
+Return the filename component from a Content-Disposition header.
+
+### `_infer_suffix(url, content_type, disposition, classification, default_suffix)`
+
+Infer a destination suffix from HTTP hints and classification heuristics.
+
+Args:
+url: Candidate download URL emitted by a resolver.
+content_type: Content-Type header returned by the response (if any).
+disposition: Raw Content-Disposition header for RFC 6266 parsing.
+classification: Downloader classification such as ``"pdf"`` or ``"html"``.
+default_suffix: Fallback extension to use when no signals are present.
+
+Returns:
+Lowercase file suffix (including leading dot) chosen from the strongest
+available signal. Preference order is:
+
+1. ``filename*`` / ``filename`` parameters in Content-Disposition.
+2. Content-Type heuristics (PDF/HTML).
+3. URL path suffix derived from :func:`urllib.parse.urlsplit`.
+4. Provided ``default_suffix``.
+
+### `_update_tail_buffer(buffer, chunk)`
+
+Maintain the trailing ``limit`` bytes of a streamed download.
+
 ### `_build_download_outcome()`
 
 Create a :class:`DownloadOutcome` applying PDF validation rules.
@@ -167,6 +216,8 @@ content_length: Size of the payload in bytes, if known.
 etag: ETag header value supplied by the origin.
 last_modified: Last-Modified header value supplied by the origin.
 extracted_text_path: Optional path to extracted HTML text artefacts.
+tail_bytes: Trailing bytes captured from the streamed download for
+corruption detection heuristics.
 dry_run: Indicates whether this execution runs in dry-run mode.
 
 Returns:
@@ -242,7 +293,8 @@ KeyError: If required identifiers are missing from the work payload.
 Download a single candidate URL and classify the payload.
 
 Args:
-session: HTTP session providing ``head`` and ``get`` methods.
+session: HTTP session capable of issuing retried requests via the
+centralised :func:`request_with_retries` helper.
 artifact: Work metadata and output directory handles for the current record.
 url: Candidate download URL discovered by a resolver.
 referer: Optional referer header override provided by the resolver.
@@ -251,7 +303,8 @@ context: Execution context containing ``dry_run``, ``extract_html_text``,
 and ``previous`` manifest lookup data.
 
 Returns:
-DownloadOutcome describing the result of the download attempt.
+DownloadOutcome describing the result of the download attempt including
+streaming hash metadata when available.
 
 Raises:
 OSError: If writing the downloaded payload to disk fails.
@@ -414,6 +467,14 @@ self: Logger instance managing the JSONL file descriptor.
 Returns:
 None
 
+### `__enter__(self)`
+
+Return ``self`` when used as a context manager.
+
+### `__exit__(self, exc_type, exc, tb)`
+
+Close the file handle on context manager exit.
+
 ### `log_attempt(self, record)`
 
 Write an attempt record to both JSONL and CSV outputs.
@@ -464,6 +525,14 @@ self: Adapter instance coordinating CSV and JSONL streams.
 Returns:
 None
 
+### `__enter__(self)`
+
+Return ``self`` when used as a context manager.
+
+### `__exit__(self, exc_type, exc, tb)`
+
+Close the CSV file handle on context manager exit.
+
 ### `__post_init__(self)`
 
 Define namespace mappings for output artefact directories.
@@ -480,6 +549,10 @@ Accumulate location URLs from a single OpenAlex location record.
 
 Args:
 loc: Location dictionary as returned by OpenAlex (may be None).
+
+### `_session_factory()`
+
+Build a fresh requests session configured with polite headers.
 
 ### `_session_factory()`
 
@@ -550,6 +623,11 @@ Examples:
 >>> logger.log_summary({"processed": 10})
 >>> logger.close()
 
+The logger serialises records outside a thread lock and performs atomic
+writes under the lock, ensuring well-formed output even when multiple
+threads share the instance. It also implements the context manager protocol
+for deterministic resource cleanup.
+
 ### `CsvAttemptLoggerAdapter`
 
 Adapter that mirrors attempt records to CSV for backward compatibility.
@@ -565,6 +643,9 @@ Examples:
 ...                                   url="https://example", status="pdf", http_status=200,
 ...                                   content_type="application/pdf", elapsed_ms=120.0))
 >>> adapter.close()
+
+CSV writes are protected by a lock to ensure rows remain well formed when
+multiple worker threads log through the same adapter instance.
 
 ### `WorkArtifact`
 

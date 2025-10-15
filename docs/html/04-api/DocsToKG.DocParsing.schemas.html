@@ -179,23 +179,25 @@ None: This helper does not raise exceptions.</p>
 </section>
 <section id="validate-schema-version-version-compatible-versions">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_schema_version(version,</span> <span class="pre">compatible_versions)</span></code><a class="headerlink" href="#validate-schema-version-version-compatible-versions" title="Link to this heading"></a></h3>
-<p>Check if schema version is compatible.</p>
+<p>Ensure a schema version string is recognised.</p>
 <p>Args:
-version: Schema version string from JSONL row.
-compatible_versions: List of accepted version identifiers.</p>
+version: Schema version string from a JSONL row.
+compatible_versions: List of accepted version identifiers.
+kind: Human-readable label describing the schema type.
+source: Optional context describing where the version originated.</p>
 <p>Returns:
-<code class="docutils literal notranslate"><span class="pre">True</span></code> when the version is recognised, <code class="docutils literal notranslate"><span class="pre">False</span></code> otherwise.</p>
+The validated schema version.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>
 <div><blockquote>
 <div><p>validate_schema_version(“docparse/1.1.0”, COMPATIBLE_CHUNK_VERSIONS)
-True</p>
+‘docparse/1.1.0’</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>
 <p>Raises:
-None: This validator does not raise exceptions.</p>
+ValueError: If the schema version is missing or unsupported.</p>
 </section>
 <section id="validate-parse-engine-cls-value">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_parse_engine(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-parse-engine-cls-value" title="Link to this heading"></a></h3>
@@ -206,6 +208,10 @@ value: Candidate parse engine label provided in the payload.</p>
 Validated parse engine string.</p>
 <p>Raises:
 ValueError: If the parser name is not recognised.</p>
+</section>
+<section id="validate-schema-version-cls-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_schema_version(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-schema-version-cls-value" title="Link to this heading"></a></h3>
+<p>Ensure chunk rows declare a supported schema identifier.</p>
 </section>
 <section id="validate-num-tokens-cls-value">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_num_tokens(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-num-tokens-cls-value" title="Link to this heading"></a></h3>
@@ -267,6 +273,10 @@ The validated dense vector instance.</p>
 <p>Raises:
 ValueError: If the actual length differs from <code class="docutils literal notranslate"><span class="pre">dimension</span></code>.</p>
 </section>
+<section id="id2">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_schema_version(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<p>Ensure vector rows declare a supported schema identifier.</p>
+</section>
 <section id="field">
 <h3><code class="docutils literal notranslate"><span class="pre">Field()</span></code><a class="headerlink" href="#field" title="Link to this heading"></a></h3>
 <p>Return default values in place of real Pydantic field descriptors.</p>
@@ -321,8 +331,8 @@ func: Function being decorated.</p>
 <p>Returns:
 The original function without modification.</p>
 </section>
-<section id="id2">
-<h3><code class="docutils literal notranslate"><span class="pre">decorator(func)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<section id="id3">
+<h3><code class="docutils literal notranslate"><span class="pre">decorator(func)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
 <p>Return the wrapped function unchanged when validation is stubbed.</p>
 <p>Args:
 func: Function being decorated.</p>
@@ -365,7 +375,10 @@ doc_items_refs: References to downstream document item metadata.
 page_nos: List of 1-based page numbers touched by the chunk.
 schema_version: Version identifier for the chunk schema.
 provenance: Optional provenance metadata describing parsing context.
-uuid: Optional stable identifier for the chunk.</p>
+uuid: Optional stable identifier for the chunk.
+has_image_captions: Optional duplicate of provenance flag for convenience.
+has_image_classification: Optional duplicate of provenance flag for convenience.
+num_images: Optional duplicate of provenance image count for convenience.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>

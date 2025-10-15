@@ -15,6 +15,7 @@ Key Features:
 - Stream SPLADE sparse encoding and Qwen dense embeddings from local caches
 - Validate vector schemas, norms, and dimensions before writing outputs
 - Record manifest metadata for observability and auditing
+- Explain SPLADE attention backend fallbacks (auto→FlashAttention2→SDPA→eager)
 
 Usage:
     python -m DocsToKG.DocParsing.EmbeddingV2 --resume
@@ -25,6 +26,42 @@ Dependencies:
 - tqdm: Surface user-friendly progress bars across pipeline phases.
 
 ## 1. Functions
+
+### `_resolve_hf_home()`
+
+Return the HuggingFace cache directory honoring environment settings.
+
+### `_resolve_with_env(env_var, default)`
+
+Resolve ``env_var`` to a path when provided, otherwise return ``default``.
+
+### `_resolve_cli_path(value, default)`
+
+Resolve CLI-provided ``value`` to an absolute path with ``default`` fallback.
+
+### `_expand_path(path)`
+
+Return ``path`` expanded to an absolute :class:`Path`.
+
+### `_resolve_hf_home()`
+
+Determine the HuggingFace cache directory respecting ``HF_HOME``.
+
+### `_resolve_model_root(hf_home)`
+
+Resolve DocsToKG model root with ``DOCSTOKG_MODEL_ROOT`` override.
+
+### `_resolve_qwen_dir(model_root)`
+
+Resolve Qwen model directory with ``DOCSTOKG_QWEN_DIR`` override.
+
+### `_resolve_splade_dir(model_root)`
+
+Resolve SPLADE model directory with ``DOCSTOKG_SPLADE_DIR`` override.
+
+### `_expand_optional(path)`
+
+Expand optional :class:`Path` values to absolutes when provided.
 
 ### `_missing_splade_dependency_message()`
 
@@ -62,6 +99,10 @@ rows: Chunk dictionaries that should include a `uuid` key.
 Returns:
 True when at least one UUID was newly assigned; otherwise False.
 
+### `ensure_chunk_schema(rows, source)`
+
+Assert that chunk rows declare a compatible schema version.
+
 ### `tokens(text)`
 
 Tokenize normalized text for sparse retrieval features.
@@ -71,16 +112,6 @@ text: Input string to tokenize.
 
 Returns:
 Lowercased alphanumeric tokens extracted from the text.
-
-### `build_bm25_stats(chunks)`
-
-Compute corpus statistics required for BM25 weighting.
-
-Args:
-chunks: Iterable of text chunks with identifiers.
-
-Returns:
-BM25Stats containing document frequency counts and average length.
 
 ### `print_bm25_summary(stats)`
 
@@ -117,6 +148,10 @@ batch_size: Optional override for the encoding batch size.
 Returns:
 Tuple of token lists and weight lists aligned per input text.
 
+### `_detect_splade_backend(encoder, requested)`
+
+Best-effort detection of the attention backend used by SPLADE.
+
 ### `_get_splade_encoder(cfg)`
 
 Retrieve (or create) a cached SPLADE encoder instance.
@@ -130,6 +165,10 @@ Cached :class:`SparseEncoder` ready for SPLADE inference.
 Raises:
 ValueError: If the encoder cannot be initialised with the supplied configuration.
 ImportError: If required SPLADE dependencies are unavailable.
+
+### `_get_splade_backend_used(cfg)`
+
+Return the backend string recorded for a given SPLADE configuration.
 
 ### `qwen_embed(cfg, texts, batch_size)`
 
@@ -152,18 +191,17 @@ files: Sequence of chunk file paths to process.
 logger: Logger used for structured progress output.
 
 Returns:
-Tuple containing the UUID→Chunk index and aggregated BM25 statistics.
+Aggregated BM25 statistics for the supplied chunk corpus.
 
 Raises:
 ValueError: Propagated when chunk rows are missing required fields.
 
-### `process_chunk_file_vectors(chunk_file, uuid_to_chunk, stats, args, validator, logger)`
+### `process_chunk_file_vectors(chunk_file, stats, args, validator, logger)`
 
 Generate vectors for a single chunk file and persist them to disk.
 
 Args:
 chunk_file: Chunk JSONL file to process.
-uuid_to_chunk: Mapping of chunk UUIDs to chunk metadata.
 stats: Precomputed BM25 statistics.
 args: Parsed CLI arguments with runtime configuration.
 validator: SPLADE validator for sparsity metrics.
@@ -284,20 +322,6 @@ Returns:
 None
 
 ## 2. Classes
-
-### `Chunk`
-
-Minimal representation of a DocTags chunk stored on disk.
-
-Attributes:
-uuid: Stable identifier for the chunk.
-text: Textual content extracted from the DocTags document.
-doc_id: Identifier of the source document for manifest reporting.
-
-Examples:
->>> chunk = Chunk(uuid="chunk-1", text="Hybrid search is powerful.", doc_id="doc")
->>> chunk.uuid
-'chunk-1'
 
 ### `BM25Stats`
 

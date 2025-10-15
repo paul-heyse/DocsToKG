@@ -1,16 +1,23 @@
-"""Refine DocParsing implementation change package documentation.
+"""
+DocsToKG DocParsing Refinement Documentation Package.
 
-This package contains documentation scaffolding that captures the intent of
-`refine-docparsing-implementation` while the actual code changes are being
-implemented elsewhere in the repository.  The docstrings summarise the
-production-readiness requirements that are documented in the OpenSpec change
-proposal so that automated documentation generators surface them alongside the
-forthcoming implementation work.
+1. Purpose
+   The ``refine-docparsing-implementation`` initiative documents production
+   hardening work for the DocsToKG DocParsing stack while the underlying code
+   evolves. Keeping this narrative in module docstrings ensures the automated
+   documentation pipeline exposes the latest OpenSpec intent alongside the
+   pending implementation.
 
-References:
-    * Specification deltas: ``openspec/changes/refine-docparsing-implementation/specs/doc-parsing/spec.md``
-    * Design discussion: ``openspec/changes/refine-docparsing-implementation/design.md``
-    * Implementation playbooks: ``openspec/changes/refine-docparsing-implementation/implementation-patterns.md``
+2. Scope
+   The annotations summarise the production-readiness requirements captured in
+   the change proposal so that reviewers, automation agents, and developers
+   understand how DocsToKG ingestion behaviour must evolve during the rollout.
+
+3. References
+   * Specification deltas: ``openspec/changes/refine-docparsing-implementation/specs/doc-parsing/spec.md``
+   * Design discussion: ``openspec/changes/refine-docparsing-implementation/design.md``
+   * Implementation playbooks: ``openspec/changes/refine-docparsing-implementation/implementation-patterns.md``
+   * Execution roadmap: ``openspec/changes/refine-docparsing-implementation/tasks.md``
 """
 
 from .documentation import RequirementDoc, load_requirement_docs

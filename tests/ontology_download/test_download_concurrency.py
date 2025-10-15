@@ -138,7 +138,9 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
         if path == "/error":
             try:
-                status_code = int(params.get("status", [str(int(HTTPStatus.INTERNAL_SERVER_ERROR))])[0])
+                status_code = int(
+                    params.get("status", [str(int(HTTPStatus.INTERNAL_SERVER_ERROR))])[0]
+                )
                 status = HTTPStatus(status_code)
             except (ValueError, KeyError):
                 status = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -254,7 +256,9 @@ def _download(
     )
 
 
-def test_retry_after_transient_error(http_server, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+def test_retry_after_transient_error(
+    http_server, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     server, base_url = http_server
     config = _make_http_config()
     destination = tmp_path / "flaky.bin"
@@ -267,7 +271,9 @@ def test_retry_after_transient_error(http_server, tmp_path: Path, caplog: pytest
     assert any("download retry" in record.message for record in caplog.records)
 
 
-def test_head_mismatch_logs_warning(http_server, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+def test_head_mismatch_logs_warning(
+    http_server, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     _, base_url = http_server
     config = _make_http_config()
     destination = tmp_path / "mismatch.bin"
@@ -278,7 +284,9 @@ def test_head_mismatch_logs_warning(http_server, tmp_path: Path, caplog: pytest.
         http_config=config,
         expected_media_type="application/rdf+xml",
     )
-    warnings = [record for record in caplog.records if "media type mismatch detected" in record.message]
+    warnings = [
+        record for record in caplog.records if "media type mismatch detected" in record.message
+    ]
     assert warnings, "expected media type mismatch warning"
 
 

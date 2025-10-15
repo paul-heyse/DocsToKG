@@ -2,27 +2,13 @@
 
 This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.validators``.
 
-Ontology Validation Pipeline
+Ontology validation pipeline.
 
-This module implements the post-download validation workflow that verifies
-ontology integrity, generates normalized artifacts, and captures structured
-telemetry for DocsToKG. Validators can leverage optional dependencies such as
-rdflib, Pronto, Owlready2, ROBOT, and Arelle while falling back gracefully
-when utilities are absent.
-
-Key Features:
-- Uniform :class:`ValidationRequest` / :class:`ValidationResult` data model
-- Timeout and memory instrumentation for resource-intensive validators
-- JSON reporting helpers compatible with automated documentation generation
-- Pluggable registry enabling selective validator execution
-- Canonical Turtle normalization with deterministic SHA-256 hashing
-- Subprocess isolation for memory-intensive Pronto and Owlready2 validators
-
-Usage:
-    from DocsToKG.OntologyDownload.validators import run_validators
-
-    results = run_validators(requests, logger)
-    print(results["rdflib"].details)
+This module implements the post-download workflow that verifies ontologies,
+normalizes output, and collects structured telemetry for DocsToKG. Validators
+support streaming normalization for large ontologies, deterministic hashing for
+manifest fingerprints, and optional dependency fallbacks for tools such as
+rdflib, Pronto, Owlready2, ROBOT, and Arelle.
 
 ## 1. Functions
 
@@ -49,6 +35,22 @@ payload: Mapping containing validation results.
 Returns:
 None
 
+### `_python_merge_sort(source, destination)`
+
+Sort an N-Triples file using a disk-backed merge strategy.
+
+### `_sort_nt(source, destination)`
+
+Sort N-Triples using platform sort when available with Python fallback.
+
+### `normalize_streaming(source_path, output_path)`
+
+Normalize an ontology file using streaming disk-backed sorting.
+
+### `_term_to_string(term, namespace_manager)`
+
+*No documentation available.*
+
 ### `_canonicalize_turtle(graph)`
 
 Return canonical Turtle output with sorted prefixes and triples.
@@ -56,6 +58,24 @@ Return canonical Turtle output with sorted prefixes and triples.
 The canonical form mirrors the ontology downloader specification by sorting
 prefixes lexicographically and emitting triples ordered by subject,
 predicate, and object so downstream hashing yields deterministic values.
+
+### `_canonicalize_blank_nodes_line(line, mapping)`
+
+Replace blank node identifiers with deterministic sequential labels.
+
+### `_sort_triple_file(source, destination)`
+
+Sort serialized triple lines using platform sort when available.
+
+### `normalize_streaming(source)`
+
+Normalize ontologies using external sort to ensure deterministic output.
+
+The streaming path serializes triples to a temporary file, leverages the
+platform ``sort`` utility (when available) to order the triples
+lexicographically, and streams the sorted output while computing the
+canonical SHA-256 hash. Callers may supply an ``output_path`` to persist the
+normalized Turtle document without storing the entire content in memory.
 
 ### `_run_validator_subprocess(name, payload)`
 
@@ -187,13 +207,17 @@ None
 Returns:
 Dictionary with boolean status, detail payload, and output paths.
 
-### `_term_to_string(term)`
+### `_replace(match)`
 
 *No documentation available.*
 
 ### `_parse()`
 
 Parse the ontology with rdflib to populate the graph object.
+
+### `_write(data)`
+
+*No documentation available.*
 
 ### `_handler(signum, frame)`
 

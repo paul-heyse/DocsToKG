@@ -87,8 +87,8 @@ for logging and metrics collection.</p>
 <p>Key Features:</p>
 <ul class="simple">
 <li><p>Sequential and concurrent resolver scheduling with configurable concurrency.</p></li>
-<li><p>Rate-limiting enforcement and optional HEAD preflight checks.</p></li>
-<li><p>State tracking for seen URLs, HTML fallbacks, and failure metrics.</p></li>
+<li><p>Rate-limiting enforcement, optional domain-level throttling, and HEAD preflight checks.</p></li>
+<li><p>State tracking for seen URLs, global deduplication, HTML fallbacks, and failure metrics.</p></li>
 </ul>
 <p>Usage:
 from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline</p>
@@ -138,6 +138,10 @@ concurrent threads honour resolver spacing requirements.</p>
 resolver_name: Name of the resolver to rate limit.</p>
 <p>Returns:
 None</p>
+</section>
+<section id="respect-domain-limit-self-url">
+<h3><code class="docutils literal notranslate"><span class="pre">_respect_domain_limit(self,</span> <span class="pre">url)</span></code><a class="headerlink" href="#respect-domain-limit-self-url" title="Link to this heading"></a></h3>
+<p>Enforce per-domain throttling when configured.</p>
 </section>
 <section id="jitter-sleep-self">
 <h3><code class="docutils literal notranslate"><span class="pre">_jitter_sleep(self)</span></code><a class="headerlink" href="#jitter-sleep-self" title="Link to this heading"></a></h3>

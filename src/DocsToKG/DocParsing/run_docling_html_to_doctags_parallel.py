@@ -17,7 +17,14 @@ from typing import Optional
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build argument parser (deprecated, forwards to unified CLI)."""
+    """Build the deprecated argument parser and forward to the unified CLI.
+
+    Returns:
+        Parser instance sourced from the unified CLI implementation.
+
+    Raises:
+        ImportError: If the unified CLI module cannot be imported.
+    """
     warnings.warn(
         "run_docling_html_to_doctags_parallel.py is deprecated. "
         "Use: python -m DocsToKG.DocParsing.cli.doctags_convert --mode html",
@@ -30,13 +37,33 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
-    """Parse command-line arguments (deprecated)."""
+    """Parse command-line arguments using the forwarded parser.
+
+    Args:
+        argv: Optional list of CLI arguments to parse instead of :data:`sys.argv`.
+
+    Returns:
+        Namespace containing CLI arguments supported by the unified command.
+
+    Raises:
+        SystemExit: Propagated when parsing fails.
+    """
     parser = build_parser()
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    """Forward to unified CLI with HTML mode forced."""
+    """Forward to the unified CLI with HTML mode forced.
+
+    Args:
+        argv: Optional CLI argument list excluding the executable.
+
+    Returns:
+        Exit status returned by the unified CLI entry point.
+
+    Raises:
+        SystemExit: Propagated if the invoked CLI terminates.
+    """
     warnings.warn(
         "\n"
         + "=" * 70

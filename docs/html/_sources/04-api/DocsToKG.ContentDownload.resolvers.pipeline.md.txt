@@ -11,8 +11,8 @@ for logging and metrics collection.
 
 Key Features:
 - Sequential and concurrent resolver scheduling with configurable concurrency.
-- Rate-limiting enforcement and optional HEAD preflight checks.
-- State tracking for seen URLs, HTML fallbacks, and failure metrics.
+- Rate-limiting enforcement, optional domain-level throttling, and HEAD preflight checks.
+- State tracking for seen URLs, global deduplication, HTML fallbacks, and failure metrics.
 
 Usage:
     from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
@@ -71,6 +71,10 @@ resolver_name: Name of the resolver to rate limit.
 
 Returns:
 None
+
+### `_respect_domain_limit(self, url)`
+
+Enforce per-domain throttling when configured.
 
 ### `_jitter_sleep(self)`
 

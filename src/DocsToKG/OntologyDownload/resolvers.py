@@ -1,22 +1,10 @@
-"""
-Ontology Resolver Implementations
+"""Ontology resolver implementations.
 
-This module defines the resolver strategies that convert download
-specifications into actionable fetch plans. Each resolver encapsulates the
-API integration, polite header management, and metadata extraction necessary
-to interact with external services such as the OBO Library, OLS, BioPortal,
-Linked Open Vocabularies (LOV), Ontobee, and SKOS/XBRL endpoints.
-
-Key Features:
-- Shared retry/backoff helpers for consistent API resilience
-- Resolver-specific metadata extraction (version, license, media type) with SPDX normalization
-- Support for additional services through the pluggable ``RESOLVERS`` map
-
-Usage:
-    from DocsToKG.OntologyDownload.resolvers import RESOLVERS
-
-    resolver = RESOLVERS[\"obo\"]
-    plan = resolver.plan(spec, config, logger)
+This module defines the strategies that translate planner specifications into
+actionable fetch plans. Each resolver applies polite headers, unified retry
+logic, SPDX-normalized licensing, and service-specific rate limits while
+participating in the automatic fallback chains described in the ontology
+download refactor. New resolvers can be registered through the ``RESOLVERS`` map.
 """
 
 from __future__ import annotations

@@ -63,12 +63,12 @@ overrides: Mapping of argument names to explicit override values.
 Returns:
 :class:`argparse.Namespace` with defaults populated and overrides applied.
 
-### `main(argv)`
+### `main(args)`
 
 Dispatch conversion to the HTML or PDF backend based on requested mode.
 
 Args:
-argv: Optional CLI arguments; defaults to :data:`sys.argv` when omitted.
+args: Either an :class:`argparse.Namespace`, a list of CLI arguments, or ``None``.
 
 Returns:
 Exit code from the selected conversion backend.

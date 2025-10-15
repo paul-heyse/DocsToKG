@@ -422,6 +422,10 @@ tmp.read_text(encoding=”utf-8”).strip()
 </div></blockquote>
 </div></blockquote>
 </section>
+<section id="manifest-filename-stage">
+<h3><code class="docutils literal notranslate"><span class="pre">_manifest_filename(stage)</span></code><a class="headerlink" href="#manifest-filename-stage" title="Link to this heading"></a></h3>
+<p>Return manifest filename for a given stage.</p>
+</section>
 <section id="manifest-append-stage-doc-id-status">
 <h3><code class="docutils literal notranslate"><span class="pre">manifest_append(stage,</span> <span class="pre">doc_id,</span> <span class="pre">status)</span></code><a class="headerlink" href="#manifest-append-stage-doc-id-status" title="Link to this heading"></a></h3>
 <p>Append a structured entry to the processing manifest.</p>
@@ -449,12 +453,19 @@ True</p>
 </div></blockquote>
 </div></blockquote>
 </section>
+<section id="resolve-hash-algorithm-default">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_hash_algorithm(default)</span></code><a class="headerlink" href="#resolve-hash-algorithm-default" title="Link to this heading"></a></h3>
+<p>Return the active content hash algorithm, honoring env overrides.</p>
+</section>
 <section id="compute-content-hash-path-algorithm">
 <h3><code class="docutils literal notranslate"><span class="pre">compute_content_hash(path,</span> <span class="pre">algorithm)</span></code><a class="headerlink" href="#compute-content-hash-path-algorithm" title="Link to this heading"></a></h3>
 <p>Compute a content hash for <code class="docutils literal notranslate"><span class="pre">path</span></code> using the requested algorithm.</p>
 <p>Args:
 path: File whose contents should be hashed.
 algorithm: Hash algorithm name supported by :mod:<code class="docutils literal notranslate"><span class="pre">hashlib</span></code>.</p>
+<p>Notes:
+The <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_HASH_ALG</span></code> environment variable overrides <code class="docutils literal notranslate"><span class="pre">algorithm</span></code>
+when set, enabling fleet-wide hash changes without code edits.</p>
 <p>Returns:
 Hex digest string.</p>
 <p>Examples:</p>

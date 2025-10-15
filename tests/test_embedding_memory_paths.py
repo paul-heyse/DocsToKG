@@ -95,7 +95,9 @@ def test_process_pass_a_returns_stats_only(tmp_path: Path, monkeypatch: pytest.M
     assert rows[0]["uuid"], "UUIDs should be assigned in-place"
 
 
-def test_process_chunk_file_vectors_reads_texts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_process_chunk_file_vectors_reads_texts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Chunk texts should be sourced directly from file rows when encoding."""
 
     _install_minimal_stubs(monkeypatch)
@@ -117,8 +119,7 @@ def test_process_chunk_file_vectors_reads_texts(tmp_path: Path, monkeypatch: pyt
     monkeypatch.setattr(
         embed_module,
         "qwen_embed",
-        lambda cfg, texts, batch_size=None: captured_texts.extend(texts)
-        or [[1.0] + [0.0] * 2559],
+        lambda cfg, texts, batch_size=None: captured_texts.extend(texts) or [[1.0] + [0.0] * 2559],
     )
     captured_write_texts: List[str] = []
 
@@ -161,7 +162,9 @@ def test_process_chunk_file_vectors_reads_texts(tmp_path: Path, monkeypatch: pyt
     assert captured_write_texts == ["Hello world"]
 
 
-def test_cli_path_overrides_take_precedence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cli_path_overrides_take_precedence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """CLI supplied model directories should override environment variables."""
 
     _install_minimal_stubs(monkeypatch)
@@ -183,9 +186,7 @@ def test_cli_path_overrides_take_precedence(tmp_path: Path, monkeypatch: pytest.
 
     captured: Dict[str, Path] = {}
 
-    def _capture(
-        chunk_file, stats, args, validator, logger
-    ) -> tuple[int, List[int], List[float]]:
+    def _capture(chunk_file, stats, args, validator, logger) -> tuple[int, List[int], List[float]]:
         captured["splade"] = args.splade_cfg.model_dir
         captured["qwen"] = args.qwen_cfg.model_dir
         return 0, [], []
@@ -197,7 +198,11 @@ def test_cli_path_overrides_take_precedence(tmp_path: Path, monkeypatch: pytest.
     )
 
     monkeypatch.setattr(embed_module, "iter_chunk_files", lambda _: [chunk_file])
-    monkeypatch.setattr(embed_module, "process_pass_a", lambda files, logger: embed_module.BM25Stats(N=1, avgdl=1.0, df={}))
+    monkeypatch.setattr(
+        embed_module,
+        "process_pass_a",
+        lambda files, logger: embed_module.BM25Stats(N=1, avgdl=1.0, df={}),
+    )
     monkeypatch.setattr(embed_module, "process_chunk_file_vectors", _capture)
     monkeypatch.setattr(embed_module, "load_manifest_index", lambda *args, **kwargs: {})
     monkeypatch.setattr(embed_module, "compute_content_hash", lambda *_: "hash")
@@ -222,7 +227,9 @@ def test_cli_path_overrides_take_precedence(tmp_path: Path, monkeypatch: pytest.
     assert captured["qwen"] == cli_qwen.resolve()
 
 
-def test_offline_mode_requires_local_models(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_offline_mode_requires_local_models(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Offline mode should raise when required models are absent."""
 
     _install_minimal_stubs(monkeypatch)

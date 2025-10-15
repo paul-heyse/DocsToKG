@@ -1,12 +1,10 @@
-"""
-Storage backends for ontology artifacts.
+"""Storage backends for ontology artifacts.
 
-This module centralizes access to ontology storage locations, supporting both
-the default local filesystem layout (managed via :mod:`pystow`) and optional
-remote backends powered by :mod:`fsspec`. Callers interact with the storage
-backend abstractly, allowing the downloader to mirror versioned ontology
-artifacts to remote object stores while maintaining a local working copy for
-streaming and validation.
+The refactored ontology downloader expects durable, versioned storage that can
+support dry-run planning, streaming normalization, and version pruning. This
+module centralizes local and optional remote (fsspec) storage implementations,
+ensuring that metadata such as latest version markers and reclaimed space
+reports remain consistent with the openspec storage management requirements.
 """
 
 from __future__ import annotations
@@ -15,17 +13,28 @@ import os
 import shutil
 import stat
 from pathlib import Path, PurePosixPath
-from typing import Iterable, List, Protocol, Tuple
+from typing import List, Protocol, Tuple
 
 from .config import ConfigError
 from .download import sanitize_filename
 from .optdeps import get_pystow
 
-try:  # pragma: no cover - guarded import for optional dependency
+try:  # pragma: no cover - optional dependency
     import fsspec  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover - handled dynamically
+except ModuleNotFoundError:  # pragma: no cover - allow local-only mode
     fsspec = None  # type: ignore
 
+__all__ = [
+    "CONFIG_DIR",
+    "CACHE_DIR",
+    "LOG_DIR",
+    "LOCAL_ONTOLOGY_DIR",
+    "StorageBackend",
+    "LocalStorageBackend",
+    "FsspecStorageBackend",
+    "get_storage_backend",
+    "STORAGE",
+]
 
 pystow = get_pystow()
 
@@ -40,118 +49,145 @@ for directory in (CONFIG_DIR, CACHE_DIR, LOG_DIR, LOCAL_ONTOLOGY_DIR):
 
 
 class StorageBackend(Protocol):
-    """Protocol describing storage backend operations.
-
-    Implementations may store data locally, mirror to remote backends, or both.
-    Callers rely on the common interface to prepare working directories,
-    enumerate versions, and finalize artefacts after downloads complete.
+    """Protocol describing the operations required by the downloader pipeline.
 
     Attributes:
-        prepare_version: Callable producing a working directory path.
-        ensure_local_version: Callable that guarantees a local working copy.
-        available_versions: Callable returning stored version identifiers.
-        finalize_version: Callable persisting local results to durable storage.
+        root_path: Canonical base path that implementations expose for disk
+            storage.  Remote-only backends can synthesize this attribute for
+            instrumentation purposes.
 
     Examples:
-        >>> backend = LocalStorageBackend(Path("/tmp/ontologies"))
-        >>> isinstance(backend.available_versions("hp"), list)
-        True
+        >>> class MemoryBackend(StorageBackend):
+        ...     root_path = Path(\"/tmp\")  # pragma: no cover - illustrative stub
+        ...     def prepare_version(self, ontology_id: str, version: str) -> Path:
+        ...         ...
     """
 
     def prepare_version(self, ontology_id: str, version: str) -> Path:
-        """Return a local directory prepared for the given ontology/version.
+        """Return a working directory prepared for the given ontology version.
 
         Args:
-            ontology_id: Stable ontology identifier requested by the caller.
-            version: Canonical version string resolved for the ontology.
+            ontology_id: Identifier of the ontology being downloaded.
+            version: Version string representing the in-flight download.
 
         Returns:
-            Path pointing to a base directory containing all working sub-folders.
+            Path to a freshly prepared directory tree ready for population.
         """
 
     def ensure_local_version(self, ontology_id: str, version: str) -> Path:
-        """Ensure the specified version exists locally, syncing from remote if needed.
+        """Ensure the requested version is present locally and return its path.
 
         Args:
-            ontology_id: Ontology identifier whose artefacts are required.
-            version: Version string that must be present locally.
+            ontology_id: Identifier whose version must be present.
+            version: Version string that should exist on local storage.
 
         Returns:
-            Path to the local directory where the ontology version resides.
+            Path to the local directory containing the requested version.
         """
 
     def available_versions(self, ontology_id: str) -> List[str]:
-        """Return sorted list of available versions from storage.
+        """Return sorted version identifiers currently stored for an ontology.
 
         Args:
-            ontology_id: Ontology identifier to inspect.
+            ontology_id: Identifier whose known versions are requested.
 
         Returns:
-            Sorted list of version strings available to the backend.
+            Sorted list of version strings recognised by the backend.
         """
 
     def available_ontologies(self) -> List[str]:
-        """Return sorted ontology identifiers managed by the backend."""
+        """Return sorted ontology identifiers known to the backend.
+
+        Returns:
+            Alphabetically sorted list of ontology identifiers the backend can
+            service.
+        """
 
     def finalize_version(self, ontology_id: str, version: str, local_dir: Path) -> None:
-        """Persist local version directory to remote storage when applicable.
+        """Persist the working directory after validation succeeds.
 
         Args:
-            ontology_id: Ontology identifier that completed processing.
-            version: Version string corresponding to the processed ontology.
-            local_dir: Local directory tree ready for publication.
+            ontology_id: Identifier of the ontology that completed processing.
+            version: Version string associated with the finalized artifacts.
+            local_dir: Directory containing the validated ontology payload.
 
         Returns:
-            None
+            None.
         """
 
-    def available_ontologies(self) -> List[str]:
-        """Return ontology identifiers managed by the backend."""
-
     def version_path(self, ontology_id: str, version: str) -> Path:
-        """Return the local filesystem location for a stored version."""
+        """Return the canonical storage path for ``ontology_id``/``version``.
+
+        Args:
+            ontology_id: Identifier of the ontology being queried.
+            version: Version string for which a canonical path is needed.
+
+        Returns:
+            Path pointing to the storage location for the requested version.
+        """
 
     def delete_version(self, ontology_id: str, version: str) -> int:
-        """Remove a stored version and return number of bytes reclaimed."""
+        """Delete a stored version returning the number of bytes reclaimed.
+
+        Args:
+            ontology_id: Identifier whose version should be removed.
+            version: Version string targeted for deletion.
+
+        Returns:
+            Number of bytes reclaimed by removing the stored version.
+        """
 
     def set_latest_version(self, ontology_id: str, version: str) -> None:
-        """Update latest version marker for an ontology."""
-        """Return sorted ontology identifiers known to the backend."""
+        """Update the latest version marker for operators and CLI tooling.
 
-    def delete_version(self, ontology_id: str, version: str) -> None:
-        """Remove an ontology version from all backing stores."""
+        Args:
+            ontology_id: Identifier whose latest marker requires updating.
+            version: Version string to record as the active release.
+
+        Returns:
+            None.
+        """
 
 
 def _safe_identifiers(ontology_id: str, version: str) -> Tuple[str, str]:
-    """Return sanitized identifiers suitable for filesystem usage."""
+    """Return identifiers sanitized for filesystem usage."""
 
     safe_id = sanitize_filename(ontology_id)
     safe_version = sanitize_filename(version)
     return safe_id, safe_version
 
 
+def _directory_size(path: Path) -> int:
+    """Return the total size in bytes for all regular files under ``path``."""
+
+    total = 0
+    for entry in path.rglob("*"):
+        try:
+            info = entry.stat()
+        except OSError:
+            continue
+        if stat.S_ISREG(info.st_mode):
+            total += info.st_size
+    return total
+
+
 class LocalStorageBackend:
     """Storage backend that keeps ontology artifacts on the local filesystem.
 
     Attributes:
-        root: Root directory under which ontology artifacts are stored. Each
-            ontology/version pair receives a dedicated subdirectory.
+        root: Base directory that stores ontology versions grouped by identifier.
 
     Examples:
-        >>> backend = LocalStorageBackend(Path("/tmp/ontologies"))
-        >>> workspace = backend.prepare_version("hp", "2024-01-01")
-        >>> (workspace / "original").exists()
-        True
+        >>> backend = LocalStorageBackend(LOCAL_ONTOLOGY_DIR)
+        >>> backend.available_ontologies()
+        []
     """
 
     def __init__(self, root: Path) -> None:
-        """Create a local storage backend rooted at ``root``.
+        """Initialise the backend with a given storage root.
 
         Args:
-            root: Base directory that stores ontology versions.
-
-        Returns:
-            None
+            root: Directory used to persist ontology artifacts.
         """
 
         self.root = root
@@ -161,7 +197,7 @@ class LocalStorageBackend:
         return self.root / safe_id / safe_version
 
     def prepare_version(self, ontology_id: str, version: str) -> Path:
-        """Create a local working directory structure for an ontology version.
+        """Create the working directory structure for a download run.
 
         Args:
             ontology_id: Identifier of the ontology being processed.
@@ -178,11 +214,11 @@ class LocalStorageBackend:
         return base
 
     def ensure_local_version(self, ontology_id: str, version: str) -> Path:
-        """Ensure a local directory exists for the requested ontology version.
+        """Ensure a local workspace exists for ``ontology_id``/``version``.
 
         Args:
-            ontology_id: Identifier of the ontology being processed.
-            version: Version string that should exist locally.
+            ontology_id: Identifier whose workspace must exist.
+            version: Version string that should map to a directory.
 
         Returns:
             Path to the local directory for the ontology version.
@@ -193,13 +229,13 @@ class LocalStorageBackend:
         return base
 
     def available_versions(self, ontology_id: str) -> List[str]:
-        """List versions already present on disk for an ontology.
+        """Return sorted versions already present for an ontology.
 
         Args:
-            ontology_id: Identifier of the ontology whose versions are requested.
+            ontology_id: Identifier whose stored versions should be listed.
 
         Returns:
-            Sorted list of version strings discovered in the local store.
+            Sorted list of version strings found under the storage root.
         """
 
         safe_id, _ = _safe_identifiers(ontology_id, "unused")
@@ -210,7 +246,11 @@ class LocalStorageBackend:
         return sorted(versions)
 
     def available_ontologies(self) -> List[str]:
-        """Return ontology identifiers discovered under the storage root."""
+        """Return ontology identifiers discovered under ``root``.
+
+        Returns:
+            Sorted list of ontology identifiers available locally.
+        """
 
         if not self.root.exists():
             return []
@@ -220,42 +260,60 @@ class LocalStorageBackend:
         """Finalize a local version directory (no-op for purely local storage).
 
         Args:
-            ontology_id: Identifier of the ontology that finished processing.
+            ontology_id: Identifier that finished processing.
             version: Version string associated with the processed ontology.
-            local_dir: Path to the local directory ready for consumption.
+            local_dir: Directory containing the ready-to-serve ontology.
 
         Returns:
-            None
+            None.
         """
 
-        # Local backend already operates in-place; nothing further needed.
         _ = (ontology_id, version, local_dir)  # pragma: no cover - intentional no-op
 
-    def available_ontologies(self) -> List[str]:
-        """Return ontology identifiers present on the local filesystem."""
-
-        if not self.root.exists():
-            return []
-        return sorted([entry.name for entry in self.root.iterdir() if entry.is_dir()])
-
     def version_path(self, ontology_id: str, version: str) -> Path:
-        """Return the directory path for a stored ontology version."""
+        """Return the local storage directory for the requested version.
+
+        Args:
+            ontology_id: Identifier being queried.
+            version: Version string whose storage path is needed.
+
+        Returns:
+            Path pointing to the stored ontology version.
+        """
 
         return self._version_dir(ontology_id, version)
 
     def delete_version(self, ontology_id: str, version: str) -> int:
-        """Delete a stored ontology version and return reclaimed bytes."""
+        """Delete a stored ontology version returning reclaimed bytes.
 
-        path = self.version_path(ontology_id, version)
+        Args:
+            ontology_id: Identifier whose stored version should be removed.
+            version: Version string targeted for deletion.
+
+        Returns:
+            Number of bytes reclaimed by removing the version directory.
+
+        Raises:
+            OSError: Propagated if filesystem deletion fails.
+        """
+
+        path = self._version_dir(ontology_id, version)
         if not path.exists():
             return 0
-
         reclaimed = _directory_size(path)
         shutil.rmtree(path)
         return reclaimed
 
     def set_latest_version(self, ontology_id: str, version: str) -> None:
-        """Update the latest version marker for an ontology."""
+        """Update symlink and marker file indicating the latest version.
+
+        Args:
+            ontology_id: Identifier whose latest marker should be updated.
+            version: Version string to record as the latest processed build.
+
+        Returns:
+            None.
+        """
 
         safe_id, _ = _safe_identifiers(ontology_id, "unused")
         base = self.root / safe_id
@@ -277,69 +335,30 @@ class LocalStorageBackend:
                 marker.unlink()
 
 
-def _directory_size(path: Path) -> int:
-    """Return the total size of all regular files within ``path``."""
-
-    total = 0
-    for entry in path.rglob("*"):
-        try:
-            info = entry.stat()
-        except OSError:
-            continue
-        if stat.S_ISREG(info.st_mode):
-            total += info.st_size
-    return total
-    def delete_version(self, ontology_id: str, version: str) -> int:
-        """Remove a stored ontology version and return reclaimed bytes."""
-
-        base = self._version_dir(ontology_id, version)
-        if not base.exists():
-            return 0
-        reclaimed = 0
-        for path in base.rglob('*'):
-            if path.is_file():
-                reclaimed += path.stat().st_size
-        shutil.rmtree(base, ignore_errors=False)
-        return reclaimed
-    def available_ontologies(self) -> List[str]:
-        if not self.root.exists():
-            return []
-        return sorted([entry.name for entry in self.root.iterdir() if entry.is_dir()])
-
-    def delete_version(self, ontology_id: str, version: str) -> None:
-        base = self._version_dir(ontology_id, version)
-        if base.exists():
-            shutil.rmtree(base)
-
-
 class FsspecStorageBackend(LocalStorageBackend):
-    """Storage backend that mirrors ontology artifacts to a remote location via fsspec.
+    """Hybrid storage backend that mirrors artifacts to an fsspec location.
 
     Attributes:
-        fs: fsspec filesystem instance used for remote interactions.
+        fs: ``fsspec`` filesystem instance used for remote operations.
         base_path: Root path within the remote filesystem where artefacts live.
 
     Examples:
-        >>> backend = FsspecStorageBackend("memory://ontologies")
-        Traceback (most recent call last):
-        ...
-        ConfigError: fsspec required for remote storage. Install it via 'pip install fsspec'.
+        >>> backend = FsspecStorageBackend("memory://ontologies")  # doctest: +SKIP
+        >>> backend.available_ontologies()  # doctest: +SKIP
+        []
     """
 
     def __init__(self, url: str) -> None:
         """Create a hybrid storage backend backed by an fsspec URL.
 
         Args:
-            url: Remote fsspec URL (e.g., ``s3://bucket/prefix``) identifying the store.
+            url: Remote ``fsspec`` URL (for example ``s3://bucket/prefix``).
 
         Raises:
-            ConfigError: If :mod:`fsspec` is not installed or the URL cannot be parsed.
-
-        Returns:
-            None
+            ConfigError: If :mod:`fsspec` is not installed or the URL is invalid.
         """
 
-        if fsspec is None:
+        if fsspec is None:  # pragma: no cover - exercised when dependency missing
             raise ConfigError(
                 "fsspec required for remote storage. Install it via 'pip install fsspec'."
             )
@@ -353,17 +372,16 @@ class FsspecStorageBackend(LocalStorageBackend):
         return (self.base_path / safe_id / safe_version).with_suffix("")
 
     def available_versions(self, ontology_id: str) -> List[str]:
-        """Return unique versions aggregated from local cache and remote storage.
+        """Return versions aggregated from local cache and remote storage.
 
         Args:
-            ontology_id: Identifier of the ontology whose versions are requested.
+            ontology_id: Identifier whose version catalogue is required.
 
         Returns:
-            Sorted list of versions available either locally or remotely.
+            Sorted list combining local and remote version identifiers.
         """
 
         local_versions = super().available_versions(ontology_id)
-        remote_versions: Iterable[str] = []
         safe_id, _ = _safe_identifiers(ontology_id, "unused")
         remote_dir = self.base_path / safe_id
         try:
@@ -373,11 +391,14 @@ class FsspecStorageBackend(LocalStorageBackend):
         remote_versions = [
             PurePosixPath(entry).name for entry in entries if entry and not entry.endswith(".tmp")
         ]
-        merged = sorted({*local_versions, *remote_versions})
-        return merged
+        return sorted({*local_versions, *remote_versions})
 
     def available_ontologies(self) -> List[str]:
-        """Return ontology identifiers available locally or remotely."""
+        """Return ontology identifiers available locally or remotely.
+
+        Returns:
+            Sorted set union of local and remote ontology identifiers.
+        """
 
         local_ids = super().available_ontologies()
         try:
@@ -385,57 +406,52 @@ class FsspecStorageBackend(LocalStorageBackend):
         except FileNotFoundError:
             entries = []
         remote_ids = [
-            PurePosixPath(entry).name
-            for entry in entries
-            if entry and not entry.endswith(".tmp")
+            PurePosixPath(entry).name for entry in entries if entry and not entry.endswith(".tmp")
         ]
         return sorted({*local_ids, *remote_ids})
 
-    def delete_version(self, ontology_id: str, version: str) -> None:
-        super().delete_version(ontology_id, version)
-        remote_dir = self._remote_version_path(ontology_id, version)
-        if self.fs.exists(str(remote_dir)):
-            self.fs.rm(str(remote_dir), recursive=True)
-
     def ensure_local_version(self, ontology_id: str, version: str) -> Path:
-        """Mirror a remote ontology version into the local cache if necessary.
+        """Mirror a remote ontology version into the local cache when absent.
 
         Args:
-            ontology_id: Identifier of the ontology being requested.
-            version: Version string to ensure locally.
+            ontology_id: Identifier whose version should exist locally.
+            version: Version string to ensure within the local cache.
 
         Returns:
             Path to the local directory containing the requested version.
         """
 
         base = super().ensure_local_version(ontology_id, version)
-        remote_dir = self._remote_version_path(ontology_id, version)
         manifest_path = base / "manifest.json"
         if manifest_path.exists():
             return base
-        if self.fs.exists(str(remote_dir)):
-            try:
-                remote_files = self.fs.find(str(remote_dir))
-            except FileNotFoundError:
-                remote_files = []
-            for remote_file in remote_files:
-                remote_path = PurePosixPath(remote_file)
-                relative = remote_path.relative_to(remote_dir)
-                local_path = base / Path(str(relative))
-                local_path.parent.mkdir(parents=True, exist_ok=True)
-                self.fs.get_file(str(remote_path), str(local_path))
+
+        remote_dir = self._remote_version_path(ontology_id, version)
+        if not self.fs.exists(str(remote_dir)):
+            return base
+
+        try:
+            remote_files = self.fs.find(str(remote_dir))
+        except FileNotFoundError:
+            remote_files = []
+        for remote_file in remote_files:
+            remote_path = PurePosixPath(remote_file)
+            relative = remote_path.relative_to(remote_dir)
+            local_path = base / Path(str(relative))
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            self.fs.get_file(str(remote_path), str(local_path))
         return base
 
     def finalize_version(self, ontology_id: str, version: str, local_dir: Path) -> None:
-        """Upload the finalized local version directory to the remote store.
+        """Upload the finalized local directory to the remote store.
 
         Args:
-            ontology_id: Identifier of the ontology ready for publication.
-            version: Version string for the finalized ontology artifacts.
-            local_dir: Local directory tree containing normalized outputs.
+            ontology_id: Identifier of the ontology that has completed processing.
+            version: Version string associated with the finalised ontology.
+            local_dir: Directory containing the validated ontology payload.
 
         Returns:
-            None
+            None.
         """
 
         remote_dir = self._remote_version_path(ontology_id, version)
@@ -448,44 +464,42 @@ class FsspecStorageBackend(LocalStorageBackend):
             self.fs.put_file(str(path), str(remote_path))
 
     def delete_version(self, ontology_id: str, version: str) -> int:
-        """Delete both local and remote copies for a stored version."""
+        """Delete both local and remote copies of a stored version.
+
+        Args:
+            ontology_id: Identifier whose stored version should be deleted.
+            version: Version string targeted for deletion.
+
+        Returns:
+            Total bytes reclaimed across local and remote storage.
+
+        Raises:
+            OSError: Propagated if remote deletion fails irrecoverably.
+        """
 
         reclaimed = super().delete_version(ontology_id, version)
         remote_dir = self._remote_version_path(ontology_id, version)
+        if not self.fs.exists(str(remote_dir)):
+            return reclaimed
+
         try:
-            self.fs.rm(str(remote_dir), recursive=True)
+            remote_files = self.fs.find(str(remote_dir))
         except FileNotFoundError:
-            pass
-        """Remove local and remote artifacts for a stored version."""
-
-        reclaimed = super().delete_version(ontology_id, version)
-        remote_dir = self._remote_version_path(ontology_id, version)
-        if self.fs.exists(str(remote_dir)):
+            remote_files = []
+        for remote_file in remote_files:
             try:
-                remote_files = self.fs.find(str(remote_dir))
+                info = self.fs.info(remote_file)
             except FileNotFoundError:
-                remote_files = []
-            for remote_file in remote_files:
-                try:
-                    info = self.fs.info(remote_file)
-                except FileNotFoundError:
-                    continue
-                size = info.get('size') if isinstance(info, dict) else None
-                if isinstance(size, (int, float)):
-                    reclaimed += int(size)
-            self.fs.rm(str(remote_dir), recursive=True)
+                continue
+            size = info.get("size") if isinstance(info, dict) else None
+            if isinstance(size, (int, float)):
+                reclaimed += int(size)
+        self.fs.rm(str(remote_dir), recursive=True)
         return reclaimed
 
 
 def get_storage_backend() -> StorageBackend:
-    """Instantiate the appropriate storage backend based on environment settings.
-
-    Args:
-        None
-
-    Returns:
-        StorageBackend implementation bound to either local or remote storage.
-    """
+    """Instantiate the storage backend based on environment configuration."""
 
     storage_url = os.getenv("ONTOFETCH_STORAGE_URL")
     if storage_url:
