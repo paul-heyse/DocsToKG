@@ -8,10 +8,6 @@ Reciprocal Rank Fusion and diversification utilities.
 
 *No documentation available.*
 
-### `_cosine_similarity(lhs, rhs)`
-
-*No documentation available.*
-
 ### `fuse(self, candidates)`
 
 *No documentation available.*

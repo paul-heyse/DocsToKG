@@ -16,7 +16,7 @@ This section summarises the primary interfaces DocsToKG exposes and how to integ
   - `diagnostics` (bool) to include per-signal scores
 - **Response**: Ranked list containing document metadata, highlight spans, fused score diagnostics, and pagination cursor.
 
-Use the generated documentation in `docs/04-api/api.md` and `docs/04-api/retrieval.md` for attribute-level detail.
+Use the generated documentation in `docs/04-api/DocsToKG.HybridSearch.api.md` and `docs/04-api/DocsToKG.HybridSearch.retrieval.md` for attribute-level detail.
 
 ## Python Service Layer
 

@@ -6,7 +6,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence
+from typing import List, Optional, Sequence
 
 from .config import ConfigError, ResolvedConfig, load_config, validate_config
 from .core import (
@@ -80,7 +80,9 @@ def _build_parser() -> argparse.ArgumentParser:
         default=CONFIG_DIR / "sources.yaml",
         help="Path to configuration file (default: ~/.data/ontology-fetcher/configs/sources.yaml)",
     )
-    config_validate.add_argument("--json", action="store_true", help="Output validation result as JSON")
+    config_validate.add_argument(
+        "--json", action="store_true", help="Output validation result as JSON"
+    )
 
     return parser
 
@@ -206,7 +208,15 @@ def _handle_pull(args, base_config: Optional[ResolvedConfig]) -> List[FetchResul
     config = base_config or ResolvedConfig.from_defaults()
     config.defaults.logging.level = args.log_level
     resolver = args.resolver or config.defaults.prefer_source[0]
-    specs = [FetchSpec(id=oid, resolver=resolver, extras={}, target_formats=target_formats or config.defaults.normalize_to) for oid in args.ids]
+    specs = [
+        FetchSpec(
+            id=oid,
+            resolver=resolver,
+            extras={},
+            target_formats=target_formats or config.defaults.normalize_to,
+        )
+        for oid in args.ids
+    ]
     results = fetch_all(specs, config=config, force=args.force)
     return results
 
@@ -319,7 +329,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             for result in results:
                 logger.info(
                     "ontology processed",
-                    extra={"stage": "complete", "ontology_id": result.spec.id, "status": result.status},
+                    extra={
+                        "stage": "complete",
+                        "ontology_id": result.spec.id,
+                        "status": result.status,
+                    },
                 )
         elif args.command == "show":
             _handle_show(args)
@@ -339,7 +353,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 sys.stdout.write("\n")
             else:
                 status = "passed" if report["ok"] else "failed"
-                print(f"Configuration {status} ({report['ontologies']} ontologies) -> {report['path']}")
+                print(
+                    f"Configuration {status} ({report['ontologies']} ontologies) -> {report['path']}"
+                )
         return 0
     except ConfigError as exc:
         print(f"Error: {exc}", file=sys.stderr)

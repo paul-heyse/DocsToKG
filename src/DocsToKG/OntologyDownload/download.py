@@ -24,8 +24,8 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import urlparse, urlunparse
 
-import psutil
 import pooch
+import psutil
 import requests
 
 from .config import ConfigError, DownloadConfiguration
@@ -40,7 +40,7 @@ def _log_memory(logger: logging.Logger, event: str) -> None:
     if not enabled:
         return
     process = psutil.Process()
-    memory_mb = process.memory_info().rss / (1024 ** 2)
+    memory_mb = process.memory_info().rss / (1024**2)
     logger.debug(
         "memory usage",
         extra={"stage": "download", "event": event, "memory_mb": round(memory_mb, 2)},
@@ -58,6 +58,7 @@ class DownloadResult:
         etag: HTTP ETag returned by the upstream server, when available.
         last_modified: Upstream last-modified header value if provided.
     """
+
     path: Path
     status: str
     sha256: str
@@ -166,7 +167,12 @@ def validate_url_security(url: str) -> str:
             raise ConfigError(f"Unable to resolve hostname {host}") from exc
         for info in infos:
             candidate_ip = ipaddress.ip_address(info[4][0])
-            if candidate_ip.is_private or candidate_ip.is_loopback or candidate_ip.is_reserved or candidate_ip.is_multicast:
+            if (
+                candidate_ip.is_private
+                or candidate_ip.is_loopback
+                or candidate_ip.is_reserved
+                or candidate_ip.is_multicast
+            ):
                 raise ConfigError(f"Refusing to download from private address resolved for {host}")
     return urlunparse(parsed)
 
@@ -187,7 +193,9 @@ def sha256_file(path: Path) -> str:
     return hasher.hexdigest()
 
 
-def extract_zip_safe(zip_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None) -> List[Path]:
+def extract_zip_safe(
+    zip_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None
+) -> List[Path]:
     """Extract a ZIP archive while preventing path traversal.
 
     Args:
@@ -287,10 +295,12 @@ class StreamingDownloader(pooch.HTTPDownloader):
                 ) as response:
                     if response.status_code == 304 and Path(self.destination).exists():
                         self.status = "cached"
-                        self.response_etag = response.headers.get("ETag") or self.previous_manifest.get("etag")
-                        self.response_last_modified = response.headers.get("Last-Modified") or self.previous_manifest.get(
-                            "last_modified"
-                        )
+                        self.response_etag = response.headers.get(
+                            "ETag"
+                        ) or self.previous_manifest.get("etag")
+                        self.response_last_modified = response.headers.get(
+                            "Last-Modified"
+                        ) or self.previous_manifest.get("last_modified")
                         part_path.unlink(missing_ok=True)
                         return
                     if response.status_code == 206:
@@ -304,7 +314,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                             total_bytes = int(length_header)
                         except ValueError:
                             total_bytes = None
-                        max_bytes = self.http_config.max_download_size_gb * (1024 ** 3)
+                        max_bytes = self.http_config.max_download_size_gb * (1024**3)
                         if total_bytes is not None and total_bytes > max_bytes:
                             self.logger.error(
                                 "file exceeds size limit",
@@ -352,13 +362,16 @@ class StreamingDownloader(pooch.HTTPDownloader):
                                         if next_progress > 1:
                                             next_progress = None
                                             break
-                                if bytes_downloaded > self.http_config.max_download_size_gb * (1024 ** 3):
+                                if bytes_downloaded > self.http_config.max_download_size_gb * (
+                                    1024**3
+                                ):
                                     self.logger.error(
                                         "download exceeded size limit",
                                         extra={
                                             "stage": "download",
                                             "size": bytes_downloaded,
-                                            "limit": self.http_config.max_download_size_gb * (1024 ** 3),
+                                            "limit": self.http_config.max_download_size_gb
+                                            * (1024**3),
                                         },
                                     )
                                     raise ConfigError(
@@ -371,15 +384,28 @@ class StreamingDownloader(pooch.HTTPDownloader):
                             extra={"stage": "download", "error": str(exc)},
                         )
                         if "No space left" in str(exc):
-                            raise ConfigError("No space left on device while writing download") from exc
+                            raise ConfigError(
+                                "No space left on device while writing download"
+                            ) from exc
                         raise ConfigError(f"Failed to write download: {exc}") from exc
                     break
-            except (requests.ConnectionError, requests.Timeout, requests.HTTPError, requests.exceptions.SSLError) as exc:
+            except (
+                requests.ConnectionError,
+                requests.Timeout,
+                requests.HTTPError,
+                requests.exceptions.SSLError,
+            ) as exc:
                 if attempt > self.http_config.max_retries:
                     raise
                 sleep_time = self.http_config.backoff_factor * (2 ** (attempt - 1))
                 self.logger.warning(
-                    "download retry", extra={"stage": "download", "attempt": attempt, "sleep_sec": sleep_time, "error": str(exc)}
+                    "download retry",
+                    extra={
+                        "stage": "download",
+                        "attempt": attempt,
+                        "sleep_sec": sleep_time,
+                        "error": str(exc),
+                    },
                 )
                 time.sleep(sleep_time)
         part_path.replace(Path(output_file))
@@ -388,7 +414,9 @@ class StreamingDownloader(pooch.HTTPDownloader):
 def _get_bucket(host: str, http_config: DownloadConfiguration) -> TokenBucket:
     bucket = _TOKEN_BUCKETS.get(host)
     if bucket is None:
-        bucket = TokenBucket(http_config.rate_limit_per_second(), capacity=http_config.rate_limit_per_second())
+        bucket = TokenBucket(
+            http_config.rate_limit_per_second(), capacity=http_config.rate_limit_per_second()
+        )
         _TOKEN_BUCKETS[host] = bucket
     return bucket
 
@@ -447,7 +475,12 @@ def download_stream(
                 progressbar=False,
             )
         )
-    except (requests.ConnectionError, requests.Timeout, requests.HTTPError, requests.exceptions.SSLError) as exc:
+    except (
+        requests.ConnectionError,
+        requests.Timeout,
+        requests.HTTPError,
+        requests.exceptions.SSLError,
+    ) as exc:
         logger.error(
             "download request failed",
             extra={"stage": "download", "url": secure_url, "error": str(exc)},

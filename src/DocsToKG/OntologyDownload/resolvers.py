@@ -23,6 +23,7 @@ from ontoportal_client import BioPortalClient
 try:  # pragma: no cover - exercised in environments without pystow installed
     import pystow  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover - provides lightweight fallback for tests
+
     class _PystowFallback:
         """Minimal pystow replacement used when optional dependency is absent."""
 
@@ -51,6 +52,7 @@ class FetchPlan:
         license: License reported for the ontology.
         media_type: MIME type of the artifact when known.
     """
+
     url: str
     headers: Dict[str, str]
     filename_hint: Optional[str]
@@ -62,7 +64,9 @@ class FetchPlan:
 class BaseResolver:
     """Shared helpers for resolver implementations."""
 
-    def _execute_with_retry(self, func, *, config: ResolvedConfig, logger: logging.Logger, name: str):
+    def _execute_with_retry(
+        self, func, *, config: ResolvedConfig, logger: logging.Logger, name: str
+    ):
         attempts = 0
         max_attempts = max(1, config.defaults.http.max_retries)
         while True:
@@ -71,11 +75,18 @@ class BaseResolver:
                 return func()
             except requests.Timeout as exc:
                 if attempts >= max_attempts:
-                    raise ConfigError(f"{name} API timeout after {config.defaults.http.timeout_sec}s") from exc
+                    raise ConfigError(
+                        f"{name} API timeout after {config.defaults.http.timeout_sec}s"
+                    ) from exc
                 sleep_time = config.defaults.http.backoff_factor * (2 ** (attempts - 1))
                 logger.warning(
                     "resolver timeout",
-                    extra={"stage": "plan", "resolver": name, "attempt": attempts, "sleep_sec": sleep_time},
+                    extra={
+                        "stage": "plan",
+                        "resolver": name,
+                        "attempt": attempts,
+                        "sleep_sec": sleep_time,
+                    },
                 )
                 time.sleep(sleep_time)
             except requests.HTTPError as exc:
@@ -132,7 +143,13 @@ class OBOResolver(BaseResolver):
             if url:
                 logger.info(
                     "resolved download url",
-                    extra={"stage": "plan", "resolver": "obo", "ontology_id": spec.id, "format": fmt, "url": url},
+                    extra={
+                        "stage": "plan",
+                        "resolver": "obo",
+                        "ontology_id": spec.id,
+                        "format": fmt,
+                        "url": url,
+                    },
                 )
                 return self._build_plan(url=url, media_type="application/rdf+xml")
         raise ConfigError(f"No download link found via Bioregistry for {spec.id}")
@@ -162,7 +179,10 @@ class OLSResolver(BaseResolver):
         ontology_id = spec.id.lower()
         try:
             record = self._execute_with_retry(
-                lambda: self.client.get_ontology(ontology_id), config=config, logger=logger, name="ols"
+                lambda: self.client.get_ontology(ontology_id),
+                config=config,
+                logger=logger,
+                name="ols",
             )
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else None
@@ -197,7 +217,9 @@ class OLSResolver(BaseResolver):
                 name="ols",
             )
             for submission in submissions:
-                candidate = submission.get("downloadLocation") or submission.get("links", {}).get("download")
+                candidate = submission.get("downloadLocation") or submission.get("links", {}).get(
+                    "download"
+                )
                 if candidate:
                     download_url = candidate
                     version = submission.get("version") or submission.get("shortForm")
@@ -209,7 +231,9 @@ class OLSResolver(BaseResolver):
             "resolved download url",
             extra={"stage": "plan", "resolver": "ols", "ontology_id": spec.id, "url": download_url},
         )
-        return self._build_plan(url=download_url, filename_hint=filename, version=version, license=license_value)
+        return self._build_plan(
+            url=download_url, filename_hint=filename, version=version, license=license_value
+        )
 
 
 class BioPortalResolver(BaseResolver):
@@ -242,7 +266,10 @@ class BioPortalResolver(BaseResolver):
         acronym = spec.extras.get("acronym", spec.id.upper())
         try:
             ontology = self._execute_with_retry(
-                lambda: self.client.get_ontology(acronym), config=config, logger=logger, name="bioportal"
+                lambda: self.client.get_ontology(acronym),
+                config=config,
+                logger=logger,
+                name="bioportal",
             )
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else None
@@ -256,7 +283,10 @@ class BioPortalResolver(BaseResolver):
         if isinstance(ontology, dict):
             license_value = ontology.get("license")
         latest_submission = self._execute_with_retry(
-            lambda: self.client.get_latest_submission(acronym), config=config, logger=logger, name="bioportal"
+            lambda: self.client.get_latest_submission(acronym),
+            config=config,
+            logger=logger,
+            name="bioportal",
         )
         if isinstance(latest_submission, dict):
             download_url = (
@@ -280,9 +310,16 @@ class BioPortalResolver(BaseResolver):
             headers["Authorization"] = f"apikey {api_key}"
         logger.info(
             "resolved download url",
-            extra={"stage": "plan", "resolver": "bioportal", "ontology_id": spec.id, "url": download_url},
+            extra={
+                "stage": "plan",
+                "resolver": "bioportal",
+                "ontology_id": spec.id,
+                "url": download_url,
+            },
         )
-        return self._build_plan(url=download_url, headers=headers, version=version, license=license_value)
+        return self._build_plan(
+            url=download_url, headers=headers, version=version, license=license_value
+        )
 
 
 class SKOSResolver(BaseResolver):

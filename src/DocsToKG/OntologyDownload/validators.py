@@ -13,20 +13,21 @@ import logging
 import platform
 import shutil
 import subprocess
+import sys
 import tempfile
 import zipfile
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, MutableMapping, Optional, cast
-
-import sys
 
 import psutil
 
 try:  # pragma: no cover - optional dependency
     import rdflib  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover - lightweight stub for tests
+
     class _StubGraph:
         def __init__(self) -> None:
             self._source: Optional[Path] = None
@@ -37,7 +38,9 @@ except ModuleNotFoundError:  # pragma: no cover - lightweight stub for tests
         def __len__(self) -> int:
             return 1
 
-        def serialize(self, destination: Path, format: str = "turtle") -> None:  # pragma: no cover - simple stub
+        def serialize(
+            self, destination: Path, format: str = "turtle"
+        ) -> None:  # pragma: no cover - simple stub
             destination_path = Path(destination)
             destination_path.parent.mkdir(parents=True, exist_ok=True)
             if self._source and self._source.exists():
@@ -54,6 +57,7 @@ except ModuleNotFoundError:  # pragma: no cover - lightweight stub for tests
 try:  # pragma: no cover - optional dependency
     import pronto  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover - lightweight stub for tests
+
     class _StubOntology:
         def __init__(self, path: str) -> None:
             self._path = Path(path)
@@ -73,6 +77,7 @@ except ModuleNotFoundError:  # pragma: no cover - lightweight stub for tests
 try:  # pragma: no cover - optional dependency
     import owlready2  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover - lightweight stub for tests
+
     class _StubLoadedOntology:
         def classes(self):  # pragma: no cover - simple stub
             return ["Class1", "Class2"]
@@ -106,6 +111,7 @@ class ValidationRequest:
         validation_dir: Directory for validator reports and logs.
         config: Resolved configuration that supplies timeout thresholds.
     """
+
     name: str
     file_path: Path
     normalized_dir: Path
@@ -122,6 +128,7 @@ class ValidationResult:
         details: Arbitrary metadata describing validator output.
         output_files: Generated files for downstream processing.
     """
+
     ok: bool
     details: Dict[str, object]
     output_files: List[str]
@@ -155,7 +162,7 @@ def _log_memory(logger: logging.Logger, validator: str, event: str) -> None:
     if not enabled:
         return
     process = psutil.Process()
-    memory_mb = process.memory_info().rss / (1024 ** 2)
+    memory_mb = process.memory_info().rss / (1024**2)
     logger.debug(
         "memory usage",
         extra={
@@ -317,6 +324,7 @@ def validate_pronto(request: ValidationRequest, logger: logging.Logger) -> Valid
     Raises:
         ValidationTimeout: Propagated when Pronto takes longer than allowed.
     """
+
     def _load() -> pronto.Ontology:
         return pronto.Ontology(request.file_path.as_posix())
 
@@ -375,7 +383,7 @@ def validate_owlready2(request: ValidationRequest, logger: logging.Logger) -> Va
         ValidationResult summarizing entity counts or failure details.
     """
     try:
-        size_mb = request.file_path.stat().st_size / (1024 ** 2)
+        size_mb = request.file_path.stat().st_size / (1024**2)
         limit = request.config.defaults.validation.skip_reasoning_if_size_mb
         if size_mb > limit:
             reason = f"Skipping reasoning for large file (> {limit} MB)"
@@ -445,7 +453,14 @@ def validate_robot(request: ValidationRequest, logger: logging.Logger) -> Valida
     report_path = request.validation_dir / "robot_report.tsv"
     try:
         _log_memory(logger, "robot", "before")
-        convert_cmd = [robot_path, "convert", "-i", str(request.file_path), "-o", str(normalized_path)]
+        convert_cmd = [
+            robot_path,
+            "convert",
+            "-i",
+            str(request.file_path),
+            "-o",
+            str(normalized_path),
+        ]
         report_cmd = [robot_path, "report", "-i", str(request.file_path), "-o", str(report_path)]
         subprocess.run(convert_cmd, check=True, capture_output=True)
         subprocess.run(report_cmd, check=True, capture_output=True)
@@ -489,7 +504,9 @@ def validate_arelle(request: ValidationRequest, logger: logging.Logger) -> Valid
         from arelle import Cntlr  # type: ignore
 
         entrypoint, artifacts = _prepare_xbrl_package(request, logger)
-        controller = Cntlr.Cntlr(logFile=str(request.validation_dir / "arelle.log"), logToBuffer=True)
+        controller = Cntlr.Cntlr(
+            logFile=str(request.validation_dir / "arelle.log"), logToBuffer=True
+        )
         _log_memory(logger, "arelle", "before")
         controller.run(["--file", str(entrypoint)])
         _log_memory(logger, "arelle", "after")
@@ -530,7 +547,9 @@ VALIDATORS = {
 }
 
 
-def run_validators(requests: Iterable[ValidationRequest], logger: logging.Logger) -> Dict[str, ValidationResult]:
+def run_validators(
+    requests: Iterable[ValidationRequest], logger: logging.Logger
+) -> Dict[str, ValidationResult]:
     """Execute registered validators and aggregate their results.
 
     Args:
@@ -552,7 +571,11 @@ def run_validators(requests: Iterable[ValidationRequest], logger: logging.Logger
             _write_validation_json(request.validation_dir / f"{request.name}_parse.json", payload)
             logger.error(
                 "validator crashed",
-                extra={"stage": "validate", "validator": request.name, "error": payload.get("error")},
+                extra={
+                    "stage": "validate",
+                    "validator": request.name,
+                    "error": payload.get("error"),
+                },
             )
             results[request.name] = ValidationResult(ok=False, details=payload, output_files=[])
     return results

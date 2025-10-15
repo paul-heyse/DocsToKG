@@ -1,13 +1,14 @@
 """Reciprocal Rank Fusion and diversification utilities."""
+
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Dict, Iterable, List, Mapping, Sequence, Tuple
+from typing import Dict, List, Mapping, Sequence
 
 import numpy as np
 
-from .types import FusionCandidate
 from .similarity import normalize_rows, pairwise_inner_products
+from .types import FusionCandidate
 
 
 class ReciprocalRankFusion:
@@ -19,6 +20,14 @@ class ReciprocalRankFusion:
         self._k0 = k0
 
     def fuse(self, candidates: Sequence[FusionCandidate]) -> Dict[str, float]:
+        """Score candidates using reciprocal rank fusion.
+
+        Args:
+            candidates: Ordered sequence of fusion candidates.
+
+        Returns:
+            Mapping of vector IDs to aggregated RRF scores.
+        """
         scores: Dict[str, float] = defaultdict(float)
         for candidate in candidates:
             contribution = 1.0 / (self._k0 + candidate.rank)
@@ -32,13 +41,27 @@ def apply_mmr_diversification(
     lambda_param: float,
     top_k: int,
 ) -> List[FusionCandidate]:
+    """Apply maximal marginal relevance to promote diversity.
+
+    Args:
+        fused_candidates: Candidates ranked by initial fusion stage.
+        fused_scores: Pre-computed relevance scores keyed by vector ID.
+        lambda_param: Balance factor between relevance and diversity [0,1].
+        top_k: Number of candidates to retain after diversification.
+
+    Returns:
+        List of diversified candidates ordered by selection.
+    """
     if not 0.0 <= lambda_param <= 1.0:
         raise ValueError("lambda_param must be within [0, 1]")
     if not fused_candidates:
         return []
 
     embeddings = np.stack(
-        [candidate.chunk.features.embedding.astype(np.float32, copy=False) for candidate in fused_candidates]
+        [
+            candidate.chunk.features.embedding.astype(np.float32, copy=False)
+            for candidate in fused_candidates
+        ]
     )
     normalized = normalize_rows(embeddings)
     similarity_matrix = pairwise_inner_products(normalized)
@@ -66,4 +89,3 @@ def apply_mmr_diversification(
         candidate_indices = [idx for idx in candidate_indices if idx != best_idx]
 
     return [fused_candidates[idx] for idx in selected_indices]
-

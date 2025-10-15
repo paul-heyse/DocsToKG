@@ -1,0 +1,162 @@
+# Module: run_docling_parallel_with_vllm_debug
+
+Start (or reuse) a local vLLM server for Granite-Docling, then run parallel Docling conversions.
+
+Improvements:
+- Port-smart: reuse healthy vLLM on 8000; else find another free port.
+- Rich diagnostics: stream vLLM logs; print HTTP status and bodies from /v1/models and /metrics.
+- tqdm progress bars for vLLM warmup and per-PDF conversion progress.
+
+## Functions
+
+### `find_data_root(start)`
+
+Locate the DocsToKG data directory starting from a filesystem path.
+
+Args:
+start: Directory to begin searching from; ancestors are inspected as well.
+
+Returns:
+Path pointing to a directory that contains the expected `PDFs` subdirectory.
+Falls back to `<start>/Data` when no ancestor contains the structure.
+
+### `port_is_free(port)`
+
+Determine whether a TCP port on localhost is currently available.
+
+Args:
+port: Port number to probe on the loopback interface.
+
+Returns:
+True when the port is unused; otherwise False.
+
+### `probe_models(port, timeout)`
+
+Inspect the `/v1/models` endpoint exposed by a vLLM HTTP server.
+
+Args:
+port: HTTP port where the vLLM server is expected to listen.
+timeout: Seconds to wait for the HTTP request before aborting.
+
+Returns:
+Tuple containing the list of model identifiers (if any), the raw response
+body, and the HTTP status code. Missing models or connection failures are
+represented by `(None, <error>, None)`.
+
+### `probe_metrics(port, timeout)`
+
+Check whether the vLLM `/metrics` endpoint is healthy.
+
+Args:
+port: HTTP port where the vLLM server should expose metrics.
+timeout: Seconds to wait for the HTTP response before aborting.
+
+Returns:
+Tuple of `(is_healthy, status_code)` where `is_healthy` is True when the
+endpoint responds with HTTP 200.
+
+### `find_free_port(start, span)`
+
+Find an available TCP port, scanning forwards from a starting point.
+
+Args:
+start: First port number to test.
+span: Maximum number of sequential ports to probe for availability.
+
+Returns:
+Available port number suitable for binding a local server.
+
+### `stream_logs(proc, prefix)`
+
+Continuously stream stdout lines from a child process to the console.
+
+Args:
+proc: Running subprocess whose stdout should be tailed.
+prefix: Text prefix applied to each emitted log line for readability.
+
+Returns:
+None
+
+### `start_vllm(port)`
+
+Launch a vLLM server process on the requested port.
+
+Args:
+port: Port on which the vLLM HTTP server should listen.
+
+Returns:
+Started subprocess handle for the vLLM server.
+
+Raises:
+SystemExit: If the `vllm` executable is not present on `PATH`.
+
+### `wait_for_vllm(port, proc, timeout_s)`
+
+Poll the vLLM server until `/v1/models` responds with success.
+
+Args:
+port: HTTP port where the server is expected to listen.
+proc: Subprocess handle representing the running vLLM instance.
+timeout_s: Maximum time in seconds to wait for readiness.
+
+Returns:
+None
+
+Raises:
+RuntimeError: If the server exits prematurely or fails to become ready
+within the allotted timeout.
+
+### `stop_vllm(proc, own, grace)`
+
+Terminate a managed vLLM process if this script launched it.
+
+Args:
+proc: Subprocess handle returned by `start_vllm`, or None.
+own: Indicates whether the caller owns the process lifetime.
+grace: Seconds to wait for graceful shutdown before forcing exit.
+
+Returns:
+None
+
+### `ensure_vllm(preferred)`
+
+Ensure a vLLM server is available, launching one when necessary.
+
+Args:
+preferred: Preferred TCP port for the server.
+
+Returns:
+Tuple containing `(port, process, owns_process)` where `process` is the
+managed subprocess handle (or None if reusing an existing server) and
+`owns_process` indicates whether the caller should terminate it.
+
+### `list_pdfs(root)`
+
+Collect PDF files under a directory recursively.
+
+Args:
+root: Directory whose subtree should be scanned for PDFs.
+
+Returns:
+Sorted list of paths to PDF files.
+
+### `convert_one(args)`
+
+Convert a single PDF into DocTags using a remote vLLM-backed pipeline.
+
+Args:
+args: Tuple containing `(pdf_path, output_dir, port)` for the work item.
+
+Returns:
+Tuple of `(pdf_name, status)` where status is one of `ok`, `skip`, or a
+`fail:<reason>` string describing the conversion issue.
+
+### `main()`
+
+Entrypoint that coordinates vLLM setup and parallel DocTags conversion.
+
+Args:
+None
+
+Returns:
+None

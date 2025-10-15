@@ -92,11 +92,13 @@ ontologies:
   - id: eurovoc
     resolver: skos
     extras:
-      url: https://op.europa.eu/o/opportal-service/euvoc-download-handler?cellarURI=http%3A%2F%2Fpublications.europa.eu%2Fresource%2Feurovoc
+      # Replace with the official EuroVoc Turtle download URL for your deployment
+      url: https://example.com/eurovoc.ttl
   - id: ifrs
     resolver: xbrl
     extras:
-      url: https://example.org/ifrs-taxonomy.zip
+      # Replace with the XBRL taxonomy archive URL
+      url: https://example.com/ifrs-taxonomy.zip
 ```
 
 When a resolver requires additional hints, populate the `extras` mapping:
@@ -104,8 +106,8 @@ When a resolver requires additional hints, populate the `extras` mapping:
 | Resolver | Required extras | Example |
 | --- | --- | --- |
 | `bioportal` | `acronym` (defaults to uppercase `id` if omitted) | `acronym: NCIT` |
-| `skos` | `url` pointing directly to the SKOS/RDF download | `url: https://.../eurovoc.ttl` |
-| `xbrl` | `url` pointing to the taxonomy ZIP archive | `url: https://example.org/ifrs-taxonomy.zip` |
+| `skos` | `url` pointing directly to the SKOS/RDF download | `url: https://example.com/eurovoc.ttl` |
+| `xbrl` | `url` pointing to the taxonomy ZIP archive | `url: https://example.com/ifrs-taxonomy.zip` |
 
 ## CLI Usage
 

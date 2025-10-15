@@ -1,0 +1,46 @@
+# Module: utils
+
+Shared utility functions for the ContentDownload module.
+
+## Functions
+
+### `normalize_doi(doi)`
+
+Normalize DOI identifiers by stripping prefixes and whitespace.
+
+Args:
+doi: Raw DOI string or URL provided by upstream metadata.
+
+Returns:
+Canonical DOI without protocol prefixes, or None when input is empty.
+
+### `normalize_pmcid(pmcid)`
+
+Normalize PMCID values ensuring a canonical PMC prefix.
+
+Args:
+pmcid: PMCID string that may contain extraneous characters.
+
+Returns:
+Normalized PMCID including the `PMC` prefix, or None if parsing fails.
+
+### `strip_prefix(value, prefix)`
+
+Strip a case-insensitive prefix from a string when present.
+
+Args:
+value: String that might contain the prefix.
+prefix: Prefix to remove from the value.
+
+Returns:
+String without the prefix, or None if the value is empty.
+
+### `dedupe(items)`
+
+Remove duplicates while preserving the first occurrence order.
+
+Args:
+items: Sequence of string values that may contain duplicates.
+
+Returns:
+New list with duplicates removed while keeping original ordering.

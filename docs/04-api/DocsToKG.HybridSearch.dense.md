@@ -1,6 +1,6 @@
 # Module: dense
 
-FAISS index management with GPU-aware fallbacks.
+GPU-only FAISS index management for dense retrieval.
 
 ## Functions
 
@@ -9,6 +9,10 @@ FAISS index management with GPU-aware fallbacks.
 *No documentation available.*
 
 ### `config(self)`
+
+*No documentation available.*
+
+### `set_id_resolver(self, resolver)`
 
 *No documentation available.*
 
@@ -56,6 +60,18 @@ FAISS index management with GPU-aware fallbacks.
 
 *No documentation available.*
 
+### `_apply_search_parameters(self, index)`
+
+*No documentation available.*
+
+### `_log_index_configuration(self, index)`
+
+*No documentation available.*
+
+### `_resolve_vector_id(self, internal_id)`
+
+*No documentation available.*
+
 ### `_init_gpu_resources(self)`
 
 *No documentation available.*
@@ -68,7 +84,7 @@ FAISS index management with GPU-aware fallbacks.
 
 *No documentation available.*
 
-### `_normalize(self, matrix)`
+### `_rebuild_index(self)`
 
 *No documentation available.*
 
@@ -80,4 +96,4 @@ Dense search hit returned by FAISS.
 
 ### `FaissIndexManager`
 
-Manage lifecycle of a FAISS index with optional GPU acceleration.
+Manage lifecycle of a GPU-resident FAISS index.

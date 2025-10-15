@@ -44,6 +44,9 @@ class HybridSearchAPI:
 
         Raises:
             TypeError: If service is not a HybridSearchService instance
+
+        Returns:
+            None
         """
         if not isinstance(service, HybridSearchService):
             raise TypeError("service must be a HybridSearchService instance")

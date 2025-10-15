@@ -1,4 +1,5 @@
 """Result shaping utilities for hybrid search responses."""
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -32,6 +33,17 @@ class ResultShaper:
         request: HybridSearchRequest,
         channel_scores: Mapping[str, Dict[str, float]],
     ) -> List[HybridSearchResult]:
+        """Transform ordered chunks into shaped search results.
+
+        Args:
+            ordered_chunks: Ranked chunk payloads emitted by fusion.
+            fused_scores: Final fused score per vector ID.
+            request: Original hybrid search request used for context.
+            channel_scores: Per-channel scoring maps keyed by vector ID.
+
+        Returns:
+            List of `HybridSearchResult` objects ready for response serialization.
+        """
         if not ordered_chunks:
             return []
 
@@ -49,7 +61,9 @@ class ResultShaper:
             rank = current_idx + 1
             if not self._within_doc_limit(chunk.doc_id, doc_buckets):
                 continue
-            if emitted_indices and self._is_near_duplicate(current_idx, emitted_indices, similarity_matrix):
+            if emitted_indices and self._is_near_duplicate(
+                current_idx, emitted_indices, similarity_matrix
+            ):
                 continue
             highlights = self._build_highlights(chunk, query_tokens)
             diagnostics = HybridSearchDiagnostics(
@@ -76,6 +90,15 @@ class ResultShaper:
         return results
 
     def _within_doc_limit(self, doc_id: str, doc_buckets: Dict[str, int]) -> bool:
+        """Check and update per-document emission counts.
+
+        Args:
+            doc_id: Document identifier being considered for emission.
+            doc_buckets: Mutable counter of chunks emitted per document.
+
+        Returns:
+            True if the document is still below the configured limit.
+        """
         doc_buckets[doc_id] += 1
         return doc_buckets[doc_id] <= self._fusion_config.max_chunks_per_doc
 
@@ -85,12 +108,31 @@ class ResultShaper:
         emitted_indices: Sequence[int],
         similarity_matrix: np.ndarray,
     ) -> bool:
+        """Determine whether the current chunk is too similar to emitted ones.
+
+        Args:
+            current_idx: Index of the current chunk in `ordered_chunks`.
+            emitted_indices: Indices already emitted into the result set.
+            similarity_matrix: Precomputed pairwise similarity matrix.
+
+        Returns:
+            True if cosine similarity exceeds the dedupe threshold.
+        """
         similarities = similarity_matrix[current_idx, emitted_indices]
         if similarities.size == 0:
             return False
         return float(np.max(similarities)) >= self._fusion_config.cosine_dedupe_threshold
 
     def _build_highlights(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
+        """Generate highlight snippets for a chunk.
+
+        Args:
+            chunk: Chunk payload being rendered.
+            query_tokens: Tokens derived from the user's query.
+
+        Returns:
+            List of highlight strings; falls back to a snippet when necessary.
+        """
         highlights = self._opensearch.highlight(chunk, query_tokens)
         if highlights:
             return highlights

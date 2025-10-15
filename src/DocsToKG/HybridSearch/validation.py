@@ -1,25 +1,26 @@
 """Automated validation harness for the hybrid search stack."""
+
 from __future__ import annotations
 
 import argparse
 import json
-import math
 import random
 import statistics
 import time
 from datetime import UTC, datetime
 from itertools import combinations
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 
-from .ingest import ChunkIngestionPipeline
-from .observability import Observability
 from .config import HybridSearchConfigManager
 from .dense import FaissIndexManager
 from .features import FeatureGenerator
-from .operations import restore_state as ops_restore_state, serialize_state as ops_serialize_state
+from .ingest import ChunkIngestionPipeline
+from .observability import Observability
+from .operations import restore_state as ops_restore_state
+from .operations import serialize_state as ops_serialize_state
 from .retrieval import HybridSearchService
 from .storage import ChunkRegistry, OpenSearchSimulator
 from .types import (
@@ -33,7 +34,14 @@ from .types import (
 
 
 def load_dataset(path: Path) -> List[Mapping[str, object]]:
-    """Load a JSONL dataset describing documents and queries."""
+    """Load a JSONL dataset describing documents and queries.
+
+    Args:
+        path: Path to a JSONL file containing dataset entries.
+
+    Returns:
+        List of parsed dataset rows suitable for validation routines.
+    """
 
     lines = path.read_text(encoding="utf-8").splitlines()
     dataset: List[Mapping[str, object]] = []
@@ -45,7 +53,14 @@ def load_dataset(path: Path) -> List[Mapping[str, object]]:
 
 
 def infer_embedding_dim(dataset: Sequence[Mapping[str, object]]) -> int:
-    """Infer dense embedding dimensionality from dataset vector artifacts."""
+    """Infer dense embedding dimensionality from dataset vector artifacts.
+
+    Args:
+        dataset: Sequence of dataset entries containing vector metadata.
+
+    Returns:
+        Inferred embedding dimensionality, defaulting to 2560 when unknown.
+    """
 
     for entry in dataset:
         document = entry.get("document", {})
@@ -99,7 +114,18 @@ class HybridSearchValidator:
         self._registry = registry
         self._opensearch = opensearch
 
-    def run(self, dataset: Sequence[Mapping[str, object]], output_root: Optional[Path] = None) -> ValidationSummary:
+    def run(
+        self, dataset: Sequence[Mapping[str, object]], output_root: Optional[Path] = None
+    ) -> ValidationSummary:
+        """Execute standard validation against a dataset.
+
+        Args:
+            dataset: Loaded dataset entries containing document and query payloads.
+            output_root: Optional directory where reports should be written.
+
+        Returns:
+            ValidationSummary capturing per-check reports.
+        """
         started = datetime.now(UTC)
         documents = [self._to_document(entry["document"]) for entry in dataset]
         self._ingestion.upsert_documents(documents)
@@ -115,7 +141,9 @@ class HybridSearchValidator:
         reports.append(calibration)
         completed = datetime.now(UTC)
         summary = ValidationSummary(reports=reports, started_at=started, completed_at=completed)
-        self._persist_reports(summary, output_root, calibration.details if calibration.details else None)
+        self._persist_reports(
+            summary, output_root, calibration.details if calibration.details else None
+        )
         return summary
 
     def run_scale(
@@ -126,6 +154,17 @@ class HybridSearchValidator:
         thresholds: Optional[Mapping[str, float]] = None,
         query_sample_size: int = 120,
     ) -> ValidationSummary:
+        """Execute a comprehensive scale validation suite.
+
+        Args:
+            dataset: Dataset entries containing documents and queries.
+            output_root: Optional directory for detailed metrics output.
+            thresholds: Optional overrides for scale validation thresholds.
+            query_sample_size: Number of queries sampled for specific checks.
+
+        Returns:
+            ValidationSummary with detailed per-check reports.
+        """
         merged_thresholds: Dict[str, float] = dict(DEFAULT_SCALE_THRESHOLDS)
         if thresholds:
             merged_thresholds.update(thresholds)
@@ -151,7 +190,9 @@ class HybridSearchValidator:
         reports.append(dense_report)
         extras[dense_report.name] = dense_report.details
 
-        relevance_report = self._scale_channel_relevance(dataset, merged_thresholds, rng, query_sample_size)
+        relevance_report = self._scale_channel_relevance(
+            dataset, merged_thresholds, rng, query_sample_size
+        )
         reports.append(relevance_report)
         extras[relevance_report.name] = relevance_report.details
 
@@ -175,7 +216,9 @@ class HybridSearchValidator:
         reports.append(acl_report)
         extras[acl_report.name] = acl_report.details
 
-        performance_report = self._scale_performance(dataset, merged_thresholds, rng, query_sample_size)
+        performance_report = self._scale_performance(
+            dataset, merged_thresholds, rng, query_sample_size
+        )
         reports.append(performance_report)
         extras[performance_report.name] = performance_report.details
 
@@ -198,6 +241,14 @@ class HybridSearchValidator:
         return summary
 
     def _to_document(self, payload: Mapping[str, object]) -> DocumentInput:
+        """Transform dataset document payload into a `DocumentInput`.
+
+        Args:
+            payload: Dataset document dictionary containing paths and metadata.
+
+        Returns:
+            Corresponding `DocumentInput` instance for ingestion.
+        """
         return DocumentInput(
             doc_id=str(payload["doc_id"]),
             namespace=str(payload["namespace"]),
@@ -207,12 +258,28 @@ class HybridSearchValidator:
         )
 
     def _check_ingest_integrity(self) -> ValidationReport:
+        """Verify that ingested chunks contain valid embeddings.
+
+        Args:
+            None
+
+        Returns:
+            ValidationReport describing integrity checks for ingested chunks.
+        """
         all_chunks = self._registry.all()
         ok = all(len(chunk.features.embedding.shape) == 1 for chunk in all_chunks)
         details = {"total_chunks": len(all_chunks)}
         return ValidationReport(name="ingest_integrity", passed=ok, details=details)
 
     def _check_dense_self_hit(self) -> ValidationReport:
+        """Ensure dense search returns each chunk as its own nearest neighbor.
+
+        Args:
+            None
+
+        Returns:
+            ValidationReport summarizing dense self-hit accuracy.
+        """
         total = 0
         hits_met = 0
         for chunk in self._registry.all():
@@ -234,6 +301,14 @@ class HybridSearchValidator:
         )
 
     def _check_sparse_relevance(self, dataset: Sequence[Mapping[str, object]]) -> ValidationReport:
+        """Check that sparse channels retrieve expected documents.
+
+        Args:
+            dataset: Dataset entries with expected relevance metadata.
+
+        Returns:
+            ValidationReport covering sparse channel relevance.
+        """
         total = 0
         hits_met = 0
         for entry in dataset:
@@ -243,9 +318,7 @@ class HybridSearchValidator:
                 expected = query.get("expected_doc_id")
                 request = self._request_for_query(query)
                 response = self._service.search(request)
-                if response.results and (
-                    not expected or response.results[0].doc_id == expected
-                ):
+                if response.results and (not expected or response.results[0].doc_id == expected):
                     hits_met += 1
         rate = hits_met / total if total else 0.0
         passed = rate >= BASIC_SPARSE_RELEVANCE_THRESHOLD
@@ -261,6 +334,14 @@ class HybridSearchValidator:
         )
 
     def _check_namespace_filters(self, dataset: Sequence[Mapping[str, object]]) -> ValidationReport:
+        """Ensure namespace-constrained queries do not leak results.
+
+        Args:
+            dataset: Dataset entries containing namespace-constrained queries.
+
+        Returns:
+            ValidationReport indicating whether namespace isolation holds.
+        """
         ok = True
         for entry in dataset:
             queries = entry.get("queries", [])
@@ -279,6 +360,14 @@ class HybridSearchValidator:
         return ValidationReport(name="namespace_filter", passed=ok, details={})
 
     def _check_pagination(self, dataset: Sequence[Mapping[str, object]]) -> ValidationReport:
+        """Verify pagination cursors do not create duplicate results.
+
+        Args:
+            dataset: Dataset entries providing queries for pagination tests.
+
+        Returns:
+            ValidationReport detailing pagination stability.
+        """
         ok = True
         for entry in dataset:
             queries = entry.get("queries", [])
@@ -299,6 +388,14 @@ class HybridSearchValidator:
         return ValidationReport(name="pagination_stability", passed=ok, details={})
 
     def _check_highlights(self, dataset: Sequence[Mapping[str, object]]) -> ValidationReport:
+        """Assert that each result includes highlight snippets.
+
+        Args:
+            dataset: Dataset entries with queries to validate highlight generation.
+
+        Returns:
+            ValidationReport indicating highlight completeness.
+        """
         ok = True
         for entry in dataset:
             queries = entry.get("queries", [])
@@ -313,20 +410,45 @@ class HybridSearchValidator:
         return ValidationReport(name="highlight_presence", passed=ok, details={})
 
     def _check_backup_restore(self, dataset: Sequence[Mapping[str, object]]) -> ValidationReport:
+        """Validate backup/restore by round-tripping the FAISS index.
+
+        Args:
+            dataset: Dataset entries used to verify consistency post-restore.
+
+        Returns:
+            ValidationReport capturing backup/restore status.
+        """
         if not dataset:
-            return ValidationReport(name="backup_restore", passed=False, details={"error": "dataset empty"})
+            return ValidationReport(
+                name="backup_restore", passed=False, details={"error": "dataset empty"}
+            )
         queries = dataset[0].get("queries", [])
         if not queries:
-            return ValidationReport(name="backup_restore", passed=False, details={"error": "missing queries"})
+            return ValidationReport(
+                name="backup_restore", passed=False, details={"error": "missing queries"}
+            )
         faiss_bytes = self._ingestion.faiss_index.serialize()
         first_query = self._request_for_query(queries[0])
         before = self._service.search(first_query)
         self._ingestion.faiss_index.restore(faiss_bytes)
         after = self._service.search(first_query)
-        ok = bool(before.results and after.results and before.results[0].doc_id == after.results[0].doc_id)
+        ok = bool(
+            before.results and after.results and before.results[0].doc_id == after.results[0].doc_id
+        )
         return ValidationReport(name="backup_restore", passed=ok, details={})
 
-    def _request_for_query(self, query: Mapping[str, object], page_size: int = 5) -> HybridSearchRequest:
+    def _request_for_query(
+        self, query: Mapping[str, object], page_size: int = 5
+    ) -> HybridSearchRequest:
+        """Construct a `HybridSearchRequest` for a dataset query payload.
+
+        Args:
+            query: Query payload from the dataset.
+            page_size: Desired page size for generated requests.
+
+        Returns:
+            HybridSearchRequest ready for execution against the service.
+        """
         return HybridSearchRequest(
             query=str(query["query"]),
             namespace=query.get("namespace"),
@@ -345,6 +467,17 @@ class HybridSearchValidator:
         *,
         extras: Optional[Mapping[str, Mapping[str, object]]] = None,
     ) -> None:
+        """Persist validation summaries and detailed metrics to disk.
+
+        Args:
+            summary: Validation summary containing reports.
+            output_root: Optional directory for storing artifacts.
+            calibration_details: Optional calibration metrics to persist.
+            extras: Optional mapping of additional metrics categories.
+
+        Returns:
+            None
+        """
         root = output_root or Path("reports/validation")
         directory = root / summary.started_at.strftime("%Y%m%d%H%M%S")
         directory.mkdir(parents=True, exist_ok=True)
@@ -356,7 +489,9 @@ class HybridSearchValidator:
             }
             for report in summary.reports
         ]
-        (directory / "summary.json").write_text(json.dumps(reports_json, indent=2), encoding="utf-8")
+        (directory / "summary.json").write_text(
+            json.dumps(reports_json, indent=2), encoding="utf-8"
+        )
         human_lines = [
             f"Validation started at: {summary.started_at.isoformat()}",
             f"Validation completed at: {summary.completed_at.isoformat()}",
@@ -366,13 +501,23 @@ class HybridSearchValidator:
             human_lines.append(f"- {report.name}: {'PASS' if report.passed else 'FAIL'}")
         (directory / "summary.txt").write_text("\n".join(human_lines), encoding="utf-8")
         if calibration_details is not None:
-            (directory / "calibration.json").write_text(json.dumps(calibration_details, indent=2), encoding="utf-8")
+            (directory / "calibration.json").write_text(
+                json.dumps(calibration_details, indent=2), encoding="utf-8"
+            )
         if extras:
             (directory / "metrics.json").write_text(json.dumps(extras, indent=2), encoding="utf-8")
 
     def _collect_queries(
         self, dataset: Sequence[Mapping[str, object]]
     ) -> List[tuple[Mapping[str, object], Mapping[str, object]]]:
+        """Collect (document, query) pairs from the dataset.
+
+        Args:
+            dataset: Loaded dataset entries containing documents and queries.
+
+        Returns:
+            List of tuples pairing document payloads with query payloads.
+        """
         pairs: List[tuple[Mapping[str, object], Mapping[str, object]]] = []
         for entry in dataset:
             document_payload = entry.get("document", {})
@@ -386,6 +531,16 @@ class HybridSearchValidator:
         sample_size: int,
         rng: random.Random,
     ) -> List[tuple[Mapping[str, object], Mapping[str, object]]]:
+        """Sample a subset of (document, query) pairs for randomized checks.
+
+        Args:
+            dataset: Dataset entries containing documents and queries.
+            sample_size: Maximum number of pairs to return.
+            rng: Random generator used for sampling.
+
+        Returns:
+            List of sampled (document, query) pairs.
+        """
         pairs = self._collect_queries(dataset)
         if not pairs:
             return []
@@ -398,6 +553,15 @@ class HybridSearchValidator:
         documents: Sequence[DocumentInput],
         dataset: Sequence[Mapping[str, object]],
     ) -> ValidationReport:
+        """Validate that ingested corpus statistics look healthy.
+
+        Args:
+            documents: Document inputs ingested during the scale run.
+            dataset: Dataset entries used for validation.
+
+        Returns:
+            ValidationReport summarizing data sanity findings.
+        """
         total_chunks = self._registry.count()
         namespaces = sorted({doc.namespace for doc in documents})
         dims: set[int] = set()
@@ -428,6 +592,17 @@ class HybridSearchValidator:
         inputs_by_doc: Mapping[str, DocumentInput],
         rng: random.Random,
     ) -> ValidationReport:
+        """Exercise CRUD operations to ensure namespace isolation stays intact.
+
+        Args:
+            documents: Documents ingested for the validation run.
+            dataset: Dataset entries providing queries for verification.
+            inputs_by_doc: Mapping back to original document inputs.
+            rng: Random generator used to select documents.
+
+        Returns:
+            ValidationReport describing CRUD and namespace violations if any.
+        """
         initial_registry = self._registry.count()
         initial_faiss = self._ingestion.faiss_index.ntotal
 
@@ -500,6 +675,15 @@ class HybridSearchValidator:
         thresholds: Mapping[str, float],
         rng: random.Random,
     ) -> ValidationReport:
+        """Assess dense retrieval self-hit, perturbation, and recall metrics.
+
+        Args:
+            thresholds: Threshold values for dense metric success.
+            rng: Random generator for selecting sample chunks.
+
+        Returns:
+            ValidationReport containing dense metric measurements.
+        """
         all_chunks = self._registry.all()
         if not all_chunks:
             return ValidationReport(
@@ -517,9 +701,10 @@ class HybridSearchValidator:
         recalls: List[float] = []
 
         # Precompute matrix for brute-force recall estimates.
-        vector_matrix = np.stack([chunk.features.embedding for chunk in all_chunks], dtype=np.float32)
+        vector_matrix = np.stack(
+            [chunk.features.embedding for chunk in all_chunks], dtype=np.float32
+        )
         vector_ids = [chunk.vector_id for chunk in all_chunks]
-        id_to_doc = {chunk.vector_id: chunk.doc_id for chunk in all_chunks}
 
         noise_rng = np.random.default_rng(2024)
 
@@ -533,7 +718,10 @@ class HybridSearchValidator:
             noise = noise_rng.normal(scale=0.01, size=query_vec.shape).astype(np.float32)
             perturbed = query_vec + noise
             perturbed_hits = self._ingestion.faiss_index.search(perturbed, top_k)
-            if any(hit.vector_id == chunk.vector_id for hit in perturbed_hits[: min(3, len(perturbed_hits))]):
+            if any(
+                hit.vector_id == chunk.vector_id
+                for hit in perturbed_hits[: min(3, len(perturbed_hits))]
+            ):
                 perturb_hits += 1
 
             scores = vector_matrix @ query_vec
@@ -568,6 +756,17 @@ class HybridSearchValidator:
         rng: random.Random,
         query_sample_size: int,
     ) -> ValidationReport:
+        """Measure top-10 relevance for each retrieval channel across sampled queries.
+
+        Args:
+            dataset: Dataset entries containing queries for evaluation.
+            thresholds: Threshold mapping for hit-rate expectations.
+            rng: Random generator used for sampling query pairs.
+            query_sample_size: Number of query pairs sampled.
+
+        Returns:
+            ValidationReport capturing per-channel relevance metrics.
+        """
         sampled_pairs = self._sample_queries(dataset, query_sample_size, rng)
         if not sampled_pairs:
             return ValidationReport(
@@ -592,7 +791,9 @@ class HybridSearchValidator:
             doc_to_embedding.setdefault(chunk.doc_id, chunk.features.embedding)
 
         for document_payload, query_payload in sampled_pairs:
-            expected_doc_id = str(query_payload.get("expected_doc_id") or document_payload.get("doc_id"))
+            expected_doc_id = str(
+                query_payload.get("expected_doc_id") or document_payload.get("doc_id")
+            )
             request = self._request_for_query(query_payload, page_size=10)
             filters = dict(request.filters)
             if request.namespace:
@@ -607,7 +808,9 @@ class HybridSearchValidator:
                 bm25_hits += 1
                 bm25_ranks.append(bm25_doc_ids.index(expected_doc_id) + 1)
 
-            splade_results, _ = self._opensearch.search_splade(features.splade_weights, filters, top_k=10)
+            splade_results, _ = self._opensearch.search_splade(
+                features.splade_weights, filters, top_k=10
+            )
             splade_doc_ids = [chunk.doc_id for chunk, _ in splade_results]
             if expected_doc_id in splade_doc_ids:
                 splade_hits += 1
@@ -662,6 +865,17 @@ class HybridSearchValidator:
         rng: random.Random,
         query_sample_size: int,
     ) -> ValidationReport:
+        """Evaluate diversification impact of MMR versus RRF on sampled queries.
+
+        Args:
+            dataset: Dataset entries containing documents and queries.
+            thresholds: Diversification thresholds for redundancy and hit-rate deltas.
+            rng: Random generator for sampling queries.
+            query_sample_size: Number of query pairs to evaluate.
+
+        Returns:
+            ValidationReport detailing redundancy reduction and hit-rate deltas.
+        """
         sampled_pairs = self._sample_queries(dataset, query_sample_size, rng)
         if not sampled_pairs:
             return ValidationReport(
@@ -670,10 +884,7 @@ class HybridSearchValidator:
                 details={"error": "no queries available"},
             )
 
-        chunk_lookup = {
-            (chunk.doc_id, chunk.chunk_id): chunk
-            for chunk in self._registry.all()
-        }
+        chunk_lookup = {(chunk.doc_id, chunk.chunk_id): chunk for chunk in self._registry.all()}
 
         redundancy_reductions: List[float] = []
         rrf_cosines: List[float] = []
@@ -682,7 +893,9 @@ class HybridSearchValidator:
         mmr_hits = 0
 
         for document_payload, query_payload in sampled_pairs:
-            expected_doc_id = str(query_payload.get("expected_doc_id") or document_payload.get("doc_id"))
+            expected_doc_id = str(
+                query_payload.get("expected_doc_id") or document_payload.get("doc_id")
+            )
 
             baseline_request = self._request_for_query(query_payload, page_size=10)
             baseline_response = self._service.search(baseline_request)
@@ -706,7 +919,11 @@ class HybridSearchValidator:
             redundancy_reductions.append(baseline_cos - mmr_cos)
 
         total_queries = len(sampled_pairs)
-        mean_reduction = float(sum(redundancy_reductions) / len(redundancy_reductions)) if redundancy_reductions else 0.0
+        mean_reduction = (
+            float(sum(redundancy_reductions) / len(redundancy_reductions))
+            if redundancy_reductions
+            else 0.0
+        )
         mean_rrf_cos = float(sum(rrf_cosines) / len(rrf_cosines)) if rrf_cosines else 0.0
         mean_mmr_cos = float(sum(mmr_cosines) / len(mmr_cosines)) if mmr_cosines else 0.0
         rrf_rate = rrf_hits / total_queries
@@ -722,10 +939,9 @@ class HybridSearchValidator:
             "hit_rate_delta": abs(rrf_rate - mmr_rate),
         }
 
-        passed = (
-            mean_reduction >= thresholds.get("mmr_redundancy_reduction", 0.0)
-            and abs(rrf_rate - mmr_rate) <= thresholds.get("mmr_hit_rate_delta", float("inf"))
-        )
+        passed = mean_reduction >= thresholds.get("mmr_redundancy_reduction", 0.0) and abs(
+            rrf_rate - mmr_rate
+        ) <= thresholds.get("mmr_hit_rate_delta", float("inf"))
         return ValidationReport(name="scale_fusion_mmr", passed=passed, details=details)
 
     def _scale_pagination(
@@ -734,6 +950,16 @@ class HybridSearchValidator:
         rng: random.Random,
         sample_size: int = 40,
     ) -> ValidationReport:
+        """Ensure page cursors generate disjoint result sets across pages.
+
+        Args:
+            dataset: Dataset entries containing documents and queries.
+            rng: Random generator for sampling query pairs.
+            sample_size: Number of queries to evaluate for pagination.
+
+        Returns:
+            ValidationReport indicating pagination overlap issues.
+        """
         sampled_pairs = self._sample_queries(dataset, sample_size, rng)
         if not sampled_pairs:
             return ValidationReport(
@@ -778,6 +1004,16 @@ class HybridSearchValidator:
         rng: random.Random,
         sample_size: int = 40,
     ) -> ValidationReport:
+        """Confirm per-document limits, deduping, and highlights behave as expected.
+
+        Args:
+            dataset: Dataset entries containing documents and queries.
+            rng: Random generator used for sampling query pairs.
+            sample_size: Number of sampled queries to evaluate.
+
+        Returns:
+            ValidationReport summarizing result shaping concerns.
+        """
         sampled_pairs = self._sample_queries(dataset, sample_size, rng)
         if not sampled_pairs:
             return ValidationReport(
@@ -789,10 +1025,7 @@ class HybridSearchValidator:
         config = self._service._config_manager.get()
         max_per_doc = config.fusion.max_chunks_per_doc
         dedupe_threshold = config.fusion.cosine_dedupe_threshold
-        chunk_lookup = {
-            (chunk.doc_id, chunk.chunk_id): chunk
-            for chunk in self._registry.all()
-        }
+        chunk_lookup = {(chunk.doc_id, chunk.chunk_id): chunk for chunk in self._registry.all()}
 
         doc_limit_violations = 0
         dedupe_violations = 0
@@ -841,6 +1074,16 @@ class HybridSearchValidator:
         rng: random.Random,
         query_sample_size: int,
     ) -> ValidationReport:
+        """Validate snapshot/restore under randomized workloads.
+
+        Args:
+            dataset: Dataset entries with documents and queries.
+            rng: Random generator for sampling queries.
+            query_sample_size: Maximum number of query pairs to evaluate.
+
+        Returns:
+            ValidationReport highlighting snapshot mismatches, if any.
+        """
         sampled_pairs = self._sample_queries(dataset, min(30, query_sample_size), rng)
         if not sampled_pairs:
             return ValidationReport(
@@ -862,7 +1105,7 @@ class HybridSearchValidator:
         ops_restore_state(self._ingestion.faiss_index, snapshot)
 
         mismatches = 0
-        for ( _, query_payload), expected in zip(sampled_pairs, baseline_results):
+        for (_, query_payload), expected in zip(sampled_pairs, baseline_results):
             request = self._request_for_query(query_payload, page_size=15)
             response = self._service.search(request)
             observed = [(result.doc_id, round(result.score, 6)) for result in response.results[:15]]
@@ -877,6 +1120,14 @@ class HybridSearchValidator:
         return ValidationReport(name="scale_backup_restore", passed=passed, details=details)
 
     def _scale_acl(self, dataset: Sequence[Mapping[str, object]]) -> ValidationReport:
+        """Ensure per-namespace ACL tags are enforced across queries.
+
+        Args:
+            dataset: Dataset entries providing documents and queries.
+
+        Returns:
+            ValidationReport listing ACL violations, if discovered.
+        """
         namespace_to_acl: Dict[str, str] = {}
         namespace_queries: Dict[str, List[Mapping[str, object]]] = {}
         for entry in dataset:
@@ -940,6 +1191,17 @@ class HybridSearchValidator:
         rng: random.Random,
         query_sample_size: int,
     ) -> ValidationReport:
+        """Benchmark latency and throughput against configured thresholds.
+
+        Args:
+            dataset: Dataset entries containing documents and queries.
+            thresholds: Threshold values for latency and headroom metrics.
+            rng: Random generator used for sampling query pairs.
+            query_sample_size: Number of queries to sample for benchmarking.
+
+        Returns:
+            ValidationReport detailing performance metrics.
+        """
         sampled_pairs = self._sample_queries(dataset, min(120, query_sample_size * 2), rng)
         if not sampled_pairs:
             return ValidationReport(
@@ -958,7 +1220,9 @@ class HybridSearchValidator:
             request = self._request_for_query(query_payload, page_size=10)
             iter_start = time.perf_counter()
             response = self._service.search(request)
-            total_timings.append(response.timings_ms.get("total_ms", (time.perf_counter() - iter_start) * 1000))
+            total_timings.append(
+                response.timings_ms.get("total_ms", (time.perf_counter() - iter_start) * 1000)
+            )
             bm25_timings.append(response.timings_ms.get("bm25_ms", 0.0))
             splade_timings.append(response.timings_ms.get("splade_ms", 0.0))
             dense_timings.append(response.timings_ms.get("dense_ms", 0.0))
@@ -971,12 +1235,14 @@ class HybridSearchValidator:
         p99 = self._percentile(total_timings, 99)
 
         estimated_usage_mb = (
-            self._ingestion.faiss_index.ntotal
-            * self._ingestion.faiss_index._dim
-            * 4
+            self._ingestion.faiss_index.ntotal * self._ingestion.faiss_index._dim * 4
         ) / (1024 * 1024)
         assumed_capacity_mb = 24000.0
-        headroom_fraction = 1.0 if assumed_capacity_mb <= 0 else max(0.0, 1.0 - (estimated_usage_mb / assumed_capacity_mb))
+        headroom_fraction = (
+            1.0
+            if assumed_capacity_mb <= 0
+            else max(0.0, 1.0 - (estimated_usage_mb / assumed_capacity_mb))
+        )
 
         details = {
             "query_count": len(sampled_pairs),
@@ -991,13 +1257,20 @@ class HybridSearchValidator:
             "headroom_fraction": headroom_fraction,
         }
 
-        passed = (
-            p95 <= thresholds.get("latency_p95_ms", float("inf"))
-            and headroom_fraction >= thresholds.get("gpu_headroom_fraction", 0.0)
-        )
+        passed = p95 <= thresholds.get(
+            "latency_p95_ms", float("inf")
+        ) and headroom_fraction >= thresholds.get("gpu_headroom_fraction", 0.0)
         return ValidationReport(name="scale_performance", passed=passed, details=details)
 
     def _run_calibration(self, dataset: Sequence[Mapping[str, object]]) -> ValidationReport:
+        """Record calibration metrics (self-hit accuracy) across oversampling factors.
+
+        Args:
+            dataset: Dataset entries (unused, provided for symmetry).
+
+        Returns:
+            ValidationReport summarizing calibration accuracy per oversample setting.
+        """
         oversamples = [1, 2, 3]
         results: List[Mapping[str, object]] = []
         total_chunks = max(1, self._registry.count())
@@ -1010,7 +1283,9 @@ class HybridSearchValidator:
                     hits += 1
             accuracy = hits / total_chunks
             results.append({"oversample": oversample, "self_hit_accuracy": accuracy})
-        passed = all(entry["self_hit_accuracy"] >= 0.95 for entry in results if entry["oversample"] >= 2)
+        passed = all(
+            entry["self_hit_accuracy"] >= 0.95 for entry in results if entry["oversample"] >= 2
+        )
         return ValidationReport(name="calibration_sweep", passed=passed, details={"dense": results})
 
     def _embeddings_for_results(
@@ -1019,6 +1294,16 @@ class HybridSearchValidator:
         chunk_lookup: Mapping[tuple[str, str], ChunkPayload],
         limit: int = 10,
     ) -> List[np.ndarray]:
+        """Retrieve embeddings for the top-N results using a chunk lookup.
+
+        Args:
+            results: Search results from which embeddings are needed.
+            chunk_lookup: Mapping from (doc_id, chunk_id) to stored payloads.
+            limit: Maximum number of results to consider.
+
+        Returns:
+            List of embedding vectors associated with the results.
+        """
         embeddings: List[np.ndarray] = []
         for result in results[:limit]:
             chunk = chunk_lookup.get((result.doc_id, result.chunk_id))
@@ -1028,6 +1313,14 @@ class HybridSearchValidator:
         return embeddings
 
     def _average_pairwise_cos(self, embeddings: Sequence[np.ndarray]) -> float:
+        """Compute average pairwise cosine similarity for a set of embeddings.
+
+        Args:
+            embeddings: Sequence of embedding vectors.
+
+        Returns:
+            Mean pairwise cosine similarity, or 0.0 when insufficient points exist.
+        """
         if len(embeddings) < 2:
             return 0.0
         total = 0.0
@@ -1041,6 +1334,15 @@ class HybridSearchValidator:
         return total / count if count else 0.0
 
     def _percentile(self, values: Sequence[float], percentile: float) -> float:
+        """Return percentile value for a sequence; defaults to 0.0 when empty.
+
+        Args:
+            values: Sequence of numeric values.
+            percentile: Desired percentile expressed as a value between 0 and 100.
+
+        Returns:
+            Percentile value cast to float, or 0.0 when the sequence is empty.
+        """
         if not values:
             return 0.0
         return float(np.percentile(np.asarray(values, dtype=np.float64), percentile))
@@ -1052,6 +1354,17 @@ class HybridSearchValidator:
         rng: random.Random,
         query_sample_size: int,
     ) -> ValidationReport:
+        """Stress-test search stability under repeated queries and churn.
+
+        Args:
+            dataset: Dataset entries containing documents and queries.
+            inputs_by_doc: Mapping of document IDs to ingestion inputs.
+            rng: Random generator used for sampling queries and churn operations.
+            query_sample_size: Number of queries to sample for stability checks.
+
+        Returns:
+            ValidationReport detailing stability mismatches.
+        """
         sampled_pairs = self._sample_queries(dataset, min(40, query_sample_size), rng)
         if not sampled_pairs:
             return ValidationReport(
@@ -1066,7 +1379,9 @@ class HybridSearchValidator:
             baseline = [res.doc_id for res in self._service.search(request).results]
             for _ in range(4):
                 repeat_request = self._request_for_query(query_payload, page_size=15)
-                repeat_results = [res.doc_id for res in self._service.search(repeat_request).results]
+                repeat_results = [
+                    res.doc_id for res in self._service.search(repeat_request).results
+                ]
                 if repeat_results != baseline:
                     repeat_mismatches += 1
                     break
@@ -1079,10 +1394,14 @@ class HybridSearchValidator:
 
         churn_failures = 0
         for document_payload, query_payload in sampled_pairs[: min(15, len(sampled_pairs))]:
-            expected_doc_id = str(query_payload.get("expected_doc_id") or document_payload.get("doc_id"))
+            expected_doc_id = str(
+                query_payload.get("expected_doc_id") or document_payload.get("doc_id")
+            )
             request = self._request_for_query(query_payload, page_size=15)
             response = self._service.search(request)
-            if expected_doc_id and not any(res.doc_id == expected_doc_id for res in response.results):
+            if expected_doc_id and not any(
+                res.doc_id == expected_doc_id for res in response.results
+            ):
                 churn_failures += 1
 
         details = {
@@ -1095,6 +1414,14 @@ class HybridSearchValidator:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> None:
+    """CLI entrypoint for running hybrid search validation suites.
+
+    Args:
+        argv: Optional list of command-line arguments overriding `sys.argv`.
+
+    Returns:
+        None
+    """
     parser = argparse.ArgumentParser(description="Hybrid search validation harness")
     parser.add_argument(
         "--dataset",

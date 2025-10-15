@@ -1,0 +1,170 @@
+# Module: observability
+
+Lightweight observability primitives for ingestion and retrieval.
+
+This module provides comprehensive observability and monitoring capabilities
+for DocsToKG's hybrid search operations, including metrics collection,
+timing utilities, and performance tracking for ingestion and retrieval
+operations.
+
+The observability system supports:
+- Counter and histogram metrics collection
+- Timing context managers for operation measurement
+- Prometheus-style metric export
+- Performance monitoring and alerting
+- Structured logging integration
+
+## Functions
+
+### `increment(self, name, amount)`
+
+Increase a counter metric by the given amount.
+
+Args:
+name: Metric identifier.
+amount: Increment to apply to the counter (default: 1.0).
+**labels: Arbitrary label key/value pairs for dimensioning.
+
+Returns:
+None
+
+### `observe(self, name, value)`
+
+Record an observation for a histogram metric.
+
+Args:
+name: Metric identifier.
+value: Observation value to append to the histogram.
+**labels: Arbitrary label key/value pairs for dimensioning.
+
+Returns:
+None
+
+### `export_counters(self)`
+
+Iterate over collected counter metrics as structured samples.
+
+Returns:
+Iterable of `CounterSample` entries representing current counters.
+
+### `export_histograms(self)`
+
+Iterate over collected histogram metrics summarized by percentiles.
+
+Returns:
+Iterable of `HistogramSample` entries containing percentile stats.
+
+### `span(self, name)`
+
+Record execution duration for a traced operation.
+
+Args:
+name: Span name, used in metric and log emission.
+**attributes: Additional context attached to metrics and logs.
+
+Yields:
+None
+
+Raises:
+Exception: Propagates any exception raised inside the traced block.
+
+### `metrics(self)`
+
+Access the shared metrics collector for hybrid search components.
+
+### `logger(self)`
+
+Structured logger scoped to hybrid search observability events.
+
+### `trace(self, name)`
+
+Create a tracing span context for measuring critical operations.
+
+Args:
+name: Span name describing the operation being timed.
+**attributes: Additional context for metrics and structured logging.
+
+Returns:
+Context manager yielding control to the caller.
+
+### `metrics_snapshot(self)`
+
+Produce a serializable snapshot of counters and histograms.
+
+Returns:
+Dictionary containing lists of counter and histogram samples.
+
+## Classes
+
+### `CounterSample`
+
+Sample from a counter metric with labels and value.
+
+This class represents a single measurement from a counter metric,
+including the metric name, associated labels, and current value.
+
+Attributes:
+name: Name of the counter metric
+labels: Dictionary of label key-value pairs
+value: Current counter value
+
+Examples:
+>>> sample = CounterSample(
+...     name="documents_processed",
+...     labels={"status": "success"},
+...     value=150.0
+... )
+
+### `HistogramSample`
+
+Sample from a histogram metric with percentile statistics.
+
+This class represents statistical information from a histogram metric,
+including count and percentile values for performance analysis.
+
+Attributes:
+name: Name of the histogram metric
+labels: Dictionary of label key-value pairs
+count: Total number of observations
+p50: 50th percentile (median) value
+p95: 95th percentile value
+p99: 99th percentile value
+
+Examples:
+>>> sample = HistogramSample(
+...     name="search_latency",
+...     labels={"method": "hybrid"},
+...     count=1000,
+...     p50=45.2,
+...     p95=89.1,
+...     p99=156.7
+... )
+
+### `MetricsCollector`
+
+In-memory metrics collector compatible with Prometheus-style summaries.
+
+This class provides lightweight, in-memory metrics collection for
+monitoring DocsToKG operations, supporting both counter and histogram
+metrics with labeled dimensions for detailed observability.
+
+The collector uses thread-safe operations and provides Prometheus-style
+metric export for integration with monitoring systems.
+
+Attributes:
+_counters: Internal storage for counter metrics
+_histograms: Internal storage for histogram metrics
+
+Examples:
+>>> collector = MetricsCollector()
+>>> collector.increment("documents_processed", labels={"type": "pdf"})
+>>> collector.observe("search_latency", 45.2, method="hybrid")
+>>> counters = list(collector.export_counters())
+
+### `TraceRecorder`
+
+Context manager producing timing spans for tracing.
+
+### `Observability`
+
+Facade for metrics, structured logging, and tracing.

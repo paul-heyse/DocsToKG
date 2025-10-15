@@ -67,16 +67,51 @@ class FaissIndexManager:
 
     @property
     def ntotal(self) -> int:
+        """Number of vectors currently stored in the FAISS index.
+
+        Args:
+            None
+
+        Returns:
+            Count of vectors indexed in FAISS.
+        """
         return int(self._index.ntotal)
 
     @property
     def config(self) -> DenseIndexConfig:
+        """Return the dense index configuration in use.
+
+        Args:
+            None
+
+        Returns:
+            DenseIndexConfig associated with this manager.
+        """
         return self._config
 
     def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
+        """Register a callback translating FAISS internal IDs to vector UUIDs.
+
+        Args:
+            resolver: Callable mapping FAISS internal IDs to vector UUIDs.
+
+        Returns:
+            None
+        """
         self._id_resolver = resolver
 
     def train(self, vectors: Sequence[np.ndarray]) -> None:
+        """Train IVF-style indexes with the provided vectors when required.
+
+        Args:
+            vectors: Sequence of vectors used for training.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If training vectors are required but not provided.
+        """
         if not hasattr(self._index, "is_trained"):
             return
         if getattr(self._index, "is_trained"):
@@ -88,10 +123,30 @@ class FaissIndexManager:
         self._index.train(matrix)
 
     def needs_training(self) -> bool:
+        """Return True when the underlying index still requires training.
+
+        Args:
+            None
+
+        Returns:
+            Boolean indicating if training is required.
+        """
         is_trained = getattr(self._index, "is_trained", True)
         return not bool(is_trained)
 
     def add(self, vectors: Sequence[np.ndarray], vector_ids: Sequence[str]) -> None:
+        """Add vectors to the index, replacing existing entries when necessary.
+
+        Args:
+            vectors: Sequence of embedding vectors to add.
+            vector_ids: Corresponding vector identifiers.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If the lengths of `vectors` and `vector_ids` differ.
+        """
         if len(vectors) != len(vector_ids):
             raise ValueError("vectors and vector_ids must align")
         if not vectors:
@@ -110,6 +165,14 @@ class FaissIndexManager:
             self._vectors[vector_id] = row.copy()
 
     def remove(self, vector_ids: Sequence[str]) -> None:
+        """Remove vectors from FAISS and the in-memory cache by vector UUID.
+
+        Args:
+            vector_ids: Identifiers of vectors to remove.
+
+        Returns:
+            None
+        """
         if not vector_ids:
             return
         ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
@@ -118,6 +181,15 @@ class FaissIndexManager:
         self._remove_ids(ids)
 
     def search(self, query: np.ndarray, top_k: int) -> List[FaissSearchResult]:
+        """Execute a cosine-similarity search returning the best `top_k` results.
+
+        Args:
+            query: Query vector to search against the index.
+            top_k: Maximum number of nearest neighbours to return.
+
+        Returns:
+            List of `FaissSearchResult` objects ordered by score.
+        """
         query_matrix = self._ensure_dim(query).reshape(1, -1).astype(np.float32)
         faiss.normalize_L2(query_matrix)
         scores, ids = self._index.search(query_matrix, top_k)
@@ -132,6 +204,14 @@ class FaissIndexManager:
         return results
 
     def serialize(self) -> bytes:
+        """Serialize the FAISS index and cached vectors for persistence.
+
+        Args:
+            None
+
+        Returns:
+            Bytes object containing serialized index and vector cache.
+        """
         cpu_index = self._to_cpu(self._index)
         index_bytes = faiss.serialize_index(cpu_index)
         payload = {
@@ -145,6 +225,17 @@ class FaissIndexManager:
         return json.dumps(payload).encode("utf-8")
 
     def restore(self, payload: bytes) -> None:
+        """Restore FAISS state from bytes produced by `serialize`.
+
+        Args:
+            payload: Bytes previously produced by `serialize`.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If the payload is invalid or incompatible.
+        """
         try:
             data = json.loads(payload.decode("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
@@ -176,6 +267,14 @@ class FaissIndexManager:
         self._vectors = restored
 
     def stats(self) -> Dict[str, float | str]:
+        """Expose diagnostic metrics for monitoring.
+
+        Args:
+            None
+
+        Returns:
+            Dictionary containing index configuration and diagnostics.
+        """
         device: Optional[int] = None
         if hasattr(self._index, "getDevice"):
             try:
@@ -249,7 +348,7 @@ class FaissIndexManager:
                 try:
                     faiss.GpuParameterSpace().set_index_parameter(index, "nprobe", nprobe)
                     handled = True
-                except Exception as exc:  # pragma: no cover - GPU parameter guard
+                except Exception:  # pragma: no cover - GPU parameter guard
                     logger.debug("Unable to set nprobe via GpuParameterSpace", exc_info=True)
                     handled = False
             if not handled and hasattr(faiss, "ParameterSpace"):
@@ -257,7 +356,7 @@ class FaissIndexManager:
                     space = faiss.ParameterSpace()
                     space.set_index_parameter(index, "nprobe", nprobe)
                     handled = True
-                except Exception as exc:  # pragma: no cover - parameter guard
+                except Exception:  # pragma: no cover - parameter guard
                     logger.debug("Unable to set nprobe via ParameterSpace", exc_info=True)
                     handled = False
             if not handled:

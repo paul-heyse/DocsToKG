@@ -8,6 +8,7 @@ for optimal document retrieval performance.
 The service supports configurable search strategies, real-time observability,
 and comprehensive result ranking through advanced fusion techniques.
 """
+
 from __future__ import annotations
 
 import time
@@ -66,6 +67,7 @@ class ChannelResults:
         ...     scores={"recall": 0.85, "latency": 45}
         ... )
     """
+
     candidates: List[FusionCandidate]
     scores: Dict[str, float]
 
@@ -120,6 +122,17 @@ class HybridSearchService:
         self._faiss.set_id_resolver(self._registry.resolve_faiss_id)
 
     def search(self, request: HybridSearchRequest) -> HybridSearchResponse:
+        """Execute a hybrid search request across all retrieval channels.
+
+        Args:
+            request: Validated hybrid search request describing query parameters.
+
+        Returns:
+            HybridSearchResponse containing fused results and cursor metadata.
+
+        Raises:
+            RequestValidationError: If the request fails validation checks.
+        """
         config = self._config_manager.get()
         self._validate_request(request)
         filters = dict(request.filters)
@@ -227,7 +240,9 @@ class HybridSearchService:
         )
         timings["splade_ms"] = (time.perf_counter() - start) * 1000
         self._observability.metrics.increment("search_channel_requests", channel="splade")
-        self._observability.metrics.observe("search_channel_candidates", len(hits), channel="splade")
+        self._observability.metrics.observe(
+            "search_channel_candidates", len(hits), channel="splade"
+        )
         candidates = [
             FusionCandidate(source="splade", score=score, chunk=chunk, rank=idx + 1)
             for idx, (chunk, score) in enumerate(hits)
@@ -245,11 +260,15 @@ class HybridSearchService:
     ) -> ChannelResults:
         start = time.perf_counter()
         oversampled = request.page_size * config.dense.oversample
-        hits = self._faiss.search(query_features.embedding, min(config.retrieval.dense_top_k, oversampled))
+        hits = self._faiss.search(
+            query_features.embedding, min(config.retrieval.dense_top_k, oversampled)
+        )
         timings["dense_ms"] = (time.perf_counter() - start) * 1000
         filtered, payloads = self._filter_dense_hits(hits, filters)
         self._observability.metrics.increment("search_channel_requests", channel="dense")
-        self._observability.metrics.observe("search_channel_candidates", len(filtered), channel="dense")
+        self._observability.metrics.observe(
+            "search_channel_candidates", len(filtered), channel="dense"
+        )
         candidates: List[FusionCandidate] = []
         scores: Dict[str, float] = {}
         for idx, hit in enumerate(filtered):
@@ -270,14 +289,12 @@ class HybridSearchService:
         if not hits:
             return [], {}
         vector_ids = [hit.vector_id for hit in hits]
-        payloads = {
-            chunk.vector_id: chunk
-            for chunk in self._registry.bulk_get(vector_ids)
-        }
+        payloads = {chunk.vector_id: chunk for chunk in self._registry.bulk_get(vector_ids)}
         filtered = [
             hit
             for hit in hits
-            if (chunk := payloads.get(hit.vector_id)) is not None and matches_filters(chunk, filters)
+            if (chunk := payloads.get(hit.vector_id)) is not None
+            and matches_filters(chunk, filters)
         ]
         return filtered, payloads
 

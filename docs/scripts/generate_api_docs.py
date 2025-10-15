@@ -8,12 +8,10 @@ Markdown documentation that can be included in the docs.
 """
 
 import ast
-import inspect
-import os
+import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Any
-import re
+from typing import Any, Dict, List
 
 
 class APIDocGenerator:
@@ -47,6 +45,8 @@ class APIDocGenerator:
                 content = f.read()
 
             tree = ast.parse(content)
+            relative_stem = file_path.relative_to(self.source_dir).with_suffix("")
+            slug = ".".join(relative_stem.parts)
 
             # Extract module docstring
             module_docstring = ast.get_docstring(tree)
@@ -77,6 +77,7 @@ class APIDocGenerator:
             return {
                 "file_path": file_path,
                 "module_name": file_path.stem,
+                "module_slug": slug,
                 "module_docstring": module_docstring,
                 "classes": classes,
                 "functions": functions,
@@ -177,8 +178,8 @@ class APIDocGenerator:
             # Generate documentation
             docs_content = self.generate_module_docs(module_info)
 
-            # Write to output file
-            output_file = self.output_dir / f"{module_info['module_name']}.md"
+            # Write to output file using module slug for uniqueness
+            output_file = self.output_dir / f"{module_info['module_slug']}.md"
             with open(output_file, "w", encoding="utf-8") as f:
                 f.write(docs_content)
 

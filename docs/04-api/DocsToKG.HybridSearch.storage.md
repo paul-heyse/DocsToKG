@@ -4,6 +4,10 @@ In-memory storage simulators for OpenSearch and chunk registry.
 
 ## Functions
 
+### `matches_filters(chunk, filters)`
+
+*No documentation available.*
+
 ### `upsert(self, chunks)`
 
 *No documentation available.*
@@ -17,6 +21,10 @@ In-memory storage simulators for OpenSearch and chunk registry.
 *No documentation available.*
 
 ### `bulk_get(self, vector_ids)`
+
+*No documentation available.*
+
+### `resolve_faiss_id(self, internal_id)`
 
 *No documentation available.*
 
@@ -72,15 +80,15 @@ In-memory storage simulators for OpenSearch and chunk registry.
 
 *No documentation available.*
 
-### `_matches_filters(self, chunk, filters)`
-
-*No documentation available.*
-
 ### `_bm25_score(self, stored, query_weights)`
 
 *No documentation available.*
 
 ### `_paginate(self, scores, top_k, cursor)`
+
+*No documentation available.*
+
+### `_search_sparse(self, scoring_fn, filters, top_k, cursor)`
 
 *No documentation available.*
 

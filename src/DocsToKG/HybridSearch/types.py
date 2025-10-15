@@ -15,6 +15,7 @@ Key Features:
 - Comprehensive validation and error handling
 - Support for both lexical and semantic search modalities
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -52,6 +53,7 @@ class DocumentInput:
         ...     metadata={"title": "AI Research Paper", "author": "Dr. Smith"}
         ... )
     """
+
     doc_id: str
     namespace: str
     chunk_path: Path
@@ -81,6 +83,7 @@ class ChunkFeatures:
         ...     embedding=np.random.rand(768).astype(np.float32)
         ... )
     """
+
     bm25_terms: Mapping[str, float]
     splade_weights: Mapping[str, float]
     embedding: NDArray[np.float32]
@@ -90,6 +93,9 @@ class ChunkFeatures:
 
         This method creates independent copies of all feature data to prevent
         unintended mutations when features are shared across operations.
+
+        Args:
+            None
 
         Returns:
             New ChunkFeatures instance with copied data
@@ -120,12 +126,12 @@ class ChunkPayload:
         vector_id: Corresponding vector identifier in FAISS
         namespace: Logical grouping for search scoping
         text: Original chunk text content
-    metadata: MutableMapping[str, Any]
-    features: ChunkFeatures
-    token_count: int
-    source_chunk_idxs: Sequence[int]
-    doc_items_refs: Sequence[str]
-    char_offset: Optional[Tuple[int, int]] = None
+        metadata: Mutable mapping of persisted chunk metadata
+        features: Hybrid feature representations associated with the chunk
+        token_count: Number of tokens contained in the chunk text
+        source_chunk_idxs: Original chunk indices contributing to this payload
+        doc_items_refs: References to DocTags items that produced the chunk
+        char_offset: Optional character span of the chunk in the source document
     """
 
     doc_id: str
@@ -139,7 +145,6 @@ class ChunkPayload:
     source_chunk_idxs: Sequence[int]
     doc_items_refs: Sequence[str]
     char_offset: Optional[Tuple[int, int]] = None
-
 
 
 @dataclass(slots=True)
@@ -162,6 +167,7 @@ class HybridSearchDiagnostics:
         ...     dense_score=0.78
         ... )
     """
+
     bm25_score: Optional[float] = None
     splade_score: Optional[float] = None
     dense_score: Optional[float] = None
@@ -198,6 +204,7 @@ class HybridSearchResult:
         ...     diagnostics=HybridSearchDiagnostics(bm25_score=0.85)
         ... )
     """
+
     doc_id: str
     chunk_id: str
     namespace: str
@@ -234,6 +241,7 @@ class HybridSearchRequest:
         ...     diversification=True
         ... )
     """
+
     query: str
     namespace: Optional[str]
     filters: Mapping[str, Any]
@@ -264,6 +272,7 @@ class HybridSearchResponse:
         ...     timings_ms={"bm25": 45, "fusion": 12}
         ... )
     """
+
     results: Sequence[HybridSearchResult]
     next_cursor: Optional[str]
     total_candidates: int
@@ -292,6 +301,7 @@ class FusionCandidate:
         ...     rank=3
         ... )
     """
+
     source: str
     score: float
     chunk: ChunkPayload
@@ -317,6 +327,7 @@ class ValidationReport:
         ...     details={"response_time": 45, "status_code": 200}
         ... )
     """
+
     name: str
     passed: bool
     details: Mapping[str, Any] = field(default_factory=dict)
@@ -345,6 +356,7 @@ class ValidationSummary:
         ... )
         >>> print(f"All validations passed: {summary.passed}")
     """
+
     reports: Sequence[ValidationReport]
     started_at: datetime
     completed_at: datetime
@@ -353,8 +365,10 @@ class ValidationSummary:
     def passed(self) -> bool:
         """Check if all validation reports passed.
 
+        Args:
+            None
+
         Returns:
             True if all reports passed, False otherwise
         """
         return all(report.passed for report in self.reports)
-

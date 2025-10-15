@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import gzip
 import json
-import gzip
-import json
 import logging
 import os
 import sys
@@ -133,8 +131,6 @@ def setup_logging(config: LoggingConfig, log_dir: Optional[Path] = None) -> logg
 
     logger = logging.getLogger("DocsToKG.OntologyDownload")
     logger.setLevel(getattr(logging, config.level.upper(), logging.INFO))
-
-    external_handlers = [h for h in logger.handlers if not getattr(h, "_ontofetch_managed", False)]
 
     for handler in list(logger.handlers):
         if getattr(handler, "_ontofetch_managed", False):

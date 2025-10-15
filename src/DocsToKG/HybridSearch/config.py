@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Literal
 
 
 @dataclass(frozen=True)
@@ -153,6 +153,15 @@ class HybridSearchConfig:
 
     @staticmethod
     def from_dict(payload: Dict[str, Any]) -> "HybridSearchConfig":
+        """Construct a config object from a dictionary payload.
+
+        Args:
+            payload: Nested mapping containing `chunking`, `dense`, `fusion`,
+                and `retrieval` sections compatible with dataclass fields.
+
+        Returns:
+            Fully populated `HybridSearchConfig` instance.
+        """
         chunking = ChunkingConfig(**payload.get("chunking", {}))
         dense = DenseIndexConfig(**payload.get("dense", {}))
         fusion = FusionConfig(**payload.get("fusion", {}))
@@ -171,10 +180,26 @@ class HybridSearchConfigManager:
         self._config = self._load()
 
     def get(self) -> HybridSearchConfig:
+        """Return the currently cached hybrid search configuration.
+
+        Args:
+            None
+
+        Returns:
+            Latest `HybridSearchConfig` loaded from disk.
+        """
         with self._lock:
             return self._config
 
     def reload(self) -> HybridSearchConfig:
+        """Reload configuration from disk, replacing the cached instance.
+
+        Args:
+            None
+
+        Returns:
+            Freshly loaded `HybridSearchConfig`.
+        """
         with self._lock:
             self._config = self._load()
             return self._config

@@ -8,19 +8,17 @@ Improvements:
 - tqdm progress bars for vLLM warmup and per-PDF conversion progress.
 """
 
-import os
-import sys
-import time
 import argparse
-import json
-import socket
+import os
 import shutil
-import signal
-import threading
+import socket
 import subprocess as sp
+import sys
+import threading
+import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import List, Optional, Tuple
-from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import requests
 from tqdm import tqdm
@@ -28,11 +26,18 @@ from tqdm import tqdm
 
 # -------- Paths --------
 def find_data_root(start: Path) -> Path:
+    """Locate the DocsToKG data directory starting from a filesystem path.
+
+    Args:
+        start: Directory to begin searching from; ancestors are inspected as well.
+
+    Returns:
+        Path pointing to a directory that contains the expected `PDFs` subdirectory.
+        Falls back to `<start>/Data` when no ancestor contains the structure.
     """
-    Walk up from `start` to find a directory that has Data/PDFs.
-    Returns `start/"Data"` if nothing matches above.
-    """
-    start = start.resolve()  # normalize before walking upward  # docs: pathlib.resolve()  :contentReference[oaicite:1]{index=1}
+    start = (
+        start.resolve()
+    )  # normalize before walking upward  # docs: pathlib.resolve()  :contentReference[oaicite:1]{index=1}
     for anc in (start, *start.parents):
         candidate = anc / "Data"
         if (candidate / "PDFs").is_dir():
@@ -87,6 +92,14 @@ ARTIFACTS = os.environ.get("DOCLING_ARTIFACTS_PATH", "")
 
 # -------- Utilities --------
 def port_is_free(port: int) -> bool:
+    """Determine whether a TCP port on localhost is currently available.
+
+    Args:
+        port: Port number to probe on the loopback interface.
+
+    Returns:
+        True when the port is unused; otherwise False.
+    """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(0.2)
         return s.connect_ex(("127.0.0.1", port)) != 0
@@ -95,7 +108,17 @@ def port_is_free(port: int) -> bool:
 def probe_models(
     port: int, timeout=2.5
 ) -> Tuple[Optional[List[str]], Optional[str], Optional[int]]:
-    """Return (names, raw_text, status) from GET /v1/models, or (None, raw, status) on failure."""
+    """Inspect the `/v1/models` endpoint exposed by a vLLM HTTP server.
+
+    Args:
+        port: HTTP port where the vLLM server is expected to listen.
+        timeout: Seconds to wait for the HTTP request before aborting.
+
+    Returns:
+        Tuple containing the list of model identifiers (if any), the raw response
+        body, and the HTTP status code. Missing models or connection failures are
+        represented by `(None, <error>, None)`.
+    """
     url = f"http://127.0.0.1:{port}/v1/models"
     try:
         r = requests.get(url, timeout=timeout)
@@ -119,7 +142,16 @@ def probe_models(
 
 
 def probe_metrics(port: int, timeout=2.5) -> Tuple[bool, Optional[int]]:
-    """Return (ok, status) from /metrics; OK if 200."""
+    """Check whether the vLLM `/metrics` endpoint is healthy.
+
+    Args:
+        port: HTTP port where the vLLM server should expose metrics.
+        timeout: Seconds to wait for the HTTP response before aborting.
+
+    Returns:
+        Tuple of `(is_healthy, status_code)` where `is_healthy` is True when the
+        endpoint responds with HTTP 200.
+    """
     url = f"http://127.0.0.1:{port}/metrics"
     try:
         r = requests.get(url, timeout=timeout)
@@ -129,6 +161,15 @@ def probe_metrics(port: int, timeout=2.5) -> Tuple[bool, Optional[int]]:
 
 
 def find_free_port(start: int, span: int = PORT_SCAN_SPAN) -> int:
+    """Find an available TCP port, scanning forwards from a starting point.
+
+    Args:
+        start: First port number to test.
+        span: Maximum number of sequential ports to probe for availability.
+
+    Returns:
+        Available port number suitable for binding a local server.
+    """
     for p in range(start, start + span):
         if port_is_free(p):
             return p
@@ -138,7 +179,15 @@ def find_free_port(start: int, span: int = PORT_SCAN_SPAN) -> int:
 
 
 def stream_logs(proc: sp.Popen, prefix="[vLLM] "):
-    """Continuously read vLLM stdout and print lines."""
+    """Continuously stream stdout lines from a child process to the console.
+
+    Args:
+        proc: Running subprocess whose stdout should be tailed.
+        prefix: Text prefix applied to each emitted log line for readability.
+
+    Returns:
+        None
+    """
     for line in iter(proc.stdout.readline, ""):
         if not line:
             break
@@ -148,6 +197,17 @@ def stream_logs(proc: sp.Popen, prefix="[vLLM] "):
 
 
 def start_vllm(port: int) -> sp.Popen:
+    """Launch a vLLM server process on the requested port.
+
+    Args:
+        port: Port on which the vLLM HTTP server should listen.
+
+    Returns:
+        Started subprocess handle for the vLLM server.
+
+    Raises:
+        SystemExit: If the `vllm` executable is not present on `PATH`.
+    """
     if shutil.which("vllm") is None:
         print("ERROR: 'vllm' not found on PATH.", file=sys.stderr)
         sys.exit(1)
@@ -179,6 +239,20 @@ def start_vllm(port: int) -> sp.Popen:
 
 
 def wait_for_vllm(port: int, proc: sp.Popen, timeout_s: int = WAIT_TIMEOUT_S):
+    """Poll the vLLM server until `/v1/models` responds with success.
+
+    Args:
+        port: HTTP port where the server is expected to listen.
+        proc: Subprocess handle representing the running vLLM instance.
+        timeout_s: Maximum time in seconds to wait for readiness.
+
+    Returns:
+        None
+
+    Raises:
+        RuntimeError: If the server exits prematurely or fails to become ready
+            within the allotted timeout.
+    """
     print(f"Probing vLLM on port {port} for up to {timeout_s}s ...")
     t0 = time.time()
     with tqdm(total=timeout_s, unit="s", desc="vLLM warmup", leave=True) as bar:
@@ -202,6 +276,16 @@ def wait_for_vllm(port: int, proc: sp.Popen, timeout_s: int = WAIT_TIMEOUT_S):
 
 
 def stop_vllm(proc: Optional[sp.Popen], own: bool, grace=10):
+    """Terminate a managed vLLM process if this script launched it.
+
+    Args:
+        proc: Subprocess handle returned by `start_vllm`, or None.
+        own: Indicates whether the caller owns the process lifetime.
+        grace: Seconds to wait for graceful shutdown before forcing exit.
+
+    Returns:
+        None
+    """
     if not own or proc is None or proc.poll() is not None:
         return
     print("Stopping vLLM...")
@@ -217,7 +301,16 @@ def stop_vllm(proc: Optional[sp.Popen], own: bool, grace=10):
 
 
 def ensure_vllm(preferred: int = PREFERRED_PORT) -> Tuple[int, Optional[sp.Popen], bool]:
-    """Return (port, process, owns_process)."""
+    """Ensure a vLLM server is available, launching one when necessary.
+
+    Args:
+        preferred: Preferred TCP port for the server.
+
+    Returns:
+        Tuple containing `(port, process, owns_process)` where `process` is the
+        managed subprocess handle (or None if reusing an existing server) and
+        `owns_process` indicates whether the caller should terminate it.
+    """
     # 1) If preferred is free, start there
     if port_is_free(preferred):
         proc = start_vllm(preferred)
@@ -241,22 +334,35 @@ def ensure_vllm(preferred: int = PREFERRED_PORT) -> Tuple[int, Optional[sp.Popen
 
 
 def list_pdfs(root: Path) -> List[Path]:
+    """Collect PDF files under a directory recursively.
+
+    Args:
+        root: Directory whose subtree should be scanned for PDFs.
+
+    Returns:
+        Sorted list of paths to PDF files.
+    """
     return sorted([p for p in root.rglob("*.pdf") if p.is_file()])
 
 
 # -------- Docling worker --------
 def convert_one(args):
+    """Convert a single PDF into DocTags using a remote vLLM-backed pipeline.
+
+    Args:
+        args: Tuple containing `(pdf_path, output_dir, port)` for the work item.
+
+    Returns:
+        Tuple of `(pdf_name, status)` where status is one of `ok`, `skip`, or a
+        `fail:<reason>` string describing the conversion issue.
+    """
     pdf_path, out_dir, port = args
     try:
-        from pathlib import Path
         from docling.backend.docling_parse_v4_backend import DoclingParseV4DocumentBackend
-        from docling.backend.docling_parse_v2_backend import (
-            DoclingParseV2DocumentBackend,
-        )  # fallback
+        from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
 
         # Imports (exact modules)
         from docling.datamodel.base_models import ConversionStatus, InputFormat
-        from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
         from docling.datamodel.pipeline_options import VlmPipelineOptions  # <-- correct module
         from docling.datamodel.pipeline_options_vlm_model import ApiVlmOptions, ResponseFormat
         from docling.document_converter import DocumentConverter, PdfFormatOption
@@ -332,6 +438,14 @@ def convert_one(args):
 
 # -------- Main --------
 def main():
+    """Entrypoint that coordinates vLLM setup and parallel DocTags conversion.
+
+    Args:
+        None
+
+    Returns:
+        None
+    """
     print(f"Input : {INPUT_DIR}")
     print(f"Output: {OUTPUT_DIR}")
     if ARTIFACTS:

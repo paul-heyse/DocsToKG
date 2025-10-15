@@ -14,6 +14,9 @@ sphinx.ext.todo
 sphinx.ext.coverage
 sphinx.ext.githubpages
 
+# Link checker dependencies
+aiohttp>=3.9.0
+
 # Mock dependencies for building docs without full environment
 # These are mocked in conf.py but listed here for reference
 # faiss

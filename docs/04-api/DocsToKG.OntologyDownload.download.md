@@ -1,0 +1,132 @@
+# Module: download
+
+Ontology Download Utilities
+
+This module houses secure download helpers that implement rate limiting,
+content validation, and resumable transfers for ontology documents. It works
+in concert with resolver planning to ensure that downloaded artifacts respect
+size limits and are safe for downstream document processing.
+
+## Functions
+
+### `_log_memory(logger, event)`
+
+*No documentation available.*
+
+### `sanitize_filename(filename)`
+
+Sanitize filenames to prevent directory traversal and unsafe characters.
+
+Args:
+filename: Candidate filename provided by an upstream service.
+
+Returns:
+Safe filename compatible with local filesystem storage.
+
+### `validate_url_security(url)`
+
+Validate URLs to avoid SSRF and insecure schemes.
+
+Args:
+url: URL returned by a resolver for ontology download.
+
+Returns:
+HTTPS URL safe for downstream download operations.
+
+Raises:
+ConfigError: If the URL uses an insecure scheme or resolves to private addresses.
+
+### `sha256_file(path)`
+
+Compute the SHA-256 digest for the provided file.
+
+Args:
+path: Path to the file whose digest should be calculated.
+
+Returns:
+Hexadecimal SHA-256 checksum string.
+
+### `extract_zip_safe(zip_path, destination)`
+
+Extract a ZIP archive while preventing path traversal.
+
+Args:
+zip_path: Path to the ZIP file to extract.
+destination: Directory where extracted files should be stored.
+logger: Optional logger for emitting extraction telemetry.
+
+Returns:
+List of extracted file paths.
+
+Raises:
+ConfigError: If the archive contains unsafe paths or is missing.
+
+### `_get_bucket(host, http_config)`
+
+*No documentation available.*
+
+### `download_stream()`
+
+Download ontology content with caching, retries, and hash validation.
+
+Args:
+url: URL of the ontology document to download.
+destination: Target file path for the downloaded content.
+headers: HTTP headers forwarded to the download request.
+previous_manifest: Manifest metadata from a prior run, used for caching.
+http_config: Download configuration containing timeouts and limits.
+cache_dir: Directory where intermediary cached files are stored.
+logger: Logger adapter for structured download telemetry.
+
+Returns:
+DownloadResult describing the final artifact and metadata.
+
+Raises:
+ConfigError: If validation fails, limits are exceeded, or HTTP errors occur.
+
+### `consume(self, tokens)`
+
+Consume tokens from the bucket, sleeping until capacity is available.
+
+Args:
+tokens: Number of tokens required for the current download request.
+
+Returns:
+None
+
+### `__call__(self, url, output_file, pooch_logger)`
+
+Stream ontology content to disk while enforcing download policies.
+
+Args:
+url: Secure download URL resolved by the planner.
+output_file: Temporary filename managed by pooch during download.
+pooch_logger: Logger instance supplied by pooch (unused).
+
+Raises:
+ConfigError: If download limits are exceeded or filesystem errors occur.
+requests.HTTPError: Propagated when HTTP status codes indicate failure.
+
+Returns:
+None
+
+## Classes
+
+### `DownloadResult`
+
+Result metadata for a completed download operation.
+
+Attributes:
+path: Final file path where the ontology document was stored.
+status: Download status (`fresh`, `updated`, or `cached`).
+sha256: SHA-256 checksum of the downloaded artifact.
+etag: HTTP ETag returned by the upstream server, when available.
+last_modified: Upstream last-modified header value if provided.
+
+### `TokenBucket`
+
+Simple token bucket implementation for per-host rate limiting.
+
+### `StreamingDownloader`
+
+Custom downloader to support conditional requests, resume, and caching.

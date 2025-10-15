@@ -1,4 +1,5 @@
 """Ingestion pipeline that materializes pre-computed chunk artifacts."""
+
 from __future__ import annotations
 
 import json
@@ -51,13 +52,40 @@ class ChunkIngestionPipeline:
 
     @property
     def metrics(self) -> IngestMetrics:
+        """Expose cumulative ingestion metrics for inspection.
+
+        Args:
+            None
+
+        Returns:
+            IngestMetrics capturing counts of upserts and deletions.
+        """
         return self._metrics
 
     @property
     def faiss_index(self) -> FaissIndexManager:
+        """Access the FAISS index manager used for vector persistence.
+
+        Args:
+            None
+
+        Returns:
+            FaissIndexManager associated with the ingestion pipeline.
+        """
         return self._faiss
 
     def upsert_documents(self, documents: Sequence[DocumentInput]) -> List[ChunkPayload]:
+        """Ingest pre-computed chunk artifacts into FAISS and OpenSearch.
+
+        Args:
+            documents: Sequence of document inputs referencing chunk/vector files.
+
+        Returns:
+            List of `ChunkPayload` objects that were successfully upserted.
+
+        Raises:
+            RetryableIngestError: When transformation fails due to transient issues.
+        """
         new_chunks: List[ChunkPayload] = []
         try:
             for document in documents:
@@ -67,7 +95,9 @@ class ChunkIngestionPipeline:
                         self._delete_existing_for_doc(document.doc_id, document.namespace)
                     new_chunks.extend(loaded)
         except Exception as exc:  # pragma: no cover - defensive guard
-            self._observability.logger.exception("chunk-ingest-error", extra={"event": {"error": str(exc)}})
+            self._observability.logger.exception(
+                "chunk-ingest-error", extra={"event": {"error": str(exc)}}
+            )
             raise RetryableIngestError("Failed to transform document") from exc
 
         if not new_chunks:
@@ -85,11 +115,24 @@ class ChunkIngestionPipeline:
         self._observability.metrics.increment("ingest_chunks", len(new_chunks))
         self._observability.logger.info(
             "chunk-upsert",
-            extra={"event": {"count": len(new_chunks), "namespaces": sorted({chunk.namespace for chunk in new_chunks})}},
+            extra={
+                "event": {
+                    "count": len(new_chunks),
+                    "namespaces": sorted({chunk.namespace for chunk in new_chunks}),
+                }
+            },
         )
         return new_chunks
 
     def delete_chunks(self, vector_ids: Sequence[str]) -> None:
+        """Delete chunks from FAISS, OpenSearch, and the registry by vector id.
+
+        Args:
+            vector_ids: Collection of vector identifiers to remove.
+
+        Returns:
+            None
+        """
         with self._observability.trace("ingest_delete", count=str(len(vector_ids))):
             self._faiss.remove(vector_ids)
             self._opensearch.bulk_delete(vector_ids)
@@ -98,12 +141,28 @@ class ChunkIngestionPipeline:
         self._observability.metrics.increment("delete_chunks", len(vector_ids))
 
     def _prepare_faiss(self, new_chunks: Sequence[ChunkPayload]) -> None:
+        """Train the FAISS index if required before adding new vectors.
+
+        Args:
+            new_chunks: Newly ingested chunks whose embeddings may train the index.
+
+        Returns:
+            None
+        """
         if not self._faiss.needs_training():
             return
         training_vectors = self._training_sample(new_chunks)
         self._faiss.train(training_vectors)
 
     def _training_sample(self, new_chunks: Sequence[ChunkPayload]) -> Sequence[np.ndarray]:
+        """Select representative embeddings for FAISS training.
+
+        Args:
+            new_chunks: Candidate chunks from the current ingestion batch.
+
+        Returns:
+            Sequence of embedding vectors used for index training.
+        """
         existing = self._registry.all()
         population = list(existing) + list(new_chunks)
         if not population:
@@ -116,6 +175,17 @@ class ChunkIngestionPipeline:
         return [chunk.features.embedding for chunk in sample]
 
     def _load_precomputed_chunks(self, document: DocumentInput) -> List[ChunkPayload]:
+        """Load chunk and vector artifacts from disk for a document.
+
+        Args:
+            document: Document input describing artifact locations and metadata.
+
+        Returns:
+            List of populated `ChunkPayload` instances.
+
+        Raises:
+            IngestError: If chunk and vector artifacts are inconsistent or missing.
+        """
         chunk_entries = self._read_jsonl(document.chunk_path)
         vector_entries = {entry["UUID"]: entry for entry in self._read_jsonl(document.vector_path)}
         payloads: List[ChunkPayload] = []
@@ -151,6 +221,15 @@ class ChunkIngestionPipeline:
         return payloads
 
     def _delete_existing_for_doc(self, doc_id: str, namespace: str) -> None:
+        """Remove previously ingested chunks for a document/namespace pair.
+
+        Args:
+            doc_id: Document identifier whose chunks should be removed.
+            namespace: Namespace to scope the deletion.
+
+        Returns:
+            None
+        """
         existing_vector_ids = [
             chunk.vector_id
             for chunk in self._registry.all()
@@ -160,6 +239,17 @@ class ChunkIngestionPipeline:
             self.delete_chunks(existing_vector_ids)
 
     def _features_from_vector(self, payload: Mapping[str, object]) -> ChunkFeatures:
+        """Convert stored vector payload into ChunkFeatures.
+
+        Args:
+            payload: Serialized feature payload from the vector JSONL artifact.
+
+        Returns:
+            ChunkFeatures object with BM25, SPLADE, and dense embeddings.
+
+        Raises:
+            IngestError: If the dense embedding has unexpected dimensionality.
+        """
         bm25 = payload.get("BM25", {})
         bm25_terms = self._weights_from_payload(bm25)
         splade = payload.get("SpladeV3", {})
@@ -175,11 +265,31 @@ class ChunkIngestionPipeline:
         )
 
     def _weights_from_payload(self, payload: Mapping[str, object]) -> Dict[str, float]:
+        """Deserialize sparse weight payloads into a term-to-weight mapping.
+
+        Args:
+            payload: Mapping containing `terms`/`tokens` and `weights` arrays.
+
+        Returns:
+            Dictionary mapping each term to its corresponding weight.
+        """
         terms = payload.get("terms") or payload.get("tokens") or []
         weights = payload.get("weights") or []
         return {str(term): float(weight) for term, weight in zip(terms, weights)}
 
     def _read_jsonl(self, path: Path) -> List[Dict[str, object]]:
+        """Load JSONL content from disk and parse each line into a dictionary.
+
+        Args:
+            path: Path to the JSONL artifact.
+
+        Returns:
+            List of parsed entries.
+
+        Raises:
+            IngestError: If the artifact file is missing.
+            json.JSONDecodeError: If any JSON line cannot be parsed.
+        """
         if not path.exists():
             raise IngestError(f"Artifact file {path} not found")
         lines = path.read_text(encoding="utf-8").splitlines()

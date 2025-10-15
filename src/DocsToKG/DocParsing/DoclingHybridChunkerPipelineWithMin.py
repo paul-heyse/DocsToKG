@@ -1,50 +1,72 @@
 #!/usr/bin/env python3
-# /home/paul/DocsToKG/src/DocsToKG/DocParsing/DoclingHybridChunkerPipeline.py
+"""
+Docling Hybrid Chunker with Minimum Token Coalescence
+
+Transforms DocTags documents into chunked records while ensuring short runs of
+chunks are merged to satisfy minimum token thresholds required by downstream
+embedding pipelines.
+"""
 
 from __future__ import annotations
-import argparse, json
+
+import argparse
+import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple, Any
+from typing import Any, List, Tuple
 
-# ---------- I/O ----------
-DEFAULT_IN_DIR = Path("/home/paul/DocsToKG/Data/DocTagsFiles")
-DEFAULT_OUT_DIR = Path("/home/paul/DocsToKG/Data/ChunkedDocTagFiles")
-
-# ---------- Docling imports ----------
-from docling_core.types.doc.document import DocTagsDocument, DoclingDocument
-from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
-from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
+# Third-party imports
 from docling_core.transforms.chunker.base import BaseChunk
 from docling_core.transforms.chunker.hierarchical_chunker import (
     ChunkingDocSerializer,
     ChunkingSerializerProvider,
 )
+from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
+from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
 from docling_core.transforms.serializer.base import BaseDocSerializer, SerializationResult
 from docling_core.transforms.serializer.common import create_ser_result
 from docling_core.transforms.serializer.markdown import (
-    MarkdownTableSerializer,
-    MarkdownPictureSerializer,
     MarkdownParams,
+    MarkdownPictureSerializer,
+    MarkdownTableSerializer,
+)
+from docling_core.types.doc.document import (
+    DoclingDocument,
+    DocTagsDocument,
+    PictureClassificationData,
+    PictureDescriptionData,
+    PictureItem,
+    PictureMoleculeData,
 )
 from docling_core.types.doc.document import (
     DoclingDocument as _Doc,
-    PictureItem,
-    PictureDescriptionData,
-    PictureClassificationData,
-    PictureMoleculeData,
 )
+from transformers import AutoTokenizer
 from typing_extensions import override
 
-from transformers import AutoTokenizer
+# ---------- I/O ----------
+DEFAULT_IN_DIR = Path("/home/paul/DocsToKG/Data/DocTagsFiles")
+DEFAULT_OUT_DIR = Path("/home/paul/DocsToKG/Data/ChunkedDocTagFiles")
 
 
 # ---------- Picture serializer: inject CAPTIONS (+ optional annotations) ----------
 class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
+    """Serialize picture items with captions and rich annotation metadata."""
+
     @override
     def serialize(
         self, *, item: PictureItem, doc_serializer: BaseDocSerializer, doc: _Doc, **_: Any
     ) -> SerializationResult:
+        """Render picture metadata into Markdown-friendly text.
+
+        Args:
+            item: Picture element emitted by Docling.
+            doc_serializer: Parent serializer responsible for post-processing.
+            doc: Full Docling document containing the picture context.
+
+        Returns:
+            SerializationResult capturing the rendered string and provenance.
+        """
         parts: List[str] = []
         try:
             cap = (item.caption_text(doc) or "").strip()
@@ -69,7 +91,17 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
 
 
 class RichSerializerProvider(ChunkingSerializerProvider):
+    """Provide a serializer that augments tables and pictures with Markdown."""
+
     def get_serializer(self, doc: DoclingDocument) -> ChunkingDocSerializer:
+        """Construct a ChunkingDocSerializer tailored for DocTags documents.
+
+        Args:
+            doc: Docling document that will be serialized into chunk text.
+
+        Returns:
+            Configured ChunkingDocSerializer instance.
+        """
         return ChunkingDocSerializer(
             doc=doc,
             table_serializer=MarkdownTableSerializer(),  # tables -> Markdown
@@ -80,6 +112,14 @@ class RichSerializerProvider(ChunkingSerializerProvider):
 
 # ---------- Helpers ----------
 def find_doctags_files(in_dir: Path) -> List[Path]:
+    """Discover `.doctags` artifacts within a directory.
+
+    Args:
+        in_dir: Directory containing DocTags outputs.
+
+    Returns:
+        Sorted list of unique DocTags file paths.
+    """
     files = []
     for pat in ("*.doctags", "*.doctag"):
         files.extend(in_dir.glob(pat))
@@ -87,15 +127,40 @@ def find_doctags_files(in_dir: Path) -> List[Path]:
 
 
 def read_utf8(p: Path) -> str:
+    """Load text from disk using UTF-8 with replacement for invalid bytes.
+
+    Args:
+        p: Path to the text file.
+
+    Returns:
+        String contents of the file.
+    """
     return p.read_text(encoding="utf-8", errors="replace")
 
 
 def build_doc(doc_name: str, doctags_text: str) -> DoclingDocument:
+    """Construct a Docling document from serialized DocTags text.
+
+    Args:
+        doc_name: Human-readable document identifier for logging.
+        doctags_text: Serialized DocTags payload.
+
+    Returns:
+        Loaded DoclingDocument ready for chunking.
+    """
     dt = DocTagsDocument.from_doctags_and_image_pairs([doctags_text], [None])
     return DoclingDocument.load_from_doctags(dt, document_name=doc_name)
 
 
 def extract_refs_and_pages(chunk: BaseChunk) -> Tuple[List[str], List[int]]:
+    """Collect self-references and page numbers associated with a chunk.
+
+    Args:
+        chunk: Chunk object produced by the hybrid chunker.
+
+    Returns:
+        Tuple containing a list of reference identifiers and sorted page numbers.
+    """
     refs, pages = [], set()
     try:
         for it in chunk.meta.doc_items:
@@ -112,6 +177,16 @@ def extract_refs_and_pages(chunk: BaseChunk) -> Tuple[List[str], List[int]]:
 
 @dataclass
 class Rec:
+    """Intermediate record tracking chunk text and provenance.
+
+    Attributes:
+        text: Chunk text content.
+        n_tok: Token count computed by the tokenizer.
+        src_idxs: Source chunk indices contributing to this record.
+        refs: List of inline reference identifiers.
+        pages: Page numbers associated with the chunk.
+    """
+
     text: str
     n_tok: int
     src_idxs: List[int]
@@ -120,6 +195,16 @@ class Rec:
 
 
 def merge_rec(a: Rec, b: Rec, tokenizer: HuggingFaceTokenizer) -> Rec:
+    """Merge two chunk records, updating token counts and provenance metadata.
+
+    Args:
+        a: First record to merge.
+        b: Second record to merge.
+        tokenizer: Tokenizer used to recompute token counts for combined text.
+
+    Returns:
+        New `Rec` instance containing fused text, token counts, and metadata.
+    """
     text = a.text + "\n\n" + b.text
     n_tok = tokenizer.count_tokens(text=text)
     refs = a.refs + [r for r in b.refs if r not in a.refs]
@@ -134,21 +219,38 @@ def coalesce_small_runs(
     min_tokens: int = 256,
     max_tokens: int = 512,
 ) -> List[Rec]:
-    """
-    Strategy:
-      • Identify contiguous runs where EVERY chunk < min_tokens.
-      • Within each run, greedily pack neighbors to form groups that hit >= min_tokens
-        without exceeding max_tokens (keeps small chunks together).
-      • If the final group in a run is still < min_tokens:
-           - prefer merging into the previous group from the SAME RUN if it fits,
-           - else merge into the smaller adjacent BIG neighbor (left/right) only if it fits,
-           - else keep as-is (rare).
-      • Chunks >= min_tokens outside runs are left untouched (avoids skewing well-formed 300–500 token chunks).
+    """Merge contiguous short chunks until they satisfy minimum token thresholds.
+
+    Args:
+        records: Ordered list of chunk records to normalize.
+        tokenizer: Tokenizer used to recompute token counts for merged chunks.
+        min_tokens: Target minimum tokens per chunk after coalescing.
+        max_tokens: Hard ceiling to avoid producing overly large chunks.
+
+    Returns:
+        New list of records where small runs are merged while preserving order.
+
+    Note:
+        Strategy:
+            • Identify contiguous runs where every chunk has fewer than `min_tokens`.
+            • Greedily pack neighbors within a run to exceed `min_tokens` without
+              surpassing `max_tokens`.
+            • Merge trailing fragments into adjacent groups when possible,
+              preferring same-run neighbors to maintain topical cohesion.
+            • Leave chunks outside small runs unchanged.
     """
     out: List[Rec] = []
     i, N = 0, len(records)
 
     def is_small(idx: int) -> bool:
+        """Return True when the chunk at `idx` is below the minimum token threshold.
+
+        Args:
+            idx: Index of the chunk under evaluation.
+
+        Returns:
+            True if the chunk length is less than `min_tokens`, else False.
+        """
         return records[idx].n_tok < min_tokens
 
     while i < N:
@@ -231,6 +333,14 @@ def coalesce_small_runs(
 
 # ---------- Main ----------
 def main():
+    """CLI driver that chunks DocTags files and enforces minimum token thresholds.
+
+    Args:
+        None
+
+    Returns:
+        None
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("--in-dir", type=Path, default=DEFAULT_IN_DIR)
     ap.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)

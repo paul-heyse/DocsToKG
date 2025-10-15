@@ -14,12 +14,28 @@ from pathlib import Path
 
 
 def clean_directory(path: Path) -> None:
+    """Remove and recreate a directory to ensure a clean workspace.
+
+    Args:
+        path: Directory path to reset.
+
+    Returns:
+        None
+    """
     if path.exists():
         shutil.rmtree(path)
     path.mkdir(parents=True, exist_ok=True)
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Entry point for executing real-vector CI regression suites.
+
+    Args:
+        argv: Optional list of command-line arguments.
+
+    Returns:
+        Process exit code indicating success (`0`) or failure.
+    """
     parser = argparse.ArgumentParser(description="Run real-vector regression suite for CI")
     parser.add_argument(
         "--output-dir",

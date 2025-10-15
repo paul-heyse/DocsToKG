@@ -1,4 +1,5 @@
 """OpenSearch schema management for hybrid chunk documents."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -17,6 +18,14 @@ class OpenSearchIndexTemplate:
     chunking: ChunkingConfig
 
     def asdict(self) -> Dict[str, Any]:
+        """Convert the template to a serializable dictionary payload.
+
+        Args:
+            None
+
+        Returns:
+            Dictionary representation suitable for persistence or logging.
+        """
         return {
             "name": self.name,
             "namespace": self.namespace,
@@ -34,7 +43,18 @@ class OpenSearchSchemaManager:
     def __init__(self) -> None:
         self._templates: MutableMapping[str, OpenSearchIndexTemplate] = {}
 
-    def bootstrap_template(self, namespace: str, chunking: Optional[ChunkingConfig] = None) -> OpenSearchIndexTemplate:
+    def bootstrap_template(
+        self, namespace: str, chunking: Optional[ChunkingConfig] = None
+    ) -> OpenSearchIndexTemplate:
+        """Create and register an index template for a namespace.
+
+        Args:
+            namespace: Namespace identifier the template should serve.
+            chunking: Optional chunking configuration override.
+
+        Returns:
+            Newly created `OpenSearchIndexTemplate` instance.
+        """
         chunking_config = chunking or ChunkingConfig()
         body = {
             "settings": {
@@ -73,13 +93,30 @@ class OpenSearchSchemaManager:
             },
         }
         name = f"hybrid-chunks-{namespace}"
-        template = OpenSearchIndexTemplate(name=name, namespace=namespace, body=body, chunking=chunking_config)
+        template = OpenSearchIndexTemplate(
+            name=name, namespace=namespace, body=body, chunking=chunking_config
+        )
         self._templates[namespace] = template
         return template
 
     def get_template(self, namespace: str) -> Optional[OpenSearchIndexTemplate]:
+        """Retrieve a registered template for the given namespace.
+
+        Args:
+            namespace: Namespace identifier to look up.
+
+        Returns:
+            Matching `OpenSearchIndexTemplate`, or None if not registered.
+        """
         return self._templates.get(namespace)
 
     def list_templates(self) -> Mapping[str, OpenSearchIndexTemplate]:
-        return dict(self._templates)
+        """Return a copy of all registered templates by namespace.
 
+        Args:
+            None
+
+        Returns:
+            Mapping from namespace to `OpenSearchIndexTemplate`.
+        """
+        return dict(self._templates)

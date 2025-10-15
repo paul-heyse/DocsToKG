@@ -12,15 +12,11 @@ Result shaping utilities for hybrid search responses.
 
 *No documentation available.*
 
-### `_is_near_duplicate(self, chunk, emitted_vector_ids)`
+### `_is_near_duplicate(self, current_idx, emitted_indices, similarity_matrix)`
 
 *No documentation available.*
 
 ### `_build_highlights(self, chunk, query_tokens)`
-
-*No documentation available.*
-
-### `_cosine_similarity(self, lhs, rhs)`
 
 *No documentation available.*
 

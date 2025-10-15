@@ -113,18 +113,54 @@ class MetricsCollector:
         )
 
     def increment(self, name: str, amount: float = 1.0, **labels: str) -> None:
+        """Increase a counter metric by the given amount.
+
+        Args:
+            name: Metric identifier.
+            amount: Increment to apply to the counter (default: 1.0).
+            **labels: Arbitrary label key/value pairs for dimensioning.
+
+        Returns:
+            None
+        """
         key = (name, tuple(sorted(labels.items())))
         self._counters[key] += amount
 
     def observe(self, name: str, value: float, **labels: str) -> None:
+        """Record an observation for a histogram metric.
+
+        Args:
+            name: Metric identifier.
+            value: Observation value to append to the histogram.
+            **labels: Arbitrary label key/value pairs for dimensioning.
+
+        Returns:
+            None
+        """
         key = (name, tuple(sorted(labels.items())))
         self._histograms[key].append(value)
 
     def export_counters(self) -> Iterable[CounterSample]:
+        """Iterate over collected counter metrics as structured samples.
+
+        Args:
+            None
+
+        Returns:
+            Iterable of `CounterSample` entries representing current counters.
+        """
         for (name, labels), value in self._counters.items():
             yield CounterSample(name=name, labels=dict(labels), value=value)
 
     def export_histograms(self) -> Iterable[HistogramSample]:
+        """Iterate over collected histogram metrics summarized by percentiles.
+
+        Args:
+            None
+
+        Returns:
+            Iterable of `HistogramSample` entries containing percentile stats.
+        """
         for (name, labels), samples in self._histograms.items():
             sorted_samples = sorted(samples)
             count = len(sorted_samples)
@@ -147,6 +183,21 @@ class TraceRecorder:
 
     @contextmanager
     def span(self, name: str, **attributes: str) -> Iterator[None]:
+        """Record execution duration for a traced operation.
+
+        Args:
+            name: Span name, used in metric and log emission.
+            **attributes: Additional context attached to metrics and logs.
+
+        Returns:
+            None
+
+        Yields:
+            None
+
+        Raises:
+            Exception: Propagates any exception raised inside the traced block.
+        """
         start = time.perf_counter()
         try:
             yield
@@ -172,16 +223,49 @@ class Observability:
 
     @property
     def metrics(self) -> MetricsCollector:
+        """Access the shared metrics collector for hybrid search components.
+
+        Args:
+            None
+
+        Returns:
+            MetricsCollector instance tracking counters and histograms.
+        """
         return self._metrics
 
     @property
     def logger(self) -> logging.Logger:
+        """Structured logger scoped to hybrid search observability events.
+
+        Args:
+            None
+
+        Returns:
+            Logger configured for DocsToKG hybrid search messages.
+        """
         return self._logger
 
     def trace(self, name: str, **attributes: str) -> Iterator[None]:
+        """Create a tracing span context for measuring critical operations.
+
+        Args:
+            name: Span name describing the operation being timed.
+            **attributes: Additional context for metrics and structured logging.
+
+        Returns:
+            Context manager yielding control to the caller.
+        """
         return self._tracer.span(name, **attributes)
 
     def metrics_snapshot(self) -> Dict[str, list[Mapping[str, object]]]:
+        """Produce a serializable snapshot of counters and histograms.
+
+        Args:
+            None
+
+        Returns:
+            Dictionary containing lists of counter and histogram samples.
+        """
         counters = [sample.__dict__ for sample in self._metrics.export_counters()]
         histograms = [sample.__dict__ for sample in self._metrics.export_histograms()]
         return {"counters": counters, "histograms": histograms}

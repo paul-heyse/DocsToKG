@@ -13,7 +13,6 @@ import json
 import logging
 import os
 import sys
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
@@ -24,6 +23,7 @@ from urllib.parse import urlparse
 try:  # pragma: no cover - exercised in environments without pystow installed
     import pystow  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover - provides lightweight fallback for tests
+
     class _PystowFallback:
         """Minimal pystow replacement used when the dependency is absent."""
 
@@ -37,7 +37,6 @@ except ModuleNotFoundError:  # pragma: no cover - provides lightweight fallback 
 
 from .config import ConfigError, ResolvedConfig, ensure_python_version
 from .download import (
-    DownloadResult,
     download_stream,
     extract_zip_safe,
     sanitize_filename,
@@ -296,13 +295,17 @@ def fetch_one(
 
     log = logger or setup_logging(active_config.defaults.logging)
     correlation = correlation_id or generate_correlation_id()
-    adapter = logging.LoggerAdapter(log, extra={"correlation_id": correlation, "ontology_id": spec.id})
+    adapter = logging.LoggerAdapter(
+        log, extra={"correlation_id": correlation, "ontology_id": spec.id}
+    )
     adapter.info("planning fetch", extra={"stage": "plan"})
 
     try:
         plan = resolver.plan(spec, active_config, adapter)
     except ConfigError as exc:
-        raise ResolverError(f"Resolver '{spec.resolver}' failed for ontology '{spec.id}': {exc}") from exc
+        raise ResolverError(
+            f"Resolver '{spec.resolver}' failed for ontology '{spec.id}': {exc}"
+        ) from exc
     except Exception as exc:  # pylint: disable=broad-except
         raise ResolverError(f"Unexpected resolver failure for ontology '{spec.id}': {exc}") from exc
 

@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, MutableMapping,
 try:  # pragma: no cover - optional dependency
     import yaml  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover - lightweight YAML fallback for tests
+
     class _YAMLError(Exception):
         pass
 
@@ -36,7 +37,7 @@ except ModuleNotFoundError:  # pragma: no cover - lightweight YAML fallback for 
             if not inner:
                 return []
             return [_parse_scalar(part.strip()) for part in inner.split(",")]
-        if (value.startswith("\"") and value.endswith("\"")) or (
+        if (value.startswith('"') and value.endswith('"')) or (
             value.startswith("'") and value.endswith("'")
         ):
             return value[1:-1]
@@ -167,6 +168,7 @@ class LoggingConfiguration:
         max_log_size_mb: Maximum individual log file size before rotation.
         retention_days: Number of days to keep logs prior to compression.
     """
+
     level: str = "INFO"
     max_log_size_mb: int = 100
     retention_days: int = 30
@@ -193,6 +195,7 @@ class DownloadConfiguration:
         per_host_rate_limit: Token bucket rate limit definition per host.
         max_download_size_gb: Maximum allowed ontology archive size.
     """
+
     max_retries: int = 5
     timeout_sec: int = 30
     download_timeout_sec: int = 300
@@ -218,14 +221,16 @@ class DownloadConfiguration:
         try:
             tokens = float(value)
         except ValueError as exc:  # pragma: no cover - validated earlier
-            raise ConfigError(f"Invalid per_host_rate_limit value: {self.per_host_rate_limit}") from exc
+            raise ConfigError(
+                f"Invalid per_host_rate_limit value: {self.per_host_rate_limit}"
+            ) from exc
         if unit.strip() not in {"second", "sec", "s"}:
             raise ConfigError("per_host_rate_limit must be expressed per second")
         return tokens
 
 
 @dataclass(slots=True)
-class DefaultsConfiguration:
+class DefaultsConfig:
     """Collection of default settings applied to ontology fetch specifications.
 
     Attributes:
@@ -238,12 +243,17 @@ class DefaultsConfiguration:
         continue_on_error: Whether to proceed after non-fatal download errors.
         concurrent_downloads: Maximum concurrent download workers to run.
     """
-    accept_licenses: Sequence[str] = field(default_factory=lambda: ["CC-BY-4.0", "CC0-1.0", "OGL-UK-3.0"])
+
+    accept_licenses: Sequence[str] = field(
+        default_factory=lambda: ["CC-BY-4.0", "CC0-1.0", "OGL-UK-3.0"]
+    )
     normalize_to: Sequence[str] = field(default_factory=lambda: ["ttl"])
-    prefer_source: Sequence[str] = field(default_factory=lambda: ["obo", "ols", "bioportal", "direct"])
-    http: HTTPConfig = field(default_factory=HTTPConfig)
+    prefer_source: Sequence[str] = field(
+        default_factory=lambda: ["obo", "ols", "bioportal", "direct"]
+    )
+    http: DownloadConfiguration = field(default_factory=DownloadConfiguration)
     validation: ValidationConfig = field(default_factory=ValidationConfig)
-    logging: LoggingConfig = field(default_factory=LoggingConfig)
+    logging: LoggingConfiguration = field(default_factory=LoggingConfiguration)
     continue_on_error: bool = True
 
 
@@ -258,7 +268,8 @@ class ResolvedConfig:
         defaults: Finalized default settings applied to fetch specs.
         specs: Sequence of ontology fetch specifications to execute.
     """
-    defaults: DefaultsConfiguration
+
+    defaults: DefaultsConfig
     specs: Sequence["FetchSpec"]
 
     @classmethod
@@ -294,23 +305,36 @@ def get_env_overrides() -> Dict[str, str]:
         their string values for supported overrides.
     """
     prefix = "ONTOFETCH_"
-    return {key[len(prefix) :].lower(): value for key, value in os.environ.items() if key.startswith(prefix)}
+    return {
+        key[len(prefix) :].lower(): value
+        for key, value in os.environ.items()
+        if key.startswith(prefix)
+    }
 
 
 def _build_defaults(raw_defaults: Mapping[str, object]) -> DefaultsConfig:
     template = DefaultsConfig()
 
-    http_defaults = raw_defaults.get("http") if isinstance(raw_defaults.get("http"), Mapping) else {}
-    validation_defaults = (
-        raw_defaults.get("validation") if isinstance(raw_defaults.get("validation"), Mapping) else {}
+    http_defaults = (
+        raw_defaults.get("http") if isinstance(raw_defaults.get("http"), Mapping) else {}
     )
-    logging_defaults = raw_defaults.get("logging") if isinstance(raw_defaults.get("logging"), Mapping) else {}
+    validation_defaults = (
+        raw_defaults.get("validation")
+        if isinstance(raw_defaults.get("validation"), Mapping)
+        else {}
+    )
+    logging_defaults = (
+        raw_defaults.get("logging") if isinstance(raw_defaults.get("logging"), Mapping) else {}
+    )
 
     defaults = DefaultsConfig(
-        accept_licenses=_coerce_sequence(raw_defaults.get("accept_licenses")) or list(template.accept_licenses),
-        normalize_to=_coerce_sequence(raw_defaults.get("normalize_to")) or list(template.normalize_to),
-        prefer_source=_coerce_sequence(raw_defaults.get("prefer_source")) or list(template.prefer_source),
-        http=HTTPConfig(
+        accept_licenses=_coerce_sequence(raw_defaults.get("accept_licenses"))
+        or list(template.accept_licenses),
+        normalize_to=_coerce_sequence(raw_defaults.get("normalize_to"))
+        or list(template.normalize_to),
+        prefer_source=_coerce_sequence(raw_defaults.get("prefer_source"))
+        or list(template.prefer_source),
+        http=DownloadConfiguration(
             max_retries=int(http_defaults.get("max_retries", template.http.max_retries)),
             timeout_sec=int(http_defaults.get("timeout_sec", template.http.timeout_sec)),
             download_timeout_sec=int(
@@ -329,16 +353,20 @@ def _build_defaults(raw_defaults: Mapping[str, object]) -> DefaultsConfig:
         ),
         validation=ValidationConfig(
             parser_timeout_sec=int(
-                validation_defaults.get("parser_timeout_sec", template.validation.parser_timeout_sec)
+                validation_defaults.get(
+                    "parser_timeout_sec", template.validation.parser_timeout_sec
+                )
             ),
             max_memory_mb=int(
                 validation_defaults.get("max_memory_mb", template.validation.max_memory_mb)
             ),
             skip_reasoning_if_size_mb=int(
-                validation_defaults.get("skip_reasoning_if_size_mb", template.validation.skip_reasoning_if_size_mb)
+                validation_defaults.get(
+                    "skip_reasoning_if_size_mb", template.validation.skip_reasoning_if_size_mb
+                )
             ),
         ),
-        logging=LoggingConfig(
+        logging=LoggingConfiguration(
             level=str(logging_defaults.get("level", template.logging.level)),
             max_log_size_mb=int(
                 logging_defaults.get("max_log_size_mb", template.logging.max_log_size_mb)
@@ -400,9 +428,7 @@ def _apply_env_overrides(defaults: DefaultsConfig) -> None:
         )
 
 
-def merge_defaults(
-    ontology_spec: Mapping[str, object], defaults: Optional[DefaultsConfig] = None
-):
+def merge_defaults(ontology_spec: Mapping[str, object], defaults: Optional[DefaultsConfig] = None):
     if defaults is None:
         return build_resolved_config(ontology_spec)
     ontology_id = str(ontology_spec.get("id", "")).strip()
@@ -457,7 +483,9 @@ def _make_fetch_spec(
     """
     from .core import FetchSpec as _FetchSpec  # Local import avoids circular dependency
 
-    return _FetchSpec(id=ontology_id, resolver=resolver, extras=dict(extras), target_formats=list(target_formats))
+    return _FetchSpec(
+        id=ontology_id, resolver=resolver, extras=dict(extras), target_formats=list(target_formats)
+    )
 
 
 def validate_config(config_path: Path) -> ResolvedConfig:
@@ -487,7 +515,15 @@ def _validate_schema(raw: Mapping[str, object], config: Optional[ResolvedConfig]
         errors.append("'defaults' section must be a mapping when provided")
     if isinstance(defaults, Mapping):
         for key in defaults:
-            if key not in {"accept_licenses", "normalize_to", "prefer_source", "http", "validation", "logging", "continue_on_error"}:
+            if key not in {
+                "accept_licenses",
+                "normalize_to",
+                "prefer_source",
+                "http",
+                "validation",
+                "logging",
+                "continue_on_error",
+            }:
                 errors.append(f"Unknown key in defaults: {key}")
 
         http_section = defaults.get("http")
@@ -510,7 +546,12 @@ def _validate_schema(raw: Mapping[str, object], config: Optional[ResolvedConfig]
                 errors.append("defaults.http.timeout_sec must be > 0")
         if isinstance(logging_section, Mapping):
             level = logging_section.get("level")
-            if level is not None and str(level).upper() not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
+            if level is not None and str(level).upper() not in {
+                "DEBUG",
+                "INFO",
+                "WARNING",
+                "ERROR",
+            }:
                 errors.append("defaults.logging.level must be one of DEBUG, INFO, WARNING, ERROR")
 
     ontologies = raw.get("ontologies")
@@ -605,7 +646,8 @@ def load_config(config_path: Path) -> ResolvedConfig:
 __all__ = [
     "ConfigError",
     "DefaultsConfig",
-    "HTTPConfig",
+    "DownloadConfiguration",
+    "LoggingConfiguration",
     "LoggingConfig",
     "ResolvedConfig",
     "ValidationConfig",
@@ -618,8 +660,6 @@ __all__ = [
 ]
 
 # Backwards compatibility exports
-DefaultsConfiguration = DefaultsConfig
-DownloadConfiguration = HTTPConfig
-LoggingConfiguration = LoggingConfig
+DefaultsConfiguration = DefaultsConfig  # DefaultsConfig is now the canonical name
+LoggingConfig = LoggingConfiguration
 ValidationConfiguration = ValidationConfig
-

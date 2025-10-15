@@ -1,4 +1,5 @@
 """Feature generation utilities for SPLADE weights and dense embeddings."""
+
 from __future__ import annotations
 
 import hashlib
@@ -22,14 +23,32 @@ class FeatureGenerator:
 
     @property
     def embedding_dim(self) -> int:
+        """Return the dimensionality used for synthetic dense embeddings.
+
+        Args:
+            None
+
+        Returns:
+            Integer dimensionality for generated embeddings.
+        """
         return self._embedding_dim
 
     def compute_features(self, text: str) -> ChunkFeatures:
+        """Generate BM25, SPLADE, and dense features for the supplied text.
+
+        Args:
+            text: Chunk text that requires feature extraction.
+
+        Returns:
+            ChunkFeatures containing sparse and dense representations.
+        """
         tokens = tokenize(text)
         bm25_terms = self._compute_bm25(tokens)
         splade_weights = self._compute_splade(tokens)
         embedding = self._compute_dense_embedding(tokens)
-        return ChunkFeatures(bm25_terms=bm25_terms, splade_weights=splade_weights, embedding=embedding)
+        return ChunkFeatures(
+            bm25_terms=bm25_terms, splade_weights=splade_weights, embedding=embedding
+        )
 
     def _compute_bm25(self, tokens: Sequence[str]) -> Dict[str, float]:
         counter = Counter(tokens)
@@ -68,4 +87,3 @@ class FeatureGenerator:
         if norm == 0.0:
             return vector
         return vector / norm
-

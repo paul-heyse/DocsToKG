@@ -9,15 +9,22 @@ This script performs thorough link checking on documentation files:
 - Provides suggestions for fixing broken links
 """
 
+import argparse
 import asyncio
-import aiohttp
 import re
 import sys
-import json
 from pathlib import Path
-from typing import Dict, List, Set, Tuple, Optional
-from urllib.parse import urlparse, urljoin
-import argparse
+from urllib.parse import urljoin, urlparse
+from typing import Dict, List, Optional, Set, Tuple
+
+try:
+    import aiohttp
+except ModuleNotFoundError:  # pragma: no cover - depends on local environment
+    print(
+        "❌ The 'aiohttp' package is required to run the link checker.\n"
+        "Install it with 'pip install aiohttp' and rerun the script."
+    )
+    sys.exit(1)
 
 
 class LinkChecker:
@@ -51,6 +58,8 @@ class LinkChecker:
         print(f"📁 Scanning {len(md_files)} files for links...")
 
         for file_path in md_files:
+            if file_path.name == "link_check_report.md":
+                continue
             links = self._extract_links_from_file(file_path)
             if links:
                 file_links[file_path] = links
@@ -94,10 +103,14 @@ class LinkChecker:
                         url = match
                         link_text = url
 
-                    if url and not self._should_ignore_url(url):
+                    sanitized = self._sanitize_url(url)
+                    if not sanitized:
+                        continue
+
+                    if sanitized and not self._should_ignore_url(sanitized):
                         links.append(
                             {
-                                "url": url,
+                                "url": sanitized,
                                 "text": link_text.strip(),
                                 "line": line_num,
                                 "type": link_type,
@@ -106,6 +119,29 @@ class LinkChecker:
                         )
 
         return links
+
+    @staticmethod
+    def _sanitize_url(url: str) -> Optional[str]:
+        """Trim trailing punctuation and skip known placeholder URLs."""
+        if not url:
+            return None
+
+        sanitized = url.strip().lstrip("<").rstrip(">")
+        sanitized = sanitized.rstrip(").,;:`'\"")
+
+        if not sanitized:
+            return None
+
+        if sanitized.startswith(("http://", "https://")):
+            host = urlparse(sanitized).netloc.lower()
+            placeholder_hosts = {"example.com", "example.org", "example.net"}
+            if host in placeholder_hosts:
+                return None
+
+        if sanitized.startswith("https://...") or sanitized.startswith("http://..."):
+            return None
+
+        return sanitized
 
     def _should_ignore_url(self, url: str) -> bool:
         """Check if URL should be ignored (e.g., placeholders, fragments)."""

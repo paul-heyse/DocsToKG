@@ -65,15 +65,20 @@ if "ontoportal_client" not in sys.modules:
     sys.modules["ontoportal_client"] = SimpleNamespace(BioPortalClient=_PlaceholderClient)
 
 if "requests" not in sys.modules:
-    sys.modules["requests"] = _StubRequestsModule(
-        Session=_StubSession,
-        HTTPError=_HTTPError,
-        Timeout=_Timeout,
-        ConnectionError=_ConnectionError,
-        RequestException=_RequestException,
-        Response=_StubResponse,
-        exceptions=SimpleNamespace(SSLError=_SSLError),
-    )
+    try:  # Prefer the real requests library if available
+        import requests as _real_requests  # type: ignore
+    except ModuleNotFoundError:
+        sys.modules["requests"] = _StubRequestsModule(
+            Session=_StubSession,
+            HTTPError=_HTTPError,
+            Timeout=_Timeout,
+            ConnectionError=_ConnectionError,
+            RequestException=_RequestException,
+            Response=_StubResponse,
+            exceptions=SimpleNamespace(SSLError=_SSLError),
+        )
+    else:
+        sys.modules["requests"] = _real_requests
 
 if "pystow" not in sys.modules:
     class _StubPystow(SimpleNamespace):

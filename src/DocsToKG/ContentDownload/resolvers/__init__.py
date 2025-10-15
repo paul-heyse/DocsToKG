@@ -8,7 +8,7 @@ PDF is downloaded.
 
 from __future__ import annotations
 
-import json
+import inspect
 import random
 import re
 import threading
@@ -17,7 +17,19 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from functools import lru_cache
 from itertools import chain
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Protocol, Sequence, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+)
 from urllib.parse import quote, urljoin, urlparse
 
 import requests
@@ -27,13 +39,15 @@ try:  # Optional dependency; landing-page resolver guards at runtime.
 except Exception:  # pragma: no cover - handled downstream
     BeautifulSoup = None
 
+if TYPE_CHECKING:
+    from .download_pyalex_pdfs import WorkArtifact
+
 from DocsToKG.ContentDownload.utils import (
     dedupe,
     normalize_doi,
     normalize_pmcid,
     strip_prefix,
 )
-
 
 DEFAULT_RESOLVER_ORDER: List[str] = [
     "unpaywall",
@@ -52,8 +66,7 @@ DEFAULT_RESOLVER_ORDER: List[str] = [
 ]
 
 _DEFAULT_RESOLVER_TOGGLES: Dict[str, bool] = {
-    name: name not in {"openaire", "hal", "osf"}
-    for name in DEFAULT_RESOLVER_ORDER
+    name: name not in {"openaire", "hal", "osf"} for name in DEFAULT_RESOLVER_ORDER
 }
 
 _TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
@@ -62,7 +75,7 @@ _DEFAULT_BACKOFF = 0.75
 
 
 def _sleep_backoff(attempt: int, base: float = _DEFAULT_BACKOFF) -> None:
-    time.sleep(base * (2 ** attempt) + random.random() * 0.1)
+    time.sleep(base * (2**attempt) + random.random() * 0.1)
 
 
 def _headers_cache_key(headers: Dict[str, str]) -> Tuple[Tuple[str, str], ...]:
@@ -157,13 +170,21 @@ def _request_with_retries(
     last_exc: Optional[Exception] = None
     for attempt in range(max_retries + 1):
         try:
-            response = session.request(method=method, url=url, **kwargs)
+            if hasattr(session, "request"):
+                response = session.request(method=method, url=url, **kwargs)
+            else:
+                request_func = getattr(session, method.lower(), None)
+                if request_func is None:
+                    raise AttributeError(f"Session missing '{method.lower()}' request method")
+                response = request_func(url, **kwargs)
         except requests.RequestException as exc:  # pragma: no cover - network paths
             last_exc = exc
             if attempt >= max_retries:
                 raise
             _sleep_backoff(attempt)
             continue
+        except AttributeError as exc:
+            raise
 
         if response.status_code in statuses and attempt < max_retries:
             _sleep_backoff(attempt)
@@ -192,9 +213,7 @@ class ResolverResult:
 
 @dataclass
 class ResolverConfig:
-    resolver_order: List[str] = field(
-        default_factory=lambda: list(DEFAULT_RESOLVER_ORDER)
-    )
+    resolver_order: List[str] = field(default_factory=lambda: list(DEFAULT_RESOLVER_ORDER))
     resolver_toggles: Dict[str, bool] = field(
         default_factory=lambda: dict(_DEFAULT_RESOLVER_TOGGLES)
     )
@@ -208,6 +227,7 @@ class ResolverConfig:
     doaj_api_key: Optional[str] = None
     resolver_timeouts: Dict[str, float] = field(default_factory=dict)
     resolver_min_interval_s: Dict[str, float] = field(default_factory=dict)
+    resolver_rate_limits: Dict[str, float] = field(default_factory=dict)
     mailto: Optional[str] = None
 
     def get_timeout(self, resolver_name: str) -> float:
@@ -215,6 +235,11 @@ class ResolverConfig:
 
     def is_enabled(self, resolver_name: str) -> bool:
         return self.resolver_toggles.get(resolver_name, True)
+
+    def __post_init__(self) -> None:
+        if self.resolver_rate_limits:
+            for name, value in self.resolver_rate_limits.items():
+                self.resolver_min_interval_s.setdefault(name, value)
 
 
 @dataclass
@@ -235,8 +260,7 @@ class AttemptRecord:
 
 
 class AttemptLogger(Protocol):
-    def log(self, record: AttemptRecord) -> None:
-        ...
+    def log(self, record: AttemptRecord) -> None: ...
 
 
 @dataclass
@@ -271,16 +295,14 @@ class PipelineResult:
 class Resolver(Protocol):
     name: str
 
-    def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
-        ...
+    def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool: ...
 
     def iter_urls(
         self,
         session: requests.Session,
         config: ResolverConfig,
         artifact: "WorkArtifact",
-    ) -> Iterable[ResolverResult]:
-        ...
+    ) -> Iterable[ResolverResult]: ...
 
 
 @dataclass
@@ -310,14 +332,24 @@ class ResolverMetrics:
         }
 
 
-DownloadFunc = Callable[[
-    requests.Session,
-    "WorkArtifact",
-    str,
-    Optional[str],
-    float,
-    Dict[str, Any],
-], DownloadOutcome]
+DownloadFunc = Callable[..., DownloadOutcome]
+
+
+def _callable_accepts_argument(func: Callable[..., Any], name: str) -> bool:
+    try:
+        signature = inspect.signature(func)
+    except (TypeError, ValueError):
+        return True
+
+    for parameter in signature.parameters.values():
+        if parameter.kind in (
+            inspect.Parameter.VAR_POSITIONAL,
+            inspect.Parameter.VAR_KEYWORD,
+        ):
+            return True
+        if parameter.name == name:
+            return True
+    return False
 
 
 class ResolverPipeline:
@@ -338,9 +370,12 @@ class ResolverPipeline:
         self.metrics = metrics or ResolverMetrics()
         self._last_invocation: Dict[str, float] = defaultdict(lambda: 0.0)
         self._lock = threading.Lock()
+        self._download_accepts_context = _callable_accepts_argument(download_func, "context")
 
     def _respect_rate_limit(self, resolver_name: str) -> None:
         limit = self.config.resolver_min_interval_s.get(resolver_name)
+        if not limit:
+            limit = self.config.resolver_rate_limits.get(resolver_name)
         if not limit:
             return
         with self._lock:
@@ -472,14 +507,23 @@ class ResolverPipeline:
 
                 seen_urls.add(url)
                 attempt_counter += 1
-                outcome = self.download_func(
-                    session,
-                    artifact,
-                    url,
-                    result.referer,
-                    self.config.get_timeout(resolver_name),
-                    context_data,
-                )
+                if self._download_accepts_context:
+                    outcome = self.download_func(
+                        session,
+                        artifact,
+                        url,
+                        result.referer,
+                        self.config.get_timeout(resolver_name),
+                        context_data,
+                    )
+                else:
+                    outcome = self.download_func(
+                        session,
+                        artifact,
+                        url,
+                        result.referer,
+                        self.config.get_timeout(resolver_name),
+                    )
                 self.logger.log(
                     AttemptRecord(
                         work_id=artifact.work_id,
@@ -554,37 +598,74 @@ class UnpaywallResolver:
                 event_reason="no-doi",
             )
             return
-        try:
-            data = _fetch_unpaywall_data(
-                doi,
-                config.unpaywall_email,
-                config.get_timeout(self.name),
-                _headers_cache_key(config.polite_headers),
-            )
-        except requests.HTTPError as exc:
-            status = exc.response.status_code if exc.response else None
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="http-error",
-                http_status=status,
-            )
-            return
-        except requests.RequestException as exc:  # pragma: no cover - network errors
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="request-error",
-                metadata={"message": str(exc)},
-            )
-            return
-        except ValueError:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="json-error",
-            )
-            return
+        endpoint = f"https://api.unpaywall.org/v2/{quote(doi)}"
+        if isinstance(session, requests.Session):
+            try:
+                data = _fetch_unpaywall_data(
+                    doi,
+                    config.unpaywall_email,
+                    config.get_timeout(self.name),
+                    _headers_cache_key(config.polite_headers),
+                )
+            except requests.HTTPError as exc:
+                status = exc.response.status_code if exc.response else None
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="http-error",
+                    http_status=status,
+                )
+                return
+            except requests.RequestException as exc:  # pragma: no cover - network errors
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="request-error",
+                    metadata={"message": str(exc)},
+                )
+                return
+            except ValueError:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="json-error",
+                )
+                return
+        else:
+            try:
+                response = session.get(
+                    endpoint,
+                    timeout=config.get_timeout(self.name),
+                    headers=dict(config.polite_headers),
+                )
+            except Exception as exc:  # pragma: no cover - safety
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="request-error",
+                    metadata={"message": str(exc)},
+                )
+                return
+
+            status = getattr(response, "status_code", 200)
+            if status != 200:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="http-error",
+                    http_status=status,
+                )
+                return
+
+            try:
+                data = response.json()
+            except Exception:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="json-error",
+                )
+                return
 
         candidates: List[Tuple[str, Dict[str, Any]]] = []
         best = (data or {}).get("best_oa_location") or {}
@@ -1084,11 +1165,7 @@ class OpenAireResolver:
             data = resp.json()
         except ValueError:
             return []
-        results = (
-            data.get("response", {})
-            .get("results", {})
-            .get("result", [])
-        )
+        results = data.get("response", {}).get("results", {}).get("result", [])
         urls: List[str] = []
         for entry in results or []:
             metadata = entry.get("metadata") or {}

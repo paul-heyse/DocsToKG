@@ -46,7 +46,6 @@ from .features import FeatureGenerator
 from .fusion import ReciprocalRankFusion, apply_mmr_diversification
 from .ingest import ChunkIngestionPipeline
 from .observability import Observability
-from .schema import OpenSearchIndexTemplate, OpenSearchSchemaManager
 from .operations import (
     PaginationCheckResult,
     build_stats_snapshot,
@@ -56,6 +55,7 @@ from .operations import (
     verify_pagination,
 )
 from .retrieval import HybridSearchService
+from .schema import OpenSearchIndexTemplate, OpenSearchSchemaManager
 from .types import (
     ChunkPayload,
     DocumentInput,

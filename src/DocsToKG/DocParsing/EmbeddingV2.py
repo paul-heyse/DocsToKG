@@ -12,14 +12,28 @@ Uses local HF cache at /home/paul/hf-cache/:
 """
 
 from __future__ import annotations
-import argparse, json, math, os, re, uuid
+
+import argparse
+import json
+import math
+import os
+import re
+import uuid
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 
-import torch
+# Third-party imports
+from sentence_transformers import (
+    SparseEncoder,
+)  # loads from local dir if given (cache_folder supported)
 from tqdm import tqdm
+
+from vllm import (
+    LLM,
+    PoolingParams,
+)  # PoolingParams(dimensions=...) selects output dim if model supports MRL
 
 # ---- Fixed locations ----
 HF_HOME = Path("/home/paul/hf-cache")
@@ -36,34 +50,48 @@ os.environ.setdefault("HF_HUB_CACHE", str(HF_HOME / "hub"))
 os.environ.setdefault("TRANSFORMERS_CACHE", str(HF_HOME / "transformers"))
 os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", str(MODEL_ROOT))
 
-# ---- SPLADE (Sentence-Transformers SparseEncoder) ----
-from sentence_transformers import (
-    SparseEncoder,
-)  # loads from local dir if given (cache_folder supported)
-
-# ---- Qwen (vLLM offline API) ----
-from vllm import (
-    LLM,
-    PoolingParams,
-)  # PoolingParams(dimensions=...) selects output dim if model supports MRL
-
 # ---- simple tokenizer for BM25 ----
-import re
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)?")
 
 
 @dataclass
 class Chunk:
+    """Minimal representation of a DocTags chunk stored on disk.
+
+    Attributes:
+        uuid: Stable identifier for the chunk.
+        text: Textual content extracted from the DocTags document.
+    """
+
     uuid: str
     text: str
 
 
 def iter_chunk_files(d: Path) -> List[Path]:
+    """Enumerate chunked DocTags JSONL files in a directory.
+
+    Args:
+        d: Directory containing `*.chunks.jsonl` files.
+
+    Returns:
+        Sorted list of chunk file paths.
+    """
     return sorted(d.glob("*.chunks.jsonl"))
 
 
 def load_rows(p: Path) -> List[dict]:
+    """Load JSONL rows from disk into memory.
+
+    Args:
+        p: Path to the `.jsonl` file.
+
+    Returns:
+        List of dictionaries parsed from the file.
+
+    Raises:
+        json.JSONDecodeError: If a line contains malformed JSON.
+    """
     rows = []
     with p.open("r", encoding="utf-8") as f:
         for line in f:
@@ -73,6 +101,15 @@ def load_rows(p: Path) -> List[dict]:
 
 
 def save_rows(p: Path, rows: List[dict]) -> None:
+    """Persist JSONL rows to disk atomically using a temporary file.
+
+    Args:
+        p: Destination path for the chunk file.
+        rows: Sequence of dictionaries to serialize.
+
+    Returns:
+        None
+    """
     tmp = p.with_suffix(".chunks.jsonl.tmp")
     with tmp.open("w", encoding="utf-8") as f:
         for r in rows:
@@ -81,24 +118,56 @@ def save_rows(p: Path, rows: List[dict]) -> None:
 
 
 def ensure_uuid(rows: List[dict]) -> None:
+    """Populate missing chunk UUIDs in-place.
+
+    Args:
+        rows: Chunk dictionaries that should include a `uuid` key.
+
+    Returns:
+        None
+    """
     for r in rows:
         if not r.get("uuid"):
             r["uuid"] = str(uuid.uuid4())
 
 
 def tokens(text: str) -> List[str]:
+    """Tokenize normalized text for sparse retrieval features.
+
+    Args:
+        text: Input string to tokenize.
+
+    Returns:
+        Lowercased alphanumeric tokens extracted from the text.
+    """
     return [t.lower() for t in TOKEN_RE.findall(text)]
 
 
 # ---- BM25 (global) ----
 @dataclass
 class BM25Stats:
+    """Corpus-wide statistics required for BM25 weighting.
+
+    Attributes:
+        N: Total number of documents (chunks) in the corpus.
+        avgdl: Average document length in tokens.
+        df: Document frequency per token.
+    """
+
     N: int
     avgdl: float
     df: Dict[str, int]
 
 
 def build_bm25_stats(chunks: Iterable[Chunk]) -> BM25Stats:
+    """Compute corpus statistics required for BM25 weighting.
+
+    Args:
+        chunks: Iterable of text chunks with identifiers.
+
+    Returns:
+        BM25Stats containing document frequency counts and average length.
+    """
     N = 0
     total = 0
     df = Counter()
@@ -114,6 +183,17 @@ def build_bm25_stats(chunks: Iterable[Chunk]) -> BM25Stats:
 def bm25_vector(
     text: str, stats: BM25Stats, k1: float = 1.5, b: float = 0.75
 ) -> Tuple[List[str], List[float]]:
+    """Generate BM25 term weights for a chunk of text.
+
+    Args:
+        text: Chunk text to convert into a sparse representation.
+        stats: Precomputed BM25 statistics for the corpus.
+        k1: Term frequency saturation parameter.
+        b: Length normalization parameter.
+
+    Returns:
+        Tuple of `(terms, weights)` describing the sparse vector.
+    """
     toks = tokens(text)
     dl = len(toks) or 1
     tf = Counter(toks)
@@ -132,6 +212,17 @@ def bm25_vector(
 # ---- SPLADE-v3 (GPU) ----
 @dataclass
 class SpladeCfg:
+    """Runtime configuration for SPLADE sparse encoding.
+
+    Attributes:
+        model_dir: Path to the SPLADE model directory.
+        device: Torch device identifier to run inference on.
+        batch_size: Number of texts encoded per batch.
+        cache_folder: Directory where transformer weights are cached.
+        max_active_dims: Optional cap on active sparse dimensions.
+        attn_impl: Preferred attention implementation override.
+    """
+
     model_dir: Path = SPLADE_DIR
     device: str = "cuda"
     batch_size: int = 32
@@ -142,6 +233,15 @@ class SpladeCfg:
 
 
 def splade_encode(cfg: SpladeCfg, texts: List[str]) -> Tuple[List[List[str]], List[List[float]]]:
+    """Encode text with SPLADE to obtain sparse lexical vectors.
+
+    Args:
+        cfg: SPLADE configuration describing device, batch size, and cache.
+        texts: Batch of input strings to encode.
+
+    Returns:
+        Tuple of token lists and weight lists aligned per input text.
+    """
     model_kwargs = {"attn_implementation": cfg.attn_impl} if cfg.attn_impl else {}
     try:
         enc = SparseEncoder(
@@ -182,6 +282,17 @@ def splade_encode(cfg: SpladeCfg, texts: List[str]) -> Tuple[List[List[str]], Li
 # ---- Qwen3-Embedding-4B via vLLM (2560-d) ----
 @dataclass
 class QwenCfg:
+    """Configuration for generating dense embeddings with Qwen via vLLM.
+
+    Attributes:
+        model_dir: Path to the local Qwen model.
+        dtype: Torch dtype used during inference.
+        tp: Tensor parallelism degree.
+        gpu_mem_util: Target GPU memory utilization for vLLM.
+        batch_size: Number of texts processed per embedding batch.
+        quantization: Optional quantization mode (e.g., `awq`).
+    """
+
     model_dir: Path = QWEN_DIR
     dtype: str = "bfloat16"  # good default on Ada/Hopper
     tp: int = 1
@@ -191,6 +302,15 @@ class QwenCfg:
 
 
 def qwen_embed(cfg: QwenCfg, texts: List[str]) -> List[List[float]]:
+    """Produce dense embeddings using a local Qwen3 model served by vLLM.
+
+    Args:
+        cfg: Configuration describing model path, dtype, and batching.
+        texts: Batch of documents to embed.
+
+    Returns:
+        List of embedding vectors, one per input text.
+    """
     llm = LLM(
         model=str(cfg.model_dir),  # local path
         task="embed",
@@ -212,6 +332,14 @@ def qwen_embed(cfg: QwenCfg, texts: List[str]) -> List[List[float]]:
 
 # ---- Main driver ----
 def main():
+    """CLI entrypoint for chunk UUID cleanup and embedding generation.
+
+    Args:
+        None
+
+    Returns:
+        None
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("--chunks-dir", type=Path, default=CHUNKS_DIR)
     ap.add_argument("--out-dir", type=Path, default=VECTORS_DIR)

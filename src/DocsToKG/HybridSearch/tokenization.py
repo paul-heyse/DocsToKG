@@ -1,20 +1,35 @@
 """Tokenization utilities shared across sparse/dense features."""
+
 from __future__ import annotations
 
 import re
-from typing import Iterable, Iterator, List, Sequence, Tuple
+from typing import Iterator, List, Sequence, Tuple
 
 _TOKEN_PATTERN = re.compile(r"[\w']+")
 
 
 def tokenize(text: str) -> List[str]:
-    """Tokenize text into lowercase alphanumeric tokens."""
+    """Tokenize text into lowercase alphanumeric tokens.
+
+    Args:
+        text: Input string to tokenize.
+
+    Returns:
+        List of lowercase tokens extracted from the text.
+    """
 
     return [token.lower() for token in _TOKEN_PATTERN.findall(text)]
 
 
 def tokenize_with_spans(text: str) -> Tuple[List[str], List[Tuple[int, int]]]:
-    """Return tokens alongside their character spans."""
+    """Return tokens alongside their character spans.
+
+    Args:
+        text: Input string to tokenize.
+
+    Returns:
+        Tuple containing the token list and matching (start, end) spans.
+    """
 
     tokens: List[str] = []
     spans: List[Tuple[int, int]] = []
@@ -25,7 +40,22 @@ def tokenize_with_spans(text: str) -> Tuple[List[str], List[Tuple[int, int]]]:
 
 
 def sliding_window(tokens: Sequence[str], window: int, overlap: int) -> Iterator[List[str]]:
-    """Yield token windows with configurable overlap."""
+    """Yield token windows with configurable overlap.
+
+    Args:
+        tokens: Sequence of tokens to segment.
+        window: Number of tokens in each window.
+        overlap: Number of tokens overlapping between consecutive windows.
+
+    Yields:
+        Lists of tokens representing each window.
+
+    Returns:
+        Iterator producing token windows.
+
+    Raises:
+        ValueError: If parameters do not describe a valid sliding window.
+    """
 
     if window <= 0:
         raise ValueError("window must be positive")
@@ -40,4 +70,3 @@ def sliding_window(tokens: Sequence[str], window: int, overlap: int) -> Iterator
         end = min(len(tokens), start + window)
         yield list(tokens[start:end])
         start += step
-

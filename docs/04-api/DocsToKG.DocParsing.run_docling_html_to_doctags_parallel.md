@@ -1,0 +1,64 @@
+# Module: run_docling_html_to_doctags_parallel
+
+HTML → DocTags (parallel, CPU-only; no captioning/classification, no HF auth)
+
+- Input : Data/HTML/ (recurses; excludes *.normalized.html)
+- Output: Data/DocTagsFiles/<mirrored_subdirs>/*.doctags
+
+Example:
+  python run_docling_html_to_doctags_parallel.py       --input  Data/HTML       --output Data/DocTagsFiles       --workers 12
+
+## Functions
+
+### `_get_converter()`
+
+Instantiate and cache a Docling HTML converter per worker process.
+
+Returns:
+DocumentConverter configured for HTML input, cached for reuse within
+the worker process.
+
+### `detect_data_root(start)`
+
+Locate the DocsToKG `Data` directory relative to a starting path.
+
+Args:
+start: Directory from which to begin scanning for `Data/HTML`.
+
+Returns:
+Path pointing to the discovered `Data` directory, or `<start>/Data`
+when no ancestor contains the expected layout.
+
+### `list_htmls(root)`
+
+Enumerate HTML-like files beneath a directory tree.
+
+Args:
+root: Directory whose subtree should be searched for HTML files.
+
+Returns:
+Sorted list of discovered HTML file paths excluding normalized outputs.
+
+### `convert_one(html_path, input_root, output_root, overwrite)`
+
+Convert a single HTML file to DocTags, honoring overwrite semantics.
+
+Args:
+html_path: Path to the source HTML document.
+input_root: Root directory used to compute relative paths for logging.
+output_root: Base directory where generated `.doctags` files are stored.
+overwrite: Whether to replace existing outputs.
+
+Returns:
+Tuple of `(relative_path, status)` where status is `ok`, `skip`, or a
+`fail:<reason>` string describing an error condition.
+
+### `main()`
+
+Entrypoint for parallel HTML-to-DocTags conversion across a dataset.
+
+Args:
+None
+
+Returns:
+None

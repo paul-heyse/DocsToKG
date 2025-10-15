@@ -13,8 +13,8 @@ Example:
 """
 
 import os
-from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
 from typing import List, Tuple
 
 from tqdm import tqdm
@@ -26,16 +26,21 @@ os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")  # CPU-only
 
 # docling imports (safe on CPU for HTML)
+from docling.backend.html_backend import HTMLDocumentBackend
 from docling.datamodel.base_models import InputFormat
 from docling.document_converter import DocumentConverter, HTMLFormatOption
-from docling.backend.html_backend import HTMLDocumentBackend
 
 # per-process converter cache
 _CONVERTER = None
 
 
 def _get_converter() -> DocumentConverter:
-    """Instantiate one converter per worker process."""
+    """Instantiate and cache a Docling HTML converter per worker process.
+
+    Returns:
+        DocumentConverter configured for HTML input, cached for reuse within
+        the worker process.
+    """
     global _CONVERTER
     if _CONVERTER is None:
         _CONVERTER = DocumentConverter(
@@ -45,6 +50,15 @@ def _get_converter() -> DocumentConverter:
 
 
 def detect_data_root(start: Path) -> Path:
+    """Locate the DocsToKG `Data` directory relative to a starting path.
+
+    Args:
+        start: Directory from which to begin scanning for `Data/HTML`.
+
+    Returns:
+        Path pointing to the discovered `Data` directory, or `<start>/Data`
+        when no ancestor contains the expected layout.
+    """
     for anc in (start, *start.parents):
         if (anc / "Data" / "HTML").is_dir():
             return anc / "Data"
@@ -52,6 +66,14 @@ def detect_data_root(start: Path) -> Path:
 
 
 def list_htmls(root: Path) -> List[Path]:
+    """Enumerate HTML-like files beneath a directory tree.
+
+    Args:
+        root: Directory whose subtree should be searched for HTML files.
+
+    Returns:
+        Sorted list of discovered HTML file paths excluding normalized outputs.
+    """
     exts = {".html", ".htm", ".xhtml"}
     out: List[Path] = []
     for p in root.rglob("*"):
@@ -63,7 +85,18 @@ def list_htmls(root: Path) -> List[Path]:
 def convert_one(
     html_path: Path, input_root: Path, output_root: Path, overwrite: bool
 ) -> Tuple[str, str]:
-    """Returns (relative_path, status) where status in {'ok','skip','fail: ...'}."""
+    """Convert a single HTML file to DocTags, honoring overwrite semantics.
+
+    Args:
+        html_path: Path to the source HTML document.
+        input_root: Root directory used to compute relative paths for logging.
+        output_root: Base directory where generated `.doctags` files are stored.
+        overwrite: Whether to replace existing outputs.
+
+    Returns:
+        Tuple of `(relative_path, status)` where status is `ok`, `skip`, or a
+        `fail:<reason>` string describing an error condition.
+    """
     rel = html_path.relative_to(input_root)
     try:
         out_path = (output_root / rel).with_suffix(".doctags")
@@ -85,6 +118,14 @@ def convert_one(
 
 
 def main():
+    """Entrypoint for parallel HTML-to-DocTags conversion across a dataset.
+
+    Args:
+        None
+
+    Returns:
+        None
+    """
     import argparse
     import multiprocessing as mp
 
