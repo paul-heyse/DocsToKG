@@ -18,6 +18,7 @@ Usage:
     pytest tests/ontology_download/test_integration.py
 """
 
+import hashlib
 import json
 import logging
 import shutil
@@ -74,9 +75,12 @@ def stubbed_validators(monkeypatch):
             json_path = req.normalized_dir / f"{req.file_path.stem}.json"
             ttl_path.write_text("normalized")
             json_path.write_text("{}")
+            details = {"ok": True}
+            if req.name == "rdflib":
+                details["normalized_sha256"] = hashlib.sha256(b"normalized").hexdigest()
             results[req.name] = validators.ValidationResult(
                 ok=True,
-                details={"ok": True},
+                details=details,
                 output_files=[str(ttl_path), str(json_path)],
             )
         return results
@@ -128,6 +132,8 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
         assert manifest["validation"]
         local_file = result.local_path
         assert manifest["sha256"] == download.sha256_file(local_file)
+        assert manifest["normalized_sha256"]
+        assert len(manifest["fingerprint"]) == 64
         normalized_dir = result.manifest_path.parent / "normalized"
         assert any(normalized_dir.glob("*.ttl"))
         assert any(normalized_dir.glob("*.json"))

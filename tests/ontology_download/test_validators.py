@@ -18,6 +18,7 @@ Usage:
     pytest tests/ontology_download/test_validators.py
 """
 
+import hashlib
 import json
 import shutil
 import sys
@@ -33,6 +34,7 @@ pytest.importorskip("pydantic_settings")
 from DocsToKG.OntologyDownload.config import DefaultsConfiguration, ResolvedConfig
 from DocsToKG.OntologyDownload.validators import (
     ValidationRequest,
+    ValidatorSubprocessError,
     validate_arelle,
     validate_owlready2,
     validate_pronto,
@@ -94,6 +96,10 @@ def test_validate_rdflib_success(ttl_file, tmp_path, config):
     assert normalized.exists()
     data = json.loads((request.validation_dir / "rdflib_parse.json").read_text())
     assert data["ok"]
+    canonical = normalized.read_text()
+    expected_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    assert data["normalized_sha256"] == expected_hash
+    assert result.details["normalized_sha256"] == expected_hash
 
 
 def test_validate_pronto_success(obo_file, tmp_path, config):
@@ -138,20 +144,18 @@ def test_validate_arelle_with_stub(monkeypatch, xbrl_package, tmp_path, config):
 
 
 def test_validate_owlready2_memory_error(monkeypatch, owl_file, tmp_path, config):
-    class DummyOntology:
-        def load(self):  # pragma: no cover - executed during test
-            raise MemoryError("OOM")
+    request = ValidationRequest("owlready2", owl_file, tmp_path / "norm", tmp_path / "val", config)
+    def _raise(*args, **kwargs):  # pragma: no cover - exercised in test
+        raise ValidatorSubprocessError("memory exceeded")
 
     monkeypatch.setattr(
-        sys.modules["owlready2"],
-        "get_ontology",
-        lambda _: DummyOntology(),
+        "DocsToKG.OntologyDownload.validators._run_validator_subprocess",
+        _raise,
     )
-    request = ValidationRequest("owlready2", owl_file, tmp_path / "norm", tmp_path / "val", config)
     result = validate_owlready2(request, _noop_logger())
     assert not result.ok
     payload = json.loads((request.validation_dir / "owlready2_parse.json").read_text())
-    assert "Memory limit exceeded" in payload["error"]
+    assert "memory exceeded" in payload["error"].lower()
 
 
 def _noop_logger():

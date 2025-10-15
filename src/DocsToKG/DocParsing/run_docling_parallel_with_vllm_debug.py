@@ -16,15 +16,17 @@ import subprocess as sp
 import sys
 import threading
 import time
+from collections import deque
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Deque, Dict, Iterable, List, Optional, Tuple
 
 import requests
 from tqdm import tqdm
 
 from DocsToKG.DocParsing._common import (
+    acquire_lock,
     compute_content_hash,
     data_doctags,
     data_manifests,
@@ -36,6 +38,12 @@ from DocsToKG.DocParsing._common import (
     manifest_append,
 )
 
+try:  # pragma: no cover - optional dependency
+    from packaging.version import InvalidVersion, Version
+except Exception:  # pragma: no cover - guard for stripped-down runtime
+    InvalidVersion = None  # type: ignore[assignment]
+    Version = None  # type: ignore[assignment]
+
 import warnings
 
 _LOGGER = get_logger(__name__)
@@ -46,6 +54,85 @@ DEFAULT_DATA_ROOT = detect_data_root()
 DEFAULT_INPUT = data_pdfs(DEFAULT_DATA_ROOT)
 DEFAULT_OUTPUT = data_doctags(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "doctags-pdf"
+
+
+def _dedupe_preserve_order(names: Iterable[str]) -> List[str]:
+    """Return a list containing ``names`` without duplicates while preserving order."""
+
+    seen = set()
+    unique: List[str] = []
+    for name in names:
+        if not name:
+            continue
+        if name not in seen:
+            seen.add(name)
+            unique.append(name)
+    return unique
+
+
+def _normalize_served_model_names(raw: Optional[Iterable[Iterable[str] | str]]) -> Tuple[str, ...]:
+    """Flatten CLI-provided served model names into a deduplicated tuple."""
+
+    if not raw:
+        return DEFAULT_SERVED_MODEL_NAMES
+
+    flattened: List[str] = []
+    for entry in raw:
+        if isinstance(entry, str):
+            flattened.append(entry)
+        else:
+            flattened.extend(str(item) for item in entry)
+    return tuple(_dedupe_preserve_order(flattened)) or DEFAULT_SERVED_MODEL_NAMES
+
+
+def detect_vllm_version() -> str:
+    """Detect the installed vLLM package version for diagnostics."""
+
+    try:  # pragma: no cover - requires optional dependency
+        import vllm  # type: ignore
+    except Exception as exc:  # pragma: no cover - logged for operator visibility
+        _LOGGER.warning(
+            "Unable to import vLLM for version detection",
+            extra={"extra_fields": {"error": str(exc)}},
+        )
+        return "unknown"
+
+    version = getattr(vllm, "__version__", "unknown")
+    _LOGGER.info(
+        "Detected vLLM package",
+        extra={"extra_fields": {"version": version}},
+    )
+    if Version is not None and version not in {"unknown", ""}:
+        try:
+            if Version(version) < Version("0.3.0"):
+                _LOGGER.warning(
+                    "vLLM version %s is below the supported minimum of 0.3.0",
+                    version,
+                )
+        except InvalidVersion:  # pragma: no cover - defensive parsing guard
+            _LOGGER.debug(
+                "Could not parse vLLM version string", extra={"extra_fields": {"version": version}}
+            )
+    return version
+
+
+def validate_served_models(available: Optional[List[str]], expected: Tuple[str, ...]) -> None:
+    """Ensure that at least one of the expected served model names is available."""
+
+    if not expected:
+        return
+
+    candidates = set(available or [])
+    if any(name in candidates for name in expected):
+        return
+
+    raise RuntimeError(
+        "Expected model not served",
+        {
+            "expected": list(expected),
+            "available": list(candidates),
+        },
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -92,6 +179,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Parallel workers for PDF conversion",
     )
     parser.add_argument(
+        "--model",
+        type=str,
+        default=DEFAULT_MODEL_PATH,
+        help="Path or identifier for the vLLM model to serve",
+    )
+    parser.add_argument(
+        "--served-model-name",
+        dest="served_model_names",
+        action="append",
+        nargs="+",
+        default=None,
+        help="Model name to expose via OpenAI compatibility API (repeatable)",
+    )
+    parser.add_argument(
+        "--gpu-memory-utilization",
+        type=float,
+        default=DEFAULT_GPU_MEMORY_UTILIZATION,
+        help="Fraction of GPU memory the vLLM server may allocate",
+    )
+    parser.add_argument(
         "--resume",
         action="store_true",
         help="Skip PDFs whose DocTags already exist with matching content hash",
@@ -121,7 +228,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return build_parser().parse_args(argv)
 
 
-MODEL_PATH = "/home/paul/hf-cache/granite-docling-258M"  # local untied snapshot
+DEFAULT_MODEL_PATH = "/home/paul/hf-cache/granite-docling-258M"
+DEFAULT_SERVED_MODEL_NAMES: Tuple[str, ...] = (
+    "granite-docling-258M",
+    "ibm-granite/granite-docling-258M",
+)
+DEFAULT_GPU_MEMORY_UTILIZATION = 0.30
 
 # -------- Settings --------
 PREFERRED_PORT = 8000
@@ -150,9 +262,20 @@ class PdfTask:
         input_hash: Content hash representing the PDF for change detection.
         doc_id: Identifier derived from the PDF path for manifest entries.
         output_path: Final DocTags artifact location.
+        served_model_names: Collection of aliases configured for the vLLM server.
+        inference_model: Primary model name used when issuing chat completions.
 
     Examples:
-        >>> task = PdfTask(Path("/tmp/sample.pdf"), Path("/tmp/out"), 8000, "hash", "doc", Path("/tmp/out/doc.doctags"))
+        >>> task = PdfTask(
+        ...     Path("/tmp/sample.pdf"),
+        ...     Path("/tmp/out"),
+        ...     8000,
+        ...     "hash",
+        ...     "doc",
+        ...     Path("/tmp/out/doc.doctags"),
+        ...     ("granite-docling-258M",),
+        ...     "granite-docling-258M",
+        ... )
         >>> task.doc_id
         'doc'
     """
@@ -163,6 +286,8 @@ class PdfTask:
     input_hash: str
     doc_id: str
     output_path: Path
+    served_model_names: Tuple[str, ...]
+    inference_model: str
 
     def __getitem__(self, index: int) -> Path:
         """Provide tuple-like access for compatibility with legacy tests.
@@ -386,7 +511,7 @@ def probe_metrics(port: int, timeout=2.5) -> Tuple[bool, Optional[int]]:
         return (False, None)
 
 
-def stream_logs(proc: sp.Popen, prefix="[vLLM] "):
+def stream_logs(proc: sp.Popen, prefix: str = "[vLLM] ", tail: Optional[Deque[str]] = None):
     """Continuously stream stdout lines from a child process to the console.
 
     Args:
@@ -400,19 +525,27 @@ def stream_logs(proc: sp.Popen, prefix="[vLLM] "):
         if not line:
             break
         s = line.rstrip()
-        if s:
-            _LOGGER.info(
-                "vLLM stdout",
-                extra={
-                    "extra_fields": {
-                        "source": "vllm",
-                        "line": prefix + s,
-                    }
-                },
-            )
+        if not s:
+            continue
+        if tail is not None:
+            tail.append(s)
+        _LOGGER.info(
+            "vLLM stdout",
+            extra={
+                "extra_fields": {
+                    "source": "vllm",
+                    "line": prefix + s,
+                }
+            },
+        )
 
 
-def start_vllm(port: int) -> sp.Popen:
+def start_vllm(
+    port: int,
+    model_path: str,
+    served_model_names: Tuple[str, ...],
+    gpu_memory_utilization: float,
+) -> sp.Popen:
     """Launch a vLLM server process on the requested port.
 
     Args:
@@ -431,18 +564,14 @@ def start_vllm(port: int) -> sp.Popen:
     cmd = [
         "vllm",
         "serve",
-        MODEL_PATH,  # /home/paul/hf-cache/granite-docling-258M
+        str(model_path),
         "--port",
         str(port),
-        # One flag with multiple names works across versions (nargs='+'):
-        "--served-model-name",
-        "granite-docling-258M",
-        "ibm-granite/granite-docling-258M",
         "--gpu-memory-utilization",
-        "0.30",
-        # If you do want to cap images, use JSON for newer vLLM:
-        # "--limit-mm-per-prompt", '{"image": 1}',
+        f"{gpu_memory_utilization:.2f}",
     ]
+    for name in served_model_names:
+        cmd.extend(["--served-model-name", name])
 
     env = os.environ.copy()
     env.setdefault("VLLM_LOG_LEVEL", "INFO")  # INFO so we can see useful lines
@@ -451,13 +580,15 @@ def start_vllm(port: int) -> sp.Popen:
         extra={"extra_fields": {"command": cmd, "env_log_level": env.get("VLLM_LOG_LEVEL")}},
     )
     proc = sp.Popen(cmd, env=env, stdout=sp.PIPE, stderr=sp.STDOUT, text=True, bufsize=1)
+    tail: Deque[str] = deque(maxlen=50)
+    setattr(proc, "_log_tail", tail)
     # Start log thread
-    t = threading.Thread(target=stream_logs, args=(proc,), daemon=True)
+    t = threading.Thread(target=stream_logs, args=(proc, "[vLLM] ", tail), daemon=True)
     t.start()
     return proc
 
 
-def wait_for_vllm(port: int, proc: sp.Popen, timeout_s: int = WAIT_TIMEOUT_S):
+def wait_for_vllm(port: int, proc: sp.Popen, timeout_s: int = WAIT_TIMEOUT_S) -> List[str]:
     """Poll the vLLM server until `/v1/models` responds with success.
 
     Args:
@@ -466,7 +597,7 @@ def wait_for_vllm(port: int, proc: sp.Popen, timeout_s: int = WAIT_TIMEOUT_S):
         timeout_s: Maximum time in seconds to wait for readiness.
 
     Returns:
-        None
+        Model names reported by the server upon readiness.
 
     Raises:
         RuntimeError: If the server exits prematurely or fails to become ready
@@ -482,18 +613,28 @@ def wait_for_vllm(port: int, proc: sp.Popen, timeout_s: int = WAIT_TIMEOUT_S):
             # If vLLM crashed, stop early and print the last lines
             if proc.poll() is not None:
                 try:
+                    tail_lines = list(getattr(proc, "_log_tail", []))
                     leftover = proc.stdout.read() or ""
+                    combined_tail = tail_lines[-50:]
+                    tail_text = "\n".join(combined_tail) if combined_tail else leftover[-800:]
                     _LOGGER.error(
                         "vLLM exited while waiting",
                         extra={
                             "extra_fields": {
                                 "port": port,
-                                "tail": leftover[-800:],
+                                "tail": tail_text,
                             }
                         },
                     )
                 finally:
-                    raise RuntimeError(f"vLLM exited early with code {proc.returncode}")
+                    message = (
+                        f"vLLM exited early with code {proc.returncode}. "
+                        "Last log lines:\n"
+                        f"{tail_text}\n"
+                        "Common causes include missing model weights, incompatible CUDA drivers, "
+                        "or insufficient GPU memory."
+                    )
+                    raise RuntimeError(message)
             names, raw, status = probe_models(port)
             if status == 200:
                 _LOGGER.info(
@@ -505,7 +646,7 @@ def wait_for_vllm(port: int, proc: sp.Popen, timeout_s: int = WAIT_TIMEOUT_S):
                         }
                     },
                 )
-                return
+                return names or []
             # (…keep your existing logging, metrics probe, and tqdm update…)
             if int(time.time() - t0) >= timeout_s:
                 raise RuntimeError(f"Timed out waiting for vLLM on port {port}")
@@ -541,11 +682,19 @@ def stop_vllm(proc: Optional[sp.Popen], own: bool, grace=10):
         pass
 
 
-def ensure_vllm(preferred: int = PREFERRED_PORT) -> Tuple[int, Optional[sp.Popen], bool]:
+def ensure_vllm(
+    preferred: int,
+    model_path: str,
+    served_model_names: Tuple[str, ...],
+    gpu_memory_utilization: float,
+) -> Tuple[int, Optional[sp.Popen], bool]:
     """Ensure a vLLM server is available, launching one when necessary.
 
     Args:
         preferred: Preferred TCP port for the server.
+        model_path: Model repository or path passed to the vLLM CLI.
+        served_model_names: Aliases that should be exposed via the OpenAI API.
+        gpu_memory_utilization: Fractional GPU memory reservation for the server.
 
     Returns:
         Tuple containing `(port, process, owns_process)` where `process` is the
@@ -554,14 +703,15 @@ def ensure_vllm(preferred: int = PREFERRED_PORT) -> Tuple[int, Optional[sp.Popen
     """
     # 1) If preferred is free, start there
     if port_is_free(preferred):
-        proc = start_vllm(preferred)
-        # ⬇️ pass the process to the waiter so it can bail if vLLM crashes
-        wait_for_vllm(preferred, proc)
+        proc = start_vllm(preferred, model_path, served_model_names, gpu_memory_utilization)
+        names = wait_for_vllm(preferred, proc)
+        validate_served_models(names, served_model_names)
         return preferred, proc, True
 
     # 2) If something is already on preferred, reuse if it's vLLM (any models list)
     names, raw, status = probe_models(preferred)
     if status == 200:
+        validate_served_models(names, served_model_names)
         _LOGGER.info(
             "Reusing vLLM",
             extra={
@@ -584,9 +734,9 @@ def ensure_vllm(preferred: int = PREFERRED_PORT) -> Tuple[int, Optional[sp.Popen
             }
         },
     )
-    proc = start_vllm(alt)
-    # ⬇️ same change here
-    wait_for_vllm(alt, proc)
+    proc = start_vllm(alt, model_path, served_model_names, gpu_memory_utilization)
+    names = wait_for_vllm(alt, proc)
+    validate_served_models(names, served_model_names)
     return alt, proc, True
 
 
@@ -622,6 +772,7 @@ def convert_one(task: PdfTask) -> PdfConversionResult:
     out_dir = task.output_dir
     port = task.port
     out_path = task.output_path
+    inference_model = task.inference_model
 
     try:
         from docling.backend.docling_parse_v4_backend import DoclingParseV4DocumentBackend
@@ -653,7 +804,7 @@ def convert_one(task: PdfTask) -> PdfConversionResult:
             url=f"http://127.0.0.1:{port}/v1/chat/completions",
             params=dict(
                 # use the name you served via --served-model-name
-                model="granite-docling-258M",  # or "ibm-granite/granite-docling-258M"
+                model=inference_model,
                 max_tokens=4096,  # <-- IMPORTANT for vLLM
                 skip_special_tokens=False,
                 temperature=0.1,
@@ -718,7 +869,28 @@ def convert_one(task: PdfTask) -> PdfConversionResult:
                 error="empty-document",
             )
 
-        result.document.save_as_doctags(out_path)
+        try:
+            with acquire_lock(out_path):
+                if out_path.exists():
+                    return PdfConversionResult(
+                        doc_id=task.doc_id,
+                        status="skip",
+                        duration_s=time.perf_counter() - start,
+                        input_path=str(pdf_path),
+                        input_hash=task.input_hash,
+                        output_path=str(out_path),
+                    )
+                result.document.save_as_doctags(out_path)
+        except TimeoutError as exc:
+            return PdfConversionResult(
+                doc_id=task.doc_id,
+                status="failure",
+                duration_s=time.perf_counter() - start,
+                input_path=str(pdf_path),
+                input_hash=task.input_hash,
+                output_path=str(out_path),
+                error=str(exc),
+            )
         return PdfConversionResult(
             doc_id=task.doc_id,
             status="success",
@@ -787,6 +959,13 @@ def main(args: argparse.Namespace | None = None) -> int:
             setattr(defaults, key, value)
     args = defaults
 
+    served_model_names = _normalize_served_model_names(args.served_model_names)
+    inference_model = served_model_names[0]
+    model_path = args.model or DEFAULT_MODEL_PATH
+    gpu_memory_utilization = float(args.gpu_memory_utilization)
+
+    vllm_version = detect_vllm_version()
+
     data_root_override = args.data_root
     resolved_root = (
         detect_data_root(data_root_override)
@@ -820,6 +999,10 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "input_dir": str(input_dir),
                 "output_dir": str(output_dir),
                 "artifacts_cache": ARTIFACTS or "",
+                "model_path": model_path,
+                "served_models": list(served_model_names),
+                "gpu_memory_utilization": gpu_memory_utilization,
+                "vllm_version": vllm_version,
             }
         },
     )
@@ -829,7 +1012,12 @@ def main(args: argparse.Namespace | None = None) -> int:
     elif args.resume:
         logger.info("Resume mode enabled: unchanged outputs will be skipped")
 
-    port, proc, owns = ensure_vllm(PREFERRED_PORT)
+    port, proc, owns = ensure_vllm(
+        PREFERRED_PORT,
+        model_path,
+        served_model_names,
+        gpu_memory_utilization,
+    )
     logger.info(
         "vLLM server ready",
         extra={
@@ -887,6 +1075,9 @@ def main(args: argparse.Namespace | None = None) -> int:
                     input_hash=input_hash,
                     output_path=str(out_path),
                     parse_engine="docling-vlm",
+                    model_name=inference_model,
+                    served_models=list(served_model_names),
+                    vllm_version=vllm_version,
                 )
                 skip += 1
                 continue
@@ -899,6 +1090,8 @@ def main(args: argparse.Namespace | None = None) -> int:
                     input_hash=input_hash,
                     doc_id=doc_id,
                     output_path=out_path,
+                    served_model_names=served_model_names,
+                    inference_model=inference_model,
                 )
             )
 
@@ -949,6 +1142,9 @@ def main(args: argparse.Namespace | None = None) -> int:
                         output_path=result.output_path,
                         error=result.error,
                         parse_engine="docling-vlm",
+                        model_name=task.inference_model,
+                        served_models=list(task.served_model_names),
+                        vllm_version=vllm_version,
                     )
 
                     pbar.update(1)
