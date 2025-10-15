@@ -2,15 +2,27 @@
 """
 Docling Hybrid Chunker with Minimum Token Coalescence
 
-Transforms DocTags documents into chunked records while ensuring short runs of
-chunks are merged to satisfy minimum token thresholds required by downstream
-embedding pipelines.
+Transforms DocTags documents into chunked records with topic-aware coalescence.
+
+Tokenizer Alignment:
+    The default tokenizer (``Qwen/Qwen3-Embedding-4B``) aligns with the dense
+    embedder used by the embeddings pipeline. When experimenting with other
+    tokenizers (for example, legacy BERT models), run the calibration utility
+    beforehand to understand token count deltas::
+
+        python scripts/calibrate_tokenizers.py --doctags-dir Data/DocTagsFiles
+
+    The calibration script reports relative token ratios and recommends
+    adjustments to ``--min-tokens`` so chunk sizes remain compatible with the
+    embedding stage.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple
@@ -23,18 +35,33 @@ from docling_core.types.doc.document import DoclingDocument, DocTagsDocument
 from transformers import AutoTokenizer
 
 from DocsToKG.DocParsing._common import (
+    compute_content_hash,
     data_chunks,
     data_doctags,
+    data_manifests,
     detect_data_root,
     get_logger,
     iter_doctags,
+    load_manifest_index,
+    manifest_append,
 )
 from DocsToKG.DocParsing.serializers import RichSerializerProvider
+from DocsToKG.DocParsing.schemas import (
+    CHUNK_SCHEMA_VERSION,
+    ChunkRow,
+    ProvenanceMetadata,
+    get_docling_version,
+)
+
+SOFT_BARRIER_MARGIN = 64
 
 # ---------- Defaults ----------
 DEFAULT_DATA_ROOT = detect_data_root()
 DEFAULT_IN_DIR = data_doctags(DEFAULT_DATA_ROOT)
 DEFAULT_OUT_DIR = data_chunks(DEFAULT_DATA_ROOT)
+MANIFEST_STAGE = "chunks"
+
+_LOGGER = get_logger(__name__)
 
 # ---------- Helpers ----------
 def read_utf8(p: Path) -> str:
@@ -89,6 +116,48 @@ def extract_refs_and_pages(chunk: BaseChunk) -> Tuple[List[str], List[int]]:
     return refs, sorted(pages)
 
 
+def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, int]:
+    """Infer image annotation flags and counts from chunk metadata and text."""
+
+    has_caption = False
+    has_classification = False
+    num_images = 0
+
+    try:
+        doc_items = getattr(chunk.meta, "doc_items", []) or []
+    except Exception:  # pragma: no cover - defensive catch
+        doc_items = []
+
+    for doc_item in doc_items:
+        picture = getattr(doc_item, "doc_item", doc_item)
+        flags = getattr(picture, "_docstokg_flags", None)
+        if isinstance(flags, dict):
+            has_caption = has_caption or bool(flags.get("has_image_captions"))
+            has_classification = has_classification or bool(
+                flags.get("has_image_classification")
+            )
+        if getattr(picture, "__class__", type(None)).__name__.lower().startswith("picture"):
+            num_images += 1
+
+    text_has_caption = any(
+        marker in text for marker in ("Figure caption:", "Picture description:", "SMILES:")
+    )
+    text_has_classification = "Picture type:" in text
+    has_caption = has_caption or text_has_caption
+    has_classification = has_classification or text_has_classification
+
+    if num_images == 0:
+        num_images = (
+            text.count("<!-- image -->")
+            + text.count("Figure caption:")
+            + text.count("Picture description:")
+        )
+    if num_images == 0 and (has_caption or has_classification):
+        num_images = 1
+
+    return has_caption, has_classification, num_images
+
+
 @dataclass
 class Rec:
     """Intermediate record tracking chunk text and provenance.
@@ -111,6 +180,9 @@ class Rec:
     src_idxs: List[int]
     refs: List[str]
     pages: List[int]
+    has_image_captions: bool = False
+    has_image_classification: bool = False
+    num_images: int = 0
 
 
 def merge_rec(a: Rec, b: Rec, tokenizer: HuggingFaceTokenizer) -> Rec:
@@ -128,7 +200,47 @@ def merge_rec(a: Rec, b: Rec, tokenizer: HuggingFaceTokenizer) -> Rec:
     n_tok = tokenizer.count_tokens(text=text)
     refs = a.refs + [r for r in b.refs if r not in a.refs]
     pages = sorted(set(a.pages).union(b.pages))
-    return Rec(text=text, n_tok=n_tok, src_idxs=a.src_idxs + b.src_idxs, refs=refs, pages=pages)
+    return Rec(
+        text=text,
+        n_tok=n_tok,
+        src_idxs=a.src_idxs + b.src_idxs,
+        refs=refs,
+        pages=pages,
+        has_image_captions=a.has_image_captions or b.has_image_captions,
+        has_image_classification=a.has_image_classification or b.has_image_classification,
+        num_images=a.num_images + b.num_images,
+    )
+
+
+# ---------- Topic-aware boundary detection ----------
+def is_structural_boundary(rec: Rec) -> bool:
+    """Detect whether a chunk begins with a structural heading or caption marker.
+
+    Args:
+        rec: Chunk record to inspect.
+
+    Returns:
+        ``True`` when ``rec.text`` starts with a heading indicator (``#``) or a
+        recognised caption prefix, otherwise ``False``.
+
+    Examples:
+        >>> is_structural_boundary(Rec(text="# Introduction", n_tok=2, src_idxs=[], refs=[], pages=[]))
+        True
+        >>> is_structural_boundary(Rec(text="Regular paragraph", n_tok=2, src_idxs=[], refs=[], pages=[]))
+        False
+    """
+
+    text = rec.text.lstrip()
+    if text.startswith("#"):
+        return True
+
+    caption_markers = (
+        "Figure caption:",
+        "Table:",
+        "Picture description:",
+        "<!-- image -->",
+    )
+    return any(text.startswith(marker) for marker in caption_markers)
 
 
 # ---------- Smart coalescence of SMALL-RUNS (< min_tokens) ----------
@@ -190,9 +302,33 @@ def coalesce_small_runs(
         while j < e:
             g = records[j]
             k = j + 1
-            while k < e and g.n_tok < min_tokens and (g.n_tok + records[k].n_tok) <= max_tokens:
-                g = merge_rec(g, records[k], tokenizer)
-                k += 1
+            while k < e and g.n_tok < min_tokens:
+                next_rec = records[k]
+                combined_size = g.n_tok + next_rec.n_tok
+                threshold = max_tokens - SOFT_BARRIER_MARGIN
+
+                if is_structural_boundary(next_rec) and combined_size > threshold:
+                    _LOGGER.debug(
+                        "Soft barrier at chunk %s: boundary detected, combined size %s > %s",
+                        k,
+                        combined_size,
+                        threshold,
+                        extra={
+                            "extra_fields": {
+                                "combined_tokens": combined_size,
+                                "threshold": threshold,
+                                "max_tokens": max_tokens,
+                                "context": "intra_run",
+                            }
+                        },
+                    )
+                    break
+
+                if combined_size <= max_tokens:
+                    g = merge_rec(g, next_rec, tokenizer)
+                    k += 1
+                else:
+                    break
             groups.append(g)
             j = k
 
@@ -204,60 +340,96 @@ def coalesce_small_runs(
 
         if trailing_small:
             tail = groups[-1]
-            # first try merge into previous group FROM SAME RUN if it fits
-            if (
-                out
-                and out[-1].src_idxs
-                and (out[-1].n_tok + tail.n_tok) <= max_tokens
-                and max(out[-1].src_idxs) < s
-            ):  # previous output is from before this run, not same run
-                # The condition above prevents merging into a big chunk; we WANT same-run,
-                # so we check if the last out element is from this run by src idx range.
-                # If it's not, we won't merge here; instead, try intra-run previous if available:
-                pass
+            threshold = max_tokens - SOFT_BARRIER_MARGIN
 
-            # better: try intra-run previous explicitly if exists
-            if len(groups) >= 2 and (groups[-2].n_tok + tail.n_tok) <= max_tokens:
-                merged = merge_rec(groups[-2], tail, tokenizer)
-                # replace the last emitted group (groups[-2]) in 'out'
-                if out and out[-1].src_idxs == groups[-2].src_idxs:
-                    out[-1] = merged
-                else:
-                    # if not last in out (e.g., unusual ordering), append
-                    out.append(merged)
-
-            else:
-                # prefer merging with the smaller big neighbor (left or right) if it FITS
-                left_can = len(out) >= 1
-                right_can = e < N  # next big chunk exists
-                left_ok = left_can and (out[-1].n_tok + tail.n_tok) <= max_tokens
-                right_ok = right_can and (records[e].n_tok + tail.n_tok) <= max_tokens
-
-                if left_ok and right_ok:
-                    # choose the neighbor with smaller size to minimize skew
-                    if out[-1].n_tok <= records[e].n_tok:
-                        out[-1] = merge_rec(out[-1], tail, tokenizer)
+            if len(groups) >= 2:
+                combined_size = groups[-2].n_tok + tail.n_tok
+                if is_structural_boundary(tail) and combined_size > threshold:
+                    _LOGGER.debug(
+                        "Soft barrier prevented intra-run merge: combined size %s > %s",
+                        combined_size,
+                        threshold,
+                        extra={
+                            "extra_fields": {
+                                "combined_tokens": combined_size,
+                                "threshold": threshold,
+                                "max_tokens": max_tokens,
+                                "context": "intra_run_tail",
+                            }
+                        },
+                    )
+                elif combined_size <= max_tokens:
+                    merged = merge_rec(groups[-2], tail, tokenizer)
+                    if out and out[-1].src_idxs == groups[-2].src_idxs:
+                        out[-1] = merged
                     else:
-                        records[e] = merge_rec(tail, records[e], tokenizer)  # pre-merge right
-                elif left_ok:
-                    out[-1] = merge_rec(out[-1], tail, tokenizer)
-                elif right_ok:
-                    records[e] = merge_rec(tail, records[e], tokenizer)
+                        out.append(merged)
+                    continue
+
+            left_can = len(out) >= 1
+            right_can = e < N
+            left_ok = False
+            right_ok = False
+
+            if left_can:
+                combined_size = out[-1].n_tok + tail.n_tok
+                if is_structural_boundary(tail) and combined_size > threshold:
+                    _LOGGER.debug(
+                        "Soft barrier prevented left merge: combined size %s > %s",
+                        combined_size,
+                        threshold,
+                        extra={
+                            "extra_fields": {
+                                "combined_tokens": combined_size,
+                                "threshold": threshold,
+                                "max_tokens": max_tokens,
+                                "context": "left_neighbor",
+                            }
+                        },
+                    )
                 else:
-                    # no good fit—emit as-is rather than exceed max_tokens
-                    out.append(tail)
+                    left_ok = combined_size <= max_tokens
+
+            if right_can:
+                combined_size = records[e].n_tok + tail.n_tok
+                if is_structural_boundary(tail) and combined_size > threshold:
+                    _LOGGER.debug(
+                        "Soft barrier prevented right merge: combined size %s > %s",
+                        combined_size,
+                        threshold,
+                        extra={
+                            "extra_fields": {
+                                "combined_tokens": combined_size,
+                                "threshold": threshold,
+                                "max_tokens": max_tokens,
+                                "context": "right_neighbor",
+                            }
+                        },
+                    )
+                else:
+                    right_ok = combined_size <= max_tokens
+
+            if left_ok and right_ok:
+                if out[-1].n_tok <= records[e].n_tok:
+                    out[-1] = merge_rec(out[-1], tail, tokenizer)
+                else:
+                    records[e] = merge_rec(tail, records[e], tokenizer)
+            elif left_ok:
+                out[-1] = merge_rec(out[-1], tail, tokenizer)
+            elif right_ok:
+                records[e] = merge_rec(tail, records[e], tokenizer)
+            else:
+                out.append(tail)
 
     return out
 
 
 # ---------- Main ----------
-def main():
-    """CLI driver that chunks DocTags files and enforces minimum token thresholds."""
+def build_parser() -> argparse.ArgumentParser:
+    """Construct an argument parser for the chunking pipeline."""
 
-    logger = get_logger(__name__)
-
-    ap = argparse.ArgumentParser()
-    ap.add_argument(
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
         "--data-root",
         type=Path,
         default=None,
@@ -266,11 +438,47 @@ def main():
             "$DOCSTOKG_DATA_ROOT."
         ),
     )
-    ap.add_argument("--in-dir", type=Path, default=DEFAULT_IN_DIR)
-    ap.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
-    ap.add_argument("--min-tokens", type=int, default=256)
-    ap.add_argument("--max-tokens", type=int, default=512)
-    args = ap.parse_args()
+    parser.add_argument("--in-dir", type=Path, default=DEFAULT_IN_DIR)
+    parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
+    parser.add_argument("--min-tokens", type=int, default=256)
+    parser.add_argument("--max-tokens", type=int, default=512)
+    parser.add_argument(
+        "--tokenizer-model",
+        type=str,
+        default="Qwen/Qwen3-Embedding-4B",
+        help="HuggingFace tokenizer model (default aligns with dense embedder)",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip DocTags whose chunk outputs already exist with matching hash",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force reprocessing even when resume criteria are satisfied",
+    )
+    return parser
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse CLI arguments for standalone chunking execution."""
+
+    return build_parser().parse_args(argv)
+
+
+def main(args: argparse.Namespace | None = None) -> int:
+    """CLI driver that chunks DocTags files and enforces minimum token thresholds."""
+
+    logger = get_logger(__name__)
+
+    parser = build_parser()
+    defaults = parser.parse_args([])
+    provided = parse_args() if args is None else args
+    for key, value in vars(provided).items():
+        if value is not None:
+            setattr(defaults, key, value)
+    args = defaults
 
     data_root_override = args.data_root
     resolved_data_root = (
@@ -279,15 +487,34 @@ def main():
         else DEFAULT_DATA_ROOT
     )
 
+    if data_root_override is not None:
+        os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved_data_root)
+
+    data_manifests(resolved_data_root)
+
+    html_manifest_index = load_manifest_index("doctags-html", resolved_data_root)
+    pdf_manifest_index = load_manifest_index("doctags-pdf", resolved_data_root)
+    parse_engine_lookup = {
+        doc_id: entry.get("parse_engine", "docling-html")
+        for doc_id, entry in html_manifest_index.items()
+    }
+    parse_engine_lookup.update(
+        {
+            doc_id: entry.get("parse_engine", "docling-vlm")
+            for doc_id, entry in pdf_manifest_index.items()
+        }
+    )
+    docling_version = get_docling_version()
+
     in_dir = (
         data_doctags(resolved_data_root)
         if args.in_dir == DEFAULT_IN_DIR and data_root_override is not None
-        else args.in_dir
+        else (args.in_dir or DEFAULT_IN_DIR)
     )
     out_dir = (
         data_chunks(resolved_data_root)
         if args.out_dir == DEFAULT_OUT_DIR and data_root_override is not None
-        else args.out_dir
+        else (args.out_dir or DEFAULT_OUT_DIR)
     )
 
     logger.info(
@@ -311,10 +538,30 @@ def main():
             "No .doctags files found",
             extra={"extra_fields": {"input_dir": str(in_dir)}},
         )
-        return
+        return 0
 
-    # Tokenizer (BERT family) → 512 cap applied to contextualized text
-    hf = AutoTokenizer.from_pretrained("bert-base-uncased", use_fast=True)
+    if args.force:
+        logger.info("Force mode: reprocessing all DocTags files")
+    elif args.resume:
+        logger.info("Resume mode enabled: unchanged inputs will be skipped")
+
+    chunk_manifest_index = (
+        load_manifest_index(MANIFEST_STAGE, resolved_data_root) if args.resume else {}
+    )
+
+    tokenizer_model = args.tokenizer_model
+    logger.info(
+        "Loading tokenizer",
+        extra={"extra_fields": {"tokenizer_model": tokenizer_model}},
+    )
+    hf = AutoTokenizer.from_pretrained(tokenizer_model, use_fast=True)
+    if "bert" in tokenizer_model.lower():
+        logger.warning(
+            "BERT tokenizer may not align with Qwen embedder. Consider running "
+            "scripts/calibrate_tokenizers.py or using --tokenizer-model "
+            "Qwen/Qwen3-Embedding-4B.",
+            extra={"extra_fields": {"tokenizer_model": tokenizer_model}},
+        )
     tokenizer = HuggingFaceTokenizer(tokenizer=hf, max_tokens=args.max_tokens)
 
     # HybridChunker: token-aware split + peer-merge; no overlap
@@ -325,55 +572,143 @@ def main():
     )
 
     for path in files:
+        rel_id = path.relative_to(in_dir).as_posix()
         name = path.stem
-        doctags_text = read_utf8(path)
-        doc = build_doc(doc_name=name, doctags_text=doctags_text)
-
-        # Stage 1: Docling chunking
-        chunks = list(chunker.chunk(dl_doc=doc))
-
-        # Stage 2: materialize contextualized text + metadata
-        recs: List[Rec] = []
-        for idx, ch in enumerate(chunks):
-            text = chunker.contextualize(ch)
-            n_tok = tokenizer.count_tokens(text=text)
-            refs, pages = extract_refs_and_pages(ch)
-            recs.append(Rec(text=text, n_tok=n_tok, src_idxs=[idx], refs=refs, pages=pages))
-
-        # Stage 3: smart coalescence of contiguous small runs
-        final_recs = coalesce_small_runs(
-            records=recs,
-            tokenizer=tokenizer,
-            min_tokens=args.min_tokens,
-            max_tokens=args.max_tokens,
-        )
-
-        # Stage 4: write JSONL
         out_path = out_dir / f"{name}.chunks.jsonl"
-        with out_path.open("w", encoding="utf-8") as f:
-            for cid, r in enumerate(final_recs):
-                obj = {
-                    "doc_id": name,
-                    "source_path": str(path),
-                    "chunk_id": cid,
-                    "source_chunk_idxs": r.src_idxs,
-                    "num_tokens": r.n_tok,
-                    "text": r.text,
-                    "doc_items_refs": r.refs,
-                    "page_nos": r.pages,
-                }
-                f.write(json.dumps(obj, ensure_ascii=False) + "\n")
-        logger.info(
-            "Chunk file written",
-            extra={
-                "extra_fields": {
-                    "doc_id": name,
-                    "chunks": len(final_recs),
-                    "output_file": out_path.name,
-                }
-            },
-        )
+        input_hash = compute_content_hash(path)
+        manifest_entry = chunk_manifest_index.get(rel_id)
+        parse_engine = parse_engine_lookup.get(rel_id, "docling-html")
+        if rel_id not in parse_engine_lookup:
+            logger.debug(
+                "Parse engine defaulted to docling-html",
+                extra={"extra_fields": {"doc_id": rel_id}},
+            )
+
+        if (
+            args.resume
+            and not args.force
+            and out_path.exists()
+            and manifest_entry
+            and manifest_entry.get("input_hash") == input_hash
+        ):
+            logger.info("Skipping %s: output exists and input unchanged", rel_id)
+            manifest_append(
+                stage=MANIFEST_STAGE,
+                doc_id=rel_id,
+                status="skip",
+                duration_s=0.0,
+                schema_version=CHUNK_SCHEMA_VERSION,
+                input_path=str(path),
+                input_hash=input_hash,
+                output_path=str(out_path),
+                parse_engine=parse_engine,
+            )
+            continue
+
+        start = time.perf_counter()
+        try:
+            doctags_text = read_utf8(path)
+            doc = build_doc(doc_name=name, doctags_text=doctags_text)
+
+            # Stage 1: Docling chunking
+            chunks = list(chunker.chunk(dl_doc=doc))
+
+            # Stage 2: materialize contextualized text + metadata
+            recs: List[Rec] = []
+            for idx, ch in enumerate(chunks):
+                text = chunker.contextualize(ch)
+                n_tok = tokenizer.count_tokens(text=text)
+                refs, pages = extract_refs_and_pages(ch)
+                has_caption, has_classification, num_images = summarize_image_metadata(
+                    ch, text
+                )
+                recs.append(
+                    Rec(
+                        text=text,
+                        n_tok=n_tok,
+                        src_idxs=[idx],
+                        refs=refs,
+                        pages=pages,
+                        has_image_captions=has_caption,
+                        has_image_classification=has_classification,
+                        num_images=num_images,
+                    )
+                )
+
+            # Stage 3: smart coalescence of contiguous small runs
+            final_recs = coalesce_small_runs(
+                records=recs,
+                tokenizer=tokenizer,
+                min_tokens=args.min_tokens,
+                max_tokens=args.max_tokens,
+            )
+
+            # Stage 4: write JSONL with schema validation
+            with out_path.open("w", encoding="utf-8") as handle:
+                for cid, r in enumerate(final_recs):
+                    provenance = ProvenanceMetadata(
+                        parse_engine=parse_engine,
+                        docling_version=docling_version,
+                        has_image_captions=r.has_image_captions,
+                        has_image_classification=r.has_image_classification,
+                        num_images=r.num_images,
+                    )
+                    row = ChunkRow(
+                        doc_id=name,
+                        source_path=str(path),
+                        chunk_id=cid,
+                        source_chunk_idxs=r.src_idxs,
+                        num_tokens=r.n_tok,
+                        text=r.text,
+                        doc_items_refs=r.refs,
+                        page_nos=r.pages,
+                        schema_version=CHUNK_SCHEMA_VERSION,
+                        provenance=provenance,
+                    )
+                    payload = row.model_dump(mode="json", exclude_none=True)
+                    handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+            duration = time.perf_counter() - start
+            logger.info(
+                "Chunk file written",
+                extra={
+                    "extra_fields": {
+                        "doc_id": name,
+                        "chunks": len(final_recs),
+                        "output_file": out_path.name,
+                    }
+                },
+            )
+            manifest_append(
+                stage=MANIFEST_STAGE,
+                doc_id=rel_id,
+                status="success",
+                duration_s=round(duration, 3),
+                schema_version=CHUNK_SCHEMA_VERSION,
+                input_path=str(path),
+                input_hash=input_hash,
+                output_path=str(out_path),
+                chunk_count=len(final_recs),
+                parse_engine=parse_engine,
+            )
+        except Exception as exc:
+            duration = time.perf_counter() - start
+            manifest_append(
+                stage=MANIFEST_STAGE,
+                doc_id=rel_id,
+                status="failure",
+                duration_s=round(duration, 3),
+                schema_version=CHUNK_SCHEMA_VERSION,
+                input_path=str(path),
+                input_hash=input_hash,
+                output_path=str(out_path),
+                error=str(exc),
+                parse_engine=parse_engine,
+            )
+            raise
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

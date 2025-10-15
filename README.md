@@ -151,7 +151,27 @@ DocsToKG/
 └── docs/scripts/                 # Documentation automation scripts
 ```
 
-## 8. Support & Community
+## 8. DocParsing Pipeline CLI
+
+The DocParsing toolkit now exposes first-class module entrypoints for each stage
+of the pipeline. The legacy scripts remain available but emit a
+``DeprecationWarning`` on direct invocation.
+
+```bash
+# Convert HTML or PDF corpora to DocTags (auto-detects mode when possible)
+python -m DocsToKG.DocParsing.cli.doctags_convert --input Data/HTML
+
+# Chunk DocTags with topic-aware coalescence
+python -m DocsToKG.DocParsing.cli.chunk_and_coalesce --min-tokens 256 --max-tokens 512
+
+# Generate hybrid embeddings (BM25 + SPLADE + Qwen)
+python -m DocsToKG.DocParsing.cli.embed_vectors --resume
+```
+
+Use ``--help`` on each command for the full set of flags, including data-root
+overrides, resume/force controls, and tokenizer configuration.
+
+## 9. Support & Community
 
 - **Issues**: [GitHub Issues](https://github.com/paul-heyse/DocsToKG/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/paul-heyse/DocsToKG/discussions)

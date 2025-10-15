@@ -56,14 +56,21 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
         """Render picture metadata into Markdown-friendly text."""
 
         parts: List[str] = []
+        annotations: List[object] = []
+        try:
+            annotations = list(item.annotations or [])
+        except Exception:  # pragma: no cover - defensive catch
+            annotations = []
+
         try:
             caption = (item.caption_text(doc) or "").strip()
             if caption:
                 parts.append(f"Figure caption: {caption}")
         except Exception:  # pragma: no cover - defensive catch
             pass
-        try:
-            for annotation in item.annotations or []:
+
+        for annotation in annotations:
+            try:
                 if isinstance(annotation, PictureDescriptionData) and annotation.text:
                     parts.append(f"Picture description: {annotation.text}")
                 elif isinstance(annotation, PictureClassificationData) and annotation.predicted_classes:
@@ -72,10 +79,31 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
                     )
                 elif isinstance(annotation, PictureMoleculeData) and annotation.smi:
                     parts.append(f"SMILES: {annotation.smi}")
-        except Exception:  # pragma: no cover - defensive catch
-            pass
+            except Exception:  # pragma: no cover - defensive catch
+                continue
         if not parts:
             parts.append("<!-- image -->")
+
+        has_caption = len(parts) > 1 or (parts and parts[0] != "<!-- image -->")
+        has_classification = any(
+            isinstance(annotation, PictureClassificationData)
+            and getattr(annotation, "predicted_classes", None)
+            for annotation in annotations
+        )
+        try:  # pragma: no cover - metadata enrichment best effort
+            flags = getattr(item, "_docstokg_flags", {})
+            if not isinstance(flags, dict):
+                flags = {}
+            flags.setdefault("has_image_captions", False)
+            flags.setdefault("has_image_classification", False)
+            flags["has_image_captions"] = flags["has_image_captions"] or has_caption
+            flags["has_image_classification"] = (
+                flags["has_image_classification"] or has_classification
+            )
+            setattr(item, "_docstokg_flags", flags)
+        except Exception:
+            pass
+
         text = doc_serializer.post_process(text="\n".join(parts))
         return create_ser_result(text=text, span_source=item)
 
