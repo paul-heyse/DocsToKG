@@ -9,6 +9,7 @@ metadata that downstream knowledge graph construction can rely upon.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import sys
@@ -28,7 +29,7 @@ from .download import (
 )
 from .logging_config import generate_correlation_id, setup_logging
 from .optdeps import get_pystow
-from .resolvers import RESOLVERS, FetchPlan
+from .resolvers import RESOLVERS, FetchPlan, normalize_license_to_spdx
 from .validators import ValidationRequest, ValidationResult, run_validators
 
 pystow = get_pystow()
@@ -160,6 +161,8 @@ class Manifest:
         license: License identifier associated with the ontology.
         status: Result status reported by the downloader.
         sha256: Hash of the downloaded artifact for integrity checking.
+        normalized_sha256: Hash of the canonical normalized TTL output.
+        fingerprint: Composite fingerprint combining key provenance values.
         etag: HTTP ETag returned by the upstream server, when provided.
         last_modified: Upstream last-modified timestamp, if supplied.
         downloaded_at: UTC timestamp of the completed download.
@@ -177,6 +180,8 @@ class Manifest:
         ...     license="CC-BY",
         ...     status="success",
         ...     sha256="deadbeef",
+        ...     normalized_sha256=None,
+        ...     fingerprint=None,
         ...     etag=None,
         ...     last_modified=None,
         ...     downloaded_at="2024-01-01T00:00:00Z",
@@ -196,6 +201,8 @@ class Manifest:
     license: Optional[str]
     status: str
     sha256: str
+    normalized_sha256: Optional[str]
+    fingerprint: Optional[str]
     etag: Optional[str]
     last_modified: Optional[str]
     downloaded_at: str
@@ -221,6 +228,8 @@ class Manifest:
             "license": self.license,
             "status": self.status,
             "sha256": self.sha256,
+            "normalized_sha256": self.normalized_sha256,
+            "fingerprint": self.fingerprint,
             "etag": self.etag,
             "last_modified": self.last_modified,
             "downloaded_at": self.downloaded_at,
@@ -336,6 +345,10 @@ def _validate_manifest(manifest: Manifest) -> None:
     for item in manifest.artifacts:
         if not isinstance(item, str):
             raise ConfigurationError("Manifest artifacts must contain only string paths")
+    if manifest.normalized_sha256 is not None and not isinstance(manifest.normalized_sha256, str):
+        raise ConfigurationError("Manifest normalized_sha256 must be a string when provided")
+    if manifest.fingerprint is not None and not isinstance(manifest.fingerprint, str):
+        raise ConfigurationError("Manifest fingerprint must be a string when provided")
 
 
 def _write_manifest(manifest_path: Path, manifest: Manifest) -> None:
@@ -382,10 +395,14 @@ def _ensure_license_allowed(plan: FetchPlan, config: ResolvedConfig, spec: Fetch
     Raises:
         ConfigurationError: If the plan's license is not permitted.
     """
-    allowed = set(config.defaults.accept_licenses)
-    if not allowed or plan.license is None:
+    allowed = {
+        normalize_license_to_spdx(entry) or entry
+        for entry in config.defaults.accept_licenses
+    }
+    plan_license = normalize_license_to_spdx(plan.license)
+    if not allowed or plan_license is None:
         return
-    if plan.license not in allowed:
+    if plan_license not in allowed:
         raise ConfigurationError(
             f"License '{plan.license}' for ontology '{spec.id}' is not in the allowlist: {sorted(allowed)}"
         )
@@ -543,6 +560,23 @@ def fetch_one(
 
     validation_results = run_validators(validation_requests, adapter)
 
+    normalized_hash = None
+    rdflib_result = validation_results.get("rdflib")
+    if rdflib_result and isinstance(rdflib_result.details, dict):
+        maybe_hash = rdflib_result.details.get("normalized_sha256")
+        if isinstance(maybe_hash, str):
+            normalized_hash = maybe_hash
+
+    fingerprint_components = [
+        spec.id,
+        spec.resolver,
+        plan.version or "",
+        result.sha256,
+        normalized_hash or "",
+        secure_url,
+    ]
+    fingerprint = hashlib.sha256("|".join(fingerprint_components).encode("utf-8")).hexdigest()
+
     manifest = Manifest(
         id=spec.id,
         resolver=spec.resolver,
@@ -552,6 +586,8 @@ def fetch_one(
         license=plan.license,
         status=result.status,
         sha256=result.sha256,
+        normalized_sha256=normalized_hash,
+        fingerprint=fingerprint,
         etag=result.etag,
         last_modified=result.last_modified,
         downloaded_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
