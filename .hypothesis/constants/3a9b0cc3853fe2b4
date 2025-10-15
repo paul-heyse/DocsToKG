@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/DocParsing/DoclingHybridChunkerPipelineWithMin.py
+# hypothesis_version: 6.141.0
+
+[0.0, 256, 512, '#', '--data-root', '--force', '--in-dir', '--max-tokens', '--min-tokens', '--out-dir', '--resume', '--tokenizer-model', '<!-- image -->', 'Chunk file written', 'DOCSTOKG_DATA_ROOT', 'Figure caption:', 'Loading tokenizer', 'Picture description:', 'Picture type:', 'SMILES:', 'Table:', '__class__', '__main__', '_docstokg_flags', 'bert', 'chunks', 'combined_tokens', 'context', 'data_root', 'doc_id', 'doc_item', 'doc_items', 'docling-html', 'docling-vlm', 'doctags-html', 'doctags-pdf', 'extra_fields', 'failure', 'has_image_captions', 'input_dir', 'input_hash', 'intra_run', 'intra_run_tail', 'json', 'left_neighbor', 'max_tokens', 'min_tokens', 'output_dir', 'output_file', 'page_no', 'parse_engine', 'picture', 'prov', 'replace', 'right_neighbor', 'self_ref', 'skip', 'store_true', 'success', 'threshold', 'tokenizer_model', 'utf-8', 'w']

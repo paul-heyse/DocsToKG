@@ -188,7 +188,20 @@ def _run_with_timeout(func, timeout_sec: int) -> None:
         import signal
 
         class _Alarm(Exception):
-            """Sentinel exception raised when the alarm signal fires."""
+            """Sentinel exception raised when the alarm signal fires.
+
+            Args:
+                message: Optional description associated with the exception.
+
+            Attributes:
+                message: Optional description associated with the exception.
+
+            Examples:
+                >>> try:
+                ...     raise _Alarm()
+                ... except _Alarm:
+                ...     pass
+            """
 
         def _handler(signum, frame):  # pragma: no cover - platform dependent
             """Signal handler converting SIGALRM into :class:`ValidationTimeout`.

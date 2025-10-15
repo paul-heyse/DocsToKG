@@ -100,26 +100,64 @@ RequestValidationError: If the request fails validation checks.</p>
 <section id="execute-bm25-self-request-filters-config-query-features-timings">
 <h3><code class="docutils literal notranslate"><span class="pre">_execute_bm25(self,</span> <span class="pre">request,</span> <span class="pre">filters,</span> <span class="pre">config,</span> <span class="pre">query_features,</span> <span class="pre">timings)</span></code><a class="headerlink" href="#execute-bm25-self-request-filters-config-query-features-timings" title="Link to this heading"></a></h3>
 <p>Run the BM25 retrieval channel and record latency metrics.</p>
+<p>Args:
+request: Hybrid search request providing query parameters.
+filters: Metadata filters applied to BM25 results.
+config: Active hybrid search configuration.
+query_features: Precomputed query features for retrieval.
+timings: Mutable dictionary used to collect latency metrics.</p>
+<p>Returns:
+ChannelResults containing BM25 candidates and score mapping.</p>
 </section>
 <section id="execute-splade-self-request-filters-config-query-features-timings">
 <h3><code class="docutils literal notranslate"><span class="pre">_execute_splade(self,</span> <span class="pre">request,</span> <span class="pre">filters,</span> <span class="pre">config,</span> <span class="pre">query_features,</span> <span class="pre">timings)</span></code><a class="headerlink" href="#execute-splade-self-request-filters-config-query-features-timings" title="Link to this heading"></a></h3>
 <p>Execute SPLADE retrieval and return channel-specific fusion candidates.</p>
+<p>Args:
+request: Hybrid search request providing query parameters.
+filters: Metadata filters applied to SPLADE results.
+config: Active hybrid search configuration.
+query_features: Precomputed query features for retrieval.
+timings: Mutable dictionary used to collect latency metrics.</p>
+<p>Returns:
+ChannelResults containing SPLADE candidates and score mapping.</p>
 </section>
 <section id="execute-dense-self-request-filters-config-query-features-timings">
 <h3><code class="docutils literal notranslate"><span class="pre">_execute_dense(self,</span> <span class="pre">request,</span> <span class="pre">filters,</span> <span class="pre">config,</span> <span class="pre">query_features,</span> <span class="pre">timings)</span></code><a class="headerlink" href="#execute-dense-self-request-filters-config-query-features-timings" title="Link to this heading"></a></h3>
 <p>Query the FAISS index for dense candidates and filter by metadata.</p>
+<p>Args:
+request: Hybrid search request providing query parameters.
+filters: Metadata filters applied to dense results.
+config: Active hybrid search configuration.
+query_features: Precomputed query features for retrieval.
+timings: Mutable dictionary used to collect latency metrics.</p>
+<p>Returns:
+ChannelResults containing dense candidates and score mapping.</p>
 </section>
 <section id="filter-dense-hits-self-hits-filters">
 <h3><code class="docutils literal notranslate"><span class="pre">_filter_dense_hits(self,</span> <span class="pre">hits,</span> <span class="pre">filters)</span></code><a class="headerlink" href="#filter-dense-hits-self-hits-filters" title="Link to this heading"></a></h3>
 <p>Apply metadata filters to dense results and gather payloads for survivors.</p>
+<p>Args:
+hits: Sequence of FAISS search results to filter.
+filters: Metadata filters applied to candidate payloads.</p>
+<p>Returns:
+Tuple containing filtered hits and a mapping of payloads by vector ID.</p>
 </section>
 <section id="dedupe-candidates-self-candidates-fused-scores">
 <h3><code class="docutils literal notranslate"><span class="pre">_dedupe_candidates(self,</span> <span class="pre">candidates,</span> <span class="pre">fused_scores)</span></code><a class="headerlink" href="#dedupe-candidates-self-candidates-fused-scores" title="Link to this heading"></a></h3>
 <p>Remove duplicate vector IDs, keeping the highest-scoring candidate per ID.</p>
+<p>Args:
+candidates: Candidate list produced across retrieval channels.
+fused_scores: Mapping of vector IDs to fused scores.</p>
+<p>Returns:
+List of candidates sorted by fused score with duplicates removed.</p>
 </section>
 <section id="validate-request-self-request">
 <h3><code class="docutils literal notranslate"><span class="pre">_validate_request(self,</span> <span class="pre">request)</span></code><a class="headerlink" href="#validate-request-self-request" title="Link to this heading"></a></h3>
 <p>Validate basic request fields before executing the search pipeline.</p>
+<p>Args:
+request: Hybrid search request to validate.</p>
+<p>Returns:
+None</p>
 </section>
 </section>
 <section id="classes">

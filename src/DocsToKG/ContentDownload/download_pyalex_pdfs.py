@@ -58,6 +58,8 @@ def _utc_timestamp() -> str:
 
 
 def _has_pdf_eof(path: Path) -> bool:
+    """Return ``True`` when ``path`` appears to end with the ``%%EOF`` marker."""
+
     try:
         with path.open("rb") as handle:
             handle.seek(0, os.SEEK_END)
@@ -658,6 +660,15 @@ class WorkArtifact:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        """Define namespace mappings for output artefact directories.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         self.namespaces: Dict[str, Path] = {"pdf": self.pdf_dir, "html": self.html_dir}
 
 
@@ -739,6 +750,8 @@ def _build_download_outcome(
 
 
 def _normalize_pmid(pmid: Optional[str]) -> Optional[str]:
+    """Extract the numeric PubMed identifier or return ``None`` when absent."""
+
     if not pmid:
         return None
     pmid = pmid.strip()
@@ -747,6 +760,8 @@ def _normalize_pmid(pmid: Optional[str]) -> Optional[str]:
 
 
 def _normalize_arxiv(arxiv_id: Optional[str]) -> Optional[str]:
+    """Normalize arXiv identifiers by removing prefixes and whitespace."""
+
     if not arxiv_id:
         return None
     arxiv_id = strip_prefix(arxiv_id, "arxiv:") or arxiv_id
@@ -755,11 +770,15 @@ def _normalize_arxiv(arxiv_id: Optional[str]) -> Optional[str]:
 
 
 def _collect_location_urls(work: Dict[str, Any]) -> Dict[str, List[str]]:
+    """Return landing/PDF/source URL collections derived from OpenAlex metadata."""
+
     landing_urls: List[str] = []
     pdf_urls: List[str] = []
     sources: List[str] = []
 
     def _append_location(loc: Optional[Dict[str, Any]]) -> None:
+        """Accumulate location URLs from a single OpenAlex location record."""
+
         if not isinstance(loc, dict):
             return
         landing = loc.get("landing_page_url")
@@ -1719,6 +1738,8 @@ def main() -> None:
     )
 
     def _session_factory() -> requests.Session:
+        """Build a fresh requests session configured with polite headers."""
+
         return _make_session_for_worker(config.polite_headers)
 
     processed = 0
@@ -1727,6 +1748,8 @@ def main() -> None:
     skipped = 0
 
     def _record_result(res: Dict[str, Any]) -> None:
+        """Update aggregate counters based on a single work result."""
+
         nonlocal processed, saved, html_only, skipped
         processed += 1
         if res.get("saved"):
@@ -1766,7 +1789,11 @@ def main() -> None:
                 futures = []
 
                 def _submit_work(work_item: Dict[str, Any]) -> None:
+                    """Submit a work item to the executor for asynchronous processing."""
+
                     def _runner() -> Dict[str, Any]:
+                        """Process a single work item within a worker-managed session."""
+
                         session = _session_factory()
                         try:
                             return process_one_work(

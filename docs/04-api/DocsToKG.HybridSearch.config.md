@@ -49,9 +49,28 @@ ValueError: If the config file is invalid JSON or YAML.
 
 Load configuration data from the configured path (JSON or YAML).
 
+Args:
+None
+
+Returns:
+:class:`HybridSearchConfig` constructed from the on-disk payload.
+
+Raises:
+FileNotFoundError: If the configuration file is missing.
+ValueError: If JSON or YAML decoding fails or yields invalid structure.
+
 ### `_load_yaml(self, raw)`
 
 Parse YAML configuration content into a dictionary.
+
+Args:
+raw: Raw YAML string read from disk.
+
+Returns:
+Dictionary representation suitable for :class:`HybridSearchConfig.from_dict`.
+
+Raises:
+ValueError: If PyYAML is unavailable or the content does not define a mapping.
 
 ## 2. Classes
 

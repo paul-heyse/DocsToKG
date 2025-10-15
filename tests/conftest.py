@@ -25,6 +25,27 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+# Always prefer the project virtual environment site-packages so tests see the
+# same dependency set as the CLI.
+VENV_ROOT = ROOT / ".venv"
+if VENV_ROOT.exists():
+    venv_prefix = VENV_ROOT.resolve()
+    current_prefix = Path(sys.prefix).resolve()
+    if current_prefix != venv_prefix:
+        raise pytest.UsageError(
+            f"Tests must run with the project virtual environment at {venv_prefix}. "
+            "Activate it (e.g. `. .venv/bin/activate`) or invoke "
+            f"`{venv_prefix}/bin/python -m pytest`."
+        )
+
+    site_packages_candidates = sorted(
+        (VENV_ROOT / "lib").glob("python*/site-packages")
+    )
+    for site_packages in site_packages_candidates:
+        site_path = str(site_packages)
+        if site_packages.exists() and site_path not in sys.path:
+            sys.path.insert(0, site_path)
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(

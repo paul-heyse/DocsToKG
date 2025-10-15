@@ -16,7 +16,6 @@ import subprocess as sp
 import sys
 import threading
 import time
-import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,12 +36,7 @@ from DocsToKG.DocParsing._common import (
     manifest_append,
 )
 
-warnings.warn(
-    "Direct invocation of run_docling_parallel_with_vllm_debug.py is deprecated. "
-    "Use unified CLI: python -m DocsToKG.DocParsing.cli.doctags_convert --mode pdf",
-    DeprecationWarning,
-    stacklevel=2,
-)
+import warnings
 
 _LOGGER = get_logger(__name__)
 
@@ -977,4 +971,10 @@ def main(args: argparse.Namespace | None = None) -> int:
 
 
 if __name__ == "__main__":
+    warnings.warn(
+        "Direct invocation of run_docling_parallel_with_vllm_debug.py is deprecated. "
+        "Use unified CLI: python -m DocsToKG.DocParsing.cli.doctags_convert --mode pdf",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     raise SystemExit(main())

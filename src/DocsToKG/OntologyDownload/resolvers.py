@@ -339,8 +339,11 @@ class BioPortalResolver(BaseResolver):
     def _load_api_key(self) -> Optional[str]:
         """Load the BioPortal API key from disk when available.
 
+        Args:
+            self: Resolver instance requesting the API key.
+
         Returns:
-            API key string stripped of whitespace, or ``None`` when missing.
+            Optional[str]: API key string stripped of whitespace, or ``None`` when missing.
         """
         if self.api_key_path.exists():
             return self.api_key_path.read_text().strip() or None

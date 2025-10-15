@@ -91,7 +91,10 @@ class StubResolver:
 
     def iter_urls(self, session, config, artifact):
         for url in self.urls:
-            yield ResolverResult(url=url)
+            if isinstance(url, ResolverResult):
+                yield url
+            else:
+                yield ResolverResult(url=url)
 
 
 def build_artifact(tmp_path: Path) -> WorkArtifact:
@@ -238,7 +241,12 @@ def test_cli_integration_happy_path(monkeypatch, tmp_path):
             return True
 
         def iter_urls(self, session, config, artifact):
-            if artifact.work_id == "W2" and self.name == "unpaywall":
+            if self.name == "openalex":
+                for direct in artifact.pdf_urls:
+                    yield ResolverResult(url=direct)
+                if artifact.open_access_url:
+                    yield ResolverResult(url=artifact.open_access_url)
+            elif artifact.work_id == "W2" and self.name == "unpaywall":
                 yield ResolverResult(url="resolver://success")
             elif artifact.work_id == "W3" and self.name == "unpaywall":
                 yield ResolverResult(url="resolver://html")
@@ -258,10 +266,17 @@ def test_cli_integration_happy_path(monkeypatch, tmp_path):
         def __init__(self):
             self.headers = {}
 
+        def mount(self, *args, **kwargs):
+            return None
+
     monkeypatch.setattr(module, "build_query", lambda args: None)
     monkeypatch.setattr(module, "iterate_openalex", fake_iterate)
     monkeypatch.setattr(module, "download_candidate", fake_download)
-    monkeypatch.setattr(module, "default_resolvers", lambda: [FakeResolver("unpaywall")])
+    monkeypatch.setattr(
+        module,
+        "default_resolvers",
+        lambda: [FakeResolver("openalex"), FakeResolver("unpaywall")],
+    )
     monkeypatch.setattr(module.requests, "Session", FakeSession)
 
     log_csv = tmp_path / "attempts.csv"
@@ -278,6 +293,8 @@ def test_cli_integration_happy_path(monkeypatch, tmp_path):
         str(pdf_dir),
         "--log-csv",
         str(log_csv),
+        "--resolver-order",
+        "openalex,unpaywall",
         "--max",
         "3",
     ]
@@ -336,6 +353,11 @@ def test_head_precheck_skips_zero_length(monkeypatch, tmp_path):
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
     config = ResolverConfig(resolver_order=["stub"], resolver_toggles={"stub": True})
     logger = ListLogger()
+    download_calls: List[str] = []
+
+    def fake_download(session, art, url, referer, timeout):
+        download_calls.append(url)
+        return DownloadOutcome("pdf", str(art.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0)
 
     def fake_request(session, method, url, **kwargs):
         return DummyHeadResponse(headers={"Content-Length": "0"})
@@ -345,14 +367,13 @@ def test_head_precheck_skips_zero_length(monkeypatch, tmp_path):
         fake_request,
     )
 
-    pipeline = ResolverPipeline(
-        [resolver], config, lambda *args, **kwargs: None, logger, ResolverMetrics()
-    )
+    pipeline = ResolverPipeline([resolver], config, fake_download, logger, ResolverMetrics())
     session = requests.Session()
     result = pipeline.run(session, artifact)
 
     assert result.success is False
     assert any(record.reason == "head-precheck-failed" for record in logger.records)
+    assert download_calls == []
 
 
 def test_head_precheck_skips_error_status(monkeypatch, tmp_path):
@@ -360,6 +381,11 @@ def test_head_precheck_skips_error_status(monkeypatch, tmp_path):
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
     config = ResolverConfig(resolver_order=["stub"], resolver_toggles={"stub": True})
     logger = ListLogger()
+    download_calls: List[str] = []
+
+    def fake_download(session, art, url, referer, timeout):
+        download_calls.append(url)
+        return DownloadOutcome("pdf", str(art.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0)
 
     def fake_request(session, method, url, **kwargs):
         return DummyHeadResponse(status_code=404)
@@ -369,14 +395,13 @@ def test_head_precheck_skips_error_status(monkeypatch, tmp_path):
         fake_request,
     )
 
-    pipeline = ResolverPipeline(
-        [resolver], config, lambda *args, **kwargs: None, logger, ResolverMetrics()
-    )
+    pipeline = ResolverPipeline([resolver], config, fake_download, logger, ResolverMetrics())
     session = requests.Session()
     result = pipeline.run(session, artifact)
 
     assert result.success is False
     assert any(record.reason == "head-precheck-failed" for record in logger.records)
+    assert download_calls == []
 
 
 def test_head_precheck_allows_pdf(monkeypatch, tmp_path):
@@ -443,6 +468,7 @@ def test_head_precheck_respects_global_disable(monkeypatch, tmp_path):
     )
     logger = ListLogger()
     head_calls: List[str] = []
+    download_calls: List[str] = []
 
     def fake_request(session, method, url, **kwargs):
         head_calls.append(url)
@@ -453,13 +479,18 @@ def test_head_precheck_respects_global_disable(monkeypatch, tmp_path):
         fake_request,
     )
 
+    def fake_download(session, art, url, referer, timeout):
+        download_calls.append(url)
+        return DownloadOutcome("pdf", str(art.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0)
+
     pipeline = ResolverPipeline(
-        [resolver], config, lambda *args, **kwargs: None, logger, ResolverMetrics()
+        [resolver], config, fake_download, logger, ResolverMetrics()
     )
     session = requests.Session()
     pipeline.run(session, artifact)
 
     assert head_calls == []
+    assert download_calls == ["https://example.org/pdf"]
 
 
 def test_head_precheck_resolver_override(monkeypatch, tmp_path):

@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/HybridSearch/observability.py
+# hypothesis_version: 6.141.0
+
+[0.5, 0.95, 0.99, 1.0, 1000, 'counters', 'duration_ms', 'error', 'event', 'histograms', 'hybrid-trace', 'ok', 'span', 'status']

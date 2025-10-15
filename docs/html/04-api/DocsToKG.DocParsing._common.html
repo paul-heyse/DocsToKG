@@ -494,7 +494,11 @@ with acquire_lock(target):
 </section>
 <section id="iter-self">
 <h3><code class="docutils literal notranslate"><span class="pre">__iter__(self)</span></code><a class="headerlink" href="#iter-self" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Yield successive lists containing up to <code class="docutils literal notranslate"><span class="pre">batch_size</span></code> elements.</p>
+<p>Args:
+None: Iteration consumes the iterable supplied to :class:<code class="docutils literal notranslate"><span class="pre">Batcher</span></code>.</p>
+<p>Returns:
+Iterator over lists where each list contains up to <code class="docutils literal notranslate"><span class="pre">batch_size</span></code> items.</p>
 </section>
 <section id="format-self-record">
 <h3><code class="docutils literal notranslate"><span class="pre">format(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#format-self-record" title="Link to this heading"></a></h3>

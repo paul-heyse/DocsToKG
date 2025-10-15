@@ -243,3 +243,12 @@ ValidationTimeout: rdflib exceeded 60s
 ### `_Alarm`
 
 Sentinel exception raised when the alarm signal fires.
+
+Attributes:
+message: Optional description associated with the exception.
+
+Examples:
+>>> try:
+...     raise _Alarm()
+... except _Alarm:
+...     pass

@@ -40,6 +40,12 @@ bool: ``True`` if the resolver is enabled.
 
 Validate configuration fields and apply defaults.
 
+Args:
+None
+
+Returns:
+None
+
 ### `log(self, record)`
 
 Log a resolver attempt.

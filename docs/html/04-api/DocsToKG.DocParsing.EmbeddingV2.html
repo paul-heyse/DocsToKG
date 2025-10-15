@@ -156,6 +156,13 @@ Tuple of token lists and weight lists aligned per input text.</p>
 <section id="get-splade-encoder-cfg">
 <h3><code class="docutils literal notranslate"><span class="pre">_get_splade_encoder(cfg)</span></code><a class="headerlink" href="#get-splade-encoder-cfg" title="Link to this heading"></a></h3>
 <p>Retrieve (or create) a cached SPLADE encoder instance.</p>
+<p>Args:
+cfg: SPLADE configuration describing model location and runtime options.</p>
+<p>Returns:
+Cached :class:<code class="docutils literal notranslate"><span class="pre">SparseEncoder</span></code> ready for SPLADE inference.</p>
+<p>Raises:
+ValueError: If the encoder cannot be initialised with the supplied configuration.
+ImportError: If required SPLADE dependencies are unavailable.</p>
 </section>
 <section id="qwen-embed-cfg-texts-batch-size">
 <h3><code class="docutils literal notranslate"><span class="pre">qwen_embed(cfg,</span> <span class="pre">texts,</span> <span class="pre">batch_size)</span></code><a class="headerlink" href="#qwen-embed-cfg-texts-batch-size" title="Link to this heading"></a></h3>

@@ -16,12 +16,29 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 class FigshareResolver:
-    """Resolver for Figshare repository."""
+    """Resolve Figshare repository metadata into download URLs.
+
+    Attributes:
+        name: Resolver identifier registered with the pipeline.
+
+    Examples:
+        >>> resolver = FigshareResolver()
+        >>> resolver.name
+        'figshare'
+    """
 
     name = "figshare"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
-        """Enable when artifact has a DOI."""
+        """Return True when the artifact exposes a DOI for Figshare lookup.
+
+        Args:
+            config: Resolver configuration (unused but part of the protocol signature).
+            artifact: Work metadata that may reference a Figshare DOI.
+
+        Returns:
+            bool: ``True`` when a DOI is present, otherwise ``False``.
+        """
 
         return artifact.doi is not None
 
@@ -31,7 +48,19 @@ class FigshareResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        """Search Figshare API by DOI and yield PDF file URLs."""
+        """Search the Figshare API by DOI and yield PDF file URLs.
+
+        Args:
+            session: Requests session used for API calls (supports retry injection).
+            config: Resolver configuration providing polite headers and timeouts.
+            artifact: Work metadata containing the DOI search key.
+
+        Returns:
+            Iterable[ResolverResult]: Iterator yielding resolver results for each candidate URL.
+
+        Raises:
+            None
+        """
 
         doi = normalize_doi(artifact.doi)
         if not doi:

@@ -24,6 +24,8 @@ def _fetch_semantic_scholar_data(
     timeout: float,
     headers_key: Tuple[Tuple[str, str], ...],
 ) -> Dict[str, Any]:
+    """Fetch Semantic Scholar Graph API metadata for ``doi`` with caching."""
+
     headers = dict(headers_key)
     if api_key:
         headers["x-api-key"] = api_key

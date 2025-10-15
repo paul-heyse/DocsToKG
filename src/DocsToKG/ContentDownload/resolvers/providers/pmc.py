@@ -18,6 +18,8 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 def _absolute_url(base: str, href: str) -> str:
+    """Resolve relative ``href`` values against ``base`` to obtain absolute URLs."""
+
     parsed = urlparse(href)
     if parsed.scheme and parsed.netloc:
         return href
@@ -54,6 +56,17 @@ class PmcResolver:
     def _lookup_pmcids(
         self, session: requests.Session, identifiers: List[str], config: ResolverConfig
     ) -> List[str]:
+        """Return PMCIDs resolved from DOI/PMID identifiers using NCBI utilities.
+
+        Args:
+            session: Requests session reused across resolver calls.
+            identifiers: DOI or PMID identifiers to convert to PMCIDs.
+            config: Resolver configuration providing timeout and polite headers.
+
+        Returns:
+            List of PMCIDs corresponding to the supplied identifiers.
+        """
+
         if not identifiers:
             return []
         try:

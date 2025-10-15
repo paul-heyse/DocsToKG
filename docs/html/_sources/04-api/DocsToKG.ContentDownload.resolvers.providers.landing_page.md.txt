@@ -8,7 +8,7 @@ Landing page scraper resolver using BeautifulSoup.
 
 ### `_absolute_url(base, href)`
 
-*No documentation available.*
+Resolve relative links on a landing page against the page URL.
 
 ### `is_enabled(self, config, artifact)`
 

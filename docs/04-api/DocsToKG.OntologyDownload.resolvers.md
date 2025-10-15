@@ -89,6 +89,9 @@ ConfigError: When the API rejects credentials or yields no URLs.
 
 Load the BioPortal API key from disk when available.
 
+Args:
+None
+
 Returns:
 API key string stripped of whitespace, or ``None`` when missing.
 

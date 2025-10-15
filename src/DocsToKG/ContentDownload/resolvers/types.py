@@ -146,7 +146,14 @@ class ResolverConfig:
         return self.resolver_toggles.get(resolver_name, True)
 
     def __post_init__(self) -> None:
-        """Validate configuration fields and apply defaults."""
+        """Validate configuration fields and apply defaults.
+
+        Args:
+            self: Instance whose configuration fields require validation.
+
+        Returns:
+            None
+        """
 
         if self.max_concurrent_resolvers < 1:
             raise ValueError(

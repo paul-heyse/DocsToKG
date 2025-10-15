@@ -12,7 +12,7 @@ Return an ISO 8601 UTC timestamp with a trailing 'Z' suffix.
 
 ### `_has_pdf_eof(path)`
 
-*No documentation available.*
+Return ``True`` when ``path`` appears to end with the ``%%EOF`` marker.
 
 ### `slugify(text, keep)`
 
@@ -129,15 +129,15 @@ bookkeeping metadata such as digests and conditional request headers.
 
 ### `_normalize_pmid(pmid)`
 
-*No documentation available.*
+Extract the numeric PubMed identifier or return ``None`` when absent.
 
 ### `_normalize_arxiv(arxiv_id)`
 
-*No documentation available.*
+Normalize arXiv identifiers by removing prefixes and whitespace.
 
 ### `_collect_location_urls(work)`
 
-*No documentation available.*
+Return landing/PDF/source URL collections derived from OpenAlex metadata.
 
 ### `build_query(args)`
 
@@ -401,27 +401,33 @@ None
 
 ### `__post_init__(self)`
 
-*No documentation available.*
+Define namespace mappings for output artefact directories.
+
+Args:
+None
+
+Returns:
+None
 
 ### `_append_location(loc)`
 
-*No documentation available.*
+Accumulate location URLs from a single OpenAlex location record.
 
 ### `_session_factory()`
 
-*No documentation available.*
+Build a fresh requests session configured with polite headers.
 
 ### `_record_result(res)`
 
-*No documentation available.*
+Update aggregate counters based on a single work result.
 
 ### `_submit_work(work_item)`
 
-*No documentation available.*
+Submit a work item to the executor for asynchronous processing.
 
 ### `_runner()`
 
-*No documentation available.*
+Process a single work item within a worker-managed session.
 
 ## 2. Classes
 

@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/openalex.py
+# hypothesis_version: 6.141.0
+
+['OpenAlexResolver', 'openalex', 'openalex_metadata', 'source']

@@ -84,7 +84,7 @@
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="absolute-url-base-href">
 <h3><code class="docutils literal notranslate"><span class="pre">_absolute_url(base,</span> <span class="pre">href)</span></code><a class="headerlink" href="#absolute-url-base-href" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Resolve relative <code class="docutils literal notranslate"><span class="pre">href</span></code> values against <code class="docutils literal notranslate"><span class="pre">base</span></code> to obtain absolute URLs.</p>
 </section>
 <section id="is-enabled-self-config-artifact">
 <h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#is-enabled-self-config-artifact" title="Link to this heading"></a></h3>
@@ -97,7 +97,13 @@ Boolean indicating whether PMC resolution should be attempted.</p>
 </section>
 <section id="lookup-pmcids-self-session-identifiers-config">
 <h3><code class="docutils literal notranslate"><span class="pre">_lookup_pmcids(self,</span> <span class="pre">session,</span> <span class="pre">identifiers,</span> <span class="pre">config)</span></code><a class="headerlink" href="#lookup-pmcids-self-session-identifiers-config" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Return PMCIDs resolved from DOI/PMID identifiers using NCBI utilities.</p>
+<p>Args:
+session: Requests session reused across resolver calls.
+identifiers: DOI or PMID identifiers to convert to PMCIDs.
+config: Resolver configuration providing timeout and polite headers.</p>
+<p>Returns:
+List of PMCIDs corresponding to the supplied identifiers.</p>
 </section>
 <section id="iter-urls-self-session-config-artifact">
 <h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#iter-urls-self-session-config-artifact" title="Link to this heading"></a></h3>

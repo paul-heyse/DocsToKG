@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/pmc.py
+# hypothesis_version: 6.141.0
+
+[200, ',', 'PmcResolver', 'WorkArtifact', 'docs-to-kg', 'email', 'format', 'get', 'href="([^"]+\\.pdf)"', 'ids', 'json', 'oa', 'pdf-fallback', 'pmc', 'pmcid', 'records', 'source', 'tool']

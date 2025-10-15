@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/semantic_scholar.py
+# hypothesis_version: 6.141.0
+
+[200, 1000, 'WorkArtifact', 'fields', 'openAccessPdf', 'semantic-scholar', 'semantic_scholar', 'source', 'title,openAccessPdf', 'url', 'x-api-key']

@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/landing_page.py
+# hypothesis_version: 6.141.0
+
+[200, '.pdf', 'LandingPageResolver', 'WorkArtifact', 'a', 'alternate', 'anchor', 'application/pdf', 'citation_pdf_url', 'content', 'error', 'get', 'href', 'http-error', 'landing', 'landing_page', 'link', 'lxml', 'message', 'meta', 'name', 'no-beautifulsoup', 'pattern', 'pdf', 'rel', 'request-error', 'skipped', 'type']

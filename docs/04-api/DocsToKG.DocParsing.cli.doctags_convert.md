@@ -34,7 +34,7 @@ ValueError: If both PDF and HTML files are present (or neither).
 
 ### `_merge_args(parser, overrides)`
 
-*No documentation available.*
+Return a parser namespace seeded with override values.
 
 ### `main(argv)`
 

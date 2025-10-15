@@ -360,6 +360,10 @@ Mean pairwise cosine similarity, or 0.0 when insufficient points exist.</p>
 <section id="ensure-validation-resources-self">
 <h3><code class="docutils literal notranslate"><span class="pre">_ensure_validation_resources(self)</span></code><a class="headerlink" href="#ensure-validation-resources-self" title="Link to this heading"></a></h3>
 <p>Lazy-create and cache GPU resources for validation-only cosine checks.</p>
+<p>Args:
+None</p>
+<p>Returns:
+FAISS GPU resources reused across validation runs.</p>
 </section>
 <section id="percentile-self-values-percentile">
 <h3><code class="docutils literal notranslate"><span class="pre">_percentile(self,</span> <span class="pre">values,</span> <span class="pre">percentile)</span></code><a class="headerlink" href="#percentile-self-values-percentile" title="Link to this heading"></a></h3>

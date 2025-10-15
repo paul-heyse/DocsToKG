@@ -34,7 +34,7 @@ Raises:
 ValueError: If the row fails schema validation.
 
 Examples:
->>> validate_chunk_row({
+>>> chunk = validate_chunk_row({
 ...     "doc_id": "doc",
 ...     "source_path": "path",
 ...     "chunk_id": 0,
@@ -42,7 +42,8 @@ Examples:
 ...     "num_tokens": 10,
 ...     "text": "hello",
 ... })
-ChunkRow(doc_id='doc', source_path='path', chunk_id=0, source_chunk_idxs=[0], num_tokens=10, text='hello', doc_items_refs=[], page_nos=[], schema_version='docparse/1.1.0', provenance=None, uuid=None)
+>>> chunk.schema_version
+'docparse/1.1.0'
 
 ### `validate_vector_row(row)`
 
@@ -58,13 +59,14 @@ Raises:
 ValueError: If the row fails schema validation.
 
 Examples:
->>> validate_vector_row({
+>>> vector = validate_vector_row({
 ...     "UUID": "uuid",
 ...     "BM25": {"terms": [], "weights": [], "avgdl": 1.0, "N": 1},
 ...     "SPLADEv3": {"tokens": [], "weights": []},
 ...     "Qwen3-4B": {"model_id": "model", "vector": [0.1], "dimension": 1},
 ... })
-VectorRow(UUID='uuid', BM25=BM25Vector(terms=[], weights=[], k1=1.5, b=0.75, avgdl=1.0, N=1), SPLADEv3=SPLADEVector(model_id='naver/splade-v3', tokens=[], weights=[]), Qwen3_4B=DenseVector(model_id='model', vector=[0.1], dimension=1), model_metadata={}, schema_version='embeddings/1.0.0')
+>>> vector.UUID
+'uuid'
 
 ### `get_docling_version()`
 
@@ -227,7 +229,7 @@ provenance: Optional provenance metadata describing parsing context.
 uuid: Optional stable identifier for the chunk.
 
 Examples:
->>> ChunkRow(
+>>> chunk = ChunkRow(
 ...     doc_id="doc-123",
 ...     source_path="/tmp/doc-123.doctags.json",
 ...     chunk_id=0,
@@ -235,7 +237,8 @@ Examples:
 ...     num_tokens=42,
 ...     text="Sample chunk text.",
 ... )
-ChunkRow(doc_id='doc-123', source_path='/tmp/doc-123.doctags.json', chunk_id=0, source_chunk_idxs=[0], num_tokens=42, text='Sample chunk text.', doc_items_refs=[], page_nos=[], schema_version='docparse/1.1.0', provenance=None, uuid=None)
+>>> chunk.doc_id
+'doc-123'
 
 ### `BM25Vector`
 
@@ -292,10 +295,11 @@ model_metadata: Additional metadata describing embedding provenance.
 schema_version: Version identifier for the vector schema.
 
 Examples:
->>> VectorRow(
+>>> vector = VectorRow(
 ...     UUID="chunk-1",
 ...     BM25={"terms": ["doc"], "weights": [1.0], "avgdl": 10.0, "N": 2},
 ...     SPLADEv3={"tokens": ["doc"], "weights": [0.1]},
 ...     Qwen3_4B={"model_id": "encoder", "vector": [0.1], "dimension": 1},
 ... )
-VectorRow(UUID='chunk-1', BM25=BM25Vector(terms=['doc'], weights=[1.0], k1=1.5, b=0.75, avgdl=10.0, N=2), SPLADEv3=SPLADEVector(model_id='naver/splade-v3', tokens=['doc'], weights=[0.1]), Qwen3_4B=DenseVector(model_id='encoder', vector=[0.1], dimension=1), model_metadata={}, schema_version='embeddings/1.0.0')
+>>> vector.BM25.avgdl
+10.0

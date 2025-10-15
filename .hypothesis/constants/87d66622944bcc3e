@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/HybridSearch/ingest.py
+# hypothesis_version: 6.141.0
+
+[256, 2048, 'BM25', 'Qwen3-4B', 'SpladeV3', 'UUID', 'chunk-ingest-error', 'chunk-upsert', 'chunk_id', 'count', 'delete_chunks', 'doc_id', 'doc_items_refs', 'error', 'event', 'ingest_chunks', 'ingest_delete', 'ingest_document', 'ingest_dual_write', 'namespaces', 'num_tokens', 'source_chunk_idxs', 'source_path', 'terms', 'text', 'tokens', 'utf-8', 'uuid', 'vector', 'weights']

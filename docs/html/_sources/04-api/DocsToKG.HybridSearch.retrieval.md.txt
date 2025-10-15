@@ -30,25 +30,75 @@ RequestValidationError: If the request fails validation checks.
 
 Run the BM25 retrieval channel and record latency metrics.
 
+Args:
+request: Hybrid search request providing query parameters.
+filters: Metadata filters applied to BM25 results.
+config: Active hybrid search configuration.
+query_features: Precomputed query features for retrieval.
+timings: Mutable dictionary used to collect latency metrics.
+
+Returns:
+ChannelResults containing BM25 candidates and score mapping.
+
 ### `_execute_splade(self, request, filters, config, query_features, timings)`
 
 Execute SPLADE retrieval and return channel-specific fusion candidates.
+
+Args:
+request: Hybrid search request providing query parameters.
+filters: Metadata filters applied to SPLADE results.
+config: Active hybrid search configuration.
+query_features: Precomputed query features for retrieval.
+timings: Mutable dictionary used to collect latency metrics.
+
+Returns:
+ChannelResults containing SPLADE candidates and score mapping.
 
 ### `_execute_dense(self, request, filters, config, query_features, timings)`
 
 Query the FAISS index for dense candidates and filter by metadata.
 
+Args:
+request: Hybrid search request providing query parameters.
+filters: Metadata filters applied to dense results.
+config: Active hybrid search configuration.
+query_features: Precomputed query features for retrieval.
+timings: Mutable dictionary used to collect latency metrics.
+
+Returns:
+ChannelResults containing dense candidates and score mapping.
+
 ### `_filter_dense_hits(self, hits, filters)`
 
 Apply metadata filters to dense results and gather payloads for survivors.
+
+Args:
+hits: Sequence of FAISS search results to filter.
+filters: Metadata filters applied to candidate payloads.
+
+Returns:
+Tuple containing filtered hits and a mapping of payloads by vector ID.
 
 ### `_dedupe_candidates(self, candidates, fused_scores)`
 
 Remove duplicate vector IDs, keeping the highest-scoring candidate per ID.
 
+Args:
+candidates: Candidate list produced across retrieval channels.
+fused_scores: Mapping of vector IDs to fused scores.
+
+Returns:
+List of candidates sorted by fused score with duplicates removed.
+
 ### `_validate_request(self, request)`
 
 Validate basic request fields before executing the search pipeline.
+
+Args:
+request: Hybrid search request to validate.
+
+Returns:
+None
 
 ## 2. Classes
 

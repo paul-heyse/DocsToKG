@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/unpaywall.py
+# hypothesis_version: 6.141.0
+
+[200, 1000, 'UnpaywallResolver', 'WorkArtifact', '_headers_cache_key', 'best_oa_location', 'email', 'error', 'get', 'http-error', 'json-error', 'message', 'no-doi', 'oa_location', 'oa_locations', 'request-error', 'skipped', 'source', 'status_code', 'unpaywall', 'url_for_pdf']

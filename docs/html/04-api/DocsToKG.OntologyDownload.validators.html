@@ -302,6 +302,19 @@ ValidationTimeout: rdflib exceeded 60s</p>
 <section id="alarm">
 <h3><code class="docutils literal notranslate"><span class="pre">_Alarm</span></code><a class="headerlink" href="#alarm" title="Link to this heading"></a></h3>
 <p>Sentinel exception raised when the alarm signal fires.</p>
+<p>Attributes:
+message: Optional description associated with the exception.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>try:
+…     raise _Alarm()
+… except _Alarm:
+…     pass</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 </section>
 </section>

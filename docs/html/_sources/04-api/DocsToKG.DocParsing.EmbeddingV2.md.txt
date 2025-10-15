@@ -93,6 +93,16 @@ Tuple of token lists and weight lists aligned per input text.
 
 Retrieve (or create) a cached SPLADE encoder instance.
 
+Args:
+cfg: SPLADE configuration describing model location and runtime options.
+
+Returns:
+Cached :class:`SparseEncoder` ready for SPLADE inference.
+
+Raises:
+ValueError: If the encoder cannot be initialised with the supplied configuration.
+ImportError: If required SPLADE dependencies are unavailable.
+
 ### `qwen_embed(cfg, texts, batch_size)`
 
 Produce dense embeddings using a local Qwen3 model served by vLLM.

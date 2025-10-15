@@ -24,6 +24,8 @@ def _fetch_crossref_data(
     timeout: float,
     headers_key: Tuple[Tuple[str, str], ...],
 ) -> Dict[str, Any]:
+    """Retrieve Crossref metadata for ``doi`` with polite header caching."""
+
     headers = dict(headers_key)
     params = {"mailto": mailto} if mailto else None
     response = requests.get(

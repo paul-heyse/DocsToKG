@@ -8,7 +8,7 @@ PubMed Central resolver leveraging NCBI utilities and OA endpoints.
 
 ### `_absolute_url(base, href)`
 
-*No documentation available.*
+Resolve relative ``href`` values against ``base`` to obtain absolute URLs.
 
 ### `is_enabled(self, config, artifact)`
 
@@ -23,7 +23,15 @@ Boolean indicating whether PMC resolution should be attempted.
 
 ### `_lookup_pmcids(self, session, identifiers, config)`
 
-*No documentation available.*
+Return PMCIDs resolved from DOI/PMID identifiers using NCBI utilities.
+
+Args:
+session: Requests session reused across resolver calls.
+identifiers: DOI or PMID identifiers to convert to PMCIDs.
+config: Resolver configuration providing timeout and polite headers.
+
+Returns:
+List of PMCIDs corresponding to the supplied identifiers.
 
 ### `iter_urls(self, session, config, artifact)`
 

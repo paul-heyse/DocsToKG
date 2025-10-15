@@ -157,6 +157,7 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
     config = ResolverConfig(
         resolver_order=["stub"],
         resolver_toggles={"stub": True},
+        enable_head_precheck=False,
     )
     pipeline = ResolverPipeline([StubResolver()], config, fake_download, logger, metrics)
 
@@ -221,6 +222,7 @@ def test_openalex_attempts_use_session_headers(tmp_path: Path) -> None:
     config = ResolverConfig(
         resolver_order=["openalex"],
         resolver_toggles={"openalex": True},
+        enable_head_precheck=False,
     )
     pipeline = ResolverPipeline(
         [OpenAlexResolver()],
@@ -242,6 +244,7 @@ def test_retry_budget_honours_max_attempts(tmp_path: Path) -> None:
         resolver_order=["stub"],
         resolver_toggles={"stub": True},
         max_attempts_per_work=3,
+        enable_head_precheck=False,
     )
 
     class StubResolver:

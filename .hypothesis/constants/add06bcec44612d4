@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/scripts/export_attempts_csv.py
+# hypothesis_version: 6.141.0
+
+['__main__', 'attempt', 'content_length', 'content_type', 'dry_run', 'elapsed_ms', 'http_status', 'input', 'metadata', 'output', 'r', 'reason', 'record_type', 'resolver_name', 'resolver_order', 'sha256', 'status', 'timestamp', 'url', 'utf-8', 'w', 'work_id']

@@ -8,11 +8,11 @@ Resolver that integrates with the Unpaywall API to locate open access PDFs.
 
 ### `_headers_cache_key(headers)`
 
-*No documentation available.*
+Create a hashable cache key for polite header dictionaries.
 
 ### `_fetch_unpaywall_data(doi, email, timeout, headers_key)`
 
-*No documentation available.*
+Fetch Unpaywall metadata for ``doi`` using polite caching.
 
 ### `is_enabled(self, config, artifact)`
 

@@ -520,6 +520,15 @@ class Batcher(Iterable[List[T]]):
         self._batch_size = batch_size
 
     def __iter__(self) -> Iterator[List[T]]:
+        """Yield successive lists containing up to ``batch_size`` elements.
+
+        Args:
+            None: Iteration consumes the iterable supplied to :class:`Batcher`.
+
+        Returns:
+            Iterator over lists where each list contains up to ``batch_size`` items.
+        """
+
         batch: List[T] = []
         for item in self._iterable:
             batch.append(item)

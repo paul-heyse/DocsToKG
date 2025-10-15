@@ -118,9 +118,21 @@ Number of identifiers scheduled for removal.
 
 Return the FAISS internal identifiers currently stored in the index.
 
+Args:
+None
+
+Returns:
+NumPy array containing the FAISS internal IDs present in the index.
+
 ### `_lookup_existing_ids(self, candidate_ids)`
 
 Identify which of the supplied FAISS IDs already exist in the index.
+
+Args:
+candidate_ids: Array of FAISS internal IDs to test for membership.
+
+Returns:
+NumPy array containing the subset of ``candidate_ids`` currently stored.
 
 ### `search(self, query, top_k)`
 
@@ -201,6 +213,15 @@ Dictionary containing index configuration and diagnostics.
 
 Construct a GPU-native FAISS index based on the configured index_type.
 
+Args:
+None
+
+Returns:
+Initialised ``faiss.Index`` residing on the configured GPU.
+
+Raises:
+RuntimeError: If GPU resources have not been initialised before invocation.
+
 ### `replicate_to_all_gpus(self, index)`
 
 Replicate a FAISS index across every visible GPU device.
@@ -218,29 +239,77 @@ RuntimeError: If multi-GPU replication is unsupported or no index is available.
 
 Promote a CPU index to GPU while enforcing strict cloning guarantees.
 
+Args:
+index: CPU-resident FAISS index to migrate onto the configured GPU(s).
+
+Returns:
+GPU-backed FAISS index, optionally replicated across devices.
+
+Raises:
+RuntimeError: If GPU resources are unavailable or promotion fails.
+
 ### `_maybe_reserve_memory(self, index)`
 
 Reserve GPU memory for the expected corpus size when supported.
+
+Args:
+index: Target FAISS index whose underlying storage may be extended.
+
+Returns:
+None
 
 ### `_to_cpu(self, index)`
 
 Clone a GPU index back to CPU memory for persistence operations.
 
+Args:
+index: GPU-resident FAISS index to convert to CPU representation.
+
+Returns:
+CPU-backed FAISS index ready for serialization.
+
+Raises:
+RuntimeError: If FAISS lacks GPU→CPU conversion support.
+
 ### `_set_nprobe(self)`
 
 Apply IVF search breadth configuration to the current index.
+
+Args:
+None
+
+Returns:
+None
 
 ### `_log_index_configuration(self, index)`
 
 Emit structured logging that captures the live index configuration.
 
+Args:
+index: FAISS index whose configuration should be summarised.
+
+Returns:
+None
+
 ### `_resolve_vector_id(self, internal_id)`
 
 Translate a FAISS internal identifier to the original vector UUID.
 
+Args:
+internal_id: FAISS-managed integer identifier produced during search.
+
+Returns:
+Matching vector UUID when available, otherwise ``None``.
+
 ### `_detect_device(self, index)`
 
 Determine the CUDA device hosting the provided index, if any.
+
+Args:
+index: FAISS index whose device affinity is being inspected.
+
+Returns:
+CUDA device ordinal when discoverable, otherwise ``None``.
 
 ### `_resolve_device(self, config)`
 
@@ -269,17 +338,44 @@ RuntimeError: If FAISS lacks GPU support or an unsuitable device is requested.
 
 Validate that the provided embedding matches the configured dimensionality.
 
+Args:
+vector: Vector whose shape should align with the configured dimension.
+
+Returns:
+NumPy array validated to match ``self._dim``.
+
+Raises:
+ValueError: If the vector dimensionality differs from ``self._dim``.
+
 ### `_flush_pending_deletes(self)`
 
 Rebuild the index when tombstone thresholds or manual flush requests demand it.
+
+Args:
+force: When ``True``, rebuild even if thresholds have not been reached.
+
+Returns:
+None
 
 ### `_remove_ids(self, ids)`
 
 Attempt to delete FAISS IDs directly, falling back to tombstones when required.
 
+Args:
+ids: Array of FAISS internal identifiers targeted for removal.
+
+Returns:
+None
+
 ### `_rebuild_index(self)`
 
 Recreate the GPU index from live vectors after tombstones accumulate.
+
+Args:
+None
+
+Returns:
+None
 
 ## 2. Classes
 

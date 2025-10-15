@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/figshare.py
+# hypothesis_version: 6.141.0
+
+[200, '.pdf', 'Content-Type', 'FigshareResolver', 'WorkArtifact', 'application/json', 'article_id', 'download_url', 'error', 'figshare', 'filename', 'files', 'http-error', 'id', 'json-error', 'message', 'name', 'no-doi', 'page', 'page_size', 'post', 'request-error', 'search_for', 'skipped', 'source']

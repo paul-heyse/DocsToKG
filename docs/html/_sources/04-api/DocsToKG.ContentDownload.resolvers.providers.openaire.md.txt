@@ -8,7 +8,7 @@ Resolver connecting to the OpenAIRE research infrastructure for discovery.
 
 ### `_collect_candidate_urls(node, results)`
 
-*No documentation available.*
+Recursively collect HTTP(S) URLs from nested OpenAIRE response payloads.
 
 ### `is_enabled(self, config, artifact)`
 

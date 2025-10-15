@@ -116,10 +116,23 @@ ValueError: If the config file is invalid JSON or YAML.</p>
 <section id="load-self">
 <h3><code class="docutils literal notranslate"><span class="pre">_load(self)</span></code><a class="headerlink" href="#load-self" title="Link to this heading"></a></h3>
 <p>Load configuration data from the configured path (JSON or YAML).</p>
+<p>Args:
+None</p>
+<p>Returns:
+:class:<code class="docutils literal notranslate"><span class="pre">HybridSearchConfig</span></code> constructed from the on-disk payload.</p>
+<p>Raises:
+FileNotFoundError: If the configuration file is missing.
+ValueError: If JSON or YAML decoding fails or yields invalid structure.</p>
 </section>
 <section id="load-yaml-self-raw">
 <h3><code class="docutils literal notranslate"><span class="pre">_load_yaml(self,</span> <span class="pre">raw)</span></code><a class="headerlink" href="#load-yaml-self-raw" title="Link to this heading"></a></h3>
 <p>Parse YAML configuration content into a dictionary.</p>
+<p>Args:
+raw: Raw YAML string read from disk.</p>
+<p>Returns:
+Dictionary representation suitable for :class:<code class="docutils literal notranslate"><span class="pre">HybridSearchConfig.from_dict</span></code>.</p>
+<p>Raises:
+ValueError: If PyYAML is unavailable or the content does not define a mapping.</p>
 </section>
 </section>
 <section id="classes">

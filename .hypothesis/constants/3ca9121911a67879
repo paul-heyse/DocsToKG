@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/HybridSearch/retrieval.py
+# hypothesis_version: 6.141.0
+
+[100, 1000, '*', '0', 'bm25', 'bm25_ms', 'dense', 'dense_ms', 'event', 'feature_ms', 'hybrid-search', 'hybrid_search', 'namespace', 'page_size too large', 'query', 'returned', 'search_candidates', 'splade', 'splade_ms', 'total_candidates', 'total_ms']

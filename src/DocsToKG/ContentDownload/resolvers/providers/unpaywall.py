@@ -17,6 +17,8 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 def _headers_cache_key(headers: Dict[str, str]) -> Tuple[Tuple[str, str], ...]:
+    """Create a hashable cache key for polite header dictionaries."""
+
     return tuple(sorted((headers or {}).items()))
 
 
@@ -27,6 +29,8 @@ def _fetch_unpaywall_data(
     timeout: float,
     headers_key: Tuple[Tuple[str, str], ...],
 ) -> Dict[str, Any]:
+    """Fetch Unpaywall metadata for ``doi`` using polite caching."""
+
     headers = dict(headers_key)
     response = requests.get(
         f"https://api.unpaywall.org/v2/{quote(doi)}",

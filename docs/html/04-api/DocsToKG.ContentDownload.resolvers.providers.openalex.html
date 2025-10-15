@@ -84,18 +84,43 @@
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="is-enabled-self-config-artifact">
 <h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#is-enabled-self-config-artifact" title="Link to this heading"></a></h3>
-<p>Enable when artifact has pdf_urls or open_access_url.</p>
+<p>Return True when the OpenAlex artifact exposes accessible PDF URLs.</p>
+<p>Args:
+config: Resolver configuration (unused but required for interface parity).
+artifact: OpenAlex metadata object containing URL fields.</p>
+<p>Returns:
+<code class="docutils literal notranslate"><span class="pre">True</span></code> when at least one candidate PDF URL is available, otherwise <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
 </section>
 <section id="iter-urls-self-session-config-artifact">
 <h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#iter-urls-self-session-config-artifact" title="Link to this heading"></a></h3>
-<p>Yield all PDF URLs from OpenAlex work metadata.</p>
+<p>Yield resolver results for each accessible PDF URL in the artifact.</p>
+<p>Args:
+session: Requests session forwarded for interface compatibility.
+config: Resolver configuration (unused but accepted for uniform signature).
+artifact: OpenAlex metadata object providing URL candidates.</p>
+<p>Returns:
+Iterator producing :class:<code class="docutils literal notranslate"><span class="pre">ResolverResult</span></code> objects for each unique URL.</p>
+<p>Raises:
+None</p>
 </section>
 </section>
 <section id="classes">
 <h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="openalexresolver">
 <h3><code class="docutils literal notranslate"><span class="pre">OpenAlexResolver</span></code><a class="headerlink" href="#openalexresolver" title="Link to this heading"></a></h3>
-<p>Resolver for PDF URLs directly provided by OpenAlex metadata.</p>
+<p>Resolve OpenAlex work metadata into candidate download URLs.</p>
+<p>Attributes:
+name: Resolver identifier advertised to the pipeline.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>resolver = OpenAlexResolver()
+resolver.name
+‘openalex’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 </section>
 </section>

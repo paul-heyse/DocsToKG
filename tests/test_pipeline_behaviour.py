@@ -98,6 +98,7 @@ def test_pipeline_respects_custom_order(tmp_path):
     config = resolvers.ResolverConfig(
         resolver_order=["beta", "alpha"],
         resolver_toggles={"alpha": True, "beta": True},
+        enable_head_precheck=False,
     )
     logger = MemoryLogger()
     pipeline = resolvers.ResolverPipeline(
@@ -130,6 +131,7 @@ def test_pipeline_stops_after_max_attempts(tmp_path):
         resolver_order=["single"],
         resolver_toggles={"single": True},
         max_attempts_per_work=1,
+        enable_head_precheck=False,
     )
     logger = MemoryLogger()
     pipeline = resolvers.ResolverPipeline(
@@ -157,6 +159,7 @@ def test_pipeline_deduplicates_urls(tmp_path):
     config = resolvers.ResolverConfig(
         resolver_order=["dup"],
         resolver_toggles={"dup": True},
+        enable_head_precheck=False,
     )
     logger = MemoryLogger()
 
@@ -188,6 +191,7 @@ def test_pipeline_collects_html_paths(tmp_path):
     config = resolvers.ResolverConfig(
         resolver_order=["html"],
         resolver_toggles={"html": True},
+        enable_head_precheck=False,
     )
     logger = MemoryLogger()
     pipeline = resolvers.ResolverPipeline(
@@ -225,6 +229,7 @@ def test_pipeline_rate_limit_enforced(monkeypatch, tmp_path):
         resolver_order=["limited"],
         resolver_toggles={"limited": True},
         resolver_rate_limits={"limited": 1.0},
+        enable_head_precheck=False,
     )
     pipeline = resolvers.ResolverPipeline(
         resolvers=[resolver],
@@ -259,6 +264,7 @@ def test_openalex_resolver_executes_first(tmp_path):
     config = resolvers.ResolverConfig(
         resolver_order=["openalex", "fallback"],
         resolver_toggles={"openalex": True, "fallback": True},
+        enable_head_precheck=False,
     )
     logger = MemoryLogger()
     metrics = resolvers.ResolverMetrics()
@@ -303,6 +309,7 @@ def test_openalex_respects_rate_limit(monkeypatch, tmp_path):
         resolver_order=["openalex"],
         resolver_toggles={"openalex": True},
         resolver_min_interval_s={"openalex": 0.8},
+        enable_head_precheck=False,
     )
     pipeline = resolvers.ResolverPipeline(
         resolvers=[OpenAlexResolver()],
@@ -328,6 +335,7 @@ def test_pipeline_records_failed_urls(tmp_path):
         resolver_order=["openalex"],
         resolver_toggles={"openalex": True},
         max_attempts_per_work=1,
+        enable_head_precheck=False,
     )
     logger = MemoryLogger()
     pipeline = resolvers.ResolverPipeline(

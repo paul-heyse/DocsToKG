@@ -16,12 +16,29 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 class ZenodoResolver:
-    """Resolver for Zenodo open access repository."""
+    """Resolve Zenodo records into downloadable open-access PDF URLs.
+
+    Attributes:
+        name: Resolver identifier registered with the content download pipeline.
+
+    Examples:
+        >>> resolver = ZenodoResolver()
+        >>> resolver.name
+        'zenodo'
+    """
 
     name = "zenodo"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
-        """Enable when artifact has a DOI."""
+        """Return True when the artifact publishes a DOI for Zenodo lookup.
+
+        Args:
+            config: Resolver configuration (unused but part of the protocol signature).
+            artifact: Work metadata potentially referencing Zenodo.
+
+        Returns:
+            bool: ``True`` when a DOI is available, otherwise ``False``.
+        """
 
         return artifact.doi is not None
 
@@ -31,7 +48,19 @@ class ZenodoResolver:
         config: ResolverConfig,
         artifact: "WorkArtifact",
     ) -> Iterable[ResolverResult]:
-        """Query Zenodo API by DOI and yield PDF file URLs."""
+        """Query the Zenodo API by DOI and yield PDF file URLs.
+
+        Args:
+            session: Requests session used for making Zenodo API calls.
+            config: Resolver configuration providing polite headers and timeouts.
+            artifact: Work metadata containing the DOI search key.
+
+        Returns:
+            Iterable[ResolverResult]: Iterator yielding resolver results for accessible PDFs.
+
+        Raises:
+            None
+        """
 
         doi = normalize_doi(artifact.doi)
         if not doi:

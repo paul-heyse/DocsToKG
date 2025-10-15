@@ -88,7 +88,7 @@
 </section>
 <section id="has-pdf-eof-path">
 <h3><code class="docutils literal notranslate"><span class="pre">_has_pdf_eof(path)</span></code><a class="headerlink" href="#has-pdf-eof-path" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when <code class="docutils literal notranslate"><span class="pre">path</span></code> appears to end with the <code class="docutils literal notranslate"><span class="pre">%%EOF</span></code> marker.</p>
 </section>
 <section id="slugify-text-keep">
 <h3><code class="docutils literal notranslate"><span class="pre">slugify(text,</span> <span class="pre">keep)</span></code><a class="headerlink" href="#slugify-text-keep" title="Link to this heading"></a></h3>
@@ -192,15 +192,15 @@ bookkeeping metadata such as digests and conditional request headers.</p>
 </section>
 <section id="normalize-pmid-pmid">
 <h3><code class="docutils literal notranslate"><span class="pre">_normalize_pmid(pmid)</span></code><a class="headerlink" href="#normalize-pmid-pmid" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Extract the numeric PubMed identifier or return <code class="docutils literal notranslate"><span class="pre">None</span></code> when absent.</p>
 </section>
 <section id="normalize-arxiv-arxiv-id">
 <h3><code class="docutils literal notranslate"><span class="pre">_normalize_arxiv(arxiv_id)</span></code><a class="headerlink" href="#normalize-arxiv-arxiv-id" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Normalize arXiv identifiers by removing prefixes and whitespace.</p>
 </section>
 <section id="collect-location-urls-work">
 <h3><code class="docutils literal notranslate"><span class="pre">_collect_location_urls(work)</span></code><a class="headerlink" href="#collect-location-urls-work" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Return landing/PDF/source URL collections derived from OpenAlex metadata.</p>
 </section>
 <section id="build-query-args">
 <h3><code class="docutils literal notranslate"><span class="pre">build_query(args)</span></code><a class="headerlink" href="#build-query-args" title="Link to this heading"></a></h3>
@@ -416,27 +416,31 @@ None</p>
 </section>
 <section id="post-init-self">
 <h3><code class="docutils literal notranslate"><span class="pre">__post_init__(self)</span></code><a class="headerlink" href="#post-init-self" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Define namespace mappings for output artefact directories.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
 </section>
 <section id="append-location-loc">
 <h3><code class="docutils literal notranslate"><span class="pre">_append_location(loc)</span></code><a class="headerlink" href="#append-location-loc" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Accumulate location URLs from a single OpenAlex location record.</p>
 </section>
 <section id="session-factory">
 <h3><code class="docutils literal notranslate"><span class="pre">_session_factory()</span></code><a class="headerlink" href="#session-factory" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Build a fresh requests session configured with polite headers.</p>
 </section>
 <section id="record-result-res">
 <h3><code class="docutils literal notranslate"><span class="pre">_record_result(res)</span></code><a class="headerlink" href="#record-result-res" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Update aggregate counters based on a single work result.</p>
 </section>
 <section id="submit-work-work-item">
 <h3><code class="docutils literal notranslate"><span class="pre">_submit_work(work_item)</span></code><a class="headerlink" href="#submit-work-work-item" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Submit a work item to the executor for asynchronous processing.</p>
 </section>
 <section id="runner">
 <h3><code class="docutils literal notranslate"><span class="pre">_runner()</span></code><a class="headerlink" href="#runner" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Process a single work item within a worker-managed session.</p>
 </section>
 </section>
 <section id="classes">

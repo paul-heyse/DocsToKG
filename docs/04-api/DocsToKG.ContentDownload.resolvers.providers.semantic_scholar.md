@@ -8,7 +8,7 @@ Resolver that queries the Semantic Scholar Graph API for open access PDFs.
 
 ### `_fetch_semantic_scholar_data(doi, api_key, timeout, headers_key)`
 
-*No documentation available.*
+Fetch Semantic Scholar Graph API metadata for ``doi`` with caching.
 
 ### `is_enabled(self, config, artifact)`
 

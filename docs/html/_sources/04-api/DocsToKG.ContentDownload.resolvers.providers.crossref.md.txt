@@ -8,7 +8,7 @@ Resolver that queries the Crossref metadata API to surface publisher-hosted PDFs
 
 ### `_fetch_crossref_data(doi, mailto, timeout, headers_key)`
 
-*No documentation available.*
+Retrieve Crossref metadata for ``doi`` with polite header caching.
 
 ### `is_enabled(self, config, artifact)`
 

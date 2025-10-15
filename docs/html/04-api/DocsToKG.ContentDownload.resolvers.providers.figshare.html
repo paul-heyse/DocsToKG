@@ -84,18 +84,43 @@
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="is-enabled-self-config-artifact">
 <h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#is-enabled-self-config-artifact" title="Link to this heading"></a></h3>
-<p>Enable when artifact has a DOI.</p>
+<p>Return True when the artifact exposes a DOI for Figshare lookup.</p>
+<p>Args:
+config: Resolver configuration (unused but part of the protocol signature).
+artifact: Work metadata that may reference a Figshare DOI.</p>
+<p>Returns:
+<code class="docutils literal notranslate"><span class="pre">True</span></code> when a DOI is present, otherwise <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
 </section>
 <section id="iter-urls-self-session-config-artifact">
 <h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#iter-urls-self-session-config-artifact" title="Link to this heading"></a></h3>
-<p>Search Figshare API by DOI and yield PDF file URLs.</p>
+<p>Search the Figshare API by DOI and yield PDF file URLs.</p>
+<p>Args:
+session: Requests session used for API calls (supports retry injection).
+config: Resolver configuration providing polite headers and timeouts.
+artifact: Work metadata containing the DOI search key.</p>
+<p>Returns:
+Iterator yielding :class:<code class="docutils literal notranslate"><span class="pre">ResolverResult</span></code> objects for each candidate URL.</p>
+<p>Raises:
+None</p>
 </section>
 </section>
 <section id="classes">
 <h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="figshareresolver">
 <h3><code class="docutils literal notranslate"><span class="pre">FigshareResolver</span></code><a class="headerlink" href="#figshareresolver" title="Link to this heading"></a></h3>
-<p>Resolver for Figshare repository.</p>
+<p>Resolve Figshare repository metadata into download URLs.</p>
+<p>Attributes:
+name: Resolver identifier registered with the pipeline.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>resolver = FigshareResolver()
+resolver.name
+‘figshare’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 </section>
 </section>

@@ -27,6 +27,16 @@ if TYPE_CHECKING:
 
 
 def _callable_accepts_argument(func: DownloadFunc, name: str) -> bool:
+    """Return ``True`` when ``func`` accepts an argument named ``name``.
+
+    Args:
+        func: Download function whose call signature should be inspected.
+        name: Argument name whose presence should be detected.
+
+    Returns:
+        bool: ``True`` when ``func`` accepts the argument or variable parameters.
+    """
+
     try:
         from inspect import Parameter, signature
     except ImportError:  # pragma: no cover - inspect always available
@@ -49,7 +59,23 @@ def _callable_accepts_argument(func: DownloadFunc, name: str) -> bool:
 
 
 class _RunState:
-    """Mutable pipeline execution state shared across resolvers."""
+    """Mutable pipeline execution state shared across resolvers.
+
+    Args:
+        dry_run: Indicates whether downloads should be skipped.
+
+    Attributes:
+        dry_run: Indicates whether downloads should be skipped.
+        seen_urls: Set of URLs already attempted.
+        html_paths: Collected HTML fallback paths.
+        failed_urls: URLs that failed during resolution.
+        attempt_counter: Total number of resolver attempts performed.
+
+    Examples:
+        >>> state = _RunState(dry_run=True)
+        >>> state.dry_run
+        True
+    """
 
     __slots__ = (
         "dry_run",
@@ -60,6 +86,15 @@ class _RunState:
     )
 
     def __init__(self, dry_run: bool) -> None:
+        """Initialise run-state bookkeeping for a pipeline execution.
+
+        Args:
+            dry_run: Flag indicating whether downloads should be skipped.
+
+        Returns:
+            None
+        """
+
         self.dry_run = dry_run
         self.seen_urls: set[str] = set()
         self.html_paths: List[str] = []
@@ -90,6 +125,19 @@ class ResolverPipeline:
         logger: AttemptLogger,
         metrics: Optional[ResolverMetrics] = None,
     ) -> None:
+        """Create a resolver pipeline with ordering, download, and metric hooks.
+
+        Args:
+            resolvers: Resolver instances available for execution.
+            config: Pipeline configuration controlling ordering and limits.
+            download_func: Callable responsible for downloading resolved URLs.
+            logger: Logger that records resolver attempt metadata.
+            metrics: Optional metrics collector used for resolver telemetry.
+
+        Returns:
+            None
+        """
+
         self._resolver_map = {resolver.name: resolver for resolver in resolvers}
         self.config = config
         self.download_func = download_func
@@ -100,6 +148,15 @@ class ResolverPipeline:
         self._download_accepts_context = _callable_accepts_argument(download_func, "context")
 
     def _respect_rate_limit(self, resolver_name: str) -> None:
+        """Sleep as required to respect per-resolver rate limiting policies.
+
+        Args:
+            resolver_name: Name of the resolver to rate limit.
+
+        Returns:
+            None
+        """
+
         limit = self.config.resolver_min_interval_s.get(resolver_name)
         if not limit:
             limit = self.config.resolver_rate_limits.get(resolver_name)
@@ -117,11 +174,29 @@ class ResolverPipeline:
             time.sleep(wait)
 
     def _jitter_sleep(self) -> None:
+        """Introduce a small delay to avoid stampeding downstream services.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         if self.config.sleep_jitter <= 0:
             return
         time.sleep(self.config.sleep_jitter + random.random() * 0.1)
 
     def _should_attempt_head_check(self, resolver_name: str) -> bool:
+        """Return ``True`` when a resolver should perform a HEAD preflight request.
+
+        Args:
+            resolver_name: Name of the resolver under consideration.
+
+        Returns:
+            Boolean indicating whether the resolver should issue a HEAD request.
+        """
+
         if resolver_name in self.config.resolver_head_precheck:
             return self.config.resolver_head_precheck[resolver_name]
         return self.config.enable_head_precheck
@@ -132,6 +207,17 @@ class ResolverPipeline:
         url: str,
         timeout: float,
     ) -> bool:
+        """Issue a HEAD request to validate that ``url`` plausibly returns a PDF.
+
+        Args:
+            session: Requests session used for issuing the HEAD request.
+            url: Candidate URL whose response should be inspected.
+            timeout: Timeout budget for the preflight request.
+
+        Returns:
+            ``True`` when the response appears to represent a PDF download.
+        """
+
         try:
             from DocsToKG.ContentDownload.http import request_with_retries
 
@@ -168,7 +254,16 @@ class ResolverPipeline:
         artifact: "WorkArtifact",
         context: Optional[Dict[str, Any]] = None,
     ) -> PipelineResult:
-        """Execute resolvers until a PDF is obtained or resolvers are exhausted."""
+        """Execute resolvers until a PDF is obtained or resolvers are exhausted.
+
+        Args:
+            session: Requests session used for resolver HTTP calls.
+            artifact: Work artifact describing the document to resolve.
+            context: Optional execution context containing flags such as ``dry_run``.
+
+        Returns:
+            PipelineResult capturing resolver attempts and successful downloads.
+        """
 
         context_data: Dict[str, Any] = context or {}
         state = _RunState(dry_run=bool(context_data.get("dry_run", False)))
@@ -185,6 +280,18 @@ class ResolverPipeline:
         context_data: Dict[str, Any],
         state: _RunState,
     ) -> PipelineResult:
+        """Execute resolvers in order using the current thread.
+
+        Args:
+            session: Shared requests session for resolver HTTP calls.
+            artifact: Work artifact describing the document being processed.
+            context_data: Execution context dictionary.
+            state: Mutable run state tracking attempts and duplicates.
+
+        Returns:
+            PipelineResult summarising the sequential run outcome.
+        """
+
         for order_index, resolver_name in enumerate(self.config.resolver_order, start=1):
             resolver = self._prepare_resolver(resolver_name, order_index, artifact, state)
             if resolver is None:
@@ -220,6 +327,18 @@ class ResolverPipeline:
         context_data: Dict[str, Any],
         state: _RunState,
     ) -> PipelineResult:
+        """Execute resolvers concurrently using a thread pool.
+
+        Args:
+            session: Shared requests session for resolver HTTP calls.
+            artifact: Work artifact describing the document being processed.
+            context_data: Execution context dictionary.
+            state: Mutable run state tracking attempts and duplicates.
+
+        Returns:
+            PipelineResult summarising the concurrent run outcome.
+        """
+
         max_workers = self.config.max_concurrent_resolvers
         active_futures: Dict[Future[List[ResolverResult]], Tuple[str, int]] = {}
 
@@ -303,6 +422,18 @@ class ResolverPipeline:
         artifact: "WorkArtifact",
         state: _RunState,
     ) -> Optional[Resolver]:
+        """Return a prepared resolver or log skip events when unavailable.
+
+        Args:
+            resolver_name: Name of the resolver to prepare.
+            order_index: Execution order index for the resolver.
+            artifact: Work artifact being processed.
+            state: Mutable run state tracking skips and duplicates.
+
+        Returns:
+            Resolver instance when available and enabled, otherwise ``None``.
+        """
+
         resolver = self._resolver_map.get(resolver_name)
         if resolver is None:
             self.logger.log(
@@ -367,6 +498,18 @@ class ResolverPipeline:
         session: requests.Session,
         artifact: "WorkArtifact",
     ) -> List[ResolverResult]:
+        """Collect resolver results while applying rate limits and error handling.
+
+        Args:
+            resolver_name: Name of the resolver being executed (for logging and limits).
+            resolver: Resolver instance that will generate candidate URLs.
+            session: Requests session forwarded to the resolver.
+            artifact: Work artifact describing the current document.
+
+        Returns:
+            List of :class:`ResolverResult` entries produced by the resolver.
+        """
+
         results: List[ResolverResult] = []
         try:
             self._respect_rate_limit(resolver_name)
@@ -395,6 +538,21 @@ class ResolverPipeline:
         context_data: Dict[str, Any],
         state: _RunState,
     ) -> Optional[PipelineResult]:
+        """Process a single resolver result and return a terminal pipeline outcome.
+
+        Args:
+            session: Requests session used for follow-up download calls.
+            artifact: Work artifact describing the document being processed.
+            resolver_name: Name of the resolver that produced the result.
+            order_index: 1-based index of the resolver in the execution order.
+            result: Resolver result containing either a URL or event metadata.
+            context_data: Execution context dictionary.
+            state: Mutable run state tracking attempts and duplicates.
+
+        Returns:
+            PipelineResult when resolution succeeds, otherwise ``None``.
+        """
+
         if result.is_event:
             self.logger.log(
                 AttemptRecord(

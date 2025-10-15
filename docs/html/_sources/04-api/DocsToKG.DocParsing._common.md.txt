@@ -369,7 +369,13 @@ Examples:
 
 ### `__iter__(self)`
 
-*No documentation available.*
+Yield successive lists containing up to ``batch_size`` elements.
+
+Args:
+None: Iteration consumes the iterable supplied to :class:`Batcher`.
+
+Returns:
+Iterator over lists where each list contains up to ``batch_size`` items.
 
 ### `format(self, record)`
 

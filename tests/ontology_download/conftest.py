@@ -13,9 +13,11 @@ Usage:
     pytest tests/ontology_download -k ontology_download
 """
 
+import importlib.machinery
 import logging
 import os
 import sys
+import types
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -67,17 +69,21 @@ class _PlaceholderClient:
 
 
 if "bioregistry" not in sys.modules:
-    sys.modules["bioregistry"] = SimpleNamespace(
-        get_obo_download=lambda prefix: None,
-        get_owl_download=lambda prefix: None,
-        get_rdf_download=lambda prefix: None,
-    )
+    _stub_bioregistry = types.ModuleType("bioregistry")
+    _stub_bioregistry.get_obo_download = lambda prefix: None  # type: ignore[attr-defined]
+    _stub_bioregistry.get_owl_download = lambda prefix: None  # type: ignore[attr-defined]
+    _stub_bioregistry.get_rdf_download = lambda prefix: None  # type: ignore[attr-defined]
+    sys.modules["bioregistry"] = _stub_bioregistry
 
 if "ols_client" not in sys.modules:
-    sys.modules["ols_client"] = SimpleNamespace(OlsClient=_PlaceholderClient)
+    _stub_ols = types.ModuleType("ols_client")
+    _stub_ols.OlsClient = _PlaceholderClient  # type: ignore[attr-defined]
+    sys.modules["ols_client"] = _stub_ols
 
 if "ontoportal_client" not in sys.modules:
-    sys.modules["ontoportal_client"] = SimpleNamespace(BioPortalClient=_PlaceholderClient)
+    _stub_ontoportal = types.ModuleType("ontoportal_client")
+    _stub_ontoportal.BioPortalClient = _PlaceholderClient  # type: ignore[attr-defined]
+    sys.modules["ontoportal_client"] = _stub_ontoportal
 
 if "requests" not in sys.modules:
     try:  # Prefer the real requests library if available
@@ -97,20 +103,29 @@ if "requests" not in sys.modules:
 
 if "pystow" not in sys.modules:
 
-    class _StubPystow(SimpleNamespace):
-        def join(self, *segments):
-            root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
-            return root.joinpath(*segments)
+    def _pystow_join(*segments):
+        root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
+        return root.joinpath(*segments)
 
-    sys.modules["pystow"] = _StubPystow()
+    _stub_pystow = types.ModuleType("pystow")
+    _stub_pystow.join = _pystow_join  # type: ignore[attr-defined]
+    sys.modules["pystow"] = _stub_pystow
 
 if "psutil" not in sys.modules:
+    try:
+        import psutil as _real_psutil  # type: ignore
+    except ModuleNotFoundError:
 
-    class _StubProcess:
-        def memory_info(self):
-            return SimpleNamespace(rss=0)
+        class _StubProcess:
+            def memory_info(self):
+                return SimpleNamespace(rss=0)
 
-    sys.modules["psutil"] = SimpleNamespace(Process=lambda: _StubProcess())
+        _stub_psutil = types.ModuleType("psutil")
+        _stub_psutil.Process = lambda: _StubProcess()  # type: ignore[attr-defined]
+        _stub_psutil.__spec__ = importlib.machinery.ModuleSpec("psutil", loader=None)
+        sys.modules["psutil"] = _stub_psutil
+    else:
+        sys.modules["psutil"] = _real_psutil
 
 if "pooch" not in sys.modules:
 
@@ -130,4 +145,7 @@ if "pooch" not in sys.modules:
         downloader(url, str(output), logging.getLogger("pooch"))
         return str(output)
 
-    sys.modules["pooch"] = SimpleNamespace(HTTPDownloader=_HTTPDownloader, retrieve=_retrieve)
+    _stub_pooch = types.ModuleType("pooch")
+    _stub_pooch.HTTPDownloader = _HTTPDownloader  # type: ignore[attr-defined]
+    _stub_pooch.retrieve = _retrieve  # type: ignore[attr-defined]
+    sys.modules["pooch"] = _stub_pooch

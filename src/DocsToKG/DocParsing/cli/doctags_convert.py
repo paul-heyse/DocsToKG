@@ -126,6 +126,8 @@ def detect_mode(input_dir: Path) -> str:
 
 
 def _merge_args(parser: argparse.ArgumentParser, overrides: Dict[str, Any]) -> argparse.Namespace:
+    """Return a parser namespace seeded with override values."""
+
     base = parser.parse_args([])
     for key, value in overrides.items():
         if value is not None:

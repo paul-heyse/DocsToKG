@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, List
 
@@ -35,6 +35,7 @@ class DummyArtifact:
     work_id: str
     pdf_dir: Path
     html_dir: Path
+    failed_pdf_urls: List[str] = field(default_factory=list)
 
 
 class DelayResolver:
@@ -87,7 +88,12 @@ def _make_artifact(tmp_path) -> DummyArtifact:
 def _make_config(names: Iterable[str], **kwargs) -> ResolverConfig:
     names = list(names)
     toggles = {name: True for name in names}
-    return ResolverConfig(resolver_order=names, resolver_toggles=toggles, **kwargs)
+    return ResolverConfig(
+        resolver_order=names,
+        resolver_toggles=toggles,
+        enable_head_precheck=False,
+        **kwargs,
+    )
 
 
 def _html_outcome() -> DownloadOutcome:

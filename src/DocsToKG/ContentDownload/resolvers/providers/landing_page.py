@@ -21,6 +21,8 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 def _absolute_url(base: str, href: str) -> str:
+    """Resolve relative links on a landing page against the page URL."""
+
     parsed = urlparse(href)
     if parsed.scheme and parsed.netloc:
         return href

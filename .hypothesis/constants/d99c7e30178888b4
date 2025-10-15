@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/wayback.py
+# hypothesis_version: 6.141.0
+
+[200, 'WaybackResolver', 'WorkArtifact', 'archived_snapshots', 'available', 'closest', 'get', 'original', 'timestamp', 'url', 'wayback']

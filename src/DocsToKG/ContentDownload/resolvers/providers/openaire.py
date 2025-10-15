@@ -17,6 +17,8 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 def _collect_candidate_urls(node: object, results: List[str]) -> None:
+    """Recursively collect HTTP(S) URLs from nested OpenAIRE response payloads."""
+
     if isinstance(node, dict):
         for value in node.values():
             _collect_candidate_urls(value, results)

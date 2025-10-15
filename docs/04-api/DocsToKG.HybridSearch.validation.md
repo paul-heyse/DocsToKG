@@ -346,6 +346,12 @@ Mean pairwise cosine similarity, or 0.0 when insufficient points exist.
 
 Lazy-create and cache GPU resources for validation-only cosine checks.
 
+Args:
+None
+
+Returns:
+FAISS GPU resources reused across validation runs.
+
 ### `_percentile(self, values, percentile)`
 
 Return percentile value for a sequence; defaults to 0.0 when empty.

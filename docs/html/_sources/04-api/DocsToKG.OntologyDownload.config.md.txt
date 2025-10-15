@@ -221,6 +221,9 @@ None.
 
 Return allowlist entries normalized to lowercase punycode labels.
 
+Args:
+None
+
 Returns:
 Tuple of (exact hostnames, wildcard suffixes) when entries exist,
 otherwise ``None`` if no valid allowlist entries are configured.

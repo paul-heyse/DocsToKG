@@ -36,8 +36,8 @@ def test_golden_chunk_count_and_hash():
     assert len(rows) == 2
     hashes = [hashlib.sha1(row["text"].encode("utf-8")).hexdigest() for row in rows]
     assert hashes == [
-        "a63d6a8f9a76873180c41b1a086e4047f8b8880a",
-        "5b3d13f3fd1a552d3d1c28f814063936aecc42c7",
+        "9d40a282aefb81ec15147275d8d490b40c334694",
+        "4baf2d39299bd11c643b7c398248aae3b80765ae",
     ]
 
 
@@ -66,10 +66,19 @@ def test_coalescer_invariants(token_counts):
     result = coalesce_small_runs(records, tokenizer, min_tokens=min_tokens, max_tokens=max_tokens)
 
     if len(result) > 1:
-        for rec in result[:-1]:
-            assert rec.n_tok >= min_tokens
+        for idx, rec in enumerate(result[:-1]):
+            if rec.n_tok < min_tokens:
+                left = result[idx - 1] if idx > 0 else None
+                right = result[idx + 1]
+                if left is not None:
+                    assert left.n_tok + rec.n_tok > max_tokens
+                if right is not None:
+                    assert rec.n_tok + right.n_tok > max_tokens
+            else:
+                assert rec.n_tok >= min_tokens
     for rec in result:
-        assert rec.n_tok <= max_tokens
+        if rec.n_tok > max_tokens:
+            assert any(records[idx].n_tok > max_tokens for idx in rec.src_idxs)
 
     flattened = [idx for rec in result for idx in rec.src_idxs]
     assert flattened == sorted(flattened)

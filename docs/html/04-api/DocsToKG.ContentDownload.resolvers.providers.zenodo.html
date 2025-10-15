@@ -84,18 +84,43 @@
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="is-enabled-self-config-artifact">
 <h3><code class="docutils literal notranslate"><span class="pre">is_enabled(self,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#is-enabled-self-config-artifact" title="Link to this heading"></a></h3>
-<p>Enable when artifact has a DOI.</p>
+<p>Return True when the artifact publishes a DOI for Zenodo lookup.</p>
+<p>Args:
+config: Resolver configuration (unused but part of the protocol signature).
+artifact: Work metadata potentially referencing Zenodo.</p>
+<p>Returns:
+<code class="docutils literal notranslate"><span class="pre">True</span></code> when a DOI is available, otherwise <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
 </section>
 <section id="iter-urls-self-session-config-artifact">
 <h3><code class="docutils literal notranslate"><span class="pre">iter_urls(self,</span> <span class="pre">session,</span> <span class="pre">config,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#iter-urls-self-session-config-artifact" title="Link to this heading"></a></h3>
-<p>Query Zenodo API by DOI and yield PDF file URLs.</p>
+<p>Query the Zenodo API by DOI and yield PDF file URLs.</p>
+<p>Args:
+session: Requests session used for making Zenodo API calls.
+config: Resolver configuration providing polite headers and timeouts.
+artifact: Work metadata containing the DOI search key.</p>
+<p>Returns:
+Iterator yielding :class:<code class="docutils literal notranslate"><span class="pre">ResolverResult</span></code> objects for each accessible PDF.</p>
+<p>Raises:
+None</p>
 </section>
 </section>
 <section id="classes">
 <h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="zenodoresolver">
 <h3><code class="docutils literal notranslate"><span class="pre">ZenodoResolver</span></code><a class="headerlink" href="#zenodoresolver" title="Link to this heading"></a></h3>
-<p>Resolver for Zenodo open access repository.</p>
+<p>Resolve Zenodo records into downloadable open-access PDF URLs.</p>
+<p>Attributes:
+name: Resolver identifier registered with the content download pipeline.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>resolver = ZenodoResolver()
+resolver.name
+‘zenodo’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 </section>
 </section>

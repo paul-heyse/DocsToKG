@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/utils.py
+# hypothesis_version: 6.141.0
+
+['(?:PMC)?(\\d+)', 'https://doi.org/']

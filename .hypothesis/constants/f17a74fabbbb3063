@@ -1,0 +1,4 @@
+# file: /home/paul/DocsToKG/src/DocsToKG/ContentDownload/resolvers/providers/arxiv.py
+# hypothesis_version: 6.141.0
+
+['ArxivResolver', 'WorkArtifact', 'arxiv', 'arxiv:', 'identifier']

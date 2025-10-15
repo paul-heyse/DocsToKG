@@ -109,7 +109,7 @@ def test_main_writes_manifest_and_sets_mailto(monkeypatch, tmp_path):
     monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
 
     class StubPipeline:
-        def __init__(self, resolvers_list, config, download_func, logger, metrics):
+        def __init__(self, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **_):
             self.logger = logger
             self.metrics = metrics
 
@@ -160,12 +160,21 @@ def test_main_writes_manifest_and_sets_mailto(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "argv", argv)
 
     downloader.main()
-    content = manifest_path.read_text(encoding="utf-8").strip().splitlines()
-    assert len(content) == 1
-    record = json.loads(content[0])
-    assert record["resolver"] == "openalex"
-    assert record["url"] == "https://oa.example/direct.pdf"
-    assert record["classification"] == "pdf"
+    entries = [
+        json.loads(line) for line in manifest_path.read_text(encoding="utf-8").strip().splitlines()
+    ]
+    attempts = [entry for entry in entries if entry.get("record_type") == "attempt"]
+    manifests = [entry for entry in entries if entry.get("record_type") == "manifest"]
+
+    assert len(attempts) == 1
+    assert attempts[0]["status"] == "pdf"
+    assert attempts[0]["resolver_name"] == "openalex"
+
+    assert len(manifests) == 1
+    manifest = manifests[0]
+    assert manifest["resolver"] == "openalex"
+    assert manifest["url"] == "https://oa.example/direct.pdf"
+    assert manifest["classification"] == "pdf"
     assert downloader.oa_config.email == "team@example.org"
     assert calls == ["machine learning"]
 
