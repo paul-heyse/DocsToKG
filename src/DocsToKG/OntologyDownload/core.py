@@ -13,22 +13,25 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from email.utils import parsedate_to_datetime
+from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Protocol, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Protocol, Sequence, Tuple
 from urllib.parse import urlparse
 
 import requests
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
 
 from .config import ConfigError, ResolvedConfig, ensure_python_version
 from .download import (
+    RDF_MIME_ALIASES,
+    DownloadResult,
     download_stream,
     extract_archive_safe,
-    RDF_MIME_ALIASES,
     sanitize_filename,
     validate_url_security,
 )
@@ -40,6 +43,125 @@ from .validators import ValidationRequest, ValidationResult, run_validators
 ONTOLOGY_DIR = LOCAL_ONTOLOGY_DIR
 
 MANIFEST_SCHEMA_VERSION = "1.0"
+
+MANIFEST_JSON_SCHEMA: Dict[str, Any] = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "DocsToKG Ontology Manifest",
+    "type": "object",
+    "required": [
+        "schema_version",
+        "id",
+        "resolver",
+        "url",
+        "filename",
+        "status",
+        "sha256",
+        "downloaded_at",
+        "target_formats",
+        "validation",
+        "artifacts",
+        "resolver_attempts",
+    ],
+    "properties": {
+        "schema_version": {"type": "string"},
+        "id": {"type": "string", "minLength": 1},
+        "resolver": {"type": "string", "minLength": 1},
+        "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": r"^https://",
+        },
+        "filename": {"type": "string", "minLength": 1},
+        "version": {"type": ["string", "null"]},
+        "license": {"type": ["string", "null"]},
+        "status": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "minLength": 1},
+        "normalized_sha256": {"type": ["string", "null"]},
+        "fingerprint": {"type": ["string", "null"]},
+        "etag": {"type": ["string", "null"]},
+        "last_modified": {"type": ["string", "null"]},
+        "downloaded_at": {"type": "string", "format": "date-time"},
+        "target_formats": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1},
+        },
+        "validation": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "object",
+                "properties": {
+                    "ok": {"type": "boolean"},
+                    "details": {"type": "object"},
+                    "output_files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                },
+                "required": ["ok", "details", "output_files"],
+            },
+        },
+        "artifacts": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "resolver_attempts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "resolver": {"type": "string"},
+                    "url": {"type": "string"},
+                    "attempt": {"type": "integer", "minimum": 1},
+                    "status": {"type": "string"},
+                    "error": {"type": "string"},
+                },
+                "required": ["resolver"],
+            },
+        },
+    },
+    "additionalProperties": True,
+}
+
+Draft202012Validator.check_schema(MANIFEST_JSON_SCHEMA)
+_MANIFEST_VALIDATOR = Draft202012Validator(MANIFEST_JSON_SCHEMA)
+
+
+def get_manifest_schema() -> Dict[str, Any]:
+    """Return a deep copy of the manifest JSON Schema definition.
+
+    Args:
+        None
+
+    Returns:
+        Dictionary describing the manifest JSON Schema.
+    """
+
+    return deepcopy(MANIFEST_JSON_SCHEMA)
+
+
+def validate_manifest_dict(payload: Mapping[str, Any], *, source: Optional[Path] = None) -> None:
+    """Validate manifest payload against the JSON Schema definition.
+
+    Args:
+        payload: Manifest dictionary loaded from JSON.
+        source: Optional filesystem path for contextual error reporting.
+
+    Returns:
+        None
+
+    Raises:
+        ConfigurationError: If validation fails.
+    """
+
+    try:
+        _MANIFEST_VALIDATOR.validate(payload)
+    except JSONSchemaValidationError as exc:
+        location = " -> ".join(str(part) for part in exc.path)
+        message = exc.message
+        if location:
+            message = f"{location}: {message}"
+        context = f" for {source}" if source else ""
+        raise ConfigurationError(f"Manifest validation failed{context}: {message}") from exc
 
 
 class OntologyDownloadError(RuntimeError):
@@ -223,16 +345,17 @@ class Manifest:
     artifacts: Sequence[str]
     resolver_attempts: Sequence[Dict[str, object]]
 
-    def to_json(self) -> str:
-        """Serialize the manifest to a stable, human-readable JSON string.
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a JSON-serializable dictionary for the manifest.
 
         Args:
             None
 
         Returns:
-            JSON document encoding the manifest metadata.
+            Dictionary representing the manifest payload.
         """
-        payload = {
+
+        return {
             "schema_version": self.schema_version,
             "id": self.id,
             "resolver": self.resolver,
@@ -252,7 +375,18 @@ class Manifest:
             "artifacts": list(self.artifacts),
             "resolver_attempts": [dict(entry) for entry in self.resolver_attempts],
         }
-        return json.dumps(payload, indent=2, sort_keys=True)
+
+    def to_json(self) -> str:
+        """Serialize the manifest to a stable, human-readable JSON string.
+
+        Args:
+            None
+
+        Returns:
+            JSON document encoding the manifest metadata.
+        """
+
+        return json.dumps(self.to_dict(), indent=2, sort_keys=True)
 
 
 class Resolver(Protocol):
@@ -539,9 +673,11 @@ def _read_manifest(manifest_path: Path) -> Optional[dict]:
     if not manifest_path.exists():
         return None
     try:
-        return json.loads(manifest_path.read_text())
+        payload = json.loads(manifest_path.read_text())
     except json.JSONDecodeError:
         return None
+    validate_manifest_dict(payload, source=manifest_path)
+    return payload
 
 
 def _validate_manifest(manifest: Manifest) -> None:
@@ -553,6 +689,8 @@ def _validate_manifest(manifest: Manifest) -> None:
     Raises:
         ConfigurationError: If required fields are missing or contain invalid types.
     """
+    validate_manifest_dict(manifest.to_dict())
+
     required_fields = [
         "id",
         "resolver",
@@ -1404,4 +1542,8 @@ __all__ = [
     "ResolverError",
     "ValidationError",
     "ConfigurationError",
+    "MANIFEST_SCHEMA_VERSION",
+    "MANIFEST_JSON_SCHEMA",
+    "get_manifest_schema",
+    "validate_manifest_dict",
 ]

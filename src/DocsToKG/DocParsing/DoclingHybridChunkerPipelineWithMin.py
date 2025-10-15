@@ -25,7 +25,6 @@ import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from types import SimpleNamespace
 from typing import List, Tuple
 
 # Third-party imports
@@ -510,19 +509,7 @@ def main(args: argparse.Namespace | None = None) -> int:
     """
 
     logger = get_logger(__name__)
-
-    parser = build_parser()
-    if args is None:
-        args = parser.parse_args()
-    elif isinstance(args, argparse.Namespace):
-        pass
-    elif isinstance(args, SimpleNamespace) or hasattr(args, "__dict__"):
-        defaults = parser.parse_args([])
-        for key, value in vars(args).items():
-            setattr(defaults, key, value)
-        args = defaults
-    else:
-        args = parser.parse_args(args)
+    args = args if args is not None else build_parser().parse_args()
 
     data_root_override = args.data_root
     resolved_data_root = (

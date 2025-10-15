@@ -12,7 +12,6 @@ from typing import Dict, Iterable, List
 
 import pytest
 
-
 chunker_manifest_log: List[dict] = []
 embeddings_manifest_log: List[dict] = []
 
@@ -73,9 +72,9 @@ _stub_module(
     attrs={"RichSerializerProvider": lambda: SimpleNamespace()},
 )
 
-from DocsToKG.DocParsing import DoclingHybridChunkerPipelineWithMin as chunker
-from DocsToKG.DocParsing import EmbeddingV2 as embeddings
-from DocsToKG.DocParsing._common import jsonl_load
+import DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin as chunker  # noqa: E402
+import DocsToKG.DocParsing.EmbeddingV2 as embeddings  # noqa: E402
+from DocsToKG.DocParsing._common import jsonl_load  # noqa: E402
 
 
 class DummyTokenizer:
@@ -160,9 +159,17 @@ def configure_chunker_stubs(
 
     monkeypatch.setattr(chunker, "HybridChunker", factory)
     monkeypatch.setattr(chunker, "RichSerializerProvider", lambda: object())
-    monkeypatch.setattr(chunker, "extract_refs_and_pages", lambda chunk: ([], []))
+
+    def _extract_refs_and_pages(chunk):
+        return [], []
+
+    monkeypatch.setattr(chunker, "extract_refs_and_pages", _extract_refs_and_pages)
     if image_metadata_fn is None:
-        image_metadata_fn = lambda *_: (False, False, 0)
+
+        def _default_image_metadata(*_, **__):
+            return False, False, 0
+
+        image_metadata_fn = _default_image_metadata
     monkeypatch.setattr(chunker, "summarize_image_metadata", image_metadata_fn)
     monkeypatch.setattr(
         chunker,

@@ -98,6 +98,9 @@ class StorageBackend(Protocol):
     def available_ontologies(self) -> List[str]:
         """Return sorted ontology identifiers known to the backend.
 
+        Args:
+            None
+
         Returns:
             Alphabetically sorted list of ontology identifiers the backend can
             service.
@@ -135,6 +138,9 @@ class StorageBackend(Protocol):
 
         Returns:
             Number of bytes reclaimed by removing the stored version.
+
+        Raises:
+            OSError: If the underlying storage provider fails to delete data.
         """
 
     def set_latest_version(self, ontology_id: str, version: str) -> None:
@@ -188,6 +194,9 @@ class LocalStorageBackend:
 
         Args:
             root: Directory used to persist ontology artifacts.
+
+        Returns:
+            None
         """
 
         self.root = root
@@ -247,6 +256,9 @@ class LocalStorageBackend:
 
     def available_ontologies(self) -> List[str]:
         """Return ontology identifiers discovered under ``root``.
+
+        Args:
+            None
 
         Returns:
             Sorted list of ontology identifiers available locally.
@@ -356,6 +368,9 @@ class FsspecStorageBackend(LocalStorageBackend):
 
         Raises:
             ConfigError: If :mod:`fsspec` is not installed or the URL is invalid.
+
+        Returns:
+            None
         """
 
         if fsspec is None:  # pragma: no cover - exercised when dependency missing
@@ -395,6 +410,9 @@ class FsspecStorageBackend(LocalStorageBackend):
 
     def available_ontologies(self) -> List[str]:
         """Return ontology identifiers available locally or remotely.
+
+        Args:
+            None
 
         Returns:
             Sorted set union of local and remote ontology identifiers.
@@ -499,7 +517,14 @@ class FsspecStorageBackend(LocalStorageBackend):
 
 
 def get_storage_backend() -> StorageBackend:
-    """Instantiate the storage backend based on environment configuration."""
+    """Instantiate the storage backend based on environment configuration.
+
+    Args:
+        None
+
+    Returns:
+        Storage backend instance selected according to ``ONTOFETCH_STORAGE_URL``.
+    """
 
     storage_url = os.getenv("ONTOFETCH_STORAGE_URL")
     if storage_url:

@@ -421,12 +421,28 @@ class JsonlLogger:
                 self._file.close()
 
     def __enter__(self) -> "JsonlLogger":
-        """Return ``self`` when used as a context manager."""
+        """Return ``self`` when used as a context manager.
+
+        Args:
+            None
+
+        Returns:
+            Logger instance configured for context-managed usage.
+        """
 
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
-        """Close the file handle on context manager exit."""
+        """Close the file handle on context manager exit.
+
+        Args:
+            exc_type: Exception type raised within the context, if any.
+            exc: Exception instance raised within the context.
+            tb: Traceback associated with ``exc``.
+
+        Returns:
+            None
+        """
 
         self.close()
 
@@ -568,12 +584,28 @@ class CsvAttemptLoggerAdapter:
         self._logger.close()
 
     def __enter__(self) -> "CsvAttemptLoggerAdapter":
-        """Return ``self`` when used as a context manager."""
+        """Return ``self`` when used as a context manager.
+
+        Args:
+            None
+
+        Returns:
+            Adapter instance configured for context-managed usage.
+        """
 
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
-        """Close the CSV file handle on context manager exit."""
+        """Close the CSV file handle on context manager exit.
+
+        Args:
+            exc_type: Exception type raised within the context, if any.
+            exc: Exception instance raised within the context.
+            tb: Traceback associated with ``exc``.
+
+        Returns:
+            None
+        """
 
         self.close()
         with self._lock:

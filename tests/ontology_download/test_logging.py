@@ -41,7 +41,12 @@ def test_mask_sensitive_data_masks_tokens():
 
 def test_setup_logging_emits_structured_json(tmp_path):
     config = LoggingConfiguration(level="INFO", max_log_size_mb=1, retention_days=1)
-    logger = setup_logging(config, log_dir=tmp_path)
+    logger = setup_logging(
+        level=config.level,
+        retention_days=config.retention_days,
+        max_log_size_mb=config.max_log_size_mb,
+        log_dir=tmp_path,
+    )
     try:
         logger.info(
             "download complete",

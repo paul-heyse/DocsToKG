@@ -9,7 +9,7 @@ mocked responses so they remain fast and deterministic.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from unittest.mock import Mock
 
 import pytest
@@ -22,26 +22,27 @@ except ModuleNotFoundError:  # pragma: no cover
 pytest.importorskip("bs4")
 
 from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
+from DocsToKG.ContentDownload.resolvers.providers import landing_page as landing_page_module
 from DocsToKG.ContentDownload.resolvers.providers.arxiv import ArxivResolver
 from DocsToKG.ContentDownload.resolvers.providers.core import CoreResolver
-from DocsToKG.ContentDownload.resolvers.providers.crossref import CrossrefResolver
-from DocsToKG.ContentDownload.resolvers.providers.crossref import _fetch_crossref_data
+from DocsToKG.ContentDownload.resolvers.providers.crossref import (
+    CrossrefResolver,
+    _fetch_crossref_data,
+)
 from DocsToKG.ContentDownload.resolvers.providers.doaj import DoajResolver
 from DocsToKG.ContentDownload.resolvers.providers.europe_pmc import EuropePmcResolver
+from DocsToKG.ContentDownload.resolvers.providers.hal import HalResolver
+from DocsToKG.ContentDownload.resolvers.providers.landing_page import LandingPageResolver
+from DocsToKG.ContentDownload.resolvers.providers.openaire import OpenAireResolver
+from DocsToKG.ContentDownload.resolvers.providers.openalex import OpenAlexResolver
+from DocsToKG.ContentDownload.resolvers.providers.osf import OsfResolver
 from DocsToKG.ContentDownload.resolvers.providers.pmc import PmcResolver
+from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import (
+    SemanticScholarResolver,
+)
 from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver
 from DocsToKG.ContentDownload.resolvers.providers.wayback import WaybackResolver
 from DocsToKG.ContentDownload.resolvers.providers.zenodo import ZenodoResolver
-from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import (
-    SemanticScholarResolver,
-    _fetch_semantic_scholar_data,
-)
-from DocsToKG.ContentDownload.resolvers.providers.hal import HalResolver
-from DocsToKG.ContentDownload.resolvers.providers.openaire import OpenAireResolver
-from DocsToKG.ContentDownload.resolvers.providers.osf import OsfResolver
-from DocsToKG.ContentDownload.resolvers.providers.openalex import OpenAlexResolver
-from DocsToKG.ContentDownload.resolvers.providers.landing_page import LandingPageResolver
-from DocsToKG.ContentDownload.resolvers.providers import landing_page as landing_page_module
 from DocsToKG.ContentDownload.resolvers.types import ResolverConfig
 
 
@@ -664,60 +665,6 @@ def test_crossref_resolver_uses_central_retry_logic(monkeypatch, tmp_path) -> No
     assert sleep_calls[1] == pytest.approx(1.5, abs=0.05)
 
 
-def test_crossref_resolver_uses_central_retry_logic(monkeypatch, tmp_path) -> None:
-    artifact = _artifact(tmp_path)
-    config = ResolverConfig()
-
-    class _Response:
-        def __init__(self, status_code: int, headers=None, payload=None):
-            self.status_code = status_code
-            self.headers = headers or {}
-            self._payload = payload
-
-        def json(self):
-            if isinstance(self._payload, Exception):
-                raise self._payload
-            return self._payload or {"message": {"link": []}}
-
-        def close(self):
-            return None
-
-        @property
-        def text(self):
-            return ""
-
-    responses = [
-        _Response(429, headers={"Retry-After": "1"}),
-        _Response(429, headers={}),
-        _Response(200, payload={"message": {"link": []}}),
-    ]
-
-    class _Session:
-        def __init__(self) -> None:
-            self.calls: list[int] = []
-
-        def request(self, method: str, url: str, **kwargs):
-            if not responses:
-                raise AssertionError("unexpected extra request")
-            response = responses.pop(0)
-            self.calls.append(response.status_code)
-            return response
-
-    monkeypatch.setattr("DocsToKG.ContentDownload.http.random.random", lambda: 0.0)
-    sleep_calls: list[float] = []
-    monkeypatch.setattr(
-        "DocsToKG.ContentDownload.http.time.sleep", lambda delay: sleep_calls.append(delay)
-    )
-
-    session = _Session()
-    results = list(CrossrefResolver().iter_urls(session, config, artifact))
-
-    assert results == []
-    assert session.calls == [429, 429, 200]
-    assert sleep_calls[0] == pytest.approx(1.0, abs=0.05)
-    assert sleep_calls[1] == pytest.approx(1.5, abs=0.05)
-
-
 # --- DoajResolver ------------------------------------------------------------------------
 
 
@@ -991,7 +938,6 @@ def test_openaire_resolver_emits_pdf(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
 
-    payload = {"result": {"items": ["ignored"]}}
     complex_payload = {
         "response": {
             "results": {

@@ -1,8 +1,8 @@
 """JSONL and CSV logging integration and concurrency tests."""
 
-from concurrent.futures import ThreadPoolExecutor
 import csv
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest

@@ -27,7 +27,6 @@ import pytest
 pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload.resolvers.types import ResolverConfig
 from DocsToKG.ContentDownload.resolvers.providers.core import CoreResolver
 from DocsToKG.ContentDownload.resolvers.providers.crossref import CrossrefResolver
 from DocsToKG.ContentDownload.resolvers.providers.doaj import DoajResolver
@@ -40,6 +39,7 @@ from DocsToKG.ContentDownload.resolvers.providers.pmc import PmcResolver
 from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import SemanticScholarResolver
 from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver
 from DocsToKG.ContentDownload.resolvers.providers.wayback import WaybackResolver
+from DocsToKG.ContentDownload.resolvers.types import ResolverConfig
 
 requests = pytest.importorskip("requests")
 responses = pytest.importorskip("responses")

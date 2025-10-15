@@ -17,7 +17,14 @@ from typing import Any, Dict, Iterable, Optional
 
 import requests
 from bioregistry import get_obo_download, get_owl_download, get_rdf_download
-from ols_client import OlsClient
+
+try:  # pragma: no cover - optional dependency shim
+    from ols_client import OlsClient as _OlsClient
+except ImportError:
+    try:
+        from ols_client import Client as _OlsClient
+    except ImportError:  # ols-client not installed
+        _OlsClient = None  # type: ignore[assignment]
 from ontoportal_client import BioPortalClient
 
 from .config import ConfigError, ResolvedConfig
@@ -25,6 +32,7 @@ from .download import TokenBucket
 from .optdeps import get_pystow
 from .utils import retry_with_backoff
 
+OlsClient = _OlsClient
 pystow = get_pystow()
 
 
@@ -385,7 +393,18 @@ class OLSResolver(BaseResolver):
     """
 
     def __init__(self) -> None:
-        self.client = OlsClient()
+        client_factory = OlsClient
+        if client_factory is None:
+            raise ConfigError("ols-client package is required for the OLS resolver")
+        try:
+            self.client = client_factory()
+        except TypeError:
+            try:
+                self.client = client_factory("https://www.ebi.ac.uk/ols4")
+            except (
+                TypeError
+            ):  # pragma: no cover - newer ols-client versions require keyword argument
+                self.client = client_factory(base_url="https://www.ebi.ac.uk/ols4")
         self.credentials_path = pystow.join("ontology-fetcher", "configs") / "ols_api_token.txt"
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
@@ -404,7 +423,11 @@ class OLSResolver(BaseResolver):
         """
         ontology_id = spec.id.lower()
         headers = self._build_polite_headers(config, logger)
-        self._apply_headers_to_session(getattr(self.client, "session", None), headers)
+        try:
+            session = getattr(self.client, "session", None)
+        except RuntimeError:  # placeholder clients used in tests may raise
+            session = None
+        self._apply_headers_to_session(session, headers)
 
         try:
             record = self._execute_with_retry(

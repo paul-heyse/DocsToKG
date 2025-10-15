@@ -20,8 +20,8 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Dict, Optional
 
-from .config import LoggingConfig
 from .download import sanitize_filename
+from .storage import LOG_DIR
 
 
 def mask_sensitive_data(payload: Dict[str, object]) -> Dict[str, object]:
@@ -142,31 +142,37 @@ def _cleanup_logs(log_dir: Path, retention_days: int) -> None:
             file.unlink(missing_ok=True)
 
 
-def setup_logging(config: LoggingConfig, log_dir: Optional[Path] = None) -> logging.Logger:
+def setup_logging(
+    *,
+    level: str = "INFO",
+    retention_days: int = 30,
+    max_log_size_mb: int = 100,
+    log_dir: Optional[Path] = None,
+) -> logging.Logger:
     """Configure structured logging handlers for ontology downloads.
 
     Args:
-        config: Logging configuration containing level, size, and retention.
+        level: Logging level string (e.g., ``INFO`` or ``DEBUG``).
+        retention_days: Number of days to retain log files before compression/removal.
+        max_log_size_mb: Maximum size of individual log files before rotation.
         log_dir: Optional directory override for log file placement.
 
     Returns:
         Configured logger instance scoped to the ontology downloader.
 
     Examples:
-        >>> logger = setup_logging(LoggingConfig(level="INFO", max_log_size_mb=1, retention_days=1))
+        >>> logger = setup_logging(level="INFO", max_log_size_mb=1, retention_days=1)
         >>> logger.name
         'DocsToKG.OntologyDownload'
     """
-    log_dir = log_dir or Path(os.environ.get("ONTOFETCH_LOG_DIR", ""))
-    if not log_dir:
-        from .core import LOG_DIR  # Local import to avoid circular dependency
-
-        log_dir = LOG_DIR
-    log_dir.mkdir(parents=True, exist_ok=True)
-    _cleanup_logs(log_dir, config.retention_days)
+    resolved_dir = log_dir or Path(os.environ.get("ONTOFETCH_LOG_DIR", ""))
+    if not resolved_dir:
+        resolved_dir = LOG_DIR
+    resolved_dir.mkdir(parents=True, exist_ok=True)
+    _cleanup_logs(resolved_dir, retention_days)
 
     logger = logging.getLogger("DocsToKG.OntologyDownload")
-    logger.setLevel(getattr(logging, config.level.upper(), logging.INFO))
+    logger.setLevel(getattr(logging, level.upper(), logging.INFO))
 
     for handler in list(logger.handlers):
         if getattr(handler, "_ontofetch_managed", False):
@@ -182,8 +188,8 @@ def setup_logging(config: LoggingConfig, log_dir: Optional[Path] = None) -> logg
     today = datetime.now(timezone.utc).strftime("%Y%m%d")
     file_name = sanitize_filename(f"ontofetch-{today}.jsonl")
     file_handler = RotatingFileHandler(
-        log_dir / file_name,
-        maxBytes=int(config.max_log_size_mb * 1024 * 1024),
+        resolved_dir / file_name,
+        maxBytes=int(max_log_size_mb * 1024 * 1024),
         backupCount=5,
     )
     file_handler.setFormatter(JSONFormatter())

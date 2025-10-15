@@ -60,8 +60,8 @@ from DocsToKG.DocParsing._common import (
     resolve_hash_algorithm,
 )
 from DocsToKG.DocParsing.schemas import (
-    BM25Vector,
     COMPATIBLE_CHUNK_VERSIONS,
+    BM25Vector,
     DenseVector,
     SPLADEVector,
     VectorRow,
@@ -108,6 +108,9 @@ def _expand_path(path: str | Path) -> Path:
 
 def _resolve_hf_home() -> Path:
     """Determine the HuggingFace cache directory respecting ``HF_HOME``.
+
+    Args:
+        None
 
     Returns:
         Absolute path to the HuggingFace cache directory.
@@ -193,9 +196,8 @@ def _resolve_cli_path(value: Optional[Path], default: Path) -> Path:
         Absolute path derived from ``value`` or ``default``.
     """
 
-    if path is None:
-        return None
-    return path.expanduser().resolve()
+    candidate = value if value is not None else default
+    return Path(candidate).expanduser().resolve()
 
 
 DEFAULT_DATA_ROOT = detect_data_root()
@@ -284,7 +286,18 @@ def ensure_uuid(rows: List[dict]) -> bool:
 
 
 def ensure_chunk_schema(rows: Sequence[dict], source: Path) -> None:
-    """Assert that chunk rows declare a compatible schema version."""
+    """Assert that chunk rows declare a compatible schema version.
+
+    Args:
+        rows: Iterable of chunk dictionaries to validate.
+        source: Path to the originating chunk file, used for error context.
+
+    Returns:
+        None
+
+    Raises:
+        ValueError: Propagated when an incompatible schema version is detected.
+    """
 
     for index, row in enumerate(rows, start=1):
         validate_schema_version(

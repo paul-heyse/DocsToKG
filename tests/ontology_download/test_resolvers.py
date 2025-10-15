@@ -73,6 +73,7 @@ def test_ols_resolver_uses_download_link(monkeypatch, resolved_config):
     }
     client = SimpleNamespace(get_ontology=lambda _: record, get_ontology_versions=lambda _: [])
     monkeypatch.setattr(resolvers, "OlsClient", lambda: client)
+    monkeypatch.setattr(resolvers, "_OlsClient", lambda: client)
     resolver = resolvers.OLSResolver()
     spec = FetchSpec(id="efo", resolver="ols", extras={}, target_formats=["owl"])
     plan = resolver.plan(spec, resolved_config, logging.getLogger(__name__))
@@ -102,6 +103,7 @@ def test_ols_resolver_contract(load_cassette, monkeypatch, resolved_config):
 
     client = StubClient(payload)
     monkeypatch.setattr(resolvers, "OlsClient", lambda: client)
+    monkeypatch.setattr(resolvers, "_OlsClient", lambda: client)
 
     resolver = resolvers.OLSResolver()
     spec = FetchSpec(id="hp", resolver="ols", extras={}, target_formats=["owl"])
@@ -129,6 +131,7 @@ def test_ols_resolver_applies_polite_headers(monkeypatch, resolved_config):
         session=StubSession(),
     )
     monkeypatch.setattr(resolvers, "OlsClient", lambda: client)
+    monkeypatch.setattr(resolvers, "_OlsClient", lambda: client)
 
     resolver = resolvers.OLSResolver()
     logger = logging.LoggerAdapter(logging.getLogger(__name__), {"correlation_id": "corr123"})
@@ -345,6 +348,7 @@ def test_resolver_uses_service_rate_limit(monkeypatch, resolved_config):
     record = {"download": "https://example.org/efo.owl"}
     client = SimpleNamespace(get_ontology=lambda _: record, get_ontology_versions=lambda _: [])
     monkeypatch.setattr(resolvers, "OlsClient", lambda: client)
+    monkeypatch.setattr(resolvers, "_OlsClient", lambda: client)
 
     resolver = resolvers.OLSResolver()
     spec = FetchSpec(id="efo", resolver="obo", extras={}, target_formats=["owl"])
@@ -508,15 +512,18 @@ def test_resolver_fallback_chain_on_failure(monkeypatch, resolved_config):
         service="ontobee",
     )
 
+    original_primary = resolvers.RESOLVERS.get("obo")
+    original_secondary = resolvers.RESOLVERS.get("lov")
+
     class SecondaryResolver:
         def plan(self, spec, config, logger):
             return fallback_plan
 
-    monkeypatch.setitem(resolvers.RESOLVERS, "primary", PrimaryResolver())
-    monkeypatch.setitem(resolvers.RESOLVERS, "secondary", SecondaryResolver())
+    monkeypatch.setitem(resolvers.RESOLVERS, "obo", PrimaryResolver())
+    monkeypatch.setitem(resolvers.RESOLVERS, "lov", SecondaryResolver())
 
-    resolved_config.defaults.prefer_source = ["primary", "secondary"]
-    spec = FetchSpec(id="hp", resolver="primary", extras={}, target_formats=["owl"])
+    resolved_config.defaults.prefer_source = ["obo", "lov"]
+    spec = FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"])
 
     monkeypatch.setattr(
         core,
@@ -526,8 +533,14 @@ def test_resolver_fallback_chain_on_failure(monkeypatch, resolved_config):
         ),
     )
 
-    planned = core.plan_one(spec, config=resolved_config)
+    try:
+        planned = core.plan_one(spec, config=resolved_config)
+    finally:
+        if original_primary is not None:
+            monkeypatch.setitem(resolvers.RESOLVERS, "obo", original_primary)
+        if original_secondary is not None:
+            monkeypatch.setitem(resolvers.RESOLVERS, "lov", original_secondary)
 
-    assert planned.resolver == "secondary"
-    assert [candidate.resolver for candidate in planned.candidates] == ["secondary"]
+    assert planned.resolver == "lov"
+    assert [candidate.resolver for candidate in planned.candidates] == ["lov"]
     assert planned.plan.url == "https://fallback.example.org/hp.owl"

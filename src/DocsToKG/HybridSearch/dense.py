@@ -573,7 +573,17 @@ class FaissIndexManager:
         return index
 
     def replicate_to_all_gpus(self, index: "faiss.Index | None" = None) -> "faiss.Index":
-        """Replicate a FAISS index across every visible GPU device."""
+        """Replicate a FAISS index across every visible GPU device.
+
+        Args:
+            index: Optional FAISS index to replicate. Defaults to the manager's active index.
+
+        Returns:
+            GPU-backed FAISS index replicated across all configured devices.
+
+        Raises:
+            RuntimeError: If multi-GPU replication is unavailable in the FAISS build.
+        """
 
         return self.distribute_to_all_gpus(index, shard=False)
 
@@ -584,6 +594,16 @@ class FaissIndexManager:
 
         When ``shard`` is ``True`` each GPU owns a disjoint partition. Otherwise the full index
         is replicated across every GPU.
+
+        Args:
+            index: Optional FAISS index to distribute. Defaults to the manager's active index.
+            shard: When ``True`` distribute shards; when ``False`` replicate the full index.
+
+        Returns:
+            GPU-backed FAISS index configured according to ``shard``.
+
+        Raises:
+            RuntimeError: If the FAISS build lacks the required multi-GPU features.
         """
 
         if not hasattr(faiss, "index_cpu_to_all_gpus"):

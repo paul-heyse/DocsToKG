@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Sequence
 import numpy as np
 
 from .config import FusionConfig
-from .similarity_gpu import cosine_batch
 from .similarity import pairwise_inner_products
+from .similarity_gpu import cosine_batch
 from .storage import OpenSearchSimulator
 from .tokenization import tokenize
 from .types import (

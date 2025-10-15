@@ -21,10 +21,12 @@ import sys
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import requests
 import yaml
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError
 
 from .cli_utils import (
     format_plan_rows,
@@ -36,10 +38,14 @@ from .config import ConfigError, ResolvedConfig, load_config, validate_config
 from .core import (
     FetchResult,
     FetchSpec,
+    MANIFEST_SCHEMA_VERSION,
     OntologyDownloadError,
     PlannedFetch,
     fetch_all,
+    get_manifest_schema,
     plan_all,
+    ConfigurationError,
+    validate_manifest_dict,
 )
 from .download import sanitize_filename
 from .logging_config import setup_logging
@@ -57,21 +63,16 @@ PLAN_DIFF_FIELDS = (
     "media_type",
     "service",
     "last_modified",
-    "size_bytes",
+    "content_length",
 )
 
+
 def _build_parser() -> argparse.ArgumentParser:
-    """Configure the top-level CLI parser and subcommands.
+    """Configure the top-level CLI parser and subcommands."""
 
-    Returns:
-        Parser instance with sub-commands for pull, show, validate, init, and config.
-
-    Raises:
-        None
-    """
     parser = argparse.ArgumentParser(
         prog="ontofetch",
-        description="Ontology downloader for DocsToKG supporting OBO, OLS, BioPortal, SKOS, XBRL sources.",
+        description="Ontology downloader for DocsToKG supporting OBO, OLS, BioPortal, SKOS, and XBRL sources.",
     )
     parser.add_argument(
         "--log-level",
@@ -100,12 +101,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     pull.add_argument("--json", action="store_true", help="Emit pull results as JSON")
     pull.add_argument(
-        "--dry-run", action="store_true", help="Preview resolver actions without downloading"
+        "--dry-run",
+        action="store_true",
+        help="Preview resolver actions without downloading",
     )
     pull.add_argument(
         "--concurrent-downloads",
         type=_parse_positive_int,
         help="Override maximum concurrent downloads for this invocation",
+    )
+    pull.add_argument(
+        "--concurrent-plans",
+        type=_parse_positive_int,
+        help="Override maximum concurrent planning workers (useful with --dry-run)",
     )
     pull.add_argument(
         "--allowed-hosts",
@@ -115,7 +123,7 @@ def _build_parser() -> argparse.ArgumentParser:
     plan_cmd = subparsers.add_parser(
         "plan",
         help="Preview resolver plans without downloading",
-        description="Plan resolver actions",
+        description="Plan resolver actions without performing downloads.",
     )
     plan_cmd.add_argument("ids", nargs="*", help="Ontology identifiers to plan")
     plan_cmd.add_argument(
@@ -128,7 +136,7 @@ def _build_parser() -> argparse.ArgumentParser:
     plan_cmd.add_argument(
         "--since",
         type=_parse_since_arg,
-        help="Only include ontologies modified on or after the provided YYYY-MM-DD date",
+        help="Only include ontologies modified on or after YYYY-MM-DD",
     )
     plan_cmd.add_argument(
         "--concurrent-plans",
@@ -146,45 +154,45 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     plan_cmd.add_argument("--json", action="store_true", help="Emit plan details as JSON")
 
-    plan_diff_cmd = subparsers.add_parser(
+    plan_diff = subparsers.add_parser(
         "plan-diff",
         help="Compare current plan output to a previous baseline",
         description="Generate a plan and compare it to a stored baseline to highlight differences.",
     )
-    plan_diff_cmd.add_argument("ids", nargs="*", help="Ontology identifiers to plan")
-    plan_diff_cmd.add_argument(
+    plan_diff.add_argument("ids", nargs="*", help="Ontology identifiers to include in the plan")
+    plan_diff.add_argument(
         "--spec",
         type=Path,
         help="Path to sources.yaml (default: configs/sources.yaml)",
     )
-    plan_diff_cmd.add_argument("--resolver", help="Resolver type for single ontology")
-    plan_diff_cmd.add_argument("--target-formats", help="Comma-separated formats (e.g., owl,obo)")
-    plan_diff_cmd.add_argument(
+    plan_diff.add_argument("--resolver", help="Resolver type for single ontology")
+    plan_diff.add_argument("--target-formats", help="Comma-separated formats (e.g., owl,obo)")
+    plan_diff.add_argument(
         "--since",
         type=_parse_since_arg,
-        help="Only include ontologies modified on or after the provided YYYY-MM-DD date",
+        help="Only include ontologies modified on or after YYYY-MM-DD",
     )
-    plan_diff_cmd.add_argument(
+    plan_diff.add_argument(
         "--baseline",
         type=Path,
         default=DEFAULT_PLAN_BASELINE,
         help=f"Baseline plan JSON file (default: {DEFAULT_PLAN_BASELINE})",
     )
-    plan_diff_cmd.add_argument(
+    plan_diff.add_argument(
         "--concurrent-plans",
         type=_parse_positive_int,
         help="Override maximum concurrent resolver planning workers",
     )
-    plan_diff_cmd.add_argument(
+    plan_diff.add_argument(
         "--concurrent-downloads",
         type=_parse_positive_int,
         help="Override concurrent downloads when using --dry-run",
     )
-    plan_diff_cmd.add_argument(
+    plan_diff.add_argument(
         "--allowed-hosts",
         help="Comma-separated list of additional hosts permitted for this run",
     )
-    plan_diff_cmd.add_argument("--json", action="store_true", help="Emit plan diff as JSON")
+    plan_diff.add_argument("--json", action="store_true", help="Emit plan diff as JSON")
 
     show = subparsers.add_parser("show", help="Display ontology metadata")
     show.add_argument("id", help="Ontology identifier")
@@ -214,7 +222,9 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to configuration file (default: ~/.data/ontology-fetcher/configs/sources.yaml)",
     )
     config_validate.add_argument(
-        "--json", action="store_true", help="Output validation result as JSON"
+        "--json",
+        action="store_true",
+        help="Output validation result as JSON",
     )
 
     doctor = subparsers.add_parser("doctor", help="Diagnose environment issues")
@@ -321,6 +331,28 @@ def _parse_allowed_hosts(value: Optional[str]) -> List[str]:
     return entries
 
 
+def _normalize_plan_args(args: Sequence[str]) -> List[str]:
+    """Ensure ``plan`` command defaults to the ``run`` subcommand when omitted."""
+
+    tokens = list(args)
+    try:
+        index = tokens.index("plan")
+    except ValueError:
+        return tokens
+
+    if index + 1 >= len(tokens):
+        return tokens + ["run"]
+
+    next_token = tokens[index + 1]
+    if next_token in {"run", "diff"}:
+        return tokens
+
+    if next_token.startswith("-"):
+        return tokens[: index + 1] + ["run", *tokens[index + 1 :]]
+
+    return tokens[: index + 1] + ["run", *tokens[index + 1 :]]
+
+
 def _parse_since_arg(value: str) -> datetime:
     """Argparse hook parsing YYYY-MM-DD strings into timezone-aware datetimes."""
 
@@ -331,12 +363,19 @@ def _parse_since_arg(value: str) -> datetime:
     return parsed.replace(tzinfo=timezone.utc)
 
 
-def _parse_since(value: Optional[str]) -> Optional[datetime]:
-    """Parse optional YYYY-MM-DD strings into timezone-aware datetimes."""
+def _parse_since(value: Optional[Union[str, datetime]]) -> Optional[datetime]:
+    """Parse optional date input into timezone-aware datetimes."""
 
-    if not value:
+    if value is None:
         return None
-    return _parse_since_arg(value)
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+    text = value.strip()
+    if not text:
+        return None
+    return _parse_since_arg(text)
 
 
 def _format_bytes(num: int) -> str:
@@ -394,19 +433,6 @@ def _parse_version_timestamp(value: Optional[str]) -> Optional[datetime]:
             continue
         return parsed.replace(tzinfo=timezone.utc)
     return None
-
-
-def _parse_allowed_hosts(value: Optional[str]) -> List[str]:
-    """Split comma-delimited host allowlist argument into unique entries."""
-
-    if not value:
-        return []
-    entries: List[str] = []
-    for host in value.split(","):
-        candidate = host.strip()
-        if candidate and candidate not in entries:
-            entries.append(candidate)
-    return entries
 
 
 def _apply_cli_overrides(config: ResolvedConfig, args) -> None:
@@ -472,8 +498,8 @@ def _results_to_dict(result: FetchResult) -> dict:
 def _compute_plan_diff(baseline: Sequence[dict], current: Sequence[dict]) -> Dict[str, object]:
     """Compute additions, removals, and modifications between plan snapshots."""
 
-    baseline_index = {entry.get('id'): entry for entry in baseline if entry.get('id')}
-    current_index = {entry.get('id'): entry for entry in current if entry.get('id')}
+    baseline_index = {entry.get("id"): entry for entry in baseline if entry.get("id")}
+    current_index = {entry.get("id"): entry for entry in current if entry.get("id")}
     baseline_ids = set(baseline_index)
     current_ids = set(current_index)
 
@@ -497,16 +523,19 @@ def _format_plan_diff(diff: Dict[str, object]) -> List[str]:
     """Render human-readable diff lines from plan comparison."""
 
     lines: List[str] = []
-    for entry in diff.get('added', []):
-        version = entry.get('version') or 'unknown'
+    for entry in diff.get("added", []):
+        version = entry.get("version") or "unknown"
         lines.append(f"+ {entry.get('id')} version={version} url={entry.get('url', '')}")
-    for entry in diff.get('removed', []):
-        version = entry.get('version') or 'unknown'
+    for entry in diff.get("removed", []):
+        version = entry.get("version") or "unknown"
         lines.append(f"- {entry.get('id')} version={version} url={entry.get('url', '')}")
-    for entry in diff.get('modified', []):
-        changes = entry.get('changes', {})
-        parts = [f"{field}: {payload.get('before')} -> {payload.get('after')}" for field, payload in changes.items()]
-        detail = ', '.join(parts) if parts else 'no changes'
+    for entry in diff.get("modified", []):
+        changes = entry.get("changes", {})
+        parts = [
+            f"{field}: {payload.get('before')} -> {payload.get('after')}"
+            for field, payload in changes.items()
+        ]
+        detail = ", ".join(parts) if parts else "no changes"
         lines.append(f"~ {entry.get('id')} {detail}")
     return lines
 
@@ -522,8 +551,9 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
         for serialization.
     """
 
-    candidates = [
-        {
+    candidates = []
+    for candidate in getattr(plan, "candidates", ()):
+        candidate_payload = {
             "resolver": candidate.resolver,
             "url": candidate.plan.url,
             "service": candidate.plan.service,
@@ -532,10 +562,10 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
             "version": candidate.plan.version,
             "license": candidate.plan.license,
             "last_modified": candidate.plan.last_modified,
-            "size_bytes": candidate.plan.content_length,
         }
-        for candidate in getattr(plan, "candidates", ())
-    ]
+        if candidate.plan.content_length is not None:
+            candidate_payload["content_length"] = candidate.plan.content_length
+        candidates.append(candidate_payload)
 
     payload = {
         "id": plan.spec.id,
@@ -553,8 +583,11 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
     last_modified = metadata.get("last_modified")
     if last_modified:
         payload["last_modified"] = last_modified
-    if metadata.get("content_length") is not None:
-        payload["content_length"] = metadata["content_length"]
+    size_hint = metadata.get("content_length")
+    if size_hint is None:
+        size_hint = getattr(plan, "size", None) or plan.plan.content_length
+    if size_hint is not None:
+        payload["content_length"] = int(size_hint)
     if metadata.get("etag"):
         payload["etag"] = metadata["etag"]
     return payload
@@ -689,7 +722,9 @@ def _infer_version_timestamp(version: str) -> Optional[datetime]:
     return None
 
 
-def _resolve_version_metadata(ontology_id: str, version: str) -> Tuple[Path, Optional[datetime], int]:
+def _resolve_version_metadata(
+    ontology_id: str, version: str
+) -> Tuple[Path, Optional[datetime], int]:
     """Return path, timestamp, and size metadata for a stored version."""
 
     path = STORAGE.version_path(ontology_id, version)
@@ -771,9 +806,9 @@ def _collect_version_metadata(ontology_id: str) -> List[Dict[str, object]]:
                 manifest_data = json.loads(manifest_path.read_text())
             except json.JSONDecodeError:
                 manifest_data = {}
-            timestamp = _parse_iso_datetime((manifest_data or {}).get('downloaded_at'))
+            timestamp = _parse_iso_datetime((manifest_data or {}).get("downloaded_at"))
             if timestamp is None:
-                timestamp = _parse_iso_datetime((manifest_data or {}).get('last_modified'))
+                timestamp = _parse_iso_datetime((manifest_data or {}).get("last_modified"))
         if timestamp is None:
             if manifest_path.exists():
                 timestamp = datetime.fromtimestamp(manifest_path.stat().st_mtime, tz=timezone.utc)
@@ -781,12 +816,23 @@ def _collect_version_metadata(ontology_id: str) -> List[Dict[str, object]]:
                 timestamp = datetime.fromtimestamp(version_dir.stat().st_mtime, tz=timezone.utc)
         size = 0
         if version_dir.exists():
-            for path in version_dir.rglob('*'):
+            for path in version_dir.rglob("*"):
                 if path.is_file():
                     size += path.stat().st_size
-        metadata.append({"id": ontology_id, "version": version, "timestamp": timestamp, "size": size, "path": version_dir})
+        metadata.append(
+            {
+                "id": ontology_id,
+                "version": version,
+                "timestamp": timestamp,
+                "size": size,
+                "path": version_dir,
+            }
+        )
 
-    metadata.sort(key=lambda item: item['timestamp'] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    metadata.sort(
+        key=lambda item: item["timestamp"] or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
     return metadata
 
 
@@ -796,7 +842,7 @@ def _update_latest_symlink(ontology_id: str, target: Path) -> None:
     safe_id = sanitize_filename(ontology_id)
     base_dir = LOCAL_ONTOLOGY_DIR / safe_id
     base_dir.mkdir(parents=True, exist_ok=True)
-    latest_link = base_dir / 'latest'
+    latest_link = base_dir / "latest"
     if not target.exists():
         return
     try:
@@ -904,20 +950,24 @@ def _handle_plan(args, base_config: Optional[ResolvedConfig]) -> List[PlannedFet
 def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, object]:
     """Compare current plan output against a baseline plan file."""
 
-    baseline_path: Path = getattr(args, "baseline", DEFAULT_PLAN_BASELINE)
-    baseline_path = baseline_path.expanduser()
+    baseline_path: Path = getattr(args, "baseline", DEFAULT_PLAN_BASELINE).expanduser()
     if not baseline_path.exists():
         raise ConfigError(f"Baseline plan file not found: {baseline_path}")
     try:
-        baseline_payload = json.loads(baseline_path.read_text())
+        baseline_payload = json.loads(baseline_path.read_text()) or []
     except json.JSONDecodeError as exc:
         raise ConfigError(f"Baseline plan file {baseline_path} is not valid JSON") from exc
+    if not isinstance(baseline_payload, list):
+        raise ConfigError("Baseline plan must be a JSON array of plan entries")
 
     since = _parse_since(getattr(args, "since", None))
     config, specs = _resolve_specs_from_args(args, base_config, allow_empty=True)
     plans = plan_all(specs, config=config, since=since)
+    _collect_plan_metadata(plans, config)
     current_payload = [_plan_to_dict(plan) for plan in plans]
-    return _compute_plan_diff(baseline_payload, current_payload)
+    diff = _compute_plan_diff(baseline_payload, current_payload)
+    diff["baseline"] = str(baseline_path)
+    return diff
 
 
 def _handle_prune(args, logger) -> Dict[str, object]:
@@ -936,7 +986,12 @@ def _handle_prune(args, logger) -> Dict[str, object]:
     messages: List[str] = []
 
     for ontology_id in target_ids:
-        metadata = _collect_version_metadata(ontology_id)
+        raw_metadata = _collect_version_metadata(ontology_id)
+        metadata = sorted(
+            raw_metadata,
+            key=lambda item: item.get("timestamp") or datetime.min.replace(tzinfo=timezone.utc),
+            reverse=True,
+        )
         if len(metadata) <= keep:
             continue
         retained = metadata[:keep]
@@ -946,7 +1001,7 @@ def _handle_prune(args, logger) -> Dict[str, object]:
         for item in to_remove:
             deleted_versions.append(item["version"])
             if args.dry_run:
-                reclaimed += item["size"]
+                reclaimed += int(item.get("size") or 0)
             else:
                 reclaimed_bytes = STORAGE.delete_version(ontology_id, item["version"])
                 reclaimed += reclaimed_bytes
@@ -976,7 +1031,7 @@ def _handle_prune(args, logger) -> Dict[str, object]:
         if args.dry_run:
             for item in to_remove:
                 messages.append(
-                    f"[DRY-RUN] {ontology_id} version {item['version']} would free {_format_bytes(item['size'])}"
+                    f"[DRY-RUN] {ontology_id} version {item['version']} would free {_format_bytes(int(item.get('size') or 0))}"
                 )
         elif deleted_versions:
             messages.append(
@@ -1085,9 +1140,7 @@ def _doctor_report() -> Dict[str, object]:
         except Exception as exc:  # pragma: no cover - YAML errors depend on file contents
             rate_limits["error"] = f"Failed to parse {config_path}: {exc}"  # type: ignore[assignment]
         else:
-            http_section = (
-                raw.get("defaults", {}).get("http") if isinstance(raw, dict) else None
-            )
+            http_section = raw.get("defaults", {}).get("http") if isinstance(raw, dict) else None
             configured = http_section.get("rate_limits") if isinstance(http_section, dict) else None
             if isinstance(configured, dict):
                 valid: Dict[str, Dict[str, object]] = {}
@@ -1107,6 +1160,47 @@ def _doctor_report() -> Dict[str, object]:
                 if invalid:
                     rate_limits["invalid"] = invalid
 
+    schema_report: Dict[str, object] = {"version": MANIFEST_SCHEMA_VERSION}
+    try:
+        Draft202012Validator.check_schema(get_manifest_schema())
+        schema_report["schema_valid"] = True
+    except SchemaError as exc:
+        schema_report["schema_valid"] = False
+        schema_report["error"] = str(exc)
+
+    sample_manifest: Optional[Path] = None
+    if LOCAL_ONTOLOGY_DIR.exists():
+        for candidate in LOCAL_ONTOLOGY_DIR.rglob("manifest.json"):
+            sample_manifest = candidate
+            break
+
+    if sample_manifest is not None:
+        try:
+            payload = json.loads(sample_manifest.read_text())
+        except json.JSONDecodeError as exc:
+            schema_report["sample"] = {
+                "path": str(sample_manifest),
+                "valid": False,
+                "error": f"Invalid JSON: {exc}",
+            }
+        else:
+            try:
+                validate_manifest_dict(payload, source=sample_manifest)
+            except ConfigurationError as exc:
+                detail = str(exc.__cause__) if exc.__cause__ else str(exc)
+                schema_report["sample"] = {
+                    "path": str(sample_manifest),
+                    "valid": False,
+                    "error": detail,
+                }
+            else:
+                schema_report["sample"] = {
+                    "path": str(sample_manifest),
+                    "valid": True,
+                }
+    else:
+        schema_report["sample"] = {"path": None, "valid": None}
+
     storage_backend = {
         "backend": STORAGE.__class__.__name__,
         "remote": hasattr(STORAGE, "fs"),
@@ -1120,6 +1214,7 @@ def _doctor_report() -> Dict[str, object]:
         "bioportal_api_key": bioportal,
         "network": network,
         "rate_limits": rate_limits,
+        "manifest_schema": schema_report,
         "storage": storage_backend,
     }
     return report
@@ -1153,9 +1248,7 @@ def _print_doctor_report(report: Dict[str, object]) -> None:
     )
     if disk.get("warning"):
         threshold_gb = disk["threshold_bytes"] / 1_000_000_000
-        print(
-            f"  Warning: free space below threshold ({threshold_gb:.2f} GB)."
-        )
+        print(f"  Warning: free space below threshold ({threshold_gb:.2f} GB).")
 
     print("Optional dependencies:")
     for name, available in report["dependencies"].items():
@@ -1189,6 +1282,27 @@ def _print_doctor_report(report: Dict[str, object]) -> None:
             print(f"    * {service}: '{value}' (expected <number>/<unit>)")
     if rate_limits.get("error"):
         print(f"Rate limit check error: {rate_limits['error']}")
+
+    schema = report.get("manifest_schema", {})
+    if schema:
+        status = "valid" if schema.get("schema_valid") else "invalid"
+        print(
+            f"Manifest schema ({schema.get('version', 'unknown')}): {status}"
+            + (f" [{schema.get('error')}]" if schema.get("error") else "")
+        )
+        sample = schema.get("sample", {})
+        sample_path = sample.get("path")
+        if sample_path:
+            sample_status = sample.get("valid")
+            if sample_status is True:
+                print(f"  Sample manifest: OK ({sample_path})")
+            elif sample_status is False:
+                error = sample.get("error", "UNKNOWN ERROR")
+                print(f"  Sample manifest: invalid ({sample_path}) - {error}")
+            else:
+                print(f"  Sample manifest: not evaluated ({sample_path})")
+        else:
+            print("  Sample manifest: none discovered")
 
     print("Network connectivity:")
     for name, info in report["network"].items():
@@ -1332,15 +1446,12 @@ def _handle_config_validate(path: Path) -> dict:
 
 
 def _normalize_argv(argv: Sequence[str]) -> List[str]:
-    """Rewrite legacy composite commands to explicit subcommands."""
+    """Rewrite legacy aliases to the canonical subcommand syntax."""
 
     tokens = list(argv)
-    try:
-        index = tokens.index("plan")
-    except ValueError:
-        return tokens
-    if index + 1 < len(tokens) and tokens[index + 1] == "diff":
-        return tokens[:index] + ["plan-diff"] + tokens[index + 2 :]
+    for index in range(len(tokens) - 1):
+        if tokens[index] == "plan" and tokens[index + 1] == "diff":
+            return tokens[:index] + ["plan-diff"] + tokens[index + 2 :]
     return tokens
 
 
@@ -1358,7 +1469,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         OntologyDownloadError: If download or validation operations fail.
     """
     raw_args = list(argv or sys.argv[1:])
-    arg_list = _normalize_argv(raw_args)
+    arg_list = _normalize_plan_args(_normalize_argv(raw_args))
     parser = _build_parser()
     args = parser.parse_args(arg_list)
     try:
@@ -1390,9 +1501,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             else:
                 results = _handle_pull(args, base_config, dry_run=False)
                 if args.json:
-                    json.dump([
-                        _results_to_dict(result) for result in results
-                    ], sys.stdout, indent=2)
+                    json.dump(
+                        [_results_to_dict(result) for result in results], sys.stdout, indent=2
+                    )
                     sys.stdout.write("\n")
                 else:
                     if results:

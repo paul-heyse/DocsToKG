@@ -22,17 +22,19 @@ import sys
 from dataclasses import replace
 from pathlib import Path
 from typing import Dict, List, Optional
+from unittest.mock import Mock, patch
 
 import pytest
-from unittest.mock import Mock, patch
 
 pytest.importorskip("pyalex")
 
 import requests
 
 from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact, classify_payload, ensure_dir
-from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
 from DocsToKG.ContentDownload.resolvers import pipeline as pipeline_module
+from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
+from DocsToKG.ContentDownload.resolvers.providers.landing_page import LandingPageResolver
+from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver
 from DocsToKG.ContentDownload.resolvers.types import (
     AttemptRecord,
     DownloadOutcome,
@@ -40,8 +42,6 @@ from DocsToKG.ContentDownload.resolvers.types import (
     ResolverMetrics,
     ResolverResult,
 )
-from DocsToKG.ContentDownload.resolvers.providers.landing_page import LandingPageResolver
-from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver
 
 
 class DummySession:

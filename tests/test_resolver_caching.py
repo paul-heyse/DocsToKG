@@ -24,10 +24,10 @@ import pytest
 pytest.importorskip("requests")
 
 from DocsToKG.ContentDownload.resolvers.cache import clear_resolver_caches
-from DocsToKG.ContentDownload.resolvers.types import ResolverConfig
 from DocsToKG.ContentDownload.resolvers.providers.crossref import CrossrefResolver
 from DocsToKG.ContentDownload.resolvers.providers.semantic_scholar import SemanticScholarResolver
 from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver
+from DocsToKG.ContentDownload.resolvers.types import ResolverConfig
 
 
 @pytest.fixture(autouse=True)

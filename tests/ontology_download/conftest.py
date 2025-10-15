@@ -162,3 +162,12 @@ def _reset_build_destination(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure tests see the canonical _build_destination implementation."""
 
     monkeypatch.setattr(core, "_build_destination", _ORIGINAL_BUILD_DESTINATION, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _ontology_env(tmp_path_factory, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Provide deterministic environment variables expected by validators."""
+
+    pystow_home = tmp_path_factory.mktemp("pystow-home")
+    monkeypatch.setenv("PYSTOW_HOME", str(pystow_home))
+    monkeypatch.setenv("BIOPORTAL_API_KEY", "test-bioportal-key")

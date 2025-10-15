@@ -20,7 +20,8 @@ import importlib
 import os
 import sys
 from pathlib import Path
-from typing import Any, Iterable, List, Optional
+from types import ModuleType
+from typing import Any, Dict, Iterable, List, Optional
 
 __all__ = [
     "get_pystow",
@@ -36,6 +37,15 @@ _pystow: Optional[Any] = None
 _rdflib: Optional[Any] = None
 _pronto: Optional[Any] = None
 _owlready2: Optional[Any] = None
+
+
+def _create_stub_module(name: str, attrs: Dict[str, Any]) -> ModuleType:
+    """Return a :class:`ModuleType` populated with *attrs*."""
+
+    module = ModuleType(name)
+    for key, value in attrs.items():
+        setattr(module, key, value)
+    return module
 
 
 def _import_module(name: str) -> Any:
@@ -110,11 +120,14 @@ def get_pystow() -> Any:
 
     global _pystow
     if _pystow is None:
-        try:  # pragma: no cover - exercised in environments with dependency
-            _pystow = _import_module("pystow")  # type: ignore
-        except ModuleNotFoundError:  # pragma: no cover - stub path tested
-            _pystow = _PystowFallback()
-            sys.modules.setdefault("pystow", _pystow)  # type: ignore[arg-type]
+        try:  # pragma: no cover - exercised when dependency is present
+            module = _import_module("pystow")  # type: ignore
+        except ModuleNotFoundError:  # pragma: no cover - fallback hit in tests
+            fallback = _PystowFallback()
+            module = _create_stub_module("pystow", {"join": fallback.join})
+            module._fallback = fallback  # type: ignore[attr-defined]
+            sys.modules["pystow"] = module
+        _pystow = module
     return _pystow
 
 
@@ -231,8 +244,9 @@ def get_rdflib() -> Any:
         try:  # pragma: no cover - requires dependency
             _rdflib = _import_module("rdflib")  # type: ignore
         except ModuleNotFoundError:  # pragma: no cover - stub behaviour tested
-            _rdflib = _StubRDFLib()
-            sys.modules.setdefault("rdflib", _rdflib)  # type: ignore[arg-type]
+            module = _create_stub_module("rdflib", {"Graph": _StubGraph})
+            _rdflib = module
+            sys.modules["rdflib"] = module
     return _rdflib
 
 
@@ -318,8 +332,9 @@ def get_pronto() -> Any:
         try:  # pragma: no cover - requires dependency
             _pronto = _import_module("pronto")  # type: ignore
         except ModuleNotFoundError:  # pragma: no cover - stub path tested
-            _pronto = _StubPronto()
-            sys.modules.setdefault("pronto", _pronto)  # type: ignore[arg-type]
+            module = _create_stub_module("pronto", {"Ontology": _StubOntology})
+            _pronto = module
+            sys.modules["pronto"] = module
     return _pronto
 
 
@@ -425,6 +440,7 @@ def get_owlready2() -> Any:
         try:  # pragma: no cover - requires dependency
             _owlready2 = _import_module("owlready2")  # type: ignore
         except ModuleNotFoundError:  # pragma: no cover - stub behaviour tested
-            _owlready2 = _StubOwlready2()
-            sys.modules.setdefault("owlready2", _owlready2)  # type: ignore[arg-type]
+            module = _create_stub_module("owlready2", {"get_ontology": _StubOwlready2.get_ontology})
+            _owlready2 = module
+            sys.modules["owlready2"] = module
     return _owlready2

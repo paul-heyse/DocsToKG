@@ -243,7 +243,14 @@ class ResolverPipeline:
             time.sleep(wait)
 
     def _respect_domain_limit(self, url: str) -> None:
-        """Enforce per-domain throttling when configured."""
+        """Enforce per-domain throttling when configured.
+
+        Args:
+            url: Resolver URL whose host may be subject to throttling.
+
+        Returns:
+            None
+        """
 
         if not url or not self.config.domain_min_interval_s:
             return

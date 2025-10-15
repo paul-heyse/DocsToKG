@@ -36,6 +36,7 @@ from DocsToKG.ContentDownload.download_pyalex_pdfs import (
     process_one_work,
 )
 from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
+from DocsToKG.ContentDownload.resolvers.providers.openalex import OpenAlexResolver
 from DocsToKG.ContentDownload.resolvers.providers.wayback import WaybackResolver
 from DocsToKG.ContentDownload.resolvers.types import (
     DownloadOutcome,
@@ -43,7 +44,6 @@ from DocsToKG.ContentDownload.resolvers.types import (
     ResolverMetrics,
     ResolverResult,
 )
-from DocsToKG.ContentDownload.resolvers.providers.openalex import OpenAlexResolver
 
 requests = pytest.importorskip("requests")
 responses = pytest.importorskip("responses")

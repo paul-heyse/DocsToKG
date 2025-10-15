@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
-import hashlib
 from pathlib import Path
 from typing import List
 

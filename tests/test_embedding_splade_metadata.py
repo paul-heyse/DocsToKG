@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import sys
 import importlib
 import json
+import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any, Dict, List
@@ -58,10 +58,6 @@ def test_splade_attn_help_text_describes_fallbacks(
     vllm_stub.PoolingParams = _PoolingParams
     monkeypatch.setitem(sys.modules, "vllm", vllm_stub)
 
-    import DocsToKG.DocParsing.EmbeddingV2 as embed_module
-
-    embed_module = importlib.reload(embed_module)
-
     parser = embed_module.build_parser()
     action = _find_action(parser, "--splade-attn")
     help_text = action.help
@@ -79,8 +75,6 @@ def test_summary_manifest_includes_splade_backend_metadata(
     tqdm_stub = ModuleType("tqdm")
     tqdm_stub.tqdm = lambda iterable=None, **_: iterable if iterable is not None else []
     monkeypatch.setitem(sys.modules, "tqdm", tqdm_stub)
-
-    import DocsToKG.DocParsing.EmbeddingV2 as embed_module
 
     manifests: List[Dict[str, Any]] = []
 

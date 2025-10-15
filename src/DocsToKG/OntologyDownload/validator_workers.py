@@ -20,22 +20,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict
 
-if __package__ in {None, ""}:
-    import importlib.util
-    import sys
-
-    PACKAGE_ROOT = Path(__file__).resolve().parents[2]
-    optdeps_path = PACKAGE_ROOT / "DocsToKG" / "OntologyDownload" / "optdeps.py"
-    spec = importlib.util.spec_from_file_location("validator_optdeps", optdeps_path)
-    if spec is None or spec.loader is None:  # pragma: no cover - defensive
-        raise RuntimeError("Failed to locate optdeps module for validator workers")
-    optdeps = importlib.util.module_from_spec(spec)
-    sys.modules.setdefault("validator_optdeps", optdeps)
-    spec.loader.exec_module(optdeps)
-    get_pronto = optdeps.get_pronto  # type: ignore[attr-defined]
-    get_owlready2 = optdeps.get_owlready2  # type: ignore[attr-defined]
-else:
-    from .optdeps import get_owlready2, get_pronto
+from .optdeps import get_owlready2, get_pronto
 
 pronto = get_pronto()
 owlready2 = get_owlready2()

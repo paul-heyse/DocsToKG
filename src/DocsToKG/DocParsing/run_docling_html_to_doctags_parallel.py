@@ -19,6 +19,9 @@ from typing import Optional
 def build_parser() -> argparse.ArgumentParser:
     """Build the deprecated argument parser and forward to the unified CLI.
 
+    Args:
+        None
+
     Returns:
         Parser instance sourced from the unified CLI implementation.
 

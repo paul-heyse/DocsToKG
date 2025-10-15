@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 import io
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
 import pytest
@@ -70,8 +70,9 @@ def test_get_pystow_fallback_when_missing(monkeypatch: pytest.MonkeyPatch, tmp_p
 
     module = optdeps.get_pystow()
 
-    assert isinstance(module, optdeps._PystowFallback)  # type: ignore[attr-defined]
-    assert module.join("cache").is_relative_to(tmp_path)  # type: ignore[attr-defined]
+    assert isinstance(module, ModuleType)
+    assert hasattr(module, "join")
+    assert module.join("cache").is_relative_to(tmp_path)
 
 
 def test_pystow_fallback_respects_env_var(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

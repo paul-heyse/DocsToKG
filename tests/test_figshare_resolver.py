@@ -18,8 +18,8 @@ if "pyalex" not in sys.modules:
 pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload.resolvers.types import ResolverConfig
 from DocsToKG.ContentDownload.resolvers.providers.figshare import FigshareResolver
+from DocsToKG.ContentDownload.resolvers.types import ResolverConfig
 
 requests = pytest.importorskip("requests")
 responses = pytest.importorskip("responses")

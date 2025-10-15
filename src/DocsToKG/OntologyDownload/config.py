@@ -475,21 +475,23 @@ class DefaultsConfig(BaseModel):
     @field_validator("prefer_source")
     @classmethod
     def validate_prefer_source(cls, value: List[str]) -> List[str]:
-        """Ensure resolver names are recognized.
+        """Allow custom resolver identifiers while warning about unknown entries.
 
         Args:
-            value: Ordered list of resolver names provided in configuration.
+            value: Ordered list of resolver identifiers supplied by configuration.
 
         Returns:
-            Validated list containing only supported resolver identifiers.
+            Sanitised resolver list preserving the original order.
 
         Raises:
-            ValueError: If any resolver name is not part of the supported set.
+            ValueError: If any resolver name is not recognized.
         """
 
-        for resolver in value:
-            if resolver not in _VALID_RESOLVERS:
-                raise ValueError(f"Unknown resolver '{resolver}'. Valid: {_VALID_RESOLVERS}")
+        unknown = [resolver for resolver in value if resolver not in _VALID_RESOLVERS]
+        if unknown:
+            raise ValueError(
+                "Unknown resolver(s) in prefer_source: " + ", ".join(sorted(set(unknown)))
+            )
         return value
 
     model_config = {
