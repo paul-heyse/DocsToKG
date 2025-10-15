@@ -101,7 +101,9 @@ class DummyHybridChunker:
         return self._texts[doc_name][idx]
 
 
-def configure_chunker_stubs(monkeypatch, texts_map: Dict[str, List[str]]) -> None:
+def configure_chunker_stubs(
+    monkeypatch, texts_map: Dict[str, List[str]], image_metadata_fn=None
+) -> None:
     """Patch chunker module dependencies with lightweight test doubles."""
 
     monkeypatch.setattr(chunker, "AutoTokenizer", SimpleNamespace(from_pretrained=lambda *_, **__: object()))
@@ -146,11 +148,9 @@ def configure_chunker_stubs(monkeypatch, texts_map: Dict[str, List[str]]) -> Non
     monkeypatch.setattr(chunker, "HybridChunker", factory)
     monkeypatch.setattr(chunker, "RichSerializerProvider", lambda: object())
     monkeypatch.setattr(chunker, "extract_refs_and_pages", lambda chunk: ([], []))
-    monkeypatch.setattr(
-        chunker,
-        "summarize_image_metadata",
-        lambda *_: (False, False, 0),
-    )
+    if image_metadata_fn is None:
+        image_metadata_fn = lambda *_: (False, False, 0)
+    monkeypatch.setattr(chunker, "summarize_image_metadata", image_metadata_fn)
     monkeypatch.setattr(
         chunker,
         "coalesce_small_runs",
@@ -336,6 +336,18 @@ def test_embeddings_failure_cleans_temporary_files(tmp_path, monkeypatch):
     env = prepare_data_root(tmp_path)
     configure_embeddings_stubs(monkeypatch)
     rows = [
+        {
+            "uuid": "u1",
+            "text": "hello world",
+            "doc_id": "doc",
+            "schema_version": "docparse/1.1.0",
+        },
+        {
+            "uuid": "u2",
+            "text": "another chunk",
+            "doc_id": "doc",
+            "schema_version": "docparse/1.1.0",
+        },
         {"uuid": "u1", "text": "hello world", "doc_id": "doc"},
         {"uuid": "u2", "text": "another chunk", "doc_id": "doc"},
     ]
@@ -367,6 +379,33 @@ def test_chunker_success_outputs_readable_file(tmp_path, monkeypatch):
     rows = jsonl_load(out_file)
     assert len(rows) == 2
     assert {row["chunk_id"] for row in rows} == {0, 1}
+
+
+@pytest.mark.usefixtures("monkeypatch")
+def test_chunker_promotes_image_metadata(tmp_path, monkeypatch):
+    env = prepare_data_root(tmp_path)
+
+    def image_meta(chunk, text):
+        _, idx = chunk
+        if idx == 0:
+            return True, False, 1
+        return False, True, 3
+
+    configure_chunker_stubs(
+        monkeypatch, {"sample": ["alpha", "beta"]}, image_metadata_fn=image_meta
+    )
+    write_dummy_doctags(env, "sample")
+
+    args = chunker_args(env)
+    assert chunker.main(args) == 0
+
+    rows = jsonl_load(env.chunks_dir / "sample.chunks.jsonl")
+    assert rows[0]["has_image_captions"] is True
+    assert rows[0]["has_image_classification"] is False
+    assert rows[0]["num_images"] == 1
+    assert rows[1]["has_image_captions"] is False
+    assert rows[1]["has_image_classification"] is True
+    assert rows[1]["num_images"] == 3
 
 
 @pytest.mark.usefixtures("monkeypatch")

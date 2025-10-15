@@ -419,43 +419,43 @@
 
 ### 11.1 Global URL Deduplication (Optional)
 
-- [ ] In `src/DocsToKG/ContentDownload/resolvers/pipeline.py`, add instance variables to the `ResolverPipeline` class
-- [ ] Add `self._global_seen_urls` as an empty set to track URLs across all works in the pipeline's lifetime
-- [ ] Add `self._global_lock` as a `threading.Lock()` to synchronize access to the global set
-- [ ] In the `_process_result` method, before adding the URL to the per-work seen set, acquire the global lock
-- [ ] Check if the URL already exists in the global seen set
-- [ ] If present, log an attempt record with status "skipped" and reason "duplicate-url-global"
-- [ ] Record a skip event in the metrics with the same reason
-- [ ] Return None to skip downloading this URL
-- [ ] If not present, add the URL to the global set before releasing the lock
-- [ ] Document that this feature is opt-in and should only be enabled for broad crawls where URL sharing across works is common
-- [ ] Add a configuration flag to enable/disable this feature, defaulting to disabled
+- [x] In `src/DocsToKG/ContentDownload/resolvers/pipeline.py`, add instance variables to the `ResolverPipeline` class
+- [x] Add `self._global_seen_urls` as an empty set to track URLs across all works in the pipeline's lifetime
+- [x] Add `self._global_lock` as a `threading.Lock()` to synchronize access to the global set
+- [x] In the `_process_result` method, before adding the URL to the per-work seen set, acquire the global lock
+- [x] Check if the URL already exists in the global seen set
+- [x] If present, log an attempt record with status "skipped" and reason "duplicate-url-global"
+- [x] Record a skip event in the metrics with the same reason
+- [x] Return None to skip downloading this URL
+- [x] If not present, add the URL to the global set before releasing the lock
+- [x] Document that this feature is opt-in and should only be enabled for broad crawls where URL sharing across works is common
+- [x] Add a configuration flag to enable/disable this feature, defaulting to disabled
 
 ### 11.2 Domain-Level Rate Limiting (Optional)
 
-- [ ] Add a new configuration field `domain_min_interval_s` as a dictionary mapping domain names to minimum interval floats
-- [ ] In the `ResolverPipeline` class, add `self._last_host_hit` as a `defaultdict(lambda: 0.0)` tracking last request time per host
-- [ ] Add `self._host_lock` as a `threading.Lock()` for synchronizing domain-level rate limiting
-- [ ] Create a helper method `_respect_domain_limit` that accepts a URL string
-- [ ] Parse the URL to extract the network location (hostname) using `urllib.parse.urlsplit`
-- [ ] Convert the hostname to lowercase for case-insensitive matching
-- [ ] Look up the minimum interval for this domain in the configuration
-- [ ] If no interval is configured, return immediately without sleeping
-- [ ] Acquire the host lock and calculate the time since the last request to this domain
-- [ ] If insufficient time has elapsed, sleep for the remaining duration
-- [ ] Update the last request timestamp for this domain before releasing the lock
-- [ ] Call this helper in `_process_result` just before invoking the download function
-- [ ] Document that this provides per-domain rate limiting independent of per-resolver limits
+- [x] Add a new configuration field `domain_min_interval_s` as a dictionary mapping domain names to minimum interval floats
+- [x] In the `ResolverPipeline` class, add `self._last_host_hit` as a `defaultdict(lambda: 0.0)` tracking last request time per host
+- [x] Add `self._host_lock` as a `threading.Lock()` for synchronizing domain-level rate limiting
+- [x] Create a helper method `_respect_domain_limit` that accepts a URL string
+- [x] Parse the URL to extract the network location (hostname) using `urllib.parse.urlsplit`
+- [x] Convert the hostname to lowercase for case-insensitive matching
+- [x] Look up the minimum interval for this domain in the configuration
+- [x] If no interval is configured, return immediately without sleeping
+- [x] Acquire the host lock and calculate the time since the last request to this domain
+- [x] If insufficient time has elapsed, sleep for the remaining duration
+- [x] Update the last request timestamp for this domain before releasing the lock
+- [x] Call this helper in `_process_result` just before invoking the download function
+- [x] Document that this provides per-domain rate limiting independent of per-resolver limits
 
 ### 11.3 Validate Optional Features
 
-- [ ] For global URL deduplication, create a test with two work items that reference the same PDF URL
-- [ ] Verify that only the first work downloads the PDF and the second logs a "duplicate-url-global" skip event
-- [ ] For domain-level rate limiting, configure a minimum interval of 0.5 seconds for a test domain
-- [ ] Execute multiple requests to that domain and measure the inter-request timing
-- [ ] Assert that each request to the domain is separated by at least 0.5 seconds
-- [ ] Document the use cases where these optional features provide value
-- [ ] Note that these features should remain disabled by default to preserve backward compatibility
+- [x] For global URL deduplication, create a test with two work items that reference the same PDF URL
+- [x] Verify that only the first work downloads the PDF and the second logs a "duplicate-url-global" skip event
+- [x] For domain-level rate limiting, configure a minimum interval of 0.5 seconds for a test domain
+- [x] Execute multiple requests to that domain and measure the inter-request timing
+- [x] Assert that each request to the domain is separated by at least 0.5 seconds
+- [x] Document the use cases where these optional features provide value
+- [x] Note that these features should remain disabled by default to preserve backward compatibility
 
 ## 12. Documentation Updates
 
@@ -476,16 +476,16 @@
 
 ### 12.3 Update CHANGELOG
 
-- [ ] Add entries for each major change under an "Unreleased" or version-specific section
-- [ ] Group changes by category: Performance, Reliability, Configuration, Deprecations
+- [x] Add entries for each major change under an "Unreleased" or version-specific section
+- [x] Group changes by category: Performance, Reliability, Configuration, Deprecations
 - [ ] Note breaking changes prominently (none expected for this change set)
-- [ ] Document new CLI flags and their default behavior
+- [x] Document new CLI flags and their default behavior
 - [ ] Mention the deprecation of `time` and `requests` re-exports with removal timeline
 
 ### 12.4 Update User-Facing Documentation
 
-- [ ] If a user guide or README exists for the Content Download component, update it to reflect new CLI options
-- [ ] Provide examples of using `--concurrent-resolvers`, `--head-precheck`, and `--accept` flags
+- [x] If a user guide or README exists for the Content Download component, update it to reflect new CLI options
+- [x] Provide examples of using `--concurrent-resolvers`, `--head-precheck`, and `--accept` flags
 - [ ] Document the metrics JSON sidecar file format for users building monitoring dashboards
 - [ ] Explain the performance benefits of streaming hash computation for users processing large files
 - [ ] Note the improved reliability from centralized retry logic for operators managing production crawls

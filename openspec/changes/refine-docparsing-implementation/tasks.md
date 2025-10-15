@@ -1719,10 +1719,10 @@ The simplification must not change any observable behavior. The only difference 
 
 ## Phase 7: Memory Optimization (Drop uuid_to_chunk)
 
-- [ ] Task 7.1: Modify Pass A to return only statistics
-- [ ] Task 7.2: Update Pass A call site in main function
-- [ ] Task 7.3: Remove uuid_to_chunk parameter from process_chunk_file_vectors
-- [ ] Task 7.4: Update call sites to process_chunk_file_vectors
+- [x] Task 7.1: Modify Pass A to return only statistics
+- [x] Task 7.2: Update Pass A call site in main function
+- [x] Task 7.3: Remove uuid_to_chunk parameter from process_chunk_file_vectors
+- [x] Task 7.4: Update call sites to process_chunk_file_vectors
 
 **Goal**: Eliminate the corpus-wide text cache to dramatically reduce peak memory usage during embeddings generation
 
@@ -1735,7 +1735,7 @@ This architecture has a critical flaw: The `uuid_to_chunk` dictionary holds the 
 You must refactor the embeddings pipeline to eliminate the `uuid_to_chunk` dictionary entirely, replacing it with direct file reads during Pass B. The refactoring must preserve all existing functionality including UUID management, BM25 statistics, validation, and manifest generation.
 
 ### Task 7.1: Modify Pass A to return only statistics
-- [ ] Task 7.1: Modify Pass A to return only statistics
+- [x] Task 7.1: Modify Pass A to return only statistics
 
 **Functional Requirements**:
 
@@ -1783,7 +1783,7 @@ After modification:
 ---
 
 ### Task 7.2: Update Pass A call site in main function
-- [ ] Task 7.2: Update Pass A call site in main function
+- [x] Task 7.2: Update Pass A call site in main function
 
 **Functional Requirements**:
 
@@ -1813,7 +1813,7 @@ After modification:
 ---
 
 ### Task 7.3: Remove uuid_to_chunk parameter from process_chunk_file_vectors
-- [ ] Task 7.3: Remove uuid_to_chunk parameter from process_chunk_file_vectors
+- [x] Task 7.3: Remove uuid_to_chunk parameter from process_chunk_file_vectors
 
 **Functional Requirements**:
 
@@ -1856,7 +1856,7 @@ After modification:
 ---
 
 ### Task 7.4: Update call sites to process_chunk_file_vectors
-- [ ] Task 7.4: Update call sites to process_chunk_file_vectors
+- [x] Task 7.4: Update call sites to process_chunk_file_vectors
 
 **Functional Requirements**:
 
@@ -1939,7 +1939,7 @@ After completing all tasks:
 **Goal**: Complete remaining improvements including path configuration, manifest optimizations, schema enhancements, and offline mode support
 
 ### Task 8.1: De-hardcode model and cache directory paths
-- [ ] Task 8.1: De-hardcode model and cache directory paths
+- [x] Task 8.1: De-hardcode model and cache directory paths
 
 **Functional Requirements**:
 
@@ -2002,7 +2002,7 @@ The embeddings module currently contains hardcoded absolute paths for model cach
 ---
 
 ### Task 8.2: Implement manifest sharding by stage
-- [ ] Task 8.2: Implement manifest sharding by stage
+- [x] Task 8.2: Implement manifest sharding by stage
 
 **Functional Requirements**:
 
@@ -2054,7 +2054,7 @@ The pipeline appends all manifest entries to a single file `docparse.manifest.js
 ---
 
 ### Task 8.3: Add vLLM service preflight telemetry to manifest
-- [ ] Task 8.3: Add vLLM service preflight telemetry to manifest
+- [x] Task 8.3: Add vLLM service preflight telemetry to manifest
 
 **Functional Requirements**:
 
@@ -2102,7 +2102,7 @@ The PDF converter uses a vLLM server to run the Granite-Docling vision model. Wh
 ---
 
 ### Task 8.4: Promote image flags to top-level chunk schema fields
-- [ ] Task 8.4: Promote image flags to top-level chunk schema fields
+- [x] Task 8.4: Promote image flags to top-level chunk schema fields
 
 **Functional Requirements**:
 
@@ -2155,7 +2155,7 @@ Chunk records currently store image metadata in a nested `provenance` object. Do
 ---
 
 ### Task 8.5: Add offline mode support for model loading
-- [ ] Task 8.5: Add offline mode support for model loading
+- [x] Task 8.5: Add offline mode support for model loading
 
 **Functional Requirements**:
 

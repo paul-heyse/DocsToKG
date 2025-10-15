@@ -175,6 +175,7 @@ def _write_document_artifacts(
         "doc_items_refs": ["#/texts/0"],
         "page_nos": [],
         "uuid": chunk_uuid,
+        "schema_version": "docparse/1.1.0",
     }
     chunk_path = chunk_dir / f"{doc_id}.chunks.jsonl"
     chunk_path.write_text(json.dumps(chunk_payload) + "\n", encoding="utf-8")
@@ -201,6 +202,7 @@ def _write_document_artifacts(
             "model_id": "Qwen/Qwen3-Embedding-4B",
             "vector": [float(x) for x in features.embedding.tolist()],
         },
+        "schema_version": "embeddings/1.0.0",
     }
     vector_path = vector_dir / f"{doc_id}.vectors.jsonl"
     vector_path.write_text(json.dumps(vector_entry) + "\n", encoding="utf-8")
