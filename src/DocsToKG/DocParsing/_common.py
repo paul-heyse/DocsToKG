@@ -19,7 +19,7 @@ import socket
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Iterable, Iterator, List, Optional, TextIO, TypeVar
+from typing import Callable, Dict, Iterable, Iterator, List, Optional, TextIO, TypeVar
 
 T = TypeVar("T")
 
@@ -41,6 +41,7 @@ __all__ = [
     "Batcher",
     "manifest_append",
     "compute_content_hash",
+    "load_manifest_index",
     "acquire_lock",
 ]
 
@@ -590,6 +591,46 @@ def compute_content_hash(path: Path, algorithm: str = "sha1") -> str:
                 break
             hasher.update(chunk)
     return hasher.hexdigest()
+
+
+def load_manifest_index(stage: str, root: Optional[Path] = None) -> Dict[str, dict]:
+    """Load the latest manifest entries for a specific pipeline stage.
+
+    Args:
+        stage: Manifest stage identifier to filter entries by.
+        root: Optional DocsToKG data root used to resolve the manifest path.
+
+    Returns:
+        Mapping of ``doc_id`` to the most recent manifest entry for that stage.
+
+    Examples:
+        >>> index = load_manifest_index("embeddings")  # doctest: +SKIP
+        >>> isinstance(index, dict)
+        True
+    """
+
+    manifest_dir = data_manifests(root)
+    manifest_path = manifest_dir / "docparse.manifest.jsonl"
+    index: Dict[str, dict] = {}
+    if not manifest_path.exists():
+        return index
+
+    with manifest_path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if entry.get("stage") != stage:
+                continue
+            doc_id = entry.get("doc_id")
+            if not doc_id:
+                continue
+            index[doc_id] = entry
+    return index
 
 
 @contextlib.contextmanager

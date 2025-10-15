@@ -704,14 +704,14 @@
 - [x] 5.3 Add diagnostic logging
   - After spawn mode is set, log: `logger.info(f"Multiprocessing method: {mp.get_start_method()}, CPU count: {os.cpu_count()}")`
 
-- [ ] 5.4 Add unit test for spawn verification
+- [x] 5.4 Add unit test for spawn verification
   - Create `tests/test_cuda_safety.py`
   - Test: Import PDF script module, verify get_start_method() returns 'spawn' after initialization
   - Test: Mock CUDA operations in worker and verify no "re-initialize" error
 
 ## 6. Streaming Embeddings Architecture
 
-- [ ] 6.1 Refactor `EmbeddingV2.py` main() into two-pass architecture
+- [x] 6.1 Refactor `EmbeddingV2.py` main() into two-pass architecture
   - **High-level structure**:
 
     ```python
@@ -748,13 +748,13 @@
         logger.info("Embedding complete")
     ```
 
-- [ ] 6.2 Implement Pass A: UUID assignment + statistics
+- [x] 6.2 Implement Pass A: UUID assignment + statistics
   - **Function**: `process_pass_a(files: List[Path]) -> Tuple[List[Chunk], BM25Stats]`
   - Must NOT retain full text in memory after processing each file
   - Only accumulate document frequency Counter and total tokens
   - Return list of Chunk objects (uuid, text) for Pass B
 
-- [ ] 6.3 Implement streaming document frequency accumulator
+- [x] 6.3 Implement streaming document frequency accumulator
   - **Refactor `build_bm25_stats` to be streaming**:
 
     ```python
@@ -778,7 +778,7 @@
             return BM25Stats(N=self.N, avgdl=avgdl, df=dict(self.df))
     ```
 
-- [ ] 6.4 Implement Pass B: batch encoding with sharding
+- [x] 6.4 Implement Pass B: batch encoding with sharding
   - **Function signature**: `def process_chunk_file_vectors(chunk_file: Path, uuid_to_chunk: Dict[str, Chunk], stats: BM25Stats, args: Namespace) -> None`
   - **Logic**:
 
@@ -800,12 +800,12 @@
     write_vectors(out_path, uuids, texts, splade_results, qwen_results, stats, args)
     ```
 
-- [ ] 6.5 Add CLI arguments for batch sizes
+- [x] 6.5 Add CLI arguments for batch sizes
   - Add to argparse: `--batch-size-splade` (default: 32)
   - Add to argparse: `--batch-size-qwen` (default: 64)
   - Add validation: batch size must be >= 1
 
-- [ ] 6.6 Implement `write_vectors` function with validation
+- [x] 6.6 Implement `write_vectors` function with validation
   - **Signature**: `def write_vectors(path: Path, uuids: List[str], texts: List[str], splade_results, qwen_results, stats: BM25Stats, args) -> None`
   - For each (uuid, text, splade, qwen):
     1. Compute BM25 vector
@@ -817,7 +817,7 @@
     7. Write JSONL line
   - Use atomic write with .tmp suffix
 
-- [ ] 6.7 Add BM25 corpus summary function
+- [x] 6.7 Add BM25 corpus summary function
   - **Implementation**:
 
     ```python
@@ -831,22 +831,22 @@
         logger.info(f"  Top 10 terms: {top_tokens}")
     ```
 
-- [ ] 6.8 Add progress tracking with tqdm
+- [x] 6.8 Add progress tracking with tqdm
   - Pass A: `tqdm(files, desc="Pass A: UUID + BM25 stats", unit="file")`
   - Pass B: `tqdm(files, desc="Pass B: Encoding vectors", unit="file")`
 
-- [ ] 6.9 Refactor SPLADE and Qwen functions to accept batch_size
+- [x] 6.9 Refactor SPLADE and Qwen functions to accept batch_size
   - Update `splade_encode` signature: `def splade_encode(cfg: SpladeCfg, texts: List[str], batch_size: Optional[int] = None) -> ...`
   - If batch_size provided, override cfg.batch_size
   - Similar for qwen_embed
 
-- [ ] 6.10 Add memory profiling instrumentation
+- [x] 6.10 Add memory profiling instrumentation
   - Import `tracemalloc` at start of Pass B
   - Log peak memory at end: `logger.info(f"Peak memory: {tracemalloc.get_traced_memory()[1] / 1024**3:.2f} GB")`
 
 ## 7. Embedding Validation & Invariants
 
-- [ ] 7.1 Add Qwen dimension assertion
+- [x] 7.1 Add Qwen dimension assertion
   - **Location**: In `write_vectors` function after qwen_embed returns
   - **Implementation**:
 
@@ -860,7 +860,7 @@
             )
     ```
 
-- [ ] 7.2 Add Qwen L2 norm validation
+- [x] 7.2 Add Qwen L2 norm validation
   - **Implementation**:
 
     ```python
@@ -877,7 +877,7 @@
             logger.warning(f"Qwen norm for UUID={uuids[i]}: {norm:.4f} (expected ~1.0)")
     ```
 
-- [ ] 7.3 Add SPLADE nnz validation
+- [x] 7.3 Add SPLADE nnz validation
   - **Implementation**:
 
     ```python
@@ -904,11 +904,11 @@
 
   - Call validator.report() at end of Pass B
 
-- [ ] 7.4 Add validation error logging to manifest
+- [x] 7.4 Add validation error logging to manifest
   - Wrap validation in try-except
   - On ValidationError, call: `manifest_append(stage="embeddings", doc_id=doc_id, status="failure", error=str(e))`
 
-- [ ] 7.5 Add corpus-level embedding statistics
+- [x] 7.5 Add corpus-level embedding statistics
   - At end of Pass B, compute and log:
     - Total vectors generated
     - SPLADE: avg nnz, median nnz, % zero-vectors
@@ -1319,42 +1319,42 @@
   - Check if lock exists and is stale (PID not running)
   - Use `acquire_lock()` context manager from _common
 
-- [ ] 15.2 Add content hash tracking
+- [x] 15.2 Add content hash tracking
   - Compute hash of input file before processing
   - Store in manifest with output file path
   - On resume, compare hash to detect changes
 
-- [ ] 15.3 Implement --resume flag
+- [x] 15.3 Implement --resume flag
   - Add to all processing scripts
   - Logic: Skip if output exists AND input hash matches manifest entry
   - Log skip reason: "Skipping {doc_id}: output exists and input unchanged"
 
-- [ ] 15.4 Add --force flag to override resume
+- [x] 15.4 Add --force flag to override resume
   - When set, ignore existing outputs and reprocess everything
   - Log: "Force mode: reprocessing all documents"
 
 ## 16. Testing Infrastructure
 
-- [ ] 16.1 Create golden-path fixture directory
+- [x] 16.1 Create golden-path fixture directory
   - `tests/data/docparsing/golden/` with:
     - sample.doctags (small known document)
     - sample.chunks.jsonl (expected chunks)
     - sample.vectors.jsonl (expected vectors)
   - Commit to git for deterministic testing
 
-- [ ] 16.2 Implement deterministic chunk count test
+- [x] 16.2 Implement deterministic chunk count test
   - Read golden fixture
   - Run chunker with fixed parameters
   - Assert chunk count matches expected
   - Assert chunk text hashes match (for ordering stability)
 
-- [ ] 16.3 Implement trip-wire test: coalescer invariants
+- [x] 16.3 Implement trip-wire test: coalescer invariants
   - Test: All chunks have >= min_tokens (except last chunk)
   - Test: No chunks exceed max_tokens
   - Test: Chunks are in document order
   - Use property-based testing (hypothesis) for randomized inputs
 
-- [ ] 16.4 Implement trip-wire test: embedding shapes
+- [x] 16.4 Implement trip-wire test: embedding shapes
   - Test: All Qwen vectors have dimension 2560
   - Test: All SPLADE vectors have non-negative weights
   - Test: BM25 term and weight lists have equal length
