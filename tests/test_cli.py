@@ -62,6 +62,9 @@ def test_load_resolver_config_applies_mailto():
             "disable_resolver": [],
             "mailto": "team@example.org",
             "resolver_order": None,
+            "concurrent_resolvers": None,
+            "head_precheck": None,
+            "accept": None,
         },
     )()
     config = downloader.load_resolver_config(args, ["alpha", "beta", "gamma"], ["beta"])
@@ -187,3 +190,76 @@ def test_main_requires_topic_or_topic_id(monkeypatch):
     )
     with pytest.raises(SystemExit):
         downloader.main()
+
+
+def test_cli_flag_propagation_and_metrics_export(monkeypatch, tmp_path):
+    manifest_path = tmp_path / "manifest.jsonl"
+    out_dir = tmp_path / "output"
+    out_dir.mkdir()
+
+    monkeypatch.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter(()))
+    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
+    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+
+    captured = {}
+
+    class _StubPipeline:
+        def __init__(self, *, config=None, logger=None, metrics=None, **kwargs):
+            captured["config"] = config
+            self.logger = logger
+            self.metrics = metrics
+
+        def run(self, *args, **kwargs):  # pragma: no cover - no work processed
+            return resolvers.PipelineResult(
+                success=False,
+                resolver_name="stub",
+                url=None,
+                outcome=None,
+                html_paths=[],
+                failed_urls=[],
+            )
+
+    monkeypatch.setattr(downloader, "ResolverPipeline", _StubPipeline)
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "download_pyalex_pdfs.py",
+            "--topic",
+            "graphs",
+            "--year-start",
+            "2020",
+            "--year-end",
+            "2020",
+            "--out",
+            str(out_dir),
+            "--manifest",
+            str(manifest_path),
+            "--concurrent-resolvers",
+            "4",
+            "--no-head-precheck",
+            "--accept",
+            "application/pdf",
+        ],
+    )
+
+    downloader.main()
+
+    config = captured["config"]
+    assert config.max_concurrent_resolvers == 4
+    assert config.enable_head_precheck is False
+    assert config.polite_headers.get("Accept") == "application/pdf"
+
+    metrics_path = manifest_path.with_suffix(".metrics.json")
+    assert metrics_path.exists()
+    metrics_doc = json.loads(metrics_path.read_text(encoding="utf-8"))
+    assert set(metrics_doc) == {"processed", "saved", "html_only", "skipped", "resolvers"}
+    assert metrics_doc["processed"] == 0
+    assert metrics_doc["resolvers"] == {
+        "attempts": {},
+        "successes": {},
+        "html": {},
+        "skips": {},
+        "failures": {},
+    }

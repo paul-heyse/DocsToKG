@@ -1,23 +1,6 @@
-"""
-JSONL Logging Integration Tests
+"""JSONL and CSV logging integration and concurrency tests."""
 
-This module ensures the JSON Lines logging utilities capture resolver
-attempt metadata and remain compatible with CSV export tooling used for
-post-processing download telemetry.
-
-Key Scenarios:
-- Validates attempt, manifest, and summary records persist correctly
-- Confirms CSV export maintains schema and preserves structured metadata
-
-Dependencies:
-- pytest: Provides fixtures and assertions
-- DocsToKG.ContentDownload.download_pyalex_pdfs: Logging helpers under test
-- scripts.export_attempts_csv: CSV conversion routine
-
-Usage:
-    pytest tests/test_jsonl_logging.py
-"""
-
+from concurrent.futures import ThreadPoolExecutor
 import csv
 import json
 from pathlib import Path
@@ -27,7 +10,11 @@ import pytest
 pytest.importorskip("requests")
 pytest.importorskip("pyalex")
 
-from DocsToKG.ContentDownload.download_pyalex_pdfs import JsonlLogger, ManifestEntry
+from DocsToKG.ContentDownload.download_pyalex_pdfs import (
+    CsvAttemptLoggerAdapter,
+    JsonlLogger,
+    ManifestEntry,
+)
 from DocsToKG.ContentDownload.resolvers.types import AttemptRecord
 from scripts.export_attempts_csv import export_attempts_jsonl_to_csv
 
@@ -128,3 +115,74 @@ def test_export_attempts_csv(tmp_path: Path) -> None:
     assert row["dry_run"] == "True"
     assert row["metadata"] == json.dumps({"status": 404}, sort_keys=True)
     assert row["resolver_wall_time_ms"] == "111.5"
+
+
+def _attempt_record(index: int) -> AttemptRecord:
+    """Construct an attempt record with deterministic fields for concurrency tests."""
+
+    return AttemptRecord(
+        work_id=f"W{index}",
+        resolver_name="unpaywall",
+        resolver_order=index % 5,
+        url=f"https://example.org/{index}",
+        status="pdf",
+        http_status=200,
+        content_type="application/pdf",
+        elapsed_ms=42.0,
+        metadata={"idx": index},
+        sha256=f"{index:032x}"[-8:],
+        content_length=2048,
+        dry_run=False,
+        resolver_wall_time_ms=12.0,
+    )
+
+
+def test_jsonl_logger_thread_safety(tmp_path: Path) -> None:
+    """Concurrent logging should keep JSON lines intact without corruption."""
+
+    log_path = tmp_path / "attempts.jsonl"
+    logger = JsonlLogger(log_path)
+
+    def _worker(offset: int) -> None:
+        for idx in range(1000):
+            logger.log_attempt(_attempt_record(offset * 1000 + idx))
+
+    with ThreadPoolExecutor(max_workers=16) as executor:
+        for worker_id in range(16):
+            executor.submit(_worker, worker_id)
+
+    logger.close()
+
+    lines = log_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 16_000
+    for line in lines[:10]:  # spot check sample lines
+        payload = json.loads(line)
+        assert payload["record_type"] == "attempt"
+        assert "metadata" in payload
+
+
+def test_csv_adapter_thread_safety(tmp_path: Path) -> None:
+    """CSV adapter must preserve row boundaries under heavy concurrency."""
+
+    log_path = tmp_path / "attempts.jsonl"
+    csv_path = tmp_path / "attempts.csv"
+    adapter = CsvAttemptLoggerAdapter(JsonlLogger(log_path), csv_path)
+
+    def _worker(offset: int) -> None:
+        for idx in range(1000):
+            adapter.log_attempt(_attempt_record(offset * 1000 + idx))
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        for worker_id in range(8):
+            executor.submit(_worker, worker_id)
+
+    adapter.close()
+
+    with csv_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        rows = list(reader)
+
+    assert len(rows) == 8_000
+    for row in rows[:5]:
+        assert row["status"] == "pdf"
+        assert row["content_length"] == "2048"

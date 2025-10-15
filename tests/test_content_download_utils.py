@@ -26,6 +26,13 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     pytest.skip("hypothesis is required for these tests", allow_module_level=True)
 
+from DocsToKG.ContentDownload.resolvers.headers import headers_cache_key
+from DocsToKG.ContentDownload.resolvers.providers.crossref import (
+    _headers_cache_key as crossref_headers_cache_key,
+)
+from DocsToKG.ContentDownload.resolvers.providers.unpaywall import (
+    _headers_cache_key as unpaywall_headers_cache_key,
+)
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
 
 given = hypothesis.given
@@ -45,6 +52,22 @@ def test_normalize_doi_with_whitespace() -> None:
 
 def test_normalize_doi_none() -> None:
     assert normalize_doi(None) is None
+
+
+@pytest.mark.parametrize(
+    "prefix",
+    [
+        "https://doi.org/",
+        "http://doi.org/",
+        "https://dx.doi.org/",
+        "http://dx.doi.org/",
+        "doi:",
+        "DOI:",
+    ],
+)
+def test_normalize_doi_prefix_variants(prefix: str) -> None:
+    canonical = "10.1234/Example"
+    assert normalize_doi(f"{prefix}{canonical}") == canonical
 
 
 def test_normalize_pmcid_with_pmc_prefix() -> None:
@@ -81,3 +104,13 @@ def test_dedupe_property(values: List[str]) -> None:
             seen.add(item)
 
     assert dedupe(values) == expected
+
+
+def test_headers_cache_key_determinism() -> None:
+    headers = {"User-Agent": "TestAgent", "accept": "text/html"}
+    expected = (("accept", "text/html"), ("user-agent", "TestAgent"))
+    key = headers_cache_key(headers)
+    assert key == expected
+    assert headers_cache_key(dict(headers)) == expected
+    assert unpaywall_headers_cache_key(headers) == expected
+    assert crossref_headers_cache_key(headers) == expected
