@@ -133,6 +133,7 @@ Additional tips:
 | vLLM server fails to start | Port conflict or missing model weights | Use `--served-model-name` when launching vLLM and verify the port is free via `lsof -i :8000`. |
 | Schema validation errors | Mixed schema versions in output directories | Run the validation CLI (`python -m DocsToKG.DocParsing.cli.embed_vectors --validate-only`) after cleaning stale shards. |
 | Missing DocTags | Input hashes mismatch resume manifest | Re-run the converter with `--force` or delete the stale DocTags file to trigger regeneration. |
+| `sentence-transformers` / `vllm` ImportError | Optional embedding dependencies not installed | Install the extras (`pip install sentence-transformers vllm`) or run the synthetic benchmark harness described below to verify environment wiring before provisioning GPUs. |
 
 ## Manifest Query Examples
 
@@ -158,3 +159,17 @@ When upgrading schema versions or changing tokenizer defaults, update the
 OpenSpec change proposal with explicit migration steps.  Provide before/after
 examples and recommend recalculating affected manifolds so downstream consumers
 can reason about historical data sets.
+
+## Synthetic Benchmarking & Test Utilities
+
+The `DocsToKG.DocParsing.testing` package provides lightweight fixtures that
+allow end-to-end validation without installing heavyweight dependencies:
+
+* `dependency_stubs()` installs stub implementations of Docling, vLLM, and
+  sentence-transformers so the CLI wrappers can be exercised on laptops without
+  GPUs. The integration tests reuse these stubs to verify manifest updates and
+  schema compliance.
+* `python -m DocsToKG.DocParsing.cli.benchmark_embeddings` runs a deterministic
+  synthetic benchmark that estimates the throughput and memory savings of the
+  streaming embedding pipeline. This harness only depends on the stubs above
+  and can be invoked as part of CI smoke-tests.

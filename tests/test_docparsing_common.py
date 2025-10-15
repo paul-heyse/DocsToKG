@@ -181,11 +181,21 @@ def test_acquire_lock_success(tmp_path: Path) -> None:
     assert not target.with_suffix(".txt.lock").exists()
 
 
-def test_acquire_lock_timeout(tmp_path: Path) -> None:
+def test_acquire_lock_timeout(monkeypatch, tmp_path: Path) -> None:
     target = tmp_path / "artifact.txt"
     lock = target.with_suffix(".txt.lock")
     lock.write_text("123", encoding="utf-8")
+    monkeypatch.setattr(_common, "_pid_is_running", lambda pid: True)
     with pytest.raises(TimeoutError):
         with _common.acquire_lock(target, timeout=0.1):
             pass
     lock.unlink()
+
+
+def test_acquire_lock_stale_lock_cleanup(monkeypatch, tmp_path: Path) -> None:
+    target = tmp_path / "artifact.txt"
+    lock = target.with_suffix(".txt.lock")
+    lock.write_text("123", encoding="utf-8")
+    monkeypatch.setattr(_common, "_pid_is_running", lambda pid: False)
+    with _common.acquire_lock(target, timeout=0.1):
+        assert lock.exists()
