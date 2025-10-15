@@ -34,6 +34,8 @@ from .validators import ValidationRequest, ValidationResult, run_validators
 
 ONTOLOGY_DIR = LOCAL_ONTOLOGY_DIR
 
+MANIFEST_SCHEMA_VERSION = "1.0"
+
 
 class OntologyDownloadError(RuntimeError):
     """Base exception for ontology download failures.
@@ -153,6 +155,7 @@ class Manifest:
     """Provenance information for a downloaded ontology artifact.
 
     Attributes:
+        schema_version: Manifest schema version identifier.
         id: Ontology identifier recorded in the manifest.
         resolver: Resolver used to retrieve the ontology.
         url: Final URL from which the ontology was fetched.
@@ -173,6 +176,7 @@ class Manifest:
 
     Examples:
         >>> manifest = Manifest(
+        ...     schema_version="1.0",
         ...     id="CHEBI",
         ...     resolver="obo",
         ...     url="https://example.org/chebi.owl",
@@ -195,6 +199,7 @@ class Manifest:
         'obo'
     """
 
+    schema_version: str
     id: str
     resolver: str
     url: str
@@ -223,6 +228,7 @@ class Manifest:
             JSON document encoding the manifest metadata.
         """
         payload = {
+            "schema_version": self.schema_version,
             "id": self.id,
             "resolver": self.resolver,
             "url": self.url,
@@ -399,6 +405,8 @@ def _validate_manifest(manifest: Manifest) -> None:
             raise ConfigurationError(f"Manifest field '{field_name}' must be populated")
     if not manifest.url.startswith("https://"):
         raise ConfigurationError("Manifest URL must use https scheme")
+    if not isinstance(manifest.schema_version, str):
+        raise ConfigurationError("Manifest schema_version must be a string")
     if not isinstance(manifest.validation, dict):
         raise ConfigurationError("Manifest validation payload must be a dictionary")
     if not isinstance(manifest.artifacts, Sequence):
@@ -837,23 +845,33 @@ def fetch_one(
     validation_results = run_validators(validation_requests, adapter)
 
     normalized_hash = None
+    normalization_mode = "none"
     rdflib_result = validation_results.get("rdflib")
     if rdflib_result and isinstance(rdflib_result.details, dict):
         maybe_hash = rdflib_result.details.get("normalized_sha256")
         if isinstance(maybe_hash, str):
             normalized_hash = maybe_hash
+        maybe_mode = rdflib_result.details.get("normalization_mode")
+        if isinstance(maybe_mode, str):
+            normalization_mode = maybe_mode
+
+    target_formats_sorted = ",".join(sorted(effective_spec.target_formats))
 
     fingerprint_components = [
+        MANIFEST_SCHEMA_VERSION,
         effective_spec.id,
         effective_spec.resolver,
         version,
         result.sha256,
         normalized_hash or "",
         secure_url,
+        target_formats_sorted,
+        normalization_mode,
     ]
     fingerprint = hashlib.sha256("|".join(fingerprint_components).encode("utf-8")).hexdigest()
 
     manifest = Manifest(
+        schema_version=MANIFEST_SCHEMA_VERSION,
         id=effective_spec.id,
         resolver=effective_spec.resolver,
         url=secure_url,
@@ -978,17 +996,58 @@ def plan_all(
         max_log_size_mb=logging_config.max_log_size_mb,
     )
     correlation = generate_correlation_id()
-    plans: List[PlannedFetch] = []
-    for spec in specs:
-        plans.append(
-            plan_one(
+    adapter = logging.LoggerAdapter(log, extra={"correlation_id": correlation})
+
+    spec_list = list(specs)
+    if not spec_list:
+        return []
+
+    max_workers = max(1, active_config.defaults.http.concurrent_plans)
+    adapter.info(
+        "planning batch",
+        extra={
+            "stage": "plan",
+            "progress": {"total": len(spec_list)},
+            "workers": max_workers,
+        },
+    )
+
+    results: Dict[int, PlannedFetch] = {}
+    futures: Dict[object, tuple[int, FetchSpec]] = {}
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for index, spec in enumerate(spec_list):
+            future = executor.submit(
+                plan_one,
                 spec,
                 config=active_config,
                 correlation_id=correlation,
                 logger=log,
             )
-        )
-    return plans
+            futures[future] = (index, spec)
+
+        for future in as_completed(futures):
+            index, spec = futures[future]
+            try:
+                planned = future.result()
+            except Exception as exc:  # pylint: disable=broad-except
+                adapter.error(
+                    "planning failed",
+                    extra={
+                        "stage": "plan",
+                        "ontology_id": spec.id,
+                        "error": str(exc),
+                    },
+                )
+                if not active_config.defaults.continue_on_error:
+                    for pending in futures:
+                        pending.cancel()
+                    raise
+            else:
+                results[index] = planned
+
+    ordered_indices = sorted(results)
+    return [results[i] for i in ordered_indices]
 
 
 def fetch_all(
