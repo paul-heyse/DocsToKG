@@ -67,6 +67,7 @@ def verify_pagination(
     cursor_chain: list[str] = []
     next_request = request
     duplicate = False
+    seen_cursors: set[str] = set()
     while True:
         response = service.search(next_request)
         for result in response.results:
@@ -74,15 +75,17 @@ def verify_pagination(
             if key in seen:
                 duplicate = True
             seen.add(key)
-        if not response.next_cursor:
+        next_cursor = response.next_cursor
+        if not next_cursor or next_cursor in seen_cursors:
             break
-        cursor_chain.append(response.next_cursor)
+        cursor_chain.append(next_cursor)
+        seen_cursors.add(next_cursor)
         next_request = HybridSearchRequest(
             query=request.query,
             namespace=request.namespace,
             filters=request.filters,
             page_size=request.page_size,
-            cursor=response.next_cursor,
+            cursor=next_cursor,
             diversification=request.diversification,
             diagnostics=request.diagnostics,
         )

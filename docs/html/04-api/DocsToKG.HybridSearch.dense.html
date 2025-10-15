@@ -256,12 +256,12 @@ RuntimeError: If GPU resources have not been initialised before invocation.</p>
 <section id="replicate-to-all-gpus-self-index">
 <h3><code class="docutils literal notranslate"><span class="pre">replicate_to_all_gpus(self,</span> <span class="pre">index)</span></code><a class="headerlink" href="#replicate-to-all-gpus-self-index" title="Link to this heading"></a></h3>
 <p>Replicate a FAISS index across every visible GPU device.</p>
-<p>Args:
-index: Optional FAISS index to clone; defaults to the actively managed index.</p>
-<p>Returns:
-FAISS index handle representing the replicated multi-GPU index.</p>
-<p>Raises:
-RuntimeError: If multi-GPU replication is unsupported or no index is available.</p>
+</section>
+<section id="distribute-to-all-gpus-self-index">
+<h3><code class="docutils literal notranslate"><span class="pre">distribute_to_all_gpus(self,</span> <span class="pre">index)</span></code><a class="headerlink" href="#distribute-to-all-gpus-self-index" title="Link to this heading"></a></h3>
+<p>Replicate or shard a FAISS index across all GPUs depending on <code class="docutils literal notranslate"><span class="pre">shard</span></code>.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">shard</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code> each GPU owns a disjoint partition. Otherwise the full index
+is replicated across every GPU.</p>
 </section>
 <section id="maybe-to-gpu-self-index">
 <h3><code class="docutils literal notranslate"><span class="pre">_maybe_to_gpu(self,</span> <span class="pre">index)</span></code><a class="headerlink" href="#maybe-to-gpu-self-index" title="Link to this heading"></a></h3>

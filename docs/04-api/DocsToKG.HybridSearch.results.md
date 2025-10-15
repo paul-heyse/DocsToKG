@@ -30,7 +30,7 @@ doc_buckets: Mutable counter of chunks emitted per document.
 Returns:
 True if the document is still below the configured limit.
 
-### `_is_near_duplicate(self, embeddings, current_idx, emitted_indices)`
+### `_is_near_duplicate(self, embeddings, current_idx, emitted_indices, pairwise)`
 
 Determine whether the current chunk is too similar to emitted ones.
 

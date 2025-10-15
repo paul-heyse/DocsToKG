@@ -102,8 +102,8 @@ doc_buckets: Mutable counter of chunks emitted per document.</p>
 <p>Returns:
 True if the document is still below the configured limit.</p>
 </section>
-<section id="is-near-duplicate-self-embeddings-current-idx-emitted-indices">
-<h3><code class="docutils literal notranslate"><span class="pre">_is_near_duplicate(self,</span> <span class="pre">embeddings,</span> <span class="pre">current_idx,</span> <span class="pre">emitted_indices)</span></code><a class="headerlink" href="#is-near-duplicate-self-embeddings-current-idx-emitted-indices" title="Link to this heading"></a></h3>
+<section id="is-near-duplicate-self-embeddings-current-idx-emitted-indices-pairwise">
+<h3><code class="docutils literal notranslate"><span class="pre">_is_near_duplicate(self,</span> <span class="pre">embeddings,</span> <span class="pre">current_idx,</span> <span class="pre">emitted_indices,</span> <span class="pre">pairwise)</span></code><a class="headerlink" href="#is-near-duplicate-self-embeddings-current-idx-emitted-indices-pairwise" title="Link to this heading"></a></h3>
 <p>Determine whether the current chunk is too similar to emitted ones.</p>
 <p>Args:
 embeddings: Matrix of chunk embeddings ordered to match <code class="docutils literal notranslate"><span class="pre">ordered_chunks</span></code>.

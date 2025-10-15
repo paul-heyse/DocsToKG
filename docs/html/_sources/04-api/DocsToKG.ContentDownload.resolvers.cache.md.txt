@@ -24,3 +24,9 @@ This utility resets the internal LRU caches used by the Unpaywall,
 Crossref, and Semantic Scholar resolvers. It should be called before
 executing resolver pipelines when deterministic behaviour across runs is
 required (for example, in unit tests or benchmarking scenarios).
+
+Args:
+None
+
+Returns:
+None

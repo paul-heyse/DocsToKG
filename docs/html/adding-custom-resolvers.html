@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Adding Custom Content Download Resolvers &mdash; DocsToKG 1.0.0 documentation</title>
+  <title>1. Adding Custom Content Download Resolvers &mdash; DocsToKG 1.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="_static/css/custom.css" />
@@ -66,7 +66,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Adding Custom Content Download Resolvers</li>
+      <li class="breadcrumb-item active">1. Adding Custom Content Download Resolvers</li>
       <li class="wy-breadcrumbs-aside">
             <a href="_sources/adding-custom-resolvers.md.txt" rel="nofollow"> View page source</a>
       </li>
@@ -77,13 +77,15 @@
            <div itemprop="articleBody">
              
   <section id="adding-custom-content-download-resolvers">
-<h1>Adding Custom Content Download Resolvers<a class="headerlink" href="#adding-custom-content-download-resolvers" title="Link to this heading"></a></h1>
-<p>This guide explains how to add new resolver providers to the modular
-DocsToKG Content Download pipeline.</p>
-<section id="resolver-skeleton">
-<h2>1. Resolver Skeleton<a class="headerlink" href="#resolver-skeleton" title="Link to this heading"></a></h2>
+<h1>1. Adding Custom Content Download Resolvers<a class="headerlink" href="#adding-custom-content-download-resolvers" title="Link to this heading"></a></h1>
+<p>This guide explains how to extend the DocsToKG content download pipeline with
+project-specific resolver providers. The numbered sections walk through the
+steps required to implement, register, and validate a new resolver.</p>
+<section id="create-the-resolver-template">
+<h2>1. Create the Resolver Template<a class="headerlink" href="#create-the-resolver-template" title="Link to this heading"></a></h2>
 <p>Create a new module under
-<code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/resolvers/providers/&lt;name&gt;.py</span></code>:</p>
+<code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/resolvers/providers/your_resolver.py</span></code> and
+implement the public surface expected by <code class="docutils literal notranslate"><span class="pre">ResolverConfig</span></code>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span>
@@ -91,15 +93,6 @@ DocsToKG Content Download pipeline.</p>
 <span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.http</span><span class="w"> </span><span class="kn">import</span> <span class="n">request_with_retries</span>
-<span class="n">Use</span> <span class="n">this</span> <span class="n">guide</span> <span class="n">to</span> <span class="n">implement</span> <span class="ow">and</span> <span class="n">register</span> <span class="n">bespoke</span> <span class="n">resolver</span> <span class="n">providers</span> <span class="n">within</span> <span class="n">the</span>
-<span class="n">modular</span> <span class="n">content</span> <span class="n">download</span> <span class="n">pipeline</span><span class="o">.</span>
-
-<span class="c1">## 1. Resolver Template</span>
-
-<span class="n">Create</span> <span class="n">a</span> <span class="n">new</span> <span class="n">module</span> <span class="n">under</span>
-<span class="err">`</span><span class="n">src</span><span class="o">/</span><span class="n">DocsToKG</span><span class="o">/</span><span class="n">ContentDownload</span><span class="o">/</span><span class="n">resolvers</span><span class="o">/</span><span class="n">providers</span><span class="o">/</span><span class="n">your_resolver</span><span class="o">.</span><span class="n">py</span><span class="err">`</span><span class="p">:</span>
-
-<span class="err">```</span><span class="n">python</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.resolvers.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">ResolverConfig</span><span class="p">,</span> <span class="n">ResolverResult</span>
 
 
@@ -109,7 +102,8 @@ DocsToKG Content Download pipeline.</p>
     <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;my_resolver&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">is_enabled</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">ResolverConfig</span><span class="p">,</span> <span class="n">artifact</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="k">return</span> <span class="kc">True</span>  <span class="c1"># adjust to inspect artifact metadata</span>
+        <span class="c1"># Gate the resolver behind optional toggles or metadata availability.</span>
+        <span class="k">return</span> <span class="n">config</span><span class="o">.</span><span class="n">toggles</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">iter_urls</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -140,65 +134,46 @@ DocsToKG Content Download pipeline.</p>
                 <span class="n">event</span><span class="o">=</span><span class="s2">&quot;error&quot;</span><span class="p">,</span>
                 <span class="n">event_reason</span><span class="o">=</span><span class="s2">&quot;http-error&quot;</span><span class="p">,</span>
                 <span class="n">http_status</span><span class="o">=</span><span class="n">response</span><span class="o">.</span><span class="n">status_code</span><span class="p">,</span>
-                <span class="n">metadata</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;error_detail&quot;</span><span class="p">:</span> <span class="s2">&quot;Unexpected status&quot;</span><span class="p">},</span>
             <span class="p">)</span>
             <span class="k">return</span>
 
         <span class="n">data</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
         <span class="c1"># Extract relevant URLs from the response payload before yielding results.</span>
-        <span class="k">yield</span> <span class="n">ResolverResult</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s2">&quot;https://example.org/file.pdf&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">candidate</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;files&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">yield</span> <span class="n">ResolverResult</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="n">candidate</span><span class="p">[</span><span class="s2">&quot;download_url&quot;</span><span class="p">])</span>
 </pre></div>
 </div>
 <p>Key requirements:</p>
 <ul class="simple">
-<li><p>Implement <code class="docutils literal notranslate"><span class="pre">name</span></code>, <code class="docutils literal notranslate"><span class="pre">is_enabled</span></code>, and <code class="docutils literal notranslate"><span class="pre">iter_urls</span></code> following the
-<code class="docutils literal notranslate"><span class="pre">Resolver</span></code> protocol documented in <code class="docutils literal notranslate"><span class="pre">resolvers/types.py</span></code>.</p></li>
+<li><p>Implement <code class="docutils literal notranslate"><span class="pre">name</span></code>, <code class="docutils literal notranslate"><span class="pre">is_enabled</span></code>, and <code class="docutils literal notranslate"><span class="pre">iter_urls</span></code> as defined in
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.types.Resolver</span></code>.</p></li>
 <li><p>Surface errors by yielding <code class="docutils literal notranslate"><span class="pre">ResolverResult</span></code> events instead of raising
 exceptions.</p></li>
-<li><p>Use <code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code> for outbound HTTP to benefit from retry
-policies and logging.</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code> for outbound HTTP to benefit from retry policies
+and structured logging.</p></li>
 </ul>
 </section>
-<section id="registering-the-resolver">
-<h2>2. Registering the Resolver<a class="headerlink" href="#registering-the-resolver" title="Link to this heading"></a></h2>
-<p>Update <code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/resolvers/providers/__init__.py</span></code>
-so that <code class="docutils literal notranslate"><span class="pre">default_resolvers()</span></code> instantiates your resolver in the desired
-position.
-# Gate the resolver behind optional toggles or metadata availability.
-return True</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>def iter_urls(self, session, config: ResolverConfig, artifact):
-    # Yield ResolverResult instances for each candidate URL.
-    yield ResolverResult(url=&quot;https://example.org/file.pdf&quot;)
+<section id="register-the-resolver">
+<h2>2. Register the Resolver<a class="headerlink" href="#register-the-resolver" title="Link to this heading"></a></h2>
+<p>Add the resolver to the provider registry in
+<code class="docutils literal notranslate"><span class="pre">src/DocsToKG/ContentDownload/resolvers/providers/__init__.py</span></code> so the DocsToKG
+pipeline can instantiate it:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">.my_resolver</span><span class="w"> </span><span class="kn">import</span> <span class="n">MyResolver</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">default_resolvers</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Resolver</span><span class="p">]:</span>
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="n">OpenAlexResolver</span><span class="p">(),</span>
+        <span class="c1"># ... existing resolvers ...</span>
+        <span class="n">MyResolver</span><span class="p">(),</span>
+    <span class="p">]</span>
 </pre></div>
 </div>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>
-Key points:
-
-* `name` must be unique and referenced in configuration toggles.
-* `iter_urls` should yield `ResolverResult` objects with either URLs or events.
-* Use `DocsToKG.ContentDownload.http.request_with_retries` for HTTP calls to
-  benefit from retry handling.
-
-## 2. Register the Resolver
-
-Add the resolver to the provider registry in
-`src/DocsToKG/ContentDownload/resolvers/providers/__init__.py`:
-
-```python
-from .my_resolver import MyResolver
-
-
-def default_resolvers() -&gt; List[Resolver]:
-    return [
-        OpenAlexResolver(),
-        # ... existing resolvers ...
-        MyResolver(),
-    ]
-</pre></div>
-</div>
+<p>Order determines fallback precedence—place the resolver alongside providers
+with similar behaviour.</p>
 </section>
-<section id="configuration-options">
-<h2>3. Configuration Options<a class="headerlink" href="#configuration-options" title="Link to this heading"></a></h2>
+<section id="configure-resolver-options">
+<h2>3. Configure Resolver Options<a class="headerlink" href="#configure-resolver-options" title="Link to this heading"></a></h2>
 <p>All resolvers automatically honour standard configuration keys:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">resolver_toggles</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">my_resolver</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
@@ -210,32 +185,28 @@ def default_resolvers() -&gt; List[Resolver]:
 <span class="w">  </span><span class="nt">my_resolver</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </pre></div>
 </div>
-<p>You can add resolver-specific settings by extending <code class="docutils literal notranslate"><span class="pre">ResolverConfig</span></code> if
-needed, but most providers can rely on the shared options above.</p>
+<p>Extend <code class="docutils literal notranslate"><span class="pre">ResolverConfig</span></code> only when new settings are unavoidable; most resolvers
+can rely on the shared options above.</p>
 </section>
-<section id="testing-checklist">
-<h2>4. Testing Checklist<a class="headerlink" href="#testing-checklist" title="Link to this heading"></a></h2>
+<section id="validate-the-resolver">
+<h2>4. Validate the Resolver<a class="headerlink" href="#validate-the-resolver" title="Link to this heading"></a></h2>
 <ol class="arabic simple">
-<li><p>Add unit tests in <code class="docutils literal notranslate"><span class="pre">tests/</span></code> covering success, HTTP errors, and malformed
-responses. Use fixtures similar to the Figshare and Zenodo tests.</p></li>
-<li><p>Update the full pipeline integration test if resolver ordering changes.</p></li>
-<li><p>Run <code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tests/</span></code> to confirm all scenarios pass.</p></li>
+<li><p>Add unit tests in <code class="docutils literal notranslate"><span class="pre">tests/</span></code> covering success cases, HTTP errors, and malformed
+responses (see the Figshare and Zenodo tests for reference).</p></li>
+<li><p>Update pipeline integration tests if resolver ordering changes.</p></li>
+<li><p>Run <code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">tests/</span></code> to confirm all DocsToKG scenarios pass.</p></li>
 </ol>
 </section>
-<section id="documentation-and-logging">
-<h2>5. Documentation and Logging<a class="headerlink" href="#documentation-and-logging" title="Link to this heading"></a></h2>
+<section id="document-and-instrument">
+<h2>5. Document and Instrument<a class="headerlink" href="#document-and-instrument" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p>Document new configuration keys or environment variables in
-<code class="docutils literal notranslate"><span class="pre">docs/</span></code> as appropriate.</p></li>
-<li><p>Log unexpected conditions using <code class="docutils literal notranslate"><span class="pre">logging.getLogger(__name__)</span></code> inside your
+<li><p>Document new configuration keys or environment variables in the DocsToKG
+documentation set.</p></li>
+<li><p>Log unexpected conditions using <code class="docutils literal notranslate"><span class="pre">logging.getLogger(__name__)</span></code> inside the
 resolver to aid troubleshooting.</p></li>
 </ul>
 <p>Following these steps keeps the resolver ecosystem consistent and ensures
-observability, retries, and configuration toggles work out of the box.
-PROVIDERS = {
-# … existing resolvers …
-“my_resolver”: MyResolver(),
-}</p>
+observability, retries, and configuration toggles work out of the box.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>
 Include the resolver in `default_resolvers()` if it should run by default.
 

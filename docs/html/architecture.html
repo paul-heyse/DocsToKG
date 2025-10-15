@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Content Download Resolver Architecture &mdash; DocsToKG 1.0.0 documentation</title>
+  <title>1. Content Download Resolver Architecture &mdash; DocsToKG 1.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="_static/css/custom.css" />
@@ -66,7 +66,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Content Download Resolver Architecture</li>
+      <li class="breadcrumb-item active">1. Content Download Resolver Architecture</li>
       <li class="wy-breadcrumbs-aside">
             <a href="_sources/architecture.md.txt" rel="nofollow"> View page source</a>
       </li>
@@ -77,7 +77,7 @@
            <div itemprop="articleBody">
              
   <section id="content-download-resolver-architecture">
-<h1>Content Download Resolver Architecture<a class="headerlink" href="#content-download-resolver-architecture" title="Link to this heading"></a></h1>
+<h1>1. Content Download Resolver Architecture<a class="headerlink" href="#content-download-resolver-architecture" title="Link to this heading"></a></h1>
 <div class="highlight-mermaid notranslate"><div class="highlight"><pre><span></span>graph TD
     Work[Work Artifact] --&gt; Pipeline[ResolverPipeline]
     Pipeline --&gt;|prepare| ResolverA[Resolver A]
@@ -90,8 +90,10 @@
     Pipeline --&gt; Outcome
 </pre></div>
 </div>
-<p>The diagram highlights the modular structure introduced by the resolver
-refactor:</p>
+<p>The diagram highlights the modular DocsToKG resolver architecture. Each
+numbered section below summarises the key components.</p>
+<section id="pipeline-orchestration">
+<h2>1. Pipeline Orchestration<a class="headerlink" href="#pipeline-orchestration" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">pipeline.py</span></code> orchestrates resolver execution, rate limiting, concurrency, and
 logging.</p></li>
@@ -101,9 +103,13 @@ other shared data structures.</p></li>
 OpenAlex, Zenodo, Figshare, etc.) exposed via
 <code class="docutils literal notranslate"><span class="pre">providers/__init__.py</span></code> and <code class="docutils literal notranslate"><span class="pre">default_resolvers()</span></code>.</p></li>
 </ul>
+</section>
+<section id="result-flow">
+<h2>2. Result Flow<a class="headerlink" href="#result-flow" title="Link to this heading"></a></h2>
 <p>Resolvers yield <code class="docutils literal notranslate"><span class="pre">ResolverResult</span></code> objects that flow back through the pipeline to
 produce a <code class="docutils literal notranslate"><span class="pre">DownloadOutcome</span></code>. HEAD pre-checks, conditional requests, and retry
 logic run in the pipeline before invoking the shared download function.</p>
+</section>
 </section>
 
 

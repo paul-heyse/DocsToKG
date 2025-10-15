@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 
-from .similarity_gpu import cosine_batch
+from .similarity import pairwise_inner_products
 from .types import FusionCandidate
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
@@ -93,6 +93,11 @@ def apply_mmr_diversification(
 
     candidate_indices = list(range(len(fused_candidates)))
     selected_indices: List[int] = []
+    if resources is None:
+        raise RuntimeError("GPU resources are required for MMR diversification")
+    sims_all = pairwise_inner_products(
+        embeddings, device=int(device), resources=resources
+    )
 
     while candidate_indices and len(selected_indices) < top_k:
         best_idx: int | None = None
@@ -100,19 +105,9 @@ def apply_mmr_diversification(
         for idx in candidate_indices:
             vector_id = fused_candidates[idx].chunk.vector_id
             relevance = fused_scores.get(vector_id, 0.0)
-            if selected_indices:
-                if resources is None:
-                    raise RuntimeError("GPU resources are required for MMR diversification")
-                selected_embeddings = embeddings[selected_indices]
-                sims = cosine_batch(
-                    embeddings[idx],
-                    selected_embeddings,
-                    device=device,
-                    resources=resources,
-                )
-                diversity_penalty = float(sims[0].max())
-            else:
-                diversity_penalty = 0.0
+            diversity_penalty = (
+                float(sims_all[idx, selected_indices].max()) if selected_indices else 0.0
+            )
             score = lambda_param * relevance - (1 - lambda_param) * diversity_penalty
             if score > best_score:
                 best_idx = idx

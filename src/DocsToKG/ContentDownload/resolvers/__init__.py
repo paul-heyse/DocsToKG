@@ -80,18 +80,6 @@ _DEPRECATION_MESSAGES = {
     ),
 }
 
-warnings.warn(
-    (
-        "Importing resolver classes from DocsToKG.ContentDownload.resolvers is "
-        "deprecated and will be removed in a future release. Import from the "
-        "explicit submodules (e.g. DocsToKG.ContentDownload.resolvers.pipeline) "
-        "instead."
-    ),
-    DeprecationWarning,
-    stacklevel=2,
-)
-
-
 __all__ = [
     "AttemptRecord",
     "AttemptLogger",

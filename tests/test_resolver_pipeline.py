@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import pytest
+from unittest.mock import Mock, patch
 
 pytest.importorskip("pyalex")
 
@@ -635,3 +636,275 @@ def test_head_precheck_resolver_override(monkeypatch, tmp_path):
     pipeline.run(session, artifact)
 
     assert head_calls == ["https://example.org/enforce.pdf"]
+
+
+def test_callable_accepts_argument_handles_noncallable():
+    from DocsToKG.ContentDownload.resolvers.pipeline import _callable_accepts_argument
+
+    sentinel = object()
+    # Non-callable should trigger TypeError path and default to True
+    assert _callable_accepts_argument(sentinel, "context") is True
+
+
+def test_pipeline_logs_missing_resolver(tmp_path):
+    artifact = build_artifact(tmp_path)
+    config = ResolverConfig(resolver_order=["ghost"], resolver_toggles={"ghost": True})
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+
+    pipeline = ResolverPipeline([], config, lambda *args, **kwargs: None, logger, metrics)
+    session = DummySession({})
+    result = pipeline.run(session, artifact)
+
+    assert result.success is False
+    assert logger.records[0].reason == "resolver-missing"
+    assert metrics.skips["ghost:missing"] == 1
+
+
+def test_pipeline_skips_disabled_resolver(tmp_path):
+    artifact = build_artifact(tmp_path)
+
+    class DisabledResolver(StubResolver):
+        def __init__(self):
+            super().__init__("disabled", [])
+
+    resolver = DisabledResolver()
+    config = ResolverConfig(resolver_order=["disabled"])
+    config.resolver_toggles["disabled"] = False
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+
+    pipeline = ResolverPipeline([resolver], config, lambda *args, **kwargs: None, logger, metrics)
+    session = DummySession({})
+    pipeline.run(session, artifact)
+
+    assert logger.records[0].reason == "resolver-disabled"
+    assert metrics.skips["disabled:disabled"] == 1
+
+
+def test_pipeline_skips_not_applicable_resolver(tmp_path):
+    artifact = build_artifact(tmp_path)
+
+    class InapplicableResolver(StubResolver):
+        def __init__(self):
+            super().__init__("inapplicable", [])
+
+        def is_enabled(self, config, art):
+            return False
+
+    resolver = InapplicableResolver()
+    config = ResolverConfig(resolver_order=["inapplicable"])
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+    pipeline = ResolverPipeline([resolver], config, lambda *args, **kwargs: None, logger, metrics)
+
+    pipeline.run(DummySession({}), artifact)
+
+    assert logger.records[0].reason == "resolver-not-applicable"
+    assert metrics.skips["inapplicable:not-applicable"] == 1
+
+
+def test_collect_resolver_results_handles_exception(tmp_path):
+    artifact = build_artifact(tmp_path)
+
+    class Exploder(StubResolver):
+        def __init__(self):
+            super().__init__("boom", [])
+
+        def iter_urls(self, session, config, art):
+            raise RuntimeError("simulated failure")
+
+    resolver = Exploder()
+    config = ResolverConfig(resolver_order=["boom"])
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+    pipeline = ResolverPipeline([resolver], config, lambda *args, **kwargs: None, logger, metrics)
+
+    results, wall_ms = pipeline._collect_resolver_results(
+        resolver.name, resolver, DummySession({}), artifact
+    )
+
+    assert wall_ms >= 0.0
+    assert results[0].event_reason == "resolver-exception"
+    assert metrics.failures["boom"] == 1
+
+
+def test_pipeline_records_event_and_skip_reason(tmp_path):
+    artifact = build_artifact(tmp_path)
+    event_result = ResolverResult(url=None, event="info", event_reason="rate-limit")
+    resolver = StubResolver("stub", [event_result])
+    config = ResolverConfig(resolver_order=["stub"])
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+
+    pipeline = ResolverPipeline([resolver], config, lambda *args, **kwargs: None, logger, metrics)
+    pipeline.run(DummySession({}), artifact)
+
+    assert logger.records[0].status == "info"
+    assert metrics.skips["stub:rate-limit"] == 1
+
+
+def test_pipeline_skips_duplicate_urls(tmp_path):
+    artifact = build_artifact(tmp_path)
+    duplicated = ResolverResult(url="https://example.org/dup.pdf")
+    resolver = StubResolver("dup", [duplicated, duplicated])
+    config = ResolverConfig(resolver_order=["dup"])
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+
+    def fake_download(session, art, url, referer, timeout):
+        return DownloadOutcome("html", None, 200, "text/html", 1.0)
+
+    pipeline = ResolverPipeline([resolver], config, fake_download, logger, metrics)
+    pipeline.run(DummySession({}), artifact)
+
+    reasons = [record.reason for record in logger.records if record.reason == "duplicate-url"]
+    assert reasons and metrics.skips["dup:duplicate-url"] == 1
+
+
+def test_pipeline_head_precheck_failure_skips_attempt(monkeypatch, tmp_path):
+    artifact = build_artifact(tmp_path)
+    resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
+    config = ResolverConfig(resolver_order=["stub"])
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+    download_mock = Mock()
+
+    pipeline = ResolverPipeline([resolver], config, download_mock, logger, metrics)
+    monkeypatch.setattr(pipeline, "_head_precheck_url", lambda *args, **kwargs: False)
+
+    pipeline.run(DummySession({}), artifact)
+
+    assert download_mock.called is False
+    assert logger.records[0].reason == "head-precheck-failed"
+    assert metrics.skips["stub:head-precheck-failed"] == 1
+
+
+def test_pipeline_event_without_reason(tmp_path):
+    artifact = build_artifact(tmp_path)
+    event_result = ResolverResult(url=None, event="info", event_reason=None)
+    resolver = StubResolver("stub", [event_result])
+    config = ResolverConfig(resolver_order=["stub"])
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+
+    pipeline = ResolverPipeline([resolver], config, lambda *args, **kwargs: None, logger, metrics)
+    pipeline.run(DummySession({}), artifact)
+
+    assert logger.records[0].status == "info"
+    assert metrics.skips == {}
+
+
+def test_pipeline_downloads_with_context_argument(tmp_path):
+    artifact = build_artifact(tmp_path)
+    resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
+    config = ResolverConfig(resolver_order=["stub"])
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+    context_received = {}
+
+    def download_with_context(session, art, url, referer, timeout, context):
+        context_received["value"] = context
+        return DownloadOutcome("http_error", None, 500, "text/html", 1.0)
+
+    pipeline = ResolverPipeline([resolver], config, download_with_context, logger, metrics)
+    pipeline.run(DummySession({}), artifact, context={"dry_run": False})
+
+    assert context_received["value"] == {"dry_run": False}
+    assert logger.records[-1].status == "http_error"
+
+
+def test_pipeline_respects_max_attempts(tmp_path):
+    artifact = build_artifact(tmp_path)
+    resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
+    config = ResolverConfig(resolver_order=["stub"], max_attempts_per_work=1)
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+
+    def non_pdf_download(session, art, url, referer, timeout):
+        return DownloadOutcome("html", None, 200, "text/html", 1.0)
+
+    pipeline = ResolverPipeline([resolver], config, non_pdf_download, logger, metrics)
+    result = pipeline.run(DummySession({}), artifact)
+
+    assert result.success is False
+    assert result.reason == "max-attempts-reached"
+
+
+def test_pipeline_jitter_sleep_no_delay():
+    config = ResolverConfig()
+    config.sleep_jitter = 0.0
+    pipeline = ResolverPipeline([], config, lambda *a, **k: None, ListLogger(), ResolverMetrics())
+
+    with patch("DocsToKG.ContentDownload.resolvers.pipeline.time.sleep") as mock_sleep:
+        pipeline._jitter_sleep()
+
+    mock_sleep.assert_not_called()
+
+
+def test_pipeline_concurrent_skips_missing_resolver(tmp_path):
+    artifact = build_artifact(tmp_path)
+    resolver = StubResolver("available", [ResolverResult(url="https://example.org/file.pdf")])
+    config = ResolverConfig(
+        resolver_order=["missing", "available"],
+        resolver_toggles={"missing": True, "available": True},
+        max_concurrent_resolvers=2,
+    )
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+
+    def download(session, art, url, referer, timeout):
+        return DownloadOutcome("pdf", str(art.pdf_dir / "result.pdf"), 200, "application/pdf", 1.0)
+
+    pipeline = ResolverPipeline([resolver], config, download, logger, metrics)
+    result = pipeline.run(DummySession({}), artifact)
+
+    assert result.success is True
+    assert any(record.reason == "resolver-missing" for record in logger.records)
+
+
+def test_pipeline_ignores_empty_url(tmp_path):
+    artifact = build_artifact(tmp_path)
+
+    class NullResolver(StubResolver):
+        def __init__(self):
+            super().__init__("null", [ResolverResult(url="")])
+
+    resolver = NullResolver()
+    config = ResolverConfig(resolver_order=["null"])
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+
+    pipeline = ResolverPipeline([resolver], config, lambda *a, **k: DownloadOutcome("html", None, 200, "text/html", 1.0), logger, metrics)
+    result = pipeline.run(DummySession({}), artifact)
+
+    assert result.success is False
+
+
+def test_pipeline_concurrent_execution(tmp_path):
+    artifact = build_artifact(tmp_path)
+    resolver_a = StubResolver("a", [ResolverResult(url="https://example.org/a.pdf")])
+    resolver_b = StubResolver("b", [ResolverResult(url="https://example.org/b.pdf")])
+    config = ResolverConfig(
+        resolver_order=["a", "b"],
+        resolver_toggles={"a": True, "b": True},
+        max_concurrent_resolvers=2,
+    )
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+
+    def download_pdf(session, art, url, referer, timeout):
+        ensure_dir(art.pdf_dir)
+        return DownloadOutcome(
+            "pdf",
+            path=str(art.pdf_dir / "result.pdf"),
+            http_status=200,
+            content_type="application/pdf",
+            elapsed_ms=1.0,
+        )
+
+    pipeline = ResolverPipeline([resolver_a, resolver_b], config, download_pdf, logger, metrics)
+    result = pipeline.run(DummySession({}), artifact)
+
+    assert result.success is True
+    assert result.resolver_name in {"a", "b"}

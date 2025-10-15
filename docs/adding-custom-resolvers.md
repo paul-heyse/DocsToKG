@@ -1,12 +1,14 @@
-# Adding Custom Content Download Resolvers
+# 1. Adding Custom Content Download Resolvers
 
-This guide explains how to add new resolver providers to the modular
-DocsToKG Content Download pipeline.
+This guide explains how to extend the DocsToKG content download pipeline with
+project-specific resolver providers. The numbered sections walk through the
+steps required to implement, register, and validate a new resolver.
 
-## 1. Resolver Skeleton
+## 1. Create the Resolver Template
 
 Create a new module under
-`src/DocsToKG/ContentDownload/resolvers/providers/<name>.py`:
+`src/DocsToKG/ContentDownload/resolvers/providers/your_resolver.py` and
+implement the public surface expected by `ResolverConfig`:
 
 ```python
 from __future__ import annotations
@@ -16,15 +18,6 @@ from typing import Iterable
 import requests
 
 from DocsToKG.ContentDownload.http import request_with_retries
-Use this guide to implement and register bespoke resolver providers within the
-modular content download pipeline.
-
-## 1. Resolver Template
-
-Create a new module under
-`src/DocsToKG/ContentDownload/resolvers/providers/your_resolver.py`:
-
-```python
 from DocsToKG.ContentDownload.resolvers.types import ResolverConfig, ResolverResult
 
 
@@ -34,7 +27,8 @@ class MyResolver:
     name = "my_resolver"
 
     def is_enabled(self, config: ResolverConfig, artifact) -> bool:
-        return True  # adjust to inspect artifact metadata
+        # Gate the resolver behind optional toggles or metadata availability.
+        return config.toggles.get(self.name, True)
 
     def iter_urls(
         self,
@@ -65,48 +59,29 @@ class MyResolver:
                 event="error",
                 event_reason="http-error",
                 http_status=response.status_code,
-                metadata={"error_detail": "Unexpected status"},
             )
             return
 
         data = response.json()
         # Extract relevant URLs from the response payload before yielding results.
-        yield ResolverResult(url="https://example.org/file.pdf")
+        for candidate in data.get("files", []):
+            yield ResolverResult(url=candidate["download_url"])
 ```
 
 Key requirements:
 
-- Implement `name`, `is_enabled`, and `iter_urls` following the
-  `Resolver` protocol documented in `resolvers/types.py`.
+- Implement `name`, `is_enabled`, and `iter_urls` as defined in
+  `DocsToKG.ContentDownload.resolvers.types.Resolver`.
 - Surface errors by yielding `ResolverResult` events instead of raising
   exceptions.
-- Use `request_with_retries` for outbound HTTP to benefit from retry
-  policies and logging.
-
-## 2. Registering the Resolver
-
-Update `src/DocsToKG/ContentDownload/resolvers/providers/__init__.py`
-so that `default_resolvers()` instantiates your resolver in the desired
-position.
-        # Gate the resolver behind optional toggles or metadata availability.
-        return True
-
-    def iter_urls(self, session, config: ResolverConfig, artifact):
-        # Yield ResolverResult instances for each candidate URL.
-        yield ResolverResult(url="https://example.org/file.pdf")
-```
-
-Key points:
-
-* `name` must be unique and referenced in configuration toggles.
-* `iter_urls` should yield `ResolverResult` objects with either URLs or events.
-* Use `DocsToKG.ContentDownload.http.request_with_retries` for HTTP calls to
-  benefit from retry handling.
+- Use `request_with_retries` for outbound HTTP to benefit from retry policies
+  and structured logging.
 
 ## 2. Register the Resolver
 
 Add the resolver to the provider registry in
-`src/DocsToKG/ContentDownload/resolvers/providers/__init__.py`:
+`src/DocsToKG/ContentDownload/resolvers/providers/__init__.py` so the DocsToKG
+pipeline can instantiate it:
 
 ```python
 from .my_resolver import MyResolver
@@ -120,7 +95,10 @@ def default_resolvers() -> List[Resolver]:
     ]
 ```
 
-## 3. Configuration Options
+Order determines fallback precedence—place the resolver alongside providers
+with similar behaviour.
+
+## 3. Configure Resolver Options
 
 All resolvers automatically honour standard configuration keys:
 
@@ -135,29 +113,25 @@ resolver_head_precheck:
   my_resolver: true
 ```
 
-You can add resolver-specific settings by extending `ResolverConfig` if
-needed, but most providers can rely on the shared options above.
+Extend `ResolverConfig` only when new settings are unavoidable; most resolvers
+can rely on the shared options above.
 
-## 4. Testing Checklist
+## 4. Validate the Resolver
 
-1. Add unit tests in `tests/` covering success, HTTP errors, and malformed
-   responses. Use fixtures similar to the Figshare and Zenodo tests.
-2. Update the full pipeline integration test if resolver ordering changes.
-3. Run `pytest tests/` to confirm all scenarios pass.
+1. Add unit tests in `tests/` covering success cases, HTTP errors, and malformed
+   responses (see the Figshare and Zenodo tests for reference).
+2. Update pipeline integration tests if resolver ordering changes.
+3. Run `pytest tests/` to confirm all DocsToKG scenarios pass.
 
-## 5. Documentation and Logging
+## 5. Document and Instrument
 
-- Document new configuration keys or environment variables in
-  `docs/` as appropriate.
-- Log unexpected conditions using `logging.getLogger(__name__)` inside your
+- Document new configuration keys or environment variables in the DocsToKG
+  documentation set.
+- Log unexpected conditions using `logging.getLogger(__name__)` inside the
   resolver to aid troubleshooting.
 
 Following these steps keeps the resolver ecosystem consistent and ensures
 observability, retries, and configuration toggles work out of the box.
-PROVIDERS = {
-    # ... existing resolvers ...
-    "my_resolver": MyResolver(),
-}
 ```
 
 Include the resolver in `default_resolvers()` if it should run by default.

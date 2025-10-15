@@ -9,6 +9,7 @@ import numpy as np
 
 from .config import FusionConfig
 from .similarity_gpu import cosine_batch
+from .similarity import pairwise_inner_products
 from .storage import OpenSearchSimulator
 from .tokenization import tokenize
 from .types import (
@@ -81,9 +82,20 @@ class ResultShaper:
         if not ordered_chunks:
             return []
 
-        embeddings = np.stack(
-            [chunk.features.embedding.astype(np.float32, copy=False) for chunk in ordered_chunks]
+        embeddings = np.ascontiguousarray(
+            np.stack(
+                [
+                    chunk.features.embedding.astype(np.float32, copy=False)
+                    for chunk in ordered_chunks
+                ]
+            ),
+            dtype=np.float32,
         )
+        pairwise: Optional[np.ndarray] = None
+        if self._gpu_resources is not None and len(ordered_chunks) <= 256:
+            pairwise = pairwise_inner_products(
+                embeddings, device=self._gpu_device, resources=self._gpu_resources
+            )
 
         doc_buckets: Dict[str, int] = defaultdict(int)
         emitted_indices: List[int] = []
@@ -94,7 +106,7 @@ class ResultShaper:
             if not self._within_doc_limit(chunk.doc_id, doc_buckets):
                 continue
             if emitted_indices and self._is_near_duplicate(
-                embeddings, current_idx, emitted_indices
+                embeddings, current_idx, emitted_indices, pairwise
             ):
                 continue
             highlights = self._build_highlights(chunk, query_tokens)
@@ -139,6 +151,7 @@ class ResultShaper:
         embeddings: np.ndarray,
         current_idx: int,
         emitted_indices: Sequence[int],
+        pairwise: Optional[np.ndarray] = None,
     ) -> bool:
         """Determine whether the current chunk is too similar to emitted ones.
 
@@ -151,9 +164,14 @@ class ResultShaper:
             True when the current chunk's embedding exceeds the cosine similarity threshold.
         """
 
-        resources = self._gpu_resources
         if not emitted_indices:
             return False
+        if pairwise is not None:
+            return (
+                float(pairwise[current_idx, emitted_indices].max())
+                >= self._fusion_config.cosine_dedupe_threshold
+            )
+        resources = self._gpu_resources
         if resources is None:
             raise RuntimeError("GPU resources are required for cosine deduplication")
         query = embeddings[current_idx]

@@ -61,6 +61,8 @@ class DenseIndexConfig:
         force_64bit_ids: Force FAISS to use 64-bit IDs even when 32-bit would suffice
         interleaved_layout: Enable GPU interleaved layout optimisations when supported
         flat_use_fp16: Use float16 compute for flat indexes when available
+        persist_mode: Persistence policy ("cpu_bytes" default, disable for GPU-only runtime)
+        ivf_train_factor: Controls IVF training sample size per nlist shard
 
     Examples:
         >>> config = DenseIndexConfig(
@@ -81,7 +83,7 @@ class DenseIndexConfig:
     device: int = 0
     ivfpq_use_precomputed: bool = True
     ivfpq_float16_lut: bool = True
-    multi_gpu_mode: Literal["single", "replicate"] = "single"
+    multi_gpu_mode: Literal["single", "replicate", "shard"] = "single"
     gpu_temp_memory_bytes: Optional[int] = None
     gpu_indices_32_bit: bool = True
     expected_ntotal: int = 0
@@ -89,6 +91,10 @@ class DenseIndexConfig:
     force_64bit_ids: bool = False
     interleaved_layout: bool = True
     flat_use_fp16: bool = False
+    # Persistence: "cpu_bytes" (default, serialize via CPU), or "disabled"
+    persist_mode: Literal["cpu_bytes", "disabled"] = "cpu_bytes"
+    # Controls training sample size for IVF: min(total, max(1024, nlist * ivf_train_factor))
+    ivf_train_factor: int = 8
 
 
 @dataclass(frozen=True)
@@ -132,6 +138,7 @@ class RetrievalConfig:
         bm25_top_k: Number of BM25 candidates to retrieve (50 default)
         splade_top_k: Number of SPLADE candidates to retrieve (50 default)
         dense_top_k: Number of dense vector candidates to retrieve (50 default)
+        dense_overfetch_factor: Multiplier applied to oversampled dense requests (1.5 default)
 
     Examples:
         >>> config = RetrievalConfig(
@@ -144,6 +151,8 @@ class RetrievalConfig:
     bm25_top_k: int = 50
     splade_top_k: int = 50
     dense_top_k: int = 50
+    # Over-fetch multiplier applied to page_size*oversample for dense search
+    dense_overfetch_factor: float = 1.5
 
 
 @dataclass(frozen=True)

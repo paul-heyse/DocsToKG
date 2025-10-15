@@ -21,6 +21,7 @@ import time
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
+from threading import RLock
 from typing import Dict, Iterable, Iterator, Mapping, MutableMapping, Optional, Tuple
 
 
@@ -114,6 +115,7 @@ class MetricsCollector:
             None
         """
 
+        self._lock = RLock()
         self._counters: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], float] = (
             defaultdict(float)
         )
@@ -133,7 +135,8 @@ class MetricsCollector:
             None
         """
         key = (name, tuple(sorted(labels.items())))
-        self._counters[key] += amount
+        with self._lock:
+            self._counters[key] += amount
 
     def observe(self, name: str, value: float, **labels: str) -> None:
         """Record an observation for a histogram metric.
@@ -147,7 +150,8 @@ class MetricsCollector:
             None
         """
         key = (name, tuple(sorted(labels.items())))
-        self._histograms[key].append(value)
+        with self._lock:
+            self._histograms[key].append(value)
 
     def export_counters(self) -> Iterable[CounterSample]:
         """Iterate over collected counter metrics as structured samples.
@@ -158,7 +162,9 @@ class MetricsCollector:
         Returns:
             Iterable of `CounterSample` entries representing current counters.
         """
-        for (name, labels), value in self._counters.items():
+        with self._lock:
+            items = list(self._counters.items())
+        for (name, labels), value in items:
             yield CounterSample(name=name, labels=dict(labels), value=value)
 
     def export_histograms(self) -> Iterable[HistogramSample]:
@@ -170,7 +176,9 @@ class MetricsCollector:
         Returns:
             Iterable of `HistogramSample` entries containing percentile stats.
         """
-        for (name, labels), samples in self._histograms.items():
+        with self._lock:
+            items = list(self._histograms.items())
+        for (name, labels), samples in items:
             sorted_samples = sorted(samples)
             count = len(sorted_samples)
             if count == 0:

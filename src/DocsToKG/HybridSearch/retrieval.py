@@ -12,6 +12,7 @@ and comprehensive result ranking through advanced fusion techniques.
 from __future__ import annotations
 
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Dict, List, Mapping, Optional, Sequence
 
@@ -160,9 +161,19 @@ class HybridSearchService:
             query_features = self._feature_generator.compute_features(request.query)
             timings["feature_ms"] = (time.perf_counter() - query_start) * 1000
 
-            bm25 = self._execute_bm25(request, filters, config, query_features, timings)
-            splade = self._execute_splade(request, filters, config, query_features, timings)
-            dense = self._execute_dense(request, filters, config, query_features, timings)
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                f_bm25 = pool.submit(
+                    self._execute_bm25, request, filters, config, query_features, timings
+                )
+                f_splade = pool.submit(
+                    self._execute_splade, request, filters, config, query_features, timings
+                )
+                f_dense = pool.submit(
+                    self._execute_dense, request, filters, config, query_features, timings
+                )
+                bm25 = f_bm25.result()
+                splade = f_splade.result()
+                dense = f_dense.result()
 
             fusion = ReciprocalRankFusion(config.fusion.k0)
             combined_candidates = bm25.candidates + splade.candidates + dense.candidates
@@ -319,7 +330,11 @@ class HybridSearchService:
         """
 
         start = time.perf_counter()
-        oversampled = request.page_size * config.dense.oversample
+        oversampled = int(
+            request.page_size
+            * config.dense.oversample
+            * max(1.0, float(getattr(config.retrieval, "dense_overfetch_factor", 1.5)))
+        )
         hits = self._faiss.search(
             query_features.embedding, min(config.retrieval.dense_top_k, oversampled)
         )

@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Resolver Configuration Guide &mdash; DocsToKG 1.0.0 documentation</title>
+  <title>1. Resolver Configuration Guide &mdash; DocsToKG 1.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="_static/css/custom.css" />
@@ -66,7 +66,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Resolver Configuration Guide</li>
+      <li class="breadcrumb-item active">1. Resolver Configuration Guide</li>
       <li class="wy-breadcrumbs-aside">
             <a href="_sources/resolver-configuration.md.txt" rel="nofollow"> View page source</a>
       </li>
@@ -77,13 +77,13 @@
            <div itemprop="articleBody">
              
   <section id="resolver-configuration-guide">
-<h1>Resolver Configuration Guide<a class="headerlink" href="#resolver-configuration-guide" title="Link to this heading"></a></h1>
-<p>The content download pipeline exposes a flexible :class:<code class="docutils literal notranslate"><span class="pre">ResolverConfig</span></code>
-structure that can be customised through configuration files or command line
-overrides. This guide documents the most common options added as part of the
-modular resolver architecture.</p>
+<h1>1. Resolver Configuration Guide<a class="headerlink" href="#resolver-configuration-guide" title="Link to this heading"></a></h1>
+<p>The DocsToKG content download pipeline exposes a flexible
+:class:<code class="docutils literal notranslate"><span class="pre">ResolverConfig</span></code> structure that can be customised through configuration
+files or command line overrides. This guide documents the most common options
+introduced with the modular resolver architecture.</p>
 <section id="enabling-concurrency">
-<h2>Enabling Concurrency<a class="headerlink" href="#enabling-concurrency" title="Link to this heading"></a></h2>
+<h2>1. Enabling Concurrency<a class="headerlink" href="#enabling-concurrency" title="Link to this heading"></a></h2>
 <p>To opt into bounded intra-work concurrency, set
 <code class="docutils literal notranslate"><span class="pre">max_concurrent_resolvers</span></code> and ensure each resolver has an appropriate rate
 limit:</p>
@@ -97,7 +97,7 @@ limit:</p>
 respecting Unpaywall and Crossref rate limits.</p>
 </section>
 <section id="tuning-head-pre-checks">
-<h2>Tuning HEAD Pre-checks<a class="headerlink" href="#tuning-head-pre-checks" title="Link to this heading"></a></h2>
+<h2>2. Tuning HEAD Pre-checks<a class="headerlink" href="#tuning-head-pre-checks" title="Link to this heading"></a></h2>
 <p>Conditional HEAD requests reduce wasted downloads by filtering obvious HTML
 landing pages. Use the following snippet to disable HEAD filtering for
 specific providers while leaving the feature enabled globally:</p>

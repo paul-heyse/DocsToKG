@@ -1,4 +1,4 @@
-# Content Download Resolver Architecture
+# 1. Content Download Resolver Architecture
 
 ```mermaid
 graph TD
@@ -13,8 +13,10 @@ graph TD
     Pipeline --> Outcome
 ```
 
-The diagram highlights the modular structure introduced by the resolver
-refactor:
+The diagram highlights the modular DocsToKG resolver architecture. Each
+numbered section below summarises the key components.
+
+## 1. Pipeline Orchestration
 
 - `pipeline.py` orchestrates resolver execution, rate limiting, concurrency, and
   logging.
@@ -23,6 +25,8 @@ refactor:
 - `providers/` contains individual resolver implementations (Unpaywall, Crossref,
   OpenAlex, Zenodo, Figshare, etc.) exposed via
   `providers/__init__.py` and `default_resolvers()`.
+
+## 2. Result Flow
 
 Resolvers yield `ResolverResult` objects that flow back through the pipeline to
 produce a `DownloadOutcome`. HEAD pre-checks, conditional requests, and retry

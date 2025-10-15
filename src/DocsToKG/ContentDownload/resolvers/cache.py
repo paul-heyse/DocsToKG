@@ -26,6 +26,12 @@ def clear_resolver_caches() -> None:
     Crossref, and Semantic Scholar resolvers. It should be called before
     executing resolver pipelines when deterministic behaviour across runs is
     required (for example, in unit tests or benchmarking scenarios).
+
+    Args:
+        None
+
+    Returns:
+        None
     """
 
     _fetch_unpaywall_data.cache_clear()

@@ -37,10 +37,11 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 If you use direnv, run `direnv allow` after activation so `.envrc` can automatically load the environment next time.
 
-> ✅ Prefer automation? Execute `./scripts/bootstrap_env.sh` from the repository root.  
-> The script creates `.venv`, installs DocsToKG in editable mode, and reminds you to run  
-> `direnv allow`. The bundled `.envrc` automatically activates `.venv` and appends `src/` to  
-> `PYTHONPATH`, so shells or agents that rely on direnv (for example `direnv exec . …`) will always resolve the project package without extra flags.
+> ✅ Prefer automation? Execute `./scripts/bootstrap_env.sh` from the repository root.<br>
+> The script creates `.venv`, installs DocsToKG in editable mode, and reminds you to run
+> `direnv allow`. The bundled `.envrc` automatically activates `.venv` and appends `src/`
+> to `PYTHONPATH`, so shells or agents that rely on direnv (for example
+> `direnv exec . …`) will always resolve the project package without extra flags.
 
 ### 3. Install Dependencies
 

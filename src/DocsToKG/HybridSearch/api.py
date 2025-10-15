@@ -145,7 +145,7 @@ class HybridSearchAPI:
         query = str(payload["query"])
         namespace = payload.get("namespace")
         filters = self._normalize_filters(payload.get("filters", {}))
-        page_size = int(payload.get("page_size", 10))
+        page_size = int(payload.get("page_size", payload.get("limit", 10)))
         cursor = payload.get("cursor")
         diversification = bool(payload.get("diversification", False))
         diagnostics = bool(payload.get("diagnostics", True))

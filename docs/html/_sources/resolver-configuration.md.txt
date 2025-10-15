@@ -1,11 +1,11 @@
-# Resolver Configuration Guide
+# 1. Resolver Configuration Guide
 
-The content download pipeline exposes a flexible :class:`ResolverConfig`
-structure that can be customised through configuration files or command line
-overrides. This guide documents the most common options added as part of the
-modular resolver architecture.
+The DocsToKG content download pipeline exposes a flexible
+:class:`ResolverConfig` structure that can be customised through configuration
+files or command line overrides. This guide documents the most common options
+introduced with the modular resolver architecture.
 
-## Enabling Concurrency
+## 1. Enabling Concurrency
 
 To opt into bounded intra-work concurrency, set
 ``max_concurrent_resolvers`` and ensure each resolver has an appropriate rate
@@ -21,7 +21,7 @@ resolver_min_interval_s:
 The example above allows up to three resolvers to run simultaneously while
 respecting Unpaywall and Crossref rate limits.
 
-## Tuning HEAD Pre-checks
+## 2. Tuning HEAD Pre-checks
 
 Conditional HEAD requests reduce wasted downloads by filtering obvious HTML
 landing pages. Use the following snippet to disable HEAD filtering for

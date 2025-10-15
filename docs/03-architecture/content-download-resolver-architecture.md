@@ -1,4 +1,4 @@
-# Content Download Resolver Architecture
+# 1. Content Download Resolver Architecture
 
 ```mermaid
 graph TD
@@ -22,7 +22,7 @@ graph TD
     L --> M[Wall-Time & Rate Statistics]
 ```
 
-## Module Responsibilities
+## 1. Module Responsibilities
 
 - **`pipeline.py`** – orchestrates resolver execution, respects rate limits,
   enforces concurrency settings, and performs HEAD pre-check filtering.
@@ -35,5 +35,8 @@ graph TD
 - **`conditional.py`** – interprets cached vs modified responses and validates
   manifest metadata.
 
-Refer to `docs/resolver-configuration.md` for configuration details and
-`docs/adding-custom-resolvers.md` for extensibility guidance.
+## 2. Related DocsToKG References
+
+- `docs/resolver-configuration.md` – configuration details and YAML snippets.
+- `docs/adding-custom-resolvers.md` – extensibility guidance for bespoke
+  providers.

@@ -224,9 +224,8 @@ class FaissIndexManager:
         if not vectors:
             return
         faiss_ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
-        existing_ids = self._lookup_existing_ids(faiss_ids)
-        if existing_ids.size:
-            self.remove_ids(existing_ids, force_flush=True)
+        # Removal is idempotent; avoids O(N) membership scan across id_map.
+        self.remove_ids(faiss_ids, force_flush=True)
         matrix = np.ascontiguousarray(
             np.stack([self._ensure_dim(vec) for vec in vectors]), dtype=np.float32
         )
@@ -372,6 +371,9 @@ class FaissIndexManager:
             raise RuntimeError("index is empty")
         # NOTE: FAISS disk writer APIs are intentionally NOT used because the GPU wheel
         # lacks writer hooks for GPU-backed IndexIDMap2 layouts. Byte serialization is canonical.
+        if getattr(self._config, "persist_mode", "cpu_bytes") == "disabled":
+            logger.info("faiss-save-skip", extra={"event": {"reason": "persist_mode=disabled"}})
+            return
         destination = Path(path)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(self.serialize())
@@ -565,28 +567,30 @@ class FaissIndexManager:
             raise ValueError(f"Unsupported index_type: {index_type}")
 
         self._maybe_reserve_memory(index)
-        if self._multi_gpu_mode == "replicate":
-            index = self.replicate_to_all_gpus(index)
+        if self._multi_gpu_mode in ("replicate", "shard"):
+            index = self.distribute_to_all_gpus(index, shard=self._multi_gpu_mode == "shard")
 
         return index
 
     def replicate_to_all_gpus(self, index: "faiss.Index | None" = None) -> "faiss.Index":
-        """Replicate a FAISS index across every visible GPU device.
+        """Replicate a FAISS index across every visible GPU device."""
 
-        Args:
-            index: Optional FAISS index to clone; defaults to the actively managed index.
+        return self.distribute_to_all_gpus(index, shard=False)
 
-        Returns:
-            FAISS index handle representing the replicated multi-GPU index.
+    def distribute_to_all_gpus(
+        self, index: "faiss.Index | None" = None, *, shard: bool = False
+    ) -> "faiss.Index":
+        """Replicate or shard a FAISS index across all GPUs depending on ``shard``.
 
-        Raises:
-            RuntimeError: If multi-GPU replication is unsupported or no index is available.
+        When ``shard`` is ``True`` each GPU owns a disjoint partition. Otherwise the full index
+        is replicated across every GPU.
         """
+
         if not hasattr(faiss, "index_cpu_to_all_gpus"):
-            raise RuntimeError("FAISS build does not support multi-GPU replication")
+            raise RuntimeError("FAISS build does not support multi-GPU distribution")
         target = index or getattr(self, "_index", None)
         if target is None:
-            raise RuntimeError("No FAISS index available to replicate")
+            raise RuntimeError("No FAISS index available to distribute")
         base = getattr(target, "index", None) or target
         if "GpuIndex" in type(base).__name__ and hasattr(faiss, "index_gpu_to_cpu"):
             cpu = faiss.index_gpu_to_cpu(target)
@@ -596,7 +600,7 @@ class FaissIndexManager:
             faiss.GpuMultipleClonerOptions() if hasattr(faiss, "GpuMultipleClonerOptions") else None
         )
         if co is not None:
-            co.shard = False
+            co.shard = bool(shard)
             co.verbose = True
             co.allowCpuCoarseQuantizer = False
             if (
@@ -605,9 +609,11 @@ class FaissIndexManager:
                 and hasattr(faiss, "INDICES_32_BIT")
             ):
                 co.indicesOptions = faiss.INDICES_32_BIT
-        replicated = faiss.index_cpu_to_all_gpus(cpu, co=co)
-        self._replicated = True
-        return replicated
+        elif shard:
+            raise RuntimeError("FAISS build lacks sharding support")
+        distributed = faiss.index_cpu_to_all_gpus(cpu, co=co)
+        self._replicated = not shard
+        return distributed
 
     def _maybe_to_gpu(self, index: "faiss.Index") -> "faiss.Index":
         """Promote a CPU index to GPU while enforcing strict cloning guarantees.
@@ -638,17 +644,18 @@ class FaissIndexManager:
                     and hasattr(faiss, "INDICES_32_BIT")
                 ):
                     co.indicesOptions = faiss.INDICES_32_BIT
+                promoted = faiss.index_cpu_to_gpu(self._gpu_resources, device, index, co)
                 return (
-                    self.replicate_to_all_gpus(
-                        faiss.index_cpu_to_gpu(self._gpu_resources, device, index, co)
+                    self.distribute_to_all_gpus(
+                        promoted, shard=self._multi_gpu_mode == "shard"
                     )
-                    if self._multi_gpu_mode == "replicate"
-                    else faiss.index_cpu_to_gpu(self._gpu_resources, device, index, co)
+                    if self._multi_gpu_mode in ("replicate", "shard")
+                    else promoted
                 )
             cloned = faiss.index_cpu_to_gpu(self._gpu_resources, device, index)
             return (
-                self.replicate_to_all_gpus(cloned)
-                if self._multi_gpu_mode == "replicate"
+                self.distribute_to_all_gpus(cloned, shard=self._multi_gpu_mode == "shard")
+                if self._multi_gpu_mode in ("replicate", "shard")
                 else cloned
             )
         except Exception as exc:  # pragma: no cover - hardware specific failure
@@ -971,6 +978,8 @@ class FaissIndexManager:
             keep_mask = np.ones_like(current_ids, dtype=bool)
         keep_positions = np.nonzero(keep_mask)[0].astype(np.int64)
         survivor_ids = current_ids[keep_mask]
+        assert base.ntotal == len(current_ids), "FAISS id_map misaligned with base index"
+        assert keep_positions.size == np.count_nonzero(keep_mask), "keep mask mismatch"
         keys = np.ascontiguousarray(keep_positions, dtype=np.int64)
         vectors = (
             base.reconstruct_batch(keys)

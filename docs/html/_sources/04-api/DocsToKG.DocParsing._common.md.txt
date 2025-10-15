@@ -25,7 +25,7 @@ Usage:
 
 Dependencies:
 - json, pathlib, logging: Provide standard I/O and diagnostics primitives.
-- typing: Supply type hints consumed by Sphinx autodoc and API generators.
+- typing: Supply type hints consumed by Sphinx documentation tooling and API generators.
 - pydantic (optional): Some helpers integrate with schema validation routines.
 
 All helpers are safe to import in multiprocessing contexts and avoid heavy
