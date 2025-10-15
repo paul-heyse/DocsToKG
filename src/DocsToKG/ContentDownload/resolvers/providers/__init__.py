@@ -8,6 +8,7 @@ from .core import CoreResolver
 from .crossref import CrossrefResolver
 from .doaj import DoajResolver
 from .europe_pmc import EuropePmcResolver
+from .figshare import FigshareResolver
 from .hal import HalResolver
 from .landing_page import LandingPageResolver
 from .openalex import OpenAlexResolver
@@ -40,6 +41,7 @@ def default_resolvers() -> List[Resolver]:
         EuropePmcResolver(),
         CoreResolver(),
         ZenodoResolver(),
+        FigshareResolver(),
         DoajResolver(),
         SemanticScholarResolver(),
         OpenAireResolver(),

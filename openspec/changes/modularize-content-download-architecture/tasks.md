@@ -1046,7 +1046,7 @@
 
 ## 9. Figshare Resolver
 
-- [ ] 9.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/figshare.py`
+- [x] 9.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/figshare.py`
 
   ```python
   """Figshare repository resolver for DOI-indexed research outputs."""
@@ -1131,14 +1131,14 @@
                       )
   ```
 
-- [ ] 9.2 Add Figshare to resolver registry
+- [x] 9.2 Add Figshare to resolver registry
   - Import `FigshareResolver` in `resolvers/providers/__init__.py`
   - Insert in `default_resolvers()` after `ZenodoResolver`, before `DoajResolver`
 
-- [ ] 9.3 Update `DEFAULT_RESOLVER_ORDER` constant
+- [x] 9.3 Update `DEFAULT_RESOLVER_ORDER` constant
   - Insert `"figshare"` after `"zenodo"` in list
 
-- [ ] 9.4 Add Figshare resolver tests in `tests/test_figshare_resolver.py`
+- [x] 9.4 Add Figshare resolver tests in `tests/test_figshare_resolver.py`
   - Test DOI search with successful response containing PDF file
   - Test DOI search with multiple files, filter to PDF only
   - Test DOI search with no matches (empty array)
@@ -1147,7 +1147,7 @@
   - Test DOI search with network error
   - Use `responses` library for mock HTTP fixtures
 
-- [ ] 9.5 Add test fixture for Figshare API response
+- [x] 9.5 Add test fixture for Figshare API response
 
   ```python
   # Create tests/data/figshare_response_sample.json
@@ -1223,21 +1223,21 @@
 
 ## 10. DownloadOutcome Completeness
 
-- [ ] 10.1 Audit `download_candidate()` for outcome completeness
+- [x] 10.1 Audit `download_candidate()` for outcome completeness
   - Verify 304 cached path (line ~989) populates all fields: `sha256`, `content_length`, `etag`, `last_modified`
   - Verify HTTP error path (line ~1002) sets fields to `None` explicitly
   - Verify PDF/HTML success path (line ~1114) populates all fields
   - Verify dry-run path (line ~1060) populates available fields or `None`
 
-- [ ] 10.2 Standardize `None` vs missing field handling
+- [x] 10.2 Standardize `None` vs missing field handling
   - In `_build_download_outcome()` (line ~694), ensure all optional fields default to `None` rather than being omitted
   - Update `DownloadOutcome` dataclass initialization defaults to `None` explicitly
 
-- [ ] 10.3 Audit `build_manifest_entry()` for completeness
+- [x] 10.3 Audit `build_manifest_entry()` for completeness
   - Verify function at line ~526 extracts all `DownloadOutcome` fields
   - Ensure `ManifestEntry` includes all fields: `sha256`, `content_length`, `etag`, `last_modified`, `extracted_text_path`
 
-- [ ] 10.4 Add validation tests in `tests/test_download_outcomes.py`
+- [x] 10.4 Add validation tests in `tests/test_download_outcomes.py`
   - Test successful download has all metadata fields populated
   - Test 304 cached response has all prior metadata fields
   - Test HTTP error response has explicit `None` for unavailable fields

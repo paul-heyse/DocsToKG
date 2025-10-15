@@ -22,6 +22,7 @@ DEFAULT_RESOLVER_ORDER: List[str] = [
     "europe_pmc",
     "core",
     "zenodo",
+    "figshare",
     "doaj",
     "semantic_scholar",
     "openaire",
@@ -288,10 +289,10 @@ class DownloadOutcome:
     """
 
     classification: str
-    path: Optional[str]
-    http_status: Optional[int]
-    content_type: Optional[str]
-    elapsed_ms: Optional[float]
+    path: Optional[str] = None
+    http_status: Optional[int] = None
+    content_type: Optional[str] = None
+    elapsed_ms: Optional[float] = None
     error: Optional[str] = None
     sha256: Optional[str] = None
     content_length: Optional[int] = None

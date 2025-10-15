@@ -706,21 +706,22 @@ def _build_download_outcome(
     path_str = str(dest_path) if dest_path else None
 
     if normalized in {"pdf", "pdf_unknown"} and not dry_run and dest_path is not None:
-        if not _has_pdf_eof(dest_path):
-            with contextlib.suppress(OSError):
-                dest_path.unlink()
-            return DownloadOutcome(
-                classification="pdf_corrupt",
-                path=None,
-                http_status=response.status_code,
-                content_type=response.headers.get("Content-Type"),
-                elapsed_ms=elapsed_ms,
-                sha256=None,
-                content_length=None,
-                etag=etag,
-                last_modified=last_modified,
-                extracted_text_path=extracted_text_path,
-            )
+            if not _has_pdf_eof(dest_path):
+                with contextlib.suppress(OSError):
+                    dest_path.unlink()
+                return DownloadOutcome(
+                    classification="pdf_corrupt",
+                    path=None,
+                    http_status=response.status_code,
+                    content_type=response.headers.get("Content-Type"),
+                    elapsed_ms=elapsed_ms,
+                    error=None,
+                    sha256=None,
+                    content_length=None,
+                    etag=etag,
+                    last_modified=last_modified,
+                    extracted_text_path=extracted_text_path,
+                )
 
     return DownloadOutcome(
         classification=normalized,
@@ -728,6 +729,7 @@ def _build_download_outcome(
         http_status=response.status_code,
         content_type=response.headers.get("Content-Type"),
         elapsed_ms=elapsed_ms,
+        error=None,
         sha256=sha256,
         content_length=content_length,
         etag=etag,
@@ -993,10 +995,12 @@ def download_candidate(
                     http_status=response.status_code,
                     content_type=response.headers.get("Content-Type") or content_type_hint,
                     elapsed_ms=elapsed_ms,
+                    error=None,
                     sha256=cached.sha256,
                     content_length=cached.content_length,
                     etag=cached.etag,
                     last_modified=cached.last_modified,
+                    extracted_text_path=None,
                 )
 
             if response.status_code != 200:
@@ -1004,8 +1008,14 @@ def download_candidate(
                     classification="http_error",
                     path=None,
                     http_status=response.status_code,
-                    content_type=response.headers.get("Content-Type"),
+                    content_type=response.headers.get("Content-Type") or content_type_hint,
                     elapsed_ms=elapsed_ms,
+                    error=None,
+                    sha256=None,
+                    content_length=None,
+                    etag=None,
+                    last_modified=None,
+                    extracted_text_path=None,
                 )
 
             modified_result: ModifiedResult = cond_helper.interpret_response(response)
@@ -1137,6 +1147,11 @@ def download_candidate(
             content_type=None,
             elapsed_ms=elapsed_ms,
             error=str(exc),
+            sha256=None,
+            content_length=None,
+            etag=None,
+            last_modified=None,
+            extracted_text_path=None,
         )
 
 
