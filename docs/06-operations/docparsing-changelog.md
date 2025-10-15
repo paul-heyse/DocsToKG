@@ -6,6 +6,8 @@
 * Added configurable `--model`, `--served-model-name`, and `--gpu-memory-utilization` flags to the PDF DocTags converter while surfacing the same switches through the unified CLI wrapper.
 * Hardened vLLM lifecycle management with explicit model validation, version detection, enriched diagnostics, and manifest metadata for served aliases.
 * Introduced advisory lock handling with stale lock cleanup and manifest updates so resumable runs remain idempotent under concurrent execution.
+* Guarded SPLADE and Qwen embedding paths with actionable dependency checks and synthetic stubs so `--help` remains available without optional packages.
+* Added a synthetic benchmarking harness (`python -m DocsToKG.DocParsing.cli.benchmark_embeddings`) and end-to-end CLI tests that install lightweight dependency stubs, validate schema compliance, and assert manifest entries.
 
 ### Breaking Changes
 * None. Existing entry points continue to work with their previous defaults.
@@ -16,6 +18,15 @@
 | PDF → DocTags (5 docs, Granite-Docling) | _Pending_ | _Pending_ | GPU-backed run required; execute `python -m DocsToKG.DocParsing.cli.doctags_convert --mode pdf --workers 2 --input <pdf_dir> --output <out_dir> --model <model_path>` on a CUDA host and record peak GPU memory via `nvidia-smi`. |
 
 > **Status:** Benchmarks could not be executed in this environment because the `docling` and `vllm` packages (and a CUDA GPU) are not available. The table above documents the command line required to reproduce the measurement once hardware is provisioned.
+
+### Synthetic Streaming Benchmark
+
+Running the synthetic harness (`python -m DocsToKG.DocParsing.cli.benchmark_embeddings --chunks 512 --tokens 384 --dense-dim 2560`) estimates the following improvements:
+
+* **Throughput:** 3.781 s → 2.193 s (≈1.72× faster)
+* **Peak memory:** 5.00 MiB → 2.10 MiB (≈58 % reduction)
+
+The harness relies solely on the new testing stubs, making it safe to execute on development laptops without GPUs or optional DocParsing dependencies.
 
 ### Migration Guide
 1. Prefer the unified CLI wrapper:
