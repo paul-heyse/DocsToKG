@@ -18,16 +18,6 @@ __all__ = [
 ]
 
 
-_DEFAULT_RESOURCES: Optional["faiss.StandardGpuResources"] = None
-
-
-def _default_resources() -> "faiss.StandardGpuResources":
-    global _DEFAULT_RESOURCES
-    if _DEFAULT_RESOURCES is None:
-        _DEFAULT_RESOURCES = faiss.StandardGpuResources()
-    return _DEFAULT_RESOURCES
-
-
 def normalize_rows(matrix: np.ndarray) -> np.ndarray:
     """Normalise rows in-place for cosine similarity operations.
 
@@ -76,7 +66,7 @@ def cosine_against_corpus_gpu(
     """
 
     if resources is None:
-        resources = _default_resources()
+        raise RuntimeError("FAISS GPU resources are required for cosine comparisons")
     if query.ndim == 1:
         query = query.reshape(1, -1)
     if query.shape[1] != corpus.shape[1]:
@@ -109,7 +99,7 @@ def pairwise_inner_products(
     """
 
     if resources is None:
-        resources = _default_resources()
+        raise RuntimeError("FAISS GPU resources are required for cosine comparisons")
     if a.size == 0:
         if b is None:
             return np.zeros((0, 0), dtype=np.float32)
@@ -145,7 +135,7 @@ def max_inner_product(
     """
 
     if resources is None:
-        resources = _default_resources()
+        raise RuntimeError("FAISS GPU resources are required for cosine comparisons")
     if corpus.size == 0:
         return float("-inf")
     sims = cosine_against_corpus_gpu(target, corpus, device=device, resources=resources)
