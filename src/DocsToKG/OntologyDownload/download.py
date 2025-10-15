@@ -72,7 +72,7 @@ class DownloadResult:
 
 
 class TokenBucket:
-    """Simple token bucket implementation for per-host rate limiting.
+    """Simple token bucket implementation for per-host and per-service rate limiting.
 
     Attributes:
         rate: Token replenishment rate per second.
@@ -288,6 +288,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         http_config: DownloadConfiguration,
         previous_manifest: Optional[Dict[str, object]],
         logger: logging.Logger,
+        expected_media_type: Optional[str] = None,
     ) -> None:
         super().__init__(headers={}, progressbar=False, timeout=http_config.timeout_sec)
         self.destination = destination
@@ -298,6 +299,121 @@ class StreamingDownloader(pooch.HTTPDownloader):
         self.status = "fresh"
         self.response_etag: Optional[str] = None
         self.response_last_modified: Optional[str] = None
+        self.expected_media_type = expected_media_type
+
+    def _preliminary_head_check(
+        self, url: str, session: requests.Session
+    ) -> tuple[Optional[str], Optional[int]]:
+        """Perform a HEAD request to gather metadata prior to GET."""
+
+        try:
+            response = session.head(
+                url,
+                headers=self.custom_headers,
+                timeout=self.http_config.timeout_sec,
+                allow_redirects=True,
+            )
+        except requests.RequestException as exc:
+            self.logger.debug(
+                "HEAD request exception, proceeding with GET",
+                extra={"stage": "download", "error": str(exc), "url": url},
+            )
+            return None, None
+
+        if response.status_code >= 400:
+            self.logger.debug(
+                "HEAD request failed, proceeding with GET",
+                extra={
+                    "stage": "download",
+                    "method": "HEAD",
+                    "status_code": response.status_code,
+                    "url": url,
+                },
+            )
+            return None, None
+
+        content_type = response.headers.get("Content-Type")
+        content_length_header = response.headers.get("Content-Length")
+        content_length = int(content_length_header) if content_length_header else None
+
+        if content_length:
+            max_bytes = self.http_config.max_download_size_gb * (1024**3)
+            if content_length > max_bytes:
+                self.logger.error(
+                    "file exceeds size limit (HEAD check)",
+                    extra={
+                        "stage": "download",
+                        "content_length": content_length,
+                        "limit_bytes": max_bytes,
+                        "url": url,
+                    },
+                )
+                raise ConfigError(
+                    "File size {size} bytes exceeds limit of {limit} GB (detected via HEAD)".format(
+                        size=content_length,
+                        limit=self.http_config.max_download_size_gb,
+                    )
+                )
+
+        return content_type, content_length
+
+    def _validate_media_type(
+        self,
+        actual_content_type: Optional[str],
+        expected_media_type: Optional[str],
+        url: str,
+    ) -> None:
+        """Validate that the received Content-Type matches expectations."""
+
+        if not self.http_config.validate_media_type:
+            return
+        if not expected_media_type:
+            return
+        if not actual_content_type:
+            self.logger.warning(
+                "server did not provide Content-Type header",
+                extra={
+                    "stage": "download",
+                    "expected_media_type": expected_media_type,
+                    "url": url,
+                },
+            )
+            return
+
+        actual_mime = actual_content_type.split(";")[0].strip().lower()
+        expected_mime = expected_media_type.strip().lower()
+        if actual_mime == expected_mime:
+            return
+
+        acceptable_variations = {
+            "application/rdf+xml": {"application/xml", "text/xml"},
+            "text/turtle": {"text/plain", "application/x-turtle"},
+            "application/owl+xml": {"application/xml", "text/xml"},
+        }
+        acceptable = acceptable_variations.get(expected_mime, set())
+        if actual_mime in acceptable:
+            self.logger.info(
+                "acceptable media type variation",
+                extra={
+                    "stage": "download",
+                    "expected": expected_mime,
+                    "actual": actual_mime,
+                    "url": url,
+                },
+            )
+            return
+
+        self.logger.warning(
+            "media type mismatch detected",
+            extra={
+                "stage": "download",
+                "expected_media_type": expected_mime,
+                "actual_media_type": actual_mime,
+                "url": url,
+                "action": "proceeding with download",
+                "override_hint": "Set defaults.http.validate_media_type: false to disable validation",
+            },
+        )
 
     def __call__(self, url: str, output_file: str, pooch_logger: logging.Logger) -> None:  # type: ignore[override]
         """Stream ontology content to disk while enforcing download policies.
@@ -326,6 +442,9 @@ class StreamingDownloader(pooch.HTTPDownloader):
             request_headers["Range"] = f"bytes={resume_position}-"
         attempt = 0
         session = requests.Session()
+        head_content_type, _ = self._preliminary_head_check(url, session)
+        if head_content_type:
+            self._validate_media_type(head_content_type, self.expected_media_type, url)
         while True:
             attempt += 1
             try:
@@ -349,6 +468,11 @@ class StreamingDownloader(pooch.HTTPDownloader):
                     if response.status_code == 206:
                         self.status = "updated"
                     response.raise_for_status()
+                    self._validate_media_type(
+                        response.headers.get("Content-Type"),
+                        self.expected_media_type,
+                        url,
+                    )
                     length_header = response.headers.get("Content-Length")
                     total_bytes: Optional[int] = None
                     next_progress: Optional[float] = 0.1
@@ -454,13 +578,19 @@ class StreamingDownloader(pooch.HTTPDownloader):
         part_path.replace(Path(output_file))
 
 
-def _get_bucket(host: str, http_config: DownloadConfiguration) -> TokenBucket:
-    bucket = _TOKEN_BUCKETS.get(host)
+def _get_bucket(
+    host: str, http_config: DownloadConfiguration, service: Optional[str] = None
+) -> TokenBucket:
+    key = f"{service}:{host}" if service else host
+    bucket = _TOKEN_BUCKETS.get(key)
     if bucket is None:
-        bucket = TokenBucket(
-            http_config.rate_limit_per_second(), capacity=http_config.rate_limit_per_second()
-        )
-        _TOKEN_BUCKETS[host] = bucket
+        rate = http_config.rate_limit_per_second()
+        if service:
+            service_rate = http_config.parse_service_rate_limit(service)
+            if service_rate:
+                rate = service_rate
+        bucket = TokenBucket(rate_per_sec=rate, capacity=rate)
+        _TOKEN_BUCKETS[key] = bucket
     return bucket
 
 
@@ -473,6 +603,8 @@ def download_stream(
     http_config: DownloadConfiguration,
     cache_dir: Path,
     logger: logging.Logger,
+    expected_media_type: Optional[str] = None,
+    service: Optional[str] = None,
 ) -> DownloadResult:
     """Download ontology content with caching, retries, and hash validation.
 
@@ -484,6 +616,8 @@ def download_stream(
         http_config: Download configuration containing timeouts and limits.
         cache_dir: Directory where intermediary cached files are stored.
         logger: Logger adapter for structured download telemetry.
+        expected_media_type: Expected Content-Type for validation, if known.
+        service: Logical service identifier for per-service rate limiting.
 
     Returns:
         DownloadResult describing the final artifact and metadata.
@@ -493,7 +627,7 @@ def download_stream(
     """
     secure_url = validate_url_security(url)
     parsed = urlparse(secure_url)
-    bucket = _get_bucket(parsed.hostname or "default", http_config)
+    bucket = _get_bucket(parsed.hostname or "default", http_config, service)
     bucket.consume()
 
     start_time = time.monotonic()
@@ -504,6 +638,7 @@ def download_stream(
         http_config=http_config,
         previous_manifest=previous_manifest,
         logger=logger,
+        expected_media_type=expected_media_type,
     )
     cache_dir.mkdir(parents=True, exist_ok=True)
     safe_name = sanitize_filename(destination.name)
@@ -578,6 +713,8 @@ def download_stream(
             http_config=http_config,
             cache_dir=cache_dir,
             logger=logger,
+            expected_media_type=expected_media_type,
+            service=service,
         )
     elapsed = (time.monotonic() - start_time) * 1000
     logger.info(

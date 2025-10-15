@@ -161,6 +161,8 @@ class HybridSearchService:
                     fused_scores,
                     config.fusion.mmr_lambda,
                     request.page_size * config.dense.oversample,
+                    device=self._faiss.device,
+                    resources=self._faiss.gpu_resources,
                 )
             else:
                 diversified = unique_candidates
@@ -171,7 +173,12 @@ class HybridSearchService:
                 "splade": splade.scores,
                 "dense": dense.scores,
             }
-            shaper = ResultShaper(self._opensearch, config.fusion)
+            shaper = ResultShaper(
+                self._opensearch,
+                config.fusion,
+                device=self._faiss.device,
+                resources=self._faiss.gpu_resources,
+            )
             shaped_results = shaper.shape(ordered_chunks, fused_scores, request, channel_score_map)
 
             start = int(request.cursor or "0")

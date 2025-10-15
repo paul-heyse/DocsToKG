@@ -83,11 +83,18 @@ class FaissIndexManager:
         self._config = config
         self._device = self._resolve_device(config)
         self._multi_gpu_mode = getattr(config, "multi_gpu_mode", "single")
+        self._indices_32_bit = bool(getattr(config, "gpu_indices_32_bit", True))
+        self._temp_memory_bytes = getattr(config, "gpu_temp_memory_bytes", None)
+        self._expected_ntotal = int(getattr(config, "expected_ntotal", 0))
+        self._rebuild_delete_threshold = int(getattr(config, "rebuild_delete_threshold", 10000))
+        self._force_64bit_ids = bool(getattr(config, "force_64bit_ids", False))
         self._replicated = False
         self._gpu_opts = GPUOpts(
             device=self._device,
             ivfpq_use_precomputed=bool(getattr(config, "ivfpq_use_precomputed", True)),
             ivfpq_float16_lut=bool(getattr(config, "ivfpq_float16_lut", True)),
+            interleaved_layout=bool(getattr(config, "interleaved_layout", True)),
+            flat_use_fp16=bool(getattr(config, "flat_use_fp16", False)),
         )
         self._gpu_resources = self._init_gpu_resources()
         self._index = self._create_index()
@@ -95,6 +102,9 @@ class FaissIndexManager:
         self._id_resolver: Optional[Callable[[int], Optional[str]]] = None
         self._use_native = True  # Backwards compat for older tests expecting this flag
         self._remove_fallbacks = 0
+        self._pending_delete_ids: list[np.ndarray] = []
+        self._dirty_deletes = 0
+        self._needs_rebuild = False
         self._apply_search_parameters(self._index)
 
     @property
@@ -120,6 +130,14 @@ class FaissIndexManager:
             DenseIndexConfig associated with this manager.
         """
         return self._config
+
+    @property
+    def gpu_resources(self) -> "faiss.StandardGpuResources | None":
+        return self._gpu_resources
+
+    @property
+    def device(self) -> int:
+        return self._device
 
     def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
         """Register a callback translating FAISS internal IDs to vector UUIDs.
@@ -182,6 +200,7 @@ class FaissIndexManager:
         Raises:
             ValueError: If the lengths of `vectors` and `vector_ids` differ.
         """
+        self._flush_pending_deletes(force=True)
         if len(vectors) != len(vector_ids):
             raise ValueError("vectors and vector_ids must align")
         if not vectors:
@@ -203,6 +222,9 @@ class FaissIndexManager:
             self._index.train(matrix[:ntrain])
         ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
         self._index.add_with_ids(matrix, ids)
+        self._pending_delete_ids.clear()
+        self._dirty_deletes = 0
+        self._needs_rebuild = False
         for row, vector_id in zip(matrix, vector_ids):
             self._vectors[vector_id] = row.copy()
 
@@ -221,6 +243,7 @@ class FaissIndexManager:
         for vector_id in vector_ids:
             self._vectors.pop(vector_id, None)
         self._remove_ids(ids)
+        self._flush_pending_deletes(force=False)
 
     def search(self, query: np.ndarray, top_k: int) -> List[FaissSearchResult]:
         """Execute a cosine-similarity search returning the best `top_k` results.
@@ -232,6 +255,7 @@ class FaissIndexManager:
         Returns:
             List of `FaissSearchResult` objects ordered by score.
         """
+        self._flush_pending_deletes(force=True)
         query_matrix = self._ensure_dim(query).reshape(1, -1).astype(np.float32)
         faiss.normalize_L2(query_matrix)
         if self._config.index_type.startswith("ivf"):
@@ -348,6 +372,12 @@ class FaissIndexManager:
         Returns:
             Dictionary containing index configuration and diagnostics.
         """
+        base = getattr(self._index, "index", None) or self._index
+        if hasattr(faiss, "downcast_index"):
+            try:
+                base = faiss.downcast_index(base)
+            except Exception:  # pragma: no cover - best effort introspection
+                pass
         device = self._detect_device(self._index)
         stats: Dict[str, float | str] = {
             "ntotal": float(self.ntotal),
@@ -359,7 +389,11 @@ class FaissIndexManager:
             "device": "*" if device is None else str(device),
             "gpu_remove_fallbacks": float(self._remove_fallbacks),
             "multi_gpu_mode": self._multi_gpu_mode,
+            "gpu_indices_32_bit": bool(self._indices_32_bit and not self._force_64bit_ids),
         }
+        if self._temp_memory_bytes is not None:
+            stats["gpu_temp_memory_bytes"] = float(self._temp_memory_bytes)
+        stats["gpu_base"] = "Gpu" in type(base).__name__
         if device is not None:
             stats["gpu_device"] = str(device)
             resources = self._gpu_resources
@@ -386,10 +420,12 @@ class FaissIndexManager:
                 raise ValueError(f"Unsupported FAISS index type: {self._config.index_type}") from exc
             cpu_index = faiss.index_factory(self._dim, spec, metric)
             mapped = faiss.IndexIDMap2(cpu_index)
-            return self._maybe_to_gpu(mapped)
+            gpu_index = self._maybe_to_gpu(mapped)
+            self._maybe_reserve_memory(gpu_index)
+            return gpu_index
 
         try:
-            return gpu_index_factory(
+            index = gpu_index_factory(
                 self._dim,
                 index_type=self._config.index_type,
                 nlist=int(self._config.nlist),
@@ -401,6 +437,8 @@ class FaissIndexManager:
             )
         except ValueError as exc:
             raise ValueError(f"Unsupported FAISS index type: {self._config.index_type}") from exc
+        self._maybe_reserve_memory(index)
+        return index
 
     def _maybe_to_gpu(self, index: "faiss.Index") -> "faiss.Index":
         if self._multi_gpu_mode == "replicate":
@@ -414,6 +452,13 @@ class FaissIndexManager:
                     cloner.shard = False
                     cloner.verbose = True
                     cloner.allowCpuCoarseQuantizer = False
+                    if (
+                        hasattr(cloner, "indicesOptions")
+                        and self._indices_32_bit
+                        and not self._force_64bit_ids
+                        and hasattr(faiss, "INDICES_32_BIT")
+                    ):
+                        cloner.indicesOptions = faiss.INDICES_32_BIT
                     if hasattr(cloner, "usePrecomputed"):
                         cloner.usePrecomputed = bool(
                             getattr(self._config, "ivfpq_use_precomputed", True)
@@ -442,7 +487,10 @@ class FaissIndexManager:
             raise RuntimeError("GPU resources are not initialised")
         try:
             gpu_index = maybe_clone_to_gpu(
-                index, device=self._device, resources=self._gpu_resources
+                index,
+                device=self._device,
+                resources=self._gpu_resources,
+                indices_32_bits=self._indices_32_bit and not self._force_64bit_ids,
             )
         except Exception as exc:  # pragma: no cover - hardware specific failure
             raise RuntimeError(
@@ -451,6 +499,26 @@ class FaissIndexManager:
             ) from exc
         logger.info("FAISS index promoted to GPU")
         return gpu_index
+
+    def _maybe_reserve_memory(self, index: "faiss.Index") -> None:
+        expected = self._expected_ntotal
+        if expected <= 0:
+            return
+        base = index.index if hasattr(index, "index") else index
+        if hasattr(faiss, "downcast_index"):
+            try:
+                base = faiss.downcast_index(base)
+            except Exception:  # pragma: no cover - best effort
+                pass
+        if hasattr(base, "reserveMemory"):
+            try:  # pragma: no cover - optimisation path
+                base.reserveMemory(int(expected))
+            except Exception:
+                logger.debug(
+                    "Unable to reserve FAISS GPU memory",
+                    extra={"event": {"expected_ntotal": expected}},
+                    exc_info=True,
+                )
 
     def _to_cpu(self, index: "faiss.Index") -> "faiss.Index":
         if hasattr(faiss, "index_gpu_to_cpu"):
@@ -581,12 +649,28 @@ class FaissIndexManager:
             raise RuntimeError(
                 f"Unable to initialise FAISS GPU resources (StandardGpuResources): {exc}"
             ) from exc
+        if self._temp_memory_bytes:
+            try:
+                resources.setTempMemory(int(self._temp_memory_bytes))
+            except Exception:  # pragma: no cover - advisory only
+                logger.debug(
+                    "Unable to set FAISS GPU temp memory",
+                    extra={"event": {"requested_bytes": self._temp_memory_bytes}},
+                    exc_info=True,
+                )
         return resources
 
     def _ensure_dim(self, vector: np.ndarray) -> np.ndarray:
         if vector.shape != (self._dim,):
             raise ValueError(f"Expected embedding dimension {self._dim}, got {vector.shape}")
         return vector
+
+    def _flush_pending_deletes(self, *, force: bool = False) -> None:
+        if not self._needs_rebuild:
+            return
+        threshold = self._rebuild_delete_threshold
+        if force or threshold <= 0 or self._dirty_deletes >= threshold:
+            self._rebuild_index()
 
     def _remove_ids(self, ids: np.ndarray) -> None:
         if ids.size == 0:
@@ -602,7 +686,12 @@ class FaissIndexManager:
                 extra={"event": {"ntotal": self.ntotal, "remove_ids_error": str(exc)}},
             )
             self._remove_fallbacks += 1
-            self._rebuild_index()
+            self._pending_delete_ids.append(ids.copy())
+            self._dirty_deletes += int(ids.size)
+            if self._dirty_deletes >= self._rebuild_delete_threshold:
+                self._rebuild_index()
+            else:
+                self._needs_rebuild = True
 
     def _rebuild_index(self) -> None:
         # Recreate the FAISS index on GPU using cached vectors when direct removal is unsupported.

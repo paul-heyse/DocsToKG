@@ -3,3 +3,5 @@ numpy==2.2.6
 torch==2.8.0+cu129
 vllm==0.11.0rc2.dev429+ga6049be73.cu129
 setuptools==79.0.1
+pydantic>=2.0.0,<3.0.0
+pydantic-settings>=2.0.0,<3.0.0

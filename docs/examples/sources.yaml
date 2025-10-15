@@ -1,0 +1,40 @@
+# Example configuration for the ontology downloader
+defaults:
+  accept_licenses: ["CC-BY-4.0", "CC0-1.0", "OGL-UK-3.0"]
+  normalize_to: ["ttl"]
+  prefer_source: ["obo", "ols", "bioportal", "direct"]
+  http:
+    max_retries: 5
+    timeout_sec: 30
+    download_timeout_sec: 300
+    backoff_factor: 0.5
+    per_host_rate_limit: "4/second"
+    rate_limits:
+      ols: "5/second"
+      bioportal: "1/second"
+    max_download_size_gb: 5
+    validate_media_type: true
+  validation:
+    parser_timeout_sec: 60
+    max_memory_mb: 2048
+    skip_reasoning_if_size_mb: 500
+  logging:
+    level: "INFO"
+    max_log_size_mb: 100
+    retention_days: 30
+  continue_on_error: true
+
+ontologies:
+  - id: hp
+    resolver: obo
+    target_formats: [owl, obo]
+  - id: efo
+    resolver: ols
+  - id: ncit
+    resolver: bioportal
+    extras:
+      acronym: NCIT
+  - id: eurovoc
+    resolver: skos
+    extras:
+      url: https://op.europa.eu/o/opportal-service/euvoc-download-handler?cellarURI=http%3A%2F%2Fpublications.europa.eu%2Fresource%2Fauthority%2Feurovoc

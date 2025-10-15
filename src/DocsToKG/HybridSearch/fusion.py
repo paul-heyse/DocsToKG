@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Dict, List, Mapping, Sequence
+from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 
-from .similarity import normalize_rows, pairwise_inner_products
+from .similarity import cosine_against_corpus_gpu
 from .types import FusionCandidate
+
+if TYPE_CHECKING:  # pragma: no cover - type checking only
+    import faiss  # type: ignore
 
 
 class ReciprocalRankFusion:
@@ -49,6 +52,9 @@ def apply_mmr_diversification(
     fused_scores: Mapping[str, float],
     lambda_param: float,
     top_k: int,
+    *,
+    device: int = 0,
+    resources: Optional["faiss.StandardGpuResources"] = None,
 ) -> List[FusionCandidate]:
     """Apply maximal marginal relevance to promote diversity.
 
@@ -72,8 +78,6 @@ def apply_mmr_diversification(
             for candidate in fused_candidates
         ]
     )
-    normalized = normalize_rows(embeddings)
-    similarity_matrix = pairwise_inner_products(normalized)
 
     candidate_indices = list(range(len(fused_candidates)))
     selected_indices: List[int] = []
@@ -85,7 +89,14 @@ def apply_mmr_diversification(
             vector_id = fused_candidates[idx].chunk.vector_id
             relevance = fused_scores.get(vector_id, 0.0)
             if selected_indices:
-                diversity_penalty = float(np.max(similarity_matrix[idx, selected_indices]))
+                selected_embeddings = embeddings[selected_indices]
+                sims = cosine_against_corpus_gpu(
+                    embeddings[idx],
+                    selected_embeddings,
+                    device=device,
+                    resources=resources,
+                )
+                diversity_penalty = float(sims[0].max())
             else:
                 diversity_penalty = 0.0
             score = lambda_param * relevance - (1 - lambda_param) * diversity_penalty

@@ -33,6 +33,8 @@ class GPUOpts:
     device: int = 0
     ivfpq_use_precomputed: bool = True
     ivfpq_float16_lut: bool = True
+    interleaved_layout: bool = True
+    flat_use_fp16: bool = False
 
 
 def gpu_index_factory(
@@ -81,6 +83,8 @@ def gpu_index_factory(
         if hasattr(faiss, "GpuIndexFlatConfig"):
             cfg = faiss.GpuIndexFlatConfig()
             cfg.device = device
+            if hasattr(cfg, "useFloat16"):
+                cfg.useFloat16 = bool(opts.flat_use_fp16)
             base = faiss.GpuIndexFlatIP(resources, dim, cfg)
         else:
             base = faiss.GpuIndexFlatIP(resources, dim)
@@ -92,6 +96,8 @@ def gpu_index_factory(
         quantizer = faiss.IndexFlatIP(dim)
         cfg = faiss.GpuIndexIVFFlatConfig()
         cfg.device = device
+        if hasattr(cfg, "interleavedLayout"):
+            cfg.interleavedLayout = bool(opts.interleaved_layout)
         base = faiss.GpuIndexIVFFlat(resources, quantizer, dim, int(nlist), metric, cfg)
         base.nprobe = int(nprobe)
         idx = faiss.IndexIDMap2(base)
@@ -105,6 +111,8 @@ def gpu_index_factory(
         cfg.device = device
         cfg.usePrecomputedTables = bool(opts.ivfpq_use_precomputed)
         cfg.useFloat16LookupTables = bool(opts.ivfpq_float16_lut)
+        if hasattr(cfg, "interleavedLayout"):
+            cfg.interleavedLayout = bool(opts.interleaved_layout)
         base = faiss.GpuIndexIVFPQ(
             resources,
             dim,
@@ -125,6 +133,7 @@ def maybe_clone_to_gpu(
     *,
     device: int,
     resources: faiss.StandardGpuResources,
+    indices_32_bits: bool = True,
 ) -> "faiss.Index":
     """Clone a CPU FAISS index onto a GPU with strict cloner options.
 
@@ -156,6 +165,8 @@ def maybe_clone_to_gpu(
         co.device = int(device)
         co.allowCpuCoarseQuantizer = False
         co.verbose = True
+        if indices_32_bits and hasattr(faiss, "INDICES_32_BIT"):
+            co.indicesOptions = faiss.INDICES_32_BIT
         return faiss.index_cpu_to_gpu(resources, int(device), index_cpu, co)
 
     return faiss.index_cpu_to_gpu(resources, int(device), index_cpu)

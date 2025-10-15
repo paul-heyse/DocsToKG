@@ -19,6 +19,7 @@ Usage:
 """
 
 import io
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -64,9 +65,11 @@ class DummyResponse:
 
 
 class DummySession:
-    def __init__(self, queue):
+    def __init__(self, queue, head_queue=None):
         self.queue = queue
+        self.head_queue = list(head_queue or [])
         self.calls = []
+        self.head_calls = []
 
     def get(self, url, *, headers=None, stream=None, timeout=None, allow_redirects=None):
         response = self.queue.pop(0)
@@ -76,15 +79,32 @@ class DummySession:
         self.calls.append(response.request_headers)
         return response
 
+    def head(self, url, *, headers=None, timeout=None, allow_redirects=None):  # pragma: no cover - exercised via downloader
+        response = self.head_queue.pop(0) if self.head_queue else DummyResponse(405, b"", {})
+        if isinstance(response, Exception):
+            raise response
+        response.request_headers = headers or {}
+        self.head_calls.append(response.request_headers)
+        return response
 
-def make_session(monkeypatch, responses):
-    session = DummySession(list(responses))
+
+def make_session(monkeypatch, responses, head_responses=None):
+    session = DummySession(list(responses), head_responses)
 
     def _factory():
         return session
 
     monkeypatch.setattr(requests, "Session", _factory)
     return session
+
+
+@pytest.fixture(autouse=True)
+def clear_token_buckets():
+    """Reset token bucket cache between tests to avoid leakage."""
+
+    download._TOKEN_BUCKETS.clear()
+    yield
+    download._TOKEN_BUCKETS.clear()
 
 
 def test_download_stream_success(monkeypatch, tmp_path):
@@ -157,7 +177,7 @@ def test_download_stream_retries(monkeypatch, tmp_path):
         destination=destination,
         headers={},
         previous_manifest=None,
-        http_config=DownloadConfiguration(max_retries=2, backoff_factor=0),
+        http_config=DownloadConfiguration(max_retries=2, backoff_factor=0.1),
         cache_dir=tmp_path / "cache",
         logger=_noop_logger(),
     )
@@ -174,7 +194,9 @@ def test_download_stream_rate_limiting(monkeypatch, tmp_path):
         def consume(self):
             consumed.append(True)
 
-    monkeypatch.setattr(download, "_get_bucket", lambda host, config: StubBucket())
+    monkeypatch.setattr(
+        download, "_get_bucket", lambda host, config, service=None: StubBucket()
+    )
     destination = tmp_path / "file.owl"
     download.download_stream(
         url="https://example.org/file.owl",
@@ -186,6 +208,189 @@ def test_download_stream_rate_limiting(monkeypatch, tmp_path):
         logger=_noop_logger(),
     )
     assert consumed
+
+
+def test_get_bucket_service_specific_rate():
+    config = DownloadConfiguration(rate_limits={"ols": "2/second"})
+
+    bucket = download._get_bucket("ols.example.org", config, "ols")
+
+    assert bucket.rate == pytest.approx(2.0)
+    assert download._TOKEN_BUCKETS["ols:ols.example.org"] is bucket
+
+
+def test_get_bucket_without_service_uses_host_key():
+    config = DownloadConfiguration(per_host_rate_limit="4/second")
+
+    bucket = download._get_bucket("example.org", config)
+
+    assert download._TOKEN_BUCKETS["example.org"] is bucket
+    assert bucket.rate == pytest.approx(config.rate_limit_per_second())
+
+
+def test_get_bucket_falls_back_to_host_limit():
+    config = DownloadConfiguration(per_host_rate_limit="6/second")
+
+    bucket = download._get_bucket("obo.org", config, "unknown")
+
+    assert bucket.rate == pytest.approx(config.rate_limit_per_second())
+    assert download._TOKEN_BUCKETS["unknown:obo.org"].rate == bucket.rate
+
+
+def test_get_bucket_independent_keys_for_services():
+    config = DownloadConfiguration(
+        rate_limits={"ols": "2/second", "bioportal": "1/second"}
+    )
+
+    ols_bucket = download._get_bucket("api.example.org", config, "ols")
+    bioportal_bucket = download._get_bucket("api.example.org", config, "bioportal")
+
+    assert ols_bucket is not bioportal_bucket
+    assert ols_bucket.rate == pytest.approx(2.0)
+    assert bioportal_bucket.rate == pytest.approx(1.0)
+
+
+def test_head_check_success(monkeypatch, tmp_path):
+    head_response = DummyResponse(
+        200,
+        b"",
+        {"Content-Type": "application/rdf+xml", "Content-Length": "1024"},
+    )
+    session = make_session(monkeypatch, [], head_responses=[head_response])
+    downloader = download.StreamingDownloader(
+        destination=tmp_path / "file.owl",
+        headers={},
+        http_config=DownloadConfiguration(),
+        previous_manifest=None,
+        logger=_noop_logger(),
+        expected_media_type="application/rdf+xml",
+    )
+    content_type, content_length = downloader._preliminary_head_check(
+        "https://example.org/ont.owl", session
+    )
+
+    assert content_type == "application/rdf+xml"
+    assert content_length == 1024
+
+
+def test_head_check_graceful_on_405(monkeypatch, tmp_path):
+    head_response = DummyResponse(405, b"", {})
+    session = make_session(monkeypatch, [], head_responses=[head_response])
+    downloader = download.StreamingDownloader(
+        destination=tmp_path / "file.owl",
+        headers={},
+        http_config=DownloadConfiguration(),
+        previous_manifest=None,
+        logger=_noop_logger(),
+    )
+    content_type, content_length = downloader._preliminary_head_check(
+        "https://example.org/ont.owl", session
+    )
+
+    assert content_type is None
+    assert content_length is None
+
+
+def test_head_check_raises_on_oversized(monkeypatch, tmp_path):
+    oversize_bytes = 6 * 1024 * 1024 * 1024
+    head_response = DummyResponse(
+        200,
+        b"",
+        {"Content-Length": str(oversize_bytes)},
+    )
+    session = make_session(monkeypatch, [], head_responses=[head_response])
+    downloader = download.StreamingDownloader(
+        destination=tmp_path / "file.owl",
+        headers={},
+        http_config=DownloadConfiguration(max_download_size_gb=5.0),
+        previous_manifest=None,
+        logger=_noop_logger(),
+    )
+    with pytest.raises(ConfigError) as exc_info:
+        downloader._preliminary_head_check("https://example.org/huge.owl", session)
+
+    assert "exceeds limit" in str(exc_info.value)
+
+
+def test_validate_media_type_match(tmp_path):
+    downloader = download.StreamingDownloader(
+        destination=tmp_path / "file.owl",
+        headers={},
+        http_config=DownloadConfiguration(),
+        previous_manifest=None,
+        logger=_noop_logger(),
+        expected_media_type="application/rdf+xml",
+    )
+
+    downloader._validate_media_type(
+        "application/rdf+xml",
+        downloader.expected_media_type,
+        "https://example.org/ont.owl",
+    )
+
+
+def test_validate_media_type_acceptable_variation(tmp_path, caplog):
+    logger = logging.getLogger("test-download-info")
+    downloader = download.StreamingDownloader(
+        destination=tmp_path / "file.owl",
+        headers={},
+        http_config=DownloadConfiguration(),
+        previous_manifest=None,
+        logger=logger,
+        expected_media_type="application/rdf+xml",
+    )
+
+    with caplog.at_level(logging.INFO, logger="test-download-info"):
+        downloader._validate_media_type(
+            "application/xml",
+            downloader.expected_media_type,
+            "https://example.org/ont.owl",
+        )
+
+    assert any("acceptable media type variation" in record.message for record in caplog.records)
+
+
+def test_validate_media_type_mismatch_logs_warning(tmp_path, caplog):
+    logger = logging.getLogger("test-download-warning")
+    downloader = download.StreamingDownloader(
+        destination=tmp_path / "file.owl",
+        headers={},
+        http_config=DownloadConfiguration(),
+        previous_manifest=None,
+        logger=logger,
+        expected_media_type="application/rdf+xml",
+    )
+
+    with caplog.at_level(logging.WARNING, logger="test-download-warning"):
+        downloader._validate_media_type(
+            "text/html",
+            downloader.expected_media_type,
+            "https://example.org/ont.owl",
+        )
+
+    assert any("media type mismatch" in record.message for record in caplog.records)
+    assert any(getattr(record, "override_hint", None) for record in caplog.records)
+
+
+def test_validate_media_type_disabled(tmp_path, caplog):
+    logger = logging.getLogger("test-download-disabled")
+    downloader = download.StreamingDownloader(
+        destination=tmp_path / "file.owl",
+        headers={},
+        http_config=DownloadConfiguration(validate_media_type=False),
+        previous_manifest=None,
+        logger=logger,
+        expected_media_type="application/rdf+xml",
+    )
+
+    with caplog.at_level(logging.WARNING, logger="test-download-disabled"):
+        downloader._validate_media_type(
+            "text/plain",
+            downloader.expected_media_type,
+            "https://example.org/ont.owl",
+        )
+
+    assert not caplog.records
 
 
 def test_extract_zip_safe(tmp_path):
@@ -315,6 +520,9 @@ def _noop_logger():
             pass
 
         def error(self, *args, **kwargs):
+            pass
+
+        def debug(self, *args, **kwargs):  # pragma: no cover - debug logging ignored in tests
             pass
 
     return _Logger()

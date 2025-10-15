@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Dict, List, Mapping, Sequence
+from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 
 from .config import FusionConfig
-from .similarity import normalize_rows, pairwise_inner_products
+from .similarity import cosine_against_corpus_gpu
 from .storage import OpenSearchSimulator
 from .tokenization import tokenize
 from .types import (
@@ -17,6 +17,9 @@ from .types import (
     HybridSearchRequest,
     HybridSearchResult,
 )
+
+if TYPE_CHECKING:  # pragma: no cover - used for type hints only
+    import faiss  # type: ignore
 
 
 class ResultShaper:
@@ -32,9 +35,18 @@ class ResultShaper:
         3
     """
 
-    def __init__(self, opensearch: OpenSearchSimulator, fusion_config: FusionConfig) -> None:
+    def __init__(
+        self,
+        opensearch: OpenSearchSimulator,
+        fusion_config: FusionConfig,
+        *,
+        device: int = 0,
+        resources: Optional["faiss.StandardGpuResources"] = None,
+    ) -> None:
         self._opensearch = opensearch
         self._fusion_config = fusion_config
+        self._gpu_device = int(device)
+        self._gpu_resources = resources
 
     def shape(
         self,
@@ -60,8 +72,6 @@ class ResultShaper:
         embeddings = np.stack(
             [chunk.features.embedding.astype(np.float32, copy=False) for chunk in ordered_chunks]
         )
-        normalized = normalize_rows(embeddings)
-        similarity_matrix = pairwise_inner_products(normalized)
 
         doc_buckets: Dict[str, int] = defaultdict(int)
         emitted_indices: List[int] = []
@@ -71,9 +81,7 @@ class ResultShaper:
             rank = current_idx + 1
             if not self._within_doc_limit(chunk.doc_id, doc_buckets):
                 continue
-            if emitted_indices and self._is_near_duplicate(
-                current_idx, emitted_indices, similarity_matrix
-            ):
+            if emitted_indices and self._is_near_duplicate(embeddings, current_idx, emitted_indices):
                 continue
             highlights = self._build_highlights(chunk, query_tokens)
             diagnostics = HybridSearchDiagnostics(
@@ -114,24 +122,23 @@ class ResultShaper:
 
     def _is_near_duplicate(
         self,
+        embeddings: np.ndarray,
         current_idx: int,
         emitted_indices: Sequence[int],
-        similarity_matrix: np.ndarray,
     ) -> bool:
-        """Determine whether the current chunk is too similar to emitted ones.
+        """Determine whether the current chunk is too similar to emitted ones."""
 
-        Args:
-            current_idx: Index of the current chunk in `ordered_chunks`.
-            emitted_indices: Indices already emitted into the result set.
-            similarity_matrix: Precomputed pairwise similarity matrix.
-
-        Returns:
-            True if cosine similarity exceeds the dedupe threshold.
-        """
-        similarities = similarity_matrix[current_idx, emitted_indices]
-        if similarities.size == 0:
+        if not emitted_indices:
             return False
-        return float(np.max(similarities)) >= self._fusion_config.cosine_dedupe_threshold
+        query = embeddings[current_idx]
+        corpus = embeddings[list(emitted_indices)]
+        sims = cosine_against_corpus_gpu(
+            query,
+            corpus,
+            device=self._gpu_device,
+            resources=self._gpu_resources,
+        )
+        return float(sims[0].max()) >= self._fusion_config.cosine_dedupe_threshold
 
     def _build_highlights(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
         """Generate highlight snippets for a chunk.

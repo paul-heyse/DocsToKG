@@ -45,6 +45,13 @@ DenseIndexConfig(
     ivfpq_use_precomputed=True,
     ivfpq_float16_lut=True,
     multi_gpu_mode="single",
+    gpu_temp_memory_bytes=None,
+    gpu_indices_32_bit=True,
+    expected_ntotal=1_000_000,
+    rebuild_delete_threshold=10000,
+    force_64bit_ids=False,
+    interleaved_layout=True,
+    flat_use_fp16=False,
 )
 ```
 
@@ -54,6 +61,16 @@ DenseIndexConfig(
 - `oversample` controls training sample size (`nlist * oversample`).
 - `multi_gpu_mode="replicate"` fans the index out to every visible GPU using
   `GpuMultipleClonerOptions`; leave as `"single"` to pin the index to one device.
+- `gpu_temp_memory_bytes` configures FAISS' temporary scratch allocator (set it
+  when you want deterministic peak VRAM usage).
+- `gpu_indices_32_bit=True` stores FAISS indices in 32-bit format, reducing VRAM
+  pressure when you know `ntotal < 2**31`.
+- `expected_ntotal` hints the expected vector count so FAISS can reserve GPU memory up front.
+- `rebuild_delete_threshold` batches delete-heavy workloads before forcing a full rebuild (set it
+  above `0` to defer rebuilds; the default of `0` rebuilds immediately for correctness).
+- `force_64bit_ids=True` disables the 32-bit ID optimisation when the full FAISS ID space is required.
+- `interleaved_layout` toggles GPU IVF interleaving optimisations (leave enabled unless debugging).
+- `flat_use_fp16` enables float16 compute for flat indexes when your workload tolerates the precision trade-off.
 
 Training samples for IVF indexes draw from a deterministic NumPy RNG, so repeated
 runs over the same corpus will reuse the exact calibration set. This makes it
