@@ -425,11 +425,11 @@
 
 ## 3. Resolver Module Restructuring - Foundation
 
-- [ ] 3.1 Create directory structure
+- [x] 3.1 Create directory structure
   - `mkdir -p src/DocsToKG/ContentDownload/resolvers/providers`
   - `touch src/DocsToKG/ContentDownload/resolvers/providers/__init__.py`
 
-- [ ] 3.2 Create `src/DocsToKG/ContentDownload/resolvers/types.py`
+- [x] 3.2 Create `src/DocsToKG/ContentDownload/resolvers/types.py`
   - Copy dataclass definitions from `resolvers/__init__.py`:
     - `ResolverResult` (lines ~198-232)
     - `ResolverConfig` (lines ~234-302)
@@ -443,7 +443,7 @@
   - Add imports: `dataclass`, `field`, `Protocol`, `Dict`, `List`, `Optional`, `Any`, `Counter`, `defaultdict`
   - Add module docstring: "Type definitions and protocols for the resolver pipeline."
 
-- [ ] 3.3 Create `src/DocsToKG/ContentDownload/resolvers/pipeline.py`
+- [x] 3.3 Create `src/DocsToKG/ContentDownload/resolvers/pipeline.py`
   - Copy `ResolverPipeline` class (lines ~594-840)
   - Copy helper functions: `_callable_accepts_argument` (lines ~577-591)
   - Import types from `.types`: `ResolverConfig`, `AttemptRecord`, `DownloadOutcome`, `PipelineResult`, `ResolverResult`, `Resolver`, `AttemptLogger`, `DownloadFunc`, `ResolverMetrics`
@@ -451,11 +451,11 @@
   - Import `requests`
   - Add module docstring: "Resolver pipeline orchestration and execution logic."
 
-- [ ] 3.4 Update `resolvers/pipeline.py` imports for new structure
+- [x] 3.4 Update `resolvers/pipeline.py` imports for new structure
   - Change `from DocsToKG.ContentDownload.utils import ...` to relative import if needed
   - Ensure all type references point to `types` module
 
-- [ ] 3.5 Create `src/DocsToKG/ContentDownload/resolvers/providers/__init__.py` with registry
+- [x] 3.5 Create `src/DocsToKG/ContentDownload/resolvers/providers/__init__.py` with registry
 
   ```python
   """Resolver provider implementations and registry."""
@@ -472,7 +472,7 @@
 
 ## 4. Resolver Module Restructuring - Individual Providers
 
-- [ ] 4.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/unpaywall.py`
+- [x] 4.1 Create `src/DocsToKG/ContentDownload/resolvers/providers/unpaywall.py`
   - Copy `UnpaywallResolver` class (lines ~851-988 from `resolvers/__init__.py`)
   - Copy `_fetch_unpaywall_data` helper and LRU cache (lines ~85-101)
   - Copy `_headers_cache_key` helper (lines ~81-82)
@@ -481,64 +481,64 @@
   - Import `requests`, `lru_cache`, `quote`, `Iterable`, `Dict`, `List`, `Tuple`, `Any`
   - Add module docstring: "Unpaywall API resolver for open access PDFs."
 
-- [ ] 4.2 Create `src/DocsToKG/ContentDownload/resolvers/providers/crossref.py`
+- [x] 4.2 Create `src/DocsToKG/ContentDownload/resolvers/providers/crossref.py`
   - Copy `CrossrefResolver` class (lines ~990-1145)
   - Copy `_fetch_crossref_data` helper and LRU cache (lines ~104-121)
   - Import necessary types and utilities
   - Add module docstring: "Crossref API resolver for publisher-hosted PDFs."
 
-- [ ] 4.3 Create `src/DocsToKG/ContentDownload/resolvers/providers/landing_page.py`
+- [x] 4.3 Create `src/DocsToKG/ContentDownload/resolvers/providers/landing_page.py`
   - Copy `LandingPageResolver` class (lines ~1148-1256)
   - Copy `_absolute_url` helper (lines ~844-848)
   - Import optional `BeautifulSoup` dependency with try/except
   - Import necessary types and utilities
   - Add module docstring: "Landing page scraper resolver using BeautifulSoup."
 
-- [ ] 4.4 Create `src/DocsToKG/ContentDownload/resolvers/providers/arxiv.py`
+- [x] 4.4 Create `src/DocsToKG/ContentDownload/resolvers/providers/arxiv.py`
   - Copy `ArxivResolver` class (lines ~1258-1309)
   - Import `strip_prefix` from utils
   - Add module docstring: "arXiv preprint resolver."
 
-- [ ] 4.5 Create `src/DocsToKG/ContentDownload/resolvers/providers/pmc.py`
+- [x] 4.5 Create `src/DocsToKG/ContentDownload/resolvers/providers/pmc.py`
   - Copy `PmcResolver` class (lines ~1312-1433)
   - Import necessary utilities including `normalize_pmcid`, `normalize_doi`, `dedupe`
   - Add module docstring: "PubMed Central resolver using NCBI utilities."
 
-- [ ] 4.6 Create `src/DocsToKG/ContentDownload/resolvers/providers/europe_pmc.py`
+- [x] 4.6 Create `src/DocsToKG/ContentDownload/resolvers/providers/europe_pmc.py`
   - Copy `EuropePmcResolver` class (lines ~1436-1504)
   - Add module docstring: "Europe PMC resolver for European open access articles."
 
-- [ ] 4.7 Create `src/DocsToKG/ContentDownload/resolvers/providers/core.py`
+- [x] 4.7 Create `src/DocsToKG/ContentDownload/resolvers/providers/core.py`
   - Copy `CoreResolver` class (lines ~1507-1581)
   - Add module docstring: "CORE API resolver for aggregated open access content."
 
-- [ ] 4.8 Create `src/DocsToKG/ContentDownload/resolvers/providers/doaj.py`
+- [x] 4.8 Create `src/DocsToKG/ContentDownload/resolvers/providers/doaj.py`
   - Copy `DoajResolver` class (lines ~1584-1658)
   - Add module docstring: "DOAJ (Directory of Open Access Journals) resolver."
 
-- [ ] 4.9 Create `src/DocsToKG/ContentDownload/resolvers/providers/semantic_scholar.py`
+- [x] 4.9 Create `src/DocsToKG/ContentDownload/resolvers/providers/semantic_scholar.py`
   - Copy `SemanticScholarResolver` class (lines ~1661-1721)
   - Copy `_fetch_semantic_scholar_data` helper and LRU cache (lines ~124-143)
   - Add module docstring: "Semantic Scholar Graph API resolver."
 
-- [ ] 4.10 Create `src/DocsToKG/ContentDownload/resolvers/providers/openaire.py`
+- [x] 4.10 Create `src/DocsToKG/ContentDownload/resolvers/providers/openaire.py`
   - Copy `OpenAireResolver` class (lines ~1724-1793)
   - Copy `_collect_candidate_urls` helper (lines ~146-155)
   - Add module docstring: "OpenAIRE research infrastructure resolver."
 
-- [ ] 4.11 Create `src/DocsToKG/ContentDownload/resolvers/providers/hal.py`
+- [x] 4.11 Create `src/DocsToKG/ContentDownload/resolvers/providers/hal.py`
   - Copy `HalResolver` class (lines ~1796-1873)
   - Add module docstring: "HAL (Hyper Articles en Ligne) open archive resolver."
 
-- [ ] 4.12 Create `src/DocsToKG/ContentDownload/resolvers/providers/osf.py`
+- [x] 4.12 Create `src/DocsToKG/ContentDownload/resolvers/providers/osf.py`
   - Copy `OsfResolver` class (lines ~1876-1954)
   - Add module docstring: "Open Science Framework preprints resolver."
 
-- [ ] 4.13 Create `src/DocsToKG/ContentDownload/resolvers/providers/wayback.py`
+- [x] 4.13 Create `src/DocsToKG/ContentDownload/resolvers/providers/wayback.py`
   - Copy `WaybackResolver` class (lines ~1957-2022)
   - Add module docstring: "Internet Archive Wayback Machine fallback resolver."
 
-- [ ] 4.14 Update `resolvers/providers/__init__.py` with complete registry
+- [x] 4.14 Update `resolvers/providers/__init__.py` with complete registry
 
   ```python
   from .unpaywall import UnpaywallResolver
@@ -573,7 +573,7 @@
       ]
   ```
 
-- [ ] 4.15 Create `src/DocsToKG/ContentDownload/resolvers/__init__.py` with backward-compatible exports
+- [x] 4.15 Create `src/DocsToKG/ContentDownload/resolvers/__init__.py` with backward-compatible exports
 
   ```python
   """Resolver pipeline and provider implementations.

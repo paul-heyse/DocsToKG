@@ -118,11 +118,7 @@ def request_with_retries(
 
     for attempt in range(max_retries + 1):
         try:
-            if hasattr(session, "request"):
-                response = session.request(method=method, url=url, **kwargs)
-            else:  # pragma: no cover - exercised in unit tests with dummy sessions
-                fallback = getattr(session, method.lower())
-                response = fallback(url, **kwargs)
+            response = session.request(method=method, url=url, **kwargs)
 
             if response.status_code not in retry_statuses:
                 return response
