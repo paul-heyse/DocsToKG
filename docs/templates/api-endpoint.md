@@ -1,12 +1,12 @@
-# API Endpoint: <ENDPOINT_PATH>
+# 1. API Endpoint: <ENDPOINT_PATH>
 
 **Method**: <HTTP_METHOD>
 
-**Description**: [Brief description of what this endpoint does]
+**Description**: [Brief description of what this endpoint does within DocsToKG]
 
 **Authentication**: [Required/Opcional authentication method]
 
-## Parameters
+## 2. Parameters
 
 ### Path Parameters
 
@@ -29,7 +29,7 @@
 
 - `Header-Name`: Description of header requirement
 
-## Responses
+## 3. Responses
 
 ### Success Response
 
@@ -66,7 +66,7 @@
 - **Status Code**: `500` - Internal Server Error
   - **Description**: [When this error occurs]
 
-## Examples
+## 4. Examples
 
 ### cURL Example
 
@@ -105,11 +105,11 @@ const data = await response.json();
 console.log(data);
 ```
 
-## Related Endpoints
+## 5. Related Endpoints
 
 - Add links to closely related endpoints here (if applicable)
 
-## Notes
+## 6. Notes
 
 - [Additional implementation notes]
 - [Rate limiting information]

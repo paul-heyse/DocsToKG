@@ -14,7 +14,17 @@ from .types import ChunkFeatures
 
 
 class FeatureGenerator:
-    """Derive sparse and dense features for chunk text."""
+    """Derive sparse and dense features for chunk text.
+
+    Attributes:
+        _embedding_dim: Dimensionality used for synthetic dense embeddings.
+
+    Examples:
+        >>> generator = FeatureGenerator(embedding_dim=8)
+        >>> features = generator.compute_features("hybrid search")
+        >>> sorted(features.bm25_terms)
+        ['hybrid', 'search']
+    """
 
     def __init__(self, *, embedding_dim: int = 2560) -> None:
         if embedding_dim <= 0:

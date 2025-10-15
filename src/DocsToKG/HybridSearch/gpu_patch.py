@@ -15,6 +15,14 @@ logger = logging.getLogger(__name__)
 
 
 def apply_patch() -> None:
+    """Preserve legacy GPU patch API while performing no operation.
+
+    Args:
+        None
+
+    Returns:
+        None
+    """
     logger.debug("HybridSearch GPU patch already integrated; nothing to apply.")
 
 

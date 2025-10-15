@@ -49,6 +49,9 @@ chunk: Chunk object produced by the hybrid chunker.
 Returns:
 Tuple containing a list of reference identifiers and sorted page numbers.
 
+Raises:
+None
+
 ### `merge_rec(a, b, tokenizer)`
 
 Merge two chunk records, updating token counts and provenance metadata.
@@ -119,15 +122,37 @@ Configured ChunkingDocSerializer instance.
 
 Return True when the chunk at `idx` is below the minimum token threshold.
 
+Args:
+idx: Index of the chunk under evaluation.
+
+Returns:
+True if the chunk length is less than `min_tokens`, else False.
+
 ## Classes
 
 ### `CaptionPlusAnnotationPictureSerializer`
 
 Serialize picture items with captions and rich annotation metadata.
 
+Attributes:
+None
+
+Examples:
+>>> serializer = CaptionPlusAnnotationPictureSerializer()
+>>> isinstance(serializer, MarkdownPictureSerializer)
+True
+
 ### `RichSerializerProvider`
 
 Provide a serializer that augments tables and pictures with Markdown.
+
+Attributes:
+None
+
+Examples:
+>>> provider = RichSerializerProvider()
+>>> isinstance(provider, ChunkingSerializerProvider)
+True
 
 ### `Rec`
 
@@ -139,3 +164,8 @@ n_tok: Token count computed by the tokenizer.
 src_idxs: Source chunk indices contributing to this record.
 refs: List of inline reference identifiers.
 pages: Page numbers associated with the chunk.
+
+Examples:
+>>> rec = Rec(text="Example", n_tok=5, src_idxs=[0], refs=[], pages=[1])
+>>> rec.n_tok
+5

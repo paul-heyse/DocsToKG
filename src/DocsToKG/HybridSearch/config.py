@@ -53,6 +53,7 @@ class DenseIndexConfig:
         device: GPU device ordinal for FAISS operations (0 default)
         ivfpq_use_precomputed: Use precomputed IVFPQ lookup tables (True default)
         ivfpq_float16_lut: Use float16 IVFPQ lookup tables when available (True default)
+        multi_gpu_mode: Replica strategy for multi-GPU hosts ("single" default)
 
     Examples:
         >>> config = DenseIndexConfig(
@@ -73,6 +74,7 @@ class DenseIndexConfig:
     device: int = 0
     ivfpq_use_precomputed: bool = True
     ivfpq_float16_lut: bool = True
+    multi_gpu_mode: Literal["single", "replicate"] = "single"
 
 
 @dataclass(frozen=True)
@@ -178,7 +180,18 @@ class HybridSearchConfig:
 
 
 class HybridSearchConfigManager:
-    """File-backed configuration manager with reload support."""
+    """File-backed configuration manager with reload support.
+
+    Attributes:
+        _path: Path to the JSON/YAML configuration file.
+        _lock: Threading lock guarding concurrent reloads.
+        _config: Cached HybridSearchConfig instance.
+
+    Examples:
+        >>> manager = HybridSearchConfigManager(Path("config.json"))  # doctest: +SKIP
+        >>> isinstance(manager.get(), HybridSearchConfig)  # doctest: +SKIP
+        True
+    """
 
     def __init__(self, path: Path) -> None:
         self._path = path
@@ -205,6 +218,10 @@ class HybridSearchConfigManager:
 
         Returns:
             Freshly loaded `HybridSearchConfig`.
+
+        Raises:
+            FileNotFoundError: If the configuration path is missing.
+            ValueError: If the config file is invalid JSON or YAML.
         """
         with self._lock:
             self._config = self._load()

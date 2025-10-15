@@ -1,10 +1,10 @@
-# [Setup Type] Setup Guide
+# 1. [Setup Type] Setup Guide
 
-## Overview
+## 2. Overview
 
-[Brief description of what this setup accomplishes and when to use it]
+[Brief description of what this setup accomplishes within DocsToKG and when to use it]
 
-## Prerequisites
+## 3. Prerequisites
 
 Before starting this setup, ensure you have:
 
@@ -26,7 +26,7 @@ Before starting this setup, ensure you have:
 - **[Account/Service]**: [Access credentials or permissions needed]
 - **[Account/Service]**: [Access credentials or permissions needed]
 
-## Installation Steps
+## 4. Installation Steps
 
 ### Step 1: [Preparation Step]
 
@@ -94,7 +94,7 @@ Before starting this setup, ensure you have:
 [Expected output or behavior]
 ```
 
-## Configuration
+## 5. Configuration
 
 ### Environment Variables
 
@@ -121,7 +121,7 @@ another_key = another_value
 
 [Instructions for configuring related services]
 
-## Verification and Testing
+## 6. Verification and Testing
 
 ### Basic Functionality Test
 
@@ -153,7 +153,7 @@ Test integration with related components:
 
 - [Expected integration result]
 
-## Troubleshooting
+## 7. Troubleshooting
 
 ### Common Issues
 
@@ -203,13 +203,13 @@ If you encounter issues not covered here:
 4. **Search existing issues**: [Link to issue tracker]
 5. **Ask for help**: [Contact information or community links]
 
-## Security Considerations
+## 8. Security Considerations
 
 - [Security best practice 1]
 - [Security best practice 2]
 - [Security checklist items]
 
-## Performance Tuning
+## 9. Performance Tuning
 
 ### Basic Optimization
 
@@ -221,7 +221,7 @@ If you encounter issues not covered here:
 - [Advanced tuning recommendation 1]
 - [Advanced tuning recommendation 2]
 
-## Maintenance
+## 10. Maintenance
 
 ### Regular Tasks
 
@@ -235,7 +235,7 @@ If you encounter issues not covered here:
 - [How to perform upgrades safely]
 - [Rollback procedures if needed]
 
-## Uninstallation
+## 11. Uninstallation
 
 To remove this installation:
 
@@ -250,13 +250,13 @@ To remove this installation:
 [cleanup_command]
 ```
 
-## Related Documentation
+## 12. Related Documentation
 
 - Add links to complementary setup guides or architecture docs
 - [Link to architecture documentation](../03-architecture/)
 - [Link to operations guide](../06-operations/)
 
-## Version History
+## 13. Version History
 
 - **v1.0.0**: Initial release
 - **v1.1.0**: [Changes in this version]

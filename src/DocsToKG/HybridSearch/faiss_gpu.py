@@ -17,7 +17,18 @@ import faiss  # type: ignore
 
 @dataclass(frozen=True, slots=True)
 class GPUOpts:
-    """Runtime options controlling GPU index behaviour."""
+    """Runtime options controlling GPU index behaviour.
+
+    Attributes:
+        device: GPU device identifier used for FAISS operations.
+        ivfpq_use_precomputed: Whether to enable IVFPQ precomputed tables.
+        ivfpq_float16_lut: Whether to enable float16 lookup tables for IVFPQ.
+
+    Examples:
+        >>> opts = GPUOpts(device=1, ivfpq_use_precomputed=False)
+        >>> opts.device
+        1
+    """
 
     device: int = 0
     ivfpq_use_precomputed: bool = True
@@ -49,6 +60,17 @@ def gpu_index_factory(
 
     Returns:
         IndexIDMap2 wrapping the requested GPU FAISS index.
+
+    Raises:
+        RuntimeError: When the requested index type is unavailable in the FAISS build.
+        ValueError: If an unsupported index_type is provided.
+
+    Examples:
+        >>> resources = faiss.StandardGpuResources()  # doctest: +SKIP
+        >>> index = gpu_index_factory(128, index_type="flat", nlist=1, nprobe=1,
+        ...                           pq_m=16, pq_bits=8, resources=resources)  # doctest: +SKIP
+        >>> isinstance(index, faiss.IndexIDMap2)  # doctest: +SKIP
+        True
     """
 
     opts = opts or GPUOpts()
@@ -104,7 +126,19 @@ def maybe_clone_to_gpu(
     device: int,
     resources: faiss.StandardGpuResources,
 ) -> "faiss.Index":
-    """Clone a CPU FAISS index onto a GPU with strict cloner options."""
+    """Clone a CPU FAISS index onto a GPU with strict cloner options.
+
+    Args:
+        index_cpu: CPU-backed FAISS index to clone.
+        device: GPU device identifier to host the cloned index.
+        resources: Shared FAISS GPU resources.
+
+    Returns:
+        faiss.Index: GPU-resident index (or the original if already on GPU).
+
+    Raises:
+        RuntimeError: If FAISS lacks GPU cloning support.
+    """
 
     # Allow callers to pass an already GPU-backed index.
     if hasattr(index_cpu, "getDevice"):

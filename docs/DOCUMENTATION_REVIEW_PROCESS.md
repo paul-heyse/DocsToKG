@@ -1,8 +1,8 @@
-# Documentation Review and Approval Process
+# 1. Documentation Review and Approval Process
 
 This document outlines the process for reviewing and approving documentation changes in the DocsToKG project. It ensures that all documentation maintains high quality, consistency, and accuracy.
 
-## Purpose
+## 2. Purpose
 
 The documentation review process ensures that:
 
@@ -11,7 +11,7 @@ The documentation review process ensures that:
 - **AI agent compatibility** is preserved for automated understanding
 - **User experience** is optimized for both human and AI readers
 
-## When Review is Required
+## 3. When Review is Required
 
 Documentation review is required for:
 
@@ -35,7 +35,7 @@ Documentation review is required for:
 - **Minor formatting** adjustments (spacing, indentation)
 - **Automated updates** from CI/CD pipelines
 
-## Review Process
+## 4. Review Process
 
 ### 1. Submission
 
@@ -73,7 +73,7 @@ Documentation review is required for:
 
 **Reviewers** approve when all criteria are met.
 
-## Documentation Review Checklist {#documentation-review-checklist}
+## 5. Documentation Review Checklist {#documentation-review-checklist}
 
 ### 📋 **Content Quality**
 
@@ -115,7 +115,7 @@ Documentation review is required for:
 - [ ] **Troubleshooting**: Common issues and solutions covered
 - [ ] **Version information**: Version compatibility clearly stated
 
-## Reviewer Guidelines
+## 6. Reviewer Guidelines
 
 ### 🎯 **Review Mindset**
 
@@ -153,7 +153,7 @@ Documentation review is required for:
     'When a token expires, call /api/auth/refresh with the refresh_token...'"
 ```
 
-## Author Guidelines
+## 7. Author Guidelines
 
 ### 📝 **Before Submission**
 
@@ -182,7 +182,7 @@ Documentation review is required for:
 - **Update documentation** based on real-world usage
 - **Share learnings** with the documentation team
 
-## Tools and Automation
+## 8. Tools and Automation
 
 ### 🤖 **Automated Checks**
 
@@ -202,7 +202,7 @@ The following automated checks run on all documentation changes:
 - **Style validators**: Vale or similar linting tools
 - **Preview tools**: Local documentation servers for testing
 
-## Escalation Process
+## 9. Escalation Process
 
 ### 🚨 **When to Escalate**
 
@@ -220,7 +220,7 @@ Escalate issues when:
 3. **Technical review**: Escalate to subject matter experts
 4. **Final decision**: Project maintainer makes final determination
 
-## Quality Metrics
+## 10. Quality Metrics
 
 ### 📊 **Success Metrics**
 
@@ -238,7 +238,7 @@ Track these metrics to improve the review process:
 - **Error reduction**: Less than 5% of approved docs require corrections
 - **User engagement**: Regular feedback and improvement suggestions
 
-## Integration with Development Workflow
+## 11. Integration with Development Workflow
 
 ### 🔄 **Git Workflow Integration**
 
@@ -259,7 +259,7 @@ Track these metrics to improve the review process:
 - **Merge requirements**: All checks must pass before merge
 - **Post-merge**: Automatic regeneration and deployment
 
-## Special Cases
+## 12. Special Cases
 
 ### 🚨 **Urgent Updates**
 
@@ -277,7 +277,7 @@ For large documentation changes:
 - **Incremental review**: Review in smaller chunks if possible
 - **Impact assessment**: Consider effects on users and AI agents
 
-## Getting Help
+## 13. Getting Help
 
 ### 📚 **Resources**
 
@@ -292,7 +292,7 @@ For large documentation changes:
 - **Technical questions**: Consult subject matter experts
 - **Process questions**: Ask documentation maintainers
 
-## Continuous Improvement
+## 14. Continuous Improvement
 
 ### 📈 **Process Evolution**
 

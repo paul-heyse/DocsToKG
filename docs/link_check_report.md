@@ -1,13 +1,13 @@
-# 🔗 Link Check Report
+# 1. 🔗 Link Check Report
 ==================================================
 Generated: 2025-10-14 20:11:12
 
-## Summary
+## 2. Summary
 - **Total Links**: 72
 - **Working Links**: 72 ✅
 - **Broken Links**: 0 ❌
 
-## ✅ Working Links (Sample)
+## 3. ✅ Working Links (Sample)
 
 - ✅ [ontology_downloader_config.md:21] https://pystow.readthedocs.io/
 - ✅ [ontology_downloader_config.md:21] https://pystow.readthedocs.io/

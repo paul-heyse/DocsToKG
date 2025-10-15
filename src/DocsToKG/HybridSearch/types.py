@@ -132,6 +132,26 @@ class ChunkPayload:
         source_chunk_idxs: Original chunk indices contributing to this payload
         doc_items_refs: References to DocTags items that produced the chunk
         char_offset: Optional character span of the chunk in the source document
+
+    Examples:
+        >>> payload = ChunkPayload(
+        ...     doc_id="doc-1",
+        ...     chunk_id="chunk-1",
+        ...     vector_id="vec-1",
+        ...     namespace="research",
+        ...     text="Hybrid search combines dense and sparse signals.",
+        ...     metadata={"section": "abstract"},
+        ...     features=ChunkFeatures(
+        ...         bm25_terms={"hybrid": 0.9},
+        ...         splade_weights={"search": 0.8},
+        ...         embedding=np.zeros(3, dtype=np.float32),
+        ...     ),
+        ...     token_count=12,
+        ...     source_chunk_idxs=[0],
+        ...     doc_items_refs=["doc:0"],
+        ... )
+        >>> payload.namespace
+        'research'
     """
 
     doc_id: str

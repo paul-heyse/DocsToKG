@@ -18,6 +18,11 @@ class PaginationCheckResult:
     Attributes:
         cursor_chain: Sequence of pagination cursors encountered.
         duplicate_detected: True when duplicate results were observed.
+
+    Examples:
+        >>> result = PaginationCheckResult(cursor_chain=[\"cursor1\"], duplicate_detected=False)
+        >>> result.duplicate_detected
+        False
     """
 
     cursor_chain: Sequence[str]

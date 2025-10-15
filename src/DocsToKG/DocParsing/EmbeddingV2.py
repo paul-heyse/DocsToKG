@@ -62,6 +62,11 @@ class Chunk:
     Attributes:
         uuid: Stable identifier for the chunk.
         text: Textual content extracted from the DocTags document.
+
+    Examples:
+        >>> chunk = Chunk(uuid="chunk-1", text="Hybrid search is powerful.")
+        >>> chunk.uuid
+        'chunk-1'
     """
 
     uuid: str
@@ -152,6 +157,11 @@ class BM25Stats:
         N: Total number of documents (chunks) in the corpus.
         avgdl: Average document length in tokens.
         df: Document frequency per token.
+
+    Examples:
+        >>> stats = BM25Stats(N=100, avgdl=120.5, df={"hybrid": 5})
+        >>> stats.df["hybrid"]
+        5
     """
 
     N: int
@@ -221,6 +231,11 @@ class SpladeCfg:
         cache_folder: Directory where transformer weights are cached.
         max_active_dims: Optional cap on active sparse dimensions.
         attn_impl: Preferred attention implementation override.
+
+    Examples:
+        >>> cfg = SpladeCfg(batch_size=8, device="cuda:1")
+        >>> cfg.batch_size
+        8
     """
 
     model_dir: Path = SPLADE_DIR
@@ -291,6 +306,11 @@ class QwenCfg:
         gpu_mem_util: Target GPU memory utilization for vLLM.
         batch_size: Number of texts processed per embedding batch.
         quantization: Optional quantization mode (e.g., `awq`).
+
+    Examples:
+        >>> cfg = QwenCfg(batch_size=64, tp=2)
+        >>> cfg.tp
+        2
     """
 
     model_dir: Path = QWEN_DIR

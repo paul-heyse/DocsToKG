@@ -5,7 +5,9 @@ and ontology ingest latency.
 
 ## 2. Hybrid Search
 
-- **Dense index parameters**: Adjust `DenseIndexConfig` (see `DocsToKG.HybridSearch.config`) for `nlist`, `nprobe`, and PQ settings. Use the FAISS scaffold to evaluate recall/latency trade-offs before rolling updates.
+- **Dense index parameters**: Adjust `DenseIndexConfig` (see
+  `DocsToKG.HybridSearch.config`) for `nlist`, `nprobe`, and PQ settings. Use the FAISS
+  scaffold to evaluate recall/latency trade-offs before rolling updates.
 - **Fusion weights**: Tweak `FusionConfig.k0` and `FusionConfig.mmr_lambda` to balance lexical vs dense dominance. Validate with `tests/test_hybrid_search.py`.
 - **Oversampling**: Increase `DenseIndexConfig.oversample` when accuracy drifts; monitor GPU memory impact via observability metrics.
 

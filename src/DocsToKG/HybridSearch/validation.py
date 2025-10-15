@@ -41,6 +41,10 @@ def load_dataset(path: Path) -> List[Mapping[str, object]]:
 
     Returns:
         List of parsed dataset rows suitable for validation routines.
+
+    Raises:
+        FileNotFoundError: If the dataset file does not exist.
+        json.JSONDecodeError: If any line contains invalid JSON.
     """
 
     lines = path.read_text(encoding="utf-8").splitlines()
@@ -99,7 +103,24 @@ BASIC_SPARSE_RELEVANCE_THRESHOLD = 0.90
 
 
 class HybridSearchValidator:
-    """Execute validation sweeps and persist reports."""
+    """Execute validation sweeps and persist reports.
+
+    Attributes:
+        _ingestion: Chunk ingestion pipeline used for preparing test data.
+        _service: Hybrid search service under validation.
+        _registry: Registry exposing ingested chunk metadata.
+        _opensearch: OpenSearch simulator for lexical storage inspection.
+
+    Examples:
+        >>> validator = HybridSearchValidator(
+        ...     ingestion=ChunkIngestionPipeline(...),  # doctest: +SKIP
+        ...     service=HybridSearchService(...),      # doctest: +SKIP
+        ...     registry=ChunkRegistry(),
+        ...     opensearch=OpenSearchSimulator(),
+        ... )
+        >>> isinstance(validator, HybridSearchValidator)
+        True
+    """
 
     def __init__(
         self,

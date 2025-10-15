@@ -63,16 +63,22 @@ logger: Logger for reporting failures or memory warnings.
 Returns:
 ValidationResult summarizing entity counts or failure details.
 
+Raises:
+None
+
 ### `validate_robot(request, logger)`
 
 Run ROBOT CLI validation and conversion workflows when available.
 
 Args:
 request: Validation request detailing ontology paths and output locations.
-logger: Logger adapter for reporting warnings and CLI errors.
+   logger: Logger adapter for reporting warnings and CLI errors.
 
 Returns:
 ValidationResult describing generated outputs or encountered issues.
+
+Raises:
+None
 
 ### `validate_arelle(request, logger)`
 
@@ -85,6 +91,9 @@ logger: Logger used to communicate validation progress and failures.
 Returns:
 ValidationResult indicating whether the validation completed and
 referencing any produced log files.
+
+Raises:
+None
 
 ### `run_validators(requests, logger)`
 
@@ -125,7 +134,16 @@ Dictionary with boolean status, detail payload, and output paths.
 
 ### `parse(self, path)`
 
-*No documentation available.*
+Record the source path so downstream operations can inspect it.
+
+Args:
+path: Filesystem path passed to the stub parser.
+
+Returns:
+None
+
+Raises:
+None
 
 ### `__len__(self)`
 
@@ -133,27 +151,68 @@ Dictionary with boolean status, detail payload, and output paths.
 
 ### `serialize(self, destination, format)`
 
-*No documentation available.*
+Write the previously parsed payload to the destination path.
+
+Args:
+destination: Output path where serialized content will be written.
+format: Serialization format requested by the caller.
+
+Returns:
+None
 
 ### `terms(self)`
 
-*No documentation available.*
+Yield placeholder ontology terms for test environments.
+
+Args:
+None
+
+Returns:
+List[str]: Static list of representative term identifiers.
 
 ### `dump(self, destination, format)`
 
-*No documentation available.*
+Write a minimal ontology representation to disk.
+
+Args:
+destination: Path where the serialized ontology should be stored.
+format: Requested output format (ignored by the stub).
+
+Returns:
+None
 
 ### `classes(self)`
 
-*No documentation available.*
+Return placeholder class identifiers for compatibility tests.
+
+Args:
+None
+
+Returns:
+list[str]: Static list of ontology class identifiers.
 
 ### `load(self)`
 
-*No documentation available.*
+Simulate ontology loading and return a stub content object.
+
+Args:
+None
+
+Returns:
+_StubLoadedOntology: Placeholder ontology representation.
+
+Raises:
+None
 
 ### `get_ontology(uri)`
 
-*No documentation available.*
+Return a stub ontology wrapper for the provided URI.
+
+Args:
+uri: URI identifying the ontology resource.
+
+Returns:
+_StubOntologyWrapper: Lightweight wrapper exposing `.load()`.
 
 ## Classes
 
@@ -168,6 +227,19 @@ normalized_dir: Directory used to write normalized artifacts.
 validation_dir: Directory for validator reports and logs.
 config: Resolved configuration that supplies timeout thresholds.
 
+Examples:
+>>> from pathlib import Path
+>>> from DocsToKG.OntologyDownload.config import ResolvedConfig
+>>> req = ValidationRequest(
+...     name="rdflib",
+...     file_path=Path("ontology.owl"),
+...     normalized_dir=Path("normalized"),
+...     validation_dir=Path("validation"),
+...     config=ResolvedConfig.from_defaults(),
+... )
+>>> req.name
+'rdflib'
+
 ### `ValidationResult`
 
 Outcome produced by a validator.
@@ -177,9 +249,23 @@ ok: Indicates whether the validator succeeded.
 details: Arbitrary metadata describing validator output.
 output_files: Generated files for downstream processing.
 
+Examples:
+>>> result = ValidationResult(ok=True, details={"triples": 10}, output_files=["ontology.ttl"])
+>>> result.ok
+True
+
 ### `ValidationTimeout`
 
 Raised when a validation task exceeds the configured timeout.
+
+Args:
+message: Optional description of the timeout condition.
+
+Examples:
+>>> raise ValidationTimeout("rdflib exceeded 60s")
+Traceback (most recent call last):
+...
+ValidationTimeout: rdflib exceeded 60s
 
 ### `_StubGraph`
 

@@ -6,99 +6,263 @@ In-memory storage simulators for OpenSearch and chunk registry.
 
 ### `matches_filters(chunk, filters)`
 
-*No documentation available.*
+Check whether a chunk satisfies OpenSearch-style filter conditions.
+
+Args:
+chunk: Chunk payload under evaluation.
+filters: Mapping of filter names to expected values or lists.
+
+Returns:
+True if the chunk matches all supplied filters, False otherwise.
 
 ### `upsert(self, chunks)`
 
-*No documentation available.*
+Insert or update chunk metadata for the provided vector IDs.
+
+Args:
+chunks: Sequence of chunks to cache by vector identifier.
+
+Returns:
+None
 
 ### `delete(self, vector_ids)`
 
-*No documentation available.*
+Remove chunk entries associated with the supplied vector IDs.
+
+Args:
+vector_ids: Vector identifiers whose payloads should be removed.
+
+Returns:
+None
+
+Raises:
+None
 
 ### `get(self, vector_id)`
 
-*No documentation available.*
+Retrieve a chunk payload by its vector identifier.
+
+Args:
+vector_id: Vector identifier to look up.
+
+Returns:
+Matching `ChunkPayload` or None if not present.
 
 ### `bulk_get(self, vector_ids)`
 
-*No documentation available.*
+Return existing chunks for the provided vector identifiers.
+
+Args:
+vector_ids: Collection of vector identifiers to fetch.
+
+Returns:
+List of chunk payloads found in the registry.
 
 ### `resolve_faiss_id(self, internal_id)`
 
-*No documentation available.*
+Translate a FAISS internal ID back to the original vector UUID.
+
+Args:
+internal_id: Integer identifier assigned by FAISS.
+
+Returns:
+Vector UUID if the mapping exists, else None.
 
 ### `all(self)`
 
-*No documentation available.*
+Return a list of all registered chunk payloads.
+
+Args:
+None
+
+Returns:
+List of all cached chunk payloads.
 
 ### `count(self)`
 
-*No documentation available.*
+Return the total number of tracked chunks.
+
+Args:
+None
+
+Returns:
+Number of chunks currently cached.
 
 ### `vector_ids(self)`
 
-*No documentation available.*
+List all vector identifiers in insertion order.
+
+Args:
+None
+
+Returns:
+List of vector identifiers tracked by the registry.
 
 ### `bulk_upsert(self, chunks)`
 
-*No documentation available.*
+Insert or replace OpenSearch documents for the provided chunks.
+
+Args:
+chunks: Sequence of chunk payloads to index.
+
+Returns:
+None
 
 ### `bulk_delete(self, vector_ids)`
 
-*No documentation available.*
+Delete OpenSearch documents associated with the vector identifiers.
+
+Args:
+vector_ids: Vector identifiers whose documents should be removed.
+
+Returns:
+None
+
+Raises:
+None
 
 ### `fetch(self, vector_ids)`
 
-*No documentation available.*
+Fetch stored chunk payloads for a list of vector IDs.
+
+Args:
+vector_ids: Vector identifiers to retrieve.
+
+Returns:
+List of chunk payloads matching the provided identifiers.
 
 ### `vector_ids(self)`
 
-*No documentation available.*
+Return all vector identifiers currently stored in OpenSearch.
+
+Args:
+None
+
+Returns:
+List of vector identifiers present in the simulator.
 
 ### `register_template(self, template)`
 
-*No documentation available.*
+Register an index template used for namespace-specific behavior.
+
+Args:
+template: Template to associate with its namespace.
+
+Returns:
+None
 
 ### `template_for(self, namespace)`
 
-*No documentation available.*
+Look up an index template for the given namespace.
+
+Args:
+namespace: Namespace identifier whose template is needed.
+
+Returns:
+Matching `OpenSearchIndexTemplate`, or None when missing.
 
 ### `search_bm25(self, query_weights, filters, top_k, cursor)`
 
-*No documentation available.*
+Execute a BM25-style search over stored chunks.
+
+Args:
+query_weights: Weighted token map for the query.
+filters: Filter constraints to apply before scoring.
+top_k: Maximum number of results to return.
+cursor: Optional pagination offset.
+
+Returns:
+Tuple of scored results and optional next cursor.
 
 ### `search_splade(self, query_weights, filters, top_k, cursor)`
 
-*No documentation available.*
+Execute a SPLADE-style sparse search over stored chunks.
+
+Args:
+query_weights: Weighted token map for SPLADE features.
+filters: Filter constraints applied before scoring.
+top_k: Maximum results to return.
+cursor: Optional pagination offset.
+
+Returns:
+Tuple of scored results and optional next cursor.
 
 ### `highlight(self, chunk, query_tokens)`
 
-*No documentation available.*
+Return basic term highlights for the given chunk.
+
+Args:
+chunk: Chunk payload whose text requires highlighting.
+query_tokens: Tokens derived from the query.
+
+Returns:
+List of highlight strings.
 
 ### `_filtered_chunks(self, filters)`
 
-*No documentation available.*
+Return chunks that match the provided filter constraints.
+
+Args:
+filters: Filter mapping applied to chunk metadata.
+
+Returns:
+List of stored chunks satisfying the filters.
 
 ### `_bm25_score(self, stored, query_weights)`
 
-*No documentation available.*
+Compute BM25 similarity between a stored chunk and query weights.
+
+Args:
+stored: Chunk under evaluation.
+query_weights: Weighted token map for the query.
+
+Returns:
+BM25 score for the chunk.
 
 ### `_paginate(self, scores, top_k, cursor)`
 
-*No documentation available.*
+Slice scored results according to the pagination cursor.
+
+Args:
+scores: Pre-sorted list of chunk-score tuples.
+top_k: Maximum number of items to emit.
+cursor: Optional offset into the ranked list.
+
+Returns:
+Tuple of the current page and optional next cursor.
 
 ### `_search_sparse(self, scoring_fn, filters, top_k, cursor)`
 
-*No documentation available.*
+Search sparse features using the supplied scoring function.
+
+Args:
+scoring_fn: Callable to compute a score for each stored chunk.
+filters: Filter mapping applied prior to scoring.
+top_k: Maximum number of results to return.
+cursor: Optional pagination offset.
+
+Returns:
+Tuple of scored results and optional next cursor.
 
 ### `_recompute_avg_length(self)`
 
-*No documentation available.*
+Maintain the running average token length for stored chunks.
+
+Args:
+None
+
+Returns:
+None
 
 ### `stats(self)`
 
-*No documentation available.*
+Return summary statistics for stored documents.
+
+Args:
+None
+
+Returns:
+Mapping containing document count and average token length.
 
 ## Classes
 
@@ -106,10 +270,40 @@ In-memory storage simulators for OpenSearch and chunk registry.
 
 Internal representation of a chunk stored in the OpenSearch simulator.
 
+Attributes:
+payload: Chunk payload persisted in the simulator.
+
+Examples:
+>>> # from DocsToKG.HybridSearch.types import ChunkFeatures, ChunkPayload  # doctest: +SKIP
+>>> # import numpy as np  # doctest: +SKIP
+>>> # payload = ChunkPayload(..., features=ChunkFeatures(...))  # doctest: +SKIP
+>>> # stored = StoredChunk(payload=payload)  # doctest: +SKIP
+>>> # stored.payload is payload  # doctest: +SKIP
+True
+
 ### `ChunkRegistry`
 
 Durable mapping of `vector_id` → `ChunkPayload` for joins and reconciliation.
 
+Attributes:
+_chunks: Mapping from vector identifiers to chunk payloads.
+_bridge: Mapping from FAISS integer IDs to vector identifiers.
+
+Examples:
+>>> registry = ChunkRegistry()
+>>> registry.count()
+0
+
 ### `OpenSearchSimulator`
 
 Subset of OpenSearch capabilities required for hybrid retrieval tests.
+
+Attributes:
+_chunks: Mapping from vector IDs to stored chunk metadata.
+_avg_length: Average chunk length for BM25 scoring.
+_templates: Registered namespace templates for index behavior.
+
+Examples:
+>>> os_sim = OpenSearchSimulator()
+>>> os_sim.vector_ids()
+[]

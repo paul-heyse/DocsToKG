@@ -15,7 +15,7 @@ import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Protocol, Sequence
 from urllib.parse import urlparse
@@ -25,7 +25,16 @@ try:  # pragma: no cover - exercised in environments without pystow installed
 except ModuleNotFoundError:  # pragma: no cover - provides lightweight fallback for tests
 
     class _PystowFallback:
-        """Minimal pystow replacement used when the dependency is absent."""
+        """Minimal pystow replacement used when the dependency is absent.
+
+        Attributes:
+            _root: Base directory used to emulate pystow's storage root.
+
+        Examples:
+            >>> fallback = _PystowFallback()
+            >>> isinstance(fallback.join("ontology"), Path)
+            True
+        """
 
         def __init__(self) -> None:
             self._root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
@@ -255,6 +264,9 @@ class Manifest:
 class Resolver(Protocol):
     """Protocol describing resolver planning behaviour.
 
+    Attributes:
+        None
+
     Examples:
         >>> import logging
         >>> spec = FetchSpec(id="CHEBI", resolver="dummy", extras={}, target_formats=("owl",))
@@ -346,7 +358,7 @@ def _write_manifest(manifest_path: Path, manifest: Manifest) -> None:
 
 
 def _build_destination(spec: FetchSpec, plan: FetchPlan, config: ResolvedConfig) -> Path:
-    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     version = plan.version or timestamp
     base_dir = ONTOLOGY_DIR / sanitize_filename(spec.id) / sanitize_filename(version)
     for subdir in ("original", "normalized", "validation"):
@@ -523,7 +535,7 @@ def fetch_one(
         sha256=result.sha256,
         etag=result.etag,
         last_modified=result.last_modified,
-        downloaded_at=datetime.utcnow().isoformat() + "Z",
+        downloaded_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         target_formats=spec.target_formats,
         validation=validation_results,
         artifacts=artifacts,

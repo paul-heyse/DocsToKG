@@ -220,25 +220,25 @@ def test_hybrid_search_returns_results(hybrid_service, seeded_chunk_fixture):
     assert response.results[0].doc_id == seeded_chunk_fixture.doc_id
 ```
 
-## Documentation Contributions
+## 7. Documentation Contributions
 
-### 6.3 Improving Existing Documentation
+### 7.1 Improving Existing Documentation
 
 1. **Identify gaps**: Look for unclear explanations or missing information
 2. **Check style**: Follow the [Style Guide](../STYLE_GUIDE.md)
 3. **Test examples**: Verify code examples work correctly
 4. **Update cross-references**: Ensure links between documents work
 
-### 6.4 Adding New Documentation
+### 7.2 Adding New Documentation
 
 1. **Use templates**: Check `docs/templates/` for appropriate templates
 2. **Follow structure**: Maintain consistent organization
 3. **Include examples**: Provide practical examples when possible
 4. **Consider AI agents**: Structure content for easy parsing
 
-## Release Process
+## 8. Release Process
 
-### 6.5 Version Management
+### 8.1 Version Management
 
 We follow [Semantic Versioning](https://semver.org/):
 
@@ -246,7 +246,7 @@ We follow [Semantic Versioning](https://semver.org/):
 - **Minor** (x.y.0): New features, backward compatible
 - **Patch** (x.y.z): Bug fixes, no new features
 
-### 6.6 Release Checklist
+### 8.2 Release Checklist
 
 - [ ] All tests pass (`pytest -q`, plus optional markers)
 - [ ] Documentation regenerated and validated
@@ -254,21 +254,21 @@ We follow [Semantic Versioning](https://semver.org/):
 - [ ] Release notes drafted (GitHub release or docs entry)
 - [ ] FAISS and ontology snapshots archived for rollback
 
-## Communication
+## 9. Communication
 
-### 6.7 Development Discussions
+### 9.1 Development Discussions
 
 - **GitHub Issues**: For bug reports and feature requests
 - **GitHub Discussions**: For questions and community discussions
 
-### 6.8 Getting Help
+### 9.2 Getting Help
 
 1. **Search existing issues** and discussions first
 2. **Check documentation** - your question might already be answered
 3. **Create a new issue** with clear description and reproduction steps
 4. **Ask in discussions** for general questions
 
-### 6.9 Contributing to This Guide
+### 9.3 Contributing to This Guide
 
 This development guide itself can be improved! If you find:
 
@@ -279,7 +279,7 @@ This development guide itself can be improved! If you find:
 
 Please contribute improvements through the same PR process.
 
-## Recognition
+## 10. Recognition
 
 Contributors are recognized through:
 
@@ -288,7 +288,7 @@ Contributors are recognized through:
 - **Special badges** for significant contributions
 - **Community spotlight** features
 
-## Code of Conduct
+## 11. Code of Conduct
 
 We follow the [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/version/2/0/code_of_conduct/). By participating, you agree to:
 

@@ -123,10 +123,51 @@ sha256: SHA-256 checksum of the downloaded artifact.
 etag: HTTP ETag returned by the upstream server, when available.
 last_modified: Upstream last-modified header value if provided.
 
+Examples:
+>>> result = DownloadResult(Path("ontology.owl"), "fresh", "deadbeef", None, None)
+>>> result.status
+'fresh'
+
 ### `TokenBucket`
 
 Simple token bucket implementation for per-host rate limiting.
 
+Attributes:
+rate: Token replenishment rate per second.
+capacity: Maximum number of tokens the bucket may hold.
+tokens: Current token balance available for consumption.
+timestamp: Monotonic timestamp of the last refill.
+lock: Threading lock protecting bucket state.
+
+Examples:
+>>> bucket = TokenBucket(rate_per_sec=2.0, capacity=4.0)
+>>> bucket.consume(1.0)  # consumes immediately
+>>> isinstance(bucket.tokens, float)
+True
+
 ### `StreamingDownloader`
 
 Custom downloader to support conditional requests, resume, and caching.
+
+Attributes:
+destination: Final location where the ontology will be stored.
+custom_headers: HTTP headers supplied by the resolver.
+http_config: Download configuration governing retries and limits.
+previous_manifest: Manifest from prior runs used for caching.
+logger: Logger used for structured telemetry.
+status: Final download status (`fresh`, `updated`, or `cached`).
+response_etag: ETag returned by the upstream server, if present.
+response_last_modified: Last-modified timestamp provided by the server.
+
+Examples:
+>>> from pathlib import Path
+>>> from DocsToKG.OntologyDownload.config import DownloadConfiguration
+>>> downloader = StreamingDownloader(
+...     destination=Path("/tmp/ontology.owl"),
+...     headers={},
+...     http_config=DownloadConfiguration(),
+...     previous_manifest={},
+...     logger=logging.getLogger("test"),
+... )
+>>> downloader.status
+'fresh'

@@ -13,7 +13,16 @@ and comprehensive result ranking through advanced fusion techniques.
 
 ### `search(self, request)`
 
-*No documentation available.*
+Execute a hybrid search request across all retrieval channels.
+
+Args:
+request: Validated hybrid search request describing query parameters.
+
+Returns:
+HybridSearchResponse containing fused results and cursor metadata.
+
+Raises:
+RequestValidationError: If the request fails validation checks.
 
 ### `_execute_bm25(self, request, filters, config, query_features, timings)`
 

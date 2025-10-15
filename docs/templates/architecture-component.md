@@ -1,16 +1,16 @@
-# Component: [COMPONENT_NAME]
+# 1. Component: [COMPONENT_NAME]
 
-## Overview
+## 2. Overview
 
-[Brief description of what this component does and its role in the system]
+[Brief description of what this component does and its role within the DocsToKG system]
 
-## Purpose and Responsibilities
+## 3. Purpose and Responsibilities
 
 - [Primary responsibility 1]
 - [Primary responsibility 2]
 - [Primary responsibility 3]
 
-## Architecture Context
+## 4. Architecture Context
 
 ### Position in System
 
@@ -32,7 +32,7 @@ graph TD
     E -.-> C
 ```
 
-## Dependencies
+## 5. Dependencies
 
 ### Internal Dependencies
 
@@ -49,7 +49,7 @@ graph TD
 - **Environment Variables**: [List required/optional env vars]
 - **Configuration Files**: [Path and purpose of config files]
 
-## Data Flow
+## 6. Data Flow
 
 ### Input Data
 
@@ -69,7 +69,7 @@ graph TD
 - **Format**: [Output data structure]
 - **Volume**: [Expected output volume]
 
-## API Interfaces
+## 7. API Interfaces
 
 ### Public Methods/Properties
 
@@ -93,14 +93,14 @@ class ComponentClass:
 
 - **Event Name**: [Trigger condition and handling]
 
-## Performance Characteristics
+## 8. Performance Characteristics
 
 - **Throughput**: [Expected requests/second or similar metric]
 - **Latency**: [Expected response time]
 - **Resource Usage**: [Memory, CPU, storage requirements]
 - **Scalability**: [Horizontal/vertical scaling capabilities]
 
-## Error Handling
+## 9. Error Handling
 
 ### Common Error Scenarios
 
@@ -112,7 +112,7 @@ class ComponentClass:
 - **[Recovery Strategy]**: [How the component recovers]
 - **[Recovery Strategy]**: [How the component recovers]
 
-## Monitoring and Observability
+## 10. Monitoring and Observability
 
 ### Key Metrics
 
@@ -129,7 +129,7 @@ class ComponentClass:
 - **Endpoint**: [Health check URL if applicable]
 - **Checks**: [What health checks verify]
 
-## Deployment and Operations
+## 11. Deployment and Operations
 
 ### Deployment Requirements
 
@@ -143,14 +143,14 @@ class ComponentClass:
 - **Shutdown**: [Graceful shutdown process]
 - **Maintenance**: [Regular maintenance tasks]
 
-## Security Considerations
+## 12. Security Considerations
 
 - **Authentication**: [How component handles auth]
 - **Authorization**: [Access control mechanisms]
 - **Data Protection**: [Encryption, PII handling]
 - **Audit Trail**: [What gets logged for security]
 
-## Testing Strategy
+## 13. Testing Strategy
 
 ### Unit Tests
 
@@ -167,7 +167,7 @@ class ComponentClass:
 - [Load testing approach]
 - [Benchmarking strategy]
 
-## Future Enhancements
+## 14. Future Enhancements
 
 ### Planned Improvements
 

@@ -21,6 +21,10 @@ Returns:
 Copy of the payload where common secret fields are replaced with
 `***masked***`.
 
+Examples:
+>>> mask_sensitive_data({"token": "secret", "status": "ok"})
+{'token': '***masked***', 'status': 'ok'}
+
 ### `generate_correlation_id()`
 
 Create a short-lived identifier that links related log entries.
@@ -31,6 +35,14 @@ None
 Returns:
 Twelve character hexadecimal identifier suitable for correlating log
 events across the ontology download pipeline.
+
+Raises:
+None
+
+Examples:
+>>> cid = generate_correlation_id()
+>>> len(cid)
+12
 
 ### `_compress_old_log(path)`
 
@@ -50,7 +62,19 @@ before deleting them.
 
 ### `setup_logging(config, log_dir)`
 
-*No documentation available.*
+Configure structured logging handlers for ontology downloads.
+
+Args:
+config: Logging configuration containing level, size, and retention.
+log_dir: Optional directory override for log file placement.
+
+Returns:
+Configured logger instance scoped to the ontology downloader.
+
+Examples:
+>>> logger = setup_logging(LoggingConfig(level="INFO", max_log_size_mb=1, retention_days=1))
+>>> logger.name
+'DocsToKG.OntologyDownload'
 
 ### `format(self, record)`
 
@@ -67,3 +91,11 @@ UTF-8 safe JSON string with masked secrets and correlation context.
 ### `JSONFormatter`
 
 Formatter emitting JSON structured logs.
+
+Attributes:
+None
+
+Examples:
+>>> formatter = JSONFormatter()
+>>> isinstance(formatter.format(logging.makeLogRecord({'msg': 'test'})), str)
+True

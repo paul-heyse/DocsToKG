@@ -10,7 +10,24 @@ from .config import ChunkingConfig
 
 @dataclass(slots=True)
 class OpenSearchIndexTemplate:
-    """Representation of an OpenSearch index template body."""
+    """Representation of an OpenSearch index template body.
+
+    Attributes:
+        name: Template name stored in OpenSearch.
+        namespace: Namespace served by the template.
+        body: Raw OpenSearch template body.
+        chunking: Chunking configuration used to parameterize the template.
+
+    Examples:
+        >>> template = OpenSearchIndexTemplate(
+        ...     name="hybrid-chunks-research",
+        ...     namespace="research",
+        ...     body={"settings": {}},
+        ...     chunking=ChunkingConfig(),
+        ... )
+        >>> template.namespace
+        'research'
+    """
 
     name: str
     namespace: str
@@ -38,7 +55,16 @@ class OpenSearchIndexTemplate:
 
 
 class OpenSearchSchemaManager:
-    """Bootstrap and track index templates per namespace."""
+    """Bootstrap and track index templates per namespace.
+
+    Attributes:
+        _templates: Mapping of namespace identifiers to index templates.
+
+    Examples:
+        >>> manager = OpenSearchSchemaManager()
+        >>> manager.bootstrap_template("research")
+        OpenSearchIndexTemplate(name='hybrid-chunks-research', namespace='research', ...)
+    """
 
     def __init__(self) -> None:
         self._templates: MutableMapping[str, OpenSearchIndexTemplate] = {}

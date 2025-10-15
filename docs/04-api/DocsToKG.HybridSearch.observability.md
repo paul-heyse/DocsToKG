@@ -44,12 +44,18 @@ None
 
 Iterate over collected counter metrics as structured samples.
 
+Args:
+None
+
 Returns:
 Iterable of `CounterSample` entries representing current counters.
 
 ### `export_histograms(self)`
 
 Iterate over collected histogram metrics summarized by percentiles.
+
+Args:
+None
 
 Returns:
 Iterable of `HistogramSample` entries containing percentile stats.
@@ -62,6 +68,9 @@ Args:
 name: Span name, used in metric and log emission.
 **attributes: Additional context attached to metrics and logs.
 
+Returns:
+None
+
 Yields:
 None
 
@@ -72,9 +81,21 @@ Exception: Propagates any exception raised inside the traced block.
 
 Access the shared metrics collector for hybrid search components.
 
+Args:
+None
+
+Returns:
+MetricsCollector instance tracking counters and histograms.
+
 ### `logger(self)`
 
 Structured logger scoped to hybrid search observability events.
+
+Args:
+None
+
+Returns:
+Logger configured for DocsToKG hybrid search messages.
 
 ### `trace(self, name)`
 
@@ -90,6 +111,9 @@ Context manager yielding control to the caller.
 ### `metrics_snapshot(self)`
 
 Produce a serializable snapshot of counters and histograms.
+
+Args:
+None
 
 Returns:
 Dictionary containing lists of counter and histogram samples.
@@ -165,6 +189,25 @@ Examples:
 
 Context manager producing timing spans for tracing.
 
+Attributes:
+_metrics: MetricsCollector used to record span durations.
+_logger: Logger that emits structured span events.
+
+Examples:
+>>> recorder = TraceRecorder(MetricsCollector(), logging.getLogger("test"))
+>>> with recorder.span("example"):
+...     pass
+
 ### `Observability`
 
 Facade for metrics, structured logging, and tracing.
+
+Attributes:
+_metrics: Shared metrics collector capturing counters and histograms.
+_logger: Logger scoped to the hybrid search subsystem.
+_tracer: TraceRecorder producing timing spans.
+
+Examples:
+>>> obs = Observability()
+>>> isinstance(obs.metrics_snapshot(), dict)
+True

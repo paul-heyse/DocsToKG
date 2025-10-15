@@ -94,11 +94,15 @@ The API returns at most `page_size` results per call. When additional results ar
 }
 ```
 
-Cursor chains are stable across requests unless the underlying index changes significantly. Use `DocsToKG.HybridSearch.operations.verify_pagination` during integration tests to ensure continuity.
+Cursor chains are stable across requests unless the underlying index changes significantly.
+Use `DocsToKG.HybridSearch.operations.verify_pagination` during integration tests to ensure
+continuity.
 
 ## 4. Diagnostics
 
-`timings_ms` contains latency measurements for each stage (BM25, SPLADE, FAISS, fusion) when observability is enabled. Per-result `diagnostics` expose individual signal scores, useful for ranking audits.
+`timings_ms` contains latency measurements for each stage (BM25, SPLADE, FAISS, fusion) when
+observability is enabled. Per-result `diagnostics` expose individual signal scores, useful for
+ranking audits.
 
 ## 5. Integrating with FastAPI
 

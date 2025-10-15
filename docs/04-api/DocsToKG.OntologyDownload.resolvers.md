@@ -98,7 +98,13 @@ ConfigError: If the specification omits the required URL.
 
 ### `join(self)`
 
-*No documentation available.*
+Join path segments relative to the fallback cache root.
+
+Args:
+*segments: Individual path components to append.
+
+Returns:
+Path rooted under the fallback pystow directory.
 
 ## Classes
 
@@ -114,30 +120,104 @@ version: Version identifier derived from resolver metadata.
 license: License reported for the ontology.
 media_type: MIME type of the artifact when known.
 
+Examples:
+>>> plan = FetchPlan(
+...     url="https://example.org/ontology.owl",
+...     headers={"Accept": "application/rdf+xml"},
+...     filename_hint="ontology.owl",
+...     version="2024-01-01",
+...     license="CC-BY",
+...     media_type="application/rdf+xml",
+... )
+>>> plan.version
+'2024-01-01'
+
 ### `BaseResolver`
 
 Shared helpers for resolver implementations.
+
+Attributes:
+None
+
+Examples:
+>>> class DemoResolver(BaseResolver):
+...     def plan(self, spec, config, logger):
+...         return self._build_plan(url="https://example.org/demo.owl")
+...
+>>> demo = DemoResolver()
+>>> isinstance(demo._build_plan(url="https://example.org").url, str)
+True
 
 ### `OBOResolver`
 
 Resolve ontologies hosted on the OBO Library using Bioregistry helpers.
 
+Attributes:
+None
+
+Examples:
+>>> resolver = OBOResolver()
+>>> callable(getattr(resolver, "plan"))
+True
+
 ### `OLSResolver`
 
 Resolve ontologies from the Ontology Lookup Service (OLS4).
+
+Attributes:
+client: OLS client instance used to perform API calls.
+credentials_path: Path where the API token is expected.
+
+Examples:
+>>> resolver = OLSResolver()
+>>> resolver.credentials_path.name.endswith(".txt")
+True
 
 ### `BioPortalResolver`
 
 Resolve ontologies using the BioPortal (OntoPortal) API.
 
+Attributes:
+client: BioPortal client used to query ontology metadata.
+api_key_path: Path on disk containing the API key.
+
+Examples:
+>>> resolver = BioPortalResolver()
+>>> resolver.api_key_path.suffix
+'.txt'
+
 ### `SKOSResolver`
 
 Resolver for direct SKOS/RDF URLs.
+
+Attributes:
+None
+
+Examples:
+>>> resolver = SKOSResolver()
+>>> callable(getattr(resolver, "plan"))
+True
 
 ### `XBRLResolver`
 
 Resolver for XBRL taxonomy packages.
 
+Attributes:
+None
+
+Examples:
+>>> resolver = XBRLResolver()
+>>> callable(getattr(resolver, "plan"))
+True
+
 ### `_PystowFallback`
 
 Minimal pystow replacement used when optional dependency is absent.
+
+Attributes:
+_root: Path root where cached resources should be stored.
+
+Examples:
+>>> fallback = _PystowFallback()
+>>> fallback.join("configs").name
+'configs'

@@ -6,14 +6,37 @@ Reciprocal Rank Fusion and diversification utilities.
 
 ### `apply_mmr_diversification(fused_candidates, fused_scores, lambda_param, top_k)`
 
-*No documentation available.*
+Apply maximal marginal relevance to promote diversity.
+
+Args:
+fused_candidates: Candidates ranked by initial fusion stage.
+fused_scores: Pre-computed relevance scores keyed by vector ID.
+lambda_param: Balance factor between relevance and diversity [0,1].
+top_k: Number of candidates to retain after diversification.
+
+Returns:
+List of diversified candidates ordered by selection.
 
 ### `fuse(self, candidates)`
 
-*No documentation available.*
+Score candidates using reciprocal rank fusion.
+
+Args:
+candidates: Ordered sequence of fusion candidates.
+
+Returns:
+Mapping of vector IDs to aggregated RRF scores.
 
 ## Classes
 
 ### `ReciprocalRankFusion`
 
 Combine ranked lists using Reciprocal Rank Fusion.
+
+Attributes:
+_k0: Fusion parameter controlling the influence of item rank.
+
+Examples:
+>>> rrf = ReciprocalRankFusion(k0=50.0)
+>>> rrf.fuse([])
+{}

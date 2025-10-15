@@ -35,7 +35,17 @@ _GPU_RES: Optional["faiss.StandardGpuResources"] = None
 
 
 def get_gpu_resources() -> "faiss.StandardGpuResources":
-    """Return a module-level `StandardGpuResources` singleton."""
+    """Return a module-level `StandardGpuResources` singleton.
+
+    Args:
+        None
+
+    Returns:
+        faiss.StandardGpuResources: Shared GPU resource manager instance.
+
+    Raises:
+        RuntimeError: If FAISS GPU helpers are unavailable or initialisation fails.
+    """
 
     if not _FAISS_AVAILABLE:
         raise RuntimeError("FAISS GPU helpers are unavailable")
@@ -55,7 +65,17 @@ def _as_f32(x: np.ndarray) -> np.ndarray:
 
 
 def normalize_rows(matrix: np.ndarray) -> np.ndarray:
-    """Normalise rows in-place for cosine similarity operations."""
+    """Normalise rows in-place for cosine similarity operations.
+
+    Args:
+        matrix: Contiguous float32 array whose rows should be L2 normalised.
+
+    Returns:
+        np.ndarray: The same matrix with rows normalised to unit length.
+
+    Raises:
+        TypeError: If the input array is not contiguous float32.
+    """
 
     if matrix.dtype != np.float32 or not matrix.flags.c_contiguous:
         raise TypeError("normalize_rows expects a contiguous float32 array")
@@ -76,7 +96,21 @@ def cosine_against_corpus_gpu(
     device: int = 0,
     resources: Optional["faiss.StandardGpuResources"] = None,
 ) -> np.ndarray:
-    """Compute cosine similarities between a query vector and a corpus on GPU."""
+    """Compute cosine similarities between a query vector and a corpus on GPU.
+
+    Args:
+        query: Query vector or matrix to compare against the corpus.
+        corpus: Corpus matrix containing candidate vectors.
+        device: GPU device index to execute the computation.
+        resources: Optional pre-created FAISS GPU resources.
+
+    Returns:
+        np.ndarray: Matrix of cosine similarities between query and corpus rows.
+
+    Raises:
+        RuntimeError: If FAISS GPU helpers are unavailable.
+        ValueError: If the query and corpus dimensionalities differ.
+    """
 
     if not _FAISS_AVAILABLE:
         raise RuntimeError("FAISS GPU helpers are unavailable")
@@ -107,7 +141,21 @@ def pairwise_inner_products(
     device: int = 0,
     resources: Optional["faiss.StandardGpuResources"] = None,
 ) -> np.ndarray:
-    """Return pairwise cosine similarities between rows of `a` and `b` on GPU."""
+    """Return pairwise cosine similarities between rows of `a` and `b` on GPU.
+
+    Args:
+        a: Matrix containing source vectors.
+        b: Optional matrix containing comparison vectors (defaults to `a`).
+        device: GPU device index to execute the computation.
+        resources: Optional FAISS GPU resources to reuse.
+
+    Returns:
+        np.ndarray: Matrix of cosine similarities between each row of `a` and `b`.
+
+    Raises:
+        RuntimeError: If FAISS GPU helpers are unavailable.
+        ValueError: If the input matrices have different dimensionality.
+    """
 
     if not _FAISS_AVAILABLE:
         raise RuntimeError("FAISS GPU helpers are unavailable")
@@ -142,7 +190,19 @@ def pairwise_inner_products(
 
 
 def max_inner_product(target: np.ndarray, corpus: np.ndarray, *, device: int = 0) -> float:
-    """Return the maximum cosine similarity between a target vector and corpus rows."""
+    """Return the maximum cosine similarity between a target vector and corpus rows.
+
+    Args:
+        target: Vector whose similarity against the corpus is evaluated.
+        corpus: Matrix containing candidate vectors.
+        device: GPU device index used for computation.
+
+    Returns:
+        float: Maximum cosine similarity score.
+
+    Raises:
+        RuntimeError: If FAISS GPU helpers are unavailable.
+    """
 
     if corpus.size == 0:
         return 0.0

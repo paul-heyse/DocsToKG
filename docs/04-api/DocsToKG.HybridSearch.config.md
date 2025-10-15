@@ -10,15 +10,38 @@ retrieval parameters with thread-safe configuration management.
 
 ### `from_dict(payload)`
 
-*No documentation available.*
+Construct a config object from a dictionary payload.
+
+Args:
+payload: Nested mapping containing `chunking`, `dense`, `fusion`,
+and `retrieval` sections compatible with dataclass fields.
+
+Returns:
+Fully populated `HybridSearchConfig` instance.
 
 ### `get(self)`
 
-*No documentation available.*
+Return the currently cached hybrid search configuration.
+
+Args:
+None
+
+Returns:
+Latest `HybridSearchConfig` loaded from disk.
 
 ### `reload(self)`
 
-*No documentation available.*
+Reload configuration from disk, replacing the cached instance.
+
+Args:
+None
+
+Returns:
+Freshly loaded `HybridSearchConfig`.
+
+Raises:
+FileNotFoundError: If the configuration path is missing.
+ValueError: If the config file is invalid JSON or YAML.
 
 ### `_load(self)`
 
@@ -59,7 +82,11 @@ nlist: Number of Voronoi cells for IVF indexes (1024 default)
 nprobe: Number of cells to search for IVF indexes (8 default)
 pq_m: Number of sub-quantizers for PQ indexes (16 default)
 pq_bits: Bits per sub-quantizer for PQ indexes (8 default)
-oversample: Oversampling factor for PQ search (2 default)
+oversample: Oversampling factor for IVF training samples (2 default)
+device: GPU device ordinal for FAISS operations (0 default)
+ivfpq_use_precomputed: Use precomputed IVFPQ lookup tables (True default)
+ivfpq_float16_lut: Use float16 IVFPQ lookup tables when available (True default)
+multi_gpu_mode: Replica strategy for multi-GPU hosts ("single" default)
 
 Examples:
 >>> config = DenseIndexConfig(
@@ -135,3 +162,13 @@ Examples:
 ### `HybridSearchConfigManager`
 
 File-backed configuration manager with reload support.
+
+Attributes:
+_path: Path to the JSON/YAML configuration file.
+_lock: Threading lock guarding concurrent reloads.
+_config: Cached HybridSearchConfig instance.
+
+Examples:
+>>> manager = HybridSearchConfigManager(Path("config.json"))  # doctest: +SKIP
+>>> isinstance(manager.get(), HybridSearchConfig)  # doctest: +SKIP
+True

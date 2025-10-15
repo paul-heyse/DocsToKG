@@ -20,7 +20,17 @@ from .types import (
 
 
 class ResultShaper:
-    """Collapse duplicates, enforce quotas, and generate highlights."""
+    """Collapse duplicates, enforce quotas, and generate highlights.
+
+    Attributes:
+        _opensearch: OpenSearch simulator providing highlighting hooks.
+        _fusion_config: Fusion configuration controlling dedupe thresholds and quotas.
+
+    Examples:
+        >>> shaper = ResultShaper(OpenSearchSimulator(), FusionConfig())
+        >>> shaper._fusion_config.max_chunks_per_doc
+        3
+    """
 
     def __init__(self, opensearch: OpenSearchSimulator, fusion_config: FusionConfig) -> None:
         self._opensearch = opensearch

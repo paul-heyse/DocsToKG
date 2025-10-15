@@ -1,22 +1,22 @@
-# Content Download Pipeline Migration Guide
+# 1. Content Download Pipeline Migration Guide
 
 This guide summarises the key operational updates introduced by the
-``refactor-content-download-pipeline`` change.
+``refactor-content-download-pipeline`` change within DocsToKG.
 
-## Config Changes
+## 2. Config Changes
 
 - ``resolver_rate_limits`` has been replaced with ``resolver_min_interval_s``.
   Update YAML/JSON resolver configurations accordingly.
 - Rate limits express the minimum seconds between requests (e.g. ``1.0`` means
   at most one request per second).
 
-## Logging Changes
+## 3. Logging Changes
 
 - Attempts and manifest records now stream to JSON Lines (``.jsonl``) files.
 - To export CSV, use the helper script: ``python scripts/export_attempts_csv.py``
   or run ``jq``: ``jq -r '[.timestamp,.work_id,...]|@csv' attempts.jsonl > attempts.csv``.
 
-## CLI Additions
+## 4. CLI Additions
 
 - ``--workers``: controls parallel worker count (default ``1``).
 - ``--dry-run``: measures resolver coverage without writing files.

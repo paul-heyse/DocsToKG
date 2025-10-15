@@ -25,7 +25,16 @@ try:  # pragma: no cover - exercised in environments without pystow installed
 except ModuleNotFoundError:  # pragma: no cover - provides lightweight fallback for tests
 
     class _PystowFallback:
-        """Minimal pystow replacement used when optional dependency is absent."""
+        """Minimal pystow replacement used when optional dependency is absent.
+
+        Attributes:
+            _root: Path root where cached resources should be stored.
+
+        Examples:
+            >>> fallback = _PystowFallback()
+            >>> fallback.join("configs").name
+            'configs'
+        """
 
         def __init__(self) -> None:
             self._root = Path(os.environ.get("PYSTOW_HOME", Path.home() / ".data"))
@@ -83,6 +92,9 @@ class FetchPlan:
 
 class BaseResolver:
     """Shared helpers for resolver implementations.
+
+    Attributes:
+        None
 
     Examples:
         >>> class DemoResolver(BaseResolver):
@@ -148,6 +160,9 @@ class BaseResolver:
 class OBOResolver(BaseResolver):
     """Resolve ontologies hosted on the OBO Library using Bioregistry helpers.
 
+    Attributes:
+        None
+
     Examples:
         >>> resolver = OBOResolver()
         >>> callable(getattr(resolver, "plan"))
@@ -193,6 +208,10 @@ class OBOResolver(BaseResolver):
 
 class OLSResolver(BaseResolver):
     """Resolve ontologies from the Ontology Lookup Service (OLS4).
+
+    Attributes:
+        client: OLS client instance used to perform API calls.
+        credentials_path: Path where the API token is expected.
 
     Examples:
         >>> resolver = OLSResolver()
@@ -280,6 +299,10 @@ class OLSResolver(BaseResolver):
 
 class BioPortalResolver(BaseResolver):
     """Resolve ontologies using the BioPortal (OntoPortal) API.
+
+    Attributes:
+        client: BioPortal client used to query ontology metadata.
+        api_key_path: Path on disk containing the API key.
 
     Examples:
         >>> resolver = BioPortalResolver()
@@ -373,6 +396,9 @@ class BioPortalResolver(BaseResolver):
 class SKOSResolver(BaseResolver):
     """Resolver for direct SKOS/RDF URLs.
 
+    Attributes:
+        None
+
     Examples:
         >>> resolver = SKOSResolver()
         >>> callable(getattr(resolver, "plan"))
@@ -405,6 +431,9 @@ class SKOSResolver(BaseResolver):
 
 class XBRLResolver(BaseResolver):
     """Resolver for XBRL taxonomy packages.
+
+    Attributes:
+        None
 
     Examples:
         >>> resolver = XBRLResolver()

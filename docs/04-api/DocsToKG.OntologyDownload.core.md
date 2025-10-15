@@ -89,7 +89,13 @@ Concrete plan containing download URL, headers, and metadata.
 
 ### `join(self)`
 
-*No documentation available.*
+Build a path relative to the fallback pystow root directory.
+
+Args:
+*segments: Path segments appended to the root directory.
+
+Returns:
+Path object pointing to the requested cache location.
 
 ## Classes
 
@@ -97,17 +103,53 @@ Concrete plan containing download URL, headers, and metadata.
 
 Base exception for ontology download failures.
 
+Args:
+message: Description of the failure encountered.
+
+Examples:
+>>> raise OntologyDownloadError("unexpected error")
+Traceback (most recent call last):
+...
+OntologyDownloadError: unexpected error
+
 ### `ResolverError`
 
 Raised when resolver planning fails.
+
+Args:
+message: Description of the resolver failure.
+
+Examples:
+>>> raise ResolverError("resolver unavailable")
+Traceback (most recent call last):
+...
+ResolverError: resolver unavailable
 
 ### `ValidationError`
 
 Raised when validation encounters unrecoverable issues.
 
+Args:
+message: Human-readable description of the validation failure.
+
+Examples:
+>>> raise ValidationError("robot validator crashed")
+Traceback (most recent call last):
+...
+ValidationError: robot validator crashed
+
 ### `ConfigurationError`
 
 Raised when configuration or manifest validation fails.
+
+Args:
+message: Details about the configuration inconsistency.
+
+Examples:
+>>> raise ConfigurationError("manifest missing sha256")
+Traceback (most recent call last):
+...
+ConfigurationError: manifest missing sha256
 
 ### `FetchSpec`
 
@@ -118,6 +160,11 @@ id: Stable identifier for the ontology to fetch.
 resolver: Name of the resolver strategy used to locate resources.
 extras: Resolver-specific configuration overrides.
 target_formats: Normalized ontology formats that should be produced.
+
+Examples:
+>>> spec = FetchSpec(id="CHEBI", resolver="obo", extras={}, target_formats=("owl",))
+>>> spec.resolver
+'obo'
 
 ### `FetchResult`
 
@@ -130,6 +177,20 @@ status: Final download status (e.g., `success`, `skipped`).
 sha256: SHA-256 digest of the downloaded file.
 manifest_path: Path to the generated manifest JSON file.
 artifacts: Ancillary files produced during extraction or validation.
+
+Examples:
+>>> from pathlib import Path
+>>> spec = FetchSpec(id="CHEBI", resolver="obo", extras={}, target_formats=("owl",))
+>>> result = FetchResult(
+...     spec=spec,
+...     local_path=Path("CHEBI.owl"),
+...     status="success",
+...     sha256="deadbeef",
+...     manifest_path=Path("manifest.json"),
+...     artifacts=(),
+... )
+>>> result.status
+'success'
 
 ### `Manifest`
 
@@ -151,10 +212,59 @@ target_formats: Desired conversion targets for normalization.
 validation: Mapping of validator names to their results.
 artifacts: Additional file paths generated during processing.
 
+Examples:
+>>> manifest = Manifest(
+...     id="CHEBI",
+...     resolver="obo",
+...     url="https://example.org/chebi.owl",
+...     filename="chebi.owl",
+...     version=None,
+...     license="CC-BY",
+...     status="success",
+...     sha256="deadbeef",
+...     etag=None,
+...     last_modified=None,
+...     downloaded_at="2024-01-01T00:00:00Z",
+...     target_formats=("owl",),
+...     validation={},
+...     artifacts=(),
+... )
+>>> manifest.resolver
+'obo'
+
 ### `Resolver`
 
 Protocol describing resolver planning behaviour.
 
+Attributes:
+None
+
+Examples:
+>>> import logging
+>>> spec = FetchSpec(id="CHEBI", resolver="dummy", extras={}, target_formats=("owl",))
+>>> class DummyResolver:
+...     def plan(self, spec, config, logger):
+...         return FetchPlan(
+...             url="https://example.org/chebi.owl",
+...             headers={},
+...             filename_hint="chebi.owl",
+...             version="v1",
+...             license="CC-BY",
+...             media_type="application/rdf+xml",
+...         )
+...
+>>> plan = DummyResolver().plan(spec, ResolvedConfig.from_defaults(), logging.getLogger("test"))
+>>> plan.url
+'https://example.org/chebi.owl'
+
 ### `_PystowFallback`
 
 Minimal pystow replacement used when the dependency is absent.
+
+Attributes:
+_root: Base directory used to emulate pystow's storage root.
+
+Examples:
+>>> fallback = _PystowFallback()
+>>> isinstance(fallback.join("ontology"), Path)
+True

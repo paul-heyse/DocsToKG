@@ -56,11 +56,30 @@ their string values for supported overrides.
 
 ### `merge_defaults(ontology_spec, defaults)`
 
-*No documentation available.*
+Merge an ontology specification with resolved default settings.
+
+Args:
+ontology_spec: Raw ontology specification loaded from configuration.
+defaults: Default configuration block to apply (optional).
+
+Returns:
+Fetch specification populated with normalized resolver settings.
+
+Raises:
+ConfigError: If required fields are missing or extras have invalid types.
 
 ### `build_resolved_config(raw_config)`
 
-*No documentation available.*
+Construct a fully-resolved configuration from raw YAML contents.
+
+Args:
+raw_config: Mapping produced by YAML parsing containing defaults and ontologies.
+
+Returns:
+ResolvedConfig containing merged defaults and instantiated fetch specs.
+
+Raises:
+ConfigError: If the raw configuration violates schema expectations.
 
 ### `_make_fetch_spec(ontology_id, resolver, extras, target_formats)`
 
@@ -117,6 +136,9 @@ config_path: Path to the YAML file describing ontology downloads.
 Returns:
 Resolved configuration with defaults merged and fetch specs created.
 
+Raises:
+ConfigError: If the configuration contains invalid structures or values.
+
 ### `rate_limit_per_second(self)`
 
 Convert the textual rate limit to a per-second float value.
@@ -133,7 +155,13 @@ unit or the numeric portion cannot be parsed.
 
 ### `from_defaults(cls)`
 
-*No documentation available.*
+Create an empty resolved configuration using library defaults.
+
+Args:
+None
+
+Returns:
+ResolvedConfig populated with default download parameters and no specs.
 
 ### `_parse_scalar(value)`
 
@@ -149,13 +177,31 @@ unit or the numeric portion cannot be parsed.
 
 ### `safe_load(text)`
 
-*No documentation available.*
+Parse a YAML string using the lightweight fallback implementation.
+
+Args:
+text: Raw YAML content to be parsed into Python structures.
+
+Returns:
+Parsed Python object mirroring the YAML structure.
+
+Raises:
+_YAMLError: If the payload contains unsupported YAML constructs.
 
 ## Classes
 
 ### `ConfigError`
 
 Raised when ontology configuration files are invalid or inconsistent.
+
+Args:
+message: Description of the configuration error encountered.
+
+Examples:
+>>> raise ConfigError("Missing ontology id")
+Traceback (most recent call last):
+...
+ConfigError: Missing ontology id
 
 ### `LoggingConfiguration`
 
@@ -166,9 +212,24 @@ level: Logging level name (e.g., `INFO`, `DEBUG`).
 max_log_size_mb: Maximum individual log file size before rotation.
 retention_days: Number of days to keep logs prior to compression.
 
+Examples:
+>>> logging_config = LoggingConfiguration(level="DEBUG", retention_days=7)
+>>> logging_config.level
+'DEBUG'
+
 ### `ValidationConfig`
 
 Validation limits governing parser execution.
+
+Attributes:
+parser_timeout_sec: Maximum runtime allowed per validator in seconds.
+max_memory_mb: Memory ceiling in megabytes for validation processes.
+skip_reasoning_if_size_mb: Threshold size that disables reasoning steps.
+
+Examples:
+>>> validation = ValidationConfig(parser_timeout_sec=120, max_memory_mb=1024)
+>>> validation.max_memory_mb
+1024
 
 ### `DownloadConfiguration`
 
@@ -181,8 +242,14 @@ download_timeout_sec: Upper bound for whole file downloads.
 backoff_factor: Backoff multiplier used between retry attempts.
 per_host_rate_limit: Token bucket rate limit definition per host.
 max_download_size_gb: Maximum allowed ontology archive size.
+concurrent_downloads: Maximum concurrent download workers to run.
 
-### `DefaultsConfiguration`
+Examples:
+>>> dl_config = DownloadConfiguration(max_retries=3, per_host_rate_limit="2/second")
+>>> dl_config.max_retries
+3
+
+### `DefaultsConfig`
 
 Collection of default settings applied to ontology fetch specifications.
 
@@ -196,6 +263,11 @@ logging: Logging configuration applied to the downloader runtime.
 continue_on_error: Whether to proceed after non-fatal download errors.
 concurrent_downloads: Maximum concurrent download workers to run.
 
+Examples:
+>>> defaults = DefaultsConfig(prefer_source=["obo", "direct"])
+>>> list(defaults.prefer_source)
+['obo', 'direct']
+
 ### `ResolvedConfig`
 
 Container for merged configuration defaults and fetch specifications.
@@ -203,6 +275,11 @@ Container for merged configuration defaults and fetch specifications.
 Attributes:
 defaults: Finalized default settings applied to fetch specs.
 specs: Sequence of ontology fetch specifications to execute.
+
+Examples:
+>>> resolved = ResolvedConfig.from_defaults()
+>>> resolved.specs
+()
 
 ### `_YAMLError`
 

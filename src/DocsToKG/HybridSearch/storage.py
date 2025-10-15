@@ -44,13 +44,35 @@ if TYPE_CHECKING:  # pragma: no cover - import guard for type checking only
 
 @dataclass(slots=True)
 class StoredChunk:
-    """Internal representation of a chunk stored in the OpenSearch simulator."""
+    """Internal representation of a chunk stored in the OpenSearch simulator.
+
+    Attributes:
+        payload: Chunk payload persisted in the simulator.
+
+    Examples:
+        >>> # from DocsToKG.HybridSearch.types import ChunkFeatures, ChunkPayload  # doctest: +SKIP
+        >>> # import numpy as np  # doctest: +SKIP
+        >>> # payload = ChunkPayload(..., features=ChunkFeatures(...))  # doctest: +SKIP
+        >>> # stored = StoredChunk(payload=payload)  # doctest: +SKIP
+        >>> # stored.payload is payload  # doctest: +SKIP
+        True
+    """
 
     payload: ChunkPayload
 
 
 class ChunkRegistry:
-    """Durable mapping of `vector_id` → `ChunkPayload` for joins and reconciliation."""
+    """Durable mapping of `vector_id` → `ChunkPayload` for joins and reconciliation.
+
+    Attributes:
+        _chunks: Mapping from vector identifiers to chunk payloads.
+        _bridge: Mapping from FAISS integer IDs to vector identifiers.
+
+    Examples:
+        >>> registry = ChunkRegistry()
+        >>> registry.count()
+        0
+    """
 
     def __init__(self) -> None:
         self._chunks: Dict[str, ChunkPayload] = {}
@@ -76,6 +98,9 @@ class ChunkRegistry:
             vector_ids: Vector identifiers whose payloads should be removed.
 
         Returns:
+            None
+
+        Raises:
             None
         """
         for vector_id in vector_ids:
@@ -150,7 +175,18 @@ class ChunkRegistry:
 
 
 class OpenSearchSimulator:
-    """Subset of OpenSearch capabilities required for hybrid retrieval tests."""
+    """Subset of OpenSearch capabilities required for hybrid retrieval tests.
+
+    Attributes:
+        _chunks: Mapping from vector IDs to stored chunk metadata.
+        _avg_length: Average chunk length for BM25 scoring.
+        _templates: Registered namespace templates for index behavior.
+
+    Examples:
+        >>> os_sim = OpenSearchSimulator()
+        >>> os_sim.vector_ids()
+        []
+    """
 
     def __init__(self) -> None:
         self._chunks: Dict[str, StoredChunk] = {}
@@ -177,6 +213,9 @@ class OpenSearchSimulator:
             vector_ids: Vector identifiers whose documents should be removed.
 
         Returns:
+            None
+
+        Raises:
             None
         """
         for vector_id in vector_ids:

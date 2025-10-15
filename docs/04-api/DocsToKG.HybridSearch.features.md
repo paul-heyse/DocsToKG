@@ -6,11 +6,23 @@ Feature generation utilities for SPLADE weights and dense embeddings.
 
 ### `embedding_dim(self)`
 
-*No documentation available.*
+Return the dimensionality used for synthetic dense embeddings.
+
+Args:
+None
+
+Returns:
+Integer dimensionality for generated embeddings.
 
 ### `compute_features(self, text)`
 
-*No documentation available.*
+Generate BM25, SPLADE, and dense features for the supplied text.
+
+Args:
+text: Chunk text that requires feature extraction.
+
+Returns:
+ChunkFeatures containing sparse and dense representations.
 
 ### `_compute_bm25(self, tokens)`
 
@@ -37,3 +49,12 @@ Feature generation utilities for SPLADE weights and dense embeddings.
 ### `FeatureGenerator`
 
 Derive sparse and dense features for chunk text.
+
+Attributes:
+_embedding_dim: Dimensionality used for synthetic dense embeddings.
+
+Examples:
+>>> generator = FeatureGenerator(embedding_dim=8)
+>>> features = generator.compute_features("hybrid search")
+>>> sorted(features.bm25_terms)
+['hybrid', 'search']

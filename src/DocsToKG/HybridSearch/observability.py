@@ -175,7 +175,17 @@ class MetricsCollector:
 
 
 class TraceRecorder:
-    """Context manager producing timing spans for tracing."""
+    """Context manager producing timing spans for tracing.
+
+    Attributes:
+        _metrics: MetricsCollector used to record span durations.
+        _logger: Logger that emits structured span events.
+
+    Examples:
+        >>> recorder = TraceRecorder(MetricsCollector(), logging.getLogger("test"))
+        >>> with recorder.span("example"):
+        ...     pass
+    """
 
     def __init__(self, metrics: MetricsCollector, logger: logging.Logger) -> None:
         self._metrics = metrics
@@ -214,7 +224,18 @@ class TraceRecorder:
 
 
 class Observability:
-    """Facade for metrics, structured logging, and tracing."""
+    """Facade for metrics, structured logging, and tracing.
+
+    Attributes:
+        _metrics: Shared metrics collector capturing counters and histograms.
+        _logger: Logger scoped to the hybrid search subsystem.
+        _tracer: TraceRecorder producing timing spans.
+
+    Examples:
+        >>> obs = Observability()
+        >>> isinstance(obs.metrics_snapshot(), dict)
+        True
+    """
 
     def __init__(self, *, logger: Optional[logging.Logger] = None) -> None:
         self._metrics = MetricsCollector()

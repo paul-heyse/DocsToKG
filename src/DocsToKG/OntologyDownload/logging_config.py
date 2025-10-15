@@ -15,7 +15,7 @@ import logging
 import os
 import sys
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Dict, Optional
@@ -62,6 +62,9 @@ def generate_correlation_id() -> str:
         Twelve character hexadecimal identifier suitable for correlating log
         events across the ontology download pipeline.
 
+    Raises:
+        None
+
     Examples:
         >>> cid = generate_correlation_id()
         >>> len(cid)
@@ -72,6 +75,9 @@ def generate_correlation_id() -> str:
 
 class JSONFormatter(logging.Formatter):
     """Formatter emitting JSON structured logs.
+
+    Attributes:
+        None
 
     Examples:
         >>> formatter = JSONFormatter()
@@ -88,8 +94,9 @@ class JSONFormatter(logging.Formatter):
         Returns:
             UTF-8 safe JSON string with masked secrets and correlation context.
         """
+        now = datetime.now(timezone.utc)
         log_obj = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": now.isoformat().replace("+00:00", "Z"),
             "level": record.levelname,
             "message": record.getMessage(),
             "correlation_id": getattr(record, "correlation_id", None),
@@ -123,14 +130,14 @@ def _cleanup_logs(log_dir: Path, retention_days: int) -> None:
         retention_days: Number of days to keep uncompressed or compressed logs
             before deleting them.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     retention_delta = timedelta(days=retention_days)
     for file in log_dir.glob("*.jsonl"):
-        mtime = datetime.utcfromtimestamp(file.stat().st_mtime)
+        mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
         if now - mtime > retention_delta:
             _compress_old_log(file)
     for file in log_dir.glob("*.jsonl.gz"):
-        mtime = datetime.utcfromtimestamp(file.stat().st_mtime)
+        mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
         if now - mtime > retention_delta:
             file.unlink(missing_ok=True)
 
@@ -172,7 +179,8 @@ def setup_logging(config: LoggingConfig, log_dir: Optional[Path] = None) -> logg
     stream_handler._ontofetch_managed = True  # type: ignore[attr-defined]
     logger.addHandler(stream_handler)
 
-    file_name = sanitize_filename(f"ontofetch-{datetime.utcnow().strftime('%Y%m%d')}.jsonl")
+    today = datetime.now(timezone.utc).strftime("%Y%m%d")
+    file_name = sanitize_filename(f"ontofetch-{today}.jsonl")
     file_handler = RotatingFileHandler(
         log_dir / file_name,
         maxBytes=int(config.max_log_size_mb * 1024 * 1024),

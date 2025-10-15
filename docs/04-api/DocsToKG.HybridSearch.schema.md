@@ -6,19 +6,44 @@ OpenSearch schema management for hybrid chunk documents.
 
 ### `asdict(self)`
 
-*No documentation available.*
+Convert the template to a serializable dictionary payload.
+
+Args:
+None
+
+Returns:
+Dictionary representation suitable for persistence or logging.
 
 ### `bootstrap_template(self, namespace, chunking)`
 
-*No documentation available.*
+Create and register an index template for a namespace.
+
+Args:
+namespace: Namespace identifier the template should serve.
+chunking: Optional chunking configuration override.
+
+Returns:
+Newly created `OpenSearchIndexTemplate` instance.
 
 ### `get_template(self, namespace)`
 
-*No documentation available.*
+Retrieve a registered template for the given namespace.
+
+Args:
+namespace: Namespace identifier to look up.
+
+Returns:
+Matching `OpenSearchIndexTemplate`, or None if not registered.
 
 ### `list_templates(self)`
 
-*No documentation available.*
+Return a copy of all registered templates by namespace.
+
+Args:
+None
+
+Returns:
+Mapping from namespace to `OpenSearchIndexTemplate`.
 
 ## Classes
 
@@ -26,6 +51,30 @@ OpenSearch schema management for hybrid chunk documents.
 
 Representation of an OpenSearch index template body.
 
+Attributes:
+name: Template name stored in OpenSearch.
+namespace: Namespace served by the template.
+body: Raw OpenSearch template body.
+chunking: Chunking configuration used to parameterize the template.
+
+Examples:
+>>> template = OpenSearchIndexTemplate(
+...     name="hybrid-chunks-research",
+...     namespace="research",
+...     body={"settings": {}},
+...     chunking=ChunkingConfig(),
+... )
+>>> template.namespace
+'research'
+
 ### `OpenSearchSchemaManager`
 
 Bootstrap and track index templates per namespace.
+
+Attributes:
+_templates: Mapping of namespace identifiers to index templates.
+
+Examples:
+>>> manager = OpenSearchSchemaManager()
+>>> manager.bootstrap_template("research")
+OpenSearchIndexTemplate(name='hybrid-chunks-research', namespace='research', ...)

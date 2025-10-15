@@ -1,6 +1,9 @@
 # 1. Code Annotation Standards for Auto-Generation
 
-This document establishes standards for code annotations (comments and docstrings) that enable automated documentation generation. Following these standards ensures that the `generate_api_docs.py` script and Sphinx autodoc can extract meaningful, consistent documentation from your code.
+This document establishes standards for code annotations (comments and docstrings) that
+enable automated documentation generation. Following these standards ensures that the
+`generate_api_docs.py` script and Sphinx autodoc can extract meaningful, consistent
+documentation from your code.
 
 ## 2. Philosophy
 

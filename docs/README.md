@@ -1,8 +1,8 @@
-# DocsToKG Documentation
+# 1. DocsToKG Documentation
 
 DocsToKG is a comprehensive system for transforming documents into knowledge graphs using vector search, machine learning, and AI technologies.
 
-## Documentation Structure
+## 2. Documentation Structure
 
 This documentation is organized hierarchically to help you quickly find the information you need:
 
@@ -34,14 +34,14 @@ Deployment instructions, monitoring, and troubleshooting guides.
 
 Glossary, Faiss integration details, and external dependencies.
 
-## Quick Start
+## 3. Quick Start
 
 1. **New to DocsToKG?** Start with [Overview](./01-overview/) to understand what we do
 2. **Ready to contribute?** Check [Development](./05-development/) for guidelines
 3. **Need to deploy?** See [Operations](./06-operations/) for deployment guides
 4. **Using the API?** Go directly to [API Reference](./04-api/)
 
-## Documentation Standards
+## 4. Documentation Standards
 
 This documentation follows established standards for clarity and consistency:
 
@@ -50,7 +50,7 @@ This documentation follows established standards for clarity and consistency:
 - Regular automated checks ensure documentation quality and link integrity
 - All documentation is version-controlled alongside the codebase
 
-## Getting Help
+## 5. Getting Help
 
 - 📖 **Read the docs** - Most questions are answered here
 - 🐛 **Found an issue?** Check existing documentation first, then file an issue

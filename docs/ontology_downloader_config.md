@@ -1,10 +1,10 @@
-# Ontology Downloader Configuration
+# 1. Ontology Downloader Configuration
 
-The ontology downloader uses a YAML configuration file (typically `sources.yaml`) to describe
-where ontologies should be downloaded from and how the pipeline behaves. The file is divided
-into a `defaults` section and an `ontologies` list.
+The DocsToKG ontology downloader uses a YAML configuration file (typically `sources.yaml`) to
+describe where ontologies should be downloaded from and how the pipeline behaves. The file is
+divided into a `defaults` section and an `ontologies` list.
 
-## Installation
+## 2. Installation
 
 Install the downloader and all required dependencies inside your virtual environment:
 
@@ -16,7 +16,7 @@ If you prefer to install the minimal dependency set manually, ensure the followi
 available: `bioregistry`, `oaklib`, `ols-client`, `ontoportal-client`, `rdflib`, `pronto`,
 `owlready2`, `arelle`, `pystow`, `pooch`, `pyyaml`, and `requests`.
 
-## Pystow Configuration
+## 3. Pystow Configuration
 
 The downloader stores cache, configuration, and logs using [pystow](https://pystow.readthedocs.io/)
 under `~/.data/ontology-fetcher/` by default. Override locations and credentials via environment
@@ -34,7 +34,7 @@ variables:
 BioPortal API keys can be stored at `~/.data/ontology-fetcher/configs/bioportal_api_key.txt`. OLS
 credentials (if required) can be stored in `~/.data/ontology-fetcher/configs/ols_api_token.txt`.
 
-## Defaults
+## 4. Defaults
 
 | Key | Type | Description |
 | --- | ---- | ----------- |
@@ -47,13 +47,13 @@ credentials (if required) can be stored in `~/.data/ontology-fetcher/configs/ols
 | `continue_on_error` | bool | Continue batch processing after an error (default `true`). |
 | `concurrent_downloads` | int | Future parallelism control (currently informational). |
 
-## Ontology Entries
+## 5. Ontology Entries
 
 Each entry in `ontologies` must provide at least an `id`. Optional keys include `resolver`
 (one of `obo`, `ols`, `bioportal`, `skos`, `xbrl`), `extras` (resolver-specific parameters), and
 `target_formats` (format priority for the resolver).
 
-## Example
+## 6. Example
 
 ```yaml
 defaults:
@@ -109,7 +109,7 @@ When a resolver requires additional hints, populate the `extras` mapping:
 | `skos` | `url` pointing directly to the SKOS/RDF download | `url: https://example.com/eurovoc.ttl` |
 | `xbrl` | `url` pointing to the taxonomy ZIP archive | `url: https://example.com/ifrs-taxonomy.zip` |
 
-## CLI Usage
+## 7. CLI Usage
 
 Use the `ontofetch` command to operate the downloader:
 
@@ -133,7 +133,7 @@ ontofetch config-validate --spec ./sources.yaml
 
 All subcommands accept `--json` for machine-readable output and `--log-level` to adjust verbosity.
 
-## Resolver Requirements
+## 8. Resolver Requirements
 
 | Resolver | Requirements |
 | --- | --- |
@@ -145,7 +145,7 @@ All subcommands accept `--json` for machine-readable output and `--log-level` to
 
 ROBOT conversions require a Java runtime and the `robot` CLI in `PATH`.
 
-## Troubleshooting
+## 9. Troubleshooting
 
 | Symptom | Resolution |
 | --- | --- |
@@ -156,7 +156,7 @@ ROBOT conversions require a Java runtime and the `robot` CLI in `PATH`.
 | Rate-limit warnings | Reduce concurrency or adjust `per_host_rate_limit` in configuration. |
 | `Permission denied writing to` | Set `PYSTOW_HOME` to a writable directory and retry. |
 
-## Storage Layout & Manifest Schema
+## 10. Storage Layout & Manifest Schema
 
 Downloaded ontologies are stored under `~/.data/ontology-fetcher/ontologies/<id>/<version>/` with
 sub-directories `original/`, `normalized/`, and `validation/`. The `manifest.json` file includes:
@@ -177,7 +177,7 @@ sub-directories `original/`, `normalized/`, and `validation/`. The `manifest.jso
 | `validation` | Validator results keyed by validator name. |
 | `artifacts` | List of stored artifact paths (including extracted ZIP contents). |
 
-## Example Workflows
+## 11. Example Workflows
 
 1. **Batch download**: Populate `sources.yaml`, then run `ontofetch pull --spec sources.yaml` to
    download all configured ontologies in one run.
@@ -186,7 +186,7 @@ sub-directories `original/`, `normalized/`, and `validation/`. The `manifest.jso
 3. **Validation-only reruns**: For previously downloaded ontologies, execute `ontofetch validate hp@2024-01-01 --robot`
    to regenerate validation reports without redownloading.
 
-## Validation
+## 12. Validation
 
 Validate configuration files using the CLI:
 

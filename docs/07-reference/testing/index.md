@@ -1,6 +1,7 @@
 # 1. Testing Strategies
 
-Testing spans ingestion utilities, ontology download workflows, and hybrid search correctness.
+Testing spans DocsToKG ingestion utilities, ontology download workflows, and hybrid search
+correctness.
 
 ## 2. Test Suites
 

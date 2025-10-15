@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Mapping, Optional, Sequence
@@ -17,23 +16,73 @@ from .types import ChunkFeatures, ChunkPayload, DocumentInput
 
 
 class IngestError(RuntimeError):
-    """Base exception for ingestion failures."""
+    """Base exception for ingestion failures.
+
+    Args:
+        message: Description of the ingestion failure.
+
+    Examples:
+        >>> raise IngestError("invalid chunk metadata")
+        Traceback (most recent call last):
+        ...
+        IngestError: invalid chunk metadata
+    """
 
 
 class RetryableIngestError(IngestError):
-    """Errors that callers should retry (e.g., transient model inference)."""
+    """Errors that callers should retry (e.g., transient model inference).
+
+    Args:
+        message: Description of the transient ingestion issue.
+
+    Examples:
+        >>> raise RetryableIngestError("embedding service unavailable")
+        Traceback (most recent call last):
+        ...
+        RetryableIngestError: embedding service unavailable
+    """
 
 
 @dataclass(slots=True)
 class IngestMetrics:
-    """Simple metrics bundle used by tests."""
+    """Simple metrics bundle used by tests.
+
+    Attributes:
+        chunks_upserted: Number of chunks upserted during ingestion runs.
+        chunks_deleted: Number of chunks removed from storage backends.
+
+    Examples:
+        >>> metrics = IngestMetrics(chunks_upserted=3)
+        >>> metrics.chunks_upserted
+        3
+    """
 
     chunks_upserted: int = 0
     chunks_deleted: int = 0
 
 
+TRAINING_SAMPLE_RNG = np.random.default_rng(13)
+
+
 class ChunkIngestionPipeline:
-    """Coordinate loading of chunk/vector artifacts and dual writes."""
+    """Coordinate loading of chunk/vector artifacts and dual writes.
+
+    Attributes:
+        _faiss: FAISS index manager responsible for vector persistence.
+        _opensearch: OpenSearch simulator handling lexical storage.
+        _registry: Registry mapping vector identifiers to chunk metadata.
+        _metrics: Aggregated ingestion metrics recorded during operations.
+        _observability: Observability facade for tracing and logging.
+
+    Examples:
+        >>> pipeline = ChunkIngestionPipeline(
+        ...     faiss_index=FaissIndexManager.build_in_memory(),
+        ...     opensearch=OpenSearchSimulator(),
+        ...     registry=ChunkRegistry(),
+        ... )
+        >>> isinstance(pipeline.metrics.chunks_upserted, int)
+        True
+    """
 
     def __init__(
         self,
@@ -132,6 +181,9 @@ class ChunkIngestionPipeline:
 
         Returns:
             None
+
+        Raises:
+            None
         """
         with self._observability.trace("ingest_delete", count=str(len(vector_ids))):
             self._faiss.remove(vector_ids)
@@ -171,7 +223,10 @@ class ChunkIngestionPipeline:
         if sample_size >= len(population):
             sample = population
         else:
-            sample = random.sample(population, sample_size)
+            indices = TRAINING_SAMPLE_RNG.choice(
+                len(population), size=sample_size, replace=False
+            )
+            sample = [population[idx] for idx in indices]
         return [chunk.features.embedding for chunk in sample]
 
     def _load_precomputed_chunks(self, document: DocumentInput) -> List[ChunkPayload]:

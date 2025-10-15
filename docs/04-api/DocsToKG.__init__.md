@@ -38,6 +38,9 @@ This function provides a simple health check for the package.
 It returns "pong" when called, indicating the package is
 properly installed and importable.
 
+Args:
+None
+
 Returns:
 String indicating the package is working
 

@@ -12,7 +12,16 @@ from .types import FusionCandidate
 
 
 class ReciprocalRankFusion:
-    """Combine ranked lists using Reciprocal Rank Fusion."""
+    """Combine ranked lists using Reciprocal Rank Fusion.
+
+    Attributes:
+        _k0: Fusion parameter controlling the influence of item rank.
+
+    Examples:
+        >>> rrf = ReciprocalRankFusion(k0=50.0)
+        >>> rrf.fuse([])
+        {}
+    """
 
     def __init__(self, k0: float = 60.0) -> None:
         if k0 <= 0:

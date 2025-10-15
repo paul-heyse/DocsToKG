@@ -112,9 +112,9 @@ python -m DocsToKG.ContentDownload.download_pyalex_pdfs --workers 3 --topic "onc
 - Alternatively, use ``jq``:
   ``jq -r '[.timestamp,.work_id,.status,.url] | @csv' attempts.jsonl > attempts.csv``.
 
-## 🔧 Development
+## 6. Development
 
-## Development Workflow
+### 6.1 Development Workflow
 
 ```bash
 # Formatting and linting
@@ -134,7 +134,7 @@ python docs/scripts/check_links.py --timeout 10
 
 Refer to `docs/05-development/index.md` for contribution guidelines and review checklists.
 
-## Project Structure
+## 7. Project Structure
 
 ```
 DocsToKG/
@@ -151,7 +151,7 @@ DocsToKG/
 └── docs/scripts/                 # Documentation automation scripts
 ```
 
-## Support & Community
+## 8. Support & Community
 
 - **Issues**: [GitHub Issues](https://github.com/paul-heyse/DocsToKG/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/paul-heyse/DocsToKG/discussions)

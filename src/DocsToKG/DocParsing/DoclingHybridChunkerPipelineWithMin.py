@@ -51,7 +51,16 @@ DEFAULT_OUT_DIR = Path("/home/paul/DocsToKG/Data/ChunkedDocTagFiles")
 
 # ---------- Picture serializer: inject CAPTIONS (+ optional annotations) ----------
 class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
-    """Serialize picture items with captions and rich annotation metadata."""
+    """Serialize picture items with captions and rich annotation metadata.
+
+    Attributes:
+        None
+
+    Examples:
+        >>> serializer = CaptionPlusAnnotationPictureSerializer()
+        >>> isinstance(serializer, MarkdownPictureSerializer)
+        True
+    """
 
     @override
     def serialize(
@@ -91,7 +100,16 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
 
 
 class RichSerializerProvider(ChunkingSerializerProvider):
-    """Provide a serializer that augments tables and pictures with Markdown."""
+    """Provide a serializer that augments tables and pictures with Markdown.
+
+    Attributes:
+        None
+
+    Examples:
+        >>> provider = RichSerializerProvider()
+        >>> isinstance(provider, ChunkingSerializerProvider)
+        True
+    """
 
     def get_serializer(self, doc: DoclingDocument) -> ChunkingDocSerializer:
         """Construct a ChunkingDocSerializer tailored for DocTags documents.
@@ -160,6 +178,9 @@ def extract_refs_and_pages(chunk: BaseChunk) -> Tuple[List[str], List[int]]:
 
     Returns:
         Tuple containing a list of reference identifiers and sorted page numbers.
+
+    Raises:
+        None
     """
     refs, pages = [], set()
     try:
@@ -185,6 +206,11 @@ class Rec:
         src_idxs: Source chunk indices contributing to this record.
         refs: List of inline reference identifiers.
         pages: Page numbers associated with the chunk.
+
+    Examples:
+        >>> rec = Rec(text="Example", n_tok=5, src_idxs=[0], refs=[], pages=[1])
+        >>> rec.n_tok
+        5
     """
 
     text: str
