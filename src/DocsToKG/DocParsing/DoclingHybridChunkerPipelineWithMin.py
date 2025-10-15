@@ -2,9 +2,19 @@
 """
 Docling Hybrid Chunker with Minimum Token Coalescence
 
-Transforms DocTags documents into chunked records while ensuring short runs of
-chunks are merged to satisfy minimum token thresholds required by downstream
-embedding pipelines.
+Transforms DocTags documents into chunked records with topic-aware coalescence.
+
+Tokenizer Alignment:
+    The default tokenizer (``Qwen/Qwen3-Embedding-4B``) aligns with the dense
+    embedder used by the embeddings pipeline. When experimenting with other
+    tokenizers (for example, legacy BERT models), run the calibration utility
+    beforehand to understand token count deltas::
+
+        python scripts/calibrate_tokenizers.py --doctags-dir Data/DocTagsFiles
+
+    The calibration script reports relative token ratios and recommends
+    adjustments to ``--min-tokens`` so chunk sizes remain compatible with the
+    embedding stage.
 """
 
 from __future__ import annotations
@@ -37,11 +47,15 @@ from DocsToKG.DocParsing._common import (
 )
 from DocsToKG.DocParsing.serializers import RichSerializerProvider
 
+SOFT_BARRIER_MARGIN = 64
+
 # ---------- Defaults ----------
 DEFAULT_DATA_ROOT = detect_data_root()
 DEFAULT_IN_DIR = data_doctags(DEFAULT_DATA_ROOT)
 DEFAULT_OUT_DIR = data_chunks(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "chunks"
+
+_LOGGER = get_logger(__name__)
 
 # ---------- Helpers ----------
 def read_utf8(p: Path) -> str:
@@ -138,6 +152,37 @@ def merge_rec(a: Rec, b: Rec, tokenizer: HuggingFaceTokenizer) -> Rec:
     return Rec(text=text, n_tok=n_tok, src_idxs=a.src_idxs + b.src_idxs, refs=refs, pages=pages)
 
 
+# ---------- Topic-aware boundary detection ----------
+def is_structural_boundary(rec: Rec) -> bool:
+    """Detect whether a chunk begins with a structural heading or caption marker.
+
+    Args:
+        rec: Chunk record to inspect.
+
+    Returns:
+        ``True`` when ``rec.text`` starts with a heading indicator (``#``) or a
+        recognised caption prefix, otherwise ``False``.
+
+    Examples:
+        >>> is_structural_boundary(Rec(text="# Introduction", n_tok=2, src_idxs=[], refs=[], pages=[]))
+        True
+        >>> is_structural_boundary(Rec(text="Regular paragraph", n_tok=2, src_idxs=[], refs=[], pages=[]))
+        False
+    """
+
+    text = rec.text.lstrip()
+    if text.startswith("#"):
+        return True
+
+    caption_markers = (
+        "Figure caption:",
+        "Table:",
+        "Picture description:",
+        "<!-- image -->",
+    )
+    return any(text.startswith(marker) for marker in caption_markers)
+
+
 # ---------- Smart coalescence of SMALL-RUNS (< min_tokens) ----------
 def coalesce_small_runs(
     records: List[Rec],
@@ -197,9 +242,33 @@ def coalesce_small_runs(
         while j < e:
             g = records[j]
             k = j + 1
-            while k < e and g.n_tok < min_tokens and (g.n_tok + records[k].n_tok) <= max_tokens:
-                g = merge_rec(g, records[k], tokenizer)
-                k += 1
+            while k < e and g.n_tok < min_tokens:
+                next_rec = records[k]
+                combined_size = g.n_tok + next_rec.n_tok
+                threshold = max_tokens - SOFT_BARRIER_MARGIN
+
+                if is_structural_boundary(next_rec) and combined_size > threshold:
+                    _LOGGER.debug(
+                        "Soft barrier at chunk %s: boundary detected, combined size %s > %s",
+                        k,
+                        combined_size,
+                        threshold,
+                        extra={
+                            "extra_fields": {
+                                "combined_tokens": combined_size,
+                                "threshold": threshold,
+                                "max_tokens": max_tokens,
+                                "context": "intra_run",
+                            }
+                        },
+                    )
+                    break
+
+                if combined_size <= max_tokens:
+                    g = merge_rec(g, next_rec, tokenizer)
+                    k += 1
+                else:
+                    break
             groups.append(g)
             j = k
 
@@ -211,48 +280,86 @@ def coalesce_small_runs(
 
         if trailing_small:
             tail = groups[-1]
-            # first try merge into previous group FROM SAME RUN if it fits
-            if (
-                out
-                and out[-1].src_idxs
-                and (out[-1].n_tok + tail.n_tok) <= max_tokens
-                and max(out[-1].src_idxs) < s
-            ):  # previous output is from before this run, not same run
-                # The condition above prevents merging into a big chunk; we WANT same-run,
-                # so we check if the last out element is from this run by src idx range.
-                # If it's not, we won't merge here; instead, try intra-run previous if available:
-                pass
+            threshold = max_tokens - SOFT_BARRIER_MARGIN
 
-            # better: try intra-run previous explicitly if exists
-            if len(groups) >= 2 and (groups[-2].n_tok + tail.n_tok) <= max_tokens:
-                merged = merge_rec(groups[-2], tail, tokenizer)
-                # replace the last emitted group (groups[-2]) in 'out'
-                if out and out[-1].src_idxs == groups[-2].src_idxs:
-                    out[-1] = merged
-                else:
-                    # if not last in out (e.g., unusual ordering), append
-                    out.append(merged)
-
-            else:
-                # prefer merging with the smaller big neighbor (left or right) if it FITS
-                left_can = len(out) >= 1
-                right_can = e < N  # next big chunk exists
-                left_ok = left_can and (out[-1].n_tok + tail.n_tok) <= max_tokens
-                right_ok = right_can and (records[e].n_tok + tail.n_tok) <= max_tokens
-
-                if left_ok and right_ok:
-                    # choose the neighbor with smaller size to minimize skew
-                    if out[-1].n_tok <= records[e].n_tok:
-                        out[-1] = merge_rec(out[-1], tail, tokenizer)
+            if len(groups) >= 2:
+                combined_size = groups[-2].n_tok + tail.n_tok
+                if is_structural_boundary(tail) and combined_size > threshold:
+                    _LOGGER.debug(
+                        "Soft barrier prevented intra-run merge: combined size %s > %s",
+                        combined_size,
+                        threshold,
+                        extra={
+                            "extra_fields": {
+                                "combined_tokens": combined_size,
+                                "threshold": threshold,
+                                "max_tokens": max_tokens,
+                                "context": "intra_run_tail",
+                            }
+                        },
+                    )
+                elif combined_size <= max_tokens:
+                    merged = merge_rec(groups[-2], tail, tokenizer)
+                    if out and out[-1].src_idxs == groups[-2].src_idxs:
+                        out[-1] = merged
                     else:
-                        records[e] = merge_rec(tail, records[e], tokenizer)  # pre-merge right
-                elif left_ok:
-                    out[-1] = merge_rec(out[-1], tail, tokenizer)
-                elif right_ok:
-                    records[e] = merge_rec(tail, records[e], tokenizer)
+                        out.append(merged)
+                    continue
+
+            left_can = len(out) >= 1
+            right_can = e < N
+            left_ok = False
+            right_ok = False
+
+            if left_can:
+                combined_size = out[-1].n_tok + tail.n_tok
+                if is_structural_boundary(tail) and combined_size > threshold:
+                    _LOGGER.debug(
+                        "Soft barrier prevented left merge: combined size %s > %s",
+                        combined_size,
+                        threshold,
+                        extra={
+                            "extra_fields": {
+                                "combined_tokens": combined_size,
+                                "threshold": threshold,
+                                "max_tokens": max_tokens,
+                                "context": "left_neighbor",
+                            }
+                        },
+                    )
                 else:
-                    # no good fit—emit as-is rather than exceed max_tokens
-                    out.append(tail)
+                    left_ok = combined_size <= max_tokens
+
+            if right_can:
+                combined_size = records[e].n_tok + tail.n_tok
+                if is_structural_boundary(tail) and combined_size > threshold:
+                    _LOGGER.debug(
+                        "Soft barrier prevented right merge: combined size %s > %s",
+                        combined_size,
+                        threshold,
+                        extra={
+                            "extra_fields": {
+                                "combined_tokens": combined_size,
+                                "threshold": threshold,
+                                "max_tokens": max_tokens,
+                                "context": "right_neighbor",
+                            }
+                        },
+                    )
+                else:
+                    right_ok = combined_size <= max_tokens
+
+            if left_ok and right_ok:
+                if out[-1].n_tok <= records[e].n_tok:
+                    out[-1] = merge_rec(out[-1], tail, tokenizer)
+                else:
+                    records[e] = merge_rec(tail, records[e], tokenizer)
+            elif left_ok:
+                out[-1] = merge_rec(out[-1], tail, tokenizer)
+            elif right_ok:
+                records[e] = merge_rec(tail, records[e], tokenizer)
+            else:
+                out.append(tail)
 
     return out
 
@@ -277,6 +384,12 @@ def main():
     ap.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     ap.add_argument("--min-tokens", type=int, default=256)
     ap.add_argument("--max-tokens", type=int, default=512)
+    ap.add_argument(
+        "--tokenizer-model",
+        type=str,
+        default="Qwen/Qwen3-Embedding-4B",
+        help="HuggingFace tokenizer model (default aligns with dense embedder)",
+    )
     ap.add_argument(
         "--resume",
         action="store_true",
@@ -342,8 +455,19 @@ def main():
 
     manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_data_root) if args.resume else {}
 
-    # Tokenizer (BERT family) → 512 cap applied to contextualized text
-    hf = AutoTokenizer.from_pretrained("bert-base-uncased", use_fast=True)
+    tokenizer_model = args.tokenizer_model
+    logger.info(
+        "Loading tokenizer",
+        extra={"extra_fields": {"tokenizer_model": tokenizer_model}},
+    )
+    hf = AutoTokenizer.from_pretrained(tokenizer_model, use_fast=True)
+    if "bert" in tokenizer_model.lower():
+        logger.warning(
+            "BERT tokenizer may not align with Qwen embedder. Consider running "
+            "scripts/calibrate_tokenizers.py or using --tokenizer-model "
+            "Qwen/Qwen3-Embedding-4B.",
+            extra={"extra_fields": {"tokenizer_model": tokenizer_model}},
+        )
     tokenizer = HuggingFaceTokenizer(tokenizer=hf, max_tokens=args.max_tokens)
 
     # HybridChunker: token-aware split + peer-merge; no overlap

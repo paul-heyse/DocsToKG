@@ -917,7 +917,7 @@
 
 ## 8. Tokenizer Alignment
 
-- [ ] 8.1 Add --tokenizer-model flag to chunking script
+- [x] 8.1 Add --tokenizer-model flag to chunking script
   - **Implementation**:
 
     ```python
@@ -929,7 +929,7 @@
     )
     ```
 
-- [ ] 8.2 Update tokenizer initialization
+- [x] 8.2 Update tokenizer initialization
   - **Before**:
 
     ```python
@@ -944,7 +944,7 @@
     hf = AutoTokenizer.from_pretrained(tokenizer_model, use_fast=True)
     ```
 
-- [ ] 8.3 Add deprecation warning for BERT tokenizer
+- [x] 8.3 Add deprecation warning for BERT tokenizer
   - **Implementation**:
 
     ```python
@@ -956,7 +956,7 @@
         )
     ```
 
-- [ ] 8.4 Implement calibration script: `scripts/calibrate_tokenizers.py`
+- [x] 8.4 Implement calibration script: `scripts/calibrate_tokenizers.py`
   - **Full Implementation**:
 
     ```python
@@ -1020,7 +1020,7 @@
         main()
     ```
 
-- [ ] 8.5 Document calibration usage in chunking script docstring
+- [x] 8.5 Document calibration usage in chunking script docstring
   - Add section:
 
     ```
@@ -1035,7 +1035,7 @@
 
 ## 9. Topic-Aware Coalescence
 
-- [ ] 9.1 Add `is_structural_boundary(rec: Rec) -> bool` helper
+- [x] 9.1 Add `is_structural_boundary(rec: Rec) -> bool` helper
   - **Implementation**:
 
     ```python
@@ -1072,7 +1072,7 @@
 
   - Place this function before `coalesce_small_runs()` in chunker script
 
-- [ ] 9.2 Update `coalesce_small_runs()` to apply soft barrier rule
+- [x] 9.2 Update `coalesce_small_runs()` to apply soft barrier rule
   - **Location**: In the inner loop where merging decision is made (around line 300)
   - **Implementation**:
 
@@ -1092,19 +1092,19 @@
             break  # Would exceed max_tokens
     ```
 
-- [ ] 9.3 Add unit test for boundary detection
+- [x] 9.3 Add unit test for boundary detection
   - **Test cases**:
     - Markdown heading levels (# through ####)
     - Figure captions with various formats
     - Regular text (should return False)
     - Edge cases: empty text, whitespace-only, mixed markers
 
-- [ ] 9.4 Add integration test with sample documents
+- [x] 9.4 Add integration test with sample documents
   - Create `tests/data/docparsing/topic_aware_sample.doctags` with clear section boundaries
   - Run chunker with topic-aware coalescence
   - Assert: no chunks span across "# Section" boundaries unless under soft barrier threshold
 
-- [ ] 9.5 Add logging for boundary-aware merge decisions
+- [x] 9.5 Add logging for boundary-aware merge decisions
   - When soft barrier prevents merge: `logger.debug(f"Soft barrier at chunk {k}: boundary detected, combined size {combined_size} > {max_tokens-64}")`
 
 ## 10. Unified CLI Entry Point
