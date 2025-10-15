@@ -20,10 +20,15 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Dict, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Sequence, Tuple
+
+if TYPE_CHECKING:  # pragma: no cover - imported for type checking only
+    from .core import FetchResult, PlannedFetch
 
 __all__ = [
     "format_table",
+    "format_plan_rows",
+    "format_results_table",
     "format_validation_summary",
 ]
 
@@ -99,3 +104,53 @@ def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
         formatted_rows.append((name, status, message))
 
     return format_table(("validator", "status", "details"), formatted_rows)
+
+
+def format_plan_rows(plans: Sequence["PlannedFetch"]) -> Sequence[Sequence[str]]:
+    """Return formatted table rows for planned fetches.
+
+    Args:
+        plans: Iterable of planned fetch objects produced by the planner.
+
+    Returns:
+        Sequence of tuples containing ``id``, ``resolver``, ``service``,
+        ``media_type``, and ``url`` suitable for :func:`format_table`.
+    """
+
+    rows = []
+    for plan in plans:
+        rows.append(
+            (
+                plan.spec.id,
+                plan.resolver,
+                plan.plan.service or "",
+                plan.plan.media_type or "",
+                plan.plan.url,
+            )
+        )
+    return rows
+
+
+def format_results_table(results: Sequence["FetchResult"]) -> str:
+    """Render fetch results as a human-readable table.
+
+    Args:
+        results: Sequence of :class:`~DocsToKG.OntologyDownload.core.FetchResult`
+            objects returned by the download workflow.
+
+    Returns:
+        ASCII table summarising resolver id, status, checksum, and file path.
+    """
+
+    rows = []
+    for result in results:
+        rows.append(
+            (
+                result.spec.id,
+                result.spec.resolver,
+                result.status,
+                result.sha256,
+                str(result.local_path),
+            )
+        )
+    return format_table(("id", "resolver", "status", "sha256", "file"), rows)

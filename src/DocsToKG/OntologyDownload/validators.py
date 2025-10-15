@@ -24,7 +24,9 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import heapq
 import json
 import logging
 import os
@@ -38,7 +40,8 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, MutableMapping, Optional
+from itertools import islice
+from typing import Dict, Iterable, Iterator, List, MutableMapping, Optional
 
 import psutil
 
@@ -174,6 +177,86 @@ def _write_validation_json(path: Path, payload: MutableMapping[str, object]) -> 
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _python_merge_sort(source: Path, destination: Path, *, chunk_size: int = 100_000) -> None:
+    """Sort an N-Triples file using a disk-backed merge strategy."""
+
+    with tempfile.TemporaryDirectory(prefix="ontology-sort-") as tmp_dir:
+        chunk_paths: List[Path] = []
+        with source.open("r", encoding="utf-8") as reader:
+            while True:
+                lines = list(islice(reader, chunk_size))
+                if not lines:
+                    break
+                lines.sort()
+                chunk_path = Path(tmp_dir) / f"chunk-{len(chunk_paths)}.nt"
+                chunk_path.write_text("".join(lines), encoding="utf-8")
+                chunk_paths.append(chunk_path)
+
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if not chunk_paths:
+            destination.write_text("", encoding="utf-8")
+            return
+
+        with contextlib.ExitStack() as stack:
+            iterators: List[Iterator[str]] = []
+            for chunk_path in chunk_paths:
+                handle = stack.enter_context(chunk_path.open("r", encoding="utf-8"))
+                iterators.append(iter(handle))
+            with destination.open("w", encoding="utf-8") as writer:
+                for line in heapq.merge(*iterators):
+                    writer.write(line)
+
+
+def _sort_nt(source: Path, destination: Path) -> None:
+    """Sort N-Triples using platform sort when available with Python fallback."""
+
+    sort_binary = shutil.which("sort")
+    if sort_binary:
+        with source.open("rb") as stdin, destination.open("wb") as stdout:
+            try:
+                subprocess.run([sort_binary], stdin=stdin, stdout=stdout, check=True)
+                return
+            except (FileNotFoundError, subprocess.CalledProcessError):
+                pass
+    _python_merge_sort(source, destination)
+
+
+def normalize_streaming(
+    source_path: Path,
+    output_path: Optional[Path] = None,
+    *,
+    graph=None,
+    chunk_bytes: int = 1 << 20,
+) -> str:
+    """Normalize an ontology file using streaming disk-backed sorting."""
+
+    with tempfile.TemporaryDirectory(prefix="ontology-stream-") as temp_dir:
+        nt_path = Path(temp_dir) / "input.nt"
+        sorted_path = Path(temp_dir) / "sorted.nt"
+
+        working_graph = graph or rdflib.Graph()
+        if graph is None:
+            working_graph.parse(source_path.as_posix())
+        working_graph.serialize(destination=str(nt_path), format="nt")
+
+        _sort_nt(nt_path, sorted_path)
+
+        hasher = hashlib.sha256()
+        with sorted_path.open("rb") as reader, contextlib.ExitStack() as stack:
+            writer = None
+            if output_path is not None:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                writer = stack.enter_context(output_path.open("wb"))
+            while True:
+                chunk = reader.read(chunk_bytes)
+                if not chunk:
+                    break
+                hasher.update(chunk)
+                if writer is not None:
+                    writer.write(chunk)
+        return hasher.hexdigest()
 
 
 def _canonicalize_turtle(graph) -> str:
@@ -446,17 +529,44 @@ def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> Valid
         triple_count = len(graph)
         payload = {"ok": True, "triples": triple_count}
         output_files: List[str] = []
+        normalization_mode = "in-memory"
         if "ttl" in request.config.defaults.normalize_to:
             request.normalized_dir.mkdir(parents=True, exist_ok=True)
-            normalized_path = request.normalized_dir / (request.file_path.stem + ".ttl")
-            try:
-                canonical_ttl = _canonicalize_turtle(graph)
-                normalized_path.write_text(canonical_ttl, encoding="utf-8")
-            except AttributeError:
-                graph.serialize(destination=normalized_path, format="turtle")
-                canonical_ttl = normalized_path.read_text(encoding="utf-8")
-            normalized_sha = hashlib.sha256(canonical_ttl.encode("utf-8")).hexdigest()
+            source_size = request.file_path.stat().st_size
+            threshold_bytes = (
+                request.config.defaults.validation.streaming_normalization_threshold_mb
+                * 1024
+                * 1024
+            )
+            if source_size > threshold_bytes:
+                normalization_mode = "streaming"
+                normalized_path = request.normalized_dir / (request.file_path.stem + ".nt")
+                streaming_sha = normalize_streaming(
+                    request.file_path,
+                    normalized_path,
+                    graph=graph,
+                )
+                try:
+                    canonical_ttl = _canonicalize_turtle(graph)
+                except AttributeError:
+                    tmp_ttl = normalized_path.with_suffix(".ttl")
+                    graph.serialize(destination=tmp_ttl, format="turtle")
+                    canonical_ttl = tmp_ttl.read_text(encoding="utf-8")
+                    tmp_ttl.unlink(missing_ok=True)
+                normalized_sha = hashlib.sha256(canonical_ttl.encode("utf-8")).hexdigest()
+                payload["streaming_nt_sha256"] = streaming_sha
+            else:
+                normalized_path = request.normalized_dir / (request.file_path.stem + ".ttl")
+                try:
+                    canonical_ttl = _canonicalize_turtle(graph)
+                except AttributeError:
+                    graph.serialize(destination=normalized_path, format="turtle")
+                    canonical_ttl = normalized_path.read_text(encoding="utf-8")
+                else:
+                    normalized_path.write_text(canonical_ttl, encoding="utf-8")
+                normalized_sha = hashlib.sha256(canonical_ttl.encode("utf-8")).hexdigest()
             payload["normalized_sha256"] = normalized_sha
+            payload["normalization_mode"] = normalization_mode
             output_files.append(str(normalized_path))
         _write_validation_json(request.validation_dir / "rdflib_parse.json", payload)
         return ValidationResult(ok=True, details=payload, output_files=output_files)
@@ -752,4 +862,5 @@ __all__ = [
     "validate_owlready2",
     "validate_robot",
     "validate_arelle",
+    "normalize_streaming",
 ]

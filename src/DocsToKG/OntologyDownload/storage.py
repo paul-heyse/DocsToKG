@@ -12,6 +12,8 @@ streaming and validation.
 from __future__ import annotations
 
 import os
+import shutil
+import stat
 from pathlib import Path, PurePosixPath
 from typing import Iterable, List, Protocol, Tuple
 
@@ -99,6 +101,18 @@ class StorageBackend(Protocol):
         Returns:
             None
         """
+
+    def available_ontologies(self) -> List[str]:
+        """Return ontology identifiers managed by the backend."""
+
+    def version_path(self, ontology_id: str, version: str) -> Path:
+        """Return the local filesystem location for a stored version."""
+
+    def delete_version(self, ontology_id: str, version: str) -> int:
+        """Remove a stored version and return number of bytes reclaimed."""
+
+    def set_latest_version(self, ontology_id: str, version: str) -> None:
+        """Update latest version marker for an ontology."""
 
 
 def _safe_identifiers(ontology_id: str, version: str) -> Tuple[str, str]:
@@ -202,6 +216,65 @@ class LocalStorageBackend:
 
         # Local backend already operates in-place; nothing further needed.
         _ = (ontology_id, version, local_dir)  # pragma: no cover - intentional no-op
+
+    def available_ontologies(self) -> List[str]:
+        """Return ontology identifiers present on the local filesystem."""
+
+        if not self.root.exists():
+            return []
+        return sorted([entry.name for entry in self.root.iterdir() if entry.is_dir()])
+
+    def version_path(self, ontology_id: str, version: str) -> Path:
+        """Return the directory path for a stored ontology version."""
+
+        return self._version_dir(ontology_id, version)
+
+    def delete_version(self, ontology_id: str, version: str) -> int:
+        """Delete a stored ontology version and return reclaimed bytes."""
+
+        path = self.version_path(ontology_id, version)
+        if not path.exists():
+            return 0
+
+        reclaimed = _directory_size(path)
+        shutil.rmtree(path)
+        return reclaimed
+
+    def set_latest_version(self, ontology_id: str, version: str) -> None:
+        """Update the latest version marker for an ontology."""
+
+        safe_id, _ = _safe_identifiers(ontology_id, "unused")
+        base = self.root / safe_id
+        base.mkdir(parents=True, exist_ok=True)
+        link = base / "latest"
+        marker = base / "latest.txt"
+        target = Path(version)
+
+        try:
+            if link.exists() or link.is_symlink():
+                link.unlink()
+            link.symlink_to(target, target_is_directory=True)
+        except OSError:
+            if marker.exists():
+                marker.unlink()
+            marker.write_text(version)
+        else:
+            if marker.exists():
+                marker.unlink()
+
+
+def _directory_size(path: Path) -> int:
+    """Return the total size of all regular files within ``path``."""
+
+    total = 0
+    for entry in path.rglob("*"):
+        try:
+            info = entry.stat()
+        except OSError:
+            continue
+        if stat.S_ISREG(info.st_mode):
+            total += info.st_size
+    return total
 
 
 class FsspecStorageBackend(LocalStorageBackend):
@@ -317,6 +390,17 @@ class FsspecStorageBackend(LocalStorageBackend):
             remote_path = remote_dir / PurePosixPath(str(relative).replace("\\", "/"))
             self.fs.makedirs(str(remote_path.parent), exist_ok=True)
             self.fs.put_file(str(path), str(remote_path))
+
+    def delete_version(self, ontology_id: str, version: str) -> int:
+        """Delete both local and remote copies for a stored version."""
+
+        reclaimed = super().delete_version(ontology_id, version)
+        remote_dir = self._remote_version_path(ontology_id, version)
+        try:
+            self.fs.rm(str(remote_dir), recursive=True)
+        except FileNotFoundError:
+            pass
+        return reclaimed
 
 
 def get_storage_backend() -> StorageBackend:
