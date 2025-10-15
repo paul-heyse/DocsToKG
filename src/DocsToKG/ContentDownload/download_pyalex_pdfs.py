@@ -593,7 +593,7 @@ def _collect_location_urls(work: Dict[str, Any]) -> Dict[str, List[str]]:
     pdf_urls: List[str] = []
     sources: List[str] = []
 
-    def append_location(loc: Optional[Dict[str, Any]]) -> None:
+    def _append_location(loc: Optional[Dict[str, Any]]) -> None:
         if not isinstance(loc, dict):
             return
         landing = loc.get("landing_page_url")
@@ -606,10 +606,10 @@ def _collect_location_urls(work: Dict[str, Any]) -> Dict[str, List[str]]:
         if source:
             sources.append(source)
 
-    append_location(work.get("best_oa_location"))
-    append_location(work.get("primary_location"))
+    _append_location(work.get("best_oa_location"))
+    _append_location(work.get("primary_location"))
     for loc in work.get("locations", []) or []:
-        append_location(loc)
+        _append_location(loc)
 
     oa_url = (work.get("open_access") or {}).get("oa_url") or None
     if oa_url:
@@ -1123,6 +1123,16 @@ def load_resolver_config(
 def iterate_openalex(
     query: Works, per_page: int, max_results: Optional[int]
 ) -> Iterable[Dict[str, Any]]:
+    """Iterate over OpenAlex works respecting pagination and limits.
+
+    Args:
+        query: Configured Works query instance.
+        per_page: Number of results to request per page.
+        max_results: Optional maximum number of works to yield.
+
+    Yields:
+        Work payload dictionaries returned by the OpenAlex API.
+    """
     pager = query.paginate(per_page=per_page, n_max=None)
     retrieved = 0
     for page in pager:
@@ -1140,6 +1150,18 @@ def attempt_openalex_candidates(
     metrics: ResolverMetrics,
     context: Optional[Dict[str, Any]] = None,
 ) -> Optional[Tuple[DownloadOutcome, str]]:
+    """Attempt downloads for all candidate URLs associated with an artifact.
+
+    Args:
+        session: Requests session configured for resolver usage.
+        artifact: Work artifact containing candidate URLs.
+        logger: Attempt logger receiving structured records.
+        metrics: Resolver metrics collector.
+        context: Optional context dict (dry-run flags, previous entries).
+
+    Returns:
+        Pair of (DownloadOutcome, URL) on success, otherwise None.
+    """
     candidates = list(artifact.pdf_urls)
     if artifact.open_access_url:
         candidates.append(artifact.open_access_url)
@@ -1576,7 +1598,7 @@ def main() -> None:
         metrics=metrics,
     )
 
-    def session_factory() -> requests.Session:
+    def _session_factory() -> requests.Session:
         return _make_session_for_worker(config.polite_headers)
 
     processed = 0
@@ -1584,7 +1606,7 @@ def main() -> None:
     html_only = 0
     skipped = 0
 
-    def record_result(res: Dict[str, Any]) -> None:
+    def _record_result(res: Dict[str, Any]) -> None:
         nonlocal processed, saved, html_only, skipped
         processed += 1
         if res.get("saved"):
@@ -1597,7 +1619,7 @@ def main() -> None:
     summary: Dict[str, Any] = {}
     try:
         if args.workers == 1:
-            session = session_factory()
+            session = _session_factory()
             try:
                 for work in iterate_openalex(query, per_page=args.per_page, max_results=args.max):
                     result = process_one_work(
@@ -1613,7 +1635,7 @@ def main() -> None:
                         previous_lookup=resume_lookup,
                         resume_completed=resume_completed,
                     )
-                    record_result(result)
+                    _record_result(result)
                     if args.sleep > 0:
                         time.sleep(args.sleep)
             finally:
@@ -1625,7 +1647,7 @@ def main() -> None:
 
                 def submit_work(work_item: Dict[str, Any]) -> None:
                     def runner() -> Dict[str, Any]:
-                        session = session_factory()
+                        session = _session_factory()
                         try:
                             return process_one_work(
                                 work_item,
@@ -1650,7 +1672,7 @@ def main() -> None:
                     submit_work(work)
 
                 for future in as_completed(futures):
-                    record_result(future.result())
+                    _record_result(future.result())
     except Exception:
         attempt_logger.close()
         raise

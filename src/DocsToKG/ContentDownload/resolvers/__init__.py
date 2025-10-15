@@ -183,7 +183,7 @@ def _request_with_retries(
                 raise
             _sleep_backoff(attempt)
             continue
-        except AttributeError as exc:
+        except AttributeError:
             raise
 
         if response.status_code in statuses and attempt < max_retries:
