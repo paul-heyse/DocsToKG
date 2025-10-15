@@ -62,6 +62,7 @@ __all__ = [
     "Batcher",
     "manifest_append",
     "compute_content_hash",
+    "resolve_hash_algorithm",
     "load_manifest_index",
     "acquire_lock",
 ]
@@ -273,6 +274,8 @@ def get_logger(name: str, level: str = "INFO") -> logging.Logger:
                 >>> hasattr(formatter, "format")
                 True
             """
+
+            converter = time.gmtime
 
             def format(self, record: logging.LogRecord) -> str:
                 """Render a log record as a JSON string.
@@ -629,12 +632,23 @@ def manifest_append(
         handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
+def resolve_hash_algorithm(default: str = "sha1") -> str:
+    """Return the active content hash algorithm, honoring env overrides."""
+
+    env_override = os.getenv("DOCSTOKG_HASH_ALG")
+    return env_override.strip() if env_override else default
+
+
 def compute_content_hash(path: Path, algorithm: str = "sha1") -> str:
     """Compute a content hash for ``path`` using the requested algorithm.
 
     Args:
         path: File whose contents should be hashed.
         algorithm: Hash algorithm name supported by :mod:`hashlib`.
+
+    Notes:
+        The ``DOCSTOKG_HASH_ALG`` environment variable overrides ``algorithm``
+        when set, enabling fleet-wide hash changes without code edits.
 
     Returns:
         Hex digest string.
@@ -646,7 +660,8 @@ def compute_content_hash(path: Path, algorithm: str = "sha1") -> str:
         True
     """
 
-    hasher = hashlib.new(algorithm)
+    selected_algorithm = resolve_hash_algorithm(algorithm)
+    hasher = hashlib.new(selected_algorithm)
     with path.open("rb") as handle:
         while True:
             chunk = handle.read(65536)

@@ -55,6 +55,7 @@ from DocsToKG.DocParsing._common import (
     jsonl_save,
     load_manifest_index,
     manifest_append,
+    resolve_hash_algorithm,
 )
 from DocsToKG.DocParsing.schemas import BM25Vector, DenseVector, SPLADEVector, VectorRow
 
@@ -1052,6 +1053,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 schema_version="embeddings/1.0.0",
                 input_path=str(chunk_file),
                 input_hash=input_hash,
+                hash_alg=resolve_hash_algorithm(),
                 output_path=str(out_path),
             )
             skipped_files += 1
@@ -1076,6 +1078,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 schema_version="embeddings/1.0.0",
                 input_path=str(chunk_file),
                 input_hash=input_hash,
+                hash_alg=resolve_hash_algorithm(),
                 output_path=str(out_path),
                 error=str(exc),
             )
@@ -1093,6 +1096,7 @@ def main(args: argparse.Namespace | None = None) -> int:
             schema_version="embeddings/1.0.0",
             input_path=str(chunk_file),
             input_hash=input_hash,
+            hash_alg=resolve_hash_algorithm(),
             output_path=str(out_path),
             vector_count=count,
         )
