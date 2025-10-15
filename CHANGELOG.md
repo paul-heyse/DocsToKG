@@ -12,6 +12,8 @@ All notable changes to DocsToKG are documented in this file.
 - Content download CLI now exposes `--concurrent-resolvers`, `--head-precheck/--no-head-precheck`,
   and `--accept` flags for resolver coordination and header customisation.
 - Download runs emit JSONL summary records and `.metrics.json` sidecar files capturing aggregate metrics.
+- Optional global URL deduplication and domain-level throttling controls, including
+  `--global-url-dedup` and `--domain-min-interval` CLI flags for ad-hoc runs.
 
 ### Changed
 - Centralised HTTP retry helper now logs timeout/connection issues separately and emits warnings when retries are exhausted.
@@ -22,6 +24,8 @@ All notable changes to DocsToKG are documented in this file.
 - JSONL and CSV attempt loggers now guard writes with locks and implement context managers for safe reuse.
 - Crossref resolver performs HTTP calls through the shared retry helper while reusing the standard header cache key utility.
 - Resolver namespace documents the deprecation timeline for the legacy ``time`` and ``requests`` aliases ahead of their removal.
+- Resolver pipeline enforces optional domain rate limits and skips repeat URLs across works when
+  global deduplication is enabled.
 
 ### Fixed
 - Tests cover HEAD pre-check redirects, resolver concurrency error isolation, and configuration validation edge cases.

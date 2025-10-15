@@ -16,6 +16,8 @@ Key Features:
 - Centralised retry handling and polite header management for resolver requests.
 - CLI flags for controlling topic selection, time ranges, resolver order, and
   polite crawling identifiers.
+- Optional global URL deduplication and domain-level throttling controls for
+  large-scale crawls.
 
 Dependencies:
 - `requests`: HTTP communication and connection pooling adapters.
@@ -135,6 +137,40 @@ def ensure_dir(path: Path) -> None:
         OSError: If the directory cannot be created because of permissions.
     """
     path.mkdir(parents=True, exist_ok=True)
+
+
+def _parse_domain_interval(value: str) -> Tuple[str, float]:
+    """Parse ``DOMAIN=SECONDS`` CLI arguments for domain throttling.
+
+    Args:
+        value: Argument provided via ``--domain-min-interval``.
+
+    Returns:
+        Tuple containing the normalized domain name and interval seconds.
+
+    Raises:
+        argparse.ArgumentTypeError: If the argument is malformed or negative.
+    """
+
+    if "=" not in value:
+        raise argparse.ArgumentTypeError(
+            "domain interval must use the format domain=seconds"
+        )
+    domain, interval = value.split("=", 1)
+    domain = domain.strip().lower()
+    if not domain:
+        raise argparse.ArgumentTypeError("domain component cannot be empty")
+    try:
+        seconds = float(interval)
+    except ValueError as exc:  # pragma: no cover - defensive parsing guard
+        raise argparse.ArgumentTypeError(
+            f"invalid interval for domain '{domain}': {interval}"
+        ) from exc
+    if seconds < 0:
+        raise argparse.ArgumentTypeError(
+            f"interval for domain '{domain}' must be non-negative"
+        )
+    return domain, seconds
 
 
 def _make_session(headers: Dict[str, str]) -> requests.Session:
@@ -878,7 +914,13 @@ def _build_download_outcome(
     path_str = str(dest_path) if dest_path else None
 
     if normalized in {"pdf", "pdf_unknown"} and not dry_run and dest_path is not None:
-        if content_length is not None and content_length < 1024:
+        size_hint = content_length
+        if size_hint is None:
+            with contextlib.suppress(OSError):
+                size_hint = dest_path.stat().st_size
+        if size_hint is not None and size_hint < 1024:
+            # PDFs smaller than 1 KiB are overwhelmingly HTML error stubs or
+            # truncated responses observed in production crawls.
             with contextlib.suppress(OSError):
                 dest_path.unlink()
             return DownloadOutcome(
@@ -1530,6 +1572,15 @@ def load_resolver_config(
     for enabled in getattr(args, "enable_resolver", []) or []:
         config.resolver_toggles[enabled] = True
 
+    if args.global_url_dedup is not None:
+        config.enable_global_url_dedup = args.global_url_dedup
+
+    if args.domain_min_interval:
+        domain_limits = dict(config.domain_min_interval_s)
+        for domain, interval in args.domain_min_interval:
+            domain_limits[domain] = interval
+        config.domain_min_interval_s = domain_limits
+
     # Polite headers include mailto when available
     headers = dict(config.polite_headers)
     existing_mailto = headers.get("mailto")
@@ -1861,6 +1912,30 @@ def main() -> None:
         help="Optional CSV attempts log output path.",
     )
     parser.add_argument(
+        "--global-url-dedup",
+        dest="global_url_dedup",
+        action="store_true",
+        help="Skip downloads when a URL was already fetched in this run.",
+    )
+    parser.add_argument(
+        "--no-global-url-dedup",
+        dest="global_url_dedup",
+        action="store_false",
+        help="Disable global URL deduplication (default).",
+    )
+    parser.add_argument(
+        "--domain-min-interval",
+        dest="domain_min_interval",
+        type=_parse_domain_interval,
+        action="append",
+        default=[],
+        metavar="DOMAIN=SECONDS",
+        help=(
+            "Enforce a minimum interval between requests to a domain. "
+            "Repeat the option to configure multiple domains."
+        ),
+    )
+    parser.add_argument(
         "--head-precheck",
         dest="head_precheck",
         action="store_true",
@@ -1878,7 +1953,7 @@ def main() -> None:
         default=None,
         help="Override the Accept header sent with resolver HTTP requests.",
     )
-    parser.set_defaults(head_precheck=True)
+    parser.set_defaults(head_precheck=True, global_url_dedup=None)
     parser.add_argument(
         "--log-format",
         choices=["jsonl", "csv"],
@@ -1964,137 +2039,147 @@ def main() -> None:
     manifest_path = args.manifest or args.log_jsonl or (pdf_dir / "manifest.jsonl")
     if manifest_path.suffix != ".jsonl":
         manifest_path = manifest_path.with_suffix(".jsonl")
-    base_logger = JsonlLogger(manifest_path)
-    attempt_logger: Any = base_logger
     csv_path = args.log_csv
     if args.log_format == "csv":
         csv_path = csv_path or manifest_path.with_suffix(".csv")
-    if csv_path:
-        attempt_logger = CsvAttemptLoggerAdapter(base_logger, csv_path)
 
-    resume_lookup, resume_completed = load_previous_manifest(args.resume_from)
-    if args.resume_from:
-        clear_resolver_caches()
-
-    metrics = ResolverMetrics()
-    pipeline = ResolverPipeline(
-        resolvers=resolver_instances,
-        config=config,
-        download_func=download_candidate,
-        logger=attempt_logger,
-        metrics=metrics,
-    )
-
-    def _session_factory() -> requests.Session:
-        """Build a fresh requests session configured with polite headers."""
-
-        return _make_session(config.polite_headers)
-
+    summary: Dict[str, Any] = {}
+    summary_record: Dict[str, Any] = {}
     processed = 0
     saved = 0
     html_only = 0
     skipped = 0
 
-    def _record_result(res: Dict[str, Any]) -> None:
-        """Update aggregate counters based on a single work result."""
+    with JsonlLogger(manifest_path) as base_logger:
+        attempt_logger: Any = base_logger
+        csv_adapter: Optional[CsvAttemptLoggerAdapter] = None
+        if csv_path:
+            csv_adapter = CsvAttemptLoggerAdapter(base_logger, csv_path)
+            attempt_logger = csv_adapter
 
-        nonlocal processed, saved, html_only, skipped
-        processed += 1
-        if res.get("saved"):
-            saved += 1
-        if res.get("html_only"):
-            html_only += 1
-        if res.get("skipped"):
-            skipped += 1
+        resume_lookup, resume_completed = load_previous_manifest(args.resume_from)
+        if args.resume_from:
+            clear_resolver_caches()
 
-    summary: Dict[str, Any] = {}
-    summary_record: Dict[str, Any] = {}
-    try:
-        if args.workers == 1:
-            session = _session_factory()
-            try:
-                for work in iterate_openalex(query, per_page=args.per_page, max_results=args.max):
-                    result = process_one_work(
-                        work,
-                        session,
-                        pdf_dir,
-                        html_dir,
-                        pipeline,
-                        attempt_logger,
-                        metrics,
-                        dry_run=args.dry_run,
-                        extract_html_text=args.extract_html_text,
-                        previous_lookup=resume_lookup,
-                        resume_completed=resume_completed,
-                    )
-                    _record_result(result)
-                    if args.sleep > 0:
-                        time.sleep(args.sleep)
-            finally:
-                if hasattr(session, "close"):
-                    session.close()
-        else:
-            with ThreadPoolExecutor(max_workers=args.workers) as executor:
-                futures = []
+        metrics = ResolverMetrics()
+        pipeline = ResolverPipeline(
+            resolvers=resolver_instances,
+            config=config,
+            download_func=download_candidate,
+            logger=attempt_logger,
+            metrics=metrics,
+        )
 
-                def _submit_work(work_item: Dict[str, Any]) -> None:
-                    """Submit a work item to the executor for asynchronous processing."""
+        def _session_factory() -> requests.Session:
+            """Build a fresh requests session configured with polite headers."""
 
-                    def _runner() -> Dict[str, Any]:
-                        """Process a single work item within a worker-managed session."""
+            return _make_session(config.polite_headers)
 
-                        session = _session_factory()
-                        try:
-                            return process_one_work(
-                                work_item,
-                                session,
-                                pdf_dir,
-                                html_dir,
-                                pipeline,
-                                attempt_logger,
-                                metrics,
-                                dry_run=args.dry_run,
-                                extract_html_text=args.extract_html_text,
-                                previous_lookup=resume_lookup,
-                                resume_completed=resume_completed,
-                            )
-                        finally:
-                            if hasattr(session, "close"):
-                                session.close()
+        def _record_result(res: Dict[str, Any]) -> None:
+            """Update aggregate counters based on a single work result."""
 
-                    futures.append(executor.submit(_runner))
+            nonlocal processed, saved, html_only, skipped
+            processed += 1
+            if res.get("saved"):
+                saved += 1
+            if res.get("html_only"):
+                html_only += 1
+            if res.get("skipped"):
+                skipped += 1
 
-                for work in iterate_openalex(query, per_page=args.per_page, max_results=args.max):
-                    _submit_work(work)
-
-                for future in as_completed(futures):
-                    _record_result(future.result())
-    except Exception:
-        attempt_logger.close()
-        raise
-    else:
-        summary = metrics.summary()
-        summary_record = {
-            "processed": processed,
-            "saved": saved,
-            "html_only": html_only,
-            "skipped": skipped,
-            "resolvers": summary,
-        }
         try:
-            attempt_logger.log_summary(summary_record)
-        except Exception:  # pragma: no cover - defensive logging safeguard
-            LOGGER.warning("Failed to log summary record", exc_info=True)
-        metrics_path = manifest_path.with_suffix(".metrics.json")
-        try:
-            ensure_dir(metrics_path.parent)
-            metrics_path.write_text(
-                json.dumps(summary_record, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
+            if args.workers == 1:
+                session = _session_factory()
+                try:
+                    for work in iterate_openalex(
+                        query, per_page=args.per_page, max_results=args.max
+                    ):
+                        result = process_one_work(
+                            work,
+                            session,
+                            pdf_dir,
+                            html_dir,
+                            pipeline,
+                            attempt_logger,
+                            metrics,
+                            dry_run=args.dry_run,
+                            extract_html_text=args.extract_html_text,
+                            previous_lookup=resume_lookup,
+                            resume_completed=resume_completed,
+                        )
+                        _record_result(result)
+                        if args.sleep > 0:
+                            time.sleep(args.sleep)
+                finally:
+                    if hasattr(session, "close"):
+                        session.close()
+            else:
+                with ThreadPoolExecutor(max_workers=args.workers) as executor:
+                    futures = []
+
+                    def _submit_work(work_item: Dict[str, Any]) -> None:
+                        """Submit a work item to the executor for async processing."""
+
+                        def _runner() -> Dict[str, Any]:
+                            """Process a single work item within worker session."""
+
+                            session = _session_factory()
+                            try:
+                                return process_one_work(
+                                    work_item,
+                                    session,
+                                    pdf_dir,
+                                    html_dir,
+                                    pipeline,
+                                    attempt_logger,
+                                    metrics,
+                                    dry_run=args.dry_run,
+                                    extract_html_text=args.extract_html_text,
+                                    previous_lookup=resume_lookup,
+                                    resume_completed=resume_completed,
+                                )
+                            finally:
+                                if hasattr(session, "close"):
+                                    session.close()
+
+                        futures.append(executor.submit(_runner))
+
+                    for work in iterate_openalex(
+                        query, per_page=args.per_page, max_results=args.max
+                    ):
+                        _submit_work(work)
+
+                    for future in as_completed(futures):
+                        _record_result(future.result())
         except Exception:
-            LOGGER.warning("Failed to write metrics sidecar %s", metrics_path, exc_info=True)
-        attempt_logger.close()
+            raise
+        else:
+            summary = metrics.summary()
+            summary_record = {
+                "processed": processed,
+                "saved": saved,
+                "html_only": html_only,
+                "skipped": skipped,
+                "resolvers": summary,
+            }
+            try:
+                attempt_logger.log_summary(summary_record)
+            except Exception:  # pragma: no cover - defensive logging safeguard
+                LOGGER.warning("Failed to log summary record", exc_info=True)
+            metrics_path = manifest_path.with_suffix(".metrics.json")
+            try:
+                ensure_dir(metrics_path.parent)
+                metrics_path.write_text(
+                    json.dumps(summary_record, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+            except Exception:
+                LOGGER.warning(
+                    "Failed to write metrics sidecar %s", metrics_path, exc_info=True
+                )
+        finally:
+            if csv_adapter is not None:
+                csv_adapter.close()
 
     print(
         f"\nDone. Processed {processed} works, saved {saved} PDFs, HTML-only {html_only}, skipped {skipped}."
