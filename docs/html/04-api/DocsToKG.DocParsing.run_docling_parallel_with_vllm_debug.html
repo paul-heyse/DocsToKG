@@ -88,14 +88,49 @@
 </ul>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="find-data-root-start">
-<h3><code class="docutils literal notranslate"><span class="pre">find_data_root(start)</span></code><a class="headerlink" href="#find-data-root-start" title="Link to this heading"></a></h3>
-<p>Locate the DocsToKG data directory starting from a filesystem path.</p>
+<section id="build-parser">
+<h3><code class="docutils literal notranslate"><span class="pre">build_parser()</span></code><a class="headerlink" href="#build-parser" title="Link to this heading"></a></h3>
+<p>Construct the argument parser for the PDF → DocTags converter.</p>
 <p>Args:
-start: Directory to begin searching from; ancestors are inspected as well.</p>
+None: Parser construction does not require inputs.</p>
 <p>Returns:
-Path pointing to a directory that contains the expected <code class="docutils literal notranslate"><span class="pre">PDFs</span></code> subdirectory.
-Falls back to <code class="docutils literal notranslate"><span class="pre">&lt;start&gt;/Data</span></code> when no ancestor contains the structure.</p>
+Argument parser configured with all supported CLI options.</p>
+<p>Raises:
+ValueError: If parser configuration fails due to invalid defaults.</p>
+</section>
+<section id="parse-args-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_args(argv)</span></code><a class="headerlink" href="#parse-args-argv" title="Link to this heading"></a></h3>
+<p>Parse CLI arguments for standalone execution.</p>
+<p>Args:
+argv: Optional CLI argument list. When <code class="docutils literal notranslate"><span class="pre">None</span></code> the values from
+:data:<code class="docutils literal notranslate"><span class="pre">sys.argv</span></code> are used.</p>
+<p>Returns:
+Namespace containing parsed CLI options.</p>
+<p>Raises:
+SystemExit: Propagated if <code class="docutils literal notranslate"><span class="pre">argparse</span></code> detects invalid arguments.</p>
+</section>
+<section id="normalize-status-raw">
+<h3><code class="docutils literal notranslate"><span class="pre">_normalize_status(raw)</span></code><a class="headerlink" href="#normalize-status-raw" title="Link to this heading"></a></h3>
+<p>Coerce legacy status strings into the canonical vocabulary.</p>
+</section>
+<section id="safe-float-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_safe_float(value)</span></code><a class="headerlink" href="#safe-float-value" title="Link to this heading"></a></h3>
+<p>Convert the supplied value to <code class="docutils literal notranslate"><span class="pre">float</span></code> when possible.</p>
+</section>
+<section id="normalize-conversion-result-result-task">
+<h3><code class="docutils literal notranslate"><span class="pre">normalize_conversion_result(result,</span> <span class="pre">task)</span></code><a class="headerlink" href="#normalize-conversion-result-result-task" title="Link to this heading"></a></h3>
+<p>Adapt heterogeneous worker return values into :class:<code class="docutils literal notranslate"><span class="pre">PdfConversionResult</span></code>.</p>
+<p>Historically the converter returned a tuple <code class="docutils literal notranslate"><span class="pre">(doc_id,</span> <span class="pre">status)</span></code>.  The
+refactor switched to <code class="docutils literal notranslate"><span class="pre">PdfConversionResult</span></code> which broke a regression test
+that still emits tuples.  This helper accepts both shapes—as well as dicts
+produced by ad-hoc stubs—and populates missing metadata from the associated
+:class:<code class="docutils literal notranslate"><span class="pre">PdfTask</span></code> when available.</p>
+<p>Args:
+result: Object returned by a worker invocation.
+task: Related :class:<code class="docutils literal notranslate"><span class="pre">PdfTask</span></code> used to back-fill metadata when needed.</p>
+<p>Returns:
+Normalised :class:<code class="docutils literal notranslate"><span class="pre">PdfConversionResult</span></code> instance encapsulating the
+conversion outcome.</p>
 </section>
 <section id="port-is-free-port">
 <h3><code class="docutils literal notranslate"><span class="pre">port_is_free(port)</span></code><a class="headerlink" href="#port-is-free-port" title="Link to this heading"></a></h3>
@@ -126,15 +161,6 @@ timeout: Seconds to wait for the HTTP response before aborting.</p>
 Tuple of <code class="docutils literal notranslate"><span class="pre">(is_healthy,</span> <span class="pre">status_code)</span></code> where <code class="docutils literal notranslate"><span class="pre">is_healthy</span></code> is True when the
 endpoint responds with HTTP 200.</p>
 </section>
-<section id="find-free-port-start-span">
-<h3><code class="docutils literal notranslate"><span class="pre">find_free_port(start,</span> <span class="pre">span)</span></code><a class="headerlink" href="#find-free-port-start-span" title="Link to this heading"></a></h3>
-<p>Find an available TCP port, scanning forwards from a starting point.</p>
-<p>Args:
-start: First port number to test.
-span: Maximum number of sequential ports to probe for availability.</p>
-<p>Returns:
-Available port number suitable for binding a local server.</p>
-</section>
 <section id="stream-logs-proc-prefix">
 <h3><code class="docutils literal notranslate"><span class="pre">stream_logs(proc,</span> <span class="pre">prefix)</span></code><a class="headerlink" href="#stream-logs-proc-prefix" title="Link to this heading"></a></h3>
 <p>Continuously stream stdout lines from a child process to the console.</p>
@@ -142,7 +168,7 @@ Available port number suitable for binding a local server.</p>
 proc: Running subprocess whose stdout should be tailed.
 prefix: Text prefix applied to each emitted log line for readability.</p>
 <p>Returns:
-None</p>
+None: This routine streams output for side effects only.</p>
 </section>
 <section id="start-vllm-port">
 <h3><code class="docutils literal notranslate"><span class="pre">start_vllm(port)</span></code><a class="headerlink" href="#start-vllm-port" title="Link to this heading"></a></h3>
@@ -195,22 +221,79 @@ root: Directory whose subtree should be scanned for PDFs.</p>
 <p>Returns:
 Sorted list of paths to PDF files.</p>
 </section>
-<section id="convert-one-args">
-<h3><code class="docutils literal notranslate"><span class="pre">convert_one(args)</span></code><a class="headerlink" href="#convert-one-args" title="Link to this heading"></a></h3>
+<section id="convert-one-task">
+<h3><code class="docutils literal notranslate"><span class="pre">convert_one(task)</span></code><a class="headerlink" href="#convert-one-task" title="Link to this heading"></a></h3>
 <p>Convert a single PDF into DocTags using a remote vLLM-backed pipeline.</p>
 <p>Args:
-args: Tuple containing <code class="docutils literal notranslate"><span class="pre">(pdf_path,</span> <span class="pre">output_dir,</span> <span class="pre">port)</span></code> for the work item.</p>
+task: Description of the conversion request, including paths and port.</p>
 <p>Returns:
-Tuple of <code class="docutils literal notranslate"><span class="pre">(pdf_name,</span> <span class="pre">status)</span></code> where status is one of <code class="docutils literal notranslate"><span class="pre">ok</span></code>, <code class="docutils literal notranslate"><span class="pre">skip</span></code>, or a
-<code class="docutils literal notranslate"><span class="pre">fail:&lt;reason&gt;</span></code> string describing the conversion issue.</p>
+Populated :class:<code class="docutils literal notranslate"><span class="pre">PdfConversionResult</span></code> reporting success, skip, or failure.</p>
+<p>Raises:
+ValueError: Propagated when the underlying conversion libraries raise
+validation errors prior to being caught by this helper.</p>
 </section>
-<section id="main">
-<h3><code class="docutils literal notranslate"><span class="pre">main()</span></code><a class="headerlink" href="#main" title="Link to this heading"></a></h3>
-<p>Entrypoint that coordinates vLLM setup and parallel DocTags conversion.</p>
+<section id="main-args">
+<h3><code class="docutils literal notranslate"><span class="pre">main(args)</span></code><a class="headerlink" href="#main-args" title="Link to this heading"></a></h3>
+<p>Coordinate vLLM startup and parallel DocTags conversion.</p>
 <p>Args:
-None</p>
+args: Optional argument namespace injected during programmatic use.</p>
 <p>Returns:
-None</p>
+Process exit code, where <code class="docutils literal notranslate"><span class="pre">0</span></code> indicates success.</p>
+</section>
+<section id="getitem-self-index">
+<h3><code class="docutils literal notranslate"><span class="pre">__getitem__(self,</span> <span class="pre">index)</span></code><a class="headerlink" href="#getitem-self-index" title="Link to this heading"></a></h3>
+<p>Provide tuple-like access for compatibility with legacy tests.</p>
+<p>Args:
+index: Position requested by tuple-style accessors.</p>
+<p>Returns:
+PDF path when <code class="docutils literal notranslate"><span class="pre">index</span></code> is <code class="docutils literal notranslate"><span class="pre">0</span></code>.</p>
+<p>Raises:
+IndexError: If <code class="docutils literal notranslate"><span class="pre">index</span></code> is not <code class="docutils literal notranslate"><span class="pre">0</span></code>.</p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="pdftask">
+<h3><code class="docutils literal notranslate"><span class="pre">PdfTask</span></code><a class="headerlink" href="#pdftask" title="Link to this heading"></a></h3>
+<p>Work item representing a single PDF conversion request.</p>
+<p>Attributes:
+pdf_path: Absolute path to the PDF document to convert.
+output_dir: Destination directory where DocTags are stored.
+port: vLLM HTTP port used for remote inference.
+input_hash: Content hash representing the PDF for change detection.
+doc_id: Identifier derived from the PDF path for manifest entries.
+output_path: Final DocTags artifact location.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>task = PdfTask(Path(“/tmp/sample.pdf”), Path(“/tmp/out”), 8000, “hash”, “doc”, Path(“/tmp/out/doc.doctags”))
+task.doc_id
+‘doc’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="pdfconversionresult">
+<h3><code class="docutils literal notranslate"><span class="pre">PdfConversionResult</span></code><a class="headerlink" href="#pdfconversionresult" title="Link to this heading"></a></h3>
+<p>Structured result returned by worker processes.</p>
+<p>Attributes:
+doc_id: Document identifier associated with the conversion.
+status: Outcome string such as <code class="docutils literal notranslate"><span class="pre">&quot;success&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;failure&quot;</span></code>.
+duration_s: Worker runtime in seconds.
+input_path: Original PDF path recorded for manifest entries.
+input_hash: Content hash used to detect stale outputs.
+output_path: Location of the produced DocTags file.
+error: Optional error detail captured during conversion.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>PdfConversionResult(“doc”, “success”, 1.0, “in.pdf”, “hash”, “out.doctags”)
+PdfConversionResult(doc_id=’doc’, status=’success’, duration_s=1.0, input_path=’in.pdf’, input_hash=’hash’, output_path=’out.doctags’, error=None)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 </section>
 </section>

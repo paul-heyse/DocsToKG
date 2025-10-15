@@ -28,27 +28,27 @@ RequestValidationError: If the request fails validation checks.
 
 ### `_execute_bm25(self, request, filters, config, query_features, timings)`
 
-*No documentation available.*
+Run the BM25 retrieval channel and record latency metrics.
 
 ### `_execute_splade(self, request, filters, config, query_features, timings)`
 
-*No documentation available.*
+Execute SPLADE retrieval and return channel-specific fusion candidates.
 
 ### `_execute_dense(self, request, filters, config, query_features, timings)`
 
-*No documentation available.*
+Query the FAISS index for dense candidates and filter by metadata.
 
 ### `_filter_dense_hits(self, hits, filters)`
 
-*No documentation available.*
+Apply metadata filters to dense results and gather payloads for survivors.
 
 ### `_dedupe_candidates(self, candidates, fused_scores)`
 
-*No documentation available.*
+Remove duplicate vector IDs, keeping the highest-scoring candidate per ID.
 
 ### `_validate_request(self, request)`
 
-*No documentation available.*
+Validate basic request fields before executing the search pipeline.
 
 ## 2. Classes
 

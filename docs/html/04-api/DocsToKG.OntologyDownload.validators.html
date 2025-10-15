@@ -80,26 +80,66 @@
 <h1>1. Module: validators<a class="headerlink" href="#module-validators" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.validators</span></code>.</p>
 <p>Ontology Validation Pipeline</p>
-<p>This module defines validators that run after ontology documents are fetched.
-Each validator parses the downloaded artifact, records structured results, and
-optionally emits normalized representations for downstream document processing.</p>
+<p>This module implements the post-download validation workflow that verifies
+ontology integrity, generates normalized artifacts, and captures structured
+telemetry for DocsToKG. Validators can leverage optional dependencies such as
+rdflib, Pronto, Owlready2, ROBOT, and Arelle while falling back gracefully
+when utilities are absent.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Uniform :class:<code class="docutils literal notranslate"><span class="pre">ValidationRequest</span></code> / :class:<code class="docutils literal notranslate"><span class="pre">ValidationResult</span></code> data model</p></li>
+<li><p>Timeout and memory instrumentation for resource-intensive validators</p></li>
+<li><p>JSON reporting helpers compatible with automated documentation generation</p></li>
+<li><p>Pluggable registry enabling selective validator execution</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.OntologyDownload.validators import run_validators</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>results = run_validators(requests, logger)
+print(results[&quot;rdflib&quot;].details)
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="log-memory-logger-validator-event">
 <h3><code class="docutils literal notranslate"><span class="pre">_log_memory(logger,</span> <span class="pre">validator,</span> <span class="pre">event)</span></code><a class="headerlink" href="#log-memory-logger-validator-event" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Emit memory usage diagnostics for a validator when debug logging is enabled.</p>
+<p>Args:
+logger: Logger responsible for validator telemetry.
+validator: Name of the validator emitting the event.
+event: Lifecycle label describing when the measurement is captured.</p>
+<p>Returns:
+None</p>
 </section>
 <section id="write-validation-json-path-payload">
 <h3><code class="docutils literal notranslate"><span class="pre">_write_validation_json(path,</span> <span class="pre">payload)</span></code><a class="headerlink" href="#write-validation-json-path-payload" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Persist structured validation metadata to disk as JSON.</p>
+<p>Args:
+path: Destination path for the JSON payload.
+payload: Mapping containing validation results.</p>
+<p>Returns:
+None</p>
 </section>
 <section id="run-with-timeout-func-timeout-sec">
 <h3><code class="docutils literal notranslate"><span class="pre">_run_with_timeout(func,</span> <span class="pre">timeout_sec)</span></code><a class="headerlink" href="#run-with-timeout-func-timeout-sec" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Execute a callable and raise :class:<code class="docutils literal notranslate"><span class="pre">ValidationTimeout</span></code> on deadline expiry.</p>
+<p>Args:
+func: Callable invoked without arguments.
+timeout_sec: Number of seconds allowed for execution.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+ValidationTimeout: When the callable exceeds the allotted runtime.</p>
 </section>
 <section id="prepare-xbrl-package-request-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">_prepare_xbrl_package(request,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#prepare-xbrl-package-request-logger" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Extract XBRL taxonomy ZIP archives for downstream validation.</p>
+<p>Args:
+request: Validation request describing the ontology package under test.
+logger: Logger used to record extraction telemetry.</p>
+<p>Returns:
+Tuple containing the entrypoint path passed to Arelle and a list of artifacts.</p>
+<p>Raises:
+ValueError: If the archive is malformed or contains unsafe paths.</p>
 </section>
 <section id="validate-rdflib-request-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_rdflib(request,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#validate-rdflib-request-logger" title="Link to this heading"></a></h3>
@@ -176,19 +216,22 @@ Dictionary with boolean status, detail payload, and output paths.</p>
 </section>
 <section id="parse">
 <h3><code class="docutils literal notranslate"><span class="pre">_parse()</span></code><a class="headerlink" href="#parse" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Parse the ontology with rdflib to populate the graph object.</p>
 </section>
 <section id="load">
 <h3><code class="docutils literal notranslate"><span class="pre">_load()</span></code><a class="headerlink" href="#load" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Load the ontology into memory using Pronto.</p>
 </section>
 <section id="handler-signum-frame">
 <h3><code class="docutils literal notranslate"><span class="pre">_handler(signum,</span> <span class="pre">frame)</span></code><a class="headerlink" href="#handler-signum-frame" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Signal handler converting SIGALRM into :class:<code class="docutils literal notranslate"><span class="pre">ValidationTimeout</span></code>.</p>
+<p>Args:
+signum: Received signal number.
+frame: Current stack frame (unused).</p>
 </section>
 <section id="execute">
 <h3><code class="docutils literal notranslate"><span class="pre">_execute()</span></code><a class="headerlink" href="#execute" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Load the ontology and capture term statistics.</p>
 </section>
 </section>
 <section id="classes">
@@ -258,7 +301,7 @@ ValidationTimeout: rdflib exceeded 60s</p>
 </section>
 <section id="alarm">
 <h3><code class="docutils literal notranslate"><span class="pre">_Alarm</span></code><a class="headerlink" href="#alarm" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Sentinel exception raised when the alarm signal fires.</p>
 </section>
 </section>
 </section>

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -95,8 +95,5 @@ def test_get_docling_version(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_validate_schema_version() -> None:
-    assert schemas.validate_schema_version(
-        "docparse/1.1.0", schemas.COMPATIBLE_CHUNK_VERSIONS
-    )
+    assert schemas.validate_schema_version("docparse/1.1.0", schemas.COMPATIBLE_CHUNK_VERSIONS)
     assert not schemas.validate_schema_version("other", schemas.COMPATIBLE_CHUNK_VERSIONS)
-

@@ -159,6 +159,23 @@ vector_ids: Identifiers of vectors to remove.</p>
 <p>Returns:
 None</p>
 </section>
+<section id="remove-ids-self-ids">
+<h3><code class="docutils literal notranslate"><span class="pre">remove_ids(self,</span> <span class="pre">ids)</span></code><a class="headerlink" href="#remove-ids-self-ids" title="Link to this heading"></a></h3>
+<p>Remove vectors by FAISS integer identifiers with optional batching.</p>
+<p>Args:
+ids: Array of FAISS internal identifiers to remove.
+force_flush: When True, rebuild immediately instead of batching.</p>
+<p>Returns:
+Number of identifiers scheduled for removal.</p>
+</section>
+<section id="current-index-ids-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_current_index_ids(self)</span></code><a class="headerlink" href="#current-index-ids-self" title="Link to this heading"></a></h3>
+<p>Return the FAISS internal identifiers currently stored in the index.</p>
+</section>
+<section id="lookup-existing-ids-self-candidate-ids">
+<h3><code class="docutils literal notranslate"><span class="pre">_lookup_existing_ids(self,</span> <span class="pre">candidate_ids)</span></code><a class="headerlink" href="#lookup-existing-ids-self-candidate-ids" title="Link to this heading"></a></h3>
+<p>Identify which of the supplied FAISS IDs already exist in the index.</p>
+</section>
 <section id="search-self-query-top-k">
 <h3><code class="docutils literal notranslate"><span class="pre">search(self,</span> <span class="pre">query,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#search-self-query-top-k" title="Link to this heading"></a></h3>
 <p>Execute a cosine-similarity search returning the best <code class="docutils literal notranslate"><span class="pre">top_k</span></code> results.</p>
@@ -170,11 +187,13 @@ List of <code class="docutils literal notranslate"><span class="pre">FaissSearch
 </section>
 <section id="serialize-self">
 <h3><code class="docutils literal notranslate"><span class="pre">serialize(self)</span></code><a class="headerlink" href="#serialize-self" title="Link to this heading"></a></h3>
-<p>Serialize the FAISS index and cached vectors for persistence.</p>
+<p>Serialize the FAISS index to bytes.</p>
 <p>Args:
 None</p>
 <p>Returns:
-Bytes object containing serialized index and vector cache.</p>
+Byte string containing the serialized FAISS index.</p>
+<p>Raises:
+RuntimeError: If the index has not been initialised.</p>
 </section>
 <section id="save-self-path">
 <h3><code class="docutils literal notranslate"><span class="pre">save(self,</span> <span class="pre">path)</span></code><a class="headerlink" href="#save-self-path" title="Link to this heading"></a></h3>
@@ -218,7 +237,7 @@ Dictionary containing index configuration and diagnostics.</p>
 </section>
 <section id="create-index-self">
 <h3><code class="docutils literal notranslate"><span class="pre">_create_index(self)</span></code><a class="headerlink" href="#create-index-self" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Construct a GPU-native FAISS index based on the configured index_type.</p>
 </section>
 <section id="replicate-to-all-gpus-self-index">
 <h3><code class="docutils literal notranslate"><span class="pre">replicate_to_all_gpus(self,</span> <span class="pre">index)</span></code><a class="headerlink" href="#replicate-to-all-gpus-self-index" title="Link to this heading"></a></h3>
@@ -232,31 +251,31 @@ RuntimeError: If multi-GPU replication is unsupported or no index is available.<
 </section>
 <section id="maybe-to-gpu-self-index">
 <h3><code class="docutils literal notranslate"><span class="pre">_maybe_to_gpu(self,</span> <span class="pre">index)</span></code><a class="headerlink" href="#maybe-to-gpu-self-index" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Promote a CPU index to GPU while enforcing strict cloning guarantees.</p>
 </section>
 <section id="maybe-reserve-memory-self-index">
 <h3><code class="docutils literal notranslate"><span class="pre">_maybe_reserve_memory(self,</span> <span class="pre">index)</span></code><a class="headerlink" href="#maybe-reserve-memory-self-index" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Reserve GPU memory for the expected corpus size when supported.</p>
 </section>
 <section id="to-cpu-self-index">
 <h3><code class="docutils literal notranslate"><span class="pre">_to_cpu(self,</span> <span class="pre">index)</span></code><a class="headerlink" href="#to-cpu-self-index" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Clone a GPU index back to CPU memory for persistence operations.</p>
 </section>
 <section id="set-nprobe-self">
 <h3><code class="docutils literal notranslate"><span class="pre">_set_nprobe(self)</span></code><a class="headerlink" href="#set-nprobe-self" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Apply IVF search breadth configuration to the current index.</p>
 </section>
 <section id="log-index-configuration-self-index">
 <h3><code class="docutils literal notranslate"><span class="pre">_log_index_configuration(self,</span> <span class="pre">index)</span></code><a class="headerlink" href="#log-index-configuration-self-index" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Emit structured logging that captures the live index configuration.</p>
 </section>
 <section id="resolve-vector-id-self-internal-id">
 <h3><code class="docutils literal notranslate"><span class="pre">_resolve_vector_id(self,</span> <span class="pre">internal_id)</span></code><a class="headerlink" href="#resolve-vector-id-self-internal-id" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Translate a FAISS internal identifier to the original vector UUID.</p>
 </section>
 <section id="detect-device-self-index">
 <h3><code class="docutils literal notranslate"><span class="pre">_detect_device(self,</span> <span class="pre">index)</span></code><a class="headerlink" href="#detect-device-self-index" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Determine the CUDA device hosting the provided index, if any.</p>
 </section>
 <section id="resolve-device-self-config">
 <h3><code class="docutils literal notranslate"><span class="pre">_resolve_device(self,</span> <span class="pre">config)</span></code><a class="headerlink" href="#resolve-device-self-config" title="Link to this heading"></a></h3>
@@ -278,19 +297,19 @@ RuntimeError: If FAISS lacks GPU support or an unsuitable device is requested.</
 </section>
 <section id="ensure-dim-self-vector">
 <h3><code class="docutils literal notranslate"><span class="pre">_ensure_dim(self,</span> <span class="pre">vector)</span></code><a class="headerlink" href="#ensure-dim-self-vector" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Validate that the provided embedding matches the configured dimensionality.</p>
 </section>
 <section id="flush-pending-deletes-self">
 <h3><code class="docutils literal notranslate"><span class="pre">_flush_pending_deletes(self)</span></code><a class="headerlink" href="#flush-pending-deletes-self" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Rebuild the index when tombstone thresholds or manual flush requests demand it.</p>
 </section>
-<section id="remove-ids-self-ids">
-<h3><code class="docutils literal notranslate"><span class="pre">_remove_ids(self,</span> <span class="pre">ids)</span></code><a class="headerlink" href="#remove-ids-self-ids" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">_remove_ids(self,</span> <span class="pre">ids)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Attempt to delete FAISS IDs directly, falling back to tombstones when required.</p>
 </section>
 <section id="rebuild-index-self">
 <h3><code class="docutils literal notranslate"><span class="pre">_rebuild_index(self)</span></code><a class="headerlink" href="#rebuild-index-self" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Recreate the GPU index from live vectors after tombstones accumulate.</p>
 </section>
 </section>
 <section id="classes">

@@ -80,19 +80,51 @@
 <h1>1. Module: resolvers<a class="headerlink" href="#module-resolvers" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.resolvers</span></code>.</p>
 <p>Ontology Resolver Implementations</p>
-<p>This module defines resolver strategies that translate fetch specifications
-into concrete download plans. Resolvers integrate with services such as the
-OBO Library, OLS, and BioPortal to identify canonical document URLs for
-downloading ontology content.</p>
+<p>This module defines the resolver strategies that convert download
+specifications into actionable fetch plans. Each resolver encapsulates the
+API integration, retry logic, and metadata extraction necessary to interact
+with external services such as the OBO Library, OLS, BioPortal, and SKOS/XBRL
+endpoints.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Shared retry/backoff helpers for consistent API resilience</p></li>
+<li><p>Resolver-specific metadata extraction (version, license, media type)</p></li>
+<li><p>Support for additional services through the pluggable <code class="docutils literal notranslate"><span class="pre">RESOLVERS</span></code> map</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.OntologyDownload.resolvers import RESOLVERS</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resolver = RESOLVERS[&quot;obo&quot;]
+plan = resolver.plan(spec, config, logger)
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="execute-with-retry-self-func">
 <h3><code class="docutils literal notranslate"><span class="pre">_execute_with_retry(self,</span> <span class="pre">func)</span></code><a class="headerlink" href="#execute-with-retry-self-func" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Run a callable with retry semantics tailored for resolver APIs.</p>
+<p>Args:
+func: Callable performing the API request.
+config: Resolved configuration containing retry and timeout settings.
+logger: Logger adapter used to record retry attempts.
+name: Human-friendly resolver name used in log messages.</p>
+<p>Returns:
+Result returned by the supplied callable.</p>
+<p>Raises:
+ConfigError: When retry limits are exceeded or HTTP errors occur.</p>
 </section>
 <section id="build-plan-self">
 <h3><code class="docutils literal notranslate"><span class="pre">_build_plan(self)</span></code><a class="headerlink" href="#build-plan-self" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Construct a <code class="docutils literal notranslate"><span class="pre">FetchPlan</span></code> from resolver components.</p>
+<p>Args:
+url: Canonical download URL for the ontology.
+headers: HTTP headers required when issuing the download.
+filename_hint: Suggested filename derived from resolver metadata.
+version: Version string reported by the resolver.
+license: License identifier reported by the resolver.
+media_type: MIME type associated with the ontology.
+service: Logical service identifier used for rate limiting.</p>
+<p>Returns:
+FetchPlan capturing resolver metadata.</p>
 </section>
 <section id="plan-self-spec-config-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#plan-self-spec-config-logger" title="Link to this heading"></a></h3>
@@ -120,7 +152,9 @@ ConfigError: When the API rejects credentials or yields no URLs.</p>
 </section>
 <section id="load-api-key-self">
 <h3><code class="docutils literal notranslate"><span class="pre">_load_api_key(self)</span></code><a class="headerlink" href="#load-api-key-self" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Load the BioPortal API key from disk when available.</p>
+<p>Returns:
+API key string stripped of whitespace, or <code class="docutils literal notranslate"><span class="pre">None</span></code> when missing.</p>
 </section>
 <section id="id2">
 <h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>

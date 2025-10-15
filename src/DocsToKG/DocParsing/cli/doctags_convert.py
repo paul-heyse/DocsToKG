@@ -31,7 +31,17 @@ _EXAMPLES = """Examples:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Construct the unified DocTags conversion argument parser."""
+    """Construct the unified DocTags conversion argument parser.
+
+    Args:
+        None: Parser creation does not require inputs.
+
+    Returns:
+        :class:`argparse.ArgumentParser` populated with DocTags CLI options.
+
+    Raises:
+        None
+    """
 
     parser = argparse.ArgumentParser(
         description="Convert HTML or PDF corpora to DocTags using Docling",
@@ -90,7 +100,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def detect_mode(input_dir: Path) -> str:
-    """Inspect ``input_dir`` and infer conversion mode based on file types."""
+    """Inspect ``input_dir`` and infer conversion mode based on file types.
+
+    Args:
+        input_dir: Directory whose contents determine the appropriate backend.
+
+    Returns:
+        ``"pdf"`` or ``"html"`` depending on the detected file extensions.
+
+    Raises:
+        ValueError: If both PDF and HTML files are present (or neither).
+    """
 
     pdf_count = sum(1 for _ in input_dir.rglob("*.pdf"))
     html_count = sum(1 for _ in input_dir.rglob("*.html")) + sum(
@@ -114,16 +134,24 @@ def _merge_args(parser: argparse.ArgumentParser, overrides: Dict[str, Any]) -> a
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Dispatch conversion to the HTML or PDF backend based on requested mode."""
+    """Dispatch conversion to the HTML or PDF backend based on requested mode.
+
+    Args:
+        argv: Optional CLI arguments; defaults to :data:`sys.argv` when omitted.
+
+    Returns:
+        Exit code from the selected conversion backend.
+
+    Raises:
+        ValueError: If conversion mode cannot be determined automatically.
+    """
 
     parser = build_parser()
     args = parser.parse_args(argv)
     logger = get_logger(__name__)
 
     resolved_root = (
-        detect_data_root(args.data_root)
-        if args.data_root is not None
-        else detect_data_root()
+        detect_data_root(args.data_root) if args.data_root is not None else detect_data_root()
     )
 
     html_default_in = data_html(resolved_root)
@@ -147,9 +175,7 @@ def main(argv: list[str] | None = None) -> int:
             elif pdf_count > 0 and html_count == 0:
                 mode = "pdf"
             else:
-                raise ValueError(
-                    "Cannot auto-detect mode: specify --mode or --input explicitly"
-                )
+                raise ValueError("Cannot auto-detect mode: specify --mode or --input explicitly")
         input_dir = html_default_in if mode == "html" else pdf_default_in
 
     output_dir = args.output.resolve() if args.output is not None else doctags_default_out

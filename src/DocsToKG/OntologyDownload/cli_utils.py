@@ -1,4 +1,21 @@
-"""CLI formatting utilities for the ontology downloader."""
+"""
+CLI Formatting Helpers
+
+This module contains lightweight formatting utilities used by the ontology
+downloader CLI. The helpers focus on producing human-friendly tables and
+summaries while remaining dependency-free so they can run in constrained
+environments such as CI workflows or air-gapped deployments.
+
+Key Features:
+- ASCII table rendering for deterministic console output
+- Validation summary formatting that mirrors structured JSON payloads
+- Utilities designed for reuse across multiple CLI subcommands
+
+Usage:
+    from DocsToKG.OntologyDownload.cli_utils import format_table
+
+    print(format_table([\"Name\", \"Status\"], [[\"hp\", \"ok\"]]))
+"""
 
 from __future__ import annotations
 
@@ -34,6 +51,14 @@ def format_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
             column_widths[index] = max(column_widths[index], len(cell))
 
     def _format_row(values: Sequence[str]) -> str:
+        """Render a single table row with padded column widths.
+
+        Args:
+            values: Ordered cell values corresponding to the table headers.
+
+        Returns:
+            String containing the formatted row.
+        """
         return " | ".join(value.ljust(column_widths[index]) for index, value in enumerate(values))
 
     separator = "-+-".join("-" * width for width in column_widths)

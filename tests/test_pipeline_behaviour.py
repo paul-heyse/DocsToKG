@@ -253,7 +253,9 @@ def test_openalex_resolver_executes_first(tmp_path):
         pdf_path.write_bytes(b"%PDF")
         return build_outcome("pdf", path=str(pdf_path))
 
-    fallback = StubResolver("fallback", [resolvers.ResolverResult(url="https://fallback.example/pdf")])
+    fallback = StubResolver(
+        "fallback", [resolvers.ResolverResult(url="https://fallback.example/pdf")]
+    )
     config = resolvers.ResolverConfig(
         resolver_order=["openalex", "fallback"],
         resolver_toggles={"openalex": True, "fallback": True},
@@ -340,5 +342,3 @@ def test_pipeline_records_failed_urls(tmp_path):
     assert result.success is False
     assert result.failed_urls == ["https://openalex.org/broken.pdf"]
     assert artifact.failed_pdf_urls == ["https://openalex.org/broken.pdf"]
-
-

@@ -1,0 +1,408 @@
+# 1. Module: _common
+
+This reference documents the DocsToKG module ``DocsToKG.DocParsing._common``.
+
+Shared utilities for DocParsing pipeline stages (path resolution, I/O, logging, batching).
+
+This module centralizes helpers that were historically duplicated across the
+DocParsing scripts. Functions cover path resolution, structured logging,
+atomic file writes, JSONL helpers, batching utilities, content hashing, and
+simple manifest management. The utilities are intentionally lightweight so
+they can be imported from multiprocessing workers without introducing heavy
+dependencies.
+
+## 1. Functions
+
+### `detect_data_root(start)`
+
+Locate the DocsToKG Data directory via env var or ancestor scan.
+
+Checks the ``DOCSTOKG_DATA_ROOT`` environment variable first. If not set,
+scans ancestor directories for a ``Data`` folder containing expected
+subdirectories (``PDFs``, ``HTML``, ``DocTagsFiles``, or
+``ChunkedDocTagFiles``).
+
+Args:
+start: Starting directory for the ancestor scan. Defaults to the
+current working directory when ``None``.
+
+Returns:
+Absolute path to the resolved ``Data`` directory.
+
+Raises:
+FileNotFoundError: If ``DOCSTOKG_DATA_ROOT`` points to a non-existent
+directory.
+
+Examples:
+>>> os.environ["DOCSTOKG_DATA_ROOT"] = "/tmp/data"
+>>> (Path("/tmp/data")).mkdir(parents=True, exist_ok=True)
+>>> detect_data_root()
+PosixPath('/tmp/data')
+
+>>> os.environ.pop("DOCSTOKG_DATA_ROOT")
+>>> detect_data_root(Path("/workspace/DocsToKG/src"))
+PosixPath('/workspace/DocsToKG/Data')
+
+### `_ensure_dir(path)`
+
+Create ``path`` if needed and return its absolute form.
+
+Args:
+path: Directory to create when missing.
+
+Returns:
+Absolute path to the created directory.
+
+Examples:
+>>> _ensure_dir(Path("./tmp_dir"))
+PosixPath('tmp_dir')
+
+### `data_doctags(root)`
+
+Return the DocTags directory and ensure it exists.
+
+Args:
+root: Optional override for the starting directory used when
+resolving the DocsToKG data root.
+
+Returns:
+Absolute path to the DocTags directory.
+
+Examples:
+>>> isinstance(data_doctags(), Path)
+True
+
+### `data_chunks(root)`
+
+Return the chunk directory and ensure it exists.
+
+Args:
+root: Optional override for the starting directory used when
+resolving the DocsToKG data root.
+
+Returns:
+Absolute path to the chunk directory.
+
+Examples:
+>>> isinstance(data_chunks(), Path)
+True
+
+### `data_vectors(root)`
+
+Return the vectors directory and ensure it exists.
+
+Args:
+root: Optional override for the starting directory used when
+resolving the DocsToKG data root.
+
+Returns:
+Absolute path to the vectors directory.
+
+Examples:
+>>> isinstance(data_vectors(), Path)
+True
+
+### `data_manifests(root)`
+
+Return the manifests directory and ensure it exists.
+
+Args:
+root: Optional override for the starting directory used when
+resolving the DocsToKG data root.
+
+Returns:
+Absolute path to the manifests directory.
+
+Examples:
+>>> isinstance(data_manifests(), Path)
+True
+
+### `data_pdfs(root)`
+
+Return the PDFs directory and ensure it exists.
+
+Args:
+root: Optional override for the starting directory used when
+resolving the DocsToKG data root.
+
+Returns:
+Absolute path to the PDFs directory.
+
+Examples:
+>>> isinstance(data_pdfs(), Path)
+True
+
+### `data_html(root)`
+
+Return the HTML directory and ensure it exists.
+
+Args:
+root: Optional override for the starting directory used when
+resolving the DocsToKG data root.
+
+Returns:
+Absolute path to the HTML directory.
+
+Examples:
+>>> isinstance(data_html(), Path)
+True
+
+### `get_logger(name, level)`
+
+Get a structured JSON logger configured for console output.
+
+Args:
+name: Name of the logger to create or retrieve.
+level: Logging level (case insensitive). Defaults to ``"INFO"``.
+
+Returns:
+Configured :class:`logging.Logger` instance.
+
+Examples:
+>>> logger = get_logger("docparse")
+>>> logger.level == logging.INFO
+True
+
+### `find_free_port(start, span)`
+
+Locate an available TCP port on localhost within a range.
+
+Args:
+start: Starting port for the scan. Defaults to ``8000``.
+span: Number of sequential ports to check. Defaults to ``32``.
+
+Returns:
+The first free port number. Falls back to an OS-assigned ephemeral port
+if the requested range is exhausted.
+
+Examples:
+>>> port = find_free_port(8500, 1)
+>>> isinstance(port, int)
+True
+
+### `atomic_write(path)`
+
+Write to a temporary file and atomically replace the destination.
+
+Args:
+path: Target path to write.
+
+Returns:
+Context manager yielding a writable text handle.
+
+Yields:
+Writable text file handle. Caller must write data before context exit.
+
+Raises:
+Any exception raised while writing or replacing the file is propagated
+after the temporary file is cleaned up.
+
+Examples:
+>>> target = Path("/tmp/example.txt")
+>>> with atomic_write(target) as handle:
+...     _ = handle.write("hello")
+
+### `iter_doctags(directory)`
+
+Yield DocTags files within ``directory`` and subdirectories.
+
+Args:
+directory: Root directory to scan for DocTags artifacts.
+
+Returns:
+Iterator over absolute ``Path`` objects.
+
+Yields:
+Absolute paths to discovered ``.doctags`` or ``.doctag`` files sorted
+lexicographically.
+
+Examples:
+>>> next(iter_doctags(Path(".")), None) is None
+True
+
+### `iter_chunks(directory)`
+
+Yield chunk JSONL files from ``directory`` (non-recursive).
+
+Args:
+directory: Directory containing chunk artifacts.
+
+Returns:
+Iterator over absolute ``Path`` objects.
+
+Yields:
+Absolute paths to files matching ``*.chunks.jsonl`` sorted
+lexicographically.
+
+Examples:
+>>> next(iter_chunks(Path(".")), None) is None
+True
+
+### `jsonl_load(path, skip_invalid, max_errors)`
+
+Load a JSONL file into memory with optional error tolerance.
+
+Args:
+path: JSON Lines file to read.
+skip_invalid: When ``True``, invalid lines are skipped up to
+``max_errors`` occurrences instead of raising immediately.
+max_errors: Maximum number of errors to tolerate when
+``skip_invalid`` is ``True``.
+
+Returns:
+List of parsed dictionaries.
+
+Raises:
+ValueError: If a malformed JSON line is encountered and ``skip_invalid``
+is ``False``.
+
+Examples:
+>>> tmp = Path("/tmp/example.jsonl")
+>>> _ = tmp.write_text('{"a": 1}
+', encoding="utf-8")
+>>> jsonl_load(tmp)
+[{'a': 1}]
+
+### `jsonl_save(path, rows, validate)`
+
+Persist dictionaries to a JSONL file atomically.
+
+Args:
+path: Destination JSONL file.
+rows: Sequence of dictionaries to serialize.
+validate: Optional callback invoked per row before serialization.
+
+Returns:
+None: This function performs I/O side effects only.
+
+Raises:
+ValueError: If ``validate`` raises an exception for any row.
+
+Examples:
+>>> tmp = Path("/tmp/example.jsonl")
+>>> jsonl_save(tmp, [{"a": 1}])
+>>> tmp.read_text(encoding="utf-8").strip()
+'{"a": 1}'
+
+### `manifest_append(stage, doc_id, status)`
+
+Append a structured entry to the processing manifest.
+
+Args:
+stage: Pipeline stage emitting the entry.
+doc_id: Identifier of the document being processed.
+status: Outcome status (``success``, ``failure``, or ``skip``).
+duration_s: Optional duration in seconds.
+warnings: Optional list of warning labels.
+error: Optional error description.
+schema_version: Schema identifier recorded for the output.
+**metadata: Arbitrary additional fields to include.
+
+Returns:
+``None``.
+
+Raises:
+ValueError: If ``status`` is not recognised.
+
+Examples:
+>>> manifest_append("chunk", "doc1", "success")
+>>> (data_manifests() / "docparse.manifest.jsonl").exists()
+True
+
+### `compute_content_hash(path, algorithm)`
+
+Compute a content hash for ``path`` using the requested algorithm.
+
+Args:
+path: File whose contents should be hashed.
+algorithm: Hash algorithm name supported by :mod:`hashlib`.
+
+Returns:
+Hex digest string.
+
+Examples:
+>>> tmp = Path("/tmp/hash.txt")
+>>> _ = tmp.write_text("hello", encoding="utf-8")
+>>> compute_content_hash(tmp) == hashlib.sha1(b"hello").hexdigest()
+True
+
+### `load_manifest_index(stage, root)`
+
+Load the latest manifest entries for a specific pipeline stage.
+
+Args:
+stage: Manifest stage identifier to filter entries by.
+root: Optional DocsToKG data root used to resolve the manifest path.
+
+Returns:
+Mapping of ``doc_id`` to the most recent manifest entry for that stage.
+
+Raises:
+None: Manifest rows that fail to parse are skipped to keep processing resilient.
+
+Examples:
+>>> index = load_manifest_index("embeddings")  # doctest: +SKIP
+>>> isinstance(index, dict)
+True
+
+### `acquire_lock(path, timeout)`
+
+Acquire an advisory lock using ``.lock`` sentinel files.
+
+Args:
+path: Target file path whose lock should be acquired.
+timeout: Maximum time in seconds to wait for the lock.
+
+Returns:
+Iterator yielding a boolean when the lock is acquired.
+
+Yields:
+``True`` once the lock is acquired.
+
+Raises:
+TimeoutError: If the lock cannot be obtained within ``timeout``.
+
+Examples:
+>>> target = Path("/tmp/lock.txt")
+>>> with acquire_lock(target):
+...     pass
+
+### `__iter__(self)`
+
+*No documentation available.*
+
+### `format(self, record)`
+
+Render a log record as a JSON string.
+
+Args:
+record: Logging record produced by the DocParsing pipeline.
+
+Returns:
+JSON-formatted string containing canonical log fields and optional extras.
+
+## 2. Classes
+
+### `Batcher`
+
+Yield fixed-size batches from an iterable.
+
+Args:
+iterable: Source iterable providing items to batch.
+batch_size: Maximum number of elements per yielded batch.
+
+Examples:
+>>> list(Batcher([1, 2, 3, 4, 5], 2))
+[[1, 2], [3, 4], [5]]
+
+### `JSONFormatter`
+
+Emit structured JSON log messages for DocParsing utilities.
+
+Attributes:
+default_time_format: Timestamp template applied to log records.
+
+Examples:
+>>> formatter = JSONFormatter()
+>>> hasattr(formatter, "format")
+True

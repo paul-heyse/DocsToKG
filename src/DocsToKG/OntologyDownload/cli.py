@@ -1,4 +1,30 @@
-"""Command-line interface for the ontology downloader."""
+"""
+Ontology Downloader CLI
+
+This module exposes the `ontofetch` command-line experience for DocsToKG.
+It provides entry points for downloading ontologies, inspecting manifests,
+re-running validators, and bootstrapping configuration files. The CLI is
+designed to support both automated pipelines and human operators by offering
+structured JSON output, progress tables, and detailed error reporting.
+
+Key Features:
+- Multi-command interface covering pull, show, validate, init, and config tasks
+- Seamless integration with resolver planning and validation subsystems
+- Support for JSON output to aid automation and downstream tooling
+- Logging configuration that aligns with DocsToKG observability standards
+
+Dependencies:
+- argparse: command-line parsing
+- pathlib: filesystem path handling
+- DocsToKG.OntologyDownload.core: download orchestration helpers
+- DocsToKG.OntologyDownload.validators: validation pipeline execution
+
+Usage:
+    from DocsToKG.OntologyDownload import cli
+
+    if __name__ == "__main__":
+        raise SystemExit(cli.main())
+"""
 
 from __future__ import annotations
 
@@ -23,6 +49,14 @@ from .validators import ValidationRequest, run_validators
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """Configure the top-level CLI parser and subcommands.
+
+    Returns:
+        Parser instance with sub-commands for pull, show, validate, init, and config.
+
+    Raises:
+        None
+    """
     parser = argparse.ArgumentParser(
         prog="ontofetch",
         description="Ontology downloader for DocsToKG supporting OBO, OLS, BioPortal, SKOS, XBRL sources.",
@@ -125,12 +159,28 @@ ontologies:
 
 
 def _parse_target_formats(value: Optional[str]) -> List[str]:
+    """Normalize comma-separated target format strings.
+
+    Args:
+        value: Raw CLI argument possibly containing comma-delimited formats.
+
+    Returns:
+        List of stripped format identifiers, or an empty list when no formats are supplied.
+    """
     if not value:
         return []
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
 def _results_to_dict(result: FetchResult) -> dict:
+    """Convert a ``FetchResult`` instance into a JSON-friendly mapping.
+
+    Args:
+        result: Completed fetch result returned by :func:`fetch_one`.
+
+    Returns:
+        Dictionary containing resolver metadata, manifest location, and artifact list.
+    """
     return {
         "id": result.spec.id,
         "resolver": result.spec.resolver,
@@ -143,6 +193,18 @@ def _results_to_dict(result: FetchResult) -> dict:
 
 
 def _ensure_manifest_path(ontology_id: str, version: Optional[str]) -> Path:
+    """Return the manifest path for a given ontology and version.
+
+    Args:
+        ontology_id: Identifier for the ontology whose manifest is requested.
+        version: Optional version string; when omitted the latest available is used.
+
+    Returns:
+        Path to the manifest JSON file on disk.
+
+    Raises:
+        ConfigError: If the ontology or manifest cannot be located locally.
+    """
     ontology_dir = ONTOLOGY_DIR / ontology_id
     if not ontology_dir.exists():
         raise ConfigError(f"Ontology '{ontology_id}' has not been downloaded yet")
@@ -160,10 +222,30 @@ def _ensure_manifest_path(ontology_id: str, version: Optional[str]) -> Path:
 
 
 def _load_manifest(manifest_path: Path) -> dict:
+    """Read and parse a manifest JSON document from disk.
+
+    Args:
+        manifest_path: Filesystem location of the manifest file.
+
+    Returns:
+        Dictionary representation of the manifest contents.
+    """
     return json.loads(manifest_path.read_text())
 
 
 def _handle_pull(args, base_config: Optional[ResolvedConfig]) -> List[FetchResult]:
+    """Execute the ``pull`` subcommand workflow.
+
+    Args:
+        args: Parsed CLI arguments for the pull command.
+        base_config: Optional pre-loaded configuration used when no spec file is supplied.
+
+    Returns:
+        List of fetch results describing downloaded or cached ontologies.
+
+    Raises:
+        ConfigError: If neither ID arguments nor a configuration file are provided.
+    """
     target_formats = _parse_target_formats(args.target_formats)
     config_path = args.spec
     if config_path is None and not args.ids:
@@ -194,6 +276,17 @@ def _handle_pull(args, base_config: Optional[ResolvedConfig]) -> List[FetchResul
 
 
 def _handle_show(args) -> None:
+    """Display ontology manifest information for the ``show`` command.
+
+    Args:
+        args: Parsed CLI arguments including ontology identifier and output format.
+
+    Returns:
+        None
+
+    Raises:
+        ConfigError: When the manifest cannot be located.
+    """
     if args.versions:
         versions = sorted(d.name for d in (ONTOLOGY_DIR / args.id).iterdir() if d.is_dir())
         for version in versions:
@@ -210,6 +303,14 @@ def _handle_show(args) -> None:
 
 
 def _selected_validators(args) -> Sequence[str]:
+    """Determine which validators should execute based on CLI flags.
+
+    Args:
+        args: Parsed CLI arguments for the ``validate`` command.
+
+    Returns:
+        Sequence containing validator names in execution order.
+    """
     mapping = {
         "rdflib": args.rdflib,
         "pronto": args.pronto,
@@ -222,6 +323,18 @@ def _selected_validators(args) -> Sequence[str]:
 
 
 def _handle_validate(args, config: ResolvedConfig) -> dict:
+    """Run validators for a previously downloaded ontology.
+
+    Args:
+        args: Parsed CLI arguments specifying ontology ID, version, and output format.
+        config: Resolved configuration supplying validator defaults.
+
+    Returns:
+        Mapping of validator names to their structured result payloads.
+
+    Raises:
+        ConfigError: If the manifest or downloaded artifacts cannot be located.
+    """
     manifest_path = _ensure_manifest_path(args.id, args.version)
     manifest = _load_manifest(manifest_path)
     version_dir = manifest_path.parent
@@ -241,6 +354,17 @@ def _handle_validate(args, config: ResolvedConfig) -> dict:
 
 
 def _handle_init(path: Path) -> None:
+    """Create a starter ``sources.yaml`` file for new installations.
+
+    Args:
+        path: Destination path for the generated configuration template.
+
+    Returns:
+        None
+
+    Raises:
+        ConfigError: If the target file already exists.
+    """
     if path.exists():
         raise ConfigError(f"Refusing to overwrite existing file {path}")
     path.write_text(EXAMPLE_SOURCES_YAML)
@@ -248,6 +372,14 @@ def _handle_init(path: Path) -> None:
 
 
 def _handle_config_validate(path: Path) -> dict:
+    """Validate a configuration file and return a summary report.
+
+    Args:
+        path: Filesystem path to the configuration file under validation.
+
+    Returns:
+        Dictionary describing validation status, ontology count, and file path.
+    """
     config = validate_config(path)
     return {
         "ok": True,

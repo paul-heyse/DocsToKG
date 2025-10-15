@@ -227,17 +227,21 @@ class ResolverPipeline:
             executor: ThreadPoolExecutor,
             start_index: int,
         ) -> int:
+            """Queue additional resolvers until reaching concurrency limits.
+
+            Args:
+                executor: Thread pool responsible for executing resolver calls.
+                start_index: Index in ``resolver_order`` where submission should resume.
+
+            Returns:
+                Updated index pointing to the next resolver candidate that has not been submitted.
+            """
             index = start_index
-            while (
-                len(active_futures) < max_workers
-                and index < len(self.config.resolver_order)
-            ):
+            while len(active_futures) < max_workers and index < len(self.config.resolver_order):
                 resolver_name = self.config.resolver_order[index]
                 order_index = index + 1
                 index += 1
-                resolver = self._prepare_resolver(
-                    resolver_name, order_index, artifact, state
-                )
+                resolver = self._prepare_resolver(resolver_name, order_index, artifact, state)
                 if resolver is None:
                     continue
                 future = executor.submit(

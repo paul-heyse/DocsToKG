@@ -86,10 +86,6 @@
 <h3><code class="docutils literal notranslate"><span class="pre">_utc_timestamp()</span></code><a class="headerlink" href="#utc-timestamp" title="Link to this heading"></a></h3>
 <p>Return an ISO 8601 UTC timestamp with a trailing ‘Z’ suffix.</p>
 </section>
-<section id="accepts-argument-func-name">
-<h3><code class="docutils literal notranslate"><span class="pre">_accepts_argument(func,</span> <span class="pre">name)</span></code><a class="headerlink" href="#accepts-argument-func-name" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
 <section id="has-pdf-eof-path">
 <h3><code class="docutils literal notranslate"><span class="pre">_has_pdf_eof(path)</span></code><a class="headerlink" href="#has-pdf-eof-path" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
@@ -298,18 +294,6 @@ max_results: Optional maximum number of works to yield.</p>
 Work payload dictionaries returned by the OpenAlex API.</p>
 <p>Returns:
 Iterable yielding work payload dictionaries.</p>
-</section>
-<section id="attempt-openalex-candidates-session-artifact-logger-metrics-context">
-<h3><code class="docutils literal notranslate"><span class="pre">attempt_openalex_candidates(session,</span> <span class="pre">artifact,</span> <span class="pre">logger,</span> <span class="pre">metrics,</span> <span class="pre">context)</span></code><a class="headerlink" href="#attempt-openalex-candidates-session-artifact-logger-metrics-context" title="Link to this heading"></a></h3>
-<p>Attempt downloads for all candidate URLs associated with an artifact.</p>
-<p>Args:
-session: Requests session configured for resolver usage.
-artifact: Work artifact containing candidate URLs.
-logger: Attempt logger receiving structured records.
-metrics: Resolver metrics collector.
-context: Optional context dict (dry-run flags, previous entries).</p>
-<p>Returns:
-Pair of (DownloadOutcome, URL) on success, otherwise None.</p>
 </section>
 <section id="process-one-work-work-session-pdf-dir-html-dir-pipeline-logger-metrics">
 <h3><code class="docutils literal notranslate"><span class="pre">process_one_work(work,</span> <span class="pre">session,</span> <span class="pre">pdf_dir,</span> <span class="pre">html_dir,</span> <span class="pre">pipeline,</span> <span class="pre">logger,</span> <span class="pre">metrics)</span></code><a class="headerlink" href="#process-one-work-work-session-pdf-dir-html-dir-pipeline-logger-metrics" title="Link to this heading"></a></h3>

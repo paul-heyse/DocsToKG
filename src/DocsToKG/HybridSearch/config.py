@@ -208,6 +208,15 @@ class HybridSearchConfigManager:
     """
 
     def __init__(self, path: Path) -> None:
+        """Create a configuration manager bound to the supplied file path.
+
+        Args:
+            path: Filesystem path pointing to a JSON or YAML configuration file.
+
+        Returns:
+            None
+        """
+
         self._path = path
         self._lock = RLock()
         self._config = self._load()
@@ -242,6 +251,19 @@ class HybridSearchConfigManager:
             return self._config
 
     def _load(self) -> HybridSearchConfig:
+        """Load configuration data from the configured path (JSON or YAML).
+
+        Args:
+            None
+
+        Returns:
+            :class:`HybridSearchConfig` constructed from the on-disk payload.
+
+        Raises:
+            FileNotFoundError: If the configuration file is missing.
+            ValueError: If JSON or YAML decoding fails or yields invalid structure.
+        """
+
         if not self._path.exists():
             raise FileNotFoundError(f"Configuration file {self._path} not found")
         raw = self._path.read_text(encoding="utf-8")
@@ -252,6 +274,18 @@ class HybridSearchConfigManager:
         return HybridSearchConfig.from_dict(payload)
 
     def _load_yaml(self, raw: str) -> Dict[str, Any]:
+        """Parse YAML configuration content into a dictionary.
+
+        Args:
+            raw: Raw YAML string read from disk.
+
+        Returns:
+            Dictionary representation suitable for :class:`HybridSearchConfig.from_dict`.
+
+        Raises:
+            ValueError: If PyYAML is unavailable or the content does not define a mapping.
+        """
+
         try:
             import yaml  # type: ignore
         except ModuleNotFoundError as exc:  # pragma: no cover - exercised in tests

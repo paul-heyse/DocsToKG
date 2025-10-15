@@ -18,14 +18,14 @@ from .providers import (
     EuropePmcResolver,
     HalResolver,
     LandingPageResolver,
-    OpenAlexResolver,
     OpenAireResolver,
+    OpenAlexResolver,
     OsfResolver,
-    ZenodoResolver,
     PmcResolver,
     SemanticScholarResolver,
     UnpaywallResolver,
     WaybackResolver,
+    ZenodoResolver,
     default_resolvers,
 )
 from .types import (

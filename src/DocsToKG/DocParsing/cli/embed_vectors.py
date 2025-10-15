@@ -11,7 +11,17 @@ from DocsToKG.DocParsing.EmbeddingV2 import main as embed_main
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Return the embedding parser with a concise description."""
+    """Return the embedding parser with a concise description.
+
+    Args:
+        None
+
+    Returns:
+        :class:`argparse.ArgumentParser` configured for embedding CLI usage.
+
+    Raises:
+        None
+    """
 
     parser = embed_build_parser()
     parser.description = "Generate BM25, SPLADE, and Qwen vectors for chunk files"
@@ -19,7 +29,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Parse arguments and invoke the embedding pipeline."""
+    """Parse arguments and invoke the embedding pipeline.
+
+    Args:
+        argv: Optional sequence of command-line arguments.
+
+    Returns:
+        Exit code from the embedding pipeline.
+
+    Raises:
+        SystemExit: Propagated when argument parsing fails.
+    """
 
     parser = build_parser()
     args = parser.parse_args(argv)

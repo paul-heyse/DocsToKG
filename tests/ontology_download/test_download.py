@@ -422,9 +422,7 @@ def test_extract_zip_rejects_absolute(tmp_path):
 
 def test_extract_zip_detects_compression_bomb(tmp_path):
     archive = tmp_path / "bomb.zip"
-    with download.zipfile.ZipFile(
-        archive, "w", compression=download.zipfile.ZIP_DEFLATED
-    ) as zf:
+    with download.zipfile.ZipFile(archive, "w", compression=download.zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("large.txt", b"0" * (11 * 1024 * 1024))
 
     with pytest.raises(download.ConfigError) as exc_info:
@@ -581,9 +579,7 @@ def test_validate_url_security_respects_allowlist(monkeypatch):
     monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
     config = DownloadConfiguration(allowed_hosts=["example.org", "purl.obolibrary.org"])
 
-    secure_url = download.validate_url_security(
-        "https://purl.obolibrary.org/ontology.owl", config
-    )
+    secure_url = download.validate_url_security("https://purl.obolibrary.org/ontology.owl", config)
 
     assert looked_up["host"] == "purl.obolibrary.org"
     assert secure_url.startswith("https://purl.obolibrary.org")
@@ -606,9 +602,7 @@ def test_validate_url_security_normalizes_idn(monkeypatch):
     monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
 
     config = DownloadConfiguration()
-    secure_url = download.validate_url_security(
-        "https://münchen.example.org/ontology.owl", config
-    )
+    secure_url = download.validate_url_security("https://münchen.example.org/ontology.owl", config)
 
     assert looked_up["host"] == "xn--mnchen-3ya.example.org"
     assert secure_url.startswith("https://xn--mnchen-3ya.example.org")
@@ -626,9 +620,7 @@ def test_validate_url_security_respects_wildcard_allowlist(monkeypatch):
     monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
     config = DownloadConfiguration(allowed_hosts=["*.example.org"])
 
-    secure_url = download.validate_url_security(
-        "https://sub.example.org/ontology.owl", config
-    )
+    secure_url = download.validate_url_security("https://sub.example.org/ontology.owl", config)
 
     assert secure_url.startswith("https://sub.example.org")
 

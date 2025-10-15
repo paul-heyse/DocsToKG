@@ -6,8 +6,9 @@ from typing import Iterable
 
 import requests
 
-from ..types import Resolver, ResolverConfig, ResolverResult
 from DocsToKG.ContentDownload.utils import dedupe
+
+from ..types import ResolverConfig, ResolverResult
 
 
 class OpenAlexResolver:
@@ -42,4 +43,3 @@ class OpenAlexResolver:
 
 
 __all__ = ["OpenAlexResolver"]
-

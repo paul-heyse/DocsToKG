@@ -28,23 +28,53 @@ ChunkFeatures containing sparse and dense representations.
 
 ### `_compute_bm25(self, tokens)`
 
-*No documentation available.*
+Calculate BM25-style term weights for the provided tokens.
+
+Args:
+tokens: Sequence of string tokens extracted from chunk text.
+
+Returns:
+Mapping of token → BM25-inspired weight using log-scaled term frequency.
 
 ### `_compute_splade(self, tokens)`
 
-*No documentation available.*
+Generate SPLADE-style sparse lexical weights for the tokens.
+
+Args:
+tokens: Token sequence used to derive sparse lexical weights.
+
+Returns:
+Mapping of token → SPLADE-inspired weight capturing term salience.
 
 ### `_compute_dense_embedding(self, tokens)`
 
-*No documentation available.*
+Aggregate per-token hashes into a normalized dense embedding.
+
+Args:
+tokens: Tokens present in the chunk text.
+
+Returns:
+L2-normalised dense embedding representing the chunk semantics.
 
 ### `_hash_to_vector(self, token)`
 
-*No documentation available.*
+Project a token deterministically into dense vector space via hashing.
+
+Args:
+token: Token string that requires a dense vector representation.
+
+Returns:
+Dense vector derived from the SHA-1 digest of the token.
 
 ### `_normalize(self, vector)`
 
-*No documentation available.*
+Return a unit-length copy of the provided dense vector.
+
+Args:
+vector: Vector to normalise to unit length.
+
+Returns:
+Normalised vector, or the original vector when zero-norm.
 
 ## 2. Classes
 

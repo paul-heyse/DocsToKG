@@ -92,6 +92,18 @@ class ChunkIngestionPipeline:
         registry: ChunkRegistry,
         observability: Optional[Observability] = None,
     ) -> None:
+        """Initialise the ingestion pipeline with storage backends and instrumentation.
+
+        Args:
+            faiss_index: FAISS index manager responsible for dense vector storage.
+            opensearch: OpenSearch simulator handling lexical storage.
+            registry: Registry mapping vector identifiers to chunk metadata.
+            observability: Optional observability façade for tracing and metrics.
+
+        Returns:
+            None: Constructors perform initialisation side effects only.
+        """
+
         self._faiss = faiss_index
         self._opensearch = opensearch
         self._registry = registry

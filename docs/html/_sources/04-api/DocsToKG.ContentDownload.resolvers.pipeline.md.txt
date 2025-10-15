@@ -18,19 +18,54 @@ Resolver pipeline orchestration and execution logic.
 
 *No documentation available.*
 
+### `_should_attempt_head_check(self, resolver_name)`
+
+*No documentation available.*
+
+### `_head_precheck_url(self, session, url, timeout)`
+
+*No documentation available.*
+
 ### `run(self, session, artifact, context)`
 
-Execute resolvers sequentially until a PDF is obtained or exhausted.
+Execute resolvers until a PDF is obtained or resolvers are exhausted.
+
+### `_run_sequential(self, session, artifact, context_data, state)`
+
+*No documentation available.*
+
+### `_run_concurrent(self, session, artifact, context_data, state)`
+
+*No documentation available.*
+
+### `_prepare_resolver(self, resolver_name, order_index, artifact, state)`
+
+*No documentation available.*
+
+### `_collect_resolver_results(self, resolver_name, resolver, session, artifact)`
+
+*No documentation available.*
+
+### `_process_result(self, session, artifact, resolver_name, order_index, result, context_data, state)`
+
+*No documentation available.*
+
+### `submit_next(executor, start_index)`
+
+Queue additional resolvers until reaching concurrency limits.
 
 Args:
-session: HTTP session shared across resolver invocations.
-artifact: Work artifact representing the item being resolved.
-context: Optional dictionary carrying pipeline execution context.
+executor: Thread pool responsible for executing resolver calls.
+start_index: Index in ``resolver_order`` where submission should resume.
 
 Returns:
-PipelineResult describing the final outcome of resolver execution.
+Updated index pointing to the next resolver candidate that has not been submitted.
 
 ## 2. Classes
+
+### `_RunState`
+
+Mutable pipeline execution state shared across resolvers.
 
 ### `ResolverPipeline`
 

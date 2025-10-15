@@ -100,23 +100,43 @@ ChunkFeatures containing sparse and dense representations.</p>
 </section>
 <section id="compute-bm25-self-tokens">
 <h3><code class="docutils literal notranslate"><span class="pre">_compute_bm25(self,</span> <span class="pre">tokens)</span></code><a class="headerlink" href="#compute-bm25-self-tokens" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Calculate BM25-style term weights for the provided tokens.</p>
+<p>Args:
+tokens: Sequence of string tokens extracted from chunk text.</p>
+<p>Returns:
+Mapping of token → BM25-inspired weight using log-scaled term frequency.</p>
 </section>
 <section id="compute-splade-self-tokens">
 <h3><code class="docutils literal notranslate"><span class="pre">_compute_splade(self,</span> <span class="pre">tokens)</span></code><a class="headerlink" href="#compute-splade-self-tokens" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Generate SPLADE-style sparse lexical weights for the tokens.</p>
+<p>Args:
+tokens: Token sequence used to derive sparse lexical weights.</p>
+<p>Returns:
+Mapping of token → SPLADE-inspired weight capturing term salience.</p>
 </section>
 <section id="compute-dense-embedding-self-tokens">
 <h3><code class="docutils literal notranslate"><span class="pre">_compute_dense_embedding(self,</span> <span class="pre">tokens)</span></code><a class="headerlink" href="#compute-dense-embedding-self-tokens" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Aggregate per-token hashes into a normalized dense embedding.</p>
+<p>Args:
+tokens: Tokens present in the chunk text.</p>
+<p>Returns:
+L2-normalised dense embedding representing the chunk semantics.</p>
 </section>
 <section id="hash-to-vector-self-token">
 <h3><code class="docutils literal notranslate"><span class="pre">_hash_to_vector(self,</span> <span class="pre">token)</span></code><a class="headerlink" href="#hash-to-vector-self-token" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Project a token deterministically into dense vector space via hashing.</p>
+<p>Args:
+token: Token string that requires a dense vector representation.</p>
+<p>Returns:
+Dense vector derived from the SHA-1 digest of the token.</p>
 </section>
 <section id="normalize-self-vector">
 <h3><code class="docutils literal notranslate"><span class="pre">_normalize(self,</span> <span class="pre">vector)</span></code><a class="headerlink" href="#normalize-self-vector" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Return a unit-length copy of the provided dense vector.</p>
+<p>Args:
+vector: Vector to normalise to unit length.</p>
+<p>Returns:
+Normalised vector, or the original vector when zero-norm.</p>
 </section>
 </section>
 <section id="classes">

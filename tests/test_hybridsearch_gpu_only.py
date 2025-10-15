@@ -18,9 +18,7 @@ faiss = pytest.importorskip("faiss")  # type: ignore
 if not hasattr(faiss, "get_num_gpus"):
     pytestmark = pytest.mark.skip(reason="FAISS GPU utilities not available in this build")
 else:
-    pytestmark = pytest.mark.skipif(
-        faiss.get_num_gpus() < 1, reason="FAISS GPU device required"
-    )
+    pytestmark = pytest.mark.skipif(faiss.get_num_gpus() < 1, reason="FAISS GPU device required")
 
 
 def _toy_data(n: int = 2048, d: int = 128) -> tuple[np.ndarray, np.ndarray]:

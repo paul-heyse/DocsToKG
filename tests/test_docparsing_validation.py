@@ -14,7 +14,6 @@ from DocsToKG.DocParsing.schemas import (
     validate_vector_row,
 )
 
-
 FIXTURE_ROOT = Path("tests/data/docparsing/golden")
 
 

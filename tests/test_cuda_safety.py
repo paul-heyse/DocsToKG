@@ -84,7 +84,9 @@ def _stub_main_setup(monkeypatch, module, tmp_path, list_return: List) -> Simple
         output=tmp_path / "output",
     )
     monkeypatch.setattr(module, "parse_args", lambda: args)
-    monkeypatch.setattr(module, "ensure_vllm", lambda *_a, **_k: (module.PREFERRED_PORT, None, False))
+    monkeypatch.setattr(
+        module, "ensure_vllm", lambda *_a, **_k: (module.PREFERRED_PORT, None, False)
+    )
     monkeypatch.setattr(module, "stop_vllm", lambda *_a, **_k: None)
     monkeypatch.setattr(module, "list_pdfs", lambda _dir: list_return)
     monkeypatch.setattr(module, "ProcessPoolExecutor", _DummyExecutor)
@@ -100,9 +102,7 @@ def _import_pdf_module(monkeypatch):
     fake_tqdm = mock.MagicMock()
     fake_tqdm.tqdm = lambda *args, **kwargs: []
     monkeypatch.setitem(sys.modules, "tqdm", fake_tqdm)
-    module = importlib.import_module(
-        "DocsToKG.DocParsing.run_docling_parallel_with_vllm_debug"
-    )
+    module = importlib.import_module("DocsToKG.DocParsing.run_docling_parallel_with_vllm_debug")
     return importlib.reload(module)
 
 
@@ -145,4 +145,3 @@ def test_spawn_prevents_cuda_reinitialization(monkeypatch, tmp_path, reset_start
 
     assert mp.get_start_method() == "spawn"
     assert len(calls) == 1
-

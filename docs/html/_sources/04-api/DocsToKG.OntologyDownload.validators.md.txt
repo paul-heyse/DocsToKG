@@ -4,27 +4,76 @@ This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.validat
 
 Ontology Validation Pipeline
 
-This module defines validators that run after ontology documents are fetched.
-Each validator parses the downloaded artifact, records structured results, and
-optionally emits normalized representations for downstream document processing.
+This module implements the post-download validation workflow that verifies
+ontology integrity, generates normalized artifacts, and captures structured
+telemetry for DocsToKG. Validators can leverage optional dependencies such as
+rdflib, Pronto, Owlready2, ROBOT, and Arelle while falling back gracefully
+when utilities are absent.
+
+Key Features:
+- Uniform :class:`ValidationRequest` / :class:`ValidationResult` data model
+- Timeout and memory instrumentation for resource-intensive validators
+- JSON reporting helpers compatible with automated documentation generation
+- Pluggable registry enabling selective validator execution
+
+Usage:
+    from DocsToKG.OntologyDownload.validators import run_validators
+
+    results = run_validators(requests, logger)
+    print(results["rdflib"].details)
 
 ## 1. Functions
 
 ### `_log_memory(logger, validator, event)`
 
-*No documentation available.*
+Emit memory usage diagnostics for a validator when debug logging is enabled.
+
+Args:
+logger: Logger responsible for validator telemetry.
+validator: Name of the validator emitting the event.
+event: Lifecycle label describing when the measurement is captured.
+
+Returns:
+None
 
 ### `_write_validation_json(path, payload)`
 
-*No documentation available.*
+Persist structured validation metadata to disk as JSON.
+
+Args:
+path: Destination path for the JSON payload.
+payload: Mapping containing validation results.
+
+Returns:
+None
 
 ### `_run_with_timeout(func, timeout_sec)`
 
-*No documentation available.*
+Execute a callable and raise :class:`ValidationTimeout` on deadline expiry.
+
+Args:
+func: Callable invoked without arguments.
+timeout_sec: Number of seconds allowed for execution.
+
+Returns:
+None
+
+Raises:
+ValidationTimeout: When the callable exceeds the allotted runtime.
 
 ### `_prepare_xbrl_package(request, logger)`
 
-*No documentation available.*
+Extract XBRL taxonomy ZIP archives for downstream validation.
+
+Args:
+request: Validation request describing the ontology package under test.
+logger: Logger used to record extraction telemetry.
+
+Returns:
+Tuple containing the entrypoint path passed to Arelle and a list of artifacts.
+
+Raises:
+ValueError: If the archive is malformed or contains unsafe paths.
 
 ### `validate_rdflib(request, logger)`
 
@@ -74,7 +123,7 @@ Run ROBOT CLI validation and conversion workflows when available.
 
 Args:
 request: Validation request detailing ontology paths and output locations.
-   logger: Logger adapter for reporting warnings and CLI errors.
+logger: Logger adapter for reporting warnings and CLI errors.
 
 Returns:
 ValidationResult describing generated outputs or encountered issues.
@@ -120,19 +169,23 @@ Dictionary with boolean status, detail payload, and output paths.
 
 ### `_parse()`
 
-*No documentation available.*
+Parse the ontology with rdflib to populate the graph object.
 
 ### `_load()`
 
-*No documentation available.*
+Load the ontology into memory using Pronto.
 
 ### `_handler(signum, frame)`
 
-*No documentation available.*
+Signal handler converting SIGALRM into :class:`ValidationTimeout`.
+
+Args:
+signum: Received signal number.
+frame: Current stack frame (unused).
 
 ### `_execute()`
 
-*No documentation available.*
+Load the ontology and capture term statistics.
 
 ## 2. Classes
 
@@ -189,4 +242,4 @@ ValidationTimeout: rdflib exceeded 60s
 
 ### `_Alarm`
 
-*No documentation available.*
+Sentinel exception raised when the alarm signal fires.

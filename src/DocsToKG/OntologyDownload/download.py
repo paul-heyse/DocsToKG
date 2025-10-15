@@ -34,6 +34,15 @@ from .config import ConfigError, DownloadConfiguration
 
 
 def _log_memory(logger: logging.Logger, event: str) -> None:
+    """Emit debug-level memory usage snapshots when enabled.
+
+    Args:
+        logger: Logger instance controlling verbosity for download telemetry.
+        event: Short label describing the lifecycle point (e.g., ``before``).
+
+    Returns:
+        None
+    """
     is_enabled = getattr(logger, "isEnabledFor", None)
     if callable(is_enabled):
         enabled = is_enabled(logging.DEBUG)
@@ -147,7 +156,17 @@ def sanitize_filename(filename: str) -> str:
 
 
 def _enforce_idn_safety(host: str) -> None:
-    """Raise ``ConfigError`` when hostname contains suspicious IDN patterns."""
+    """Validate internationalized hostnames and reject suspicious patterns.
+
+    Args:
+        host: Hostname component extracted from the download URL.
+
+    Returns:
+        None
+
+    Raises:
+        ConfigError: If the hostname mixes multiple scripts or contains invisible characters.
+    """
 
     if all(ord(char) < 128 for char in host):
         return
@@ -176,7 +195,15 @@ def _enforce_idn_safety(host: str) -> None:
 
 
 def _rebuild_netloc(parsed: ParseResult, ascii_host: str) -> str:
-    """Reconstruct URL netloc with normalized hostname."""
+    """Reconstruct URL netloc with a normalized hostname.
+
+    Args:
+        parsed: Parsed URL components produced by :func:`urllib.parse.urlparse`.
+        ascii_host: ASCII-normalized hostname (potentially IPv6).
+
+    Returns:
+        String suitable for use as the netloc portion of a URL.
+    """
 
     auth = ""
     if parsed.username:
@@ -193,9 +220,7 @@ def _rebuild_netloc(parsed: ParseResult, ascii_host: str) -> str:
     return f"{auth}{host_component}{port}"
 
 
-def validate_url_security(
-    url: str, http_config: Optional[DownloadConfiguration] = None
-) -> str:
+def validate_url_security(url: str, http_config: Optional[DownloadConfiguration] = None) -> str:
     """Validate URLs to avoid SSRF, enforce HTTPS, and honor host allowlists.
 
     Args:
@@ -250,12 +275,7 @@ def validate_url_security(
 
     if is_ip:
         address = ipaddress.ip_address(ascii_host)
-        if (
-            address.is_private
-            or address.is_loopback
-            or address.is_reserved
-            or address.is_multicast
-        ):
+        if address.is_private or address.is_loopback or address.is_reserved or address.is_multicast:
             raise ConfigError(f"Refusing to download from private address {host}")
         return urlunparse(parsed)
 
@@ -272,9 +292,7 @@ def validate_url_security(
             or candidate_ip.is_reserved
             or candidate_ip.is_multicast
         ):
-            raise ConfigError(
-                f"Refusing to download from private address resolved for {host}"
-            )
+            raise ConfigError(f"Refusing to download from private address resolved for {host}")
 
     return urlunparse(parsed)
 
@@ -463,9 +481,7 @@ def extract_tar_safe(
                         f"Unsupported special file detected in archive: {member.name}"
                     )
                 if not member.isfile():
-                    raise ConfigError(
-                        f"Unsupported tar member type encountered: {member.name}"
-                    )
+                    raise ConfigError(f"Unsupported tar member type encountered: {member.name}")
                 total_uncompressed += int(member.size)
                 safe_members.append((member, member_path))
             compressed_size = tar_path.stat().st_size
@@ -848,6 +864,16 @@ class StreamingDownloader(pooch.HTTPDownloader):
 def _get_bucket(
     host: str, http_config: DownloadConfiguration, service: Optional[str] = None
 ) -> TokenBucket:
+    """Return a token bucket keyed by host and optional service name.
+
+    Args:
+        host: Hostname extracted from the download URL.
+        http_config: Download configuration providing base rate limits.
+        service: Logical service identifier enabling per-service overrides.
+
+    Returns:
+        TokenBucket instance shared across downloads for throttling.
+    """
     key = f"{service}:{host}" if service else host
     bucket = _TOKEN_BUCKETS.get(key)
     if bucket is None:

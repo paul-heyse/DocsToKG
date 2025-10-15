@@ -47,11 +47,11 @@ ValueError: If the config file is invalid JSON or YAML.
 
 ### `_load(self)`
 
-*No documentation available.*
+Load configuration data from the configured path (JSON or YAML).
 
 ### `_load_yaml(self, raw)`
 
-*No documentation available.*
+Parse YAML configuration content into a dictionary.
 
 ## 2. Classes
 

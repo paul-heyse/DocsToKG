@@ -105,6 +105,15 @@ class MetricsCollector:
     """
 
     def __init__(self) -> None:
+        """Initialise in-memory storage for counter and histogram metrics.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         self._counters: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], float] = (
             defaultdict(float)
         )
@@ -188,6 +197,16 @@ class TraceRecorder:
     """
 
     def __init__(self, metrics: MetricsCollector, logger: logging.Logger) -> None:
+        """Create a trace recorder bound to the supplied metrics collector and logger.
+
+        Args:
+            metrics: Metrics collector used to record span durations.
+            logger: Logger that receives structured trace events.
+
+        Returns:
+            None
+        """
+
         self._metrics = metrics
         self._logger = logger
 
@@ -238,6 +257,15 @@ class Observability:
     """
 
     def __init__(self, *, logger: Optional[logging.Logger] = None) -> None:
+        """Initialise observability helpers with optional logger injection.
+
+        Args:
+            logger: Optional preconfigured logger for observability events.
+
+        Returns:
+            None
+        """
+
         self._metrics = MetricsCollector()
         self._logger = logger or logging.getLogger("DocsToKG.HybridSearch")
         self._tracer = TraceRecorder(self._metrics, self._logger)

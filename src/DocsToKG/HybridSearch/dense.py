@@ -22,7 +22,6 @@ try:  # pragma: no cover - exercised indirectly via integration tests
         for attr in (
             "GpuIndexFlatIP",
             "IndexIDMap2",
-            "index_factory",
             "index_cpu_to_gpu",
             "index_gpu_to_cpu",
             "StandardGpuResources",
@@ -68,6 +67,19 @@ class FaissIndexManager:
     """
 
     def __init__(self, dim: int, config: DenseIndexConfig) -> None:
+        """Create a GPU-resident FAISS index manager for the given dimensionality.
+
+        Args:
+            dim: Dimensionality of the dense vectors managed by the index.
+            config: Configuration object governing index construction and tuning.
+
+        Returns:
+            None
+
+        Raises:
+            RuntimeError: If FAISS GPU extensions are unavailable.
+        """
+
         if not _FAISS_AVAILABLE:
             raise RuntimeError(
                 "FAISS GPU extensions are required for dense retrieval "
@@ -204,7 +216,9 @@ class FaissIndexManager:
         Raises:
             ValueError: If the lengths of `vectors` and `vector_ids` differ.
         """
-        self._flush_pending_deletes(force=True)
+        # Only rebuild when the configured threshold is reached to avoid
+        # triggering tombstone rebuilds in the query path.
+        self._flush_pending_deletes(force=False)
         if len(vectors) != len(vector_ids):
             raise ValueError("vectors and vector_ids must align")
         if not vectors:
@@ -266,11 +280,29 @@ class FaissIndexManager:
         return int(ids64.size)
 
     def _current_index_ids(self) -> np.ndarray:
+        """Return the FAISS internal identifiers currently stored in the index.
+
+        Args:
+            None
+
+        Returns:
+            NumPy array containing the FAISS internal IDs present in the index.
+        """
+
         if self._index is None or self._index.ntotal == 0:
             return np.empty(0, dtype=np.int64)
         return np.asarray(faiss.vector_to_array(self._index.id_map), dtype=np.int64)
 
     def _lookup_existing_ids(self, candidate_ids: np.ndarray) -> np.ndarray:
+        """Identify which of the supplied FAISS IDs already exist in the index.
+
+        Args:
+            candidate_ids: Array of FAISS internal IDs to test for membership.
+
+        Returns:
+            NumPy array containing the subset of ``candidate_ids`` currently stored.
+        """
+
         if candidate_ids.size == 0 or self._index.ntotal == 0:
             return np.empty(0, dtype=np.int64)
         current_ids = self._current_index_ids()
@@ -287,7 +319,7 @@ class FaissIndexManager:
         Returns:
             List of `FaissSearchResult` objects ordered by score.
         """
-        self._flush_pending_deletes(force=True)
+        self._flush_pending_deletes(force=False)
         query_matrix = np.ascontiguousarray(
             self._ensure_dim(query).reshape(1, -1), dtype=np.float32
         )
@@ -305,7 +337,17 @@ class FaissIndexManager:
         return results
 
     def serialize(self) -> bytes:
-        """Serialize the FAISS index to bytes."""
+        """Serialize the FAISS index to bytes.
+
+        Args:
+            None
+
+        Returns:
+            Byte string containing the serialized FAISS index.
+
+        Raises:
+            RuntimeError: If the index has not been initialised.
+        """
 
         if self._index is None:
             raise RuntimeError("index is empty")
@@ -376,7 +418,7 @@ class FaissIndexManager:
         self._needs_rebuild = False
         self._set_nprobe()
 
-    def stats(self) -> Dict[str, float | str]:
+    def stats(self) -> dict[str, float | str]:
         """Expose diagnostic metrics for monitoring.
 
         Args:
@@ -391,7 +433,7 @@ class FaissIndexManager:
                 base = faiss.downcast_index(base)
             except Exception:  # pragma: no cover - best effort introspection
                 pass
-        stats: Dict[str, float | str] = {
+        stats: dict[str, float | str] = {
             "ntotal": float(self.ntotal),
             "index_type": self._config.index_type,
             "nlist": float(getattr(self._config, "nlist", 0)),
@@ -423,6 +465,18 @@ class FaissIndexManager:
         return stats
 
     def _create_index(self) -> "faiss.Index":
+        """Construct a GPU-native FAISS index based on the configured index_type.
+
+        Args:
+            None
+
+        Returns:
+            Initialised ``faiss.Index`` residing on the configured GPU.
+
+        Raises:
+            RuntimeError: If GPU resources have not been initialised before invocation.
+        """
+
         self.init_gpu()
         if self._gpu_resources is None:
             raise RuntimeError("GPU resources must be initialised before index creation")
@@ -539,9 +593,7 @@ class FaissIndexManager:
         else:
             cpu = target
         co = (
-            faiss.GpuMultipleClonerOptions()
-            if hasattr(faiss, "GpuMultipleClonerOptions")
-            else None
+            faiss.GpuMultipleClonerOptions() if hasattr(faiss, "GpuMultipleClonerOptions") else None
         )
         if co is not None:
             co.shard = False
@@ -558,6 +610,18 @@ class FaissIndexManager:
         return replicated
 
     def _maybe_to_gpu(self, index: "faiss.Index") -> "faiss.Index":
+        """Promote a CPU index to GPU while enforcing strict cloning guarantees.
+
+        Args:
+            index: CPU-resident FAISS index to migrate onto the configured GPU(s).
+
+        Returns:
+            GPU-backed FAISS index, optionally replicated across devices.
+
+        Raises:
+            RuntimeError: If GPU resources are unavailable or promotion fails.
+        """
+
         self.init_gpu()
         if self._gpu_resources is None:
             raise RuntimeError("GPU resources are not initialised")
@@ -594,6 +658,15 @@ class FaissIndexManager:
             ) from exc
 
     def _maybe_reserve_memory(self, index: "faiss.Index") -> None:
+        """Reserve GPU memory for the expected corpus size when supported.
+
+        Args:
+            index: Target FAISS index whose underlying storage may be extended.
+
+        Returns:
+            None
+        """
+
         expected = self._expected_ntotal
         if expected <= 0:
             return
@@ -614,6 +687,18 @@ class FaissIndexManager:
                 )
 
     def _to_cpu(self, index: "faiss.Index") -> "faiss.Index":
+        """Clone a GPU index back to CPU memory for persistence operations.
+
+        Args:
+            index: GPU-resident FAISS index to convert to CPU representation.
+
+        Returns:
+            CPU-backed FAISS index ready for serialization.
+
+        Raises:
+            RuntimeError: If FAISS lacks GPU→CPU conversion support.
+        """
+
         if not hasattr(faiss, "index_gpu_to_cpu"):
             raise RuntimeError(
                 "FAISS index_gpu_to_cpu is unavailable; install faiss-gpu>=1.7.4 with GPU support."
@@ -626,6 +711,15 @@ class FaissIndexManager:
             ) from exc
 
     def _set_nprobe(self) -> None:
+        """Apply IVF search breadth configuration to the current index.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         index = getattr(self, "_index", None)
         if index is None or not self._config.index_type.startswith("ivf"):
             return
@@ -649,6 +743,15 @@ class FaissIndexManager:
         self._log_index_configuration(index)
 
     def _log_index_configuration(self, index: "faiss.Index") -> None:
+        """Emit structured logging that captures the live index configuration.
+
+        Args:
+            index: FAISS index whose configuration should be summarised.
+
+        Returns:
+            None
+        """
+
         if index is None:
             return
         device = self._detect_device(index)
@@ -663,6 +766,15 @@ class FaissIndexManager:
         logger.info("faiss-index-config", extra={"event": event})
 
     def _resolve_vector_id(self, internal_id: int) -> Optional[str]:
+        """Translate a FAISS internal identifier to the original vector UUID.
+
+        Args:
+            internal_id: FAISS-managed integer identifier produced during search.
+
+        Returns:
+            Matching vector UUID when available, otherwise ``None``.
+        """
+
         if self._id_resolver is None:
             return None
         try:
@@ -672,6 +784,15 @@ class FaissIndexManager:
             return None
 
     def _detect_device(self, index: "faiss.Index") -> Optional[int]:
+        """Determine the CUDA device hosting the provided index, if any.
+
+        Args:
+            index: FAISS index whose device affinity is being inspected.
+
+        Returns:
+            CUDA device ordinal when discoverable, otherwise ``None``.
+        """
+
         base = index.index if hasattr(index, "index") else index
         candidate = base
         if hasattr(faiss, "downcast_index"):
@@ -744,11 +865,32 @@ class FaissIndexManager:
         self._gpu_resources = resources
 
     def _ensure_dim(self, vector: np.ndarray) -> np.ndarray:
+        """Validate that the provided embedding matches the configured dimensionality.
+
+        Args:
+            vector: Vector whose shape should align with the configured dimension.
+
+        Returns:
+            NumPy array validated to match ``self._dim``.
+
+        Raises:
+            ValueError: If the vector dimensionality differs from ``self._dim``.
+        """
+
         if vector.shape != (self._dim,):
             raise ValueError(f"Expected embedding dimension {self._dim}, got {vector.shape}")
         return vector
 
     def _flush_pending_deletes(self, *, force: bool = False) -> None:
+        """Rebuild the index when tombstone thresholds or manual flush requests demand it.
+
+        Args:
+            force: When ``True``, rebuild even if thresholds have not been reached.
+
+        Returns:
+            None
+        """
+
         if not self._needs_rebuild and not force:
             return
         if not self._tombstones:
@@ -763,6 +905,15 @@ class FaissIndexManager:
             self._needs_rebuild = False
 
     def _remove_ids(self, ids: np.ndarray) -> None:
+        """Attempt to delete FAISS IDs directly, falling back to tombstones when required.
+
+        Args:
+            ids: Array of FAISS internal identifiers targeted for removal.
+
+        Returns:
+            None
+        """
+
         if ids.size == 0:
             return
         selector = faiss.IDSelectorBatch(ids.astype(np.int64))
@@ -796,6 +947,15 @@ class FaissIndexManager:
             self._needs_rebuild = True
 
     def _rebuild_index(self) -> None:
+        """Recreate the GPU index from live vectors after tombstones accumulate.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         # Recreate the FAISS index on GPU using cached vectors when direct removal is unsupported.
         old_index = self._index
         base = old_index.index if hasattr(old_index, "index") else old_index
@@ -812,8 +972,10 @@ class FaissIndexManager:
         keep_positions = np.nonzero(keep_mask)[0].astype(np.int64)
         survivor_ids = current_ids[keep_mask]
         keys = np.ascontiguousarray(keep_positions, dtype=np.int64)
-        vectors = base.reconstruct_batch(keys) if keys.size else np.empty(
-            (0, self._dim), dtype=np.float32
+        vectors = (
+            base.reconstruct_batch(keys)
+            if keys.size
+            else np.empty((0, self._dim), dtype=np.float32)
         )
         vectors = np.ascontiguousarray(vectors, dtype=np.float32)
         self._index = self._create_index()

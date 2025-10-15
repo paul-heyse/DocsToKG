@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import warnings
 from collections import Counter
 from dataclasses import dataclass, field
-import warnings
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Protocol
 
 import requests
@@ -168,17 +168,17 @@ class ResolverConfig:
         for resolver_name, timeout_val in self.resolver_timeouts.items():
             if timeout_val <= 0:
                 raise ValueError(
-                    (
-                        "resolver_timeouts['{name}'] must be positive, got {value}"
-                    ).format(name=resolver_name, value=timeout_val)
+                    ("resolver_timeouts['{name}'] must be positive, got {value}").format(
+                        name=resolver_name, value=timeout_val
+                    )
                 )
 
         for resolver_name, interval in self.resolver_min_interval_s.items():
             if interval < 0:
                 raise ValueError(
-                    (
-                        "resolver_min_interval_s['{name}'] must be non-negative, got {value}"
-                    ).format(name=resolver_name, value=interval)
+                    ("resolver_min_interval_s['{name}'] must be non-negative, got {value}").format(
+                        name=resolver_name, value=interval
+                    )
                 )
 
         if self.resolver_rate_limits:

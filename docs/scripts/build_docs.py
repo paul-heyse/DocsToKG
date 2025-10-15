@@ -71,7 +71,6 @@ class DocsBuilder:
                 dest_file.unlink()
             shutil.copy2(src_file, dest_file)
 
-
     def build_html(self, clean: bool = True) -> bool:
         """Build HTML documentation."""
         if clean:

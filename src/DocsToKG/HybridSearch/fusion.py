@@ -27,6 +27,18 @@ class ReciprocalRankFusion:
     """
 
     def __init__(self, k0: float = 60.0) -> None:
+        """Initialise the RRF helper with the configured rank influence parameter.
+
+        Args:
+            k0: Fusion parameter controlling the influence of item rank.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If ``k0`` is not positive.
+        """
+
         if k0 <= 0:
             raise ValueError("k0 must be positive")
         self._k0 = k0

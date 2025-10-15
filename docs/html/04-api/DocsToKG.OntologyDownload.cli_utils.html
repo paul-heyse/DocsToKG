@@ -79,7 +79,22 @@
   <section id="module-cli-utils">
 <h1>1. Module: cli_utils<a class="headerlink" href="#module-cli-utils" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.cli_utils</span></code>.</p>
-<p>CLI formatting utilities for the ontology downloader.</p>
+<p>CLI Formatting Helpers</p>
+<p>This module contains lightweight formatting utilities used by the ontology
+downloader CLI. The helpers focus on producing human-friendly tables and
+summaries while remaining dependency-free so they can run in constrained
+environments such as CI workflows or air-gapped deployments.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>ASCII table rendering for deterministic console output</p></li>
+<li><p>Validation summary formatting that mirrors structured JSON payloads</p></li>
+<li><p>Utilities designed for reuse across multiple CLI subcommands</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.OntologyDownload.cli_utils import format_table</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>print(format_table([&quot;Name&quot;, &quot;Status&quot;], [[&quot;hp&quot;, &quot;ok&quot;]]))
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="format-table-headers-rows">
@@ -126,7 +141,11 @@ rdflib    | ok     | triples=100</p>
 </section>
 <section id="format-row-values">
 <h3><code class="docutils literal notranslate"><span class="pre">_format_row(values)</span></code><a class="headerlink" href="#format-row-values" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Render a single table row with padded column widths.</p>
+<p>Args:
+values: Ordered cell values corresponding to the table headers.</p>
+<p>Returns:
+String containing the formatted row.</p>
 </section>
 </section>
 </section>

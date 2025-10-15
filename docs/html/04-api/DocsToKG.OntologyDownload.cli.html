@@ -79,52 +79,134 @@
   <section id="module-cli">
 <h1>1. Module: cli<a class="headerlink" href="#module-cli" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.cli</span></code>.</p>
-<p>Command-line interface for the ontology downloader.</p>
+<p>Ontology Downloader CLI</p>
+<p>This module exposes the <code class="docutils literal notranslate"><span class="pre">ontofetch</span></code> command-line experience for DocsToKG.
+It provides entry points for downloading ontologies, inspecting manifests,
+re-running validators, and bootstrapping configuration files. The CLI is
+designed to support both automated pipelines and human operators by offering
+structured JSON output, progress tables, and detailed error reporting.</p>
+<p>Key Features:</p>
+<ul class="simple">
+<li><p>Multi-command interface covering pull, show, validate, init, and config tasks</p></li>
+<li><p>Seamless integration with resolver planning and validation subsystems</p></li>
+<li><p>Support for JSON output to aid automation and downstream tooling</p></li>
+<li><p>Logging configuration that aligns with DocsToKG observability standards</p></li>
+</ul>
+<p>Dependencies:</p>
+<ul class="simple">
+<li><p>argparse: command-line parsing</p></li>
+<li><p>pathlib: filesystem path handling</p></li>
+<li><p>DocsToKG.OntologyDownload.core: download orchestration helpers</p></li>
+<li><p>DocsToKG.OntologyDownload.validators: validation pipeline execution</p></li>
+</ul>
+<p>Usage:
+from DocsToKG.OntologyDownload import cli</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>if __name__ == &quot;__main__&quot;:
+    raise SystemExit(cli.main())
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="build-parser">
 <h3><code class="docutils literal notranslate"><span class="pre">_build_parser()</span></code><a class="headerlink" href="#build-parser" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Configure the top-level CLI parser and subcommands.</p>
+<p>Returns:
+Parser instance with sub-commands for pull, show, validate, init, and config.</p>
+<p>Raises:
+None</p>
 </section>
 <section id="parse-target-formats-value">
 <h3><code class="docutils literal notranslate"><span class="pre">_parse_target_formats(value)</span></code><a class="headerlink" href="#parse-target-formats-value" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Normalize comma-separated target format strings.</p>
+<p>Args:
+value: Raw CLI argument possibly containing comma-delimited formats.</p>
+<p>Returns:
+List of stripped format identifiers, or an empty list when no formats are supplied.</p>
 </section>
 <section id="results-to-dict-result">
 <h3><code class="docutils literal notranslate"><span class="pre">_results_to_dict(result)</span></code><a class="headerlink" href="#results-to-dict-result" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Convert a <code class="docutils literal notranslate"><span class="pre">FetchResult</span></code> instance into a JSON-friendly mapping.</p>
+<p>Args:
+result: Completed fetch result returned by :func:<code class="docutils literal notranslate"><span class="pre">fetch_one</span></code>.</p>
+<p>Returns:
+Dictionary containing resolver metadata, manifest location, and artifact list.</p>
 </section>
 <section id="ensure-manifest-path-ontology-id-version">
 <h3><code class="docutils literal notranslate"><span class="pre">_ensure_manifest_path(ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#ensure-manifest-path-ontology-id-version" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Return the manifest path for a given ontology and version.</p>
+<p>Args:
+ontology_id: Identifier for the ontology whose manifest is requested.
+version: Optional version string; when omitted the latest available is used.</p>
+<p>Returns:
+Path to the manifest JSON file on disk.</p>
+<p>Raises:
+ConfigError: If the ontology or manifest cannot be located locally.</p>
 </section>
 <section id="load-manifest-manifest-path">
 <h3><code class="docutils literal notranslate"><span class="pre">_load_manifest(manifest_path)</span></code><a class="headerlink" href="#load-manifest-manifest-path" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Read and parse a manifest JSON document from disk.</p>
+<p>Args:
+manifest_path: Filesystem location of the manifest file.</p>
+<p>Returns:
+Dictionary representation of the manifest contents.</p>
 </section>
 <section id="handle-pull-args-base-config">
 <h3><code class="docutils literal notranslate"><span class="pre">_handle_pull(args,</span> <span class="pre">base_config)</span></code><a class="headerlink" href="#handle-pull-args-base-config" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Execute the <code class="docutils literal notranslate"><span class="pre">pull</span></code> subcommand workflow.</p>
+<p>Args:
+args: Parsed CLI arguments for the pull command.
+base_config: Optional pre-loaded configuration used when no spec file is supplied.</p>
+<p>Returns:
+List of fetch results describing downloaded or cached ontologies.</p>
+<p>Raises:
+ConfigError: If neither ID arguments nor a configuration file are provided.</p>
 </section>
 <section id="handle-show-args">
 <h3><code class="docutils literal notranslate"><span class="pre">_handle_show(args)</span></code><a class="headerlink" href="#handle-show-args" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Display ontology manifest information for the <code class="docutils literal notranslate"><span class="pre">show</span></code> command.</p>
+<p>Args:
+args: Parsed CLI arguments including ontology identifier and output format.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+ConfigError: When the manifest cannot be located.</p>
 </section>
 <section id="selected-validators-args">
 <h3><code class="docutils literal notranslate"><span class="pre">_selected_validators(args)</span></code><a class="headerlink" href="#selected-validators-args" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Determine which validators should execute based on CLI flags.</p>
+<p>Args:
+args: Parsed CLI arguments for the <code class="docutils literal notranslate"><span class="pre">validate</span></code> command.</p>
+<p>Returns:
+Sequence containing validator names in execution order.</p>
 </section>
 <section id="handle-validate-args-config">
 <h3><code class="docutils literal notranslate"><span class="pre">_handle_validate(args,</span> <span class="pre">config)</span></code><a class="headerlink" href="#handle-validate-args-config" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Run validators for a previously downloaded ontology.</p>
+<p>Args:
+args: Parsed CLI arguments specifying ontology ID, version, and output format.
+config: Resolved configuration supplying validator defaults.</p>
+<p>Returns:
+Mapping of validator names to their structured result payloads.</p>
+<p>Raises:
+ConfigError: If the manifest or downloaded artifacts cannot be located.</p>
 </section>
 <section id="handle-init-path">
 <h3><code class="docutils literal notranslate"><span class="pre">_handle_init(path)</span></code><a class="headerlink" href="#handle-init-path" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Create a starter <code class="docutils literal notranslate"><span class="pre">sources.yaml</span></code> file for new installations.</p>
+<p>Args:
+path: Destination path for the generated configuration template.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+ConfigError: If the target file already exists.</p>
 </section>
 <section id="handle-config-validate-path">
 <h3><code class="docutils literal notranslate"><span class="pre">_handle_config_validate(path)</span></code><a class="headerlink" href="#handle-config-validate-path" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Validate a configuration file and return a summary report.</p>
+<p>Args:
+path: Filesystem path to the configuration file under validation.</p>
+<p>Returns:
+Dictionary describing validation status, ontology count, and file path.</p>
 </section>
 <section id="main-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">main(argv)</span></code><a class="headerlink" href="#main-argv" title="Link to this heading"></a></h3>

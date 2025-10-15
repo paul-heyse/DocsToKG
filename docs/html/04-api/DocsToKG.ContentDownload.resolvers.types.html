@@ -108,7 +108,7 @@ bool: <code class="docutils literal notranslate"><span class="pre">True</span></
 </section>
 <section id="post-init-self">
 <h3><code class="docutils literal notranslate"><span class="pre">__post_init__(self)</span></code><a class="headerlink" href="#post-init-self" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Validate configuration fields and apply defaults.</p>
 </section>
 <section id="log-self-record">
 <h3><code class="docutils literal notranslate"><span class="pre">log(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#log-self-record" title="Link to this heading"></a></h3>
@@ -221,6 +221,8 @@ doaj_api_key: API key for DOAJ resolver.
 resolver_timeouts: Resolver-specific timeout overrides.
 resolver_min_interval_s: Minimum interval between resolver requests.
 resolver_rate_limits: Deprecated rate limit configuration retained for compat.
+enable_head_precheck: Toggle applying HEAD filtering before downloads.
+resolver_head_precheck: Per-resolver overrides for HEAD filtering behaviour.
 mailto: Contact email appended to polite headers and user agent string.</p>
 <p>Examples:</p>
 <blockquote>
@@ -323,6 +325,7 @@ resolver_name: Resolver that produced the successful result.
 url: URL that was ultimately fetched.
 outcome: Download outcome associated with the result.
 html_paths: Collected HTML artefacts from the pipeline.
+failed_urls: Candidate URLs that failed during this run.
 reason: Optional reason string explaining failures.</p>
 <p>Examples:</p>
 <blockquote>

@@ -2,8 +2,6 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("docling_core")
-
 from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (
     Rec,
     coalesce_small_runs,

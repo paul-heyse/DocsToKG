@@ -79,30 +79,36 @@
   <section id="module-run-docling-html-to-doctags-parallel">
 <h1>1. Module: run_docling_html_to_doctags_parallel<a class="headerlink" href="#module-run-docling-html-to-doctags-parallel" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.run_docling_html_to_doctags_parallel</span></code>.</p>
-<p>HTML → DocTags (parallel, CPU-only; no captioning/classification, no HF auth)</p>
-<ul class="simple">
-<li><p>Input : Data/HTML/ (recurses; excludes *.normalized.html)</p></li>
-<li><p>Output: Data/DocTagsFiles/&lt;mirrored_subdirs&gt;/*.doctags</p></li>
-</ul>
-<p>Example:
-python run_docling_html_to_doctags_parallel.py       –input  Data/HTML       –output Data/DocTagsFiles       –workers 12</p>
+<p>Parallel HTML → DocTags conversion with manifest-aware resume support.</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="build-parser">
+<h3><code class="docutils literal notranslate"><span class="pre">build_parser()</span></code><a class="headerlink" href="#build-parser" title="Link to this heading"></a></h3>
+<p>Construct an argument parser for the HTML → DocTags converter.</p>
+<p>Args:
+None: Parser initialization does not require inputs.</p>
+<p>Returns:
+Configured :class:<code class="docutils literal notranslate"><span class="pre">argparse.ArgumentParser</span></code> instance.</p>
+<p>Raises:
+None</p>
+</section>
+<section id="parse-args-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_args(argv)</span></code><a class="headerlink" href="#parse-args-argv" title="Link to this heading"></a></h3>
+<p>Parse command-line arguments for standalone execution.</p>
+<p>Args:
+argv: Optional CLI argument vector. When <code class="docutils literal notranslate"><span class="pre">None</span></code> the values from
+:data:<code class="docutils literal notranslate"><span class="pre">sys.argv</span></code> are used.</p>
+<p>Returns:
+Namespace containing parsed CLI options.</p>
+<p>Raises:
+SystemExit: Propagated if <code class="docutils literal notranslate"><span class="pre">argparse</span></code> detects invalid options.</p>
+</section>
 <section id="get-converter">
 <h3><code class="docutils literal notranslate"><span class="pre">_get_converter()</span></code><a class="headerlink" href="#get-converter" title="Link to this heading"></a></h3>
 <p>Instantiate and cache a Docling HTML converter per worker process.</p>
 <p>Returns:
 DocumentConverter configured for HTML input, cached for reuse within
 the worker process.</p>
-</section>
-<section id="detect-data-root-start">
-<h3><code class="docutils literal notranslate"><span class="pre">detect_data_root(start)</span></code><a class="headerlink" href="#detect-data-root-start" title="Link to this heading"></a></h3>
-<p>Locate the DocsToKG <code class="docutils literal notranslate"><span class="pre">Data</span></code> directory relative to a starting path.</p>
-<p>Args:
-start: Directory from which to begin scanning for <code class="docutils literal notranslate"><span class="pre">Data/HTML</span></code>.</p>
-<p>Returns:
-Path pointing to the discovered <code class="docutils literal notranslate"><span class="pre">Data</span></code> directory, or <code class="docutils literal notranslate"><span class="pre">&lt;start&gt;/Data</span></code>
-when no ancestor contains the expected layout.</p>
 </section>
 <section id="list-htmls-root">
 <h3><code class="docutils literal notranslate"><span class="pre">list_htmls(root)</span></code><a class="headerlink" href="#list-htmls-root" title="Link to this heading"></a></h3>
@@ -112,25 +118,66 @@ root: Directory whose subtree should be searched for HTML files.</p>
 <p>Returns:
 Sorted list of discovered HTML file paths excluding normalized outputs.</p>
 </section>
-<section id="convert-one-html-path-input-root-output-root-overwrite">
-<h3><code class="docutils literal notranslate"><span class="pre">convert_one(html_path,</span> <span class="pre">input_root,</span> <span class="pre">output_root,</span> <span class="pre">overwrite)</span></code><a class="headerlink" href="#convert-one-html-path-input-root-output-root-overwrite" title="Link to this heading"></a></h3>
+<section id="convert-one-task">
+<h3><code class="docutils literal notranslate"><span class="pre">convert_one(task)</span></code><a class="headerlink" href="#convert-one-task" title="Link to this heading"></a></h3>
 <p>Convert a single HTML file to DocTags, honoring overwrite semantics.</p>
 <p>Args:
-html_path: Path to the source HTML document.
-input_root: Root directory used to compute relative paths for logging.
-output_root: Base directory where generated <code class="docutils literal notranslate"><span class="pre">.doctags</span></code> files are stored.
-overwrite: Whether to replace existing outputs.</p>
+task: Conversion details including paths, hash, and overwrite policy.</p>
 <p>Returns:
-Tuple of <code class="docutils literal notranslate"><span class="pre">(relative_path,</span> <span class="pre">status)</span></code> where status is <code class="docutils literal notranslate"><span class="pre">ok</span></code>, <code class="docutils literal notranslate"><span class="pre">skip</span></code>, or a
-<code class="docutils literal notranslate"><span class="pre">fail:&lt;reason&gt;</span></code> string describing an error condition.</p>
+:class:<code class="docutils literal notranslate"><span class="pre">ConversionResult</span></code> capturing the conversion status.</p>
+<p>Raises:
+ValueError: Propagated when Docling validation fails prior to internal handling.</p>
 </section>
-<section id="main">
-<h3><code class="docutils literal notranslate"><span class="pre">main()</span></code><a class="headerlink" href="#main" title="Link to this heading"></a></h3>
+<section id="main-args">
+<h3><code class="docutils literal notranslate"><span class="pre">main(args)</span></code><a class="headerlink" href="#main-args" title="Link to this heading"></a></h3>
 <p>Entrypoint for parallel HTML-to-DocTags conversion across a dataset.</p>
 <p>Args:
-None</p>
+args: Optional pre-parsed CLI namespace to override command-line inputs.</p>
 <p>Returns:
-None</p>
+Process exit code, where <code class="docutils literal notranslate"><span class="pre">0</span></code> denotes success.</p>
+</section>
+</section>
+<section id="classes">
+<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="htmltask">
+<h3><code class="docutils literal notranslate"><span class="pre">HtmlTask</span></code><a class="headerlink" href="#htmltask" title="Link to this heading"></a></h3>
+<p>Work item describing a single HTML conversion job.</p>
+<p>Attributes:
+html_path: Absolute path to the HTML file to be converted.
+relative_id: Relative identifier for manifest entries.
+output_path: Destination DocTags path.
+input_hash: Content hash used for resume detection.
+overwrite: Flag indicating whether existing outputs should be replaced.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>HtmlTask(Path(“/tmp/a.html”), “doc”, Path(“/tmp/doc.doctags”), “hash”, False)
+HtmlTask(html_path=PosixPath(‘/tmp/a.html’), relative_id=’doc’, output_path=PosixPath(‘/tmp/doc.doctags’), input_hash=’hash’, overwrite=False)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="conversionresult">
+<h3><code class="docutils literal notranslate"><span class="pre">ConversionResult</span></code><a class="headerlink" href="#conversionresult" title="Link to this heading"></a></h3>
+<p>Structured result emitted by worker processes.</p>
+<p>Attributes:
+doc_id: Document identifier matching manifest entries.
+status: Conversion outcome (<code class="docutils literal notranslate"><span class="pre">&quot;success&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;skip&quot;</span></code>, or <code class="docutils literal notranslate"><span class="pre">&quot;failure&quot;</span></code>).
+duration_s: Time in seconds spent converting.
+input_path: Source HTML path recorded for auditing.
+input_hash: Content hash captured prior to conversion.
+output_path: Destination DocTags path.
+error: Optional error detail for failures.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>ConversionResult(“doc”, “success”, 1.0, “in.html”, “hash”, “out.doctags”)
+ConversionResult(doc_id=’doc’, status=’success’, duration_s=1.0, input_path=’in.html’, input_hash=’hash’, output_path=’out.doctags’, error=None)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 </section>
 </section>

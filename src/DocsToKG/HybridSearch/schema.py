@@ -67,6 +67,15 @@ class OpenSearchSchemaManager:
     """
 
     def __init__(self) -> None:
+        """Initialise the schema manager with an empty namespace registry.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         self._templates: MutableMapping[str, OpenSearchIndexTemplate] = {}
 
     def bootstrap_template(

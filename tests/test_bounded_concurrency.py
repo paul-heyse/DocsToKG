@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Iterable, List
-
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterable, List
 
 from DocsToKG.ContentDownload.resolvers import (
     AttemptRecord,
@@ -137,12 +136,8 @@ def test_concurrent_execution_with_three_workers(tmp_path):
         DelayResolver("r2", ["https://r2.example/a"], delay=0.3),
         DelayResolver("r3", ["https://r3.example/a"], delay=0.3),
     ]
-    sequential_config = _make_config(
-        [r.name for r in seq_resolvers], max_concurrent_resolvers=1
-    )
-    concurrent_config = _make_config(
-        [r.name for r in conc_resolvers], max_concurrent_resolvers=3
-    )
+    sequential_config = _make_config([r.name for r in seq_resolvers], max_concurrent_resolvers=1)
+    concurrent_config = _make_config([r.name for r in conc_resolvers], max_concurrent_resolvers=3)
     logger = RecordingLogger()
     metrics = ResolverMetrics()
 

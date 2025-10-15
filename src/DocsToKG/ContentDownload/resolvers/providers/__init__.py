@@ -11,14 +11,14 @@ from .europe_pmc import EuropePmcResolver
 from .figshare import FigshareResolver
 from .hal import HalResolver
 from .landing_page import LandingPageResolver
-from .openalex import OpenAlexResolver
 from .openaire import OpenAireResolver
+from .openalex import OpenAlexResolver
 from .osf import OsfResolver
 from .pmc import PmcResolver
 from .semantic_scholar import SemanticScholarResolver
-from .zenodo import ZenodoResolver
 from .unpaywall import UnpaywallResolver
 from .wayback import WaybackResolver
+from .zenodo import ZenodoResolver
 
 
 def default_resolvers() -> List[Resolver]:

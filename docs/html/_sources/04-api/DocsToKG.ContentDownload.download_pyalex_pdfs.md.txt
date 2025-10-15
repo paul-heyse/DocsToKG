@@ -10,10 +10,6 @@ Download PDFs for OpenAlex works with a configurable resolver stack.
 
 Return an ISO 8601 UTC timestamp with a trailing 'Z' suffix.
 
-### `_accepts_argument(func, name)`
-
-*No documentation available.*
-
 ### `_has_pdf_eof(path)`
 
 *No documentation available.*
@@ -256,20 +252,6 @@ Work payload dictionaries returned by the OpenAlex API.
 
 Returns:
 Iterable yielding work payload dictionaries.
-
-### `attempt_openalex_candidates(session, artifact, logger, metrics, context)`
-
-Attempt downloads for all candidate URLs associated with an artifact.
-
-Args:
-session: Requests session configured for resolver usage.
-artifact: Work artifact containing candidate URLs.
-logger: Attempt logger receiving structured records.
-metrics: Resolver metrics collector.
-context: Optional context dict (dry-run flags, previous entries).
-
-Returns:
-Pair of (DownloadOutcome, URL) on success, otherwise None.
 
 ### `process_one_work(work, session, pdf_dir, html_dir, pipeline, logger, metrics)`
 

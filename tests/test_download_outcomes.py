@@ -4,7 +4,6 @@ import types
 from pathlib import Path
 from typing import Callable, Dict, Tuple
 
-import pytest
 import requests
 
 if "pyalex" not in sys.modules:
@@ -64,7 +63,9 @@ def make_artifact(tmp_path: Path) -> downloader.WorkArtifact:
     return artifact
 
 
-def stub_requests(monkeypatch, mapping: Dict[Tuple[str, str], Callable[[], FakeResponse] | FakeResponse]):
+def stub_requests(
+    monkeypatch, mapping: Dict[Tuple[str, str], Callable[[], FakeResponse] | FakeResponse]
+):
     def fake_request(session, method, url, **kwargs):
         key = (method.upper(), url)
         if key not in mapping:
@@ -136,7 +137,9 @@ def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
     stub_requests(monkeypatch, mapping)
 
     session = requests.Session()
-    outcome = downloader.download_candidate(session, artifact, url, None, timeout=10.0, context=context)
+    outcome = downloader.download_candidate(
+        session, artifact, url, None, timeout=10.0, context=context
+    )
 
     assert outcome.classification == "cached"
     assert outcome.path == cached_path

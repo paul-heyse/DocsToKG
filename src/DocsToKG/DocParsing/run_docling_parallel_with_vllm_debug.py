@@ -37,7 +37,6 @@ from DocsToKG.DocParsing._common import (
     manifest_append,
 )
 
-
 warnings.warn(
     "Direct invocation of run_docling_parallel_with_vllm_debug.py is deprecated. "
     "Use unified CLI: python -m DocsToKG.DocParsing.cli.doctags_convert --mode pdf",
@@ -56,7 +55,17 @@ MANIFEST_STAGE = "doctags-pdf"
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Construct the argument parser for the PDF → DocTags converter."""
+    """Construct the argument parser for the PDF → DocTags converter.
+
+    Args:
+        None: Parser construction does not require inputs.
+
+    Returns:
+        Argument parser configured with all supported CLI options.
+
+    Raises:
+        ValueError: If parser configuration fails due to invalid defaults.
+    """
 
     parser = argparse.ArgumentParser(
         description="Convert PDF corpora to DocTags with an optional vLLM backend",
@@ -102,9 +111,21 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse CLI arguments for standalone execution."""
+    """Parse CLI arguments for standalone execution.
+
+    Args:
+        argv: Optional CLI argument list. When ``None`` the values from
+            :data:`sys.argv` are used.
+
+    Returns:
+        Namespace containing parsed CLI options.
+
+    Raises:
+        SystemExit: Propagated if ``argparse`` detects invalid arguments.
+    """
 
     return build_parser().parse_args(argv)
+
 
 MODEL_PATH = "/home/paul/hf-cache/granite-docling-258M"  # local untied snapshot
 
@@ -126,7 +147,21 @@ ARTIFACTS = os.environ.get("DOCLING_ARTIFACTS_PATH", "")
 # -------- Utilities --------
 @dataclass
 class PdfTask:
-    """Work item representing a single PDF conversion request."""
+    """Work item representing a single PDF conversion request.
+
+    Attributes:
+        pdf_path: Absolute path to the PDF document to convert.
+        output_dir: Destination directory where DocTags are stored.
+        port: vLLM HTTP port used for remote inference.
+        input_hash: Content hash representing the PDF for change detection.
+        doc_id: Identifier derived from the PDF path for manifest entries.
+        output_path: Final DocTags artifact location.
+
+    Examples:
+        >>> task = PdfTask(Path("/tmp/sample.pdf"), Path("/tmp/out"), 8000, "hash", "doc", Path("/tmp/out/doc.doctags"))
+        >>> task.doc_id
+        'doc'
+    """
 
     pdf_path: Path
     output_dir: Path
@@ -136,7 +171,17 @@ class PdfTask:
     output_path: Path
 
     def __getitem__(self, index: int) -> Path:
-        """Provide tuple-like access for compatibility with legacy tests."""
+        """Provide tuple-like access for compatibility with legacy tests.
+
+        Args:
+            index: Position requested by tuple-style accessors.
+
+        Returns:
+            PDF path when ``index`` is ``0``.
+
+        Raises:
+            IndexError: If ``index`` is not ``0``.
+        """
 
         if index == 0:
             return self.pdf_path
@@ -145,7 +190,21 @@ class PdfTask:
 
 @dataclass
 class PdfConversionResult:
-    """Structured result returned by worker processes."""
+    """Structured result returned by worker processes.
+
+    Attributes:
+        doc_id: Document identifier associated with the conversion.
+        status: Outcome string such as ``"success"`` or ``"failure"``.
+        duration_s: Worker runtime in seconds.
+        input_path: Original PDF path recorded for manifest entries.
+        input_hash: Content hash used to detect stale outputs.
+        output_path: Location of the produced DocTags file.
+        error: Optional error detail captured during conversion.
+
+    Examples:
+        >>> PdfConversionResult("doc", "success", 1.0, "in.pdf", "hash", "out.doctags")
+        PdfConversionResult(doc_id='doc', status='success', duration_s=1.0, input_path='in.pdf', input_hash='hash', output_path='out.doctags', error=None)
+    """
 
     doc_id: str
     status: str
@@ -181,9 +240,7 @@ def _safe_float(value: Any) -> float:
         return 0.0
 
 
-def normalize_conversion_result(
-    result: Any, task: Optional[PdfTask] = None
-) -> PdfConversionResult:
+def normalize_conversion_result(result: Any, task: Optional[PdfTask] = None) -> PdfConversionResult:
     """Adapt heterogeneous worker return values into :class:`PdfConversionResult`.
 
     Historically the converter returned a tuple ``(doc_id, status)``.  The
@@ -191,6 +248,14 @@ def normalize_conversion_result(
     that still emits tuples.  This helper accepts both shapes—as well as dicts
     produced by ad-hoc stubs—and populates missing metadata from the associated
     :class:`PdfTask` when available.
+
+    Args:
+        result: Object returned by a worker invocation.
+        task: Related :class:`PdfTask` used to back-fill metadata when needed.
+
+    Returns:
+        Normalised :class:`PdfConversionResult` instance encapsulating the
+        conversion outcome.
     """
 
     if isinstance(result, PdfConversionResult):
@@ -204,18 +269,9 @@ def normalize_conversion_result(
             doc_id=str(doc_id),
             status=status,
             duration_s=_safe_float(payload.get("duration_s", 0.0)),
-            input_path=str(
-                payload.get("input_path")
-                or (task.pdf_path if task else "")
-            ),
-            input_hash=str(
-                payload.get("input_hash")
-                or (task.input_hash if task else "")
-            ),
-            output_path=str(
-                payload.get("output_path")
-                or (task.output_path if task else "")
-            ),
+            input_path=str(payload.get("input_path") or (task.pdf_path if task else "")),
+            input_hash=str(payload.get("input_hash") or (task.input_hash if task else "")),
+            output_path=str(payload.get("output_path") or (task.output_path if task else "")),
             error=payload.get("error"),
         )
 
@@ -344,7 +400,7 @@ def stream_logs(proc: sp.Popen, prefix="[vLLM] "):
         prefix: Text prefix applied to each emitted log line for readability.
 
     Returns:
-        None
+        None: This routine streams output for side effects only.
     """
     for line in iter(proc.stdout.readline, ""):
         if not line:
@@ -554,7 +610,18 @@ def list_pdfs(root: Path) -> List[Path]:
 
 # -------- Docling worker --------
 def convert_one(task: PdfTask) -> PdfConversionResult:
-    """Convert a single PDF into DocTags using a remote vLLM-backed pipeline."""
+    """Convert a single PDF into DocTags using a remote vLLM-backed pipeline.
+
+    Args:
+        task: Description of the conversion request, including paths and port.
+
+    Returns:
+        Populated :class:`PdfConversionResult` reporting success, skip, or failure.
+
+    Raises:
+        ValueError: Propagated when the underlying conversion libraries raise
+            validation errors prior to being caught by this helper.
+    """
 
     start = time.perf_counter()
     pdf_path = task.pdf_path
@@ -680,7 +747,14 @@ def convert_one(task: PdfTask) -> PdfConversionResult:
 
 # -------- Main --------
 def main(args: argparse.Namespace | None = None) -> int:
-    """Coordinate vLLM startup and parallel DocTags conversion."""
+    """Coordinate vLLM startup and parallel DocTags conversion.
+
+    Args:
+        args: Optional argument namespace injected during programmatic use.
+
+    Returns:
+        Process exit code, where ``0`` indicates success.
+    """
 
     import multiprocessing as mp
 
@@ -781,9 +855,7 @@ def main(args: argparse.Namespace | None = None) -> int:
             )
             return 0
 
-        manifest_index = (
-            load_manifest_index(MANIFEST_STAGE, resolved_root) if args.resume else {}
-        )
+        manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_root) if args.resume else {}
 
         workers = max(1, int(args.workers))
         logger.info(
@@ -810,9 +882,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 and manifest_entry
                 and manifest_entry.get("input_hash") == input_hash
             ):
-                logger.info(
-                    "Skipping %s: output exists and input unchanged", doc_id
-                )
+                logger.info("Skipping %s: output exists and input unchanged", doc_id)
                 manifest_append(
                     stage=MANIFEST_STAGE,
                     doc_id=doc_id,
@@ -853,9 +923,7 @@ def main(args: argparse.Namespace | None = None) -> int:
 
         with ProcessPoolExecutor(max_workers=workers) as ex:
             future_map = {ex.submit(convert_one, task): task for task in tasks}
-            with tqdm(
-                total=len(future_map), desc="Converting PDFs", unit="file"
-            ) as pbar:
+            with tqdm(total=len(future_map), desc="Converting PDFs", unit="file") as pbar:
                 for fut in as_completed(future_map):
                     task = future_map[fut]
                     raw_result = fut.result()

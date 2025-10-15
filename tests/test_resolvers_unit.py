@@ -168,9 +168,7 @@ def test_landing_page_resolver_patterns(tmp_path):
     responses.add(responses.GET, "https://site.example/article", body=html, status=200)
     session = requests.Session()
     results = [
-        r
-        for r in LandingPageResolver().iter_urls(session, config, artifact)
-        if not r.is_event
+        r for r in LandingPageResolver().iter_urls(session, config, artifact) if not r.is_event
     ]
     assert results[0].url == "https://site.example/files/paper.pdf"
 
@@ -180,9 +178,7 @@ def test_landing_page_resolver_patterns(tmp_path):
     responses.add(responses.GET, "https://site.example/anchor", body=html_anchor, status=200)
     artifact.landing_urls = ["https://site.example/anchor"]
     results = [
-        r
-        for r in LandingPageResolver().iter_urls(session, config, artifact)
-        if not r.is_event
+        r for r in LandingPageResolver().iter_urls(session, config, artifact) if not r.is_event
     ]
     assert results[0].metadata["pattern"] == "anchor"
 
@@ -194,11 +190,7 @@ def test_landing_page_resolver_http_error(tmp_path):
     config = build_config()
     responses.add(responses.GET, "https://site.example/error", status=500)
     session = requests.Session()
-    events = [
-        r
-        for r in LandingPageResolver().iter_urls(session, config, artifact)
-        if r.is_event
-    ]
+    events = [r for r in LandingPageResolver().iter_urls(session, config, artifact) if r.is_event]
     assert events[0].event_reason == "http-error"
 
 

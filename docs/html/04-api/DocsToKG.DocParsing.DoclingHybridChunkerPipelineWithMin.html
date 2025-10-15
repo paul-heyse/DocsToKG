@@ -80,19 +80,21 @@
 <h1>1. Module: DoclingHybridChunkerPipelineWithMin<a class="headerlink" href="#module-doclinghybridchunkerpipelinewithmin" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin</span></code>.</p>
 <p>Docling Hybrid Chunker with Minimum Token Coalescence</p>
-<p>Transforms DocTags documents into chunked records while ensuring short runs of
-chunks are merged to satisfy minimum token thresholds required by downstream
-embedding pipelines.</p>
+<p>Transforms DocTags documents into chunked records with topic-aware coalescence.</p>
+<p>Tokenizer Alignment:
+The default tokenizer (<code class="docutils literal notranslate"><span class="pre">Qwen/Qwen3-Embedding-4B</span></code>) aligns with the dense
+embedder used by the embeddings pipeline. When experimenting with other
+tokenizers (for example, legacy BERT models), run the calibration utility
+beforehand to understand token count deltas::</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>    python scripts/calibrate_tokenizers.py --doctags-dir Data/DocTagsFiles
+
+The calibration script reports relative token ratios and recommends
+adjustments to ``--min-tokens`` so chunk sizes remain compatible with the
+embedding stage.
+</pre></div>
+</div>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="find-doctags-files-in-dir">
-<h3><code class="docutils literal notranslate"><span class="pre">find_doctags_files(in_dir)</span></code><a class="headerlink" href="#find-doctags-files-in-dir" title="Link to this heading"></a></h3>
-<p>Discover <code class="docutils literal notranslate"><span class="pre">.doctags</span></code> artifacts within a directory.</p>
-<p>Args:
-in_dir: Directory containing DocTags outputs.</p>
-<p>Returns:
-Sorted list of unique DocTags file paths.</p>
-</section>
 <section id="read-utf8-p">
 <h3><code class="docutils literal notranslate"><span class="pre">read_utf8(p)</span></code><a class="headerlink" href="#read-utf8-p" title="Link to this heading"></a></h3>
 <p>Load text from disk using UTF-8 with replacement for invalid bytes.</p>
@@ -120,6 +122,16 @@ Tuple containing a list of reference identifiers and sorted page numbers.</p>
 <p>Raises:
 None</p>
 </section>
+<section id="summarize-image-metadata-chunk-text">
+<h3><code class="docutils literal notranslate"><span class="pre">summarize_image_metadata(chunk,</span> <span class="pre">text)</span></code><a class="headerlink" href="#summarize-image-metadata-chunk-text" title="Link to this heading"></a></h3>
+<p>Infer image annotation flags and counts from chunk metadata and text.</p>
+<p>Args:
+chunk: Chunk metadata object containing image annotations.
+text: Chunk text used to detect fallback caption cues.</p>
+<p>Returns:
+Tuple of <code class="docutils literal notranslate"><span class="pre">(has_caption,</span> <span class="pre">has_classification,</span> <span class="pre">num_images)</span></code> describing
+inferred image metadata.</p>
+</section>
 <section id="merge-rec-a-b-tokenizer">
 <h3><code class="docutils literal notranslate"><span class="pre">merge_rec(a,</span> <span class="pre">b,</span> <span class="pre">tokenizer)</span></code><a class="headerlink" href="#merge-rec-a-b-tokenizer" title="Link to this heading"></a></h3>
 <p>Merge two chunk records, updating token counts and provenance metadata.</p>
@@ -129,6 +141,26 @@ b: Second record to merge.
 tokenizer: Tokenizer used to recompute token counts for combined text.</p>
 <p>Returns:
 New <code class="docutils literal notranslate"><span class="pre">Rec</span></code> instance containing fused text, token counts, and metadata.</p>
+</section>
+<section id="is-structural-boundary-rec">
+<h3><code class="docutils literal notranslate"><span class="pre">is_structural_boundary(rec)</span></code><a class="headerlink" href="#is-structural-boundary-rec" title="Link to this heading"></a></h3>
+<p>Detect whether a chunk begins with a structural heading or caption marker.</p>
+<p>Args:
+rec: Chunk record to inspect.</p>
+<p>Returns:
+<code class="docutils literal notranslate"><span class="pre">True</span></code> when <code class="docutils literal notranslate"><span class="pre">rec.text</span></code> starts with a heading indicator (<code class="docutils literal notranslate"><span class="pre">#</span></code>) or a
+recognised caption prefix, otherwise <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>is_structural_boundary(Rec(text=”# Introduction”, n_tok=2, src_idxs=[], refs=[], pages=[]))
+True
+is_structural_boundary(Rec(text=”Regular paragraph”, n_tok=2, src_idxs=[], refs=[], pages=[]))
+False</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 <section id="coalesce-small-runs-records-tokenizer-min-tokens-max-tokens">
 <h3><code class="docutils literal notranslate"><span class="pre">coalesce_small_runs(records,</span> <span class="pre">tokenizer,</span> <span class="pre">min_tokens,</span> <span class="pre">max_tokens)</span></code><a class="headerlink" href="#coalesce-small-runs-records-tokenizer-min-tokens-max-tokens" title="Link to this heading"></a></h3>
@@ -149,31 +181,34 @@ surpassing <code class="docutils literal notranslate"><span class="pre">max_toke
 preferring same-run neighbors to maintain topical cohesion.
 • Leave chunks outside small runs unchanged.</p>
 </section>
-<section id="main">
-<h3><code class="docutils literal notranslate"><span class="pre">main()</span></code><a class="headerlink" href="#main" title="Link to this heading"></a></h3>
+<section id="build-parser">
+<h3><code class="docutils literal notranslate"><span class="pre">build_parser()</span></code><a class="headerlink" href="#build-parser" title="Link to this heading"></a></h3>
+<p>Construct an argument parser for the chunking pipeline.</p>
+<p>Args:
+None: Parser construction does not require inputs.</p>
+<p>Returns:
+:class:<code class="docutils literal notranslate"><span class="pre">argparse.ArgumentParser</span></code> configured with chunking options.</p>
+<p>Raises:
+None</p>
+</section>
+<section id="parse-args-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_args(argv)</span></code><a class="headerlink" href="#parse-args-argv" title="Link to this heading"></a></h3>
+<p>Parse CLI arguments for standalone chunking execution.</p>
+<p>Args:
+argv: Optional CLI argument vector. When <code class="docutils literal notranslate"><span class="pre">None</span></code> the process arguments
+are parsed.</p>
+<p>Returns:
+Namespace containing parsed CLI options.</p>
+<p>Raises:
+SystemExit: Propagated if <code class="docutils literal notranslate"><span class="pre">argparse</span></code> reports invalid arguments.</p>
+</section>
+<section id="main-args">
+<h3><code class="docutils literal notranslate"><span class="pre">main(args)</span></code><a class="headerlink" href="#main-args" title="Link to this heading"></a></h3>
 <p>CLI driver that chunks DocTags files and enforces minimum token thresholds.</p>
 <p>Args:
-None</p>
+args: Optional CLI namespace supplied during testing or orchestration.</p>
 <p>Returns:
-None</p>
-</section>
-<section id="serialize-self">
-<h3><code class="docutils literal notranslate"><span class="pre">serialize(self)</span></code><a class="headerlink" href="#serialize-self" title="Link to this heading"></a></h3>
-<p>Render picture metadata into Markdown-friendly text.</p>
-<p>Args:
-item: Picture element emitted by Docling.
-doc_serializer: Parent serializer responsible for post-processing.
-doc: Full Docling document containing the picture context.</p>
-<p>Returns:
-SerializationResult capturing the rendered string and provenance.</p>
-</section>
-<section id="get-serializer-self-doc">
-<h3><code class="docutils literal notranslate"><span class="pre">get_serializer(self,</span> <span class="pre">doc)</span></code><a class="headerlink" href="#get-serializer-self-doc" title="Link to this heading"></a></h3>
-<p>Construct a ChunkingDocSerializer tailored for DocTags documents.</p>
-<p>Args:
-doc: Docling document that will be serialized into chunk text.</p>
-<p>Returns:
-Configured ChunkingDocSerializer instance.</p>
+Exit code where <code class="docutils literal notranslate"><span class="pre">0</span></code> indicates success.</p>
 </section>
 <section id="is-small-idx">
 <h3><code class="docutils literal notranslate"><span class="pre">is_small(idx)</span></code><a class="headerlink" href="#is-small-idx" title="Link to this heading"></a></h3>
@@ -186,38 +221,6 @@ True if the chunk length is less than <code class="docutils literal notranslate"
 </section>
 <section id="classes">
 <h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
-<section id="captionplusannotationpictureserializer">
-<h3><code class="docutils literal notranslate"><span class="pre">CaptionPlusAnnotationPictureSerializer</span></code><a class="headerlink" href="#captionplusannotationpictureserializer" title="Link to this heading"></a></h3>
-<p>Serialize picture items with captions and rich annotation metadata.</p>
-<p>Attributes:
-None</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>serializer = CaptionPlusAnnotationPictureSerializer()
-isinstance(serializer, MarkdownPictureSerializer)
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-<section id="richserializerprovider">
-<h3><code class="docutils literal notranslate"><span class="pre">RichSerializerProvider</span></code><a class="headerlink" href="#richserializerprovider" title="Link to this heading"></a></h3>
-<p>Provide a serializer that augments tables and pictures with Markdown.</p>
-<p>Attributes:
-None</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>provider = RichSerializerProvider()
-isinstance(provider, ChunkingSerializerProvider)
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
 <section id="rec">
 <h3><code class="docutils literal notranslate"><span class="pre">Rec</span></code><a class="headerlink" href="#rec" title="Link to this heading"></a></h3>
 <p>Intermediate record tracking chunk text and provenance.</p>

@@ -4,9 +4,19 @@ This reference documents the DocsToKG module ``DocsToKG.DocParsing.DoclingHybrid
 
 Docling Hybrid Chunker with Minimum Token Coalescence
 
-Transforms DocTags documents into chunked records while ensuring short runs of
-chunks are merged to satisfy minimum token thresholds required by downstream
-embedding pipelines.
+Transforms DocTags documents into chunked records with topic-aware coalescence.
+
+Tokenizer Alignment:
+    The default tokenizer (``Qwen/Qwen3-Embedding-4B``) aligns with the dense
+    embedder used by the embeddings pipeline. When experimenting with other
+    tokenizers (for example, legacy BERT models), run the calibration utility
+    beforehand to understand token count deltas::
+
+        python scripts/calibrate_tokenizers.py --doctags-dir Data/DocTagsFiles
+
+    The calibration script reports relative token ratios and recommends
+    adjustments to ``--min-tokens`` so chunk sizes remain compatible with the
+    embedding stage.
 
 ## 1. Functions
 
@@ -44,6 +54,18 @@ Tuple containing a list of reference identifiers and sorted page numbers.
 Raises:
 None
 
+### `summarize_image_metadata(chunk, text)`
+
+Infer image annotation flags and counts from chunk metadata and text.
+
+Args:
+chunk: Chunk metadata object containing image annotations.
+text: Chunk text used to detect fallback caption cues.
+
+Returns:
+Tuple of ``(has_caption, has_classification, num_images)`` describing
+inferred image metadata.
+
 ### `merge_rec(a, b, tokenizer)`
 
 Merge two chunk records, updating token counts and provenance metadata.
@@ -55,6 +77,23 @@ tokenizer: Tokenizer used to recompute token counts for combined text.
 
 Returns:
 New `Rec` instance containing fused text, token counts, and metadata.
+
+### `is_structural_boundary(rec)`
+
+Detect whether a chunk begins with a structural heading or caption marker.
+
+Args:
+rec: Chunk record to inspect.
+
+Returns:
+``True`` when ``rec.text`` starts with a heading indicator (``#``) or a
+recognised caption prefix, otherwise ``False``.
+
+Examples:
+>>> is_structural_boundary(Rec(text="# Introduction", n_tok=2, src_idxs=[], refs=[], pages=[]))
+True
+>>> is_structural_boundary(Rec(text="Regular paragraph", n_tok=2, src_idxs=[], refs=[], pages=[]))
+False
 
 ### `coalesce_small_runs(records, tokenizer, min_tokens, max_tokens)`
 
@@ -78,15 +117,42 @@ surpassing `max_tokens`.
 preferring same-run neighbors to maintain topical cohesion.
 • Leave chunks outside small runs unchanged.
 
-### `main()`
+### `build_parser()`
+
+Construct an argument parser for the chunking pipeline.
+
+Args:
+None: Parser construction does not require inputs.
+
+Returns:
+:class:`argparse.ArgumentParser` configured with chunking options.
+
+Raises:
+None
+
+### `parse_args(argv)`
+
+Parse CLI arguments for standalone chunking execution.
+
+Args:
+argv: Optional CLI argument vector. When ``None`` the process arguments
+are parsed.
+
+Returns:
+Namespace containing parsed CLI options.
+
+Raises:
+SystemExit: Propagated if ``argparse`` reports invalid arguments.
+
+### `main(args)`
 
 CLI driver that chunks DocTags files and enforces minimum token thresholds.
 
 Args:
-None
+args: Optional CLI namespace supplied during testing or orchestration.
 
 Returns:
-None
+Exit code where ``0`` indicates success.
 
 ### `is_small(idx)`
 

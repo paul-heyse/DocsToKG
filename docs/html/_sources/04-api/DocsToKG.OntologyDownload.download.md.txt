@@ -13,7 +13,14 @@ size limits and are safe for downstream document processing.
 
 ### `_log_memory(logger, event)`
 
-*No documentation available.*
+Emit debug-level memory usage snapshots when enabled.
+
+Args:
+logger: Logger instance controlling verbosity for download telemetry.
+event: Short label describing the lifecycle point (e.g., ``before``).
+
+Returns:
+None
 
 ### `sanitize_filename(filename)`
 
@@ -25,18 +32,43 @@ filename: Candidate filename provided by an upstream service.
 Returns:
 Safe filename compatible with local filesystem storage.
 
-### `validate_url_security(url)`
+### `_enforce_idn_safety(host)`
 
-Validate URLs to avoid SSRF and insecure schemes.
+Validate internationalized hostnames and reject suspicious patterns.
+
+Args:
+host: Hostname component extracted from the download URL.
+
+Returns:
+None
+
+Raises:
+ConfigError: If the hostname mixes multiple scripts or contains invisible characters.
+
+### `_rebuild_netloc(parsed, ascii_host)`
+
+Reconstruct URL netloc with a normalized hostname.
+
+Args:
+parsed: Parsed URL components produced by :func:`urllib.parse.urlparse`.
+ascii_host: ASCII-normalized hostname (potentially IPv6).
+
+Returns:
+String suitable for use as the netloc portion of a URL.
+
+### `validate_url_security(url, http_config)`
+
+Validate URLs to avoid SSRF, enforce HTTPS, and honor host allowlists.
 
 Args:
 url: URL returned by a resolver for ontology download.
+http_config: Download configuration providing optional host allowlist.
 
 Returns:
 HTTPS URL safe for downstream download operations.
 
 Raises:
-ConfigError: If the URL uses an insecure scheme or resolves to private addresses.
+ConfigError: If the URL violates security requirements or allowlists.
 
 ### `sha256_file(path)`
 
@@ -48,9 +80,36 @@ path: Path to the file whose digest should be calculated.
 Returns:
 Hexadecimal SHA-256 checksum string.
 
+### `_validate_member_path(member_name)`
+
+Validate archive member paths to prevent traversal attacks.
+
+Args:
+member_name: Path declared within the archive.
+
+Returns:
+Sanitised relative path safe for extraction on the local filesystem.
+
+Raises:
+ConfigError: If the member path is absolute or contains traversal segments.
+
+### `_check_compression_ratio()`
+
+Ensure compressed archives do not expand beyond the permitted ratio.
+
+Args:
+total_uncompressed: Sum of file sizes within the archive.
+compressed_size: Archive file size on disk (or sum of compressed entries).
+archive: Path to the archive on disk.
+logger: Optional logger for emitting diagnostic messages.
+archive_type: Human readable label for error messages (ZIP/TAR).
+
+Raises:
+ConfigError: If the archive exceeds the allowed expansion ratio.
+
 ### `extract_zip_safe(zip_path, destination)`
 
-Extract a ZIP archive while preventing path traversal.
+Extract a ZIP archive while preventing traversal and compression bombs.
 
 Args:
 zip_path: Path to the ZIP file to extract.
@@ -61,11 +120,34 @@ Returns:
 List of extracted file paths.
 
 Raises:
-ConfigError: If the archive contains unsafe paths or is missing.
+ConfigError: If the archive contains unsafe paths, compression bombs, or is missing.
+
+### `extract_tar_safe(tar_path, destination)`
+
+Safely extract tar archives with traversal and compression checks.
+
+Args:
+tar_path: Path to the tar archive (tar, tar.gz, tar.xz).
+destination: Directory where extracted files should be stored.
+logger: Optional logger for emitting extraction telemetry.
+
+Returns:
+List of extracted file paths.
+
+Raises:
+ConfigError: If the archive is missing, unsafe, or exceeds compression limits.
 
 ### `_get_bucket(host, http_config, service)`
 
-*No documentation available.*
+Return a token bucket keyed by host and optional service name.
+
+Args:
+host: Hostname extracted from the download URL.
+http_config: Download configuration providing base rate limits.
+service: Logical service identifier enabling per-service overrides.
+
+Returns:
+TokenBucket instance shared across downloads for throttling.
 
 ### `download_stream()`
 

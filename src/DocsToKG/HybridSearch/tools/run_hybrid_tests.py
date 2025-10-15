@@ -11,6 +11,8 @@ import sys
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run selected hybrid-search pytest suites with optional extra arguments."""
+
     parser = argparse.ArgumentParser(description="Run hybrid search pytest suites")
     parser.add_argument(
         "mode",

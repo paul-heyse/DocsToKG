@@ -4,8 +4,9 @@ This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolver
 
 Resolver pipeline and provider implementations.
 
-This module maintains backward compatibility by re-exporting all public APIs.
-New code should import from submodules (pipeline, types, providers) directly.
+This module maintains backward compatibility by re-exporting legacy entry points
+so existing integrations and tests can continue to monkeypatch ``requests`` or
+``time`` on the resolver namespace.
 
 ## 1. Functions
 

@@ -2,7 +2,29 @@
 
 This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.config``.
 
-Configuration models, parsing, and validation for the ontology downloader.
+Ontology Downloader Configuration
+
+This module centralizes configuration schema definitions, environment
+overrides, and YAML parsing for DocsToKG's ontology downloader. It builds on
+Pydantic models to provide strong validation, type-safe defaults, and runtime
+mutability where operational overrides are required.
+
+Key Features:
+- Declarative Pydantic models for HTTP, validation, and logging settings
+- YAML loading with structural validation and friendly error messages
+- Environment variable overrides for containerized deployments
+- Utilities to merge defaults with ad-hoc fetch specifications
+
+Dependencies:
+- PyYAML for configuration parsing
+- pydantic and pydantic-settings for model validation
+
+Usage:
+    from DocsToKG.OntologyDownload.config import load_config
+
+    resolved = load_config(Path("sources.yaml"))
+    for spec in resolved.specs:
+        print(spec.id)
 
 ## 1. Functions
 
@@ -194,6 +216,17 @@ Requests-per-second value when configured, otherwise ``None``.
 
 Raises:
 None.
+
+### `normalized_allowed_hosts(self)`
+
+Return allowlist entries normalized to lowercase punycode labels.
+
+Returns:
+Tuple of (exact hostnames, wildcard suffixes) when entries exist,
+otherwise ``None`` if no valid allowlist entries are configured.
+
+Raises:
+ValueError: If any configured hostname cannot be converted to punycode.
 
 ### `validate_prefer_source(cls, value)`
 

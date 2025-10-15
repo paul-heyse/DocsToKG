@@ -27,6 +27,18 @@ class FeatureGenerator:
     """
 
     def __init__(self, *, embedding_dim: int = 2560) -> None:
+        """Create a feature generator with a deterministic dense embedding dimensionality.
+
+        Args:
+            embedding_dim: Dimensionality used for generated dense embeddings.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If ``embedding_dim`` is not positive.
+        """
+
         if embedding_dim <= 0:
             raise ValueError("embedding_dim must be positive")
         self._embedding_dim = embedding_dim
@@ -61,10 +73,26 @@ class FeatureGenerator:
         )
 
     def _compute_bm25(self, tokens: Sequence[str]) -> Dict[str, float]:
+        """Calculate BM25-style term weights for the provided tokens.
+
+        Args:
+            tokens: Sequence of string tokens extracted from chunk text.
+
+        Returns:
+            Mapping of token → BM25-inspired weight using log-scaled term frequency.
+        """
         counter = Counter(tokens)
         return {token: float(1.0 + np.log1p(freq)) for token, freq in counter.items()}
 
     def _compute_splade(self, tokens: Sequence[str]) -> Dict[str, float]:
+        """Generate SPLADE-style sparse lexical weights for the tokens.
+
+        Args:
+            tokens: Token sequence used to derive sparse lexical weights.
+
+        Returns:
+            Mapping of token → SPLADE-inspired weight capturing term salience.
+        """
         counter = Counter(tokens)
         if not counter:
             return {}
@@ -76,6 +104,14 @@ class FeatureGenerator:
         return weights
 
     def _compute_dense_embedding(self, tokens: Sequence[str]) -> NDArray[np.float32]:
+        """Aggregate per-token hashes into a normalized dense embedding.
+
+        Args:
+            tokens: Tokens present in the chunk text.
+
+        Returns:
+            L2-normalised dense embedding representing the chunk semantics.
+        """
         if not tokens:
             return np.zeros(self._embedding_dim, dtype=np.float32)
         aggregate = np.zeros(self._embedding_dim, dtype=np.float32)
@@ -84,6 +120,14 @@ class FeatureGenerator:
         return self._normalize(aggregate)
 
     def _hash_to_vector(self, token: str) -> NDArray[np.float32]:
+        """Project a token deterministically into dense vector space via hashing.
+
+        Args:
+            token: Token string that requires a dense vector representation.
+
+        Returns:
+            Dense vector derived from the SHA-1 digest of the token.
+        """
         digest = hashlib.sha1(token.encode("utf-8")).digest()
         required = self._embedding_dim
         repeats = (required + len(digest) - 1) // len(digest)
@@ -93,6 +137,14 @@ class FeatureGenerator:
         return arr
 
     def _normalize(self, vector: NDArray[np.float32]) -> NDArray[np.float32]:
+        """Return a unit-length copy of the provided dense vector.
+
+        Args:
+            vector: Vector to normalise to unit length.
+
+        Returns:
+            Normalised vector, or the original vector when zero-norm.
+        """
         norm = float(np.linalg.norm(vector))
         if norm == 0.0:
             return vector

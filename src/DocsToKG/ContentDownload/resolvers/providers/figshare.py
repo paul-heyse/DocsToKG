@@ -105,4 +105,3 @@ class FigshareResolver:
 
 
 __all__ = ["FigshareResolver"]
-

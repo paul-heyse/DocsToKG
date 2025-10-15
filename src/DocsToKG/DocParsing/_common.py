@@ -242,7 +242,26 @@ def get_logger(name: str, level: str = "INFO") -> logging.Logger:
         handler = logging.StreamHandler()
 
         class JSONFormatter(logging.Formatter):
-            def format(self, record: logging.LogRecord) -> str:  # noqa: D401 - simple override
+            """Emit structured JSON log messages for DocParsing utilities.
+
+            Attributes:
+                default_time_format: Timestamp template applied to log records.
+
+            Examples:
+                >>> formatter = JSONFormatter()
+                >>> hasattr(formatter, "format")
+                True
+            """
+
+            def format(self, record: logging.LogRecord) -> str:
+                """Render a log record as a JSON string.
+
+                Args:
+                    record: Logging record produced by the DocParsing pipeline.
+
+                Returns:
+                    JSON-formatted string containing canonical log fields and optional extras.
+                """
                 payload = {
                     "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S.%fZ"),
                     "level": record.levelname,
@@ -300,6 +319,9 @@ def atomic_write(path: Path) -> Iterator[TextIO]:
 
     Args:
         path: Target path to write.
+
+    Returns:
+        Context manager yielding a writable text handle.
 
     Yields:
         Writable text file handle. Caller must write data before context exit.
@@ -373,15 +395,11 @@ def iter_chunks(directory: Path) -> Iterator[Path]:
     """
 
     yield from (
-        path.resolve()
-        for path in sorted(directory.glob("*.chunks.jsonl"))
-        if path.is_file()
+        path.resolve() for path in sorted(directory.glob("*.chunks.jsonl")) if path.is_file()
     )
 
 
-def jsonl_load(
-    path: Path, skip_invalid: bool = False, max_errors: int = 10
-) -> List[dict]:
+def jsonl_load(path: Path, skip_invalid: bool = False, max_errors: int = 10) -> List[dict]:
     """Load a JSONL file into memory with optional error tolerance.
 
     Args:
@@ -451,6 +469,9 @@ def jsonl_save(
         path: Destination JSONL file.
         rows: Sequence of dictionaries to serialize.
         validate: Optional callback invoked per row before serialization.
+
+    Returns:
+        None: This function performs I/O side effects only.
 
     Raises:
         ValueError: If ``validate`` raises an exception for any row.
@@ -602,6 +623,9 @@ def load_manifest_index(stage: str, root: Optional[Path] = None) -> Dict[str, di
 
     Returns:
         Mapping of ``doc_id`` to the most recent manifest entry for that stage.
+
+    Raises:
+        None: Manifest rows that fail to parse are skipped to keep processing resilient.
 
     Examples:
         >>> index = load_manifest_index("embeddings")  # doctest: +SKIP

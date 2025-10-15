@@ -19,24 +19,19 @@ import math
 import os
 import re
 import statistics
-import tracemalloc
 import time
+import tracemalloc
 import uuid
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 # Third-party imports
 from sentence_transformers import (
     SparseEncoder,
 )  # loads from local dir if given (cache_folder supported)
 from tqdm import tqdm
-
-from vllm import (
-    LLM,
-    PoolingParams,
-)  # PoolingParams(dimensions=...) selects output dim if model supports MRL
 
 from DocsToKG.DocParsing._common import (
     Batcher,
@@ -53,6 +48,10 @@ from DocsToKG.DocParsing._common import (
     manifest_append,
 )
 from DocsToKG.DocParsing.schemas import BM25Vector, DenseVector, SPLADEVector, VectorRow
+from vllm import (
+    LLM,
+    PoolingParams,
+)  # PoolingParams(dimensions=...) selects output dim if model supports MRL
 
 # ---- Fixed locations ----
 HF_HOME = Path("/home/paul/hf-cache")
@@ -175,7 +174,19 @@ def build_bm25_stats(chunks: Iterable[Chunk]) -> BM25Stats:
 
 
 class BM25StatsAccumulator:
-    """Streaming accumulator for BM25 corpus statistics."""
+    """Streaming accumulator for BM25 corpus statistics.
+
+    Attributes:
+        N: Number of documents processed so far.
+        total_tokens: Total token count across processed documents.
+        df: Document frequency map collected to date.
+
+    Examples:
+        >>> acc = BM25StatsAccumulator()
+        >>> acc.add_document("hybrid search")
+        >>> acc.N
+        1
+    """
 
     def __init__(self) -> None:
         self.N = 0
@@ -183,7 +194,14 @@ class BM25StatsAccumulator:
         self.df = Counter()
 
     def add_document(self, text: str) -> None:
-        """Add document to statistics without retaining text."""
+        """Add document to statistics without retaining text.
+
+        Args:
+            text: Document contents used to update running statistics.
+
+        Returns:
+            None
+        """
 
         toks = tokens(text)
         self.N += 1
@@ -191,14 +209,28 @@ class BM25StatsAccumulator:
         self.df.update(set(toks))
 
     def finalize(self) -> BM25Stats:
-        """Compute final statistics."""
+        """Compute final statistics.
+
+        Args:
+            None: The accumulator finalises its internal counters without parameters.
+
+        Returns:
+            :class:`BM25Stats` summarising the accumulated corpus.
+        """
 
         avgdl = self.total_tokens / max(self.N, 1)
         return BM25Stats(N=self.N, avgdl=avgdl, df=dict(self.df))
 
 
 def print_bm25_summary(stats: BM25Stats) -> None:
-    """Print corpus-level BM25 statistics."""
+    """Print corpus-level BM25 statistics.
+
+    Args:
+        stats: Computed BM25 statistics to log.
+
+    Returns:
+        None: Writes structured logs only.
+    """
 
     logger = get_logger(__name__)
     top_tokens = list(stats.df.items())
@@ -303,7 +335,18 @@ _SPLADE_ENCODER_CACHE: Dict[Tuple[str, str, Optional[str], Optional[int]], Spars
 
 
 def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
-    """Retrieve (or create) a cached SPLADE encoder instance."""
+    """Retrieve (or create) a cached SPLADE encoder instance.
+
+    Args:
+        cfg: SPLADE configuration describing model location and runtime options.
+
+    Returns:
+        Cached :class:`SparseEncoder` ready for SPLADE inference.
+
+    Raises:
+        ValueError: If the encoder cannot be initialised with the supplied configuration.
+        ImportError: If required SPLADE dependencies are unavailable.
+    """
 
     key = (str(cfg.model_dir), cfg.device, cfg.attn_impl, cfg.max_active_dims)
     if key in _SPLADE_ENCODER_CACHE:
@@ -343,7 +386,18 @@ def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
 
 
 class SPLADEValidator:
-    """Track SPLADE sparsity metrics across the corpus."""
+    """Track SPLADE sparsity metrics across the corpus.
+
+    Attributes:
+        total_chunks: Total number of chunks inspected.
+        zero_nnz_chunks: UUIDs whose SPLADE vector has zero active terms.
+        nnz_counts: Non-zero counts per processed chunk.
+
+    Examples:
+        >>> validator = SPLADEValidator()
+        >>> validator.total_chunks
+        0
+    """
 
     def __init__(self) -> None:
         self.total_chunks = 0
@@ -351,7 +405,19 @@ class SPLADEValidator:
         self.nnz_counts: List[int] = []
 
     def validate(self, uuid: str, tokens: Sequence[str], weights: Sequence[float]) -> None:
-        """Record sparsity information for a single chunk."""
+        """Record sparsity information for a single chunk.
+
+        Args:
+            uuid: Chunk identifier associated with the SPLADE vector.
+            tokens: Token list produced by the SPLADE encoder.
+            weights: Weight list aligned with ``tokens``.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
 
         self.total_chunks += 1
         nnz = sum(1 for weight in weights if weight > 0)
@@ -360,7 +426,14 @@ class SPLADEValidator:
             self.zero_nnz_chunks.append(uuid)
 
     def report(self, logger) -> None:
-        """Emit warnings if sparsity metrics exceed thresholds."""
+        """Emit warnings if sparsity metrics exceed thresholds.
+
+        Args:
+            logger: Logger used to emit warnings and metrics.
+
+        Returns:
+            None
+        """
 
         if not self.total_chunks:
             return
@@ -439,7 +512,18 @@ def qwen_embed(
 
 
 def process_pass_a(files: Sequence[Path], logger) -> Tuple[Dict[str, Chunk], BM25Stats]:
-    """Assign UUIDs and build BM25 statistics for a corpus of chunk files."""
+    """Assign UUIDs and build BM25 statistics for a corpus of chunk files.
+
+    Args:
+        files: Sequence of chunk file paths to process.
+        logger: Logger used for structured progress output.
+
+    Returns:
+        Tuple containing the UUID→Chunk index and aggregated BM25 statistics.
+
+    Raises:
+        ValueError: Propagated when chunk rows are missing required fields.
+    """
 
     uuid_to_chunk: Dict[str, Chunk] = {}
     accumulator = BM25StatsAccumulator()
@@ -480,13 +564,26 @@ def process_chunk_file_vectors(
     validator: SPLADEValidator,
     logger,
 ) -> Tuple[int, List[int], List[float]]:
-    """Generate vectors for a single chunk file and persist them to disk."""
+    """Generate vectors for a single chunk file and persist them to disk.
+
+    Args:
+        chunk_file: Chunk JSONL file to process.
+        uuid_to_chunk: Mapping of chunk UUIDs to chunk metadata.
+        stats: Precomputed BM25 statistics.
+        args: Parsed CLI arguments with runtime configuration.
+        validator: SPLADE validator for sparsity metrics.
+        logger: Logger for structured output.
+
+    Returns:
+        Tuple of ``(vector_count, splade_nnz_list, qwen_norms)``.
+
+    Raises:
+        ValueError: Propagated if vector dimensions or norms fail validation.
+    """
 
     rows = jsonl_load(chunk_file)
     if not rows:
-        logger.warning(
-            "Chunk file empty", extra={"extra_fields": {"chunk_file": str(chunk_file)}}
-        )
+        logger.warning("Chunk file empty", extra={"extra_fields": {"chunk_file": str(chunk_file)}})
         return 0, [], []
 
     uuids = [row["uuid"] for row in rows]
@@ -497,9 +594,7 @@ def process_chunk_file_vectors(
             args.splade_cfg, list(batch), batch_size=args.batch_size_splade
         )
         splade_results.extend(zip(tokens_batch, weights_batch))
-    qwen_results = qwen_embed(
-        args.qwen_cfg, texts, batch_size=args.batch_size_qwen
-    )
+    qwen_results = qwen_embed(args.qwen_cfg, texts, batch_size=args.batch_size_qwen)
 
     out_path = args.out_dir / f"{chunk_file.stem.replace('.chunks', '')}.vectors.jsonl"
     count, nnz, norms = write_vectors(
@@ -541,15 +636,29 @@ def write_vectors(
     validator: SPLADEValidator,
     logger,
 ) -> Tuple[int, List[int], List[float]]:
-    """Write validated vector rows to disk with schema enforcement."""
+    """Write validated vector rows to disk with schema enforcement.
 
-    if not (
-        len(uuids)
-        == len(texts)
-        == len(splade_results)
-        == len(qwen_results)
-        == len(rows)
-    ):
+    Args:
+        path: Destination JSONL path for vector rows.
+        uuids: Sequence of chunk UUIDs aligned with the other inputs.
+        texts: Chunk text bodies.
+        splade_results: SPLADE token and weight pairs per chunk.
+        qwen_results: Dense embedding vectors per chunk.
+        stats: BM25 statistics used to generate sparse vectors.
+        args: Parsed CLI arguments for runtime configuration.
+        rows: Original chunk row dictionaries.
+        validator: SPLADE validator capturing sparsity data.
+        logger: Logger used to emit structured diagnostics.
+
+    Returns:
+        Tuple containing the number of vectors written, SPLADE nnz counts,
+        and Qwen vector norms.
+
+    Raises:
+        ValueError: If vector lengths are inconsistent or fail validation.
+    """
+
+    if not (len(uuids) == len(texts) == len(splade_results) == len(qwen_results) == len(rows)):
         raise ValueError("Mismatch between chunk, SPLADE, or Qwen result lengths")
 
     bm25_k1 = float(args.bm25_k1)
@@ -598,9 +707,7 @@ def write_vectors(
                 )
                 raise ValueError(message)
             if abs(norm - 1.0) > 0.01:
-                logger.warning(
-                    "Qwen norm for UUID=%s: %.4f (expected ~1.0)", uuid_value, norm
-                )
+                logger.warning("Qwen norm for UUID=%s: %.4f (expected ~1.0)", uuid_value, norm)
             qwen_norms.append(norm)
 
             terms, weights = bm25_vector(text, stats, k1=bm25_k1, b=bm25_b)
@@ -655,9 +762,21 @@ def write_vectors(
             handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
     return len(uuids), splade_nnz, qwen_norms
+
+
 # ---- Main driver ----
 def build_parser() -> argparse.ArgumentParser:
-    """Construct the CLI parser for the embedding pipeline."""
+    """Construct the CLI parser for the embedding pipeline.
+
+    Args:
+        None: Parser creation does not require inputs.
+
+    Returns:
+        :class:`argparse.ArgumentParser` configured for embedding options.
+
+    Raises:
+        None
+    """
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -700,13 +819,34 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse CLI arguments for standalone embedding execution."""
+    """Parse CLI arguments for standalone embedding execution.
+
+    Args:
+        argv: Optional CLI argument vector. When ``None`` the current process
+            arguments are used.
+
+    Returns:
+        Namespace containing parsed embedding configuration.
+
+    Raises:
+        SystemExit: Propagated if ``argparse`` reports invalid options.
+    """
 
     return build_parser().parse_args(argv)
 
 
 def main(args: argparse.Namespace | None = None) -> int:
-    """CLI entrypoint for chunk UUID cleanup and embedding generation."""
+    """CLI entrypoint for chunk UUID cleanup and embedding generation.
+
+    Args:
+        args: Optional parsed arguments, primarily for testing or orchestration.
+
+    Returns:
+        Exit code where ``0`` indicates success.
+
+    Raises:
+        ValueError: If invalid runtime parameters (such as batch sizes) are supplied.
+    """
 
     logger = get_logger(__name__)
 
@@ -797,9 +937,7 @@ def main(args: argparse.Namespace | None = None) -> int:
     splade_nnz_all: List[int] = []
     qwen_norms_all: List[float] = []
 
-    manifest_index = (
-        load_manifest_index(MANIFEST_STAGE, resolved_root) if args.resume else {}
-    )
+    manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_root) if args.resume else {}
     file_entries = []
     skipped_files = 0
     for chunk_file in files:
@@ -875,16 +1013,12 @@ def main(args: argparse.Namespace | None = None) -> int:
     validator.report(logger)
 
     zero_pct = (
-        100.0 * len([n for n in splade_nnz_all if n == 0]) / total_vectors
-        if total_vectors
-        else 0.0
+        100.0 * len([n for n in splade_nnz_all if n == 0]) / total_vectors if total_vectors else 0.0
     )
     avg_nnz = statistics.mean(splade_nnz_all) if splade_nnz_all else 0.0
     median_nnz = statistics.median(splade_nnz_all) if splade_nnz_all else 0.0
     avg_norm = statistics.mean(qwen_norms_all) if qwen_norms_all else 0.0
-    std_norm = (
-        statistics.pstdev(qwen_norms_all) if len(qwen_norms_all) > 1 else 0.0
-    )
+    std_norm = statistics.pstdev(qwen_norms_all) if len(qwen_norms_all) > 1 else 0.0
 
     logger.info(
         "Embedding summary",

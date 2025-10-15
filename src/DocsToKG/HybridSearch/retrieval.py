@@ -113,6 +113,20 @@ class HybridSearchService:
         registry: ChunkRegistry,
         observability: Optional[Observability] = None,
     ) -> None:
+        """Initialise the hybrid search service with retrieval backends and configuration.
+
+        Args:
+            config_manager: Source of runtime hybrid search configuration.
+            feature_generator: Feature generator used to embed queries.
+            faiss_index: Dense retrieval backend powered by FAISS.
+            opensearch: Lexical retrieval backend.
+            registry: Registry offering chunk metadata lookups.
+            observability: Optional observability façade for metrics/tracing.
+
+        Returns:
+            None
+        """
+
         self._config_manager = config_manager
         self._feature_generator = feature_generator
         self._faiss = faiss_index
@@ -215,6 +229,19 @@ class HybridSearchService:
         query_features: ChunkFeatures,
         timings: Dict[str, float],
     ) -> ChannelResults:
+        """Run the BM25 retrieval channel and record latency metrics.
+
+        Args:
+            request: Hybrid search request providing query parameters.
+            filters: Metadata filters applied to BM25 results.
+            config: Active hybrid search configuration.
+            query_features: Precomputed query features for retrieval.
+            timings: Mutable dictionary used to collect latency metrics.
+
+        Returns:
+            ChannelResults containing BM25 candidates and score mapping.
+        """
+
         start = time.perf_counter()
         hits, _ = self._opensearch.search_bm25(
             query_features.bm25_terms,
@@ -239,6 +266,19 @@ class HybridSearchService:
         query_features: ChunkFeatures,
         timings: Dict[str, float],
     ) -> ChannelResults:
+        """Execute SPLADE retrieval and return channel-specific fusion candidates.
+
+        Args:
+            request: Hybrid search request providing query parameters.
+            filters: Metadata filters applied to SPLADE results.
+            config: Active hybrid search configuration.
+            query_features: Precomputed query features for retrieval.
+            timings: Mutable dictionary used to collect latency metrics.
+
+        Returns:
+            ChannelResults containing SPLADE candidates and score mapping.
+        """
+
         start = time.perf_counter()
         hits, _ = self._opensearch.search_splade(
             query_features.splade_weights,
@@ -265,6 +305,19 @@ class HybridSearchService:
         query_features: ChunkFeatures,
         timings: Dict[str, float],
     ) -> ChannelResults:
+        """Query the FAISS index for dense candidates and filter by metadata.
+
+        Args:
+            request: Hybrid search request providing query parameters.
+            filters: Metadata filters applied to dense results.
+            config: Active hybrid search configuration.
+            query_features: Precomputed query features for retrieval.
+            timings: Mutable dictionary used to collect latency metrics.
+
+        Returns:
+            ChannelResults containing dense candidates and score mapping.
+        """
+
         start = time.perf_counter()
         oversampled = request.page_size * config.dense.oversample
         hits = self._faiss.search(
@@ -293,6 +346,16 @@ class HybridSearchService:
         hits: Sequence[FaissSearchResult],
         filters: Mapping[str, object],
     ) -> tuple[List[FaissSearchResult], Dict[str, ChunkPayload]]:
+        """Apply metadata filters to dense results and gather payloads for survivors.
+
+        Args:
+            hits: Sequence of FAISS search results to filter.
+            filters: Metadata filters applied to candidate payloads.
+
+        Returns:
+            Tuple containing filtered hits and a mapping of payloads by vector ID.
+        """
+
         if not hits:
             return [], {}
         vector_ids = [hit.vector_id for hit in hits]
@@ -310,6 +373,16 @@ class HybridSearchService:
         candidates: Sequence[FusionCandidate],
         fused_scores: Mapping[str, float],
     ) -> List[FusionCandidate]:
+        """Remove duplicate vector IDs, keeping the highest-scoring candidate per ID.
+
+        Args:
+            candidates: Candidate list produced across retrieval channels.
+            fused_scores: Mapping of vector IDs to fused scores.
+
+        Returns:
+            List of candidates sorted by fused score with duplicates removed.
+        """
+
         unique: Dict[str, FusionCandidate] = {}
         for candidate in candidates:
             vector_id = candidate.chunk.vector_id
@@ -329,6 +402,15 @@ class HybridSearchService:
         return ordered
 
     def _validate_request(self, request: HybridSearchRequest) -> None:
+        """Validate basic request fields before executing the search pipeline.
+
+        Args:
+            request: Hybrid search request to validate.
+
+        Returns:
+            None
+        """
+
         if not request.query.strip():
             raise RequestValidationError("query must not be empty")
         if request.page_size <= 0:

@@ -42,7 +42,16 @@ __all__ = [
 
 
 class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
-    """Serialize picture items with captions and rich annotation metadata."""
+    """Serialize picture items with captions and rich annotation metadata.
+
+    Attributes:
+        image_placeholder: Fallback marker inserted when an image lacks metadata.
+
+    Examples:
+        >>> serializer = CaptionPlusAnnotationPictureSerializer()
+        >>> isinstance(serializer, CaptionPlusAnnotationPictureSerializer)
+        True
+    """
 
     @override
     def serialize(
@@ -53,7 +62,17 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
         doc: _Doc,
         **_: Any,
     ) -> SerializationResult:
-        """Render picture metadata into Markdown-friendly text."""
+        """Render picture metadata into Markdown-friendly text.
+
+        Args:
+            item: Picture element extracted from the Docling document.
+            doc_serializer: Serializer orchestrating the chunking pipeline.
+            doc: Source document providing contextual accessors.
+            **_: Additional keyword arguments ignored by this implementation.
+
+        Returns:
+            Serialization result containing Markdown-ready text and spans.
+        """
 
         parts: List[str] = []
         annotations: List[object] = []
@@ -73,10 +92,11 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
             try:
                 if isinstance(annotation, PictureDescriptionData) and annotation.text:
                     parts.append(f"Picture description: {annotation.text}")
-                elif isinstance(annotation, PictureClassificationData) and annotation.predicted_classes:
-                    parts.append(
-                        f"Picture type: {annotation.predicted_classes[0].class_name}"
-                    )
+                elif (
+                    isinstance(annotation, PictureClassificationData)
+                    and annotation.predicted_classes
+                ):
+                    parts.append(f"Picture type: {annotation.predicted_classes[0].class_name}")
                 elif isinstance(annotation, PictureMoleculeData) and annotation.smi:
                     parts.append(f"SMILES: {annotation.smi}")
             except Exception:  # pragma: no cover - defensive catch
@@ -109,10 +129,26 @@ class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
 
 
 class RichSerializerProvider(ChunkingSerializerProvider):
-    """Provide a serializer that augments tables and pictures with Markdown."""
+    """Provide a serializer that augments tables and pictures with Markdown.
+
+    Attributes:
+        markdown_params: Default Markdown parameters passed to serializers.
+
+    Examples:
+        >>> provider = RichSerializerProvider()
+        >>> isinstance(provider, RichSerializerProvider)
+        True
+    """
 
     def get_serializer(self, doc: DoclingDocument) -> ChunkingDocSerializer:
-        """Construct a ChunkingDocSerializer tailored for DocTags documents."""
+        """Construct a ChunkingDocSerializer tailored for DocTags documents.
+
+        Args:
+            doc: Docling document to serialize into DocTags-compatible chunks.
+
+        Returns:
+            Chunking serializer configured with Markdown enrichments.
+        """
 
         return ChunkingDocSerializer(
             doc=doc,

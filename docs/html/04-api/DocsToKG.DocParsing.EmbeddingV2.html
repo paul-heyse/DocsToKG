@@ -100,32 +100,13 @@ d: Directory containing <code class="docutils literal notranslate"><span class="
 <p>Returns:
 Sorted list of chunk file paths.</p>
 </section>
-<section id="load-rows-p">
-<h3><code class="docutils literal notranslate"><span class="pre">load_rows(p)</span></code><a class="headerlink" href="#load-rows-p" title="Link to this heading"></a></h3>
-<p>Load JSONL rows from disk into memory.</p>
-<p>Args:
-p: Path to the <code class="docutils literal notranslate"><span class="pre">.jsonl</span></code> file.</p>
-<p>Returns:
-List of dictionaries parsed from the file.</p>
-<p>Raises:
-json.JSONDecodeError: If a line contains malformed JSON.</p>
-</section>
-<section id="save-rows-p-rows">
-<h3><code class="docutils literal notranslate"><span class="pre">save_rows(p,</span> <span class="pre">rows)</span></code><a class="headerlink" href="#save-rows-p-rows" title="Link to this heading"></a></h3>
-<p>Persist JSONL rows to disk atomically using a temporary file.</p>
-<p>Args:
-p: Destination path for the chunk file.
-rows: Sequence of dictionaries to serialize.</p>
-<p>Returns:
-None</p>
-</section>
 <section id="ensure-uuid-rows">
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_uuid(rows)</span></code><a class="headerlink" href="#ensure-uuid-rows" title="Link to this heading"></a></h3>
 <p>Populate missing chunk UUIDs in-place.</p>
 <p>Args:
 rows: Chunk dictionaries that should include a <code class="docutils literal notranslate"><span class="pre">uuid</span></code> key.</p>
 <p>Returns:
-None</p>
+True when at least one UUID was newly assigned; otherwise False.</p>
 </section>
 <section id="tokens-text">
 <h3><code class="docutils literal notranslate"><span class="pre">tokens(text)</span></code><a class="headerlink" href="#tokens-text" title="Link to this heading"></a></h3>
@@ -143,6 +124,14 @@ chunks: Iterable of text chunks with identifiers.</p>
 <p>Returns:
 BM25Stats containing document frequency counts and average length.</p>
 </section>
+<section id="print-bm25-summary-stats">
+<h3><code class="docutils literal notranslate"><span class="pre">print_bm25_summary(stats)</span></code><a class="headerlink" href="#print-bm25-summary-stats" title="Link to this heading"></a></h3>
+<p>Print corpus-level BM25 statistics.</p>
+<p>Args:
+stats: Computed BM25 statistics to log.</p>
+<p>Returns:
+None: Writes structured logs only.</p>
+</section>
 <section id="bm25-vector-text-stats-k1-b">
 <h3><code class="docutils literal notranslate"><span class="pre">bm25_vector(text,</span> <span class="pre">stats,</span> <span class="pre">k1,</span> <span class="pre">b)</span></code><a class="headerlink" href="#bm25-vector-text-stats-k1-b" title="Link to this heading"></a></h3>
 <p>Generate BM25 term weights for a chunk of text.</p>
@@ -154,29 +143,140 @@ b: Length normalization parameter.</p>
 <p>Returns:
 Tuple of <code class="docutils literal notranslate"><span class="pre">(terms,</span> <span class="pre">weights)</span></code> describing the sparse vector.</p>
 </section>
-<section id="splade-encode-cfg-texts">
-<h3><code class="docutils literal notranslate"><span class="pre">splade_encode(cfg,</span> <span class="pre">texts)</span></code><a class="headerlink" href="#splade-encode-cfg-texts" title="Link to this heading"></a></h3>
+<section id="splade-encode-cfg-texts-batch-size">
+<h3><code class="docutils literal notranslate"><span class="pre">splade_encode(cfg,</span> <span class="pre">texts,</span> <span class="pre">batch_size)</span></code><a class="headerlink" href="#splade-encode-cfg-texts-batch-size" title="Link to this heading"></a></h3>
 <p>Encode text with SPLADE to obtain sparse lexical vectors.</p>
 <p>Args:
 cfg: SPLADE configuration describing device, batch size, and cache.
-texts: Batch of input strings to encode.</p>
+texts: Batch of input strings to encode.
+batch_size: Optional override for the encoding batch size.</p>
 <p>Returns:
 Tuple of token lists and weight lists aligned per input text.</p>
 </section>
-<section id="qwen-embed-cfg-texts">
-<h3><code class="docutils literal notranslate"><span class="pre">qwen_embed(cfg,</span> <span class="pre">texts)</span></code><a class="headerlink" href="#qwen-embed-cfg-texts" title="Link to this heading"></a></h3>
+<section id="get-splade-encoder-cfg">
+<h3><code class="docutils literal notranslate"><span class="pre">_get_splade_encoder(cfg)</span></code><a class="headerlink" href="#get-splade-encoder-cfg" title="Link to this heading"></a></h3>
+<p>Retrieve (or create) a cached SPLADE encoder instance.</p>
+</section>
+<section id="qwen-embed-cfg-texts-batch-size">
+<h3><code class="docutils literal notranslate"><span class="pre">qwen_embed(cfg,</span> <span class="pre">texts,</span> <span class="pre">batch_size)</span></code><a class="headerlink" href="#qwen-embed-cfg-texts-batch-size" title="Link to this heading"></a></h3>
 <p>Produce dense embeddings using a local Qwen3 model served by vLLM.</p>
 <p>Args:
 cfg: Configuration describing model path, dtype, and batching.
-texts: Batch of documents to embed.</p>
+texts: Batch of documents to embed.
+batch_size: Optional override for inference batch size.</p>
 <p>Returns:
 List of embedding vectors, one per input text.</p>
 </section>
-<section id="main">
-<h3><code class="docutils literal notranslate"><span class="pre">main()</span></code><a class="headerlink" href="#main" title="Link to this heading"></a></h3>
+<section id="process-pass-a-files-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">process_pass_a(files,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#process-pass-a-files-logger" title="Link to this heading"></a></h3>
+<p>Assign UUIDs and build BM25 statistics for a corpus of chunk files.</p>
+<p>Args:
+files: Sequence of chunk file paths to process.
+logger: Logger used for structured progress output.</p>
+<p>Returns:
+Tuple containing the UUID→Chunk index and aggregated BM25 statistics.</p>
+<p>Raises:
+ValueError: Propagated when chunk rows are missing required fields.</p>
+</section>
+<section id="process-chunk-file-vectors-chunk-file-uuid-to-chunk-stats-args-validator-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">process_chunk_file_vectors(chunk_file,</span> <span class="pre">uuid_to_chunk,</span> <span class="pre">stats,</span> <span class="pre">args,</span> <span class="pre">validator,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#process-chunk-file-vectors-chunk-file-uuid-to-chunk-stats-args-validator-logger" title="Link to this heading"></a></h3>
+<p>Generate vectors for a single chunk file and persist them to disk.</p>
+<p>Args:
+chunk_file: Chunk JSONL file to process.
+uuid_to_chunk: Mapping of chunk UUIDs to chunk metadata.
+stats: Precomputed BM25 statistics.
+args: Parsed CLI arguments with runtime configuration.
+validator: SPLADE validator for sparsity metrics.
+logger: Logger for structured output.</p>
+<p>Returns:
+Tuple of <code class="docutils literal notranslate"><span class="pre">(vector_count,</span> <span class="pre">splade_nnz_list,</span> <span class="pre">qwen_norms)</span></code>.</p>
+<p>Raises:
+ValueError: Propagated if vector dimensions or norms fail validation.</p>
+</section>
+<section id="write-vectors-path-uuids-texts-splade-results-qwen-results-stats-args">
+<h3><code class="docutils literal notranslate"><span class="pre">write_vectors(path,</span> <span class="pre">uuids,</span> <span class="pre">texts,</span> <span class="pre">splade_results,</span> <span class="pre">qwen_results,</span> <span class="pre">stats,</span> <span class="pre">args)</span></code><a class="headerlink" href="#write-vectors-path-uuids-texts-splade-results-qwen-results-stats-args" title="Link to this heading"></a></h3>
+<p>Write validated vector rows to disk with schema enforcement.</p>
+<p>Args:
+path: Destination JSONL path for vector rows.
+uuids: Sequence of chunk UUIDs aligned with the other inputs.
+texts: Chunk text bodies.
+splade_results: SPLADE token and weight pairs per chunk.
+qwen_results: Dense embedding vectors per chunk.
+stats: BM25 statistics used to generate sparse vectors.
+args: Parsed CLI arguments for runtime configuration.
+rows: Original chunk row dictionaries.
+validator: SPLADE validator capturing sparsity data.
+logger: Logger used to emit structured diagnostics.</p>
+<p>Returns:
+Tuple containing the number of vectors written, SPLADE nnz counts,
+and Qwen vector norms.</p>
+<p>Raises:
+ValueError: If vector lengths are inconsistent or fail validation.</p>
+</section>
+<section id="build-parser">
+<h3><code class="docutils literal notranslate"><span class="pre">build_parser()</span></code><a class="headerlink" href="#build-parser" title="Link to this heading"></a></h3>
+<p>Construct the CLI parser for the embedding pipeline.</p>
+<p>Args:
+None: Parser creation does not require inputs.</p>
+<p>Returns:
+:class:<code class="docutils literal notranslate"><span class="pre">argparse.ArgumentParser</span></code> configured for embedding options.</p>
+<p>Raises:
+None</p>
+</section>
+<section id="parse-args-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_args(argv)</span></code><a class="headerlink" href="#parse-args-argv" title="Link to this heading"></a></h3>
+<p>Parse CLI arguments for standalone embedding execution.</p>
+<p>Args:
+argv: Optional CLI argument vector. When <code class="docutils literal notranslate"><span class="pre">None</span></code> the current process
+arguments are used.</p>
+<p>Returns:
+Namespace containing parsed embedding configuration.</p>
+<p>Raises:
+SystemExit: Propagated if <code class="docutils literal notranslate"><span class="pre">argparse</span></code> reports invalid options.</p>
+</section>
+<section id="main-args">
+<h3><code class="docutils literal notranslate"><span class="pre">main(args)</span></code><a class="headerlink" href="#main-args" title="Link to this heading"></a></h3>
 <p>CLI entrypoint for chunk UUID cleanup and embedding generation.</p>
 <p>Args:
+args: Optional parsed arguments, primarily for testing or orchestration.</p>
+<p>Returns:
+Exit code where <code class="docutils literal notranslate"><span class="pre">0</span></code> indicates success.</p>
+<p>Raises:
+ValueError: If invalid runtime parameters (such as batch sizes) are supplied.</p>
+</section>
+<section id="add-document-self-text">
+<h3><code class="docutils literal notranslate"><span class="pre">add_document(self,</span> <span class="pre">text)</span></code><a class="headerlink" href="#add-document-self-text" title="Link to this heading"></a></h3>
+<p>Add document to statistics without retaining text.</p>
+<p>Args:
+text: Document contents used to update running statistics.</p>
+<p>Returns:
 None</p>
+</section>
+<section id="finalize-self">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize(self)</span></code><a class="headerlink" href="#finalize-self" title="Link to this heading"></a></h3>
+<p>Compute final statistics.</p>
+<p>Args:
+None: The accumulator finalises its internal counters without parameters.</p>
+<p>Returns:
+:class:<code class="docutils literal notranslate"><span class="pre">BM25Stats</span></code> summarising the accumulated corpus.</p>
+</section>
+<section id="validate-self-uuid-tokens-weights">
+<h3><code class="docutils literal notranslate"><span class="pre">validate(self,</span> <span class="pre">uuid,</span> <span class="pre">tokens,</span> <span class="pre">weights)</span></code><a class="headerlink" href="#validate-self-uuid-tokens-weights" title="Link to this heading"></a></h3>
+<p>Record sparsity information for a single chunk.</p>
+<p>Args:
+uuid: Chunk identifier associated with the SPLADE vector.
+tokens: Token list produced by the SPLADE encoder.
+weights: Weight list aligned with <code class="docutils literal notranslate"><span class="pre">tokens</span></code>.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+None</p>
+</section>
+<section id="report-self-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">report(self,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#report-self-logger" title="Link to this heading"></a></h3>
+<p>Emit warnings if sparsity metrics exceed thresholds.</p>
+<p>Args:
+logger: Logger used to emit warnings and metrics.</p>
 <p>Returns:
 None</p>
 </section>
@@ -188,12 +288,13 @@ None</p>
 <p>Minimal representation of a DocTags chunk stored on disk.</p>
 <p>Attributes:
 uuid: Stable identifier for the chunk.
-text: Textual content extracted from the DocTags document.</p>
+text: Textual content extracted from the DocTags document.
+doc_id: Identifier of the source document for manifest reporting.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>
 <div><blockquote>
-<div><p>chunk = Chunk(uuid=”chunk-1”, text=”Hybrid search is powerful.”)
+<div><p>chunk = Chunk(uuid=”chunk-1”, text=”Hybrid search is powerful.”, doc_id=”doc”)
 chunk.uuid
 ‘chunk-1’</p>
 </div></blockquote>
@@ -218,6 +319,25 @@ stats.df[“hybrid”]
 </div></blockquote>
 </div></blockquote>
 </section>
+<section id="bm25statsaccumulator">
+<h3><code class="docutils literal notranslate"><span class="pre">BM25StatsAccumulator</span></code><a class="headerlink" href="#bm25statsaccumulator" title="Link to this heading"></a></h3>
+<p>Streaming accumulator for BM25 corpus statistics.</p>
+<p>Attributes:
+N: Number of documents processed so far.
+total_tokens: Total token count across processed documents.
+df: Document frequency map collected to date.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>acc = BM25StatsAccumulator()
+acc.add_document(“hybrid search”)
+acc.N
+1</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
 <section id="spladecfg">
 <h3><code class="docutils literal notranslate"><span class="pre">SpladeCfg</span></code><a class="headerlink" href="#spladecfg" title="Link to this heading"></a></h3>
 <p>Runtime configuration for SPLADE sparse encoding.</p>
@@ -235,6 +355,24 @@ attn_impl: Preferred attention implementation override.</p>
 <div><p>cfg = SpladeCfg(batch_size=8, device=”cuda:1”)
 cfg.batch_size
 8</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="spladevalidator">
+<h3><code class="docutils literal notranslate"><span class="pre">SPLADEValidator</span></code><a class="headerlink" href="#spladevalidator" title="Link to this heading"></a></h3>
+<p>Track SPLADE sparsity metrics across the corpus.</p>
+<p>Attributes:
+total_chunks: Total number of chunks inspected.
+zero_nnz_chunks: UUIDs whose SPLADE vector has zero active terms.
+nnz_counts: Non-zero counts per processed chunk.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>validator = SPLADEValidator()
+validator.total_chunks
+0</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>

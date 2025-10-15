@@ -43,6 +43,18 @@ class ResultShaper:
         device: int = 0,
         resources: Optional["faiss.StandardGpuResources"] = None,
     ) -> None:
+        """Initialise the shaper with retrieval backends, fusion settings, and GPU context.
+
+        Args:
+            opensearch: OpenSearch simulator used for highlighting.
+            fusion_config: Fusion configuration controlling dedupe behaviour.
+            device: CUDA device ordinal for GPU-based similarity checks.
+            resources: Optional FAISS GPU resources for cosine comparisons.
+
+        Returns:
+            None
+        """
+
         self._opensearch = opensearch
         self._fusion_config = fusion_config
         self._gpu_device = int(device)

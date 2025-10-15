@@ -4,20 +4,56 @@ This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.resolve
 
 Ontology Resolver Implementations
 
-This module defines resolver strategies that translate fetch specifications
-into concrete download plans. Resolvers integrate with services such as the
-OBO Library, OLS, and BioPortal to identify canonical document URLs for
-downloading ontology content.
+This module defines the resolver strategies that convert download
+specifications into actionable fetch plans. Each resolver encapsulates the
+API integration, retry logic, and metadata extraction necessary to interact
+with external services such as the OBO Library, OLS, BioPortal, and SKOS/XBRL
+endpoints.
+
+Key Features:
+- Shared retry/backoff helpers for consistent API resilience
+- Resolver-specific metadata extraction (version, license, media type)
+- Support for additional services through the pluggable ``RESOLVERS`` map
+
+Usage:
+    from DocsToKG.OntologyDownload.resolvers import RESOLVERS
+
+    resolver = RESOLVERS["obo"]
+    plan = resolver.plan(spec, config, logger)
 
 ## 1. Functions
 
 ### `_execute_with_retry(self, func)`
 
-*No documentation available.*
+Run a callable with retry semantics tailored for resolver APIs.
+
+Args:
+func: Callable performing the API request.
+config: Resolved configuration containing retry and timeout settings.
+logger: Logger adapter used to record retry attempts.
+name: Human-friendly resolver name used in log messages.
+
+Returns:
+Result returned by the supplied callable.
+
+Raises:
+ConfigError: When retry limits are exceeded or HTTP errors occur.
 
 ### `_build_plan(self)`
 
-*No documentation available.*
+Construct a ``FetchPlan`` from resolver components.
+
+Args:
+url: Canonical download URL for the ontology.
+headers: HTTP headers required when issuing the download.
+filename_hint: Suggested filename derived from resolver metadata.
+version: Version string reported by the resolver.
+license: License identifier reported by the resolver.
+media_type: MIME type associated with the ontology.
+service: Logical service identifier used for rate limiting.
+
+Returns:
+FetchPlan capturing resolver metadata.
 
 ### `plan(self, spec, config, logger)`
 
@@ -51,7 +87,10 @@ ConfigError: When the API rejects credentials or yields no URLs.
 
 ### `_load_api_key(self)`
 
-*No documentation available.*
+Load the BioPortal API key from disk when available.
+
+Returns:
+API key string stripped of whitespace, or ``None`` when missing.
 
 ### `plan(self, spec, config, logger)`
 

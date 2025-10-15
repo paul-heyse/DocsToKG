@@ -8,11 +8,12 @@ import random
 import statistics
 import time
 from datetime import UTC, datetime
-from itertools import combinations
 from pathlib import Path
 from typing import Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
+
+import faiss  # type: ignore
 
 from .config import HybridSearchConfigManager
 from .dense import FaissIndexManager
@@ -22,6 +23,7 @@ from .observability import Observability
 from .operations import restore_state as ops_restore_state
 from .operations import serialize_state as ops_serialize_state
 from .retrieval import HybridSearchService
+from .similarity import pairwise_inner_products
 from .storage import ChunkRegistry, OpenSearchSimulator
 from .types import (
     ChunkPayload,
@@ -130,10 +132,23 @@ class HybridSearchValidator:
         registry: ChunkRegistry,
         opensearch: OpenSearchSimulator,
     ) -> None:
+        """Bind ingestion, retrieval, and storage components for validation sweeps.
+
+        Args:
+            ingestion: Ingestion pipeline used to materialise chunk data.
+            service: Hybrid search service under test.
+            registry: Chunk registry exposing ingested metadata.
+            opensearch: OpenSearch simulator for lexical validation.
+
+        Returns:
+            None
+        """
+
         self._ingestion = ingestion
         self._service = service
         self._registry = registry
         self._opensearch = opensearch
+        self._validation_resources: Optional["faiss.StandardGpuResources"] = None
 
     def run(
         self, dataset: Sequence[Mapping[str, object]], output_root: Optional[Path] = None
@@ -1047,6 +1062,7 @@ class HybridSearchValidator:
         max_per_doc = config.fusion.max_chunks_per_doc
         dedupe_threshold = config.fusion.cosine_dedupe_threshold
         chunk_lookup = {(chunk.doc_id, chunk.chunk_id): chunk for chunk in self._registry.all()}
+        device = int(config.dense.device)
 
         doc_limit_violations = 0
         dedupe_violations = 0
@@ -1071,14 +1087,14 @@ class HybridSearchValidator:
 
             # Dedupe check based on cosine similarity
             if len(embeddings) > 1:
-                for lhs, rhs in combinations(embeddings, 2):
-                    denom = float(np.linalg.norm(lhs) * np.linalg.norm(rhs))
-                    if denom == 0.0:
-                        continue
-                    cosine = float(np.dot(lhs, rhs) / denom)
-                    if cosine >= dedupe_threshold:
-                        dedupe_violations += 1
-                        break
+                matrix = np.ascontiguousarray(np.stack(embeddings), dtype=np.float32)
+                sims = pairwise_inner_products(
+                    matrix,
+                    device=device,
+                    resources=self._ensure_validation_resources(),
+                )
+                if np.any(np.triu(sims, k=1) >= dedupe_threshold):
+                    dedupe_violations += 1
 
         details = {
             "queries_checked": len(sampled_pairs),
@@ -1344,15 +1360,32 @@ class HybridSearchValidator:
         """
         if len(embeddings) < 2:
             return 0.0
-        total = 0.0
-        count = 0
-        for lhs, rhs in combinations(embeddings, 2):
-            denom = float(np.linalg.norm(lhs) * np.linalg.norm(rhs))
-            if denom == 0.0:
-                continue
-            total += float(np.dot(lhs, rhs) / denom)
-            count += 1
-        return total / count if count else 0.0
+        matrix = np.ascontiguousarray(np.stack(embeddings), dtype=np.float32)
+        config = self._service._config_manager.get()
+        sims = pairwise_inner_products(
+            matrix,
+            device=int(config.dense.device),
+            resources=self._ensure_validation_resources(),
+        )
+        upper = np.triu(sims, k=1)
+        values = upper[np.triu_indices_from(upper, k=1)]
+        if values.size == 0:
+            return 0.0
+        return float(np.mean(values))
+
+    def _ensure_validation_resources(self) -> "faiss.StandardGpuResources":
+        """Lazy-create and cache GPU resources for validation-only cosine checks.
+
+        Args:
+            None
+
+        Returns:
+            FAISS GPU resources reused across validation runs.
+        """
+
+        if self._validation_resources is None:
+            self._validation_resources = faiss.StandardGpuResources()
+        return self._validation_resources
 
     def _percentile(self, values: Sequence[float], percentile: float) -> float:
         """Return percentile value for a sequence; defaults to 0.0 when empty.

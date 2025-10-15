@@ -8,13 +8,14 @@ from pathlib import Path
 
 import pytest
 
-hypothesis = pytest.importorskip("hypothesis")
-from hypothesis import given, strategies as st
-
 from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (
     Rec,
     coalesce_small_runs,
 )
+
+hypothesis = pytest.importorskip("hypothesis")
+given = hypothesis.given
+st = hypothesis.strategies
 
 GOLDEN_DIR = Path("tests/data/docparsing/golden")
 GOLDEN_CHUNKS = GOLDEN_DIR / "sample.chunks.jsonl"

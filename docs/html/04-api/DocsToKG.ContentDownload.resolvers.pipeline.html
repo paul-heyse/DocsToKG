@@ -94,19 +94,54 @@
 <h3><code class="docutils literal notranslate"><span class="pre">_jitter_sleep(self)</span></code><a class="headerlink" href="#jitter-sleep-self" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
+<section id="should-attempt-head-check-self-resolver-name">
+<h3><code class="docutils literal notranslate"><span class="pre">_should_attempt_head_check(self,</span> <span class="pre">resolver_name)</span></code><a class="headerlink" href="#should-attempt-head-check-self-resolver-name" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="head-precheck-url-self-session-url-timeout">
+<h3><code class="docutils literal notranslate"><span class="pre">_head_precheck_url(self,</span> <span class="pre">session,</span> <span class="pre">url,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#head-precheck-url-self-session-url-timeout" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="run-self-session-artifact-context">
 <h3><code class="docutils literal notranslate"><span class="pre">run(self,</span> <span class="pre">session,</span> <span class="pre">artifact,</span> <span class="pre">context)</span></code><a class="headerlink" href="#run-self-session-artifact-context" title="Link to this heading"></a></h3>
-<p>Execute resolvers sequentially until a PDF is obtained or exhausted.</p>
+<p>Execute resolvers until a PDF is obtained or resolvers are exhausted.</p>
+</section>
+<section id="run-sequential-self-session-artifact-context-data-state">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_sequential(self,</span> <span class="pre">session,</span> <span class="pre">artifact,</span> <span class="pre">context_data,</span> <span class="pre">state)</span></code><a class="headerlink" href="#run-sequential-self-session-artifact-context-data-state" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="run-concurrent-self-session-artifact-context-data-state">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_concurrent(self,</span> <span class="pre">session,</span> <span class="pre">artifact,</span> <span class="pre">context_data,</span> <span class="pre">state)</span></code><a class="headerlink" href="#run-concurrent-self-session-artifact-context-data-state" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="prepare-resolver-self-resolver-name-order-index-artifact-state">
+<h3><code class="docutils literal notranslate"><span class="pre">_prepare_resolver(self,</span> <span class="pre">resolver_name,</span> <span class="pre">order_index,</span> <span class="pre">artifact,</span> <span class="pre">state)</span></code><a class="headerlink" href="#prepare-resolver-self-resolver-name-order-index-artifact-state" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="collect-resolver-results-self-resolver-name-resolver-session-artifact">
+<h3><code class="docutils literal notranslate"><span class="pre">_collect_resolver_results(self,</span> <span class="pre">resolver_name,</span> <span class="pre">resolver,</span> <span class="pre">session,</span> <span class="pre">artifact)</span></code><a class="headerlink" href="#collect-resolver-results-self-resolver-name-resolver-session-artifact" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="process-result-self-session-artifact-resolver-name-order-index-result-context-data-state">
+<h3><code class="docutils literal notranslate"><span class="pre">_process_result(self,</span> <span class="pre">session,</span> <span class="pre">artifact,</span> <span class="pre">resolver_name,</span> <span class="pre">order_index,</span> <span class="pre">result,</span> <span class="pre">context_data,</span> <span class="pre">state)</span></code><a class="headerlink" href="#process-result-self-session-artifact-resolver-name-order-index-result-context-data-state" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="submit-next-executor-start-index">
+<h3><code class="docutils literal notranslate"><span class="pre">submit_next(executor,</span> <span class="pre">start_index)</span></code><a class="headerlink" href="#submit-next-executor-start-index" title="Link to this heading"></a></h3>
+<p>Queue additional resolvers until reaching concurrency limits.</p>
 <p>Args:
-session: HTTP session shared across resolver invocations.
-artifact: Work artifact representing the item being resolved.
-context: Optional dictionary carrying pipeline execution context.</p>
+executor: Thread pool responsible for executing resolver calls.
+start_index: Index in <code class="docutils literal notranslate"><span class="pre">resolver_order</span></code> where submission should resume.</p>
 <p>Returns:
-PipelineResult describing the final outcome of resolver execution.</p>
+Updated index pointing to the next resolver candidate that has not been submitted.</p>
 </section>
 </section>
 <section id="classes">
 <h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="runstate">
+<h3><code class="docutils literal notranslate"><span class="pre">_RunState</span></code><a class="headerlink" href="#runstate" title="Link to this heading"></a></h3>
+<p>Mutable pipeline execution state shared across resolvers.</p>
+</section>
 <section id="resolverpipeline">
 <h3><code class="docutils literal notranslate"><span class="pre">ResolverPipeline</span></code><a class="headerlink" href="#resolverpipeline" title="Link to this heading"></a></h3>
 <p>Executes resolvers in priority order until a PDF download succeeds.</p>

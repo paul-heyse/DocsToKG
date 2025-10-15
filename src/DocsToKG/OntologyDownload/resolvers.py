@@ -1,10 +1,22 @@
 """
 Ontology Resolver Implementations
 
-This module defines resolver strategies that translate fetch specifications
-into concrete download plans. Resolvers integrate with services such as the
-OBO Library, OLS, and BioPortal to identify canonical document URLs for
-downloading ontology content.
+This module defines the resolver strategies that convert download
+specifications into actionable fetch plans. Each resolver encapsulates the
+API integration, retry logic, and metadata extraction necessary to interact
+with external services such as the OBO Library, OLS, BioPortal, and SKOS/XBRL
+endpoints.
+
+Key Features:
+- Shared retry/backoff helpers for consistent API resilience
+- Resolver-specific metadata extraction (version, license, media type)
+- Support for additional services through the pluggable ``RESOLVERS`` map
+
+Usage:
+    from DocsToKG.OntologyDownload.resolvers import RESOLVERS
+
+    resolver = RESOLVERS[\"obo\"]
+    plan = resolver.plan(spec, config, logger)
 """
 
 from __future__ import annotations
@@ -80,6 +92,20 @@ class BaseResolver:
     def _execute_with_retry(
         self, func, *, config: ResolvedConfig, logger: logging.Logger, name: str
     ):
+        """Run a callable with retry semantics tailored for resolver APIs.
+
+        Args:
+            func: Callable performing the API request.
+            config: Resolved configuration containing retry and timeout settings.
+            logger: Logger adapter used to record retry attempts.
+            name: Human-friendly resolver name used in log messages.
+
+        Returns:
+            Result returned by the supplied callable.
+
+        Raises:
+            ConfigError: When retry limits are exceeded or HTTP errors occur.
+        """
         attempts = 0
         max_attempts = max(1, config.defaults.http.max_retries)
         while True:
@@ -119,6 +145,20 @@ class BaseResolver:
         media_type: Optional[str] = None,
         service: Optional[str] = None,
     ) -> FetchPlan:
+        """Construct a ``FetchPlan`` from resolver components.
+
+        Args:
+            url: Canonical download URL for the ontology.
+            headers: HTTP headers required when issuing the download.
+            filename_hint: Suggested filename derived from resolver metadata.
+            version: Version string reported by the resolver.
+            license: License identifier reported by the resolver.
+            media_type: MIME type associated with the ontology.
+            service: Logical service identifier used for rate limiting.
+
+        Returns:
+            FetchPlan capturing resolver metadata.
+        """
         return FetchPlan(
             url=url,
             headers=headers or {},
@@ -297,6 +337,11 @@ class BioPortalResolver(BaseResolver):
         self.api_key_path = config_dir / "bioportal_api_key.txt"
 
     def _load_api_key(self) -> Optional[str]:
+        """Load the BioPortal API key from disk when available.
+
+        Returns:
+            API key string stripped of whitespace, or ``None`` when missing.
+        """
         if self.api_key_path.exists():
             return self.api_key_path.read_text().strip() or None
         return None

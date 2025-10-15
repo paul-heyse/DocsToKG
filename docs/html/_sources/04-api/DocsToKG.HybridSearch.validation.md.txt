@@ -342,6 +342,10 @@ embeddings: Sequence of embedding vectors.
 Returns:
 Mean pairwise cosine similarity, or 0.0 when insufficient points exist.
 
+### `_ensure_validation_resources(self)`
+
+Lazy-create and cache GPU resources for validation-only cosine checks.
+
 ### `_percentile(self, values, percentile)`
 
 Return percentile value for a sequence; defaults to 0.0 when empty.

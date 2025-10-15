@@ -189,4 +189,3 @@ def test_acquire_lock_timeout(tmp_path: Path) -> None:
         with _common.acquire_lock(target, timeout=0.1):
             pass
     lock.unlink()
-

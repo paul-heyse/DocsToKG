@@ -80,8 +80,9 @@
 <h1>1. Module: <strong>init</strong><a class="headerlink" href="#module-init" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.__init__</span></code>.</p>
 <p>Resolver pipeline and provider implementations.</p>
-<p>This module maintains backward compatibility by re-exporting all public APIs.
-New code should import from submodules (pipeline, types, providers) directly.</p>
+<p>This module maintains backward compatibility by re-exporting legacy entry points
+so existing integrations and tests can continue to monkeypatch <code class="docutils literal notranslate"><span class="pre">requests</span></code> or
+<code class="docutils literal notranslate"><span class="pre">time</span></code> on the resolver namespace.</p>
 <section id="functions">
 <h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="clear-resolver-caches">

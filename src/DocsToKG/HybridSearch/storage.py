@@ -75,6 +75,15 @@ class ChunkRegistry:
     """
 
     def __init__(self) -> None:
+        """Create an empty registry with FAISS ID ↔ vector ID bridges.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         self._chunks: Dict[str, ChunkPayload] = {}
         self._bridge: Dict[int, str] = {}
 
@@ -189,6 +198,15 @@ class OpenSearchSimulator:
     """
 
     def __init__(self) -> None:
+        """Initialise in-memory OpenSearch document storage and metadata.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         self._chunks: Dict[str, StoredChunk] = {}
         self._avg_length: float = 0.0
         self._templates: Dict[str, "OpenSearchIndexTemplate"] = {}

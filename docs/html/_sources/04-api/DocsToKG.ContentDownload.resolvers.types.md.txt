@@ -38,7 +38,7 @@ bool: ``True`` if the resolver is enabled.
 
 ### `__post_init__(self)`
 
-*No documentation available.*
+Validate configuration fields and apply defaults.
 
 ### `log(self, record)`
 
@@ -156,6 +156,8 @@ doaj_api_key: API key for DOAJ resolver.
 resolver_timeouts: Resolver-specific timeout overrides.
 resolver_min_interval_s: Minimum interval between resolver requests.
 resolver_rate_limits: Deprecated rate limit configuration retained for compat.
+enable_head_precheck: Toggle applying HEAD filtering before downloads.
+resolver_head_precheck: Per-resolver overrides for HEAD filtering behaviour.
 mailto: Contact email appended to polite headers and user agent string.
 
 Examples:
@@ -242,6 +244,7 @@ resolver_name: Resolver that produced the successful result.
 url: URL that was ultimately fetched.
 outcome: Download outcome associated with the result.
 html_paths: Collected HTML artefacts from the pipeline.
+failed_urls: Candidate URLs that failed during this run.
 reason: Optional reason string explaining failures.
 
 Examples:

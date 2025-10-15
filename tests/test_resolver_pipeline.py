@@ -345,7 +345,9 @@ def test_head_precheck_skips_zero_length(monkeypatch, tmp_path):
         fake_request,
     )
 
-    pipeline = ResolverPipeline([resolver], config, lambda *args, **kwargs: None, logger, ResolverMetrics())
+    pipeline = ResolverPipeline(
+        [resolver], config, lambda *args, **kwargs: None, logger, ResolverMetrics()
+    )
     session = requests.Session()
     result = pipeline.run(session, artifact)
 
@@ -367,7 +369,9 @@ def test_head_precheck_skips_error_status(monkeypatch, tmp_path):
         fake_request,
     )
 
-    pipeline = ResolverPipeline([resolver], config, lambda *args, **kwargs: None, logger, ResolverMetrics())
+    pipeline = ResolverPipeline(
+        [resolver], config, lambda *args, **kwargs: None, logger, ResolverMetrics()
+    )
     session = requests.Session()
     result = pipeline.run(session, artifact)
 
@@ -449,7 +453,9 @@ def test_head_precheck_respects_global_disable(monkeypatch, tmp_path):
         fake_request,
     )
 
-    pipeline = ResolverPipeline([resolver], config, lambda *args, **kwargs: None, logger, ResolverMetrics())
+    pipeline = ResolverPipeline(
+        [resolver], config, lambda *args, **kwargs: None, logger, ResolverMetrics()
+    )
     session = requests.Session()
     pipeline.run(session, artifact)
 
@@ -459,7 +465,9 @@ def test_head_precheck_respects_global_disable(monkeypatch, tmp_path):
 def test_head_precheck_resolver_override(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
     skip_resolver = StubResolver("skip", [ResolverResult(url="https://example.org/skip.pdf")])
-    enforce_resolver = StubResolver("enforce", [ResolverResult(url="https://example.org/enforce.pdf")])
+    enforce_resolver = StubResolver(
+        "enforce", [ResolverResult(url="https://example.org/enforce.pdf")]
+    )
     config = ResolverConfig(
         resolver_order=["skip", "enforce"],
         resolver_toggles={"skip": True, "enforce": True},

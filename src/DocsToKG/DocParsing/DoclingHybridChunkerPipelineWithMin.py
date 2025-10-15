@@ -45,13 +45,13 @@ from DocsToKG.DocParsing._common import (
     load_manifest_index,
     manifest_append,
 )
-from DocsToKG.DocParsing.serializers import RichSerializerProvider
 from DocsToKG.DocParsing.schemas import (
     CHUNK_SCHEMA_VERSION,
     ChunkRow,
     ProvenanceMetadata,
     get_docling_version,
 )
+from DocsToKG.DocParsing.serializers import RichSerializerProvider
 
 SOFT_BARRIER_MARGIN = 64
 
@@ -64,6 +64,7 @@ DEFAULT_OUT_DIR = data_chunks(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "chunks"
 
 _LOGGER = get_logger(__name__)
+
 
 # ---------- Helpers ----------
 def read_utf8(p: Path) -> str:
@@ -119,7 +120,16 @@ def extract_refs_and_pages(chunk: BaseChunk) -> Tuple[List[str], List[int]]:
 
 
 def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, int]:
-    """Infer image annotation flags and counts from chunk metadata and text."""
+    """Infer image annotation flags and counts from chunk metadata and text.
+
+    Args:
+        chunk: Chunk metadata object containing image annotations.
+        text: Chunk text used to detect fallback caption cues.
+
+    Returns:
+        Tuple of ``(has_caption, has_classification, num_images)`` describing
+        inferred image metadata.
+    """
 
     has_caption = False
     has_classification = False
@@ -135,9 +145,7 @@ def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, i
         flags = getattr(picture, "_docstokg_flags", None)
         if isinstance(flags, dict):
             has_caption = has_caption or bool(flags.get("has_image_captions"))
-            has_classification = has_classification or bool(
-                flags.get("has_image_classification")
-            )
+            has_classification = has_classification or bool(flags.get("has_image_classification"))
         if getattr(picture, "__class__", type(None)).__name__.lower().startswith("picture"):
             num_images += 1
 
@@ -212,37 +220,6 @@ def merge_rec(a: Rec, b: Rec, tokenizer: HuggingFaceTokenizer) -> Rec:
         has_image_classification=a.has_image_classification or b.has_image_classification,
         num_images=a.num_images + b.num_images,
     )
-
-
-# ---------- Topic-aware boundary detection ----------
-def is_structural_boundary(rec: Rec) -> bool:
-    """Detect whether a chunk begins with a structural heading or caption marker.
-
-    Args:
-        rec: Chunk record to inspect.
-
-    Returns:
-        ``True`` when ``rec.text`` starts with a heading indicator (``#``) or a
-        recognised caption prefix, otherwise ``False``.
-
-    Examples:
-        >>> is_structural_boundary(Rec(text="# Introduction", n_tok=2, src_idxs=[], refs=[], pages=[]))
-        True
-        >>> is_structural_boundary(Rec(text="Regular paragraph", n_tok=2, src_idxs=[], refs=[], pages=[]))
-        False
-    """
-
-    text = rec.text.lstrip()
-    if text.startswith("#"):
-        return True
-
-    caption_markers = (
-        "Figure caption:",
-        "Table:",
-        "Picture description:",
-        "<!-- image -->",
-    )
-    return any(text.startswith(marker) for marker in caption_markers)
 
 
 # ---------- Topic-aware boundary detection ----------
@@ -459,7 +436,17 @@ def coalesce_small_runs(
 
 # ---------- Main ----------
 def build_parser() -> argparse.ArgumentParser:
-    """Construct an argument parser for the chunking pipeline."""
+    """Construct an argument parser for the chunking pipeline.
+
+    Args:
+        None: Parser construction does not require inputs.
+
+    Returns:
+        :class:`argparse.ArgumentParser` configured with chunking options.
+
+    Raises:
+        None
+    """
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -495,13 +482,31 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse CLI arguments for standalone chunking execution."""
+    """Parse CLI arguments for standalone chunking execution.
+
+    Args:
+        argv: Optional CLI argument vector. When ``None`` the process arguments
+            are parsed.
+
+    Returns:
+        Namespace containing parsed CLI options.
+
+    Raises:
+        SystemExit: Propagated if ``argparse`` reports invalid arguments.
+    """
 
     return build_parser().parse_args(argv)
 
 
 def main(args: argparse.Namespace | None = None) -> int:
-    """CLI driver that chunks DocTags files and enforces minimum token thresholds."""
+    """CLI driver that chunks DocTags files and enforces minimum token thresholds.
+
+    Args:
+        args: Optional CLI namespace supplied during testing or orchestration.
+
+    Returns:
+        Exit code where ``0`` indicates success.
+    """
 
     logger = get_logger(__name__)
 
@@ -652,9 +657,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 text = chunker.contextualize(ch)
                 n_tok = tokenizer.count_tokens(text=text)
                 refs, pages = extract_refs_and_pages(ch)
-                has_caption, has_classification, num_images = summarize_image_metadata(
-                    ch, text
-                )
+                has_caption, has_classification, num_images = summarize_image_metadata(ch, text)
                 recs.append(
                     Rec(
                         text=text,

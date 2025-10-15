@@ -2,15 +2,36 @@
 
 This reference documents the DocsToKG module ``DocsToKG.DocParsing.run_docling_html_to_doctags_parallel``.
 
-HTML → DocTags (parallel, CPU-only; no captioning/classification, no HF auth)
-
-- Input : Data/HTML/ (recurses; excludes *.normalized.html)
-- Output: Data/DocTagsFiles/<mirrored_subdirs>/*.doctags
-
-Example:
-  python run_docling_html_to_doctags_parallel.py       --input  Data/HTML       --output Data/DocTagsFiles       --workers 12
+Parallel HTML → DocTags conversion with manifest-aware resume support.
 
 ## 1. Functions
+
+### `build_parser()`
+
+Construct an argument parser for the HTML → DocTags converter.
+
+Args:
+None: Parser initialization does not require inputs.
+
+Returns:
+Configured :class:`argparse.ArgumentParser` instance.
+
+Raises:
+None
+
+### `parse_args(argv)`
+
+Parse command-line arguments for standalone execution.
+
+Args:
+argv: Optional CLI argument vector. When ``None`` the values from
+:data:`sys.argv` are used.
+
+Returns:
+Namespace containing parsed CLI options.
+
+Raises:
+SystemExit: Propagated if ``argparse`` detects invalid options.
 
 ### `_get_converter()`
 
@@ -19,17 +40,6 @@ Instantiate and cache a Docling HTML converter per worker process.
 Returns:
 DocumentConverter configured for HTML input, cached for reuse within
 the worker process.
-
-### `detect_data_root(start)`
-
-Locate the DocsToKG `Data` directory relative to a starting path.
-
-Args:
-start: Directory from which to begin scanning for `Data/HTML`.
-
-Returns:
-Path pointing to the discovered `Data` directory, or `<start>/Data`
-when no ancestor contains the expected layout.
 
 ### `list_htmls(root)`
 
@@ -41,26 +51,59 @@ root: Directory whose subtree should be searched for HTML files.
 Returns:
 Sorted list of discovered HTML file paths excluding normalized outputs.
 
-### `convert_one(html_path, input_root, output_root, overwrite)`
+### `convert_one(task)`
 
 Convert a single HTML file to DocTags, honoring overwrite semantics.
 
 Args:
-html_path: Path to the source HTML document.
-input_root: Root directory used to compute relative paths for logging.
-output_root: Base directory where generated `.doctags` files are stored.
-overwrite: Whether to replace existing outputs.
+task: Conversion details including paths, hash, and overwrite policy.
 
 Returns:
-Tuple of `(relative_path, status)` where status is `ok`, `skip`, or a
-`fail:<reason>` string describing an error condition.
+:class:`ConversionResult` capturing the conversion status.
 
-### `main()`
+Raises:
+ValueError: Propagated when Docling validation fails prior to internal handling.
+
+### `main(args)`
 
 Entrypoint for parallel HTML-to-DocTags conversion across a dataset.
 
 Args:
-None
+args: Optional pre-parsed CLI namespace to override command-line inputs.
 
 Returns:
-None
+Process exit code, where ``0`` denotes success.
+
+## 2. Classes
+
+### `HtmlTask`
+
+Work item describing a single HTML conversion job.
+
+Attributes:
+html_path: Absolute path to the HTML file to be converted.
+relative_id: Relative identifier for manifest entries.
+output_path: Destination DocTags path.
+input_hash: Content hash used for resume detection.
+overwrite: Flag indicating whether existing outputs should be replaced.
+
+Examples:
+>>> HtmlTask(Path("/tmp/a.html"), "doc", Path("/tmp/doc.doctags"), "hash", False)
+HtmlTask(html_path=PosixPath('/tmp/a.html'), relative_id='doc', output_path=PosixPath('/tmp/doc.doctags'), input_hash='hash', overwrite=False)
+
+### `ConversionResult`
+
+Structured result emitted by worker processes.
+
+Attributes:
+doc_id: Document identifier matching manifest entries.
+status: Conversion outcome (``"success"``, ``"skip"``, or ``"failure"``).
+duration_s: Time in seconds spent converting.
+input_path: Source HTML path recorded for auditing.
+input_hash: Content hash captured prior to conversion.
+output_path: Destination DocTags path.
+error: Optional error detail for failures.
+
+Examples:
+>>> ConversionResult("doc", "success", 1.0, "in.html", "hash", "out.doctags")
+ConversionResult(doc_id='doc', status='success', duration_s=1.0, input_path='in.html', input_hash='hash', output_path='out.doctags', error=None)

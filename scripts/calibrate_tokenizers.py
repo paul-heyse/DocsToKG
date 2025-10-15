@@ -45,12 +45,8 @@ def main() -> None:
     bert_tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased", use_fast=True)
     qwen_tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-Embedding-4B", use_fast=True)
 
-    bert_counts = [
-        len(bert_tokenizer.encode(sample, add_special_tokens=False)) for sample in texts
-    ]
-    qwen_counts = [
-        len(qwen_tokenizer.encode(sample, add_special_tokens=False)) for sample in texts
-    ]
+    bert_counts = [len(bert_tokenizer.encode(sample, add_special_tokens=False)) for sample in texts]
+    qwen_counts = [len(qwen_tokenizer.encode(sample, add_special_tokens=False)) for sample in texts]
 
     ratios = [q / max(b, 1) for b, q in zip(bert_counts, qwen_counts)]
     mean_ratio = statistics.mean(ratios)

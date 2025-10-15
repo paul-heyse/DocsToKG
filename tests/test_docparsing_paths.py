@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import os
 import subprocess
 import sys
@@ -17,11 +16,6 @@ SCRIPTS = [
     Path("src/DocsToKG/DocParsing/EmbeddingV2.py"),
 ]
 
-pytestmark = pytest.mark.skipif(
-    importlib.util.find_spec("docling_core") is None,
-    reason="docling_core is not available in the test environment",
-)
-
 
 def test_scripts_respect_data_root(tmp_path: Path) -> None:
     """Scripts should honor DOCSTOKG_DATA_ROOT when resolving defaults."""
@@ -31,6 +25,12 @@ def test_scripts_respect_data_root(tmp_path: Path) -> None:
 
     env = os.environ.copy()
     env["DOCSTOKG_DATA_ROOT"] = str(data_root)
+    project_root = Path(__file__).resolve().parents[1] / "src"
+    existing_path = env.get("PYTHONPATH")
+    path_entries = [str(project_root)]
+    if existing_path:
+        path_entries.append(existing_path)
+    env["PYTHONPATH"] = os.pathsep.join(path_entries)
 
     for script in SCRIPTS:
         result = subprocess.run(

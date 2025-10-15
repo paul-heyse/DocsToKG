@@ -10,7 +10,7 @@ import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import TYPE_CHECKING, List
 
 from tqdm import tqdm
 
@@ -29,6 +29,9 @@ DEFAULT_INPUT_DIR = data_html()
 DEFAULT_OUTPUT_DIR = data_doctags()
 MANIFEST_STAGE = "doctags-html"
 
+if TYPE_CHECKING:
+    from docling.document_converter import DocumentConverter
+
 warnings.warn(
     "Direct invocation of run_docling_html_to_doctags_parallel.py is deprecated. "
     "Use unified CLI: python -m DocsToKG.DocParsing.cli.doctags_convert --mode html",
@@ -44,17 +47,22 @@ os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")  # CPU-only
 
-# docling imports (safe on CPU for HTML)
-from docling.backend.html_backend import HTMLDocumentBackend
-from docling.datamodel.base_models import InputFormat
-from docling.document_converter import DocumentConverter, HTMLFormatOption
-
 # per-process converter cache
 _CONVERTER = None
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Construct an argument parser for the HTML → DocTags converter."""
+    """Construct an argument parser for the HTML → DocTags converter.
+
+    Args:
+        None: Parser initialization does not require inputs.
+
+    Returns:
+        Configured :class:`argparse.ArgumentParser` instance.
+
+    Raises:
+        None
+    """
 
     parser = argparse.ArgumentParser(
         description="Convert HTML corpora to DocTags using Docling",
@@ -103,14 +111,37 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse command-line arguments for standalone execution."""
+    """Parse command-line arguments for standalone execution.
+
+    Args:
+        argv: Optional CLI argument vector. When ``None`` the values from
+            :data:`sys.argv` are used.
+
+    Returns:
+        Namespace containing parsed CLI options.
+
+    Raises:
+        SystemExit: Propagated if ``argparse`` detects invalid options.
+    """
 
     return build_parser().parse_args(argv)
 
 
 @dataclass
 class HtmlTask:
-    """Work item describing a single HTML conversion job."""
+    """Work item describing a single HTML conversion job.
+
+    Attributes:
+        html_path: Absolute path to the HTML file to be converted.
+        relative_id: Relative identifier for manifest entries.
+        output_path: Destination DocTags path.
+        input_hash: Content hash used for resume detection.
+        overwrite: Flag indicating whether existing outputs should be replaced.
+
+    Examples:
+        >>> HtmlTask(Path("/tmp/a.html"), "doc", Path("/tmp/doc.doctags"), "hash", False)
+        HtmlTask(html_path=PosixPath('/tmp/a.html'), relative_id='doc', output_path=PosixPath('/tmp/doc.doctags'), input_hash='hash', overwrite=False)
+    """
 
     html_path: Path
     relative_id: str
@@ -121,7 +152,21 @@ class HtmlTask:
 
 @dataclass
 class ConversionResult:
-    """Structured result emitted by worker processes."""
+    """Structured result emitted by worker processes.
+
+    Attributes:
+        doc_id: Document identifier matching manifest entries.
+        status: Conversion outcome (``"success"``, ``"skip"``, or ``"failure"``).
+        duration_s: Time in seconds spent converting.
+        input_path: Source HTML path recorded for auditing.
+        input_hash: Content hash captured prior to conversion.
+        output_path: Destination DocTags path.
+        error: Optional error detail for failures.
+
+    Examples:
+        >>> ConversionResult("doc", "success", 1.0, "in.html", "hash", "out.doctags")
+        ConversionResult(doc_id='doc', status='success', duration_s=1.0, input_path='in.html', input_hash='hash', output_path='out.doctags', error=None)
+    """
 
     doc_id: str
     status: str
@@ -132,13 +177,17 @@ class ConversionResult:
     error: str | None = None
 
 
-def _get_converter() -> DocumentConverter:
+def _get_converter() -> "DocumentConverter":
     """Instantiate and cache a Docling HTML converter per worker process.
 
     Returns:
         DocumentConverter configured for HTML input, cached for reuse within
         the worker process.
     """
+    from docling.backend.html_backend import HTMLDocumentBackend
+    from docling.datamodel.base_models import InputFormat
+    from docling.document_converter import DocumentConverter, HTMLFormatOption
+
     global _CONVERTER
     if _CONVERTER is None:
         _CONVERTER = DocumentConverter(
@@ -165,7 +214,17 @@ def list_htmls(root: Path) -> List[Path]:
 
 
 def convert_one(task: HtmlTask) -> ConversionResult:
-    """Convert a single HTML file to DocTags, honoring overwrite semantics."""
+    """Convert a single HTML file to DocTags, honoring overwrite semantics.
+
+    Args:
+        task: Conversion details including paths, hash, and overwrite policy.
+
+    Returns:
+        :class:`ConversionResult` capturing the conversion status.
+
+    Raises:
+        ValueError: Propagated when Docling validation fails prior to internal handling.
+    """
 
     start = time.perf_counter()
     try:
@@ -218,7 +277,14 @@ def convert_one(task: HtmlTask) -> ConversionResult:
 
 
 def main(args: argparse.Namespace | None = None) -> int:
-    """Entrypoint for parallel HTML-to-DocTags conversion across a dataset."""
+    """Entrypoint for parallel HTML-to-DocTags conversion across a dataset.
+
+    Args:
+        args: Optional pre-parsed CLI namespace to override command-line inputs.
+
+    Returns:
+        Process exit code, where ``0`` denotes success.
+    """
 
     import multiprocessing as mp
 
@@ -335,7 +401,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 input_hash=input_hash,
                 overwrite=args.overwrite,
             )
-            )
+        )
 
     if not tasks:
         _LOGGER.info(
