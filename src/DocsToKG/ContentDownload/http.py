@@ -117,11 +117,22 @@ def request_with_retries(
     if retry_statuses is None:
         retry_statuses = {429, 500, 502, 503, 504}
 
+    request_func = getattr(session, "request", None)
+    if not callable(request_func):
+        fallback = getattr(session, method.lower(), None)
+        if not callable(fallback):
+            raise AttributeError(
+                f"Session object of type {type(session)!r} lacks 'request' and '{method.lower()}' callables"
+            )
+
+        def request_func(*, method: str, url: str, **call_kwargs: Any) -> requests.Response:
+            return fallback(url, **call_kwargs)
+
     last_exception: Optional[Exception] = None
 
     for attempt in range(max_retries + 1):
         try:
-            response = session.request(method=method, url=url, **kwargs)
+            response = request_func(method=method, url=url, **kwargs)
 
             if response.status_code not in retry_statuses:
                 return response

@@ -149,6 +149,10 @@ Dictionary containing index configuration and diagnostics.
 
 *No documentation available.*
 
+### `replicate_to_all_gpus(self, index)`
+
+*No documentation available.*
+
 ### `_maybe_to_gpu(self, index)`
 
 *No documentation available.*
@@ -161,7 +165,7 @@ Dictionary containing index configuration and diagnostics.
 
 *No documentation available.*
 
-### `_apply_search_parameters(self, index)`
+### `_set_nprobe(self)`
 
 *No documentation available.*
 
@@ -187,7 +191,7 @@ config: Dense index configuration supplying the default device.
 Returns:
 int: GPU device identifier to use for FAISS operations.
 
-### `_init_gpu_resources(self)`
+### `init_gpu(self)`
 
 *No documentation available.*
 

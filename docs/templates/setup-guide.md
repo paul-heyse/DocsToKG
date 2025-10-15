@@ -253,8 +253,8 @@ To remove this installation:
 ## 12. Related Documentation
 
 - Add links to complementary setup guides or architecture docs
-- [Link to architecture documentation](../03-architecture/)
-- [Link to operations guide](../06-operations/)
+- [Link to architecture documentation](../03-architecture/index.md)
+- [Link to operations guide](../06-operations/index.md)
 
 ## 13. Version History
 

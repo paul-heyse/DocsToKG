@@ -74,3 +74,7 @@ The helper is thread-safe provided the supplied ``session`` can be used
 safely across threads. Standard :class:`requests.Session` instances are
 generally safe for concurrent reads when configured with connection
 pooling adapters.
+
+### `request_func()`
+
+*No documentation available.*

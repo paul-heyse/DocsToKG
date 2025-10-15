@@ -359,7 +359,6 @@ class FaissIndexManager:
                 base = faiss.downcast_index(base)
             except Exception:  # pragma: no cover - best effort introspection
                 pass
-        device = self._detect_device(self._index)
         stats: Dict[str, float | str] = {
             "ntotal": float(self.ntotal),
             "index_type": self._config.index_type,
@@ -367,125 +366,179 @@ class FaissIndexManager:
             "nprobe": float(getattr(self._config, "nprobe", 0)),
             "pq_m": float(getattr(self._config, "pq_m", 0)),
             "pq_bits": float(getattr(self._config, "pq_bits", 0)),
-            "device": "*" if device is None else str(device),
             "gpu_remove_fallbacks": float(self._remove_fallbacks),
             "multi_gpu_mode": self._multi_gpu_mode,
             "gpu_indices_32_bit": bool(self._indices_32_bit and not self._force_64bit_ids),
+            "gpu_device": str(getattr(self._config, "device", 0)),
         }
         if self._temp_memory_bytes is not None:
             stats["gpu_temp_memory_bytes"] = float(self._temp_memory_bytes)
-        stats["gpu_base"] = "Gpu" in type(base).__name__
-        if device is not None:
-            stats["gpu_device"] = str(device)
-            resources = self._gpu_resources
-            if resources is not None and hasattr(resources, "getMemoryInfo"):
-                try:
+        try:
+            stats["gpu_base"] = "GpuIndex" in type(base).__name__
+            device = self._detect_device(self._index)
+            if device is not None:
+                stats["gpu_device"] = str(device)
+                resources = self._gpu_resources
+                if resources is not None and hasattr(resources, "getMemoryInfo"):
                     free, total = resources.getMemoryInfo(device)
                     stats["gpu_mem_free"] = float(free)
                     stats["gpu_mem_total"] = float(total)
-                except Exception:  # pragma: no cover - not all builds expose memory info
-                    logger.debug("FAISS GPU memory info unavailable", exc_info=True)
+            stats["dirty_deletes"] = float(getattr(self, "_dirty_deletes", 0))
+        except Exception:  # pragma: no cover - diagnostic only
+            logger.debug("Unable to gather complete FAISS stats", exc_info=True)
         return stats
 
     def _create_index(self) -> "faiss.Index":
-        if self._multi_gpu_mode == "replicate":
-            metric = faiss.METRIC_INNER_PRODUCT
-            spec_map = {
-                "flat": "Flat",
-                "ivf_flat": f"IVF{int(self._config.nlist)},Flat",
-                "ivf_pq": f"IVF{int(self._config.nlist)},PQ{int(self._config.pq_m)}x{int(self._config.pq_bits)}",
-            }
-            try:
-                spec = spec_map[self._config.index_type]
-            except KeyError as exc:
-                raise ValueError(
-                    f"Unsupported FAISS index type: {self._config.index_type}"
-                ) from exc
-            cpu_index = faiss.index_factory(self._dim, spec, metric)
-            mapped = faiss.IndexIDMap2(cpu_index)
-            gpu_index = self._maybe_to_gpu(mapped)
-            self._maybe_reserve_memory(gpu_index)
-            return gpu_index
+        self.init_gpu()
+        if self._gpu_resources is None:
+            raise RuntimeError("GPU resources must be initialised before index creation")
+        metric = faiss.METRIC_INNER_PRODUCT
+        dev = int(self._device)
+        index_type = self._config.index_type
 
-        try:
-            index = gpu_index_factory(
-                self._dim,
-                index_type=self._config.index_type,
-                nlist=int(self._config.nlist),
-                nprobe=int(self._config.nprobe),
-                pq_m=int(self._config.pq_m),
-                pq_bits=int(self._config.pq_bits),
-                resources=self._gpu_resources,
-                opts=self._gpu_opts,
-            )
-        except ValueError as exc:
-            raise ValueError(f"Unsupported FAISS index type: {self._config.index_type}") from exc
+        if index_type == "flat":
+            cfg = faiss.GpuIndexFlatConfig() if hasattr(faiss, "GpuIndexFlatConfig") else None
+            if cfg is not None:
+                cfg.device = dev
+                if hasattr(cfg, "useFloat16"):
+                    cfg.useFloat16 = bool(getattr(self._config, "flat_use_fp16", False))
+                base = faiss.GpuIndexFlatIP(self._gpu_resources, self._dim, cfg)
+            else:
+                base = faiss.GpuIndexFlatIP(self._gpu_resources, self._dim)
+            index: "faiss.Index" = faiss.IndexIDMap2(base)
+        elif index_type == "ivf_flat":
+            quantizer = faiss.GpuIndexFlatIP(self._gpu_resources, self._dim)
+            cfg = faiss.GpuIndexIVFFlatConfig() if hasattr(faiss, "GpuIndexIVFFlatConfig") else None
+            if cfg is not None:
+                cfg.device = dev
+                if hasattr(cfg, "interleavedLayout"):
+                    cfg.interleavedLayout = bool(getattr(self._config, "interleaved_layout", True))
+                base = faiss.GpuIndexIVFFlat(
+                    self._gpu_resources,
+                    quantizer,
+                    self._dim,
+                    int(self._config.nlist),
+                    metric,
+                    cfg,
+                )
+            else:
+                base = faiss.GpuIndexIVFFlat(
+                    self._gpu_resources,
+                    quantizer,
+                    self._dim,
+                    int(self._config.nlist),
+                    metric,
+                )
+            base.nprobe = int(self._config.nprobe)
+            index = faiss.IndexIDMap2(base)
+        elif index_type == "ivf_pq":
+            cfg = faiss.GpuIndexIVFPQConfig() if hasattr(faiss, "GpuIndexIVFPQConfig") else None
+            if cfg is not None:
+                cfg.device = dev
+                if hasattr(cfg, "interleavedLayout"):
+                    cfg.interleavedLayout = bool(getattr(self._config, "interleaved_layout", True))
+                if hasattr(cfg, "usePrecomputedTables"):
+                    cfg.usePrecomputedTables = bool(
+                        getattr(self._config, "ivfpq_use_precomputed", True)
+                    )
+                if hasattr(cfg, "useFloat16LookupTables"):
+                    cfg.useFloat16LookupTables = bool(
+                        getattr(self._config, "ivfpq_float16_lut", True)
+                    )
+                base = faiss.GpuIndexIVFPQ(
+                    self._gpu_resources,
+                    self._dim,
+                    int(self._config.nlist),
+                    int(self._config.pq_m),
+                    int(self._config.pq_bits),
+                    metric,
+                    cfg,
+                )
+            else:
+                base = faiss.GpuIndexIVFPQ(
+                    self._gpu_resources,
+                    self._dim,
+                    int(self._config.nlist),
+                    int(self._config.pq_m),
+                    int(self._config.pq_bits),
+                    metric,
+                )
+            base.nprobe = int(self._config.nprobe)
+            index = faiss.IndexIDMap2(base)
+        else:
+            raise ValueError(f"Unsupported index_type: {index_type}")
+
         self._maybe_reserve_memory(index)
+        if self._multi_gpu_mode == "replicate":
+            index = self.replicate_to_all_gpus(index)
+
         return index
 
-    def _maybe_to_gpu(self, index: "faiss.Index") -> "faiss.Index":
-        if self._multi_gpu_mode == "replicate":
-            if not hasattr(faiss, "index_cpu_to_all_gpus"):
-                raise RuntimeError(
-                    "FAISS missing index_cpu_to_all_gpus; multi_gpu_mode='replicate' unavailable"
-                )
-            try:
-                cloner = (
-                    faiss.GpuMultipleClonerOptions()
-                    if hasattr(faiss, "GpuMultipleClonerOptions")
-                    else None
-                )
-                if cloner is not None:
-                    cloner.shard = False
-                    cloner.verbose = True
-                    cloner.allowCpuCoarseQuantizer = False
-                    if (
-                        hasattr(cloner, "indicesOptions")
-                        and self._indices_32_bit
-                        and not self._force_64bit_ids
-                        and hasattr(faiss, "INDICES_32_BIT")
-                    ):
-                        cloner.indicesOptions = faiss.INDICES_32_BIT
-                    if hasattr(cloner, "usePrecomputed"):
-                        cloner.usePrecomputed = bool(
-                            getattr(self._config, "ivfpq_use_precomputed", True)
-                            if self._config.index_type == "ivf_pq"
-                            else False
-                        )
-                    if hasattr(cloner, "useFloat16"):
-                        cloner.useFloat16 = bool(
-                            getattr(self._config, "ivfpq_float16_lut", True)
-                            if self._config.index_type == "ivf_pq"
-                            else False
-                        )
-                    if hasattr(cloner, "useFloat16CoarseQuantizer"):
-                        cloner.useFloat16CoarseQuantizer = False
-                gpu_index = faiss.index_cpu_to_all_gpus(index, co=cloner)
-            except Exception as exc:  # pragma: no cover - hardware specific failure
-                raise RuntimeError(
-                    "Failed to replicate FAISS index across GPUs "
-                    f"(index type={type(index).__name__}): {exc}"
-                ) from exc
-            logger.info("FAISS index replicated across available GPUs")
-            self._replicated = True
-            return gpu_index
+    def replicate_to_all_gpus(self, index: "faiss.Index | None" = None) -> "faiss.Index":
+        if not hasattr(faiss, "index_cpu_to_all_gpus"):
+            raise RuntimeError("FAISS build does not support multi-GPU replication")
+        target = index or getattr(self, "_index", None)
+        if target is None:
+            raise RuntimeError("No FAISS index available to replicate")
+        base = getattr(target, "index", None) or target
+        if "GpuIndex" in type(base).__name__ and hasattr(faiss, "index_gpu_to_cpu"):
+            cpu = faiss.index_gpu_to_cpu(target)
+        else:
+            cpu = target
+        co = (
+            faiss.GpuMultipleClonerOptions()
+            if hasattr(faiss, "GpuMultipleClonerOptions")
+            else None
+        )
+        if co is not None:
+            co.shard = False
+            co.verbose = True
+            co.allowCpuCoarseQuantizer = False
+            if (
+                not self._force_64bit_ids
+                and self._indices_32_bit
+                and hasattr(faiss, "INDICES_32_BIT")
+            ):
+                co.indicesOptions = faiss.INDICES_32_BIT
+        replicated = faiss.index_cpu_to_all_gpus(cpu, co=co)
+        self._replicated = True
+        return replicated
 
+    def _maybe_to_gpu(self, index: "faiss.Index") -> "faiss.Index":
+        self.init_gpu()
         if self._gpu_resources is None:
             raise RuntimeError("GPU resources are not initialised")
+        device = int(self._device)
         try:
-            gpu_index = maybe_clone_to_gpu(
-                index,
-                device=self._device,
-                resources=self._gpu_resources,
-                indices_32_bits=self._indices_32_bit and not self._force_64bit_ids,
+            if hasattr(faiss, "GpuClonerOptions"):
+                co = faiss.GpuClonerOptions()
+                co.device = device
+                co.verbose = True
+                co.allowCpuCoarseQuantizer = False
+                if (
+                    not self._force_64bit_ids
+                    and self._indices_32_bit
+                    and hasattr(faiss, "INDICES_32_BIT")
+                ):
+                    co.indicesOptions = faiss.INDICES_32_BIT
+                return (
+                    self.replicate_to_all_gpus(
+                        faiss.index_cpu_to_gpu(self._gpu_resources, device, index, co)
+                    )
+                    if self._multi_gpu_mode == "replicate"
+                    else faiss.index_cpu_to_gpu(self._gpu_resources, device, index, co)
+                )
+            cloned = faiss.index_cpu_to_gpu(self._gpu_resources, device, index)
+            return (
+                self.replicate_to_all_gpus(cloned)
+                if self._multi_gpu_mode == "replicate"
+                else cloned
             )
         except Exception as exc:  # pragma: no cover - hardware specific failure
             raise RuntimeError(
                 "Failed to promote FAISS index to GPU "
-                f"(index type={type(index).__name__}, device={self._device}): {exc}"
+                f"(index type={type(index).__name__}, device={device}): {exc}"
             ) from exc
-        logger.info("FAISS index promoted to GPU")
-        return gpu_index
 
     def _maybe_reserve_memory(self, index: "faiss.Index") -> None:
         expected = self._expected_ntotal
@@ -508,53 +561,41 @@ class FaissIndexManager:
                 )
 
     def _to_cpu(self, index: "faiss.Index") -> "faiss.Index":
-        if hasattr(faiss, "index_gpu_to_cpu"):
-            try:
-                return faiss.index_gpu_to_cpu(index)
-            except Exception as exc:  # pragma: no cover - hardware specific failure
-                raise RuntimeError(
-                    f"Unable to transfer FAISS index from GPU to CPU for serialization: {exc}"
-                ) from exc
-        raise RuntimeError(
-            "FAISS index_gpu_to_cpu is unavailable; install faiss-gpu>=1.7.4 with GPU support."
-        )
+        base = getattr(index, "index", None) or index
+        if "GpuIndex" not in type(base).__name__:
+            return index
+        if not hasattr(faiss, "index_gpu_to_cpu"):
+            raise RuntimeError(
+                "FAISS index_gpu_to_cpu is unavailable; install faiss-gpu>=1.7.4 with GPU support."
+            )
+        try:
+            return faiss.index_gpu_to_cpu(index)
+        except Exception as exc:  # pragma: no cover - hardware specific failure
+            raise RuntimeError(
+                f"Unable to transfer FAISS index from GPU to CPU for serialization: {exc}"
+            ) from exc
 
-    def _apply_search_parameters(self, index: "faiss.Index | None") -> None:
-        if index is None:
+    def _set_nprobe(self) -> None:
+        index = getattr(self, "_index", None)
+        if index is None or not self._config.index_type.startswith("ivf"):
             return
-
-        if self._config.index_type.startswith("ivf"):
-            nprobe = int(self._config.nprobe)
-            base = index.index if hasattr(index, "index") else index
-            if hasattr(base, "nprobe"):
-                try:
-                    base.nprobe = nprobe
-                    self._log_index_configuration(index)
-                    return
-                except Exception:  # pragma: no cover - parameter guard
-                    logger.debug("Unable to set nprobe directly on FAISS index", exc_info=True)
-            handled = False
+        nprobe = int(self._config.nprobe)
+        try:
             if hasattr(faiss, "GpuParameterSpace"):
-                try:
-                    faiss.GpuParameterSpace().set_index_parameter(index, "nprobe", nprobe)
-                    handled = True
-                except Exception:  # pragma: no cover - GPU parameter guard
-                    logger.debug("Unable to set nprobe via GpuParameterSpace", exc_info=True)
-                    handled = False
-            if not handled and hasattr(faiss, "ParameterSpace"):
-                try:
-                    space = faiss.ParameterSpace()
-                    space.set_index_parameter(index, "nprobe", nprobe)
-                    handled = True
-                except Exception:  # pragma: no cover - parameter guard
-                    logger.debug("Unable to set nprobe via ParameterSpace", exc_info=True)
-                    handled = False
-            if not handled:
-                raise RuntimeError(
-                    "Unable to configure FAISS nprobe parameter on IVF index; "
-                    "confirm faiss-gpu is fully installed and the index type supports nprobe."
-                )
-
+                gps = faiss.GpuParameterSpace()
+                gps.set_index_parameter(index, "nprobe", nprobe)
+                self._log_index_configuration(index)
+                return
+        except Exception:  # pragma: no cover - defensive guard
+            logger.debug("Unable to set nprobe via GpuParameterSpace", exc_info=True)
+        base = getattr(index, "index", None) or index
+        try:
+            if hasattr(base, "nprobe"):
+                base.nprobe = nprobe
+            elif hasattr(index, "nprobe"):
+                index.nprobe = nprobe
+        except Exception:  # pragma: no cover - defensive guard
+            logger.debug("Unable to set nprobe attribute on FAISS index", exc_info=True)
         self._log_index_configuration(index)
 
     def _log_index_configuration(self, index: "faiss.Index") -> None:
@@ -616,7 +657,9 @@ class FaissIndexManager:
                 )
         return int(getattr(config, "device", 0))
 
-    def _init_gpu_resources(self) -> "faiss.StandardGpuResources":
+    def init_gpu(self) -> None:
+        if self._gpu_resources is not None:
+            return
         if not hasattr(faiss, "StandardGpuResources"):
             raise RuntimeError(
                 "FAISS GPU resources are unavailable; ensure faiss-gpu is installed with CUDA support."
@@ -626,9 +669,10 @@ class FaissIndexManager:
                 num_gpus = int(faiss.get_num_gpus())
             except Exception as exc:  # pragma: no cover - hardware query failure
                 raise RuntimeError("Unable to enumerate FAISS GPUs") from exc
-            if num_gpus <= self._device:
+            device = int(self._device)
+            if num_gpus <= device:
                 raise RuntimeError(
-                    f"Requested GPU device {self._device} but only {num_gpus} device(s) visible"
+                    f"Requested GPU device {device} but only {num_gpus} device(s) visible"
                 )
         try:
             resources = faiss.StandardGpuResources()
@@ -645,7 +689,7 @@ class FaissIndexManager:
                     extra={"event": {"requested_bytes": self._temp_memory_bytes}},
                     exc_info=True,
                 )
-        return resources
+        self._gpu_resources = resources
 
     def _ensure_dim(self, vector: np.ndarray) -> np.ndarray:
         if vector.shape != (self._dim,):
