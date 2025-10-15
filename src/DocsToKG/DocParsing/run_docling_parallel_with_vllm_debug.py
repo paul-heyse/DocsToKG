@@ -17,6 +17,7 @@ import sys
 import threading
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -24,11 +25,15 @@ import requests
 from tqdm import tqdm
 
 from DocsToKG.DocParsing._common import (
+    compute_content_hash,
     data_doctags,
+    data_manifests,
     data_pdfs,
     detect_data_root,
     find_free_port,
     get_logger,
+    load_manifest_index,
+    manifest_append,
 )
 
 
@@ -36,6 +41,7 @@ from DocsToKG.DocParsing._common import (
 DEFAULT_DATA_ROOT = detect_data_root()
 DEFAULT_INPUT = data_pdfs(DEFAULT_DATA_ROOT)
 DEFAULT_OUTPUT = data_doctags(DEFAULT_DATA_ROOT)
+MANIFEST_STAGE = "doctags-pdf"
 
 
 def parse_args() -> argparse.Namespace:
@@ -63,6 +69,22 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_OUTPUT,
         help="Folder for Doctags output.",
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=DEFAULT_WORKERS,
+        help="Parallel workers for PDF conversion",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip PDFs whose DocTags already exist with matching content hash",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force reprocessing even when resume criteria are satisfied",
+    )
     return parser.parse_args()
 
 MODEL_PATH = "/home/paul/hf-cache/granite-docling-258M"  # local untied snapshot
@@ -83,6 +105,31 @@ ARTIFACTS = os.environ.get("DOCLING_ARTIFACTS_PATH", "")
 
 
 # -------- Utilities --------
+@dataclass
+class PdfTask:
+    """Work item representing a single PDF conversion request."""
+
+    pdf_path: Path
+    output_dir: Path
+    port: int
+    input_hash: str
+    doc_id: str
+    output_path: Path
+
+
+@dataclass
+class PdfConversionResult:
+    """Structured result returned by worker processes."""
+
+    doc_id: str
+    status: str
+    duration_s: float
+    input_path: str
+    input_hash: str
+    output_path: str
+    error: Optional[str] = None
+
+
 def port_is_free(port: int) -> bool:
     """Determine whether a TCP port on localhost is currently available.
 
@@ -320,17 +367,15 @@ def list_pdfs(root: Path) -> List[Path]:
 
 
 # -------- Docling worker --------
-def convert_one(args):
-    """Convert a single PDF into DocTags using a remote vLLM-backed pipeline.
+def convert_one(task: PdfTask) -> PdfConversionResult:
+    """Convert a single PDF into DocTags using a remote vLLM-backed pipeline."""
 
-    Args:
-        args: Tuple containing `(pdf_path, output_dir, port)` for the work item.
+    start = time.perf_counter()
+    pdf_path = task.pdf_path
+    out_dir = task.output_dir
+    port = task.port
+    out_path = task.output_path
 
-    Returns:
-        Tuple of `(pdf_name, status)` where status is one of `ok`, `skip`, or a
-        `fail:<reason>` string describing the conversion issue.
-    """
-    pdf_path, out_dir, port = args
     try:
         from docling.backend.docling_parse_v4_backend import DoclingParseV4DocumentBackend
         from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
@@ -343,9 +388,15 @@ def convert_one(args):
         from docling.pipeline.vlm_pipeline import VlmPipeline
 
         out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / (pdf_path.stem + ".doctags")
         if out_path.exists():
-            return (pdf_path.name, "skip")
+            return PdfConversionResult(
+                doc_id=task.doc_id,
+                status="skip",
+                duration_s=0.0,
+                input_path=str(pdf_path),
+                input_hash=task.input_hash,
+                output_path=str(out_path),
+            )
 
         # Accelerator (use CUDA; keep CPU thread count small per worker)
         accel = AcceleratorOptions(num_threads=2, device=AcceleratorDevice.CUDA)
@@ -399,15 +450,46 @@ def convert_one(args):
             detail = f"status={getattr(result.status, 'value', result.status)}"
             if err_msgs:
                 detail += " " + "; ".join(err_msgs)
-            return (pdf_path.name, f"fail:{detail}")
+            return PdfConversionResult(
+                doc_id=task.doc_id,
+                status="failure",
+                duration_s=time.perf_counter() - start,
+                input_path=str(pdf_path),
+                input_hash=task.input_hash,
+                output_path=str(out_path),
+                error=detail,
+            )
 
         if result.document is None:
-            return (pdf_path.name, "fail:empty-document")
+            return PdfConversionResult(
+                doc_id=task.doc_id,
+                status="failure",
+                duration_s=time.perf_counter() - start,
+                input_path=str(pdf_path),
+                input_hash=task.input_hash,
+                output_path=str(out_path),
+                error="empty-document",
+            )
 
         result.document.save_as_doctags(out_path)
-        return (pdf_path.name, "ok")
-    except Exception as e:
-        return (pdf_path.name, f"fail:{e}")
+        return PdfConversionResult(
+            doc_id=task.doc_id,
+            status="success",
+            duration_s=time.perf_counter() - start,
+            input_path=str(pdf_path),
+            input_hash=task.input_hash,
+            output_path=str(out_path),
+        )
+    except Exception as exc:  # pragma: no cover - exercised during integration runs
+        return PdfConversionResult(
+            doc_id=task.doc_id,
+            status="failure",
+            duration_s=time.perf_counter() - start,
+            input_path=str(pdf_path),
+            input_hash=task.input_hash,
+            output_path=str(out_path),
+            error=str(exc),
+        )
 
 
 # -------- Main --------
@@ -457,6 +539,11 @@ def main():
         else DEFAULT_DATA_ROOT
     )
 
+    if data_root_override is not None:
+        os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved_root)
+
+    data_manifests(resolved_root)
+
     if args.input == DEFAULT_INPUT and data_root_override is not None:
         input_dir = data_pdfs(resolved_root)
     else:
@@ -482,6 +569,11 @@ def main():
         },
     )
 
+    if args.force:
+        logger.info("Force mode: reprocessing all documents")
+    elif args.resume:
+        logger.info("Resume mode enabled: unchanged outputs will be skipped")
+
     port, proc, owns = ensure_vllm(PREFERRED_PORT)
     logger.info(
         "vLLM server ready",
@@ -502,25 +594,83 @@ def main():
             )
             return
 
+        manifest_index = (
+            load_manifest_index(MANIFEST_STAGE, resolved_root) if args.resume else {}
+        )
+
+        workers = max(1, int(args.workers))
         logger.info(
             "Launching workers",
             extra={
                 "extra_fields": {
                     "pdf_count": len(pdfs),
-                    "workers": DEFAULT_WORKERS,
+                    "workers": workers,
                 }
             },
         )
-        tasks = [(p, output_dir, port) for p in pdfs]
+
+        tasks: List[PdfTask] = []
         ok = fail = skip = 0
-        with ProcessPoolExecutor(max_workers=DEFAULT_WORKERS) as ex:
-            futures = [ex.submit(convert_one, t) for t in tasks]
+        for pdf_path in pdfs:
+            doc_id = pdf_path.relative_to(input_dir).as_posix()
+            out_path = output_dir / (pdf_path.stem + ".doctags")
+            input_hash = compute_content_hash(pdf_path)
+            manifest_entry = manifest_index.get(doc_id)
+            if (
+                args.resume
+                and not args.force
+                and out_path.exists()
+                and manifest_entry
+                and manifest_entry.get("input_hash") == input_hash
+            ):
+                logger.info(
+                    "Skipping %s: output exists and input unchanged", doc_id
+                )
+                manifest_append(
+                    stage=MANIFEST_STAGE,
+                    doc_id=doc_id,
+                    status="skip",
+                    duration_s=0.0,
+                    schema_version="docparse/1.1.0",
+                    input_path=str(pdf_path),
+                    input_hash=input_hash,
+                    output_path=str(out_path),
+                )
+                skip += 1
+                continue
+
+            tasks.append(
+                PdfTask(
+                    pdf_path=pdf_path,
+                    output_dir=output_dir,
+                    port=port,
+                    input_hash=input_hash,
+                    doc_id=doc_id,
+                    output_path=out_path,
+                )
+            )
+
+        if not tasks:
+            logger.info(
+                "Conversion summary",
+                extra={
+                    "extra_fields": {
+                        "ok": 0,
+                        "skip": skip,
+                        "fail": 0,
+                    }
+                },
+            )
+            return
+
+        with ProcessPoolExecutor(max_workers=workers) as ex:
+            futures = [ex.submit(convert_one, task) for task in tasks]
             with tqdm(total=len(futures), desc="Converting PDFs", unit="file") as pbar:
                 for fut in as_completed(futures):
-                    name, status = fut.result()
-                    if status == "ok":
+                    result = fut.result()
+                    if result.status == "success":
                         ok += 1
-                    elif status == "skip":
+                    elif result.status == "skip":
                         skip += 1
                     else:
                         fail += 1
@@ -528,11 +678,24 @@ def main():
                             "Conversion failed",
                             extra={
                                 "extra_fields": {
-                                    "doc_id": name,
-                                    "status": status,
+                                    "doc_id": result.doc_id,
+                                    "error": result.error or "unknown",
                                 }
                             },
                         )
+
+                    manifest_append(
+                        stage=MANIFEST_STAGE,
+                        doc_id=result.doc_id,
+                        status=result.status,
+                        duration_s=round(result.duration_s, 3),
+                        schema_version="docparse/1.1.0",
+                        input_path=result.input_path,
+                        input_hash=result.input_hash,
+                        output_path=result.output_path,
+                        error=result.error,
+                    )
+
                     pbar.update(1)
 
         logger.info(

@@ -1,0 +1,42 @@
+{
+  "hits": {
+    "hits": [
+      {
+        "id": "1234567",
+        "doi": "10.5281/zenodo.1234567",
+        "metadata": {
+          "title": "Sample Research Data",
+          "publication_date": "2024-01-15",
+          "creators": [{"name": "Researcher, Jane"}]
+        },
+        "files": [
+          {
+            "key": "dataset.csv",
+            "type": "csv",
+            "size": 1048576,
+            "links": {
+              "self": "https://zenodo.org/api/files/abc123/dataset.csv"
+            }
+          },
+          {
+            "key": "paper.pdf",
+            "type": "pdf",
+            "size": 524288,
+            "links": {
+              "self": "https://zenodo.org/api/files/abc123/paper.pdf"
+            }
+          },
+          {
+            "key": "figures.zip",
+            "type": "zip",
+            "size": 2097152,
+            "links": {
+              "self": "https://zenodo.org/api/files/abc123/figures.zip"
+            }
+          }
+        ]
+      }
+    ],
+    "total": 1
+  }
+}

@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import base64
-import json
 import logging
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Sequence
+from pathlib import Path
+from typing import Callable, List, Optional, Sequence
 
 import numpy as np
 
@@ -22,7 +21,6 @@ try:  # pragma: no cover - exercised indirectly via integration tests
         hasattr(faiss, attr)
         for attr in (
             "GpuIndexFlatIP",
-            "IndexFlatIP",
             "IndexIDMap2",
             "index_factory",
             "index_cpu_to_gpu",
@@ -90,11 +88,9 @@ class FaissIndexManager:
         self._gpu_resources: Optional["faiss.StandardGpuResources"] = None
         self.init_gpu()
         self._index = self._create_index()
-        self._vectors: Dict[str, np.ndarray] = {}
         self._id_resolver: Optional[Callable[[int], Optional[str]]] = None
-        self._use_native = True  # Backwards compat for older tests expecting this flag
         self._remove_fallbacks = 0
-        self._pending_delete_ids: list[np.ndarray] = []
+        self._tombstones: set[int] = set()
         self._dirty_deletes = 0
         self._needs_rebuild = False
         self._set_nprobe()
@@ -213,12 +209,10 @@ class FaissIndexManager:
             raise ValueError("vectors and vector_ids must align")
         if not vectors:
             return
-        existing_ids = [vector_id for vector_id in vector_ids if vector_id in self._vectors]
-        if existing_ids:
-            for vector_id in existing_ids:
-                self._vectors.pop(vector_id, None)
-            ids = np.array([vector_uuid_to_faiss_int(vid) for vid in existing_ids], dtype=np.int64)
-            self._remove_ids(ids)
+        faiss_ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
+        existing_ids = self._lookup_existing_ids(faiss_ids)
+        if existing_ids.size:
+            self.remove_ids(existing_ids, force_flush=True)
         matrix = np.ascontiguousarray(
             np.stack([self._ensure_dim(vec) for vec in vectors]), dtype=np.float32
         )
@@ -235,13 +229,9 @@ class FaissIndexManager:
             oversample = max(1, int(getattr(self._config, "oversample", 2)))
             ntrain = min(matrix.shape[0], nlist * oversample)
             train_target.train(matrix[:ntrain])
-        ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
-        self._index.add_with_ids(matrix, ids)
-        self._pending_delete_ids.clear()
+        self._index.add_with_ids(matrix, faiss_ids)
         self._dirty_deletes = 0
         self._needs_rebuild = False
-        for row, vector_id in zip(matrix, vector_ids):
-            self._vectors[vector_id] = row.copy()
 
     def remove(self, vector_ids: Sequence[str]) -> None:
         """Remove vectors from FAISS and the in-memory cache by vector UUID.
@@ -255,8 +245,6 @@ class FaissIndexManager:
         if not vector_ids:
             return
         ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
-        for vector_id in vector_ids:
-            self._vectors.pop(vector_id, None)
         self.remove_ids(ids, force_flush=True)
 
     def remove_ids(self, ids: np.ndarray, *, force_flush: bool = False) -> int:
@@ -276,6 +264,18 @@ class FaissIndexManager:
         self._remove_ids(ids64)
         self._flush_pending_deletes(force=force_flush)
         return int(ids64.size)
+
+    def _current_index_ids(self) -> np.ndarray:
+        if self._index is None or self._index.ntotal == 0:
+            return np.empty(0, dtype=np.int64)
+        return np.asarray(faiss.vector_to_array(self._index.id_map), dtype=np.int64)
+
+    def _lookup_existing_ids(self, candidate_ids: np.ndarray) -> np.ndarray:
+        if candidate_ids.size == 0 or self._index.ntotal == 0:
+            return np.empty(0, dtype=np.int64)
+        current_ids = self._current_index_ids()
+        mask = np.isin(current_ids, candidate_ids)
+        return current_ids[mask]
 
     def search(self, query: np.ndarray, top_k: int) -> List[FaissSearchResult]:
         """Execute a cosine-similarity search returning the best `top_k` results.
@@ -305,23 +305,13 @@ class FaissIndexManager:
         return results
 
     def serialize(self) -> bytes:
-        """Serialize the FAISS index and cached vectors for persistence.
+        """Serialize the FAISS index to bytes."""
 
-        Args:
-            None
-
-        Returns:
-            Bytes object containing serialized index and vector cache.
-        """
-        payload = {
-            "mode": "vectors_only_v1",
-            "index_type": self._config.index_type,
-            "vectors": {
-                vector_id: base64.b64encode(vector.tobytes()).decode("ascii")
-                for vector_id, vector in self._vectors.items()
-            },
-        }
-        return json.dumps(payload).encode("utf-8")
+        if self._index is None:
+            raise RuntimeError("index is empty")
+        cpu_index = self._to_cpu(self._index)
+        blob = faiss.serialize_index(cpu_index)
+        return bytes(blob)
 
     def save(self, path: str) -> None:
         """Persist the FAISS index to disk without CPU fallbacks.
@@ -338,11 +328,11 @@ class FaissIndexManager:
 
         if self._index is None:
             raise RuntimeError("index is empty")
-        # NOTE: Current FAISS wheel lacks write_index hooks for GPU-backed ID maps; if a future
-        # rebuild exposes that functionality we can switch, but treat it as TBD for now.
-        serialized = self.serialize()
-        with open(path, "wb") as handle:
-            handle.write(serialized)
+        # NOTE: FAISS disk writer APIs are intentionally NOT used because the GPU wheel
+        # lacks writer hooks for GPU-backed IndexIDMap2 layouts. Byte serialization is canonical.
+        destination = Path(path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(self.serialize())
 
     @classmethod
     def load(cls, path: str, config: DenseIndexConfig, dim: int) -> "FaissIndexManager":
@@ -360,10 +350,9 @@ class FaissIndexManager:
             RuntimeError: If the FAISS index cannot be read or promoted to GPU memory.
         """
 
-        with open(path, "rb") as handle:
-            payload = handle.read()
+        blob = Path(path).read_bytes()
         manager = cls(dim=dim, config=config)
-        manager.restore(payload)
+        manager.restore(blob)
         return manager
 
     def restore(self, payload: bytes) -> None:
@@ -378,65 +367,13 @@ class FaissIndexManager:
         Raises:
             ValueError: If the payload is invalid or incompatible.
         """
-        try:
-            data = json.loads(payload.decode("utf-8"))
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            raise ValueError("Invalid FAISS payload") from exc
-
-        mode = data.get("mode")
-
-        vectors_blob = data.get("vectors", {})
-        restored: Dict[str, np.ndarray] = {}
-        if isinstance(vectors_blob, dict):
-            for vector_id, encoded in vectors_blob.items():
-                try:
-                    raw = base64.b64decode(str(encoded))
-                except Exception as exc:
-                    raise ValueError("Invalid FAISS vector payload") from exc
-                vector = np.frombuffer(raw, dtype=np.float32)
-                if vector.size != self._dim:
-                    raise ValueError("Invalid FAISS vector dimension in payload")
-                restored[vector_id] = vector.copy()
-        self._vectors = restored
-
-        if mode == "native":
-            encoded = data.get("index")
-            if isinstance(encoded, str):
-                try:
-                    index_bytes = base64.b64decode(encoded.encode("ascii"))
-                    cpu_index = faiss.deserialize_index(np.frombuffer(index_bytes, dtype=np.uint8))
-                    self._index = self._maybe_to_gpu(cpu_index)
-                    self._set_nprobe()
-                    return
-                except Exception:
-                    logger.debug("Falling back to vector rebuild during restore", exc_info=True)
-
-        # Rebuild the GPU index directly from the stored vectors.
-        self._index = self._create_index()
-        self._pending_delete_ids.clear()
+        if not payload:
+            raise ValueError("Empty FAISS payload")
+        cpu_index = faiss.deserialize_index(np.frombuffer(payload, dtype=np.uint8))
+        self._index = self._maybe_to_gpu(cpu_index)
+        self._tombstones.clear()
         self._dirty_deletes = 0
         self._needs_rebuild = False
-        if not restored:
-            self._set_nprobe()
-            return
-        vector_items = list(restored.items())
-        vector_ids = [item[0] for item in vector_items]
-        matrix = np.stack([item[1] for item in vector_items]).astype(np.float32, copy=False)
-        faiss.normalize_L2(matrix)
-        base_index = self._index.index if hasattr(self._index, "index") else self._index
-        train_target = base_index
-        if hasattr(faiss, "downcast_index"):
-            try:
-                train_target = faiss.downcast_index(base_index)
-            except Exception:
-                train_target = base_index
-        if hasattr(train_target, "is_trained") and not getattr(train_target, "is_trained"):
-            nlist = int(getattr(self._config, "nlist", 1024))
-            oversample = max(1, int(getattr(self._config, "oversample", 2)))
-            ntrain = min(matrix.shape[0], nlist * oversample)
-            train_target.train(matrix[:ntrain])
-        ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
-        self._index.add_with_ids(matrix, ids)
         self._set_nprobe()
 
     def stats(self) -> Dict[str, float | str]:
@@ -677,19 +614,14 @@ class FaissIndexManager:
                 )
 
     def _to_cpu(self, index: "faiss.Index") -> "faiss.Index":
-        base = getattr(index, "index", None) or index
-        if "GpuIndex" not in type(base).__name__:
-            return index
         if not hasattr(faiss, "index_gpu_to_cpu"):
             raise RuntimeError(
                 "FAISS index_gpu_to_cpu is unavailable; install faiss-gpu>=1.7.4 with GPU support."
             )
         try:
             return faiss.index_gpu_to_cpu(index)
-        except Exception as exc:  # pragma: no cover - hardware specific failure
-            raise RuntimeError(
-                f"Unable to transfer FAISS index from GPU to CPU for serialization: {exc}"
-            ) from exc
+        except Exception:
+            return index
 
     def _set_nprobe(self) -> None:
         index = getattr(self, "_index", None)
@@ -817,14 +749,14 @@ class FaissIndexManager:
     def _flush_pending_deletes(self, *, force: bool = False) -> None:
         if not self._needs_rebuild and not force:
             return
-        if not self._pending_delete_ids:
+        if not self._tombstones:
             self._dirty_deletes = 0
             self._needs_rebuild = False
             return
         threshold = int(self._rebuild_delete_threshold)
         if force or threshold <= 0 or self._dirty_deletes >= threshold:
             self._rebuild_index()
-            self._pending_delete_ids.clear()
+            self._tombstones.clear()
             self._dirty_deletes = 0
             self._needs_rebuild = False
 
@@ -834,8 +766,6 @@ class FaissIndexManager:
         selector = faiss.IDSelectorBatch(ids.astype(np.int64))
         try:
             removed = int(self._index.remove_ids(selector))
-            if removed >= int(ids.size):
-                return
         except RuntimeError as exc:
             if "remove_ids not implemented" not in str(exc).lower():
                 raise
@@ -843,13 +773,21 @@ class FaissIndexManager:
                 "FAISS remove_ids not implemented on GPU index; scheduling rebuild.",
                 extra={"event": {"ntotal": self.ntotal, "remove_ids_error": str(exc)}},
             )
+            remaining = ids
+        else:
+            if removed >= int(ids.size):
+                return
+            current = self._current_index_ids()
+            remaining = ids[np.isin(ids, current)]
+            if remaining.size == 0:
+                return
         self._remove_fallbacks += 1
-        self._pending_delete_ids.append(ids.astype(np.int64, copy=True))
-        self._dirty_deletes += int(ids.size)
+        self._tombstones.update(int(v) for v in remaining.tolist())
+        self._dirty_deletes += int(remaining.size)
         threshold = int(self._rebuild_delete_threshold)
         if threshold > 0 and self._dirty_deletes >= threshold:
             self._rebuild_index()
-            self._pending_delete_ids.clear()
+            self._tombstones.clear()
             self._dirty_deletes = 0
             self._needs_rebuild = False
         else:
@@ -857,18 +795,38 @@ class FaissIndexManager:
 
     def _rebuild_index(self) -> None:
         # Recreate the FAISS index on GPU using cached vectors when direct removal is unsupported.
-        vector_items = list(self._vectors.items())
+        old_index = self._index
+        base = old_index.index if hasattr(old_index, "index") else old_index
+        current_ids = self._current_index_ids()
+        if current_ids.size == 0:
+            self._index = self._create_index()
+            self._set_nprobe()
+            return
+        if self._tombstones:
+            tombstone_array = np.fromiter(self._tombstones, dtype=np.int64)
+            keep_mask = ~np.isin(current_ids, tombstone_array)
+        else:
+            keep_mask = np.ones_like(current_ids, dtype=bool)
+        keep_positions = np.nonzero(keep_mask)[0].astype(np.int64)
+        survivor_ids = current_ids[keep_mask]
+        keys = np.ascontiguousarray(keep_positions, dtype=np.int64)
+        vectors = base.reconstruct_batch(keys) if keys.size else np.empty(
+            (0, self._dim), dtype=np.float32
+        )
+        vectors = np.ascontiguousarray(vectors, dtype=np.float32)
         self._index = self._create_index()
         self._set_nprobe()
-        if not vector_items:
-            return
-        vector_ids = [item[0] for item in vector_items]
-        matrix = np.stack([item[1] for item in vector_items]).astype(np.float32, copy=False)
-        faiss.normalize_L2(matrix)
-        if hasattr(self._index, "is_trained") and not getattr(self._index, "is_trained"):
-            nlist = int(getattr(self._config, "nlist", 1024))
-            oversample = max(1, int(getattr(self._config, "oversample", 2)))
-            ntrain = min(matrix.shape[0], nlist * oversample)
-            self._index.train(matrix[:ntrain])
-        ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
-        self._index.add_with_ids(matrix, ids)
+        if vectors.size:
+            base_new = self._index.index if hasattr(self._index, "index") else self._index
+            train_target = base_new
+            if hasattr(faiss, "downcast_index"):
+                try:
+                    train_target = faiss.downcast_index(base_new)
+                except Exception:
+                    train_target = base_new
+            if hasattr(train_target, "is_trained") and not getattr(train_target, "is_trained"):
+                nlist = int(getattr(self._config, "nlist", 1024))
+                oversample = max(1, int(getattr(self._config, "oversample", 2)))
+                ntrain = min(vectors.shape[0], nlist * oversample)
+                train_target.train(vectors[:ntrain])
+            self._index.add_with_ids(vectors, survivor_ids.astype(np.int64))

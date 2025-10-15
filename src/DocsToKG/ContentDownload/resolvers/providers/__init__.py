@@ -14,6 +14,7 @@ from .openaire import OpenAireResolver
 from .osf import OsfResolver
 from .pmc import PmcResolver
 from .semantic_scholar import SemanticScholarResolver
+from .zenodo import ZenodoResolver
 from .unpaywall import UnpaywallResolver
 from .wayback import WaybackResolver
 
@@ -36,6 +37,7 @@ def default_resolvers() -> List[Resolver]:
         PmcResolver(),
         EuropePmcResolver(),
         CoreResolver(),
+        ZenodoResolver(),
         DoajResolver(),
         SemanticScholarResolver(),
         OpenAireResolver(),

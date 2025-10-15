@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple
@@ -23,11 +25,15 @@ from docling_core.types.doc.document import DoclingDocument, DocTagsDocument
 from transformers import AutoTokenizer
 
 from DocsToKG.DocParsing._common import (
+    compute_content_hash,
     data_chunks,
     data_doctags,
+    data_manifests,
     detect_data_root,
     get_logger,
     iter_doctags,
+    load_manifest_index,
+    manifest_append,
 )
 from DocsToKG.DocParsing.serializers import RichSerializerProvider
 
@@ -35,6 +41,7 @@ from DocsToKG.DocParsing.serializers import RichSerializerProvider
 DEFAULT_DATA_ROOT = detect_data_root()
 DEFAULT_IN_DIR = data_doctags(DEFAULT_DATA_ROOT)
 DEFAULT_OUT_DIR = data_chunks(DEFAULT_DATA_ROOT)
+MANIFEST_STAGE = "chunks"
 
 # ---------- Helpers ----------
 def read_utf8(p: Path) -> str:
@@ -270,6 +277,16 @@ def main():
     ap.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     ap.add_argument("--min-tokens", type=int, default=256)
     ap.add_argument("--max-tokens", type=int, default=512)
+    ap.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip DocTags whose chunk outputs already exist with matching hash",
+    )
+    ap.add_argument(
+        "--force",
+        action="store_true",
+        help="Force reprocessing even when resume criteria are satisfied",
+    )
     args = ap.parse_args()
 
     data_root_override = args.data_root
@@ -278,6 +295,11 @@ def main():
         if data_root_override is not None
         else DEFAULT_DATA_ROOT
     )
+
+    if data_root_override is not None:
+        os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved_data_root)
+
+    data_manifests(resolved_data_root)
 
     in_dir = (
         data_doctags(resolved_data_root)
@@ -313,6 +335,13 @@ def main():
         )
         return
 
+    if args.force:
+        logger.info("Force mode: reprocessing all DocTags files")
+    elif args.resume:
+        logger.info("Resume mode enabled: unchanged inputs will be skipped")
+
+    manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_data_root) if args.resume else {}
+
     # Tokenizer (BERT family) → 512 cap applied to contextualized text
     hf = AutoTokenizer.from_pretrained("bert-base-uncased", use_fast=True)
     tokenizer = HuggingFaceTokenizer(tokenizer=hf, max_tokens=args.max_tokens)
@@ -325,54 +354,107 @@ def main():
     )
 
     for path in files:
+        rel_id = path.relative_to(in_dir).as_posix()
         name = path.stem
-        doctags_text = read_utf8(path)
-        doc = build_doc(doc_name=name, doctags_text=doctags_text)
-
-        # Stage 1: Docling chunking
-        chunks = list(chunker.chunk(dl_doc=doc))
-
-        # Stage 2: materialize contextualized text + metadata
-        recs: List[Rec] = []
-        for idx, ch in enumerate(chunks):
-            text = chunker.contextualize(ch)
-            n_tok = tokenizer.count_tokens(text=text)
-            refs, pages = extract_refs_and_pages(ch)
-            recs.append(Rec(text=text, n_tok=n_tok, src_idxs=[idx], refs=refs, pages=pages))
-
-        # Stage 3: smart coalescence of contiguous small runs
-        final_recs = coalesce_small_runs(
-            records=recs,
-            tokenizer=tokenizer,
-            min_tokens=args.min_tokens,
-            max_tokens=args.max_tokens,
-        )
-
-        # Stage 4: write JSONL
         out_path = out_dir / f"{name}.chunks.jsonl"
-        with out_path.open("w", encoding="utf-8") as f:
-            for cid, r in enumerate(final_recs):
-                obj = {
-                    "doc_id": name,
-                    "source_path": str(path),
-                    "chunk_id": cid,
-                    "source_chunk_idxs": r.src_idxs,
-                    "num_tokens": r.n_tok,
-                    "text": r.text,
-                    "doc_items_refs": r.refs,
-                    "page_nos": r.pages,
-                }
-                f.write(json.dumps(obj, ensure_ascii=False) + "\n")
-        logger.info(
-            "Chunk file written",
-            extra={
-                "extra_fields": {
-                    "doc_id": name,
-                    "chunks": len(final_recs),
-                    "output_file": out_path.name,
-                }
-            },
-        )
+        input_hash = compute_content_hash(path)
+        manifest_entry = manifest_index.get(rel_id)
+
+        if (
+            args.resume
+            and not args.force
+            and out_path.exists()
+            and manifest_entry
+            and manifest_entry.get("input_hash") == input_hash
+        ):
+            logger.info("Skipping %s: output exists and input unchanged", rel_id)
+            manifest_append(
+                stage=MANIFEST_STAGE,
+                doc_id=rel_id,
+                status="skip",
+                duration_s=0.0,
+                schema_version="docparse/1.1.0",
+                input_path=str(path),
+                input_hash=input_hash,
+                output_path=str(out_path),
+            )
+            continue
+
+        start = time.perf_counter()
+        try:
+            doctags_text = read_utf8(path)
+            doc = build_doc(doc_name=name, doctags_text=doctags_text)
+
+            # Stage 1: Docling chunking
+            chunks = list(chunker.chunk(dl_doc=doc))
+
+            # Stage 2: materialize contextualized text + metadata
+            recs: List[Rec] = []
+            for idx, ch in enumerate(chunks):
+                text = chunker.contextualize(ch)
+                n_tok = tokenizer.count_tokens(text=text)
+                refs, pages = extract_refs_and_pages(ch)
+                recs.append(Rec(text=text, n_tok=n_tok, src_idxs=[idx], refs=refs, pages=pages))
+
+            # Stage 3: smart coalescence of contiguous small runs
+            final_recs = coalesce_small_runs(
+                records=recs,
+                tokenizer=tokenizer,
+                min_tokens=args.min_tokens,
+                max_tokens=args.max_tokens,
+            )
+
+            # Stage 4: write JSONL
+            with out_path.open("w", encoding="utf-8") as f:
+                for cid, r in enumerate(final_recs):
+                    obj = {
+                        "doc_id": name,
+                        "source_path": str(path),
+                        "chunk_id": cid,
+                        "source_chunk_idxs": r.src_idxs,
+                        "num_tokens": r.n_tok,
+                        "text": r.text,
+                        "doc_items_refs": r.refs,
+                        "page_nos": r.pages,
+                    }
+                    f.write(json.dumps(obj, ensure_ascii=False) + "\n")
+
+            duration = time.perf_counter() - start
+            logger.info(
+                "Chunk file written",
+                extra={
+                    "extra_fields": {
+                        "doc_id": name,
+                        "chunks": len(final_recs),
+                        "output_file": out_path.name,
+                    }
+                },
+            )
+            manifest_append(
+                stage=MANIFEST_STAGE,
+                doc_id=rel_id,
+                status="success",
+                duration_s=round(duration, 3),
+                schema_version="docparse/1.1.0",
+                input_path=str(path),
+                input_hash=input_hash,
+                output_path=str(out_path),
+                chunk_count=len(final_recs),
+            )
+        except Exception as exc:
+            duration = time.perf_counter() - start
+            manifest_append(
+                stage=MANIFEST_STAGE,
+                doc_id=rel_id,
+                status="failure",
+                duration_s=round(duration, 3),
+                schema_version="docparse/1.1.0",
+                input_path=str(path),
+                input_hash=input_hash,
+                output_path=str(out_path),
+                error=str(exc),
+            )
+            raise
 
 
 if __name__ == "__main__":
