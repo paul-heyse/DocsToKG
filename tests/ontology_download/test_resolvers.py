@@ -20,6 +20,7 @@ Usage:
 
 import logging
 from types import SimpleNamespace
+from typing import Dict
 
 import pytest
 import requests
@@ -148,3 +149,79 @@ def test_ols_resolver_timeout_retry(monkeypatch, resolved_config):
     plan = resolver.plan(spec, resolved_config, logging.getLogger(__name__))
     assert plan.url == "https://example.org/bfo.owl"
     assert attempts["count"] == 2
+
+
+def test_lov_resolver_success(monkeypatch, resolved_config):
+    captured: Dict[str, Dict[str, str]] = {}
+
+    def fake_get(url, params=None, headers=None, timeout=None):  # type: ignore[override]
+        captured["params"] = params or {}
+        captured["headers"] = headers or {}
+
+        class _Resp:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> Dict[str, object]:
+                return {
+                    "versions": [
+                        {
+                            "fileURL": "https://example.org/voaf.ttl",
+                            "name": "2024-01-01",
+                            "licence": "CC-BY-4.0",
+                        }
+                    ]
+                }
+
+        return _Resp()
+
+    monkeypatch.setattr(resolvers.requests, "get", fake_get, raising=False)
+    monkeypatch.setattr(
+        resolvers.BaseResolver, "_execute_with_retry", lambda self, func, **_: func()
+    )
+    spec = FetchSpec(id="voaf", resolver="lov", extras={}, target_formats=["ttl"])
+    plan = resolvers.LOVResolver().plan(spec, resolved_config, logging.getLogger(__name__))
+    assert plan.url.endswith("voaf.ttl")
+    assert plan.media_type == "text/turtle"
+    assert plan.license == "CC-BY-4.0"
+    assert captured["params"]["vocab"] == "voaf"
+    assert "User-Agent" in captured["headers"]
+
+
+def test_lov_resolver_handles_http_error(monkeypatch, resolved_config):
+    class _ErrorResponse:
+        status_code = 503
+
+        def raise_for_status(self) -> None:
+            raise requests.HTTPError("unavailable", response=self)
+
+        def json(self):  # pragma: no cover - never reached
+            return {}
+
+    monkeypatch.setattr(
+        resolvers.requests,
+        "get",
+        lambda *args, **kwargs: _ErrorResponse(),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        resolvers.BaseResolver, "_execute_with_retry", lambda self, func, **_: func()
+    )
+    spec = FetchSpec(id="voaf", resolver="lov", extras={}, target_formats=["ttl"])
+    with pytest.raises(resolvers.ConfigError):
+        resolvers.LOVResolver().plan(spec, resolved_config, logging.getLogger(__name__))
+
+
+def test_ontobee_resolver_prefers_target_format(resolved_config):
+    resolver = resolvers.OntobeeResolver()
+    spec = FetchSpec(id="HP", resolver="ontobee", extras={}, target_formats=["obo", "owl"])
+    plan = resolver.plan(spec, resolved_config, logging.getLogger(__name__))
+    assert plan.url.endswith("hp.obo")
+    assert plan.media_type == "text/plain"
+
+
+def test_ontobee_resolver_validates_prefix(resolved_config):
+    resolver = resolvers.OntobeeResolver()
+    spec = FetchSpec(id="hp invalid", resolver="ontobee", extras={}, target_formats=["owl"])
+    with pytest.raises(resolvers.ConfigError):
+        resolver.plan(spec, resolved_config, logging.getLogger(__name__))

@@ -146,6 +146,27 @@ def test_download_config_normalizes_allowed_hosts() -> None:
     assert "xn--mnchen-3ya.example.org" in exact
 
 
+def test_download_config_polite_headers_defaults() -> None:
+    """Polite headers should provide defaults when not configured."""
+
+    config = DownloadConfiguration()
+    headers = config.build_polite_headers(correlation_id="corr-123")
+    assert headers["User-Agent"].startswith("DocsToKG-OntologyDownloader/")
+    assert headers["X-Request-ID"].startswith("corr-123-")
+
+
+def test_download_config_polite_headers_overrides() -> None:
+    """Configured polite headers should be preserved and augmented."""
+
+    config = DownloadConfiguration(
+        polite_headers={"User-Agent": "Custom/1.0", "From": "ops@example.org"}
+    )
+    headers = config.build_polite_headers()
+    assert headers["User-Agent"] == "Custom/1.0"
+    assert headers["From"] == "ops@example.org"
+    assert headers["X-Request-ID"].startswith("ontofetch-")
+
+
 def test_defaults_config_pydantic() -> None:
     """DefaultsConfig should inherit from BaseModel for Pydantic features."""
 

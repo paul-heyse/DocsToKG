@@ -47,9 +47,10 @@ def patched_dirs(monkeypatch, tmp_path):
 
 
 class _StubResolver:
-    def __init__(self, fixture: Path, version: str):
+    def __init__(self, fixture: Path, version: str, license_value: str = "CC0-1.0"):
         self.fixture = fixture
         self.version = version
+        self.license_value = license_value
 
     def plan(self, spec, config, logger):
         return resolvers.FetchPlan(
@@ -57,7 +58,7 @@ class _StubResolver:
             headers={},
             filename_hint=self.fixture.name,
             version=self.version,
-            license="CC0-1.0",
+            license=self.license_value,
             media_type="application/rdf+xml",
             service=spec.resolver,
         )
@@ -73,9 +74,12 @@ def stubbed_validators(monkeypatch):
             json_path = req.normalized_dir / f"{req.file_path.stem}.json"
             ttl_path.write_text("normalized")
             json_path.write_text("{}")
+            details = {"ok": True}
+            if req.name == "rdflib":
+                details["normalized_sha256"] = "abc123"
             results[req.name] = validators.ValidationResult(
                 ok=True,
-                details={"ok": True},
+                details=details,
                 output_files=[str(ttl_path), str(json_path)],
             )
         return results
@@ -127,11 +131,40 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
         assert manifest["validation"]
         local_file = result.local_path
         assert manifest["sha256"] == download.sha256_file(local_file)
+        assert manifest.get("normalized_sha256") == "abc123"
         normalized_dir = result.manifest_path.parent / "normalized"
         assert any(normalized_dir.glob("*.ttl"))
         assert any(normalized_dir.glob("*.json"))
 
 
+def test_fetch_one_normalizes_license(monkeypatch, patched_dirs, stubbed_validators):
+    fixture = Path("tests/data/ontology_fixtures/mini.ttl")
+    monkeypatch.setitem(
+        resolvers.RESOLVERS,
+        "obo",
+        _StubResolver(fixture, "2024-03-01", license_value="CC BY 4.0"),
+    )
+
+    def _download(**kwargs):
+        kwargs["destination"].write_bytes(fixture.read_bytes())
+        return download.DownloadResult(
+            path=kwargs["destination"],
+            status="fresh",
+            sha256="sha",
+            etag=None,
+            last_modified=None,
+        )
+
+    monkeypatch.setattr(core, "download_stream", _download)
+    config = ResolvedConfig(defaults=DefaultsConfiguration(), specs=())
+    config.defaults.accept_licenses = ["CC-BY-4.0"]
+    result = core.fetch_one(
+        core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"]),
+        config=config,
+        force=True,
+    )
+    manifest = json.loads(result.manifest_path.read_text())
+    assert manifest["license"] == "CC-BY-4.0"
 def test_force_download_bypasses_manifest(monkeypatch, patched_dirs, stubbed_validators):
     fixture = Path("tests/data/ontology_fixtures/mini.ttl")
     captured = {"previous": None}
@@ -179,6 +212,49 @@ def test_multi_version_storage(monkeypatch, patched_dirs, stubbed_validators):
     core.fetch_one(spec, config=config, force=True)
     versions = sorted((patched_dirs / "pato").iterdir())
     assert {v.name for v in versions} == {"2024-01-01", "2024-02-01"}
+
+
+def test_fetch_one_resolver_fallback_success(monkeypatch, patched_dirs, stubbed_validators):
+    fixture = Path("tests/data/ontology_fixtures/mini.ttl")
+
+    class _FailingResolver:
+        def plan(self, spec, config, logger):  # pragma: no cover - simple stub
+            raise resolvers.ConfigError("no download url")
+
+    monkeypatch.setitem(resolvers.RESOLVERS, "obo", _FailingResolver())
+    monkeypatch.setitem(resolvers.RESOLVERS, "ols", _StubResolver(fixture, "2024-05-01"))
+
+    def _download(**kwargs):
+        kwargs["destination"].write_bytes(fixture.read_bytes())
+        return download.DownloadResult(
+            path=kwargs["destination"],
+            status="fresh",
+            sha256="sha",
+            etag=None,
+            last_modified=None,
+        )
+
+    monkeypatch.setattr(core, "download_stream", _download)
+    config = ResolvedConfig(defaults=DefaultsConfiguration(), specs=())
+    spec = core.FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"])
+    result = core.fetch_one(spec, config=config, force=True)
+    assert result.spec.resolver == "ols"
+    manifest = json.loads(result.manifest_path.read_text())
+    assert manifest["resolver"] == "ols"
+
+
+def test_fetch_one_resolver_fallback_disabled(monkeypatch, patched_dirs, stubbed_validators):
+    class _FailingResolver:
+        def plan(self, spec, config, logger):
+            raise resolvers.ConfigError("no download url")
+
+    monkeypatch.setitem(resolvers.RESOLVERS, "obo", _FailingResolver())
+    monkeypatch.setitem(resolvers.RESOLVERS, "ols", _FailingResolver())
+    config = ResolvedConfig(defaults=DefaultsConfiguration(), specs=())
+    config.defaults.resolver_fallback_enabled = False
+    spec = core.FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"])
+    with pytest.raises(core.ResolverError):
+        core.fetch_one(spec, config=config, force=True)
 
 
 def test_fetch_all_logs_progress(monkeypatch, patched_dirs, stubbed_validators, caplog):

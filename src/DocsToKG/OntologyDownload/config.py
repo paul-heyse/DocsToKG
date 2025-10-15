@@ -29,6 +29,7 @@ from __future__ import annotations
 import logging
 import re
 import sys
+import time
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -242,6 +243,10 @@ class DownloadConfiguration(BaseModel):
     validate_media_type: bool = Field(default=True)
     rate_limits: Dict[str, str] = Field(default_factory=dict)
     allowed_hosts: Optional[List[str]] = Field(default=None)
+    polite_headers: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Optional polite HTTP headers for resolver API requests.",
+    )
 
     @field_validator("rate_limits")
     @classmethod
@@ -369,6 +374,36 @@ class DownloadConfiguration(BaseModel):
 
         return exact, suffixes
 
+    def build_polite_headers(self, correlation_id: Optional[str] = None) -> Dict[str, str]:
+        """Construct polite HTTP headers for resolver API calls.
+
+        Args:
+            correlation_id: Optional identifier used to inject structured
+                ``X-Request-ID`` header values.
+
+        Returns:
+            Mapping of HTTP headers suitable for resolver metadata requests.
+        """
+
+        headers: Dict[str, str] = {
+            key: value
+            for key, value in self.polite_headers.items()
+            if isinstance(key, str) and value
+        }
+
+        user_agent = headers.get("User-Agent") or "DocsToKG-OntologyDownloader/1.0"
+        headers["User-Agent"] = user_agent
+
+        timestamp = int(time.time() * 1000)
+        request_id = headers.get("X-Request-ID")
+        if correlation_id:
+            request_id = f"{correlation_id}-{timestamp}"
+        elif not request_id:
+            request_id = f"ontofetch-{timestamp}"
+        headers["X-Request-ID"] = request_id
+
+        return headers
+
     model_config = {
         "frozen": False,
         "validate_assignment": True,
@@ -415,6 +450,10 @@ class DefaultsConfig(BaseModel):
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
     logging: LoggingConfiguration = Field(default_factory=LoggingConfiguration)
     continue_on_error: bool = Field(default=True)
+    resolver_fallback_enabled: bool = Field(
+        default=True,
+        description="Enable automatic resolver fallback when planning downloads.",
+    )
 
     @field_validator("prefer_source")
     @classmethod

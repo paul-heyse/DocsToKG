@@ -2065,18 +2065,53 @@ def test_validate_media_type_disabled():
 
 ---
 
+### 3.1 Deterministic TTL Normalization
+
+- [x] Implement canonical Turtle serialization in `validate_rdflib`, sorting prefixes and triples and computing a normalized SHA-256 hash.
+- [x] Record the canonical hash in validation results and propagate it into manifests for downstream consumers.
+- [x] Add unit coverage exercising canonical ordering, hash stability, and manifest persistence.
+
+### 3.2 Subprocess Validator Isolation
+
+- [x] Execute Pronto and Owlready2 validators via a dedicated subprocess worker module with JSON-based IPC and timeout handling.
+- [x] Integrate the worker helper into validator functions while preserving logging semantics and fallback behaviour.
+- [x] Expand validator tests to mock subprocess execution, covering success, error, and skip scenarios.
+
+### 3.3 SPDX License Normalization
+
+- [x] Normalize resolver-reported license strings to SPDX identifiers prior to allowlist checks.
+- [x] Persist normalized licenses in manifests and expose the canonical value through fetch results.
+- [x] Add integration tests verifying alias acceptance and manifest output when alternate license spellings are provided.
+
+### 4.1 Automatic Resolver Fallback
+
+- [x] Added `_plan_with_fallback()` in `core.fetch_one()` to iterate configured resolvers with structured logging and manifest updates when fallback succeeds.
+- [x] Introduced configuration toggle `resolver_fallback_enabled` with integration coverage for both enabled and disabled scenarios.
+
+### 4.2 Polite API Headers
+
+- [x] Extended `DownloadConfiguration` with `polite_headers` plus helpers to emit default User-Agent and correlation-based X-Request-ID values.
+- [x] Applied polite headers across OLS and BioPortal clients and exposed configuration defaults with new unit tests.
+
+### 4.3 LOV and Ontobee Resolvers
+
+- [x] Implemented `LOVResolver` with error handling for unavailable metadata and media type inference, including resolver unit coverage.
+- [x] Added `OntobeeResolver` for format-aware PURL generation with validation of OBO prefixes and per-format MIME types.
+
+---
+
 ## Task Completion Tracking
 
 **Foundation (1.1-1.4)**: 27/52 tasks complete
 **Robustness Downloads (2.1-2.4)**: 15/27 tasks complete
-**Robustness Validation (3.1-3.4)**: 0/21 tasks complete
-**Capabilities (4.1-5.2)**: 0/32 tasks complete
+**Robustness Validation (3.1-3.4)**: 9/21 tasks complete
+**Capabilities (4.1-5.2)**: 6/32 tasks complete
 **Storage (6.1)**: 0/10 tasks complete
 **CLI (7.1-7.3)**: 0/13 tasks complete
 **Testing (8.1-8.5)**: 0/30 tasks complete
 **Deployment (9.1-9.3)**: 0/13 tasks complete
 
-**Total**: 42/198 tasks complete (21.2%)
+**Total**: 57/198 tasks complete (28.8%)
 
 ## Notes for AI Programming Agents
 
