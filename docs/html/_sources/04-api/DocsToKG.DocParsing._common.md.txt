@@ -197,6 +197,18 @@ Examples:
 >>> isinstance(data_html(), Path)
 True
 
+### `derive_doc_id_and_vectors_path(chunk_file, chunks_root, vectors_root)`
+
+Return manifest doc identifier and vectors output path for ``chunk_file``.
+
+Args:
+chunk_file: Path to the chunk JSONL artefact.
+chunks_root: Root directory containing chunk artefacts.
+vectors_root: Root directory where vector outputs should be written.
+
+Returns:
+Tuple containing the manifest ``doc_id`` and the full vectors output path.
+
 ### `get_logger(name, level)`
 
 Get a structured JSON logger configured for console output.
@@ -360,7 +372,7 @@ ValueError: If ``status`` is not recognised.
 
 Examples:
 >>> manifest_append("chunk", "doc1", "success")
->>> (data_manifests() / "docparse.manifest.jsonl").exists()
+>>> (data_manifests() / "docparse.chunk.manifest.jsonl").exists()
 True
 
 ### `resolve_hash_algorithm(default)`

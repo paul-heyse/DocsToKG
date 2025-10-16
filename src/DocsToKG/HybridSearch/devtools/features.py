@@ -78,6 +78,9 @@ def sliding_window(
 
     Raises:
         ValueError: If ``window`` or ``overlap`` violate expected constraints.
+
+    Returns:
+        Iterator over token windows respecting the configured parameters.
     """
     if window <= 0:
         raise ValueError("window must be positive")
@@ -114,6 +117,9 @@ class FeatureGenerator:
 
         Raises:
             ValueError: If ``embedding_dim`` is not positive.
+
+        Returns:
+            None
         """
         if embedding_dim <= 0:
             raise ValueError("embedding_dim must be positive")
@@ -122,6 +128,9 @@ class FeatureGenerator:
     @property
     def embedding_dim(self) -> int:
         """Return the configured dense embedding dimensionality.
+
+        Args:
+            None
 
         Returns:
             Positive integer describing the dense embedding dimensionality.

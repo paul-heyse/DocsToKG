@@ -147,6 +147,8 @@ from types import SimpleNamespace
 from typing import Any, Dict, List
 
 import pytest
+from tools.manifest_to_csv import convert_manifest_to_csv
+from tools.manifest_to_index import convert_manifest_to_index
 # --- Globals ---
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -329,6 +331,7 @@ def test_main_writes_manifest_and_sets_mailto(download_modules, monkeypatch, tmp
     assert calls == ["machine learning"]
 
     index_path = manifest_path.with_suffix(".index.json")
+    convert_manifest_to_index(manifest_path, index_path)
     index_payload = json.loads(index_path.read_text(encoding="utf-8"))
     assert manifest["work_id"] in index_payload
     assert index_payload[manifest["work_id"]]["classification"] == "pdf"
@@ -426,6 +429,8 @@ def test_main_with_csv_writes_last_attempt_csv(download_modules, monkeypatch, tm
     downloader.main()
 
     last_csv = manifest_path.with_name("manifest.last.csv")
+    convert_manifest_to_csv(manifest_path, last_csv)
+
     with last_csv.open("r", encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
 
@@ -550,6 +555,7 @@ def test_main_with_staging_creates_timestamped_directories(download_modules, mon
     assert not manifest_override.exists()
 
     index_path = manifest_path.with_suffix(".index.json")
+    convert_manifest_to_index(manifest_path, index_path)
     assert index_path.exists()
     payload = json.loads(index_path.read_text(encoding="utf-8"))
     assert payload["WSTAGING"]["pdf_path"].endswith("out.pdf")
@@ -833,6 +839,7 @@ def test_process_one_work_logs_manifest_in_dry_run(download_modules, tmp_path):
         logger=logger,
         metrics=metrics,
         dry_run=True,
+        list_only=False,
         extract_html_text=False,
         previous_lookup={},
         resume_completed=set(),
@@ -886,6 +893,7 @@ def test_resume_skips_completed_work(download_modules, tmp_path):
         logger=logger,
         metrics=metrics,
         dry_run=False,
+        list_only=False,
         extract_html_text=False,
         previous_lookup={},
         resume_completed={"W-RESUME"},

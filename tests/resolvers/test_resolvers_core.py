@@ -944,9 +944,9 @@ import DocsToKG.ContentDownload.resolvers as pipeline_module
 import DocsToKG.ContentDownload.resolvers as providers_module
 import DocsToKG.ContentDownload.resolvers as resolvers
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
+from DocsToKG.ContentDownload.classifier import classify_payload
 from DocsToKG.ContentDownload.download_pyalex_pdfs import (
     WorkArtifact,
-    classify_payload,
     ensure_dir,
     load_resolver_config,
 )
@@ -1477,9 +1477,20 @@ class DummyResponse:
 class ListLogger:
     def __init__(self):
         self.records = []
+        self.manifests = []
+        self.summaries = []
 
-    def log(self, record: AttemptRecord) -> None:
+    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
         self.records.append(record)
+
+    def log_manifest(self, entry) -> None:  # pragma: no cover - simple test helper
+        self.manifests.append(entry)
+
+    def log_summary(self, summary) -> None:  # pragma: no cover - simple test helper
+        self.summaries.append(summary)
+
+    def close(self) -> None:  # pragma: no cover - interface compliance
+        return None
 
 
 # --- test_resolver_pipeline.py ---

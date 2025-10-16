@@ -69,11 +69,13 @@ import base64
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from threading import RLock
 from typing import TYPE_CHECKING, Callable, List, Optional, Sequence
 
 import numpy as np
 
 from .config import DenseIndexConfig
+from .interfaces import DenseVectorStore
 from .types import vector_uuid_to_faiss_int
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -88,6 +90,7 @@ __all__ = (
     "FaissSearchResult",
     "cosine_against_corpus_gpu",
     "cosine_batch",
+    "cosine_topk_blockwise",
     "max_inner_product",
     "normalize_rows",
     "pairwise_inner_products",
@@ -133,7 +136,7 @@ class FaissSearchResult:
     score: float
 
 
-class FaissVectorStore:
+class FaissVectorStore(DenseVectorStore):
     """Manage a GPU-backed FAISS index for dense retrieval.
 
     The store encapsulates FAISS initialisation, GPU resource management,
@@ -190,6 +193,7 @@ class FaissVectorStore:
         self._replicated = False
         self._gpu_resources: Optional["faiss.StandardGpuResources"] = None
         self.init_gpu()
+        self._lock = RLock()
         self._index = self._create_index()
         if self._dim != dim:
             raise RuntimeError(
@@ -297,8 +301,8 @@ class FaissVectorStore:
         matrix = np.stack([self._ensure_dim(vec) for vec in vectors]).astype(np.float32)
         faiss.normalize_L2(matrix)
         nlist = int(getattr(self._config, "nlist", 1024))
-        oversample = max(1, int(getattr(self._config, "oversample", 2)))
-        ntrain = min(matrix.shape[0], nlist * oversample)
+        factor = max(1, int(getattr(self._config, "ivf_train_factor", 8)))
+        ntrain = min(matrix.shape[0], nlist * factor)
         self._index.train(matrix[:ntrain])
 
     def needs_training(self) -> bool:
@@ -326,39 +330,42 @@ class FaissVectorStore:
         Returns:
             None
         """
-        self._flush_pending_deletes(force=False)
-        if len(vectors) != len(vector_ids):
-            raise ValueError("vectors and vector_ids must align")
-        if not vectors:
-            return
-        faiss_ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
-        if self._supports_remove_ids is None:
-            self._supports_remove_ids = self._probe_remove_support()
-        if self._supports_remove_ids:
-            self.remove_ids(faiss_ids, force_flush=True)
-        else:
-            existing_ids = self._lookup_existing_ids(faiss_ids)
-            if existing_ids.size:
-                self.remove_ids(existing_ids, force_flush=True)
-        matrix = np.ascontiguousarray(
-            np.stack([self._ensure_dim(vec) for vec in vectors]), dtype=np.float32
-        )
-        faiss.normalize_L2(matrix)
-        base = self._index.index if hasattr(self._index, "index") else self._index
-        train_target = base
-        if hasattr(faiss, "downcast_index"):
-            try:
-                train_target = faiss.downcast_index(base)
-            except Exception:
-                train_target = base
+        with self._lock:
+            self._flush_pending_deletes(force=False)
+            if len(vectors) != len(vector_ids):
+                raise ValueError("vectors and vector_ids must align")
+            if not vectors:
+                return
+            faiss_ids = np.array(
+                [vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64
+            )
+            if self._supports_remove_ids is None:
+                self._supports_remove_ids = self._probe_remove_support()
+            if self._supports_remove_ids:
+                self.remove_ids(faiss_ids, force_flush=True)
+            else:
+                existing_ids = self._lookup_existing_ids(faiss_ids)
+                if existing_ids.size:
+                    self.remove_ids(existing_ids, force_flush=True)
+            matrix = np.ascontiguousarray(
+                np.stack([self._ensure_dim(vec) for vec in vectors]), dtype=np.float32
+            )
+            faiss.normalize_L2(matrix)
+            base = self._index.index if hasattr(self._index, "index") else self._index
+            train_target = base
+            if hasattr(faiss, "downcast_index"):
+                try:
+                    train_target = faiss.downcast_index(base)
+                except Exception:
+                    train_target = base
         if hasattr(train_target, "is_trained") and not getattr(train_target, "is_trained"):
             nlist = int(getattr(self._config, "nlist", 1024))
-            oversample = max(1, int(getattr(self._config, "oversample", 2)))
-            ntrain = min(matrix.shape[0], nlist * oversample)
+            factor = max(1, int(getattr(self._config, "ivf_train_factor", 8)))
+            ntrain = min(matrix.shape[0], nlist * factor)
             train_target.train(matrix[:ntrain])
-        self._index.add_with_ids(matrix, faiss_ids)
-        self._dirty_deletes = 0
-        self._needs_rebuild = False
+            self._index.add_with_ids(matrix, faiss_ids)
+            self._dirty_deletes = 0
+            self._needs_rebuild = False
 
     def remove(self, vector_ids: Sequence[str]) -> None:
         """Remove vectors from the index using application-level identifiers.
@@ -372,7 +379,8 @@ class FaissVectorStore:
         if not vector_ids:
             return
         ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
-        self.remove_ids(ids, force_flush=True)
+        with self._lock:
+            self.remove_ids(ids, force_flush=True)
 
     def remove_ids(self, ids: np.ndarray, *, force_flush: bool = False) -> int:
         """Remove vectors using FAISS internal ids.
@@ -384,14 +392,16 @@ class FaissVectorStore:
         Returns:
             Number of ids scheduled for removal.
         """
-        ids64 = np.asarray(ids, dtype=np.int64)
-        if ids64.size == 0:
-            return 0
-        self._remove_ids(ids64)
-        self._flush_pending_deletes(force=force_flush)
-        return int(ids64.size)
+        with self._lock:
+            ids64 = np.asarray(ids, dtype=np.int64)
+            if ids64.size == 0:
+                return 0
+            self._remove_ids(ids64)
+            self._flush_pending_deletes(force=force_flush)
+            return int(ids64.size)
 
     def _current_index_ids(self) -> np.ndarray:
+        # Robustly extract id_map across wrappers / GPU clones.
         if self._index is None or self._index.ntotal == 0:
             return np.empty(0, dtype=np.int64)
         try:
@@ -426,22 +436,54 @@ class FaissVectorStore:
         Returns:
             Ranked list of :class:`FaissSearchResult` objects.
         """
-        self._flush_pending_deletes(force=False)
-        query_matrix = np.ascontiguousarray(
-            self._ensure_dim(query).reshape(1, -1), dtype=np.float32
-        )
-        faiss.normalize_L2(query_matrix)
-        self._set_nprobe()
-        scores, ids = self._index.search(query_matrix, top_k)
-        results: List[FaissSearchResult] = []
-        for score, internal_id in zip(scores[0], ids[0]):
-            if internal_id == -1:
-                continue
-            vector_id = self._resolve_vector_id(int(internal_id))
-            if vector_id is None:
-                continue
-            results.append(FaissSearchResult(vector_id=vector_id, score=float(score)))
-        return results
+        with self._lock:
+            self._flush_pending_deletes(force=False)
+            query_matrix = np.ascontiguousarray(
+                self._ensure_dim(query).reshape(1, -1), dtype=np.float32
+            )
+            faiss.normalize_L2(query_matrix)
+            self._set_nprobe()
+            scores, ids = self._index.search(query_matrix, top_k)
+            results: List[FaissSearchResult] = []
+            for score, internal_id in zip(scores[0], ids[0]):
+                if internal_id == -1:
+                    continue
+                vector_id = self._resolve_vector_id(int(internal_id))
+                if vector_id is None:
+                    continue
+                results.append(FaissSearchResult(vector_id=vector_id, score=float(score)))
+            return results
+
+    def search_many(self, queries: np.ndarray, top_k: int) -> List[List[FaissSearchResult]]:
+        """Search the index for multiple queries in a single FAISS call."""
+
+        if queries.ndim == 1:
+            queries = queries.reshape(1, -1)
+        with self._lock:
+            self._flush_pending_deletes(force=False)
+            matrix = np.ascontiguousarray(queries, dtype=np.float32)
+            if matrix.shape[1] != self._dim:
+                raise ValueError(f"Query dimensionality {matrix.shape[1]} != index dim {self._dim}")
+            faiss.normalize_L2(matrix)
+            self._set_nprobe()
+            scores, ids = self._index.search(matrix, top_k)
+        batched: List[List[FaissSearchResult]] = []
+        for row_scores, row_ids in zip(scores, ids):
+            row_results: List[FaissSearchResult] = []
+            for score, internal_id in zip(row_scores, row_ids):
+                if internal_id == -1:
+                    continue
+                vector_id = self._resolve_vector_id(int(internal_id))
+                if vector_id is None:
+                    continue
+                row_results.append(FaissSearchResult(vector_id=vector_id, score=float(score)))
+            batched.append(row_results)
+        return batched
+
+    def search_batch(self, queries: np.ndarray, top_k: int) -> List[List[FaissSearchResult]]:
+        """Alias for ``search_many`` to support batch query workflows."""
+
+        return self.search_many(queries, top_k)
 
     def serialize(self) -> bytes:
         """Return a CPU-serialised representation of the FAISS index.
@@ -455,11 +497,12 @@ class FaissVectorStore:
         Raises:
             RuntimeError: If the index has not been initialised.
         """
-        if self._index is None:
-            raise RuntimeError("index is empty")
-        cpu_index = self._to_cpu(self._index)
-        blob = faiss.serialize_index(cpu_index)
-        return bytes(blob)
+        with self._lock:
+            if self._index is None:
+                raise RuntimeError("index is empty")
+            cpu_index = self._to_cpu(self._index)
+            blob = faiss.serialize_index(cpu_index)
+            return bytes(blob)
 
     def save(self, path: str) -> None:
         """Persist the FAISS index to ``path`` when persistence is enabled.
@@ -516,12 +559,13 @@ class FaissVectorStore:
         """
         if not payload:
             raise ValueError("Empty FAISS payload")
-        cpu_index = faiss.deserialize_index(np.frombuffer(payload, dtype=np.uint8))
-        self._index = self._maybe_to_gpu(cpu_index)
-        self._tombstones.clear()
-        self._dirty_deletes = 0
-        self._needs_rebuild = False
-        self._set_nprobe()
+        with self._lock:
+            cpu_index = faiss.deserialize_index(np.frombuffer(payload, dtype=np.uint8))
+            self._index = self._maybe_to_gpu(cpu_index)
+            self._tombstones.clear()
+            self._dirty_deletes = 0
+            self._needs_rebuild = False
+            self._set_nprobe()
 
     def stats(self) -> dict[str, float | str]:
         """Return diagnostic metrics describing the active FAISS index.
@@ -791,24 +835,44 @@ class FaissVectorStore:
             self._maybe_reserve_memory(index)
             return faiss.IndexIDMap2(index)
 
-        quantizer = faiss.IndexFlatIP(self._dim)
         if index_type == "ivf_flat":
-            base = faiss.IndexIVFFlat(quantizer, self._dim, int(self._config.nlist), metric)
-        elif index_type == "ivf_pq":
-            base = faiss.IndexIVFPQ(
-                quantizer,
+            if not hasattr(faiss, "GpuIndexIVFFlat"):
+                raise RuntimeError("faiss build missing GpuIndexIVFFlat support")
+            cfg = faiss.GpuIndexIVFFlatConfig()
+            cfg.device = dev
+            index = faiss.GpuIndexIVFFlat(
+                self._gpu_resources, self._dim, int(self._config.nlist), metric, cfg
+            )
+            self._maybe_reserve_memory(index)
+            return faiss.IndexIDMap2(index)
+        if index_type == "ivf_pq":
+            if not hasattr(faiss, "GpuIndexIVFPQ"):
+                raise RuntimeError("faiss build missing GpuIndexIVFPQ support")
+            cfg = faiss.GpuIndexIVFPQConfig()
+            cfg.device = dev
+            if hasattr(cfg, "usePrecomputedTables"):
+                cfg.usePrecomputedTables = bool(
+                    getattr(self._config, "ivfpq_use_precomputed", True)
+                )
+            if hasattr(cfg, "useFloat16LookupTables"):
+                cfg.useFloat16LookupTables = bool(
+                    getattr(self._config, "ivfpq_float16_lut", True)
+                )
+            if hasattr(cfg, "interleavedLayout"):
+                cfg.interleavedLayout = bool(getattr(self._config, "interleaved_layout", True))
+            index = faiss.GpuIndexIVFPQ(
+                self._gpu_resources,
                 self._dim,
                 int(self._config.nlist),
                 int(self._config.pq_m),
                 int(self._config.pq_bits),
+                metric,
+                cfg,
             )
-        else:
-            raise RuntimeError(f"Unsupported index type: {index_type}")
-        base.nprobe = int(self._config.nprobe)
-        index = faiss.IndexIDMap2(base)
-        gpu_index = self._maybe_to_gpu(index)
-        self._maybe_reserve_memory(gpu_index)
-        return gpu_index
+            self._maybe_reserve_memory(index)
+            return faiss.IndexIDMap2(index)
+
+        raise RuntimeError(f"Unsupported or unimplemented FAISS index type: {index_type}")
 
     def _probe_remove_support(self) -> bool:
         selector = faiss.IDSelectorBatch(np.empty(0, dtype=np.int64))
@@ -904,8 +968,8 @@ class FaissVectorStore:
                     train_target = base_new
             if hasattr(train_target, "is_trained") and not getattr(train_target, "is_trained"):
                 nlist = int(getattr(self._config, "nlist", 1024))
-                oversample = max(1, int(getattr(self._config, "oversample", 2)))
-                ntrain = min(vectors.shape[0], nlist * oversample)
+                factor = max(1, int(getattr(self._config, "ivf_train_factor", 8)))
+                ntrain = min(vectors.shape[0], nlist * factor)
                 train_target.train(vectors[:ntrain])
             self._index.add_with_ids(vectors, survivor_ids.astype(np.int64))
 
@@ -1082,8 +1146,8 @@ def cosine_batch(
     """
     if q.ndim == 1:
         q = q.reshape(1, -1)
-    q = np.ascontiguousarray(q, dtype=np.float32).copy()
-    C = np.ascontiguousarray(C, dtype=np.float32).copy()
+    q = np.ascontiguousarray(q, dtype=np.float32)
+    C = np.ascontiguousarray(C, dtype=np.float32)
     faiss.normalize_L2(q)
     faiss.normalize_L2(C)
     return faiss.pairwise_distance_gpu(
@@ -1093,6 +1157,93 @@ def cosine_batch(
         metric=faiss.METRIC_INNER_PRODUCT,
         device=int(device),
     )
+
+
+def cosine_topk_blockwise(
+    q: np.ndarray,
+    C: np.ndarray,
+    *,
+    k: int,
+    device: int,
+    resources: "faiss.StandardGpuResources",
+    block_rows: int = 65_536,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return Top-K cosine similarities between ``q`` and ``C`` using GPU tiling.
+
+    The helper avoids materialising the full ``(N × M)`` similarity matrix by
+    iterating over ``C`` in row blocks and maintaining a running Top-K per query
+    row. Inputs are copied and normalised inside the routine so callers retain
+    ownership of their buffers.
+
+    Args:
+        q: Query vector or matrix (``N × D``).
+        C: Corpus matrix (``M × D``).
+        k: Number of neighbours to return per query row.
+        device: CUDA device ordinal used for FAISS kernels.
+        resources: FAISS GPU resources backing ``pairwise_distance_gpu``.
+        block_rows: Number of corpus rows processed per iteration.
+
+    Returns:
+        Tuple ``(scores, indices)`` where each has shape ``(N × K)``. Scores are
+        sorted in descending order for every query row and indices reference rows
+        within ``C``.
+    """
+
+    if resources is None:
+        raise RuntimeError("FAISS GPU resources are required for cosine comparisons")
+    if block_rows <= 0:
+        raise ValueError("block_rows must be positive")
+
+    if q.ndim == 1:
+        q = q.reshape(1, -1)
+    q = np.ascontiguousarray(q, dtype=np.float32).copy()
+    C = np.ascontiguousarray(C, dtype=np.float32)
+
+    if q.shape[1] != C.shape[1]:
+        raise ValueError("q and C must have same dimensionality")
+    if C.shape[0] == 0:
+        empty_scores = np.empty((q.shape[0], 0), dtype=np.float32)
+        empty_indices = np.empty((q.shape[0], 0), dtype=np.int64)
+        return empty_scores, empty_indices
+
+    if k <= 0:
+        raise ValueError("k must be positive")
+    k = min(k, C.shape[0])
+
+    faiss.normalize_L2(q)
+
+    N, M = q.shape[0], C.shape[0]
+    best_scores = np.full((N, k), -np.inf, dtype=np.float32)
+    best_index = np.full((N, k), -1, dtype=np.int64)
+
+    start = 0
+    while start < M:
+        end = min(M, start + block_rows)
+        block = np.array(C[start:end], dtype=np.float32, copy=True)
+        faiss.normalize_L2(block)
+        sims = faiss.pairwise_distance_gpu(
+            resources,
+            q,
+            block,
+            metric=faiss.METRIC_INNER_PRODUCT,
+            device=int(device),
+        )
+
+        block_idx = np.arange(start, end, dtype=np.int64)
+        cand_scores = np.concatenate([best_scores, sims], axis=1)
+        cand_index = np.concatenate(
+            [best_index, np.broadcast_to(block_idx, (N, block_idx.size))], axis=1
+        )
+        select = np.argpartition(cand_scores, -k, axis=1)[:, -k:]
+        rows = np.arange(N)[:, None]
+        best_scores = np.take_along_axis(cand_scores, select, axis=1)
+        best_index = np.take_along_axis(cand_index, select, axis=1)
+        start = end
+
+    order = np.argsort(best_scores, axis=1)[:, ::-1]
+    best_scores = np.take_along_axis(best_scores, order, axis=1)
+    best_index = np.take_along_axis(best_index, order, axis=1)
+    return best_scores, best_index
 
 
 def serialize_state(faiss_index: FaissVectorStore, registry: "ChunkRegistry") -> dict[str, object]:

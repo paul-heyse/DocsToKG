@@ -90,6 +90,7 @@ Available commands:
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Sequence
 
@@ -254,6 +255,48 @@ def _build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPa
     return parser
 
 
+_PDF_SUFFIXES: tuple[str, ...] = (".pdf",)
+_HTML_SUFFIXES: tuple[str, ...] = (".html", ".htm")
+
+
+def _scan_pdf_html(input_dir: Path) -> tuple[bool, bool]:
+    """Return booleans indicating whether PDFs or HTML files exist beneath ``input_dir``."""
+
+    has_pdf = False
+    has_html = False
+
+    if not input_dir.exists():
+        return has_pdf, has_html
+
+    for root, _dirs, files in os.walk(input_dir):
+        if not files:
+            continue
+        for name in files:
+            lower = name.lower()
+            if not has_pdf and lower.endswith(_PDF_SUFFIXES):
+                has_pdf = True
+            elif not has_html and lower.endswith(_HTML_SUFFIXES):
+                has_html = True
+            if has_pdf and has_html:
+                return has_pdf, has_html
+    return has_pdf, has_html
+
+
+def _directory_contains_suffixes(directory: Path, suffixes: tuple[str, ...]) -> bool:
+    """Return True when ``directory`` contains at least one file ending with ``suffixes``."""
+
+    if not directory.exists():
+        return False
+    suffixes_lower = tuple(s.lower() for s in suffixes)
+    for root, _dirs, files in os.walk(directory):
+        if not files:
+            continue
+        for name in files:
+            if name.lower().endswith(suffixes_lower):
+                return True
+    return False
+
+
 def _detect_mode(input_dir: Path) -> str:
     """Infer conversion mode based on the contents of ``input_dir``.
 
@@ -264,20 +307,21 @@ def _detect_mode(input_dir: Path) -> str:
         ``"pdf"`` when only PDFs are present, ``"html"`` when only HTML files exist.
 
     Raises:
-        ValueError: If both formats are present or neither can be detected.
+        ValueError: If both formats are present, neither type can be detected, or the directory is missing.
     """
-    pdf_count = sum(1 for _ in input_dir.rglob("*.pdf"))
-    html_count = sum(1 for _ in input_dir.rglob("*.html")) + sum(
-        1 for _ in input_dir.rglob("*.htm")
-    )
-    if pdf_count > 0 and html_count == 0:
+    if not input_dir.exists():
+        raise ValueError(f"Cannot auto-detect mode in {input_dir}: directory not found")
+
+    has_pdf, has_html = _scan_pdf_html(input_dir)
+    if has_pdf and not has_html:
         return "pdf"
-    if html_count > 0 and pdf_count == 0:
+    if has_html and not has_pdf:
         return "html"
-    raise ValueError(
-        f"Cannot auto-detect mode in {input_dir}: "
-        f"found {pdf_count} PDFs and {html_count} HTML files"
-    )
+    if has_pdf and has_html:
+        raise ValueError(
+            f"Cannot auto-detect mode in {input_dir}: found both PDF and HTML files"
+        )
+    raise ValueError(f"Cannot auto-detect mode in {input_dir}: no PDF or HTML files found")
 
 
 def _merge_args(parser: argparse.ArgumentParser, overrides: Dict[str, Any]) -> argparse.Namespace:
@@ -325,13 +369,11 @@ def _run_doctags(argv: Sequence[str]) -> int:
             mode = _detect_mode(input_dir)
     else:
         if mode == "auto":
-            html_count = sum(1 for _ in html_default_in.rglob("*.html")) + sum(
-                1 for _ in html_default_in.rglob("*.htm")
-            )
-            pdf_count = sum(1 for _ in pdf_default_in.rglob("*.pdf"))
-            if html_count > 0 and pdf_count == 0:
+            html_present = _directory_contains_suffixes(html_default_in, _HTML_SUFFIXES)
+            pdf_present = _directory_contains_suffixes(pdf_default_in, _PDF_SUFFIXES)
+            if html_present and not pdf_present:
                 mode = "html"
-            elif pdf_count > 0 and html_count == 0:
+            elif pdf_present and not html_present:
                 mode = "pdf"
             else:
                 raise ValueError("Cannot auto-detect mode: specify --mode or --input explicitly")

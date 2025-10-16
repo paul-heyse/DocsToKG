@@ -50,7 +50,7 @@ from .types import (
     HybridSearchRequest,
     HybridSearchResult,
 )
-from .vectorstore import cosine_batch, pairwise_inner_products
+from .vectorstore import cosine_batch, cosine_topk_blockwise, pairwise_inner_products
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import faiss  # type: ignore
@@ -129,7 +129,7 @@ class ResultShaper:
         _gpu_resources: Optional FAISS resources for GPU pairwise similarity.
 
     Examples:
-        >>> from DocsToKG.HybridSearch.devtools.opensearch_simulator import OpenSearchSimulator  # doctest: +SKIP
+        >>> from DocsToKG.HybridSearch.storage import OpenSearchSimulator  # doctest: +SKIP
         >>> shaper = ResultShaper(OpenSearchSimulator(), FusionConfig())  # doctest: +SKIP
         >>> shaper.shape([], {}, HybridSearchRequest(query="", namespace=None, filters={}, page_size=1), {})  # doctest: +SKIP
         []
@@ -243,8 +243,14 @@ class ResultShaper:
         query = embeddings[current_idx]
         corpus = embeddings[list(emitted_indices)]
         if resources is not None:
-            sims = cosine_batch(query, corpus, device=self._gpu_device, resources=resources)
-            return float(sims[0].max()) >= self._fusion_config.cosine_dedupe_threshold
+            top1, _ = cosine_topk_blockwise(
+                np.asarray(query, dtype=np.float32).reshape(1, -1),
+                corpus.astype(np.float32, copy=False),
+                k=1,
+                device=self._gpu_device,
+                resources=resources,
+            )
+            return float(top1[0, 0]) >= self._fusion_config.cosine_dedupe_threshold
         query_norm = np.linalg.norm(query)
         if query_norm == 0.0:
             return False

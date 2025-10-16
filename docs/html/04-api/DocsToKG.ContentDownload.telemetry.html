@@ -1,0 +1,340 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: telemetry &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: telemetry</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.ContentDownload.telemetry.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-telemetry">
+<h1>1. Module: telemetry<a class="headerlink" href="#module-telemetry" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.telemetry</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Telemetry contracts shared by DocsToKG content download tooling.</p>
+<p>Centralises manifest and attempt payload structures so the CLI, resolver
+pipeline, and downstream analytics speak a consistent schema. Keeping these
+definitions in one place prevents subtle drift between components while allowing
+test doubles to implement the same interfaces.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+<p>Raises:
+None</p>
+</section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="utc-timestamp">
+<h3><code class="docutils literal notranslate"><span class="pre">_utc_timestamp()</span></code><a class="headerlink" href="#utc-timestamp" title="Link to this heading"></a></h3>
+<p>Return the current time as an ISO 8601 UTC timestamp.</p>
+</section>
+<section id="ensure-parent-exists-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_ensure_parent_exists(path)</span></code><a class="headerlink" href="#ensure-parent-exists-path" title="Link to this heading"></a></h3>
+<p>Ensure the parent directory for <code class="docutils literal notranslate"><span class="pre">path</span></code> exists.</p>
+</section>
+<section id="log-attempt-self-record">
+<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#log-attempt-self-record" title="Link to this heading"></a></h3>
+<p>Record a resolver attempt.</p>
+<p>Args:
+record: Resolver attempt metadata.
+timestamp: Optional timestamp override for the event.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+Exception: Implementations may propagate write failures.</p>
+</section>
+<section id="log-manifest-self-entry">
+<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#log-manifest-self-entry" title="Link to this heading"></a></h3>
+<p>Persist a manifest entry.</p>
+<p>Args:
+entry: Manifest payload describing a successfully processed artifact.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+Exception: Implementations may propagate write failures.</p>
+</section>
+<section id="log-summary-self-summary">
+<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#log-summary-self-summary" title="Link to this heading"></a></h3>
+<p>Store aggregated run metrics.</p>
+<p>Args:
+summary: Aggregated counters or diagnostic information.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+Exception: Implementations may propagate write failures.</p>
+</section>
+<section id="close-self">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#close-self" title="Link to this heading"></a></h3>
+<p>Release any resources held by the sink.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+<p>Raises:
+Exception: Implementations may propagate shutdown failures.</p>
+</section>
+<section id="write-self-payload">
+<h3><code class="docutils literal notranslate"><span class="pre">_write(self,</span> <span class="pre">payload)</span></code><a class="headerlink" href="#write-self-payload" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id2">
+<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id3">
+<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id4">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="enter-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#enter-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="exit-self-exc-type-exc-tb">
+<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#exit-self-exc-type-exc-tb" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id5">
+<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id6">
+<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id7">
+<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id8">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id9">
+<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#id9" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id10">
+<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#id10" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id11">
+<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id11" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id12">
+<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id12" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id13">
+<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id13" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id14">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id14" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id15">
+<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#id15" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id16">
+<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#id16" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+</section>
+<section id="classes">
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="manifestentry">
+<h3><code class="docutils literal notranslate"><span class="pre">ManifestEntry</span></code><a class="headerlink" href="#manifestentry" title="Link to this heading"></a></h3>
+<p>Structured manifest entry describing a resolved artifact.</p>
+<p>Attributes:
+timestamp: ISO-8601 timestamp describing when the artifact was stored.
+work_id: Primary identifier (e.g., OpenAlex work ID) for the artifact.
+title: Human-readable work title.
+publication_year: Optional publication year derived from upstream data.
+resolver: Resolver name that sourced the artifact, when known.
+url: Final URL from which the artifact was fetched.
+path: Local filesystem path where the artifact is stored.
+classification: Classifier label describing the download outcome.
+content_type: MIME type or equivalent classification when available.
+reason: Diagnostic reason for failure or classification notes.
+html_paths: Any extracted HTML content paths stored alongside the PDF.
+sha256: Optional SHA256 digest of the stored artifact.
+content_length: Content size in bytes when reported by the server.
+etag: Server-provided entity tag when available.
+last_modified: HTTP <code class="docutils literal notranslate"><span class="pre">Last-Modified</span></code> header value if supplied.
+extracted_text_path: Path to extracted text artefacts when produced.
+dry_run: Flag indicating whether the artifact was processed in dry-run mode.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>entry = ManifestEntry(
+…     timestamp=”2025-01-01T00:00:00Z”,
+…     work_id=”W123”,
+…     title=”Example”,
+…     publication_year=2024,
+…     resolver=”openalex”,
+…     url=”https://example.org/doc.pdf”,
+…     path=”/tmp/doc.pdf”,
+…     classification=”success”,
+…     content_type=”application/pdf”,
+…     reason=None,
+… )
+entry.work_id
+‘W123’</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="attemptsink">
+<h3><code class="docutils literal notranslate"><span class="pre">AttemptSink</span></code><a class="headerlink" href="#attemptsink" title="Link to this heading"></a></h3>
+<p>Protocol implemented by telemetry sinks used by the pipeline and CLI.</p>
+<p>Implementations typically write to JSONL/CSV and may maintain external
+storage handles; consumers should always call :meth:<code class="docutils literal notranslate"><span class="pre">close</span></code> when finished.</p>
+<p>Attributes:
+None</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>class InMemorySink:
+…     def <strong>init</strong>(self) -&gt; None:
+…         self.attempts = []
+…     def log_attempt(self, record, *, timestamp=None):
+…         self.attempts.append(record)
+…     def log_manifest(self, entry):
+…         pass
+…     def log_summary(self, summary):
+…         pass
+…     def close(self):
+…         pass
+isinstance(InMemorySink(), AttemptSink)
+True</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="jsonlsink">
+<h3><code class="docutils literal notranslate"><span class="pre">JsonlSink</span></code><a class="headerlink" href="#jsonlsink" title="Link to this heading"></a></h3>
+<p>Thread-safe sink that streams attempt, manifest, and summary events to JSONL files.</p>
+</section>
+<section id="csvsink">
+<h3><code class="docutils literal notranslate"><span class="pre">CsvSink</span></code><a class="headerlink" href="#csvsink" title="Link to this heading"></a></h3>
+<p>Lightweight sink that mirrors attempt records into a CSV for spreadsheet review.</p>
+</section>
+<section id="multisink">
+<h3><code class="docutils literal notranslate"><span class="pre">MultiSink</span></code><a class="headerlink" href="#multisink" title="Link to this heading"></a></h3>
+<p>Composite sink that fans out logging calls to multiple sinks.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

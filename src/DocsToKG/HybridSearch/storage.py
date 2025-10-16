@@ -16,7 +16,9 @@ from typing import Dict, List, Mapping, Optional, Sequence
 
 from .types import ChunkPayload, vector_uuid_to_faiss_int
 
-__all__ = ("ChunkRegistry", "matches_filters")
+from .devtools.opensearch_simulator import OpenSearchSimulator
+
+__all__ = ("ChunkRegistry", "OpenSearchSimulator", "matches_filters")
 
 
 class ChunkRegistry:
@@ -57,6 +59,9 @@ class ChunkRegistry:
             vector_ids: Identifiers associated with chunks to delete.
 
         Returns:
+            None
+
+        Raises:
             None
         """
         for vector_id in vector_ids:

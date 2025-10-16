@@ -10,7 +10,13 @@ Ranking, fusion, and result shaping utilities for DocsToKG hybrid search.
 
 ### `_basic_tokenize(text)`
 
-Minimal tokenizer used to avoid devtools dependencies in production code.
+Tokenize ``text`` using a simple regex to avoid devtools dependencies.
+
+Args:
+text: Source string to segment into lowercase tokens.
+
+Returns:
+List of tokens extracted from ``text``.
 
 ### `apply_mmr_diversification(fused_candidates, fused_scores, lambda_param, top_k)`
 

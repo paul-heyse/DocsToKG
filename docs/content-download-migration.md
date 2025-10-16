@@ -27,11 +27,19 @@ change set.
 ## 3. CLI Behaviour Changes
 
 - Use `--staging` to create timestamped run directories with separate `PDF/`
-  and `HTML/` folders plus `manifest.jsonl`, `manifest.index.json`, and
-  `manifest.metrics.json` sidecars.
+  and `HTML/` folders plus `manifest.jsonl` and `manifest.metrics.json`.
+  Generate `manifest.index.json` and `manifest.last.csv` after the run using
+  the helpers in `tools/`:
+
+  ```bash
+  python tools/manifest_to_index.py runs/YYYYMMDD_HHMM/manifest.jsonl \
+    runs/YYYYMMDD_HHMM/manifest.index.json
+  python tools/manifest_to_csv.py runs/YYYYMMDD_HHMM/manifest.jsonl \
+    runs/YYYYMMDD_HHMM/manifest.last.csv
+  ```
 - The CLI always writes JSONL manifests. When `--log-format csv` is supplied
-  it additionally produces `manifest.last.csv` summarising the latest attempt
-  per work.
+  it additionally produces an attempts CSV; run `tools/manifest_to_csv.py` to
+  refresh `manifest.last.csv` for human review.
 - Domain-level throttling (`--domain-min-interval`) and global URL deduplication
   (`--global-url-dedup`) now apply across worker threads.
 - Resume runs tolerate manifests with incomplete metadata; partial entries no
@@ -40,9 +48,11 @@ change set.
 
 ## 4. Manifest Consumers
 
-- Manifest entries maintain their historical schema. New sidecar files
+- Manifest entries maintain their historical schema. Sidecar files
   (`.index.json`, `.metrics.json`, `manifest.last.csv`) provide faster lookup
-  surfaces for resumption tools and operational dashboards.
+  surfaces for resumption tools and operational dashboards. Generate the index
+  and last CSV from `manifest.jsonl` with the conversion utilities under
+  `tools/`.
 - HTTP corruption heuristics now record whether HEAD prechecks succeeded via
   the `head_precheck_passed` manifest flag.
 

@@ -296,6 +296,16 @@ True</p>
 </div></blockquote>
 </div></blockquote>
 </section>
+<section id="derive-doc-id-and-vectors-path-chunk-file-chunks-root-vectors-root">
+<h3><code class="docutils literal notranslate"><span class="pre">derive_doc_id_and_vectors_path(chunk_file,</span> <span class="pre">chunks_root,</span> <span class="pre">vectors_root)</span></code><a class="headerlink" href="#derive-doc-id-and-vectors-path-chunk-file-chunks-root-vectors-root" title="Link to this heading"></a></h3>
+<p>Return manifest doc identifier and vectors output path for <code class="docutils literal notranslate"><span class="pre">chunk_file</span></code>.</p>
+<p>Args:
+chunk_file: Path to the chunk JSONL artefact.
+chunks_root: Root directory containing chunk artefacts.
+vectors_root: Root directory where vector outputs should be written.</p>
+<p>Returns:
+Tuple containing the manifest <code class="docutils literal notranslate"><span class="pre">doc_id</span></code> and the full vectors output path.</p>
+</section>
 <section id="get-logger-name-level">
 <h3><code class="docutils literal notranslate"><span class="pre">get_logger(name,</span> <span class="pre">level)</span></code><a class="headerlink" href="#get-logger-name-level" title="Link to this heading"></a></h3>
 <p>Get a structured JSON logger configured for console output.</p>
@@ -473,7 +483,7 @@ ValueError: If <code class="docutils literal notranslate"><span class="pre">stat
 <div><blockquote>
 <div><blockquote>
 <div><p>manifest_append(“chunk”, “doc1”, “success”)
-(data_manifests() / “docparse.manifest.jsonl”).exists()
+(data_manifests() / “docparse.chunk.manifest.jsonl”).exists()
 True</p>
 </div></blockquote>
 </div></blockquote>

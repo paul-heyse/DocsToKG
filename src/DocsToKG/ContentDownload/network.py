@@ -107,7 +107,6 @@ from __future__ import annotations
 import logging
 import random
 import time
-from unittest.mock import Mock as _Mock
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -137,6 +136,8 @@ def create_session(
     headers: Optional[Mapping[str, str]] = None,
     *,
     adapter_max_retries: int = 0,
+    pool_connections: int = 64,
+    pool_maxsize: int = 128,
 ) -> requests.Session:
     """Return a ``requests.Session`` configured for DocsToKG network requests.
 
@@ -146,6 +147,8 @@ def create_session(
             unchanged.
         adapter_max_retries: Retry count configured on mounted HTTP adapters. Defaults to
             ``0`` so :func:`request_with_retries` governs retry behaviour.
+        pool_connections: Lower bound of connection pools shared across the session's adapters.
+        pool_maxsize: Maximum number of connections kept per host in the adapter pool.
 
     Returns:
         requests.Session: Session instance with HTTP/HTTPS adapters mounted and ready for pipeline usage.
@@ -171,7 +174,11 @@ def create_session(
                 session_headers,
             )
 
-    adapter = HTTPAdapter(max_retries=adapter_max_retries)
+    adapter = HTTPAdapter(
+        max_retries=adapter_max_retries,
+        pool_connections=pool_connections,
+        pool_maxsize=pool_maxsize,
+    )
     if hasattr(session, "mount"):
         session.mount("http://", adapter)
         session.mount("https://", adapter)
@@ -276,87 +283,20 @@ def request_with_retries(
     else:
         retry_statuses = set(retry_statuses)
 
-    request_attr = getattr(session, "request", None)
-    use_request = callable(request_attr) and (
-        getattr(session, "_spec_class", None) is not None
-        or not isinstance(request_attr, _Mock)
-        or getattr(request_attr, "side_effect", None) is not None
-    )
-    if use_request:
+    if not hasattr(session, "request") or not callable(getattr(session, "request")):
+        raise AttributeError(
+            f"Session object of type {type(session)!r} lacks callable 'request'."
+        )
 
-        def request_func(
-            *,
-            method: str,
-            url: str,
-            **call_kwargs: Any,
-        ) -> requests.Response:
-            """Invoke :meth:`requests.Session.request` via the pooled session.
+    def request_func(
+        *,
+        method: str,
+        url: str,
+        **call_kwargs: Any,
+    ) -> requests.Response:
+        """Invoke :meth:`requests.Session.request` on the provided session."""
 
-            Args:
-                method: HTTP method name such as ``"GET"``.
-                url: Fully qualified URL to request.
-                **call_kwargs: Forwarded keyword arguments for ``session.request``.
-
-            Returns:
-                requests.Response: Response object produced by the session.
-            """
-
-            response = request_attr(method=method, url=url, **call_kwargs)
-            status = getattr(response, "status_code", None)
-            if isinstance(status, _Mock):
-                fallback = getattr(session, method.lower(), None)
-                if callable(fallback):
-                    return fallback(url, **call_kwargs)
-            return response
-
-    else:
-        method_func = getattr(session, method.lower(), None)
-        if callable(method_func):
-
-            def request_func(
-                *,
-                method: str,
-                url: str,
-                **call_kwargs: Any,
-            ) -> requests.Response:
-                """Call the method-specific session helper when available.
-
-                Args:
-                    method: HTTP method name (used for diagnostics).
-                    url: Fully qualified URL to request.
-                    **call_kwargs: Additional arguments forwarded to the helper.
-
-                Returns:
-                    requests.Response: Response object produced by the method helper.
-                """
-
-                return method_func(url, **call_kwargs)
-
-        elif callable(request_attr):
-
-            def request_func(
-                *,
-                method: str,
-                url: str,
-                **call_kwargs: Any,
-            ) -> requests.Response:
-                """Fallback to the session-level ``request`` implementation.
-
-                Args:
-                    method: HTTP method name such as ``"GET"``.
-                    url: Fully qualified URL to request.
-                    **call_kwargs: Keyword arguments forwarded to ``session.request``.
-
-                Returns:
-                    requests.Response: Response object produced by the session.
-                """
-
-                return request_attr(method=method, url=url, **call_kwargs)
-
-        else:
-            raise AttributeError(
-                f"Session object of type {type(session)!r} lacks 'request' and '{method.lower()}' callables"
-            )
+        return session.request(method=method, url=url, **call_kwargs)
 
     last_exception: Optional[Exception] = None
 
@@ -517,8 +457,11 @@ def _looks_like_pdf(headers: Mapping[str, str]) -> bool:
     content_type = (headers.get("Content-Type") or "").lower()
     content_length = (headers.get("Content-Length") or "").strip()
 
-    if "text/html" in content_type:
+    if any(t in content_type for t in ("text/html", "application/json", "text/plain")):
         return False
+    dispo = (headers.get("Content-Disposition") or "").lower()
+    if "filename=" in dispo and ".pdf" in dispo:
+        return True
     if content_length == "0":
         return False
     return True
@@ -680,6 +623,10 @@ class ConditionalRequestHelper:
                 LOGGER.warning(
                     "resume-metadata-incomplete: falling back to full fetch (missing %s)",
                     ", ".join(missing),
+                    extra={
+                        "reason": "resume-metadata-incomplete",
+                        "missing_resume_fields": missing,
+                    },
                 )
                 return {}
         if self.prior_etag:

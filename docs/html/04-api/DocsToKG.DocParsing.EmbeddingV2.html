@@ -126,10 +126,6 @@ model_root: Base directory housing DocsToKG models.</p>
 <p>Returns:
 Absolute path to the SPLADE model directory.</p>
 </section>
-<section id="derive-doc-id-and-output-path-chunk-file-chunks-root-vectors-root">
-<h3><code class="docutils literal notranslate"><span class="pre">_derive_doc_id_and_output_path(chunk_file,</span> <span class="pre">chunks_root,</span> <span class="pre">vectors_root)</span></code><a class="headerlink" href="#derive-doc-id-and-output-path-chunk-file-chunks-root-vectors-root" title="Link to this heading"></a></h3>
-<p>Return manifest doc_id and vector output path for a chunk artifact.</p>
-</section>
 <section id="expand-optional-path">
 <h3><code class="docutils literal notranslate"><span class="pre">_expand_optional(path)</span></code><a class="headerlink" href="#expand-optional-path" title="Link to this heading"></a></h3>
 <p>Expand optional :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code> values to absolutes when provided.</p>
@@ -250,14 +246,19 @@ List of embedding vectors, one per input text.</p>
 </section>
 <section id="process-pass-a-files-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">process_pass_a(files,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#process-pass-a-files-logger" title="Link to this heading"></a></h3>
-<p>Assign UUIDs and build BM25 statistics for a corpus of chunk files.</p>
+<p>Assign UUIDs and build BM25 statistics (streaming + atomic rewrite).</p>
+<p>This implementation streams each JSONL row and writes a temporary file with
+normalised schema/UUIDs. The original file is atomically replaced <strong>only</strong>
+when changes are detected. This bounds memory on huge shards and prevents
+partial writes.</p>
 <p>Args:
 files: Sequence of chunk file paths to process.
 logger: Logger used for structured progress output.</p>
 <p>Returns:
 Aggregated BM25 statistics for the supplied chunk corpus.</p>
 <p>Raises:
-ValueError: Propagated when chunk rows are missing required fields.</p>
+OSError: If chunk files cannot be read or written.
+json.JSONDecodeError: If a chunk row contains invalid JSON.</p>
 </section>
 <section id="iter-rows-in-batches-path-batch-size">
 <h3><code class="docutils literal notranslate"><span class="pre">iter_rows_in_batches(path,</span> <span class="pre">batch_size)</span></code><a class="headerlink" href="#iter-rows-in-batches-path-batch-size" title="Link to this heading"></a></h3>

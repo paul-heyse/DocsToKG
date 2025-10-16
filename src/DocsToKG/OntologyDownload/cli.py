@@ -875,6 +875,13 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
         }
         if candidate.plan.content_length is not None:
             candidate_payload["content_length"] = candidate.plan.content_length
+        candidate_metadata = getattr(candidate, "metadata", None)
+        if candidate_metadata is None:
+            candidate_metadata = getattr(candidate.plan, "metadata", None)
+        if isinstance(candidate_metadata, dict):
+            etag_value = candidate_metadata.get("etag")
+            if etag_value:
+                candidate_payload["etag"] = etag_value
         candidates.append(candidate_payload)
 
     payload = {
@@ -1202,6 +1209,8 @@ def _handle_prune(args, logger) -> Dict[str, object]:
         total_reclaimed += reclaimed
         if args.dry_run:
             total_deleted += len(to_remove)
+        retained_versions = [entry["version"] for entry in retained]
+        keep_summary = ", ".join(retained_versions) if retained_versions else "none"
         summary.append(
             {
                 "id": ontology_id,
@@ -1211,13 +1220,17 @@ def _handle_prune(args, logger) -> Dict[str, object]:
             }
         )
         if args.dry_run:
+            if to_remove:
+                messages.append(
+                    f"[DRY-RUN] {ontology_id}: keep {keep_summary}; would delete {len(to_remove)} version(s) freeing {_format_bytes(reclaimed)}"
+                )
             for item in to_remove:
                 messages.append(
                     f"[DRY-RUN] {ontology_id} version {item['version']} would free {_format_bytes(int(item.get('size') or 0))}"
                 )
         elif deleted_versions:
             messages.append(
-                f"Deleted {len(deleted_versions)} versions for {ontology_id} (freed {_format_bytes(reclaimed)})"
+                f"Deleted {len(deleted_versions)} versions for {ontology_id} (freed {_format_bytes(reclaimed)}; kept {keep_summary})"
             )
 
     return {

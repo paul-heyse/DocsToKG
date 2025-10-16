@@ -87,7 +87,11 @@
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="basic-tokenize-text">
 <h3><code class="docutils literal notranslate"><span class="pre">_basic_tokenize(text)</span></code><a class="headerlink" href="#basic-tokenize-text" title="Link to this heading"></a></h3>
-<p>Minimal tokenizer used to avoid devtools dependencies in production code.</p>
+<p>Tokenize <code class="docutils literal notranslate"><span class="pre">text</span></code> using a simple regex to avoid devtools dependencies.</p>
+<p>Args:
+text: Source string to segment into lowercase tokens.</p>
+<p>Returns:
+List of tokens extracted from <code class="docutils literal notranslate"><span class="pre">text</span></code>.</p>
 </section>
 <section id="apply-mmr-diversification-fused-candidates-fused-scores-lambda-param-top-k">
 <h3><code class="docutils literal notranslate"><span class="pre">apply_mmr_diversification(fused_candidates,</span> <span class="pre">fused_scores,</span> <span class="pre">lambda_param,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#apply-mmr-diversification-fused-candidates-fused-scores-lambda-param-top-k" title="Link to this heading"></a></h3>

@@ -205,23 +205,6 @@ self: Configuration instance requiring validation.</p>
 <p>Returns:
 None</p>
 </section>
-<section id="log-attempt-self-record">
-<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#log-attempt-self-record" title="Link to this heading"></a></h3>
-<p>Log a resolver attempt with optional timestamp override.</p>
-<p>Args:
-record: Structured attempt event emitted by a resolver.
-timestamp: Override timestamp string for deterministic replay.</p>
-<p>Returns:
-None</p>
-</section>
-<section id="log-self-record">
-<h3><code class="docutils literal notranslate"><span class="pre">log(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#log-self-record" title="Link to this heading"></a></h3>
-<p>Log a resolver attempt.</p>
-<p>Args:
-record: Attempt record describing the resolver execution.</p>
-<p>Returns:
-None</p>
-</section>
 <section id="is-pdf-self">
 <h3><code class="docutils literal notranslate"><span class="pre">is_pdf(self)</span></code><a class="headerlink" href="#is-pdf-self" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when the classification represents a PDF.</p>
@@ -664,8 +647,8 @@ self: Pipeline instance executing resolver scheduling logic.</p>
 <p>Returns:
 None</p>
 </section>
-<section id="should-attempt-head-check-self-resolver-name">
-<h3><code class="docutils literal notranslate"><span class="pre">_should_attempt_head_check(self,</span> <span class="pre">resolver_name)</span></code><a class="headerlink" href="#should-attempt-head-check-self-resolver-name" title="Link to this heading"></a></h3>
+<section id="should-attempt-head-check-self-resolver-name-url">
+<h3><code class="docutils literal notranslate"><span class="pre">_should_attempt_head_check(self,</span> <span class="pre">resolver_name,</span> <span class="pre">url)</span></code><a class="headerlink" href="#should-attempt-head-check-self-resolver-name-url" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when a resolver should perform a HEAD preflight request.</p>
 <p>Args:
 resolver_name: Name of the resolver under consideration.</p>
@@ -854,27 +837,6 @@ dry_run: Flag indicating whether the attempt occurred in dry-run mode.</p>
 …     content_type=”application/pdf”,
 …     elapsed_ms=120.5,
 … )</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-<section id="attemptsink">
-<h3><code class="docutils literal notranslate"><span class="pre">AttemptSink</span></code><a class="headerlink" href="#attemptsink" title="Link to this heading"></a></h3>
-<p>Protocol for logging resolver attempts.</p>
-<p>Attributes:
-None: The protocol formalises the callable surface without storing state.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>class Collector:
-…     def <strong>init</strong>(self):
-…         self.records = []
-…     def log(self, record: AttemptRecord) -&gt; None:
-…         self.records.append(record)
-collector = Collector()
-isinstance(collector, AttemptSink)
-True</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>

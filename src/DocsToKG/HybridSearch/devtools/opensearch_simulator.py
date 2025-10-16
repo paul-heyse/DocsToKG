@@ -12,10 +12,15 @@ Raises:
 
 from __future__ import annotations
 
+
+import math
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
+import math
+
 from ..config import ChunkingConfig
+from ..interfaces import LexicalIndex
 from ..types import ChunkPayload
 
 __all__ = (
@@ -167,6 +172,9 @@ class OpenSearchSchemaManager:
     def list_templates(self) -> Mapping[str, OpenSearchIndexTemplate]:
         """Return a shallow copy of the namespace → template mapping.
 
+        Args:
+            None
+
         Returns:
             Mapping of namespace names to template definitions.
         """
@@ -201,7 +209,7 @@ class _StoredChunk:
     payload: ChunkPayload
 
 
-class OpenSearchSimulator:
+class OpenSearchSimulator(LexicalIndex):
     """Simplified OpenSearch-like index used for development and tests.
 
     The simulator implements the :class:`~DocsToKG.HybridSearch.interfaces.LexicalIndex`
@@ -223,15 +231,26 @@ class OpenSearchSimulator:
         self._chunks: Dict[str, _StoredChunk] = {}
         self._avg_length: float = 0.0
         self._templates: Dict[str, OpenSearchIndexTemplate] = {}
+        self._df: Dict[str, int] = {}
 
     def bulk_upsert(self, chunks: Sequence[ChunkPayload]) -> None:
         """Insert or update ``chunks`` within the simulator.
 
         Args:
             chunks: Iterable of chunk payloads to store or replace.
+
+        Returns:
+            None
+
+        Raises:
+            None
         """
         for chunk in chunks:
+            previous = self._chunks.get(chunk.vector_id)
+            if previous is not None:
+                self._update_df_on_remove(set(previous.payload.features.bm25_terms.keys()))
             self._chunks[chunk.vector_id] = _StoredChunk(chunk)
+            self._update_df_on_add(set(chunk.features.bm25_terms.keys()))
         self._recompute_avg_length()
 
     def bulk_delete(self, vector_ids: Sequence[str]) -> None:
@@ -239,10 +258,30 @@ class OpenSearchSimulator:
 
         Args:
             vector_ids: Vector identifiers associated with chunks to remove.
+
+        Returns:
+            None
+
+        Raises:
+            None
         """
         for vector_id in vector_ids:
-            self._chunks.pop(vector_id, None)
+            existing = self._chunks.pop(vector_id, None)
+            if existing is not None:
+                self._update_df_on_remove(set(existing.payload.features.bm25_terms.keys()))
         self._recompute_avg_length()
+
+    def _update_df_on_add(self, terms: set[str]) -> None:
+        for token in terms:
+            self._df[token] = self._df.get(token, 0) + 1
+
+    def _update_df_on_remove(self, terms: set[str]) -> None:
+        for token in terms:
+            current = self._df.get(token, 0)
+            if current <= 1:
+                self._df.pop(token, None)
+            else:
+                self._df[token] = current - 1
 
     def fetch(self, vector_ids: Sequence[str]) -> List[ChunkPayload]:
         """Return the stored payloads matching ``vector_ids``.
@@ -258,6 +297,9 @@ class OpenSearchSimulator:
     def vector_ids(self) -> List[str]:
         """Return all vector identifiers currently stored.
 
+        Args:
+            None
+
         Returns:
             Vector identifiers known to the simulator.
         """
@@ -268,6 +310,9 @@ class OpenSearchSimulator:
 
         Args:
             template: Template definition to register.
+
+        Returns:
+            None
         """
         self._templates[template.namespace] = template
 
@@ -336,7 +381,15 @@ class OpenSearchSimulator:
         )
 
     def highlight(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
-        """Return naive highlight tokens that appear in ``chunk``."""
+        """Return naive highlight tokens that appear in ``chunk``.
+
+        Args:
+            chunk: Chunk text that should be scanned for highlights.
+            query_tokens: Tokens extracted from the query phrase.
+
+        Returns:
+            List of tokens present in both ``chunk`` and ``query_tokens``.
+        """
         lowered = chunk.text.lower()
         highlights: List[str] = []
         for token in query_tokens:
@@ -438,11 +491,57 @@ class OpenSearchSimulator:
             score = scoring_fn(stored)
             if score > 0.0:
                 scored.append((stored.payload, float(score)))
-        scored.sort(key=lambda item: item[1], reverse=True)
+        # Stable ordering on ties to keep cursors deterministic.
+        scored.sort(key=lambda item: (-item[1], item[0].vector_id))
+        return self._paginate(scored, top_k, cursor)
+
+    def search_bm25_true(
+        self,
+        query_weights: Mapping[str, float],
+        filters: Mapping[str, object],
+        top_k: int,
+        cursor: Optional[int] = None,
+        *,
+        k1: float = 1.2,
+        b: float = 0.75,
+    ) -> Tuple[List[Tuple[ChunkPayload, float]], Optional[int]]:
+        """Execute Okapi BM25 using stored DF statistics."""
+
+        candidates = self._filtered_chunks(filters)
+        if not candidates or not query_weights:
+            return ([], None)
+
+        N = max(1, len(self._chunks))
+        avgdl = self._avg_length if self._avg_length > 0.0 else 1.0
+        terms = list(query_weights.keys())
+
+        def bm25_score(stored: _StoredChunk) -> float:
+            dl = max(1.0, float(stored.payload.token_count))
+            score = 0.0
+            for token in terms:
+                tf = float(stored.payload.features.bm25_terms.get(token, 0.0))
+                if tf <= 0.0:
+                    continue
+                df = self._df.get(token, 0)
+                if df <= 0:
+                    continue
+                idf = math.log((N - df + 0.5) / (df + 0.5) + 1.0)
+                denom = tf + k1 * (1.0 - b + b * (dl / avgdl))
+                if denom <= 0.0:
+                    continue
+                score += idf * (tf * (k1 + 1.0)) / denom
+            return float(score)
+
+        scored = [(stored.payload, bm25_score(stored)) for stored in candidates]
+        scored = [(payload, score) for payload, score in scored if score > 0.0]
+        scored.sort(key=lambda item: (-item[1], item[0].vector_id))
         return self._paginate(scored, top_k, cursor)
 
     def _recompute_avg_length(self) -> None:
         """Update the cached average chunk length metric.
+
+        Args:
+            None
 
         Returns:
             None

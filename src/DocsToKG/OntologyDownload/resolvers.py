@@ -3,84 +3,18 @@
 #   "module": "DocsToKG.OntologyDownload.resolvers",
 #   "purpose": "Implements DocsToKG.OntologyDownload.resolvers behaviors and helpers",
 #   "sections": [
-#     {
-#       "id": "normalize-license-to-spdx",
-#       "name": "normalize_license_to_spdx",
-#       "anchor": "function-normalize-license-to-spdx",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "get-service-bucket",
-#       "name": "_get_service_bucket",
-#       "anchor": "function-get-service-bucket",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "fetchplan",
-#       "name": "FetchPlan",
-#       "anchor": "class-fetchplan",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "baseresolver",
-#       "name": "BaseResolver",
-#       "anchor": "class-baseresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "oboresolver",
-#       "name": "OBOResolver",
-#       "anchor": "class-oboresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "olsresolver",
-#       "name": "OLSResolver",
-#       "anchor": "class-olsresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "bioportalresolver",
-#       "name": "BioPortalResolver",
-#       "anchor": "class-bioportalresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "lovresolver",
-#       "name": "LOVResolver",
-#       "anchor": "class-lovresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "skosresolver",
-#       "name": "SKOSResolver",
-#       "anchor": "class-skosresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "xbrlresolver",
-#       "name": "XBRLResolver",
-#       "anchor": "class-xbrlresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "ontobeeresolver",
-#       "name": "OntobeeResolver",
-#       "anchor": "class-ontobeeresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "load-resolver-plugins",
-#       "name": "_load_resolver_plugins",
-#       "anchor": "function-load-resolver-plugins",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "load-resolver-plugins",
-#       "name": "_load_resolver_plugins",
-#       "anchor": "function-load-resolver-plugins",
-#       "kind": "function"
-#     }
+#     {"id": "normalize_license_to_spdx", "name": "normalize_license_to_spdx", "anchor": "function-normalize_license_to_spdx", "kind": "function"},
+#     {"id": "_get_service_bucket", "name": "_get_service_bucket", "anchor": "function-_get_service_bucket", "kind": "function"},
+#     {"id": "FetchPlan", "name": "FetchPlan", "anchor": "class-FetchPlan", "kind": "class"},
+#     {"id": "BaseResolver", "name": "BaseResolver", "anchor": "class-BaseResolver", "kind": "class"},
+#     {"id": "OBOResolver", "name": "OBOResolver", "anchor": "class-OBOResolver", "kind": "class"},
+#     {"id": "OLSResolver", "name": "OLSResolver", "anchor": "class-OLSResolver", "kind": "class"},
+#     {"id": "BioPortalResolver", "name": "BioPortalResolver", "anchor": "class-BioPortalResolver", "kind": "class"},
+#     {"id": "LOVResolver", "name": "LOVResolver", "anchor": "class-LOVResolver", "kind": "class"},
+#     {"id": "SKOSResolver", "name": "SKOSResolver", "anchor": "class-SKOSResolver", "kind": "class"},
+#     {"id": "XBRLResolver", "name": "XBRLResolver", "anchor": "class-XBRLResolver", "kind": "class"},
+#     {"id": "OntobeeResolver", "name": "OntobeeResolver", "anchor": "class-OntobeeResolver", "kind": "class"},
+#     {"id": "_load_resolver_plugins", "name": "_load_resolver_plugins", "anchor": "function-_load_resolver_plugins", "kind": "function"}
 #   ]
 # }
 # === /NAVMAP ===
@@ -111,7 +45,6 @@ except ModuleNotFoundError:  # pragma: no cover - provide actionable error for r
     get_obo_download = None  # type: ignore[assignment]
     get_owl_download = None  # type: ignore[assignment]
     get_rdf_download = None  # type: ignore[assignment]
-from bioregistry import get_obo_download, get_owl_download, get_rdf_download
 
 try:  # pragma: no cover - optional dependency shim
     from ols_client import OlsClient as _OlsClient
@@ -896,6 +829,68 @@ class SKOSResolver(BaseResolver):
         )
 
 
+class DirectResolver(BaseResolver):
+    """Resolver that consumes explicit URLs supplied via ``spec.extras``."""
+
+    def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Return a fetch plan using the direct URL provided in ``spec.extras``.
+
+        Args:
+            spec: Fetch specification containing the upstream download details.
+            config: Resolved configuration (unused, provided for interface parity).
+            logger: Logger adapter used to record telemetry.
+
+        Returns:
+            FetchPlan referencing the explicit URL.
+
+        Raises:
+            ConfigError: If the specification omits the required URL or provides invalid extras.
+        """
+
+        extras = getattr(spec, "extras", {}) or {}
+        if not isinstance(extras, dict):
+            raise ConfigError("direct resolver expects spec.extras to be a mapping")
+
+        url = extras.get("url")
+        if not isinstance(url, str) or not url.strip():
+            raise ConfigError("direct resolver requires 'extras.url'")
+        url = url.strip()
+
+        headers = extras.get("headers")
+        if headers is not None and not isinstance(headers, dict):
+            raise ConfigError("direct resolver expects 'extras.headers' to be a mapping")
+
+        filename_hint = extras.get("filename_hint")
+        if filename_hint is not None and not isinstance(filename_hint, str):
+            raise ConfigError("direct resolver expects 'extras.filename_hint' to be a string")
+
+        license_hint = extras.get("license")
+        if license_hint is not None and not isinstance(license_hint, str):
+            raise ConfigError("direct resolver expects 'extras.license' to be a string")
+
+        version = extras.get("version")
+        if version is not None and not isinstance(version, str):
+            raise ConfigError("direct resolver expects 'extras.version' to be a string")
+
+        logger.info(
+            "resolved download url",
+            extra={
+                "stage": "plan",
+                "resolver": "direct",
+                "ontology_id": spec.id,
+                "url": url,
+            },
+        )
+        return self._build_plan(
+            url=url,
+            headers=headers,
+            filename_hint=filename_hint,
+            version=version,
+            license=license_hint,
+            service="direct",
+        )
+
+
 class XBRLResolver(BaseResolver):
     """Resolver for XBRL taxonomy packages.
 
@@ -1046,6 +1041,19 @@ def _load_resolver_plugins(logger: Optional[logging.Logger] = None) -> None:
             )
 
 
+_PLUGINS_LOADED = False
+
+
+def _ensure_plugins_loaded(logger: Optional[logging.Logger] = None) -> None:
+    """Ensure resolver plugins are loaded at most once per interpreter."""
+
+    global _PLUGINS_LOADED
+    if _PLUGINS_LOADED:
+        return
+    _load_resolver_plugins(logger)
+    _PLUGINS_LOADED = True
+
+
 _LOGGER = logging.getLogger(__name__)
 
 RESOLVERS: Dict[str, BaseResolver] = {
@@ -1053,6 +1061,7 @@ RESOLVERS: Dict[str, BaseResolver] = {
     "bioregistry": OBOResolver(),
     "lov": LOVResolver(),
     "skos": SKOSResolver(),
+    "direct": DirectResolver(),
     "xbrl": XBRLResolver(),
     "ontobee": OntobeeResolver(),
 }
@@ -1073,7 +1082,7 @@ if BioPortalClient is not None:
 else:  # pragma: no cover - depends on optional dependency presence
     _LOGGER.debug("BioPortal resolver disabled because ontoportal-client is not installed")
 
-_load_resolver_plugins()
+_ensure_plugins_loaded()
 
 
 # --- Globals ---
@@ -1085,40 +1094,9 @@ __all__ = [
     "BioPortalResolver",
     "LOVResolver",
     "SKOSResolver",
+    "DirectResolver",
     "XBRLResolver",
     "OntobeeResolver",
     "RESOLVERS",
     "normalize_license_to_spdx",
 ]
-
-
-def _load_resolver_plugins(logger: Optional[logging.Logger] = None) -> None:
-    """Discover resolver plugins registered via Python entry points."""
-
-    logger = logger or logging.getLogger(__name__)
-    try:
-        entry_points = metadata.entry_points()
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.warning(
-            "resolver plugin discovery failed",
-            extra={"stage": "init", "error": str(exc)},
-        )
-        return
-
-    for entry in entry_points.select(group="docstokg.ontofetch.resolver"):
-        try:
-            loaded = entry.load()
-            resolver = loaded() if isinstance(loaded, type) else loaded
-            if not hasattr(resolver, "plan"):
-                raise TypeError("resolver plugin must define a plan method")
-            name = getattr(resolver, "NAME", entry.name)
-            RESOLVERS[name] = resolver
-            logger.info(
-                "resolver plugin registered",
-                extra={"stage": "init", "resolver": name},
-            )
-        except Exception as exc:  # pragma: no cover - plugin faults
-            logger.warning(
-                "resolver plugin failed",
-                extra={"stage": "init", "resolver": entry.name, "error": str(exc)},
-            )

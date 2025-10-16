@@ -155,8 +155,23 @@ seconds per domain:</p>
 <p>Domain-level limits complement existing resolver-level throttles and are
 particularly helpful when multiple providers resolve to the same host.</p>
 </section>
+<section id="adjusting-classification-heuristics">
+<h2>5. Adjusting Classification Heuristics<a class="headerlink" href="#adjusting-classification-heuristics" title="Link to this heading"></a></h2>
+<p>The downloader exposes configurable heuristics for classifying streamed
+payloads and validating PDFs. Set the knobs in resolver configuration files to
+override the defaults (which mirror historical behaviour):</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">sniff_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">65536</span><span class="w">        </span><span class="c1"># auto-upgrade ambiguous streams to PDF after n bytes</span>
+<span class="nt">min_pdf_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1024</span><span class="w">       </span><span class="c1"># PDFs smaller than this are treated as corrupt</span>
+<span class="nt">tail_check_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span><span class="w">    </span><span class="c1"># number of bytes scanned for the %%EOF marker</span>
+</pre></div>
+</div>
+<p>These values propagate through the resolver pipeline context so that
+<code class="docutils literal notranslate"><span class="pre">download_candidate</span></code> applies them consistently across worker threads. Lower
+<code class="docutils literal notranslate"><span class="pre">sniff_bytes</span></code> when dealing with very small PDFs, or raise <code class="docutils literal notranslate"><span class="pre">tail_check_bytes</span></code>
+for publishers that append trailers after the EOF marker.</p>
+</section>
 <section id="staging-mode-and-derived-logs">
-<h2>5. Staging Mode and Derived Logs<a class="headerlink" href="#staging-mode-and-derived-logs" title="Link to this heading"></a></h2>
+<h2>6. Staging Mode and Derived Logs<a class="headerlink" href="#staging-mode-and-derived-logs" title="Link to this heading"></a></h2>
 <p>Long-running harvests benefit from isolated output folders and richer manifest
 artifacts. The downloader exposes a <code class="docutils literal notranslate"><span class="pre">--staging</span></code> flag that creates a timestamped
 run directory containing all artifacts for that invocation:</p>
@@ -172,12 +187,19 @@ run directory containing all artifacts for that invocation:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">runs/YYYYMMDD_HHMM/PDF/</span></code> for downloaded PDFs</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">runs/YYYYMMDD_HHMM/HTML/</span></code> for captured HTML fallbacks</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">runs/YYYYMMDD_HHMM/manifest.jsonl</span></code> for manifest records</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">runs/YYYYMMDD_HHMM/manifest.index.json</span></code> for a work → artifact summary</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">runs/YYYYMMDD_HHMM/manifest.metrics.json</span></code> for aggregate resolver metrics</p></li>
 </ul>
+<p>Generate the sidecar index and last-attempt CSV after the run completes:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>tools/manifest_to_index.py<span class="w"> </span>runs/YYYYMMDD_HHMM/manifest.jsonl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>runs/YYYYMMDD_HHMM/manifest.index.json
+python<span class="w"> </span>tools/manifest_to_csv.py<span class="w"> </span>runs/YYYYMMDD_HHMM/manifest.jsonl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>runs/YYYYMMDD_HHMM/manifest.last.csv
+</pre></div>
+</div>
 <p>When <code class="docutils literal notranslate"><span class="pre">--log-format</span> <span class="pre">csv</span></code> is supplied the downloader still emits JSONL manifests
-and additionally produces a <code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code> file that captures the latest
-manifest record per work for rapid auditing:</p>
+and writes an attempts CSV mirror. Run <code class="docutils literal notranslate"><span class="pre">tools/manifest_to_csv.py</span></code> to produce a
+<code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code> file that captures the latest manifest record per work for
+rapid auditing:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.download_pyalex_pdfs<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--topic<span class="w"> </span><span class="s2">&quot;graph embeddings&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--year-start<span class="w"> </span><span class="m">2022</span><span class="w"> </span>--year-end<span class="w"> </span><span class="m">2024</span><span class="w"> </span><span class="se">\</span>

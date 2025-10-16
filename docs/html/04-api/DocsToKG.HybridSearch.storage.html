@@ -82,44 +82,89 @@
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Chunk registry helpers and shared filter utilities.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+<p>Raises:
+None</p>
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="matches-filters-chunk-filters">
 <h3><code class="docutils literal notranslate"><span class="pre">matches_filters(chunk,</span> <span class="pre">filters)</span></code><a class="headerlink" href="#matches-filters-chunk-filters" title="Link to this heading"></a></h3>
 <p>Check whether <code class="docutils literal notranslate"><span class="pre">chunk</span></code> satisfies the provided OpenSearch-style filters.</p>
+<p>Args:
+chunk: Chunk payload whose metadata should be evaluated.
+filters: Mapping of filter keys to expected values.</p>
+<p>Returns:
+<code class="docutils literal notranslate"><span class="pre">True</span></code> if the chunk matches every filter, otherwise <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
 </section>
 <section id="upsert-self-chunks">
 <h3><code class="docutils literal notranslate"><span class="pre">upsert(self,</span> <span class="pre">chunks)</span></code><a class="headerlink" href="#upsert-self-chunks" title="Link to this heading"></a></h3>
 <p>Insert or update registry entries for <code class="docutils literal notranslate"><span class="pre">chunks</span></code>.</p>
+<p>Args:
+chunks: Chunk payloads that should be tracked by the registry.</p>
+<p>Returns:
+None</p>
 </section>
 <section id="delete-self-vector-ids">
 <h3><code class="docutils literal notranslate"><span class="pre">delete(self,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#delete-self-vector-ids" title="Link to this heading"></a></h3>
 <p>Remove registry entries for the supplied vector identifiers.</p>
+<p>Args:
+vector_ids: Identifiers associated with chunks to delete.</p>
+<p>Returns:
+None</p>
+<p>Raises:
+None</p>
 </section>
 <section id="get-self-vector-id">
 <h3><code class="docutils literal notranslate"><span class="pre">get(self,</span> <span class="pre">vector_id)</span></code><a class="headerlink" href="#get-self-vector-id" title="Link to this heading"></a></h3>
 <p>Return the chunk payload for <code class="docutils literal notranslate"><span class="pre">vector_id</span></code> when available.</p>
+<p>Args:
+vector_id: Identifier of the chunk to retrieve.</p>
+<p>Returns:
+Matching chunk payload, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if the identifier is unknown.</p>
 </section>
 <section id="bulk-get-self-vector-ids">
 <h3><code class="docutils literal notranslate"><span class="pre">bulk_get(self,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#bulk-get-self-vector-ids" title="Link to this heading"></a></h3>
 <p>Return chunk payloads for identifiers present in the registry.</p>
+<p>Args:
+vector_ids: Identifiers of the desired chunk payloads.</p>
+<p>Returns:
+List of chunk payloads that are present in the registry.</p>
 </section>
 <section id="resolve-faiss-id-self-internal-id">
 <h3><code class="docutils literal notranslate"><span class="pre">resolve_faiss_id(self,</span> <span class="pre">internal_id)</span></code><a class="headerlink" href="#resolve-faiss-id-self-internal-id" title="Link to this heading"></a></h3>
 <p>Translate a FAISS integer id back to the original vector identifier.</p>
+<p>Args:
+internal_id: Integer id assigned by the FAISS vector store.</p>
+<p>Returns:
+Associated vector identifier when the mapping exists.</p>
 </section>
 <section id="all-self">
 <h3><code class="docutils literal notranslate"><span class="pre">all(self)</span></code><a class="headerlink" href="#all-self" title="Link to this heading"></a></h3>
 <p>Return all cached chunk payloads.</p>
+<p>Args:
+None</p>
+<p>Returns:
+List containing every chunk payload stored in the registry.</p>
 </section>
 <section id="count-self">
 <h3><code class="docutils literal notranslate"><span class="pre">count(self)</span></code><a class="headerlink" href="#count-self" title="Link to this heading"></a></h3>
 <p>Return the number of chunks tracked by the registry.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Number of chunk payloads stored in the registry.</p>
 </section>
 <section id="vector-ids-self">
 <h3><code class="docutils literal notranslate"><span class="pre">vector_ids(self)</span></code><a class="headerlink" href="#vector-ids-self" title="Link to this heading"></a></h3>
 <p>Return all vector identifiers in insertion order.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Vector identifiers ordered by insertion time.</p>
 </section>
 </section>
 <section id="classes">
@@ -127,6 +172,20 @@
 <section id="chunkregistry">
 <h3><code class="docutils literal notranslate"><span class="pre">ChunkRegistry</span></code><a class="headerlink" href="#chunkregistry" title="Link to this heading"></a></h3>
 <p>Durable mapping of vector identifiers to chunk payloads.</p>
+<p>Attributes:
+_chunks: Mapping from vector identifier to chunk payload.
+_bridge: Mapping from FAISS integer identifier to vector identifier.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>registry = ChunkRegistry()
+registry.upsert([])  # no-op
+registry.count()
+0</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 </section>
 </section>

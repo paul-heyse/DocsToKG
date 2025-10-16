@@ -4,228 +4,38 @@
 #   "module": "DocsToKG.ContentDownload.download_pyalex_pdfs",
 #   "purpose": "OpenAlex PDF download CLI and supporting utilities",
 #   "sections": [
-#     {
-#       "id": "utc-timestamp",
-#       "name": "_utc_timestamp",
-#       "anchor": "function-utc-timestamp",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "has-pdf-eof",
-#       "name": "_has_pdf_eof",
-#       "anchor": "function-has-pdf-eof",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "slugify",
-#       "name": "slugify",
-#       "anchor": "function-slugify",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure-dir",
-#       "name": "ensure_dir",
-#       "anchor": "function-ensure-dir",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "parse-domain-interval",
-#       "name": "_parse_domain_interval",
-#       "anchor": "function-parse-domain-interval",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "make-session",
-#       "name": "_make_session",
-#       "anchor": "function-make-session",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "manifestentry",
-#       "name": "ManifestEntry",
-#       "anchor": "class-manifestentry",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "attemptsink",
-#       "name": "AttemptSink",
-#       "anchor": "class-attemptsink",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "jsonlsink",
-#       "name": "JsonlSink",
-#       "anchor": "class-jsonlsink",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "csvsink",
-#       "name": "CsvSink",
-#       "anchor": "class-csvsink",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "csvattemptloggeradapter",
-#       "name": "CsvAttemptLoggerAdapter",
-#       "anchor": "class-csvattemptloggeradapter",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "multisink",
-#       "name": "MultiSink",
-#       "anchor": "class-multisink",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "manifestindexsink",
-#       "name": "ManifestIndexSink",
-#       "anchor": "class-manifestindexsink",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "lastattemptcsvsink",
-#       "name": "LastAttemptCsvSink",
-#       "anchor": "class-lastattemptcsvsink",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "load-previous-manifest",
-#       "name": "load_previous_manifest",
-#       "anchor": "function-load-previous-manifest",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "build-manifest-entry",
-#       "name": "build_manifest_entry",
-#       "anchor": "function-build-manifest-entry",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "classify-payload",
-#       "name": "classify_payload",
-#       "anchor": "function-classify-payload",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "extract-filename-from-disposition",
-#       "name": "_extract_filename_from_disposition",
-#       "anchor": "function-extract-filename-from-disposition",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "infer-suffix",
-#       "name": "_infer_suffix",
-#       "anchor": "function-infer-suffix",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "update-tail-buffer",
-#       "name": "_update_tail_buffer",
-#       "anchor": "function-update-tail-buffer",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "workartifact",
-#       "name": "WorkArtifact",
-#       "anchor": "class-workartifact",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "downloadstate",
-#       "name": "DownloadState",
-#       "anchor": "class-downloadstate",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "build-download-outcome",
-#       "name": "_build_download_outcome",
-#       "anchor": "function-build-download-outcome",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "normalize-pmid",
-#       "name": "_normalize_pmid",
-#       "anchor": "function-normalize-pmid",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "normalize-arxiv",
-#       "name": "_normalize_arxiv",
-#       "anchor": "function-normalize-arxiv",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "collect-location-urls",
-#       "name": "_collect_location_urls",
-#       "anchor": "function-collect-location-urls",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "build-query",
-#       "name": "build_query",
-#       "anchor": "function-build-query",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "resolve-topic-id-if-needed",
-#       "name": "resolve_topic_id_if_needed",
-#       "anchor": "function-resolve-topic-id-if-needed",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "create-artifact",
-#       "name": "create_artifact",
-#       "anchor": "function-create-artifact",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "download-candidate",
-#       "name": "download_candidate",
-#       "anchor": "function-download-candidate",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "read-resolver-config",
-#       "name": "read_resolver_config",
-#       "anchor": "function-read-resolver-config",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "seed-resolver-toggle-defaults",
-#       "name": "_seed_resolver_toggle_defaults",
-#       "anchor": "function-seed-resolver-toggle-defaults",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "apply-config-overrides",
-#       "name": "apply_config_overrides",
-#       "anchor": "function-apply-config-overrides",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "load-resolver-config",
-#       "name": "load_resolver_config",
-#       "anchor": "function-load-resolver-config",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "iterate-openalex",
-#       "name": "iterate_openalex",
-#       "anchor": "function-iterate-openalex",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "process-one-work",
-#       "name": "process_one_work",
-#       "anchor": "function-process-one-work",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "main",
-#       "name": "main",
-#       "anchor": "function-main",
-#       "kind": "function"
-#     }
+#     {"id": "_utc_timestamp", "name": "_utc_timestamp", "anchor": "function-_utc_timestamp", "kind": "function"},
+#     {"id": "_has_pdf_eof", "name": "_has_pdf_eof", "anchor": "function-_has_pdf_eof", "kind": "function"},
+#     {"id": "slugify", "name": "slugify", "anchor": "function-slugify", "kind": "function"},
+#     {"id": "ensure_dir", "name": "ensure_dir", "anchor": "function-ensure_dir", "kind": "function"},
+#     {"id": "_parse_domain_interval", "name": "_parse_domain_interval", "anchor": "function-_parse_domain_interval", "kind": "function"},
+#     {"id": "_make_session", "name": "_make_session", "anchor": "function-_make_session", "kind": "function"},
+#     {"id": "JsonlSink", "name": "JsonlSink", "anchor": "class-JsonlSink", "kind": "class"},
+#     {"id": "CsvSink", "name": "CsvSink", "anchor": "class-CsvSink", "kind": "class"},
+#     {"id": "MultiSink", "name": "MultiSink", "anchor": "class-MultiSink", "kind": "class"},
+#     {"id": "load_previous_manifest", "name": "load_previous_manifest", "anchor": "function-load_previous_manifest", "kind": "function"},
+#     {"id": "build_manifest_entry", "name": "build_manifest_entry", "anchor": "function-build_manifest_entry", "kind": "function"},
+#     {"id": "classify_payload", "name": "classify_payload", "anchor": "function-classify_payload", "kind": "function"},
+#     {"id": "_extract_filename_from_disposition", "name": "_extract_filename_from_disposition", "anchor": "function-_extract_filename_from_disposition", "kind": "function"},
+#     {"id": "_infer_suffix", "name": "_infer_suffix", "anchor": "function-_infer_suffix", "kind": "function"},
+#     {"id": "_update_tail_buffer", "name": "_update_tail_buffer", "anchor": "function-_update_tail_buffer", "kind": "function"},
+#     {"id": "WorkArtifact", "name": "WorkArtifact", "anchor": "class-WorkArtifact", "kind": "class"},
+#     {"id": "DownloadState", "name": "DownloadState", "anchor": "class-DownloadState", "kind": "class"},
+#     {"id": "_build_download_outcome", "name": "_build_download_outcome", "anchor": "function-_build_download_outcome", "kind": "function"},
+#     {"id": "_normalize_pmid", "name": "_normalize_pmid", "anchor": "function-_normalize_pmid", "kind": "function"},
+#     {"id": "_normalize_arxiv", "name": "_normalize_arxiv", "anchor": "function-_normalize_arxiv", "kind": "function"},
+#     {"id": "_collect_location_urls", "name": "_collect_location_urls", "anchor": "function-_collect_location_urls", "kind": "function"},
+#     {"id": "build_query", "name": "build_query", "anchor": "function-build_query", "kind": "function"},
+#     {"id": "resolve_topic_id_if_needed", "name": "resolve_topic_id_if_needed", "anchor": "function-resolve_topic_id_if_needed", "kind": "function"},
+#     {"id": "create_artifact", "name": "create_artifact", "anchor": "function-create_artifact", "kind": "function"},
+#     {"id": "download_candidate", "name": "download_candidate", "anchor": "function-download_candidate", "kind": "function"},
+#     {"id": "read_resolver_config", "name": "read_resolver_config", "anchor": "function-read_resolver_config", "kind": "function"},
+#     {"id": "_seed_resolver_toggle_defaults", "name": "_seed_resolver_toggle_defaults", "anchor": "function-_seed_resolver_toggle_defaults", "kind": "function"},
+#     {"id": "apply_config_overrides", "name": "apply_config_overrides", "anchor": "function-apply_config_overrides", "kind": "function"},
+#     {"id": "load_resolver_config", "name": "load_resolver_config", "anchor": "function-load_resolver_config", "kind": "function"},
+#     {"id": "iterate_openalex", "name": "iterate_openalex", "anchor": "function-iterate_openalex", "kind": "function"},
+#     {"id": "process_one_work", "name": "process_one_work", "anchor": "function-process_one_work", "kind": "function"},
+#     {"id": "main", "name": "main", "anchor": "function-main", "kind": "function"}
 #   ]
 # }
 # === /NAVMAP ===
@@ -268,15 +78,12 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import csv
 import hashlib
 import json
 import logging
 import os
-import re
-import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
@@ -298,6 +105,7 @@ from pyalex import Topics, Works
 from pyalex import config as oa_config
 
 from DocsToKG.ContentDownload import resolvers
+from DocsToKG.ContentDownload.classifications import Classification, PDF_LIKE
 from DocsToKG.ContentDownload.network import (
     CachedResult,
     ConditionalRequestHelper,
@@ -306,8 +114,27 @@ from DocsToKG.ContentDownload.network import (
     head_precheck,
     request_with_retries,
 )
-from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
-from DocsToKG.ContentDownload.telemetry import AttemptSink, ManifestEntry
+from DocsToKG.ContentDownload.classifier import (
+    classify_payload,
+    _extract_filename_from_disposition,
+    _infer_suffix,
+)
+from DocsToKG.ContentDownload.utils import (
+    dedupe,
+    normalize_doi,
+    normalize_pmcid,
+    normalize_pmid as _normalize_pmid,
+    normalize_arxiv as _normalize_arxiv,
+    strip_prefix,
+    slugify,
+)
+from DocsToKG.ContentDownload.telemetry import (
+    AttemptSink,
+    CsvSink,
+    JsonlSink,
+    ManifestEntry,
+    MultiSink,
+)
 
 ResolverPipeline = resolvers.ResolverPipeline
 ResolverConfig = resolvers.ResolverConfig
@@ -320,7 +147,6 @@ default_resolvers = resolvers.default_resolvers
 
 __all__ = (
     "AttemptSink",
-    "CsvAttemptLoggerAdapter",
     "CsvSink",
     "DownloadState",
     "JsonlSink",
@@ -344,7 +170,6 @@ __all__ = (
     "slugify",
 )
 
-MAX_SNIFF_BYTES = 64 * 1024
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
 
 
@@ -360,11 +185,12 @@ def _utc_timestamp() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
-def _has_pdf_eof(path: Path) -> bool:
+def _has_pdf_eof(path: Path, *, window_bytes: int = 2048) -> bool:
     """Check whether a PDF file terminates with the ``%%EOF`` marker.
 
     Args:
         path: Path to the candidate PDF file.
+        window_bytes: Number of trailing bytes to scan for the EOF marker.
 
     Returns:
         ``True`` if the file ends with ``%%EOF``; ``False`` otherwise.
@@ -374,7 +200,8 @@ def _has_pdf_eof(path: Path) -> bool:
         with path.open("rb") as handle:
             handle.seek(0, os.SEEK_END)
             size = handle.tell()
-            offset = max(size - 1024, 0)
+            window = max(int(window_bytes), 0)
+            offset = max(size - window, 0)
             handle.seek(offset)
             tail = handle.read().decode(errors="ignore")
             return "%%EOF" in tail
@@ -382,22 +209,17 @@ def _has_pdf_eof(path: Path) -> bool:
         return False
 
 
+def _update_tail_buffer(buffer: bytearray, chunk: bytes, *, limit: int = 1024) -> None:
+    """Maintain the trailing ``limit`` bytes of a streamed download."""
+
+    if not chunk:
+        return
+    buffer.extend(chunk)
+    if len(buffer) > limit:
+        del buffer[:-limit]
+
+
 # --- Public Functions ---
-
-def slugify(text: str, keep: int = 80) -> str:
-    """Create a filesystem-friendly slug for a work title.
-
-    Args:
-        text: Input string to normalize into a slug.
-        keep: Maximum number of characters to retain.
-
-    Returns:
-        Sanitized slug string suitable for filenames.
-    """
-    text = re.sub(r"[^\w\s]+", "", text or "")
-    text = re.sub(r"\s+", "_", text.strip())
-    return text[:keep] or "untitled"
-
 
 def ensure_dir(path: Path) -> None:
     """Create a directory if it does not already exist.
@@ -412,6 +234,142 @@ def ensure_dir(path: Path) -> None:
         OSError: If the directory cannot be created because of permissions.
     """
     path.mkdir(parents=True, exist_ok=True)
+
+
+@dataclass
+class WorkArtifact:
+    """Normalized artifact describing an OpenAlex work to process."""
+
+    work_id: str
+    title: str
+    publication_year: Optional[int]
+    doi: Optional[str]
+    pmid: Optional[str]
+    pmcid: Optional[str]
+    arxiv_id: Optional[str]
+    landing_urls: List[str]
+    pdf_urls: List[str]
+    open_access_url: Optional[str]
+    source_display_names: List[str]
+    base_stem: str
+    pdf_dir: Path
+    html_dir: Path
+    failed_pdf_urls: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        self.namespaces: Dict[str, Path] = {"pdf": self.pdf_dir, "html": self.html_dir}
+
+
+class DownloadState(Enum):
+    """State machine for streaming downloads."""
+
+    PENDING = "pending"
+    WRITING = "writing"
+
+
+def _build_download_outcome(
+    *,
+    artifact: WorkArtifact,
+    classification: Optional[Classification | str],
+    dest_path: Optional[Path],
+    response: requests.Response,
+    elapsed_ms: float,
+    flagged_unknown: bool,
+    sha256: Optional[str],
+    content_length: Optional[int],
+    etag: Optional[str],
+    last_modified: Optional[str],
+    extracted_text_path: Optional[str],
+    tail_bytes: Optional[bytes],
+    dry_run: bool,
+    head_precheck_passed: bool = False,
+    min_pdf_bytes: int = 1024,
+    tail_check_bytes: int = 2048,
+) -> DownloadOutcome:
+    classification_text = str(classification) if classification else ""
+    normalized_text = classification_text or "empty"
+    normalized_code = Classification.from_wire(normalized_text)
+    if flagged_unknown and normalized_code is Classification.PDF:
+        normalized_code = Classification.PDF_UNKNOWN
+        normalized_text = normalized_code.value
+
+    path_str = str(dest_path) if dest_path else None
+
+    if normalized_code in PDF_LIKE and not dry_run and dest_path is not None:
+        size_hint = content_length
+        if size_hint is None:
+            with contextlib.suppress(OSError):
+                size_hint = dest_path.stat().st_size
+        if (
+            size_hint is not None
+            and min_pdf_bytes > 0
+            and size_hint < min_pdf_bytes
+            and not head_precheck_passed
+        ):
+            with contextlib.suppress(OSError):
+                dest_path.unlink()
+            return DownloadOutcome(
+                classification=Classification.PDF_CORRUPT,
+                path=None,
+                http_status=response.status_code,
+                content_type=response.headers.get("Content-Type"),
+                elapsed_ms=elapsed_ms,
+                error=None,
+                sha256=None,
+                content_length=None,
+                etag=etag,
+                last_modified=last_modified,
+                extracted_text_path=extracted_text_path,
+            )
+
+        if tail_bytes and b"</html" in tail_bytes.lower():
+            with contextlib.suppress(OSError):
+                dest_path.unlink()
+            return DownloadOutcome(
+                classification=Classification.PDF_CORRUPT,
+                path=None,
+                http_status=response.status_code,
+                content_type=response.headers.get("Content-Type"),
+                elapsed_ms=elapsed_ms,
+                error=None,
+                sha256=None,
+                content_length=None,
+                etag=etag,
+                last_modified=last_modified,
+                extracted_text_path=extracted_text_path,
+            )
+
+        if not _has_pdf_eof(dest_path, window_bytes=tail_check_bytes):
+            with contextlib.suppress(OSError):
+                dest_path.unlink()
+            return DownloadOutcome(
+                classification=Classification.PDF_CORRUPT,
+                path=None,
+                http_status=response.status_code,
+                content_type=response.headers.get("Content-Type"),
+                elapsed_ms=elapsed_ms,
+                error=None,
+                sha256=None,
+                content_length=None,
+                etag=etag,
+                last_modified=last_modified,
+                extracted_text_path=extracted_text_path,
+            )
+
+    return DownloadOutcome(
+        classification=normalized_code or normalized_text,
+        path=path_str,
+        http_status=response.status_code,
+        content_type=response.headers.get("Content-Type"),
+        elapsed_ms=elapsed_ms,
+        error=None,
+        sha256=sha256,
+        content_length=content_length,
+        etag=etag,
+        last_modified=last_modified,
+        extracted_text_path=extracted_text_path,
+    )
 
 
 def _parse_domain_interval(value: str) -> Tuple[str, float]:
@@ -444,7 +402,12 @@ def _parse_domain_interval(value: str) -> Tuple[str, float]:
     return domain, seconds
 
 
-def _make_session(headers: Dict[str, str]) -> requests.Session:
+def _make_session(
+    headers: Dict[str, str],
+    *,
+    pool_connections: int = 64,
+    pool_maxsize: int = 128,
+) -> requests.Session:
     """Create a :class:`requests.Session` configured for polite crawling.
 
     Adapter-level retries remain disabled so :func:`request_with_retries` fully
@@ -456,6 +419,8 @@ def _make_session(headers: Dict[str, str]) -> requests.Session:
             project user agent and ``mailto`` contact address. A copy of the
             mapping is applied to the outgoing session so callers can reuse
             mutable dictionaries without side effects.
+        pool_connections: Minimum pool size shared across HTTP and HTTPS adapters.
+        pool_maxsize: Upper bound for per-host connections retained in the pool.
 
     Returns:
         requests.Session: Session with connection pooling enabled and retries
@@ -475,463 +440,14 @@ def _make_session(headers: Dict[str, str]) -> requests.Session:
     """
 
     # Delegate to shared network helper to keep adapter defaults aligned.
-    return create_session(headers)
+    return create_session(
+        headers,
+        pool_connections=pool_connections,
+        pool_maxsize=pool_maxsize,
+    )
 
 
 # --- Logging Sinks ---
-
-class JsonlSink:
-    """Thread-safe sink that streams attempt, manifest, and summary events to JSONL files.
-
-    Attributes:
-        _path: Destination JSONL file path.
-        _file: Lazily opened file handle pointing at ``_path``.
-        _lock: Mutex used to serialize concurrent writes.
-
-    Examples:
-        >>> sink = JsonlSink(Path('/tmp/attempts.jsonl'))  # doctest: +SKIP
-        >>> sink.log_summary({'attempts': 1})  # doctest: +SKIP
-        >>> sink.close()  # doctest: +SKIP
-    """
-
-    def __init__(self, path: Path) -> None:
-        """Create a sink backed by the given JSONL file path.
-
-        Args:
-            path: Destination JSONL file that will receive telemetry records.
-
-        Returns:
-            None
-        """
-
-        self._path = path
-        ensure_dir(path.parent)
-        self._file = path.open("a", encoding="utf-8")
-        self._lock = threading.Lock()
-
-    def _write(self, payload: Dict[str, Any]) -> None:
-        payload.setdefault("timestamp", _utc_timestamp())
-        line = json.dumps(payload, sort_keys=True) + "\n"
-        with self._lock:
-            self._file.write(line)
-            self._file.flush()
-
-    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
-        """Persist a resolver attempt record to the JSONL file.
-
-        Args:
-            record: Attempt metadata describing the resolver execution outcome.
-            timestamp: Optional override timestamp applied to the JSONL payload.
-
-        Returns:
-            None
-        """
-
-        ts = timestamp or _utc_timestamp()
-        self._write(
-            {
-                "record_type": "attempt",
-                "timestamp": ts,
-                "work_id": record.work_id,
-                "resolver_name": record.resolver_name,
-                "resolver_order": record.resolver_order,
-                "url": record.url,
-                "status": record.status,
-                "http_status": record.http_status,
-                "content_type": record.content_type,
-                "elapsed_ms": record.elapsed_ms,
-                "resolver_wall_time_ms": record.resolver_wall_time_ms,
-                "reason": record.reason,
-                "metadata": record.metadata,
-                "sha256": record.sha256,
-                "content_length": record.content_length,
-                "dry_run": record.dry_run,
-            }
-        )
-
-    def log_manifest(self, entry: ManifestEntry) -> None:
-        """Persist a manifest entry describing a resolved document.
-
-        Args:
-            entry: Manifest metadata to append to the JSONL log.
-
-        Returns:
-            None
-        """
-
-        self._write(
-            {
-                "record_type": "manifest",
-                "timestamp": entry.timestamp,
-                "work_id": entry.work_id,
-                "title": entry.title,
-                "publication_year": entry.publication_year,
-                "resolver": entry.resolver,
-                "url": entry.url,
-                "path": entry.path,
-                "classification": entry.classification,
-                "content_type": entry.content_type,
-                "reason": entry.reason,
-                "html_paths": entry.html_paths,
-                "sha256": entry.sha256,
-                "content_length": entry.content_length,
-                "etag": entry.etag,
-                "last_modified": entry.last_modified,
-                "extracted_text_path": entry.extracted_text_path,
-                "dry_run": entry.dry_run,
-            }
-        )
-
-    def log_summary(self, summary: Dict[str, Any]) -> None:
-        """Persist aggregated run metrics to the JSONL file.
-
-        Args:
-            summary: Dictionary of summary statistics such as totals and timings.
-
-        Returns:
-            None
-        """
-
-        payload = {
-            "record_type": "summary",
-            "timestamp": _utc_timestamp(),
-            **summary,
-        }
-        self._write(payload)
-
-    def close(self) -> None:
-        """Flush and close the underlying JSONL file handle.
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-
-        with self._lock:
-            if not self._file.closed:
-                self._file.close()
-
-    def __enter__(self) -> "JsonlSink":
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        self.close()
-
-
-class CsvSink:
-    """Lightweight sink that mirrors attempt records into a CSV for spreadsheet review.
-
-    Attributes:
-        _file: Open CSV file handle for appending attempts.
-        _writer: :class:`csv.DictWriter` configured with attempt headers.
-        _lock: Mutex guarding concurrent writes.
-
-    Examples:
-        >>> sink = CsvSink(Path('/tmp/attempts.csv'))  # doctest: +SKIP
-        >>> sink.log_summary({'attempts': 1})  # doctest: +SKIP
-        >>> sink.close()  # doctest: +SKIP
-    """
-
-    HEADER = [
-        "timestamp",
-        "work_id",
-        "resolver_name",
-        "resolver_order",
-        "url",
-        "status",
-        "http_status",
-        "content_type",
-        "elapsed_ms",
-        "resolver_wall_time_ms",
-        "reason",
-        "sha256",
-        "content_length",
-        "dry_run",
-        "metadata",
-    ]
-
-    def __init__(self, path: Path) -> None:
-        """Initialize the CSV sink and ensure headers exist.
-
-        Args:
-            path: Destination CSV file used to store attempt records.
-
-        Returns:
-            None
-        """
-
-        ensure_dir(path.parent)
-        exists = path.exists()
-        self._file = path.open("a", newline="", encoding="utf-8")
-        self._writer = csv.DictWriter(self._file, fieldnames=self.HEADER)
-        self._lock = threading.Lock()
-        if not exists:
-            self._writer.writeheader()
-
-    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
-        """Append a resolver attempt row to the CSV file.
-
-        Args:
-            record: Attempt metadata describing the resolver execution.
-            timestamp: Optional override timestamp applied to the CSV row.
-
-        Returns:
-            None
-        """
-
-        ts = timestamp or _utc_timestamp()
-        row = {
-            "timestamp": ts,
-            "work_id": record.work_id,
-            "resolver_name": record.resolver_name,
-            "resolver_order": record.resolver_order,
-            "url": record.url,
-            "status": record.status,
-            "http_status": record.http_status,
-            "content_type": record.content_type,
-            "elapsed_ms": record.elapsed_ms,
-            "resolver_wall_time_ms": record.resolver_wall_time_ms,
-            "reason": record.reason,
-            "sha256": record.sha256,
-            "content_length": record.content_length,
-            "dry_run": record.dry_run,
-            "metadata": json.dumps(record.metadata, sort_keys=True) if record.metadata else "",
-        }
-        with self._lock:
-            self._writer.writerow(row)
-            self._file.flush()
-
-    def log_manifest(self, entry: ManifestEntry) -> None:
-        """Ignore manifest entries; CSV sink only records attempt rows.
-
-        Args:
-            entry: Manifest metadata supplied by the pipeline.
-
-        Returns:
-            None
-        """
-
-        return None
-
-    def log_summary(self, summary: Dict[str, Any]) -> None:
-        """Ignore summary metrics; CSV sink only records attempt rows.
-
-        Args:
-            summary: Mapping of summary metrics (unused).
-
-        Returns:
-            None
-        """
-
-        return None
-
-    def close(self) -> None:
-        """Flush and close the CSV file handle.
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-
-        with self._lock:
-            if not self._file.closed:
-                self._file.close()
-
-    def __enter__(self) -> "CsvSink":
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        self.close()
-
-    DictReader = staticmethod(csv.DictReader)
-
-
-class CsvAttemptLoggerAdapter(CsvSink):
-    """Adapter that mirrors JSONL logging into a CSV sink for compatibility.
-
-    Attributes:
-        _base_logger: Primary sink that receives mirrored logging calls.
-
-    Examples:
-        >>> adapter = CsvAttemptLoggerAdapter(JsonlSink(Path('/tmp/a.jsonl')), Path('/tmp/a.csv'))  # doctest: +SKIP
-        >>> adapter.close()  # doctest: +SKIP
-    """
-
-    def __init__(self, base_logger: AttemptSink, path: Path) -> None:
-        """Create a CSV adapter that delegates attempts to ``base_logger``.
-
-        Args:
-            base_logger: Primary sink that should receive mirrored events.
-            path: Destination CSV file used by the adapter.
-
-        Returns:
-            None
-        """
-
-        super().__init__(path)
-        self._base_logger = base_logger
-
-    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
-        """Send the attempt to both the base logger and the CSV sink.
-
-        Args:
-            record: Attempt record to mirror to both sinks.
-            timestamp: Optional timestamp to apply to the mirrored record.
-
-        Returns:
-            None
-        """
-
-        ts = timestamp or _utc_timestamp()
-        self._base_logger.log_attempt(record, timestamp=ts)
-        super().log_attempt(record, timestamp=ts)
-
-    def log_manifest(self, entry: ManifestEntry) -> None:
-        """Forward manifest entries to both the base logger and CSV sink.
-
-        Args:
-            entry: Manifest record describing the resolved document.
-
-        Returns:
-            None
-        """
-
-        self._base_logger.log_manifest(entry)
-
-    def log_summary(self, summary: Dict[str, Any]) -> None:
-        """Forward summary telemetry to both adapters.
-
-        Args:
-            summary: Mapping of summary metrics to forward.
-
-        Returns:
-            None
-        """
-
-        self._base_logger.log_summary(summary)
-
-    def close(self) -> None:
-        """Close the base logger and CSV sink, propagating base errors.
-
-        Args:
-            None
-
-        Returns:
-            None
-
-        Raises:
-            BaseException: Re-raises any error encountered when closing the base logger.
-        """
-
-        base_error: BaseException | None = None
-        try:
-            self._base_logger.close()
-        except BaseException as exc:  # pragma: no cover - defensive aggregation
-            base_error = exc
-        super().close()
-        if base_error is not None:
-            raise base_error
-
-
-class MultiSink:
-    """Composite sink that fans out logging calls to multiple sinks.
-
-    Attributes:
-        _sinks: Sequence of sink instances that receive mirrored events.
-
-    Examples:
-        >>> sink = MultiSink([JsonlSink(Path('/tmp/a.jsonl'))])  # doctest: +SKIP
-        >>> sink.close()  # doctest: +SKIP
-    """
-
-    def __init__(self, sinks: Iterable[AttemptSink]):
-        """Instantiate the composite sink with a collection of delegates.
-
-        Args:
-            sinks: Iterable of sink objects implementing ``AttemptSink``.
-
-        Returns:
-            None
-        """
-
-        self._sinks = list(sinks)
-
-    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
-        """Forward a resolver attempt to all registered sinks.
-
-        Args:
-            record: Attempt metadata to broadcast.
-            timestamp: Optional shared timestamp passed to each sink.
-
-        Returns:
-            None
-        """
-
-        ts = timestamp or _utc_timestamp()
-        for sink in self._sinks:
-            sink.log_attempt(record, timestamp=ts)
-
-    def log_manifest(self, entry: ManifestEntry) -> None:
-        """Forward a manifest entry to all registered sinks.
-
-        Args:
-            entry: Manifest record to broadcast.
-
-        Returns:
-            None
-        """
-
-        for sink in self._sinks:
-            sink.log_manifest(entry)
-
-    def log_summary(self, summary: Dict[str, Any]) -> None:
-        """Forward summary telemetry to all registered sinks.
-
-        Args:
-            summary: Mapping of aggregated metrics to broadcast.
-
-        Returns:
-            None
-        """
-
-        for sink in self._sinks:
-            sink.log_summary(summary)
-
-    def close(self) -> None:
-        """Close all sinks, propagating the first raised exception.
-
-        Args:
-            None
-
-        Returns:
-            None
-
-        Raises:
-            BaseException: Re-raises the first error encountered when closing delegates.
-        """
-
-        errors: List[BaseException] = []
-        for sink in self._sinks:
-            try:
-                sink.close()
-            except BaseException as exc:  # pragma: no cover - defensive aggregation
-                errors.append(exc)
-        if errors:
-            raise errors[0]
-
-    def __enter__(self) -> "MultiSink":
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        try:
-            self.close()
-        finally:
-            return None
-
 
 # --- Manifest Utilities ---
 
@@ -973,11 +489,19 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
             url = data.get("url")
             if not work_id or not url:
                 raise ValueError("Manifest entries must include work_id and url fields.")
+            content_length = data.get("content_length")
+            if isinstance(content_length, str):
+                try:
+                    data["content_length"] = int(content_length)
+                except ValueError:
+                    data["content_length"] = None
             per_work.setdefault(work_id, {})[url] = data
-            classification = (data.get("classification") or "").lower()
-            if not classification:
+            raw_classification = data.get("classification")
+            classification_text = (raw_classification or "").strip()
+            if not classification_text:
                 raise ValueError("Manifest entries must declare a classification.")
-            if classification in {"pdf", "pdf_unknown", "cached"}:
+            classification_code = Classification.from_wire(classification_text)
+            if classification_code in PDF_LIKE or classification_code is Classification.CACHED:
                 completed.add(work_id)
 
     return per_work, completed
@@ -1010,7 +534,7 @@ def build_manifest_entry(
         ManifestEntry populated with download metadata.
     """
     timestamp = _utc_timestamp()
-    classification = outcome.classification if outcome else "miss"
+    classification = str(outcome.classification) if outcome else Classification.MISS.value
     return ManifestEntry(
         timestamp=timestamp,
         work_id=artifact.work_id,
@@ -1030,383 +554,6 @@ def build_manifest_entry(
         extracted_text_path=outcome.extracted_text_path if outcome else None,
         dry_run=dry_run,
     )
-
-
-def classify_payload(head_bytes: bytes, content_type: str, url: str) -> Optional[str]:
-    """Classify a payload as PDF, HTML, or unknown based on heuristics.
-
-    Args:
-        head_bytes: Leading bytes from the HTTP payload.
-        content_type: Content-Type header reported by the server.
-        url: Source URL of the payload.
-
-    Returns:
-        Classification string ``\"pdf\"`` or ``\"html\"`` when detection succeeds,
-        otherwise ``None``.
-
-    Raises:
-        UnicodeDecodeError: If heuristics attempt to decode malformed byte
-            sequences while inspecting the payload prefix.
-    """
-
-    ctype = (content_type or "").lower()
-    stripped = head_bytes.lstrip() if head_bytes else b""
-    prefix = stripped[:64].lower()
-
-    if prefix.startswith(b"<!doctype html") or prefix.startswith(b"<html"):
-        return "html"
-    if prefix.startswith(b"<head") or prefix.startswith(b"<body"):
-        return "html"
-
-    if stripped.startswith(b"%PDF") or b"%PDF" in head_bytes[:2048]:
-        return "pdf"
-
-    if "html" in ctype:
-        return "html"
-    if "pdf" in ctype:
-        return "pdf"
-    if ctype == "application/octet-stream":
-        return None
-
-    if url.lower().endswith(".pdf"):
-        return "pdf"
-
-    return None
-
-
-def _extract_filename_from_disposition(disposition: Optional[str]) -> Optional[str]:
-    """Return the filename component from a Content-Disposition header."""
-
-    if not disposition:
-        return None
-    parts = [segment.strip() for segment in disposition.split(";") if segment.strip()]
-    for part in parts:
-        lower = part.lower()
-        if lower.startswith("filename*="):
-            try:
-                value = part.split("=", 1)[1].strip()
-            except IndexError:
-                continue
-            _, _, encoded = value.partition("''")
-            candidate = unquote(encoded or value)
-            candidate = candidate.strip('"')
-            if candidate:
-                return candidate
-        if lower.startswith("filename="):
-            try:
-                candidate = part.split("=", 1)[1].strip()
-            except IndexError:
-                continue
-            candidate = candidate.strip('"')
-            if candidate:
-                return candidate
-    return None
-
-
-def _infer_suffix(
-    url: str,
-    content_type: Optional[str],
-    disposition: Optional[str],
-    classification: str,
-    default_suffix: str,
-) -> str:
-    """Infer a destination suffix from HTTP hints and classification heuristics.
-
-    Args:
-        url: Candidate download URL emitted by a resolver.
-        content_type: Content-Type header returned by the response (if any).
-        disposition: Raw Content-Disposition header for RFC 6266 parsing.
-        classification: Downloader classification such as ``"pdf"`` or ``"html"``.
-        default_suffix: Fallback extension to use when no signals are present.
-
-    Returns:
-        Lowercase file suffix (including leading dot) chosen from the strongest
-        available signal. Preference order is:
-
-        1. ``filename*`` / ``filename`` parameters in Content-Disposition.
-        2. Content-Type heuristics (PDF/HTML).
-        3. URL path suffix derived from :func:`urllib.parse.urlsplit`.
-        4. Provided ``default_suffix``.
-    """
-
-    filename = _extract_filename_from_disposition(disposition)
-    if filename:
-        suffix = Path(filename).suffix
-        if suffix:
-            return suffix.lower()
-
-    ctype = (content_type or "").split(";")[0].strip().lower()
-    if ctype == "application/pdf" or (ctype.endswith("pdf") and classification.startswith("pdf")):
-        return ".pdf"
-    if ctype in {"text/html", "application/xhtml+xml"} or "html" in ctype:
-        return ".html"
-
-    if classification.startswith("pdf"):
-        path_suffix = Path(urlsplit(url).path).suffix.lower()
-        if path_suffix:
-            return path_suffix
-        return default_suffix
-
-    if classification == "html":
-        path_suffix = Path(urlsplit(url).path).suffix.lower()
-        if path_suffix:
-            return path_suffix
-        return default_suffix
-
-    return default_suffix
-
-
-def _update_tail_buffer(buffer: bytearray, chunk: bytes, *, limit: int = 1024) -> None:
-    """Maintain the trailing ``limit`` bytes of a streamed download."""
-
-    if not chunk:
-        return
-    buffer.extend(chunk)
-    if len(buffer) > limit:
-        del buffer[:-limit]
-
-
-@dataclass
-class WorkArtifact:
-    """Normalized artifact describing an OpenAlex work to process.
-
-    Attributes:
-        work_id: OpenAlex work identifier.
-        title: Work title suitable for logging.
-        publication_year: Publication year or None.
-        doi: Canonical DOI string.
-        pmid: PubMed identifier (normalized).
-        pmcid: PubMed Central identifier (normalized).
-        arxiv_id: Normalized arXiv identifier.
-        landing_urls: Candidate landing page URLs.
-        pdf_urls: Candidate PDF download URLs.
-        open_access_url: Open access URL provided by OpenAlex.
-        source_display_names: Source names for provenance.
-        base_stem: Base filename stem for local artefacts.
-        pdf_dir: Directory where PDFs are stored.
-        html_dir: Directory where HTML assets are stored.
-        failed_pdf_urls: URLs that failed during resolution.
-        metadata: Arbitrary metadata collected during processing.
-
-    Examples:
-        >>> artifact = WorkArtifact(
-        ...     work_id="W123",
-        ...     title="Sample Work",
-        ...     publication_year=2024,
-        ...     doi="10.1234/example",
-        ...     pmid=None,
-        ...     pmcid=None,
-        ...     arxiv_id=None,
-        ...     landing_urls=["https://example.org"],
-        ...     pdf_urls=[],
-        ...     open_access_url=None,
-        ...     source_display_names=["Example Source"],
-        ...     base_stem="2024__Sample_Work__W123",
-        ...     pdf_dir=Path("pdfs"),
-        ...     html_dir=Path("html"),
-        ... )
-    """
-
-    work_id: str
-    title: str
-    publication_year: Optional[int]
-    doi: Optional[str]
-    pmid: Optional[str]
-    pmcid: Optional[str]
-    arxiv_id: Optional[str]
-    landing_urls: List[str]
-    pdf_urls: List[str]
-    open_access_url: Optional[str]
-    source_display_names: List[str]
-    base_stem: str
-    pdf_dir: Path
-    html_dir: Path
-    failed_pdf_urls: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        """Define namespace mappings for output artefact directories.
-
-        Args:
-            self: Instance whose namespace mapping is being initialised.
-
-        Returns:
-            None
-        """
-
-        self.namespaces: Dict[str, Path] = {"pdf": self.pdf_dir, "html": self.html_dir}
-
-
-class DownloadState(Enum):
-    """State machine for streaming downloads.
-
-    Attributes:
-        PENDING: Payload type is being sniffed.
-        WRITING: Payload bytes are being streamed to disk.
-
-    Examples:
-        >>> DownloadState.PENDING is DownloadState.WRITING
-        False
-    """
-
-    PENDING = "pending"
-    WRITING = "writing"
-
-
-def _build_download_outcome(
-    *,
-    artifact: WorkArtifact,
-    classification: Optional[str],
-    dest_path: Optional[Path],
-    response: requests.Response,
-    elapsed_ms: float,
-    flagged_unknown: bool,
-    sha256: Optional[str],
-    content_length: Optional[int],
-    etag: Optional[str],
-    last_modified: Optional[str],
-    extracted_text_path: Optional[str],
-    tail_bytes: Optional[bytes],
-    dry_run: bool,
-    head_precheck_passed: bool = False,
-) -> DownloadOutcome:
-    """Create a :class:`DownloadOutcome` applying PDF validation rules.
-
-    The helper normalises classification labels, performs the terminal ``%%EOF``
-    check for PDFs (skipping when running in ``--dry-run`` mode), and attaches
-    bookkeeping metadata such as digests and conditional request headers.
-
-    Args:
-        artifact: Work metadata describing the current OpenAlex record.
-        classification: Initial classification derived from content sniffing.
-        dest_path: Final storage path for the artefact (if any).
-        response: HTTP response object returned by :func:`request_with_retries`.
-        elapsed_ms: Download duration in milliseconds.
-        flagged_unknown: Whether heuristics flagged the payload as ambiguous.
-        sha256: SHA-256 digest of the payload when computed.
-        content_length: Size of the payload in bytes, if known.
-        etag: ETag header value supplied by the origin.
-        last_modified: Last-Modified header value supplied by the origin.
-        extracted_text_path: Optional path to extracted HTML text artefacts.
-        tail_bytes: Trailing bytes captured from the streamed download for
-            corruption detection heuristics.
-        dry_run: Indicates whether this execution runs in dry-run mode.
-
-    Returns:
-        DownloadOutcome capturing the normalized classification and metadata.
-    """
-
-    normalized = classification or "empty"
-    if flagged_unknown and normalized == "pdf":
-        normalized = "pdf_unknown"
-
-    path_str = str(dest_path) if dest_path else None
-
-    if normalized in {"pdf", "pdf_unknown"} and not dry_run and dest_path is not None:
-        size_hint = content_length
-        if size_hint is None:
-            with contextlib.suppress(OSError):
-                size_hint = dest_path.stat().st_size
-        if size_hint is not None and size_hint < 1024 and not head_precheck_passed:
-            # PDFs smaller than 1 KiB are overwhelmingly HTML error stubs or
-            # truncated responses observed in production crawls.
-            with contextlib.suppress(OSError):
-                dest_path.unlink()
-            return DownloadOutcome(
-                classification="pdf_corrupt",
-                path=None,
-                http_status=response.status_code,
-                content_type=response.headers.get("Content-Type"),
-                elapsed_ms=elapsed_ms,
-                error=None,
-                sha256=None,
-                content_length=None,
-                etag=etag,
-                last_modified=last_modified,
-                extracted_text_path=extracted_text_path,
-            )
-
-        if tail_bytes and b"</html" in tail_bytes.lower():
-            with contextlib.suppress(OSError):
-                dest_path.unlink()
-            return DownloadOutcome(
-                classification="pdf_corrupt",
-                path=None,
-                http_status=response.status_code,
-                content_type=response.headers.get("Content-Type"),
-                elapsed_ms=elapsed_ms,
-                error=None,
-                sha256=None,
-                content_length=None,
-                etag=etag,
-                last_modified=last_modified,
-                extracted_text_path=extracted_text_path,
-            )
-
-        if not _has_pdf_eof(dest_path):
-            with contextlib.suppress(OSError):
-                dest_path.unlink()
-            return DownloadOutcome(
-                classification="pdf_corrupt",
-                path=None,
-                http_status=response.status_code,
-                content_type=response.headers.get("Content-Type"),
-                elapsed_ms=elapsed_ms,
-                error=None,
-                sha256=None,
-                content_length=None,
-                etag=etag,
-                last_modified=last_modified,
-                extracted_text_path=extracted_text_path,
-            )
-
-    return DownloadOutcome(
-        classification=normalized,
-        path=path_str,
-        http_status=response.status_code,
-        content_type=response.headers.get("Content-Type"),
-        elapsed_ms=elapsed_ms,
-        error=None,
-        sha256=sha256,
-        content_length=content_length,
-        etag=etag,
-        last_modified=last_modified,
-        extracted_text_path=extracted_text_path,
-    )
-
-
-def _normalize_pmid(pmid: Optional[str]) -> Optional[str]:
-    """Extract the numeric PubMed identifier or return ``None`` when absent.
-
-    Args:
-        pmid: Raw PubMed identifier string which may include prefixes.
-
-    Returns:
-        Normalised numeric PMCID string or ``None`` when not parsable.
-    """
-
-    if not pmid:
-        return None
-    pmid = pmid.strip()
-    match = re.search(r"(\d+)", pmid)
-    return match.group(1) if match else None
-
-
-def _normalize_arxiv(arxiv_id: Optional[str]) -> Optional[str]:
-    """Normalize arXiv identifiers by removing prefixes and whitespace.
-
-    Args:
-        arxiv_id: Raw arXiv identifier which may include URL or prefix.
-
-    Returns:
-        Canonical arXiv identifier without prefixes or whitespace.
-    """
-
-    if not arxiv_id:
-        return None
-    arxiv_id = strip_prefix(arxiv_id, "arxiv:") or arxiv_id
-    arxiv_id = arxiv_id.replace("https://arxiv.org/abs/", "")
-    return arxiv_id.strip()
 
 
 def _collect_location_urls(work: Dict[str, Any]) -> Dict[str, List[str]]:
@@ -1603,6 +750,9 @@ def download_candidate(
         TypeError: If conditional response parsing returns unexpected objects.
     """
     context = context or {}
+    sniff_limit = max(int(context.get("sniff_bytes", 64 * 1024)), 0)
+    min_pdf_bytes = max(int(context.get("min_pdf_bytes", 1024)), 0)
+    tail_window_bytes = max(int(context.get("tail_check_bytes", 2048)), 0)
     headers: Dict[str, str] = {}
     if referer:
         headers["Referer"] = referer
@@ -1648,7 +798,7 @@ def download_candidate(
                 if not isinstance(cached, CachedResult):  # pragma: no cover - defensive
                     raise TypeError("Expected CachedResult for 304 response")
                 return DownloadOutcome(
-                    classification="cached",
+                    classification=Classification.CACHED,
                     path=cached.path,
                     http_status=response.status_code,
                     content_type=response.headers.get("Content-Type") or content_type_hint,
@@ -1663,7 +813,7 @@ def download_candidate(
 
             if response.status_code != 200:
                 return DownloadOutcome(
-                    classification="http_error",
+                    classification=Classification.HTTP_ERROR,
                     path=None,
                     http_status=response.status_code,
                     content_type=response.headers.get("Content-Type") or content_type_hint,
@@ -1681,7 +831,7 @@ def download_candidate(
             content_type = response.headers.get("Content-Type") or content_type_hint
             disposition = response.headers.get("Content-Disposition")
             sniff_buffer = bytearray()
-            detected: Optional[str] = None
+            detected: Optional[Classification] = None
             flagged_unknown = False
             dest_path: Optional[Path] = None
             part_path: Optional[Path] = None
@@ -1698,18 +848,22 @@ def download_candidate(
                     if state is DownloadState.PENDING:
                         sniff_buffer.extend(chunk)
                         detected = classify_payload(bytes(sniff_buffer), content_type, url)
-                        if detected is None and len(sniff_buffer) >= MAX_SNIFF_BYTES:
-                            detected = "pdf"
+                        if (
+                            detected is None
+                            and sniff_limit
+                            and len(sniff_buffer) >= sniff_limit
+                        ):
+                            detected = Classification.PDF
                             flagged_unknown = True
 
                         if detected is not None:
                             if dry_run:
                                 break
-                            default_suffix = ".html" if detected == "html" else ".pdf"
+                            default_suffix = ".html" if detected == Classification.HTML else ".pdf"
                             suffix = _infer_suffix(
                                 url, content_type, disposition, detected, default_suffix
                             )
-                            dest_dir = artifact.html_dir if detected == "html" else artifact.pdf_dir
+                            dest_dir = artifact.html_dir if detected == Classification.HTML else artifact.pdf_dir
                             dest_path = dest_dir / f"{artifact.base_stem}{suffix}"
                             ensure_dir(dest_path.parent)
                             part_path = dest_path.with_suffix(dest_path.suffix + ".part")
@@ -1720,7 +874,9 @@ def download_candidate(
                                 if hasher:
                                     hasher.update(initial_bytes)
                                 byte_count += len(initial_bytes)
-                                _update_tail_buffer(tail_buffer, initial_bytes)
+                                _update_tail_buffer(
+                                    tail_buffer, initial_bytes, limit=tail_window_bytes
+                                )
                             sniff_buffer.clear()
                             state = DownloadState.WRITING
                             continue
@@ -1729,7 +885,7 @@ def download_candidate(
                         if hasher:
                             hasher.update(chunk)
                         byte_count += len(chunk)
-                        _update_tail_buffer(tail_buffer, chunk)
+                        _update_tail_buffer(tail_buffer, chunk, limit=tail_window_bytes)
 
                 if detected is None:
                     return DownloadOutcome(
@@ -1759,6 +915,8 @@ def download_candidate(
                     dry_run=True,
                     tail_bytes=None,
                     head_precheck_passed=head_precheck_passed,
+                    min_pdf_bytes=min_pdf_bytes,
+                    tail_check_bytes=tail_window_bytes,
                 )
 
             sha256: Optional[str] = None
@@ -1774,7 +932,7 @@ def download_candidate(
             tail_snapshot: Optional[bytes] = bytes(tail_buffer) if tail_buffer else None
 
             extracted_text_path: Optional[str] = None
-            if dest_path and detected == "html" and extract_html_text:
+            if dest_path and detected == Classification.HTML and extract_html_text:
                 try:
                     import trafilatura  # type: ignore
                 except ImportError:
@@ -1809,6 +967,8 @@ def download_candidate(
                 dry_run=False,
                 tail_bytes=tail_snapshot,
                 head_precheck_passed=head_precheck_passed,
+                min_pdf_bytes=min_pdf_bytes,
+                tail_check_bytes=tail_window_bytes,
             )
     except requests.RequestException as exc:
         elapsed_ms = (time.monotonic() - start) * 1000.0
@@ -2049,6 +1209,7 @@ def process_one_work(
     metrics: ResolverMetrics,
     *,
     dry_run: bool,
+    list_only: bool,
     extract_html_text: bool,
     previous_lookup: Dict[str, Dict[str, Any]],
     resume_completed: Set[str],
@@ -2064,6 +1225,7 @@ def process_one_work(
         logger: Structured attempt logger capturing manifest records.
         metrics: Resolver metrics collector.
         dry_run: When True, simulate downloads without writing files.
+        list_only: When True, record candidate URLs without fetching content.
         extract_html_text: Whether to extract plaintext from HTML artefacts.
         previous_lookup: Mapping of work_id/URL to prior manifest entries.
         resume_completed: Set of work IDs already processed in resume mode.
@@ -2081,26 +1243,62 @@ def process_one_work(
     result = {"work_id": artifact.work_id, "saved": False, "html_only": False, "skipped": False}
 
     raw_previous = previous_lookup.get(artifact.work_id, {})
-    previous_map = {
-        url: {
-            "etag": entry.get("etag"),
-            "last_modified": entry.get("last_modified"),
-            "path": entry.get("path"),
-            "sha256": entry.get("sha256"),
-            "content_length": entry.get("content_length"),
+    previous_map: Dict[str, Dict[str, Any]] = {}
+    for url, entry in raw_previous.items():
+        if not isinstance(entry, dict):
+            continue
+        etag = entry.get("etag")
+        last_modified = entry.get("last_modified")
+        path = entry.get("path")
+        sha256 = entry.get("sha256")
+        content_length = entry.get("content_length")
+        content_length_value: Optional[int]
+        if isinstance(content_length, str):
+            try:
+                content_length_value = int(content_length)
+            except ValueError:
+                content_length_value = None
+        else:
+            content_length_value = content_length
+
+        if etag or last_modified:
+            missing_fields = []
+            if not path:
+                missing_fields.append("path")
+            if not sha256:
+                missing_fields.append("sha256")
+            if content_length_value is None:
+                missing_fields.append("content_length")
+            if missing_fields:
+                LOGGER.warning(
+                    "resume-metadata-incomplete: dropping cached metadata",
+                    extra={
+                        "extra_fields": {
+                            "work_id": artifact.work_id,
+                            "url": url,
+                            "missing_fields": missing_fields,
+                        }
+                    },
+                )
+                continue
+        previous_map[url] = {
+            "etag": etag,
+            "last_modified": last_modified,
+            "path": path,
+            "sha256": sha256,
+            "content_length": content_length_value,
         }
-        for url, entry in raw_previous.items()
-    }
     download_context = {
         "dry_run": dry_run,
         "extract_html_text": extract_html_text,
         "previous": previous_map,
+        "list_only": list_only,
     }
 
     if artifact.work_id in resume_completed:
         LOGGER.info("Skipping %s (already completed)", artifact.work_id)
         skipped_outcome = DownloadOutcome(
-            classification="skipped",
+            classification=Classification.SKIPPED,
             path=None,
             http_status=None,
             content_type=None,
@@ -2123,7 +1321,7 @@ def process_one_work(
     existing_pdf = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
     if not dry_run and existing_pdf.exists():
         existing_outcome = DownloadOutcome(
-            classification="exists",
+            classification=Classification.EXISTS,
             path=str(existing_pdf),
             http_status=None,
             content_type=None,
@@ -2146,6 +1344,10 @@ def process_one_work(
     pipeline_result = pipeline.run(session, artifact, context=download_context)
     html_paths_total = list(pipeline_result.html_paths)
 
+    if list_only:
+        result["skipped"] = True
+        return result
+
     if pipeline_result.success and pipeline_result.outcome:
         entry = build_manifest_entry(
             artifact,
@@ -2158,7 +1360,10 @@ def process_one_work(
         logger.log_manifest(entry)
         if pipeline_result.outcome.is_pdf:
             result["saved"] = True
-        elif pipeline_result.outcome.classification == "html":
+        elif (
+            Classification.from_wire(pipeline_result.outcome.classification)
+            is Classification.HTML
+        ):
             result["html_only"] = True
         return result
 
@@ -2166,7 +1371,7 @@ def process_one_work(
         pipeline_result.outcome.error if pipeline_result.outcome else "no-resolver-success"
     )
     outcome = pipeline_result.outcome or DownloadOutcome(
-        classification="miss",
+        classification=Classification.MISS,
         path=None,
         http_status=None,
         content_type=None,
@@ -2388,6 +1593,11 @@ def main() -> None:
         help="Measure resolver coverage without writing files.",
     )
     parser.add_argument(
+        "--list-only",
+        action="store_true",
+        help="Discover candidate URLs but do not fetch content.",
+    )
+    parser.add_argument(
         "--resume-from",
         type=Path,
         default=None,
@@ -2466,6 +1676,13 @@ def main() -> None:
         config = load_resolver_config(args, resolver_names, resolver_order_override)
     except ValueError as exc:
         parser.error(str(exc))
+    concurrency_product = max(args.workers, 1) * max(config.max_concurrent_resolvers, 1)
+    if concurrency_product > 32:
+        LOGGER.warning(
+            "High parallelism detected (workers x concurrent_resolvers = %s). "
+            "Ensure resolver and domain rate limits are configured appropriately.",
+            concurrency_product,
+        )
 
     if manifest_path.suffix != ".jsonl":
         manifest_path = manifest_path.with_suffix(".jsonl")
@@ -2508,7 +1725,13 @@ def main() -> None:
             thread-local.
             """
 
-            return _make_session(config.polite_headers)
+            pool_connections = max(64, concurrency_product * 4)
+            pool_maxsize = max(128, concurrency_product * 8)
+            return _make_session(
+                config.polite_headers,
+                pool_connections=pool_connections,
+                pool_maxsize=pool_maxsize,
+            )
 
         def _record_result(res: Dict[str, Any]) -> None:
             """Update aggregate counters based on a single work result."""
@@ -2538,6 +1761,7 @@ def main() -> None:
                             attempt_logger,
                             metrics,
                             dry_run=args.dry_run,
+                            list_only=args.list_only,
                             extract_html_text=args.extract_html_text,
                             previous_lookup=resume_lookup,
                             resume_completed=resume_completed,
@@ -2550,9 +1774,10 @@ def main() -> None:
                         session.close()
             else:
                 with ThreadPoolExecutor(max_workers=args.workers) as executor:
-                    futures = []
+                    in_flight: List[Future[Dict[str, Any]]] = []
+                    max_in_flight = max(args.workers * 2, 1)
 
-                    def _submit_work(work_item: Dict[str, Any]) -> None:
+                    def _submit(work_item: Dict[str, Any]) -> Future[Dict[str, Any]]:
                         """Submit a work item to the executor for asynchronous processing."""
 
                         def _runner() -> Dict[str, Any]:
@@ -2569,6 +1794,7 @@ def main() -> None:
                                     attempt_logger,
                                     metrics,
                                     dry_run=args.dry_run,
+                                    list_only=args.list_only,
                                     extract_html_text=args.extract_html_text,
                                     previous_lookup=resume_lookup,
                                     resume_completed=resume_completed,
@@ -2577,15 +1803,21 @@ def main() -> None:
                                 if hasattr(session, "close"):
                                     session.close()
 
-                        futures.append(executor.submit(_runner))
+                        return executor.submit(_runner)
 
                     for work in iterate_openalex(
                         query, per_page=args.per_page, max_results=args.max
                     ):
-                        _submit_work(work)
+                        if len(in_flight) >= max_in_flight:
+                            done, pending = wait(set(in_flight), return_when=FIRST_COMPLETED)
+                            for completed_future in done:
+                                _record_result(completed_future.result())
+                            in_flight = list(pending)
+                        in_flight.append(_submit(work))
 
-                    for future in as_completed(futures):
-                        _record_result(future.result())
+                    if in_flight:
+                        for future in as_completed(list(in_flight)):
+                            _record_result(future.result())
         except Exception:
             raise
         else:

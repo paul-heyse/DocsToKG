@@ -92,6 +92,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
 
@@ -394,6 +395,155 @@ def test_plan_all_skips_failures_when_configured(monkeypatch: pytest.MonkeyPatch
 
     assert len(plans) == 1
     assert plans[0].spec.id == "good"
+
+
+def test_plan_all_since_filters_outdated_plans(monkeypatch: pytest.MonkeyPatch) -> None:
+    defaults = DefaultsConfig()
+    config = ResolvedConfig(defaults=defaults, specs=[])
+    spec = core.FetchSpec(id="hp", resolver="direct", extras={}, target_formats=("owl",))
+
+    def fake_plan_one(spec, **_kwargs):
+        fetch_plan = FetchPlan(
+            url="https://example.org/hp.owl",
+            headers={},
+            filename_hint=None,
+            version=None,
+            license="CC-BY",
+            media_type="application/rdf+xml",
+            service="direct",
+            last_modified="Wed, 01 Jan 2020 00:00:00 GMT",
+        )
+        return core.PlannedFetch(
+            spec=spec,
+            resolver="direct",
+            plan=fetch_plan,
+            candidates=(),
+            last_modified=fetch_plan.last_modified,
+            last_modified_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
+        )
+
+    def fake_as_completed(iterable):
+        yield from list(iterable)
+
+    class DummyExecutor:
+        def __init__(self, max_workers: int) -> None:  # pragma: no cover - simple stub
+            self._futures: List[_ImmediateFuture] = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def submit(self, fn, *args, **kwargs):
+            try:
+                value = fn(*args, **kwargs)
+                future = _ImmediateFuture(value=value)
+            except Exception as exc:  # pragma: no cover - defensive
+                future = _ImmediateFuture(error=exc)
+            self._futures.append(future)
+            return future
+
+    def fake_setup_logging(*, level="INFO", retention_days=30, max_log_size_mb=100, log_dir=None):
+        logger = logging.getLogger("plan-since-filter")
+        logger.handlers[:] = []
+        logger.addHandler(logging.NullHandler())
+        logger.setLevel(level)
+        logger.propagate = False
+        return logger
+
+    monkeypatch.setattr(core, "ThreadPoolExecutor", DummyExecutor)
+    monkeypatch.setattr(core, "as_completed", fake_as_completed)
+    monkeypatch.setattr(core, "plan_one", fake_plan_one)
+    monkeypatch.setattr(core, "setup_logging", fake_setup_logging)
+    monkeypatch.setattr(core, "ensure_python_version", lambda: None)
+    monkeypatch.setattr(core, "generate_correlation_id", lambda: "fixed-correlation")
+
+    cutoff = datetime(2021, 1, 1, tzinfo=timezone.utc)
+    plans = core.plan_all([spec], config=config, since=cutoff)
+
+    assert plans == []
+
+
+def test_plan_all_since_fetches_missing_last_modified(monkeypatch: pytest.MonkeyPatch) -> None:
+    defaults = DefaultsConfig()
+    config = ResolvedConfig(defaults=defaults, specs=[])
+    spec = core.FetchSpec(id="go", resolver="direct", extras={}, target_formats=("owl",))
+
+    def fake_plan_one(spec, **_kwargs):
+        fetch_plan = FetchPlan(
+            url="https://example.org/go.owl",
+            headers={},
+            filename_hint=None,
+            version=None,
+            license="CC-BY",
+            media_type="application/rdf+xml",
+            service="direct",
+            last_modified=None,
+        )
+        return core.PlannedFetch(
+            spec=spec,
+            resolver="direct",
+            plan=fetch_plan,
+            candidates=(),
+            last_modified=None,
+            last_modified_at=None,
+        )
+
+    def fake_as_completed(iterable):
+        yield from list(iterable)
+
+    class DummyExecutor:
+        def __init__(self, max_workers: int) -> None:  # pragma: no cover - simple stub
+            self._futures: List[_ImmediateFuture] = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def submit(self, fn, *args, **kwargs):
+            try:
+                value = fn(*args, **kwargs)
+                future = _ImmediateFuture(value=value)
+            except Exception as exc:  # pragma: no cover - defensive
+                future = _ImmediateFuture(error=exc)
+            self._futures.append(future)
+            return future
+
+    fetched = {"count": 0}
+    header_value = "Wed, 05 Feb 2025 00:00:00 GMT"
+
+    def fake_fetch_last_modified(plan, _config, _logger):
+        fetched["count"] += 1
+        return header_value
+
+    def fake_setup_logging(*, level="INFO", retention_days=30, max_log_size_mb=100, log_dir=None):
+        logger = logging.getLogger("plan-since-head")
+        logger.handlers[:] = []
+        logger.addHandler(logging.NullHandler())
+        logger.setLevel(level)
+        logger.propagate = False
+        return logger
+
+    monkeypatch.setattr(core, "ThreadPoolExecutor", DummyExecutor)
+    monkeypatch.setattr(core, "as_completed", fake_as_completed)
+    monkeypatch.setattr(core, "plan_one", fake_plan_one)
+    monkeypatch.setattr(core, "_fetch_last_modified", fake_fetch_last_modified)
+    monkeypatch.setattr(core, "setup_logging", fake_setup_logging)
+    monkeypatch.setattr(core, "ensure_python_version", lambda: None)
+    monkeypatch.setattr(core, "generate_correlation_id", lambda: "fixed-correlation")
+
+    cutoff = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    plans = core.plan_all([spec], config=config, since=cutoff)
+
+    assert fetched["count"] == 1
+    assert len(plans) == 1
+    plan = plans[0]
+    assert plan.last_modified == header_value
+    assert plan.plan.last_modified == header_value
+    assert plan.last_modified_at == datetime(2025, 2, 5, tzinfo=timezone.utc)
 
 
 def test_plan_one_uses_fallback(monkeypatch: pytest.MonkeyPatch) -> None:

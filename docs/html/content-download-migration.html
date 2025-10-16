@@ -107,13 +107,21 @@ shared network helpers.</p></li>
 </section>
 <section id="cli-behaviour-changes">
 <h2>3. CLI Behaviour Changes<a class="headerlink" href="#cli-behaviour-changes" title="Link to this heading"></a></h2>
-<ul class="simple">
+<ul>
 <li><p>Use <code class="docutils literal notranslate"><span class="pre">--staging</span></code> to create timestamped run directories with separate <code class="docutils literal notranslate"><span class="pre">PDF/</span></code>
-and <code class="docutils literal notranslate"><span class="pre">HTML/</span></code> folders plus <code class="docutils literal notranslate"><span class="pre">manifest.jsonl</span></code>, <code class="docutils literal notranslate"><span class="pre">manifest.index.json</span></code>, and
-<code class="docutils literal notranslate"><span class="pre">manifest.metrics.json</span></code> sidecars.</p></li>
+and <code class="docutils literal notranslate"><span class="pre">HTML/</span></code> folders plus <code class="docutils literal notranslate"><span class="pre">manifest.jsonl</span></code> and <code class="docutils literal notranslate"><span class="pre">manifest.metrics.json</span></code>.
+Generate <code class="docutils literal notranslate"><span class="pre">manifest.index.json</span></code> and <code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code> after the run using
+the helpers in <code class="docutils literal notranslate"><span class="pre">tools/</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>tools/manifest_to_index.py<span class="w"> </span>runs/YYYYMMDD_HHMM/manifest.jsonl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>runs/YYYYMMDD_HHMM/manifest.index.json
+python<span class="w"> </span>tools/manifest_to_csv.py<span class="w"> </span>runs/YYYYMMDD_HHMM/manifest.jsonl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>runs/YYYYMMDD_HHMM/manifest.last.csv
+</pre></div>
+</div>
+</li>
 <li><p>The CLI always writes JSONL manifests. When <code class="docutils literal notranslate"><span class="pre">--log-format</span> <span class="pre">csv</span></code> is supplied
-it additionally produces <code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code> summarising the latest attempt
-per work.</p></li>
+it additionally produces an attempts CSV; run <code class="docutils literal notranslate"><span class="pre">tools/manifest_to_csv.py</span></code> to
+refresh <code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code> for human review.</p></li>
 <li><p>Domain-level throttling (<code class="docutils literal notranslate"><span class="pre">--domain-min-interval</span></code>) and global URL deduplication
 (<code class="docutils literal notranslate"><span class="pre">--global-url-dedup</span></code>) now apply across worker threads.</p></li>
 <li><p>Resume runs tolerate manifests with incomplete metadata; partial entries no
@@ -124,9 +132,11 @@ required fields are missing.</p></li>
 <section id="manifest-consumers">
 <h2>4. Manifest Consumers<a class="headerlink" href="#manifest-consumers" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p>Manifest entries maintain their historical schema. New sidecar files
+<li><p>Manifest entries maintain their historical schema. Sidecar files
 (<code class="docutils literal notranslate"><span class="pre">.index.json</span></code>, <code class="docutils literal notranslate"><span class="pre">.metrics.json</span></code>, <code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code>) provide faster lookup
-surfaces for resumption tools and operational dashboards.</p></li>
+surfaces for resumption tools and operational dashboards. Generate the index
+and last CSV from <code class="docutils literal notranslate"><span class="pre">manifest.jsonl</span></code> with the conversion utilities under
+<code class="docutils literal notranslate"><span class="pre">tools/</span></code>.</p></li>
 <li><p>HTTP corruption heuristics now record whether HEAD prechecks succeeded via
 the <code class="docutils literal notranslate"><span class="pre">head_precheck_passed</span></code> manifest flag.</p></li>
 </ul>

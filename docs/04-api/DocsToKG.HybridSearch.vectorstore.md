@@ -84,6 +84,28 @@ resources: FAISS GPU resources backing the kernel.
 Returns:
 numpy.ndarray: Pairwise cosine similarities with shape ``(N, M)``.
 
+### `cosine_topk_blockwise(q, C)`
+
+Return Top-K cosine similarities between ``q`` and ``C`` using GPU tiling.
+
+The helper avoids materialising the full ``(N × M)`` similarity matrix by
+iterating over ``C`` in row blocks and maintaining a running Top-K per query
+row. Inputs are copied and normalised inside the routine so callers retain
+ownership of their buffers.
+
+Args:
+q: Query vector or matrix (``N × D``).
+C: Corpus matrix (``M × D``).
+k: Number of neighbours to return per query row.
+device: CUDA device ordinal used for FAISS kernels.
+resources: FAISS GPU resources backing ``pairwise_distance_gpu``.
+block_rows: Number of corpus rows processed per iteration.
+
+Returns:
+Tuple ``(scores, indices)`` where each has shape ``(N × K)``. Scores are
+sorted in descending order for every query row and indices reference rows
+within ``C``.
+
 ### `serialize_state(faiss_index, registry)`
 
 Serialize the vector store and chunk registry to a JSON-safe payload.

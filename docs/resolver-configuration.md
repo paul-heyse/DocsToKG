@@ -92,7 +92,24 @@ python -m DocsToKG.ContentDownload.download_pyalex_pdfs \
 Domain-level limits complement existing resolver-level throttles and are
 particularly helpful when multiple providers resolve to the same host.
 
-## 5. Staging Mode and Derived Logs
+## 5. Adjusting Classification Heuristics
+
+The downloader exposes configurable heuristics for classifying streamed
+payloads and validating PDFs. Set the knobs in resolver configuration files to
+override the defaults (which mirror historical behaviour):
+
+```yaml
+sniff_bytes: 65536        # auto-upgrade ambiguous streams to PDF after n bytes
+min_pdf_bytes: 1024       # PDFs smaller than this are treated as corrupt
+tail_check_bytes: 2048    # number of bytes scanned for the %%EOF marker
+```
+
+These values propagate through the resolver pipeline context so that
+`download_candidate` applies them consistently across worker threads. Lower
+`sniff_bytes` when dealing with very small PDFs, or raise `tail_check_bytes`
+for publishers that append trailers after the EOF marker.
+
+## 6. Staging Mode and Derived Logs
 
 Long-running harvests benefit from isolated output folders and richer manifest
 artifacts. The downloader exposes a `--staging` flag that creates a timestamped
@@ -111,12 +128,21 @@ With staging enabled the CLI writes:
 - `runs/YYYYMMDD_HHMM/PDF/` for downloaded PDFs
 - `runs/YYYYMMDD_HHMM/HTML/` for captured HTML fallbacks
 - `runs/YYYYMMDD_HHMM/manifest.jsonl` for manifest records
-- `runs/YYYYMMDD_HHMM/manifest.index.json` for a work → artifact summary
 - `runs/YYYYMMDD_HHMM/manifest.metrics.json` for aggregate resolver metrics
 
+Generate the sidecar index and last-attempt CSV after the run completes:
+
+```bash
+python tools/manifest_to_index.py runs/YYYYMMDD_HHMM/manifest.jsonl \
+  runs/YYYYMMDD_HHMM/manifest.index.json
+python tools/manifest_to_csv.py runs/YYYYMMDD_HHMM/manifest.jsonl \
+  runs/YYYYMMDD_HHMM/manifest.last.csv
+```
+
 When `--log-format csv` is supplied the downloader still emits JSONL manifests
-and additionally produces a `manifest.last.csv` file that captures the latest
-manifest record per work for rapid auditing:
+and writes an attempts CSV mirror. Run `tools/manifest_to_csv.py` to produce a
+`manifest.last.csv` file that captures the latest manifest record per work for
+rapid auditing:
 
 ```bash
 python -m DocsToKG.ContentDownload.download_pyalex_pdfs \

@@ -391,6 +391,49 @@ def test_offline_mode_requires_local_models(
     assert "Qwen model directory not found" in message
 
 
+def test_validate_only_mode_checks_vectors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Validation-only flag should scan vector files without invoking models."""
+
+    embed_module = _reload_embedding_module(monkeypatch)
+    from DocsToKG.DocParsing import schemas as _schemas
+
+    vector_version = _schemas.VECTOR_SCHEMA_VERSION
+
+    chunks_dir = tmp_path / "chunks"
+    vectors_dir = tmp_path / "vectors"
+    chunks_dir.mkdir()
+    vectors_dir.mkdir()
+
+    chunk_file = chunks_dir / "doc.chunks.jsonl"
+    chunk_file.write_text(
+        json.dumps({"uuid": "chunk-1", "doc_id": "doc", "text": "sample text"}) + "\n",
+        encoding="utf-8",
+    )
+
+    vector_file = vectors_dir / "doc.vectors.jsonl"
+    vector_file.write_text(
+        json.dumps(
+            {
+                "UUID": "chunk-1",
+                "BM25": {"terms": ["doc"], "weights": [1.0], "avgdl": 1.0, "N": 1},
+                "SPLADEv3": {"tokens": ["doc"], "weights": [0.1]},
+                "Qwen3-4B": {"model_id": "encoder", "vector": [0.1], "dimension": 1},
+                "schema_version": vector_version,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(tmp_path))
+    args = embed_module.parse_args(
+        ["--chunks-dir", str(chunks_dir), "--out-dir", str(vectors_dir), "--validate-only"]
+    )
+
+    exit_code = embed_module.main(args)
+    assert exit_code == 0
+
+
 def _find_action(parser, option: str):
     for action in parser._actions:  # pragma: no cover - exercised in tests
         if option in action.option_strings:

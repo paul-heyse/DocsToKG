@@ -4,47 +4,39 @@
 #   "module": "DocsToKG.DocParsing.EmbeddingV2",
 #   "purpose": "Embedding pipelines for DocParsing",
 #   "sections": [
-#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
-#     {"id": "public-functions", "name": "Public Functions", "anchor": "public-functions", "kind": "api"},
-#     {"id": "public-functions-qwen-cache-key", "name": "_qwen_cache_key", "anchor": "public-functions-qwen-cache-key", "kind": "function"},
-#     {"id": "cache-utilities", "name": "Cache Utilities", "anchor": "cache-utilities", "kind": "internal"},
-#     {"id": "cache-utilities-resolve-qwen-dir", "name": "_resolve_qwen_dir", "anchor": "cache-utilities-resolve-qwen-dir", "kind": "function"},
-#     {"id": "cache-utilities-resolve-splade-dir", "name": "_resolve_splade_dir", "anchor": "cache-utilities-resolve-splade-dir", "kind": "function"},
-#     {"id": "cache-utilities-derive-doc-id-and-output-path", "name": "_derive_doc_id_and_output_path", "anchor": "cache-utilities-derive-doc-id-and-output-path", "kind": "function"},
-#     {"id": "cache-utilities-expand-optional", "name": "_expand_optional", "anchor": "cache-utilities-expand-optional", "kind": "function"},
-#     {"id": "cache-utilities-resolve-cli-path", "name": "_resolve_cli_path", "anchor": "cache-utilities-resolve-cli-path", "kind": "function"},
-#     {"id": "cache-utilities-missing-splade-dependency-message", "name": "_missing_splade_dependency_message", "anchor": "cache-utilities-missing-splade-dependency-message", "kind": "function"},
-#     {"id": "cache-utilities-missing-qwen-dependency-message", "name": "_missing_qwen_dependency_message", "anchor": "cache-utilities-missing-qwen-dependency-message", "kind": "function"},
-#     {"id": "cache-utilities-ensure-splade-dependencies", "name": "_ensure_splade_dependencies", "anchor": "cache-utilities-ensure-splade-dependencies", "kind": "function"},
-#     {"id": "cache-utilities-ensure-qwen-dependencies", "name": "_ensure_qwen_dependencies", "anchor": "cache-utilities-ensure-qwen-dependencies", "kind": "function"},
-#     {"id": "bm25-tokenizer", "name": "BM25 Tokenizer", "anchor": "bm25-tokenizer", "kind": "internal"},
-#     {"id": "bm25-tokenizer-ensure-uuid", "name": "ensure_uuid", "anchor": "bm25-tokenizer-ensure-uuid", "kind": "function"},
-#     {"id": "bm25-tokenizer-ensure-chunk-schema", "name": "ensure_chunk_schema", "anchor": "bm25-tokenizer-ensure-chunk-schema", "kind": "function"},
-#     {"id": "bm25-tokenizer-tokens", "name": "tokens", "anchor": "bm25-tokenizer-tokens", "kind": "function"},
-#     {"id": "public-classes", "name": "Public Classes", "anchor": "public-classes", "kind": "api"},
-#     {"id": "public-classes-bm25stats", "name": "BM25Stats", "anchor": "public-classes-bm25stats", "kind": "class"},
-#     {"id": "public-classes-bm25statsaccumulator", "name": "BM25StatsAccumulator", "anchor": "public-classes-bm25statsaccumulator", "kind": "class"},
-#     {"id": "public-classes-print-bm25-summary", "name": "print_bm25_summary", "anchor": "public-classes-print-bm25-summary", "kind": "function"},
-#     {"id": "public-classes-bm25-vector", "name": "bm25_vector", "anchor": "public-classes-bm25-vector", "kind": "function"},
-#     {"id": "splade-v3-gpu", "name": "SPLADE-v3 (GPU)", "anchor": "splade-v3-gpu", "kind": "api"},
-#     {"id": "splade-v3-gpu-spladecfg", "name": "SpladeCfg", "anchor": "splade-v3-gpu-spladecfg", "kind": "class"},
-#     {"id": "splade-v3-gpu-splade-encode", "name": "splade_encode", "anchor": "splade-v3-gpu-splade-encode", "kind": "function"},
-#     {"id": "splade-v3-gpu-detect-splade-backend", "name": "_detect_splade_backend", "anchor": "splade-v3-gpu-detect-splade-backend", "kind": "function"},
-#     {"id": "splade-v3-gpu-get-splade-encoder", "name": "_get_splade_encoder", "anchor": "splade-v3-gpu-get-splade-encoder", "kind": "function"},
-#     {"id": "splade-v3-gpu-get-splade-backend-used", "name": "_get_splade_backend_used", "anchor": "splade-v3-gpu-get-splade-backend-used", "kind": "function"},
-#     {"id": "splade-v3-gpu-spladevalidator", "name": "SPLADEValidator", "anchor": "splade-v3-gpu-spladevalidator", "kind": "class"},
-#     {"id": "qwen3-embeddings", "name": "Qwen3 Embeddings", "anchor": "qwen3-embeddings", "kind": "api"},
-#     {"id": "qwen3-embeddings-qwencfg", "name": "QwenCfg", "anchor": "qwen3-embeddings-qwencfg", "kind": "class"},
-#     {"id": "qwen3-embeddings-qwen-embed", "name": "qwen_embed", "anchor": "qwen3-embeddings-qwen-embed", "kind": "function"},
-#     {"id": "qwen3-embeddings-process-pass-a", "name": "process_pass_a", "anchor": "qwen3-embeddings-process-pass-a", "kind": "function"},
-#     {"id": "qwen3-embeddings-iter-rows-in-batches", "name": "iter_rows_in_batches", "anchor": "qwen3-embeddings-iter-rows-in-batches", "kind": "function"},
-#     {"id": "qwen3-embeddings-iter-chunk-files", "name": "iter_chunk_files", "anchor": "qwen3-embeddings-iter-chunk-files", "kind": "function"},
-#     {"id": "qwen3-embeddings-process-chunk-file-vectors", "name": "process_chunk_file_vectors", "anchor": "qwen3-embeddings-process-chunk-file-vectors", "kind": "function"},
-#     {"id": "qwen3-embeddings-write-vectors", "name": "write_vectors", "anchor": "qwen3-embeddings-write-vectors", "kind": "function"},
-#     {"id": "main-driver", "name": "Main Driver", "anchor": "main-driver", "kind": "cli"},
-#     {"id": "main-driver-build-parser", "name": "build_parser", "anchor": "main-driver-build-parser", "kind": "function"},
-#     {"id": "main-driver-parse-args", "name": "parse_args", "anchor": "main-driver-parse-args", "kind": "function"},
-#     {"id": "main-driver-main", "name": "main", "anchor": "main-driver-main", "kind": "function"}
+#     {"id": "_qwen_cache_key", "name": "_qwen_cache_key", "anchor": "function-_qwen_cache_key", "kind": "function"},
+#     {"id": "_resolve_qwen_dir", "name": "_resolve_qwen_dir", "anchor": "function-_resolve_qwen_dir", "kind": "function"},
+#     {"id": "_resolve_splade_dir", "name": "_resolve_splade_dir", "anchor": "function-_resolve_splade_dir", "kind": "function"},
+#     {"id": "_expand_optional", "name": "_expand_optional", "anchor": "function-_expand_optional", "kind": "function"},
+#     {"id": "_resolve_cli_path", "name": "_resolve_cli_path", "anchor": "function-_resolve_cli_path", "kind": "function"},
+#     {"id": "_missing_splade_dependency_message", "name": "_missing_splade_dependency_message", "anchor": "function-_missing_splade_dependency_message", "kind": "function"},
+#     {"id": "_missing_qwen_dependency_message", "name": "_missing_qwen_dependency_message", "anchor": "function-_missing_qwen_dependency_message", "kind": "function"},
+#     {"id": "_ensure_splade_dependencies", "name": "_ensure_splade_dependencies", "anchor": "function-_ensure_splade_dependencies", "kind": "function"},
+#     {"id": "_ensure_qwen_dependencies", "name": "_ensure_qwen_dependencies", "anchor": "function-_ensure_qwen_dependencies", "kind": "function"},
+#     {"id": "ensure_uuid", "name": "ensure_uuid", "anchor": "function-ensure_uuid", "kind": "function"},
+#     {"id": "ensure_chunk_schema", "name": "ensure_chunk_schema", "anchor": "function-ensure_chunk_schema", "kind": "function"},
+#     {"id": "tokens", "name": "tokens", "anchor": "function-tokens", "kind": "function"},
+#     {"id": "BM25Stats", "name": "BM25Stats", "anchor": "class-BM25Stats", "kind": "class"},
+#     {"id": "BM25StatsAccumulator", "name": "BM25StatsAccumulator", "anchor": "class-BM25StatsAccumulator", "kind": "class"},
+#     {"id": "print_bm25_summary", "name": "print_bm25_summary", "anchor": "function-print_bm25_summary", "kind": "function"},
+#     {"id": "bm25_vector", "name": "bm25_vector", "anchor": "function-bm25_vector", "kind": "function"},
+#     {"id": "SpladeCfg", "name": "SpladeCfg", "anchor": "class-SpladeCfg", "kind": "class"},
+#     {"id": "splade_encode", "name": "splade_encode", "anchor": "function-splade_encode", "kind": "function"},
+#     {"id": "_detect_splade_backend", "name": "_detect_splade_backend", "anchor": "function-_detect_splade_backend", "kind": "function"},
+#     {"id": "_get_splade_encoder", "name": "_get_splade_encoder", "anchor": "function-_get_splade_encoder", "kind": "function"},
+#     {"id": "_get_splade_backend_used", "name": "_get_splade_backend_used", "anchor": "function-_get_splade_backend_used", "kind": "function"},
+#     {"id": "SPLADEValidator", "name": "SPLADEValidator", "anchor": "class-SPLADEValidator", "kind": "class"},
+#     {"id": "QwenCfg", "name": "QwenCfg", "anchor": "class-QwenCfg", "kind": "class"},
+#     {"id": "qwen_embed", "name": "qwen_embed", "anchor": "function-qwen_embed", "kind": "function"},
+#     {"id": "process_pass_a", "name": "process_pass_a", "anchor": "function-process_pass_a", "kind": "function"},
+#     {"id": "iter_rows_in_batches", "name": "iter_rows_in_batches", "anchor": "function-iter_rows_in_batches", "kind": "function"},
+#     {"id": "iter_chunk_files", "name": "iter_chunk_files", "anchor": "function-iter_chunk_files", "kind": "function"},
+#     {"id": "process_chunk_file_vectors", "name": "process_chunk_file_vectors", "anchor": "function-process_chunk_file_vectors", "kind": "function"},
+#     {"id": "write_vectors", "name": "write_vectors", "anchor": "function-write_vectors", "kind": "function"},
+#     {"id": "_validate_vectors_for_chunks", "name": "_validate_vectors_for_chunks", "anchor": "function-_validate_vectors_for_chunks", "kind": "function"},
+#     {"id": "build_parser", "name": "build_parser", "anchor": "function-build_parser", "kind": "function"},
+#     {"id": "parse_args", "name": "parse_args", "anchor": "function-parse_args", "kind": "function"},
+#     {"id": "main", "name": "main", "anchor": "function-main", "kind": "function"}
 #   ]
 # }
 # === /NAVMAP ===
@@ -77,6 +69,7 @@ Dependencies:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -101,6 +94,7 @@ from DocsToKG.DocParsing._common import (
     data_chunks,
     data_vectors,
     detect_data_root,
+    derive_doc_id_and_vectors_path,
     expand_path,
     get_logger,
     iter_chunks,
@@ -230,22 +224,6 @@ QWEN_DIR = expand_path(_resolve_qwen_dir(MODEL_ROOT))
 SPLADE_DIR = expand_path(_resolve_splade_dir(MODEL_ROOT))
 
 
-def _derive_doc_id_and_output_path(
-    chunk_file: Path, chunks_root: Path, vectors_root: Path
-) -> tuple[str, Path]:
-    """Return manifest doc_id and vector output path for a chunk artifact."""
-
-    relative = chunk_file.relative_to(chunks_root)
-    base = relative
-    if base.suffix == ".jsonl":
-        base = base.with_suffix("")
-    if base.suffix == ".chunks":
-        base = base.with_suffix("")
-    doc_id = base.with_suffix(".doctags").as_posix()
-    vector_relative = base.with_suffix(".vectors.jsonl")
-    return doc_id, vectors_root / vector_relative
-
-
 def _expand_optional(path: Optional[Path]) -> Optional[Path]:
     """Expand optional :class:`Path` values to absolutes when provided.
 
@@ -330,21 +308,48 @@ def _ensure_qwen_dependencies() -> None:
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)?")
 
+# Project-wide namespace for deterministic UUIDv5 generation.
+UUID_NAMESPACE = uuid.UUID("00000000-0000-0000-0000-000000000000")
+
 
 def ensure_uuid(rows: List[dict]) -> bool:
-    """Populate missing chunk UUIDs in-place.
+    """Populate missing chunk UUIDs in-place using deterministic UUIDv5 derivation.
 
     Args:
         rows: Chunk dictionaries that should include a `uuid` key.
 
     Returns:
-        True when at least one UUID was newly assigned; otherwise False.
+        True when at least one UUID was newly assigned; otherwise False. UUIDs are
+        derived from a namespace, doc ID, source chunk indices, and the first 16 hex
+        characters of the chunk text SHA-1 digest. If deterministic generation fails,
+        a UUID4 is assigned as a fallback.
     """
 
     updated = False
     for row in rows:
         if not row.get("uuid"):
-            row["uuid"] = str(uuid.uuid4())
+            try:
+                doc_id = row.get("doc_id") or ""
+                src_raw = row.get("source_chunk_idxs") or []
+                if isinstance(src_raw, (str, bytes)):
+                    src_iterable = [src_raw]
+                elif isinstance(src_raw, Sequence):
+                    src_iterable = list(src_raw)
+                else:
+                    src_iterable = [src_raw] if src_raw is not None else []
+                src = ",".join(str(idx) for idx in src_iterable)
+
+                text_raw = row.get("text", "")
+                if isinstance(text_raw, bytes):
+                    text_value = text_raw.decode("utf-8", errors="ignore")
+                else:
+                    text_value = str(text_raw) if text_raw is not None else ""
+                digest = hashlib.sha1(text_value.encode("utf-8")).hexdigest()[:16]
+
+                name = f"{doc_id}|{src}|{digest}"
+                row["uuid"] = str(uuid.uuid5(UUID_NAMESPACE, name))
+            except Exception:
+                row["uuid"] = str(uuid.uuid4())
             updated = True
     return updated
 
@@ -533,6 +538,7 @@ class SpladeCfg:
         cache_folder: Directory where transformer weights are cached.
         max_active_dims: Optional cap on active sparse dimensions.
         attn_impl: Preferred attention implementation override.
+        local_files_only: Restrict Hugging Face hub access to local cache.
 
     Examples:
         >>> cfg = SpladeCfg(batch_size=8, device="cuda:1")
@@ -547,6 +553,7 @@ class SpladeCfg:
     max_active_dims: int | None = None
     # Leave None to let HF/torch pick (usually SDPA); set to "flash_attention_2" if available.
     attn_impl: str | None = None
+    local_files_only: bool = True
 
 
 def splade_encode(
@@ -643,7 +650,7 @@ def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
             device=cfg.device,
             cache_folder=str(cfg.cache_folder),
             model_kwargs=model_kwargs,
-            local_files_only=True,
+            local_files_only=cfg.local_files_only,
         )
         backend_used = _detect_splade_backend(encoder, backend_used)
     except (ValueError, ImportError) as exc:
@@ -656,7 +663,7 @@ def _get_splade_encoder(cfg: SpladeCfg) -> SparseEncoder:
                 device=cfg.device,
                 cache_folder=str(cfg.cache_folder),
                 model_kwargs=fallback_kwargs,
-                local_files_only=True,
+                local_files_only=cfg.local_files_only,
             )
             backend_used = _detect_splade_backend(encoder, "sdpa")
         else:
@@ -747,15 +754,14 @@ class SPLADEValidator:
         pct = 100 * len(self.zero_nnz_chunks) / self.total_chunks
         if pct > self.warn_threshold_pct:
             logger.warning(
-                "SPLADE sparsity warning: %s / %s (%.1f%%) chunks have zero non-zero "
-                "elements (threshold=%.1f%%).",
+                "SPLADE sparsity warning: %s / %s (%.1f%%) chunks have zero non-zero elements.",
                 len(self.zero_nnz_chunks),
                 self.total_chunks,
                 pct,
-                self.warn_threshold_pct,
             )
             logger.warning(
-                "Affected UUIDs (first 10): %s",
+                "Affected UUIDs (first 10 of %s): %s",
+                len(self.zero_nnz_chunks),
                 self.zero_nnz_chunks[:10],
             )
 
@@ -843,6 +849,10 @@ def process_pass_a(files: Sequence[Path], logger) -> BM25Stats:
 
     Returns:
         Aggregated BM25 statistics for the supplied chunk corpus.
+
+    Raises:
+        OSError: If chunk files cannot be read or written.
+        json.JSONDecodeError: If a chunk row contains invalid JSON.
     """
 
     accumulator = BM25StatsAccumulator()
@@ -1197,26 +1207,68 @@ def write_vectors(
 # --- Main Driver ---
 
 
-def _validate_vectors_in_dir(vectors_dir: Path, logger) -> tuple[int, int]:
-    """Validate all *.vectors.jsonl files under a directory tree.
+def _validate_vectors_for_chunks(
+    chunks_dir: Path, vectors_dir: Path, logger
+) -> tuple[int, int]:
+    """Validate vectors associated with chunk files without recomputing models.
 
     Returns:
         (files_checked, rows_validated)
     """
     from DocsToKG.DocParsing.schemas import validate_vector_row
-    files = sorted([p for p in vectors_dir.rglob("*.vectors.jsonl") if p.is_file()])
-    rows = 0
-    for f in files:
-        for batch in iter_rows_in_batches(f, 4096):
+
+    files_checked = 0
+    rows_validated = 0
+    missing: List[tuple[str, Path]] = []
+
+    for chunk_path in iter_chunks(chunks_dir):
+        doc_id, vector_path = derive_doc_id_and_vectors_path(chunk_path, chunks_dir, vectors_dir)
+        if not vector_path.exists():
+            missing.append((doc_id, vector_path))
+            continue
+        files_checked += 1
+        for batch in iter_rows_in_batches(vector_path, 4096):
             for row in batch:
                 # Raises on error
                 validate_vector_row(row)
-                rows += 1
+                rows_validated += 1
+
+    if missing:
+        preview = ", ".join(doc for doc, _ in missing[:5])
+        if len(missing) > 5:
+            preview += ", ..."
+        logger.error(
+            "Missing vector files for chunk documents",
+            extra={
+                "extra_fields": {
+                    "missing": [str(path) for _, path in missing],
+                    "missing_count": len(missing),
+                    "chunks_dir": str(chunks_dir),
+                    "vectors_dir": str(vectors_dir),
+                }
+            },
+        )
+        raise FileNotFoundError(
+            "Vector files not found for documents: " + preview
+        )
+
     logger.info(
         "Validated vector files",
-        extra={"extra_fields": {"files": len(files), "rows": rows, "dir": str(vectors_dir)}},
+        extra={
+            "extra_fields": {
+                "files_checked": files_checked,
+                "rows_validated": rows_validated,
+                "chunks_dir": str(chunks_dir),
+                "vectors_dir": str(vectors_dir),
+            }
+        },
     )
-    return len(files), rows
+    print(
+        f"Validated {rows_validated} rows across {files_checked} vector files under {vectors_dir}"
+    )
+    return files_checked, rows_validated
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct the CLI parser for the embedding pipeline.
 
@@ -1274,7 +1326,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--splade-sparsity-warn-pct",
+        "--splade-zero-pct-warn-threshold",
         dest="sparsity_warn_threshold_pct",
         type=float,
         default=SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
@@ -1369,7 +1421,9 @@ def main(args: argparse.Namespace | None = None) -> int:
     os.environ["TRANSFORMERS_CACHE"] = str(hf_home / "transformers")
     os.environ["SENTENCE_TRANSFORMERS_HOME"] = str(model_root)
 
-    if offline_mode:
+    validate_only = bool(getattr(args, "validate_only", False))
+
+    if offline_mode and not validate_only:
         os.environ["TRANSFORMERS_OFFLINE"] = "1"
         missing_paths = []
         if not splade_model_dir.exists():
@@ -1395,7 +1449,7 @@ def main(args: argparse.Namespace | None = None) -> int:
 
     overall_start = time.perf_counter()
 
-    if args.offline:
+    if args.offline and not validate_only:
         os.environ["TRANSFORMERS_OFFLINE"] = "1"
         os.environ.setdefault("HF_HUB_OFFLINE", "1")
         logger.info("Offline mode enabled: expecting local caches only")
@@ -1410,12 +1464,13 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "Offline mode requires local model directories. Missing: " + missing_desc
             )
 
-    try:
-        _ensure_splade_dependencies()
-        _ensure_qwen_dependencies()
-    except ImportError as exc:
-        logger.error("Embedding dependencies unavailable: %s", exc)
-        raise
+    if not validate_only:
+        try:
+            _ensure_splade_dependencies()
+            _ensure_qwen_dependencies()
+        except ImportError as exc:
+            logger.error("Embedding dependencies unavailable: %s", exc)
+            raise
 
     data_root_override = args.data_root
     data_root_overridden = data_root_override is not None
@@ -1438,9 +1493,19 @@ def main(args: argparse.Namespace | None = None) -> int:
     ).resolve()
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    if getattr(args, 'validate_only', False):
-        _f, _r = _validate_vectors_in_dir(out_dir, logger)
-        logger.info('Validation-only mode complete', extra={'extra_fields': {'files': _f, 'rows': _r}})
+    if validate_only:
+        files_checked, rows_validated = _validate_vectors_for_chunks(chunks_dir, out_dir, logger)
+        logger.info(
+            "Validation-only mode complete",
+            extra={
+                "extra_fields": {
+                    "files": files_checked,
+                    "rows": rows_validated,
+                    "chunks_dir": str(chunks_dir),
+                    "vectors_dir": str(out_dir),
+                }
+            },
+        )
         return 0
 
     args.out_dir = out_dir
@@ -1479,6 +1544,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         batch_size=args.batch_size_splade,
         max_active_dims=args.splade_max_active_dims,
         attn_impl=attn_impl,
+        local_files_only=bool(args.offline),
     )
     args.qwen_cfg = QwenCfg(
         model_dir=qwen_model_dir,
@@ -1511,7 +1577,7 @@ def main(args: argparse.Namespace | None = None) -> int:
     file_entries = []
     skipped_files = 0
     for chunk_file in files:
-        doc_id, out_path = _derive_doc_id_and_output_path(chunk_file, chunks_dir, args.out_dir)
+        doc_id, out_path = derive_doc_id_and_vectors_path(chunk_file, chunks_dir, args.out_dir)
         input_hash = compute_content_hash(chunk_file)
         entry = manifest_index.get(doc_id)
         if (

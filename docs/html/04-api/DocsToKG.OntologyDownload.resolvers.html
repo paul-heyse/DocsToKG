@@ -109,9 +109,9 @@ cleaned original value or <code class="docutils literal notranslate"><span class
 <h3><code class="docutils literal notranslate"><span class="pre">_load_resolver_plugins(logger)</span></code><a class="headerlink" href="#load-resolver-plugins-logger" title="Link to this heading"></a></h3>
 <p>Discover resolver plugins registered via Python entry points.</p>
 </section>
-<section id="id1">
-<h3><code class="docutils literal notranslate"><span class="pre">_load_resolver_plugins(logger)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
-<p>Discover resolver plugins registered via Python entry points.</p>
+<section id="ensure-plugins-loaded-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">_ensure_plugins_loaded(logger)</span></code><a class="headerlink" href="#ensure-plugins-loaded-logger" title="Link to this heading"></a></h3>
+<p>Ensure resolver plugins are loaded at most once per interpreter.</p>
 </section>
 <section id="execute-with-retry-self-func">
 <h3><code class="docutils literal notranslate"><span class="pre">_execute_with_retry(self,</span> <span class="pre">func)</span></code><a class="headerlink" href="#execute-with-retry-self-func" title="Link to this heading"></a></h3>
@@ -178,8 +178,8 @@ FetchPlan pointing to the preferred download URL.</p>
 <p>Raises:
 ConfigError: If no download URL can be derived.</p>
 </section>
-<section id="id2">
-<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
 <p>Discover download locations via the OLS API.</p>
 <p>Args:
 spec: Fetch specification containing ontology identifiers and extras.
@@ -198,8 +198,8 @@ self: Resolver instance requesting the API key.</p>
 <p>Returns:
 Optional[str]: API key string stripped of whitespace, or <code class="docutils literal notranslate"><span class="pre">None</span></code> when missing.</p>
 </section>
-<section id="id3">
-<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<section id="id2">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
 <p>Resolve BioPortal download URLs and authorization headers.</p>
 <p>Args:
 spec: Fetch specification with optional API extras like acronyms.
@@ -218,8 +218,8 @@ ConfigError: If authentication fails or no download link is available.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_iter_dicts(payload)</span></code><a class="headerlink" href="#iter-dicts-payload" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
-<section id="id4">
-<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<section id="id3">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
 <p>Discover download metadata from the LOV API.</p>
 <p>Args:
 spec: Fetch specification providing ontology identifier and extras.
@@ -230,8 +230,8 @@ FetchPlan describing the resolved download URL and metadata.</p>
 <p>Raises:
 ConfigError: If required metadata is missing or the LOV API fails.</p>
 </section>
-<section id="id5">
-<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
+<section id="id4">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
 <p>Return a fetch plan for explicitly provided SKOS URLs.</p>
 <p>Args:
 spec: Fetch specification containing the <code class="docutils literal notranslate"><span class="pre">extras.url</span></code> field.
@@ -241,6 +241,18 @@ logger: Logger adapter used to report resolved URL information.</p>
 FetchPlan with the provided URL and appropriate media type.</p>
 <p>Raises:
 ConfigError: If the specification omits the required URL.</p>
+</section>
+<section id="id5">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
+<p>Return a fetch plan using the direct URL provided in <code class="docutils literal notranslate"><span class="pre">spec.extras</span></code>.</p>
+<p>Args:
+spec: Fetch specification containing the upstream download details.
+config: Resolved configuration (unused, provided for interface parity).
+logger: Logger adapter used to record telemetry.</p>
+<p>Returns:
+FetchPlan referencing the explicit URL.</p>
+<p>Raises:
+ConfigError: If the specification omits the required URL or provides invalid extras.</p>
 </section>
 <section id="id6">
 <h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
@@ -417,6 +429,10 @@ True</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>
+</section>
+<section id="directresolver">
+<h3><code class="docutils literal notranslate"><span class="pre">DirectResolver</span></code><a class="headerlink" href="#directresolver" title="Link to this heading"></a></h3>
+<p>Resolver that consumes explicit URLs supplied via <code class="docutils literal notranslate"><span class="pre">spec.extras</span></code>.</p>
 </section>
 <section id="xbrlresolver">
 <h3><code class="docutils literal notranslate"><span class="pre">XBRLResolver</span></code><a class="headerlink" href="#xbrlresolver" title="Link to this heading"></a></h3>

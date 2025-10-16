@@ -117,6 +117,14 @@ value: Observation value to append to the histogram.
 <p>Returns:
 None</p>
 </section>
+<section id="set-gauge-self-name-value">
+<h3><code class="docutils literal notranslate"><span class="pre">set_gauge(self,</span> <span class="pre">name,</span> <span class="pre">value)</span></code><a class="headerlink" href="#set-gauge-self-name-value" title="Link to this heading"></a></h3>
+<p>Set (or update) the value of a gauge metric.</p>
+</section>
+<section id="percentile-self-name-percentile">
+<h3><code class="docutils literal notranslate"><span class="pre">percentile(self,</span> <span class="pre">name,</span> <span class="pre">percentile)</span></code><a class="headerlink" href="#percentile-self-name-percentile" title="Link to this heading"></a></h3>
+<p>Return the requested percentile for <code class="docutils literal notranslate"><span class="pre">name</span></code> if samples exist.</p>
+</section>
 <section id="export-counters-self">
 <h3><code class="docutils literal notranslate"><span class="pre">export_counters(self)</span></code><a class="headerlink" href="#export-counters-self" title="Link to this heading"></a></h3>
 <p>Iterate over collected counter metrics as structured samples.</p>
@@ -132,6 +140,10 @@ Iterable of <code class="docutils literal notranslate"><span class="pre">Counter
 None</p>
 <p>Returns:
 Iterable of <code class="docutils literal notranslate"><span class="pre">HistogramSample</span></code> entries containing percentile stats.</p>
+</section>
+<section id="export-gauges-self">
+<h3><code class="docutils literal notranslate"><span class="pre">export_gauges(self)</span></code><a class="headerlink" href="#export-gauges-self" title="Link to this heading"></a></h3>
+<p>Iterate over gauge metrics as structured samples.</p>
 </section>
 <section id="span-self-name">
 <h3><code class="docutils literal notranslate"><span class="pre">span(self,</span> <span class="pre">name)</span></code><a class="headerlink" href="#span-self-name" title="Link to this heading"></a></h3>
@@ -178,6 +190,10 @@ Context manager yielding control to the caller.</p>
 None</p>
 <p>Returns:
 Dictionary containing lists of counter and histogram samples.</p>
+</section>
+<section id="deque-factory">
+<h3><code class="docutils literal notranslate"><span class="pre">_deque_factory()</span></code><a class="headerlink" href="#deque-factory" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 </section>
 <section id="classes">
@@ -231,6 +247,10 @@ p99: 99th percentile value</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>
+</section>
+<section id="gaugesample">
+<h3><code class="docutils literal notranslate"><span class="pre">GaugeSample</span></code><a class="headerlink" href="#gaugesample" title="Link to this heading"></a></h3>
+<p>Sample from a gauge metric capturing the latest recorded value.</p>
 </section>
 <section id="metricscollector">
 <h3><code class="docutils literal notranslate"><span class="pre">MetricsCollector</span></code><a class="headerlink" href="#metricscollector" title="Link to this heading"></a></h3>

@@ -73,3 +73,19 @@ items: Sequence of string values that may contain duplicates.
 
 Returns:
 New list with duplicates removed while keeping original ordering.
+
+### `normalize_pmid(pmid)`
+
+Extract the numeric PubMed identifier from the supplied string.
+
+### `normalize_arxiv(arxiv_id)`
+
+Normalize arXiv identifiers by removing common prefixes and whitespace.
+
+### `slugify(text, keep)`
+
+Create a filesystem-friendly slug from the provided text.
+
+### `normalize_url(url)`
+
+Return a canonicalised version of ``url`` suitable for deduplication.

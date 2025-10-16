@@ -4,15 +4,27 @@ This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.optdeps
 
 ## 1. Overview
 
-Optional dependency helpers for the ontology downloader.
+Optional dependency helpers retained as a testing shim.
+
+Production code should import optional dependency helpers from
+``DocsToKG.OntologyDownload.ontology_download`` directly. This proxy exists so
+tests can monkeypatch the internal caches without touching private globals.
 
 ## 2. Functions
+
+### `patch_getter(name, replacement)`
+
+Temporarily replace an optional dependency getter for tests.
 
 ### `__getattr__(self, name)`
 
 *No documentation available.*
 
 ### `__setattr__(self, name, value)`
+
+*No documentation available.*
+
+### `__delattr__(self, name)`
 
 *No documentation available.*
 

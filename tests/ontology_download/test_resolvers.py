@@ -754,3 +754,19 @@ def test_resolver_plugin_loader_registers_and_warns(monkeypatch, caplog):
     assert "plugin" in resolvers.RESOLVERS
     assert isinstance(resolvers.RESOLVERS["plugin"], DummyResolver)
     assert any(record.message == "resolver plugin failed" for record in caplog.records)
+
+
+def test_resolver_plugin_guard_is_idempotent(monkeypatch):
+    calls = {"count": 0}
+
+    def fake_entry_points():
+        calls["count"] += 1
+        return SimpleNamespace(select=lambda *, group=None: [])
+
+    monkeypatch.setattr(resolvers.metadata, "entry_points", fake_entry_points)
+    monkeypatch.setattr(resolvers, "_PLUGINS_LOADED", False, raising=False)
+
+    resolvers._ensure_plugins_loaded(logging.getLogger("test"))
+    resolvers._ensure_plugins_loaded(logging.getLogger("test"))
+
+    assert calls["count"] == 1

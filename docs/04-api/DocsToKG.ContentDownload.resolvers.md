@@ -145,27 +145,6 @@ self: Configuration instance requiring validation.
 Returns:
 None
 
-### `log_attempt(self, record)`
-
-Log a resolver attempt with optional timestamp override.
-
-Args:
-record: Structured attempt event emitted by a resolver.
-timestamp: Override timestamp string for deterministic replay.
-
-Returns:
-None
-
-### `log(self, record)`
-
-Log a resolver attempt.
-
-Args:
-record: Attempt record describing the resolver execution.
-
-Returns:
-None
-
 ### `is_pdf(self)`
 
 Return ``True`` when the classification represents a PDF.
@@ -695,7 +674,7 @@ self: Pipeline instance executing resolver scheduling logic.
 Returns:
 None
 
-### `_should_attempt_head_check(self, resolver_name)`
+### `_should_attempt_head_check(self, resolver_name, url)`
 
 Return ``True`` when a resolver should perform a HEAD preflight request.
 
@@ -894,23 +873,6 @@ Examples:
 ...     content_type="application/pdf",
 ...     elapsed_ms=120.5,
 ... )
-
-### `AttemptSink`
-
-Protocol for logging resolver attempts.
-
-Attributes:
-None: The protocol formalises the callable surface without storing state.
-
-Examples:
->>> class Collector:
-...     def __init__(self):
-...         self.records = []
-...     def log(self, record: AttemptRecord) -> None:
-...         self.records.append(record)
->>> collector = Collector()
->>> isinstance(collector, AttemptSink)
-True
 
 ### `DownloadOutcome`
 

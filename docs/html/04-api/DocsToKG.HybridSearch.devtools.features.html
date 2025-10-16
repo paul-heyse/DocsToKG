@@ -82,48 +82,110 @@
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Synthetic feature generation utilities for development and testing.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+<p>Raises:
+None</p>
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="tokenize-text">
 <h3><code class="docutils literal notranslate"><span class="pre">tokenize(text)</span></code><a class="headerlink" href="#tokenize-text" title="Link to this heading"></a></h3>
 <p>Tokenize <code class="docutils literal notranslate"><span class="pre">text</span></code> into lower-cased alphanumeric tokens.</p>
+<p>Args:
+text: Source string that should be segmented into tokens.</p>
+<p>Returns:
+List of tokens extracted from <code class="docutils literal notranslate"><span class="pre">text</span></code> with all characters lower-cased.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>tokenize(“Hybrid Search FTW!”)
+[‘hybrid’, ‘search’, ‘ftw’]</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 <section id="tokenize-with-spans-text">
 <h3><code class="docutils literal notranslate"><span class="pre">tokenize_with_spans(text)</span></code><a class="headerlink" href="#tokenize-with-spans-text" title="Link to this heading"></a></h3>
 <p>Tokenize <code class="docutils literal notranslate"><span class="pre">text</span></code> and return token spans for highlight generation.</p>
+<p>Args:
+text: Source string that should be segmented while preserving offsets.</p>
+<p>Returns:
+Tuple containing the token list and a list of <code class="docutils literal notranslate"><span class="pre">(start,</span> <span class="pre">end)</span></code> offsets.</p>
 </section>
 <section id="sliding-window-tokens-window-overlap">
 <h3><code class="docutils literal notranslate"><span class="pre">sliding_window(tokens,</span> <span class="pre">window,</span> <span class="pre">overlap)</span></code><a class="headerlink" href="#sliding-window-tokens-window-overlap" title="Link to this heading"></a></h3>
 <p>Yield sliding windows across <code class="docutils literal notranslate"><span class="pre">tokens</span></code> with <code class="docutils literal notranslate"><span class="pre">overlap</span></code> between chunks.</p>
+<p>Args:
+tokens: Token sequence that should be windowed.
+window: Maximum number of tokens per emitted window (must be &gt; 0).
+overlap: Number of tokens shared between consecutive windows. Must be
+less than <code class="docutils literal notranslate"><span class="pre">window</span></code> and greater than or equal to zero.</p>
+<p>Yields:
+Token windows with the configured overlap.</p>
+<p>Raises:
+ValueError: If <code class="docutils literal notranslate"><span class="pre">window</span></code> or <code class="docutils literal notranslate"><span class="pre">overlap</span></code> violate expected constraints.</p>
+<p>Returns:
+Iterator over token windows respecting the configured parameters.</p>
 </section>
 <section id="embedding-dim-self">
 <h3><code class="docutils literal notranslate"><span class="pre">embedding_dim(self)</span></code><a class="headerlink" href="#embedding-dim-self" title="Link to this heading"></a></h3>
 <p>Return the configured dense embedding dimensionality.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Positive integer describing the dense embedding dimensionality.</p>
 </section>
 <section id="compute-features-self-text">
 <h3><code class="docutils literal notranslate"><span class="pre">compute_features(self,</span> <span class="pre">text)</span></code><a class="headerlink" href="#compute-features-self-text" title="Link to this heading"></a></h3>
 <p>Compute synthetic BM25, SPLADE, and dense vector features.</p>
+<p>Args:
+text: Chunk text that should be transformed into features.</p>
+<p>Returns:
+ChunkFeatures containing sparse weights and a dense embedding.</p>
 </section>
 <section id="compute-bm25-self-tokens">
 <h3><code class="docutils literal notranslate"><span class="pre">_compute_bm25(self,</span> <span class="pre">tokens)</span></code><a class="headerlink" href="#compute-bm25-self-tokens" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Compute BM25-style weights for <code class="docutils literal notranslate"><span class="pre">tokens</span></code>.</p>
+<p>Args:
+tokens: Token sequence produced from the source text.</p>
+<p>Returns:
+Mapping of token to BM25-inspired weight.</p>
 </section>
 <section id="compute-splade-self-tokens">
 <h3><code class="docutils literal notranslate"><span class="pre">_compute_splade(self,</span> <span class="pre">tokens)</span></code><a class="headerlink" href="#compute-splade-self-tokens" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Compute SPLADE-inspired sparse weights for <code class="docutils literal notranslate"><span class="pre">tokens</span></code>.</p>
+<p>Args:
+tokens: Token sequence produced from the source text.</p>
+<p>Returns:
+Mapping of token to SPLADE-style activation weight.</p>
 </section>
 <section id="compute-dense-embedding-self-tokens">
 <h3><code class="docutils literal notranslate"><span class="pre">_compute_dense_embedding(self,</span> <span class="pre">tokens)</span></code><a class="headerlink" href="#compute-dense-embedding-self-tokens" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Aggregate token hashes into a deterministic dense embedding.</p>
+<p>Args:
+tokens: Token sequence produced from the source text.</p>
+<p>Returns:
+L2-normalised dense vector with dimensionality <code class="docutils literal notranslate"><span class="pre">embedding_dim</span></code>.</p>
 </section>
 <section id="hash-to-vector-self-token">
 <h3><code class="docutils literal notranslate"><span class="pre">_hash_to_vector(self,</span> <span class="pre">token)</span></code><a class="headerlink" href="#hash-to-vector-self-token" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Map a token to a deterministic dense vector using a SHA1 hash.</p>
+<p>Args:
+token: Token string to transform.</p>
+<p>Returns:
+Dense vector representing the hashed token.</p>
 </section>
 <section id="normalize-self-vector">
 <h3><code class="docutils literal notranslate"><span class="pre">_normalize(self,</span> <span class="pre">vector)</span></code><a class="headerlink" href="#normalize-self-vector" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
+<p>Normalise <code class="docutils literal notranslate"><span class="pre">vector</span></code> to unit length if its norm is non-zero.</p>
+<p>Args:
+vector: Dense vector to normalise.</p>
+<p>Returns:
+Normalised vector with L2 norm equal to one unless <code class="docutils literal notranslate"><span class="pre">vector</span></code> is zero.</p>
 </section>
 </section>
 <section id="classes">
@@ -131,6 +193,19 @@
 <section id="featuregenerator">
 <h3><code class="docutils literal notranslate"><span class="pre">FeatureGenerator</span></code><a class="headerlink" href="#featuregenerator" title="Link to this heading"></a></h3>
 <p>Deterministic feature generator used by tests and validation harnesses.</p>
+<p>Attributes:
+_embedding_dim: Dimensionality of the dense embedding vectors produced.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>generator = FeatureGenerator(embedding_dim=8)
+features = generator.compute_features(“hello hybrid search”)
+sorted(features.bm25_terms)
+[‘hello’, ‘hybrid’, ‘search’]</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 </section>
 </section>

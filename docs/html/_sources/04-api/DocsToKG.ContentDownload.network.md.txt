@@ -146,6 +146,10 @@ Return ``True`` when response headers suggest a PDF payload.
 
 Fallback GET probe for providers that reject HEAD requests.
 
+### `request_func()`
+
+Invoke :meth:`requests.Session.request` on the provided session.
+
 ### `build_headers(self)`
 
 Generate conditional request headers from cached metadata.
@@ -172,42 +176,6 @@ Raises:
 ValueError: If a 304 response arrives without complete cached
 metadata.
 TypeError: If ``response`` lacks ``status_code`` or ``headers``.
-
-### `request_func()`
-
-Invoke :meth:`requests.Session.request` via the pooled session.
-
-Args:
-method: HTTP method name such as ``"GET"``.
-url: Fully qualified URL to request.
-**call_kwargs: Forwarded keyword arguments for ``session.request``.
-
-Returns:
-requests.Response: Response object produced by the session.
-
-### `request_func()`
-
-Call the method-specific session helper when available.
-
-Args:
-method: HTTP method name (used for diagnostics).
-url: Fully qualified URL to request.
-**call_kwargs: Additional arguments forwarded to the helper.
-
-Returns:
-requests.Response: Response object produced by the method helper.
-
-### `request_func()`
-
-Fallback to the session-level ``request`` implementation.
-
-Args:
-method: HTTP method name such as ``"GET"``.
-url: Fully qualified URL to request.
-**call_kwargs: Keyword arguments forwarded to ``session.request``.
-
-Returns:
-requests.Response: Response object produced by the session.
 
 ## 3. Classes
 

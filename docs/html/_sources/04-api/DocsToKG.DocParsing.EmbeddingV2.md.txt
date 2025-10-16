@@ -53,10 +53,6 @@ model_root: Base directory housing DocsToKG models.
 Returns:
 Absolute path to the SPLADE model directory.
 
-### `_derive_doc_id_and_output_path(chunk_file, chunks_root, vectors_root)`
-
-Return manifest doc_id and vector output path for a chunk artifact.
-
 ### `_expand_optional(path)`
 
 Expand optional :class:`Path` values to absolutes when provided.
@@ -199,7 +195,12 @@ List of embedding vectors, one per input text.
 
 ### `process_pass_a(files, logger)`
 
-Assign UUIDs and build BM25 statistics for a corpus of chunk files.
+Assign UUIDs and build BM25 statistics (streaming + atomic rewrite).
+
+This implementation streams each JSONL row and writes a temporary file with
+normalised schema/UUIDs. The original file is atomically replaced **only**
+when changes are detected. This bounds memory on huge shards and prevents
+partial writes.
 
 Args:
 files: Sequence of chunk file paths to process.
@@ -209,7 +210,8 @@ Returns:
 Aggregated BM25 statistics for the supplied chunk corpus.
 
 Raises:
-ValueError: Propagated when chunk rows are missing required fields.
+OSError: If chunk files cannot be read or written.
+json.JSONDecodeError: If a chunk row contains invalid JSON.
 
 ### `iter_rows_in_batches(path, batch_size)`
 

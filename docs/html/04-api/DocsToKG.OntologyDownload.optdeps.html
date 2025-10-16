@@ -81,16 +81,27 @@
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.optdeps</span></code>.</p>
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>Optional dependency helpers for the ontology downloader.</p>
+<p>Optional dependency helpers retained as a testing shim.</p>
+<p>Production code should import optional dependency helpers from
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.ontology_download</span></code> directly. This proxy exists so
+tests can monkeypatch the internal caches without touching private globals.</p>
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="patch-getter-name-replacement">
+<h3><code class="docutils literal notranslate"><span class="pre">patch_getter(name,</span> <span class="pre">replacement)</span></code><a class="headerlink" href="#patch-getter-name-replacement" title="Link to this heading"></a></h3>
+<p>Temporarily replace an optional dependency getter for tests.</p>
+</section>
 <section id="getattr-self-name">
 <h3><code class="docutils literal notranslate"><span class="pre">__getattr__(self,</span> <span class="pre">name)</span></code><a class="headerlink" href="#getattr-self-name" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 <section id="setattr-self-name-value">
 <h3><code class="docutils literal notranslate"><span class="pre">__setattr__(self,</span> <span class="pre">name,</span> <span class="pre">value)</span></code><a class="headerlink" href="#setattr-self-name-value" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="delattr-self-name">
+<h3><code class="docutils literal notranslate"><span class="pre">__delattr__(self,</span> <span class="pre">name)</span></code><a class="headerlink" href="#delattr-self-name" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 <section id="dir-self">

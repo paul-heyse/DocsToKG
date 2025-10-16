@@ -1,236 +1,45 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.ContentDownload.resolvers",
-#   "purpose": "Resolver registry, pipeline orchestration, and provider helpers",
+#   "purpose": "Resolver definitions and pipeline orchestration",
 #   "sections": [
-#     {
-#       "id": "resolverresult",
-#       "name": "ResolverResult",
-#       "anchor": "class-resolverresult",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "resolverconfig",
-#       "name": "ResolverConfig",
-#       "anchor": "class-resolverconfig",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "attemptrecord",
-#       "name": "AttemptRecord",
-#       "anchor": "class-attemptrecord",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "attemptsink",
-#       "name": "AttemptSink",
-#       "anchor": "class-attemptsink",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "downloadoutcome",
-#       "name": "DownloadOutcome",
-#       "anchor": "class-downloadoutcome",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "pipelineresult",
-#       "name": "PipelineResult",
-#       "anchor": "class-pipelineresult",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "resolver",
-#       "name": "Resolver",
-#       "anchor": "class-resolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "resolvermetrics",
-#       "name": "ResolverMetrics",
-#       "anchor": "class-resolvermetrics",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "fetch-semantic-scholar-data",
-#       "name": "_fetch_semantic_scholar_data",
-#       "anchor": "function-fetch-semantic-scholar-data",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "fetch-unpaywall-data",
-#       "name": "_fetch_unpaywall_data",
-#       "anchor": "function-fetch-unpaywall-data",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "resolverregistry",
-#       "name": "ResolverRegistry",
-#       "anchor": "class-resolverregistry",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "registeredresolver",
-#       "name": "RegisteredResolver",
-#       "anchor": "class-registeredresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "apiresolverbase",
-#       "name": "ApiResolverBase",
-#       "anchor": "class-apiresolverbase",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "absolute-url",
-#       "name": "_absolute_url",
-#       "anchor": "function-absolute-url",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "collect-candidate-urls",
-#       "name": "_collect_candidate_urls",
-#       "anchor": "function-collect-candidate-urls",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "find-pdf-via-meta",
-#       "name": "find_pdf_via_meta",
-#       "anchor": "function-find-pdf-via-meta",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "find-pdf-via-link",
-#       "name": "find_pdf_via_link",
-#       "anchor": "function-find-pdf-via-link",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "find-pdf-via-anchor",
-#       "name": "find_pdf_via_anchor",
-#       "anchor": "function-find-pdf-via-anchor",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "default-resolvers",
-#       "name": "default_resolvers",
-#       "anchor": "function-default-resolvers",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "arxivresolver",
-#       "name": "ArxivResolver",
-#       "anchor": "class-arxivresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "coreresolver",
-#       "name": "CoreResolver",
-#       "anchor": "class-coreresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "crossrefresolver",
-#       "name": "CrossrefResolver",
-#       "anchor": "class-crossrefresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "doajresolver",
-#       "name": "DoajResolver",
-#       "anchor": "class-doajresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "europepmcresolver",
-#       "name": "EuropePmcResolver",
-#       "anchor": "class-europepmcresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "figshareresolver",
-#       "name": "FigshareResolver",
-#       "anchor": "class-figshareresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "halresolver",
-#       "name": "HalResolver",
-#       "anchor": "class-halresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "landingpageresolver",
-#       "name": "LandingPageResolver",
-#       "anchor": "class-landingpageresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "openaireresolver",
-#       "name": "OpenAireResolver",
-#       "anchor": "class-openaireresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "openalexresolver",
-#       "name": "OpenAlexResolver",
-#       "anchor": "class-openalexresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "osfresolver",
-#       "name": "OsfResolver",
-#       "anchor": "class-osfresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "pmcresolver",
-#       "name": "PmcResolver",
-#       "anchor": "class-pmcresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "semanticscholarresolver",
-#       "name": "SemanticScholarResolver",
-#       "anchor": "class-semanticscholarresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "unpaywallresolver",
-#       "name": "UnpaywallResolver",
-#       "anchor": "class-unpaywallresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "waybackresolver",
-#       "name": "WaybackResolver",
-#       "anchor": "class-waybackresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "zenodoresolver",
-#       "name": "ZenodoResolver",
-#       "anchor": "class-zenodoresolver",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "callable-accepts-argument",
-#       "name": "_callable_accepts_argument",
-#       "anchor": "function-callable-accepts-argument",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "runstate",
-#       "name": "_RunState",
-#       "anchor": "class-runstate",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "resolverpipeline",
-#       "name": "ResolverPipeline",
-#       "anchor": "class-resolverpipeline",
-#       "kind": "class"
-#     }
+#     {"id": "ResolverResult", "name": "ResolverResult", "anchor": "class-ResolverResult", "kind": "class"},
+#     {"id": "ResolverConfig", "name": "ResolverConfig", "anchor": "class-ResolverConfig", "kind": "class"},
+#     {"id": "AttemptRecord", "name": "AttemptRecord", "anchor": "class-AttemptRecord", "kind": "class"},
+#     {"id": "DownloadOutcome", "name": "DownloadOutcome", "anchor": "class-DownloadOutcome", "kind": "class"},
+#     {"id": "PipelineResult", "name": "PipelineResult", "anchor": "class-PipelineResult", "kind": "class"},
+#     {"id": "Resolver", "name": "Resolver", "anchor": "class-Resolver", "kind": "class"},
+#     {"id": "ResolverMetrics", "name": "ResolverMetrics", "anchor": "class-ResolverMetrics", "kind": "class"},
+#     {"id": "_fetch_semantic_scholar_data", "name": "_fetch_semantic_scholar_data", "anchor": "function-_fetch_semantic_scholar_data", "kind": "function"},
+#     {"id": "_fetch_unpaywall_data", "name": "_fetch_unpaywall_data", "anchor": "function-_fetch_unpaywall_data", "kind": "function"},
+#     {"id": "ResolverRegistry", "name": "ResolverRegistry", "anchor": "class-ResolverRegistry", "kind": "class"},
+#     {"id": "RegisteredResolver", "name": "RegisteredResolver", "anchor": "class-RegisteredResolver", "kind": "class"},
+#     {"id": "ApiResolverBase", "name": "ApiResolverBase", "anchor": "class-ApiResolverBase", "kind": "class"},
+#     {"id": "_absolute_url", "name": "_absolute_url", "anchor": "function-_absolute_url", "kind": "function"},
+#     {"id": "_collect_candidate_urls", "name": "_collect_candidate_urls", "anchor": "function-_collect_candidate_urls", "kind": "function"},
+#     {"id": "find_pdf_via_meta", "name": "find_pdf_via_meta", "anchor": "function-find_pdf_via_meta", "kind": "function"},
+#     {"id": "find_pdf_via_link", "name": "find_pdf_via_link", "anchor": "function-find_pdf_via_link", "kind": "function"},
+#     {"id": "find_pdf_via_anchor", "name": "find_pdf_via_anchor", "anchor": "function-find_pdf_via_anchor", "kind": "function"},
+#     {"id": "default_resolvers", "name": "default_resolvers", "anchor": "function-default_resolvers", "kind": "function"},
+#     {"id": "ArxivResolver", "name": "ArxivResolver", "anchor": "class-ArxivResolver", "kind": "class"},
+#     {"id": "CoreResolver", "name": "CoreResolver", "anchor": "class-CoreResolver", "kind": "class"},
+#     {"id": "CrossrefResolver", "name": "CrossrefResolver", "anchor": "class-CrossrefResolver", "kind": "class"},
+#     {"id": "DoajResolver", "name": "DoajResolver", "anchor": "class-DoajResolver", "kind": "class"},
+#     {"id": "EuropePmcResolver", "name": "EuropePmcResolver", "anchor": "class-EuropePmcResolver", "kind": "class"},
+#     {"id": "FigshareResolver", "name": "FigshareResolver", "anchor": "class-FigshareResolver", "kind": "class"},
+#     {"id": "HalResolver", "name": "HalResolver", "anchor": "class-HalResolver", "kind": "class"},
+#     {"id": "LandingPageResolver", "name": "LandingPageResolver", "anchor": "class-LandingPageResolver", "kind": "class"},
+#     {"id": "OpenAireResolver", "name": "OpenAireResolver", "anchor": "class-OpenAireResolver", "kind": "class"},
+#     {"id": "OpenAlexResolver", "name": "OpenAlexResolver", "anchor": "class-OpenAlexResolver", "kind": "class"},
+#     {"id": "OsfResolver", "name": "OsfResolver", "anchor": "class-OsfResolver", "kind": "class"},
+#     {"id": "PmcResolver", "name": "PmcResolver", "anchor": "class-PmcResolver", "kind": "class"},
+#     {"id": "SemanticScholarResolver", "name": "SemanticScholarResolver", "anchor": "class-SemanticScholarResolver", "kind": "class"},
+#     {"id": "UnpaywallResolver", "name": "UnpaywallResolver", "anchor": "class-UnpaywallResolver", "kind": "class"},
+#     {"id": "WaybackResolver", "name": "WaybackResolver", "anchor": "class-WaybackResolver", "kind": "class"},
+#     {"id": "ZenodoResolver", "name": "ZenodoResolver", "anchor": "class-ZenodoResolver", "kind": "class"},
+#     {"id": "_callable_accepts_argument", "name": "_callable_accepts_argument", "anchor": "function-_callable_accepts_argument", "kind": "function"},
+#     {"id": "_RunState", "name": "_RunState", "anchor": "class-_RunState", "kind": "class"},
+#     {"id": "ResolverPipeline", "name": "ResolverPipeline", "anchor": "class-ResolverPipeline", "kind": "class"}
 #   ]
 # }
 # === /NAVMAP ===
@@ -275,6 +84,7 @@ import re
 import threading
 import time as _time
 import warnings
+import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
@@ -299,10 +109,12 @@ from urllib.parse import quote, urljoin, urlparse, urlsplit
 import requests as _requests
 
 from DocsToKG.ContentDownload.network import head_precheck, request_with_retries
+from DocsToKG.ContentDownload.classifications import Classification, PDF_LIKE
 from DocsToKG.ContentDownload.utils import (
     dedupe,
     normalize_doi,
     normalize_pmcid,
+    normalize_url,
     strip_prefix,
 )
 from DocsToKG.ContentDownload.telemetry import AttemptSink
@@ -474,9 +286,14 @@ class ResolverConfig:
     domain_min_interval_s: Dict[str, float] = field(default_factory=dict)
     enable_head_precheck: bool = True
     resolver_head_precheck: Dict[str, bool] = field(default_factory=dict)
+    head_precheck_host_overrides: Dict[str, bool] = field(default_factory=dict)
     mailto: Optional[str] = None
     max_concurrent_resolvers: int = 1
     enable_global_url_dedup: bool = False
+    # Heuristic knobs (defaults preserve current CLI behaviour)
+    sniff_bytes: int = 64 * 1024
+    min_pdf_bytes: int = 1024
+    tail_check_bytes: int = 2048
 
     def get_timeout(self, resolver_name: str) -> float:
         """Return the timeout to use for a resolver, falling back to defaults.
@@ -635,7 +452,7 @@ class DownloadOutcome:
         ...                 content_type="application/pdf", elapsed_ms=150.0)
     """
 
-    classification: str
+    classification: Classification | str
     path: Optional[str] = None
     http_status: Optional[int] = None
     content_type: Optional[str] = None
@@ -658,7 +475,8 @@ class DownloadOutcome:
             bool: ``True`` if the outcome corresponds to a PDF download.
         """
 
-        return self.classification in {"pdf", "pdf_unknown"}
+        classification = Classification.from_wire(self.classification)
+        return classification in PDF_LIKE
 
 
 @dataclass
@@ -764,9 +582,10 @@ class ResolverMetrics:
             None
         """
 
+        classification = Classification.from_wire(outcome.classification)
         with self._lock:
             self.attempts[resolver_name] += 1
-            if outcome.classification == "html":
+            if classification is Classification.HTML:
                 self.html[resolver_name] += 1
             if outcome.is_pdf:
                 self.successes[resolver_name] += 1
@@ -1268,7 +1087,7 @@ class ArxivResolver(RegisteredResolver):
         )
 
 
-class CoreResolver(RegisteredResolver):
+class CoreResolver(ApiResolverBase):
     """Resolve PDFs using the CORE API.
 
     Attributes:
@@ -1280,6 +1099,7 @@ class CoreResolver(RegisteredResolver):
     """
 
     name = "core"
+    api_display_name = "CORE"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
         """Return ``True`` when resolver prerequisites are met for the artifact.
@@ -1313,71 +1133,20 @@ class CoreResolver(RegisteredResolver):
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
             return
-        headers = dict(config.polite_headers)
-        headers["Authorization"] = f"Bearer {config.core_api_key}"
-        try:
-            resp = request_with_retries(
-                session,
-                "get",
-                "https://api.core.ac.uk/v3/search/works",
-                params={"q": f'doi:"{doi}"', "page": 1, "pageSize": 3},
-                headers=headers,
-                timeout=config.get_timeout(self.name),
-            )
-        except _requests.Timeout as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="timeout",
-                metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
-            )
+        headers = {"Authorization": f"Bearer {config.core_api_key}"}
+        data, error = self._request_json(
+            session,
+            "GET",
+            "https://api.core.ac.uk/v3/search/works",
+            config=config,
+            params={"q": f'doi:"{doi}"', "page": 1, "pageSize": 3},
+            headers=headers,
+        )
+        if error:
+            yield error
             return
-        except _requests.ConnectionError as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="connection-error",
-                metadata={"error": str(exc)},
-            )
-            return
-        except _requests.RequestException as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="request-error",
-                metadata={"error": str(exc)},
-            )
-            return
-        except Exception as exc:  # pragma: no cover - defensive
-            LOGGER.exception("Unexpected error in CORE resolver")
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="unexpected-error",
-                metadata={"error": str(exc), "error_type": type(exc).__name__},
-            )
-            return
-        if resp.status_code != 200:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="http-error",
-                http_status=resp.status_code,
-                metadata={"error_detail": f"CORE API returned {resp.status_code}"},
-            )
-            return
-        try:
-            data = resp.json()
-        except ValueError as json_err:
-            preview = resp.text[:200] if hasattr(resp, "text") else ""
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="json-error",
-                metadata={"error_detail": str(json_err), "content_preview": preview},
-            )
-            return
-        for hit in data.get("results", []) or []:
+        results = (data.get("results") if isinstance(data, dict) else None) or []
+        for hit in results:
             if not isinstance(hit, dict):
                 continue
             url = hit.get("downloadUrl") or hit.get("pdfDownloadLink")
@@ -1390,7 +1159,7 @@ class CoreResolver(RegisteredResolver):
                         yield ResolverResult(url=href, metadata={"source": "core"})
 
 
-class CrossrefResolver(RegisteredResolver):
+class CrossrefResolver(ApiResolverBase):
     """Resolve candidate URLs from the Crossref metadata API.
 
     Attributes:
@@ -1402,6 +1171,7 @@ class CrossrefResolver(RegisteredResolver):
     """
 
     name = "crossref"
+    api_display_name = "Crossref"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
         """Return ``True`` when resolver prerequisites are met for the artifact.
@@ -1436,80 +1206,19 @@ class CrossrefResolver(RegisteredResolver):
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
             return
         email = config.mailto or config.unpaywall_email
-        endpoint = f"https://api.crossref.org/works/{quote(doi)}"
         params = {"mailto": email} if email else None
-        headers = dict(config.polite_headers)
-        data: Optional[Dict[str, Any]] = None
-        response: Optional[_requests.Response] = None
-        try:
-            response = request_with_retries(
-                session,
-                "GET",
-                endpoint,
-                params=params,
-                timeout=config.get_timeout(self.name),
-                headers=headers,
-                allow_redirects=True,
-            )
-        except _requests.Timeout as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="timeout",
-                metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
-            )
-            return
-        except _requests.ConnectionError as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="connection-error",
-                metadata={"error": str(exc)},
-            )
-            return
-        except _requests.RequestException as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="request-error",
-                metadata={"error": str(exc)},
-            )
-            return
-        except Exception as exc:  # pragma: no cover - defensive
-            LOGGER.exception("Unexpected error in Crossref resolver")
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="unexpected-error",
-                metadata={"error": str(exc), "error_type": type(exc).__name__},
-            )
+        data, error = self._request_json(
+            session,
+            "GET",
+            f"https://api.crossref.org/works/{quote(doi)}",
+            config=config,
+            params=params,
+        )
+        if error:
+            yield error
             return
 
-        try:
-            if response.status_code != 200:
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="http-error",
-                    http_status=response.status_code,
-                    metadata={"error_detail": f"Crossref API returned {response.status_code}"},
-                )
-                return
-            data = response.json()
-        except ValueError as json_err:
-            preview = response.text[:200] if hasattr(response, "text") else ""
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="json-error",
-                metadata={"error_detail": str(json_err), "content_preview": preview},
-            )
-            return
-        finally:
-            if response is not None:
-                response.close()
-
-        message = ((data or {}).get("message") or {}) if isinstance(data, dict) else {}
+        message = (data.get("message") if isinstance(data, dict) else None) or {}
         link_section = message.get("link") or []
         if not isinstance(link_section, list):
             link_section = []
@@ -1520,7 +1229,8 @@ class CrossrefResolver(RegisteredResolver):
                 continue
             url = entry.get("URL")
             content_type = entry.get("content-type")
-            if url and (content_type or "").lower() in {"application/pdf", "text/html"}:
+            ctype = (content_type or "").lower()
+            if url and ctype in {"application/pdf", "application/x-pdf", "text/html"}:
                 candidates.append((url, {"content_type": content_type}))
 
         for url in dedupe([candidate_url for candidate_url, _ in candidates]):
@@ -1675,7 +1385,7 @@ class EuropePmcResolver(ApiResolverBase):
             yield ResolverResult(url=url, metadata={"source": "europe_pmc"})
 
 
-class FigshareResolver(RegisteredResolver):
+class FigshareResolver(ApiResolverBase):
     """Resolve Figshare repository metadata into download URLs.
 
     Attributes:
@@ -1687,6 +1397,7 @@ class FigshareResolver(RegisteredResolver):
     """
 
     name = "figshare"
+    api_display_name = "Figshare"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
         """Return ``True`` when resolver prerequisites are met for the artifact.
@@ -1721,80 +1432,27 @@ class FigshareResolver(RegisteredResolver):
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
             return
 
-        headers = dict(config.polite_headers)
-        headers.setdefault("Content-Type", "application/json")
-
-        try:
-            response = request_with_retries(
-                session,
-                "post",
-                "https://api.figshare.com/v2/articles/search",
-                json={
-                    "search_for": f':doi: "{doi}"',
-                    "page": 1,
-                    "page_size": 3,
-                },
-                timeout=config.get_timeout(self.name),
-                headers=headers,
-            )
-        except _requests.Timeout as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="timeout",
-                metadata={
-                    "timeout": config.get_timeout(self.name),
-                    "error": str(exc),
-                },
-            )
-            return
-        except _requests.RequestException as exc:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="request-error",
-                metadata={"error": str(exc)},
-            )
-            return
-        except Exception as exc:  # pragma: no cover - defensive
-            LOGGER.exception("Unexpected error in Figshare resolver")
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="unexpected-error",
-                metadata={"error": str(exc), "error_type": type(exc).__name__},
-            )
+        extra_headers = {"Content-Type": "application/json"}
+        data, error = self._request_json(
+            session,
+            "POST",
+            "https://api.figshare.com/v2/articles/search",
+            config=config,
+            json={"search_for": f':doi: "{doi}"', "page": 1, "page_size": 3},
+            headers=extra_headers,
+        )
+        if error:
+            yield error
             return
 
-        if response.status_code != 200:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="http-error",
-                http_status=response.status_code,
-                metadata={
-                    "error_detail": f"Figshare API returned {response.status_code}",
-                },
-            )
-            return
-
-        try:
-            articles = response.json()
-        except ValueError as json_err:
-            preview = response.text[:200] if hasattr(response, "text") else ""
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="json-error",
-                metadata={"error_detail": str(json_err), "content_preview": preview},
-            )
-            return
-
-        if not isinstance(articles, list):
+        if isinstance(data, list):
+            articles = data
+        else:
             LOGGER.warning(
-                "Figshare API returned non-list articles payload: %s", type(articles).__name__
+                "Figshare API returned non-list articles payload: %s",
+                type(data).__name__ if data is not None else "None",
             )
-            return
+            articles = []
 
         for article in articles:
             if not isinstance(article, dict):
@@ -2457,13 +2115,31 @@ class PmcResolver(RegisteredResolver):
                     metadata={"pmcid": pmcid, "source": "pdf-fallback"},
                 )
                 continue
-            for match in re.finditer(r'href="([^"]+\.pdf)"', resp.text, flags=re.I):
-                href = match.group(1)
-                url = _absolute_url(oa_url, href)
-                yield ResolverResult(
-                    url=url,
-                    metadata={"pmcid": pmcid, "source": "oa"},
-                )
+            pdf_links_emitted = False
+            try:
+                root = ET.fromstring(resp.text)
+            except ET.ParseError as exc:
+                LOGGER.debug("PMC OA XML parse error for %s: %s", pmcid, exc)
+            else:
+                for link in root.iter():
+                    tag = link.tag.rsplit("}", 1)[-1].lower()
+                    if tag != "link":
+                        continue
+                    href = (
+                        link.attrib.get("href")
+                        or link.attrib.get("{http://www.w3.org/1999/xlink}href")
+                        or ""
+                    ).strip()
+                    fmt = (link.attrib.get("format") or "").lower()
+                    mime = (link.attrib.get("type") or "").lower()
+                    if not href:
+                        continue
+                    if fmt == "pdf" or mime == "application/pdf" or href.lower().endswith(".pdf"):
+                        pdf_links_emitted = True
+                        yield ResolverResult(
+                            url=_absolute_url(oa_url, href),
+                            metadata={"pmcid": pmcid, "source": "oa"},
+                        )
             yield ResolverResult(
                 url=fallback_url,
                 metadata={"pmcid": pmcid, "source": "pdf-fallback"},
@@ -3096,18 +2772,11 @@ class ResolverPipeline:
             None
         """
 
-        log_attempt = getattr(self.logger, "log_attempt", None)
-        if callable(log_attempt):
-            if timestamp is not None:
-                log_attempt(record, timestamp=timestamp)
-            else:
-                log_attempt(record)
-            return
-        legacy_log = getattr(self.logger, "log", None)
-        if callable(legacy_log):
-            legacy_log(record)
-            return
-        raise AttributeError("ResolverPipeline logger must provide log_attempt() or log().")
+        if not hasattr(self.logger, "log_attempt") or not callable(
+            getattr(self.logger, "log_attempt")
+        ):
+            raise AttributeError("ResolverPipeline logger must provide log_attempt().")
+        self.logger.log_attempt(record, timestamp=timestamp)
 
     def _respect_rate_limit(self, resolver_name: str) -> None:
         """Sleep as required to respect per-resolver rate limiting policies.
@@ -3187,7 +2856,7 @@ class ResolverPipeline:
             return
         _time.sleep(self.config.sleep_jitter + random.random() * 0.1)
 
-    def _should_attempt_head_check(self, resolver_name: str) -> bool:
+    def _should_attempt_head_check(self, resolver_name: str, url: Optional[str]) -> bool:
         """Return ``True`` when a resolver should perform a HEAD preflight request.
 
         Args:
@@ -3199,6 +2868,15 @@ class ResolverPipeline:
 
         if resolver_name in self.config.resolver_head_precheck:
             return self.config.resolver_head_precheck[resolver_name]
+        if url:
+            parsed = urlparse(url)
+            host = (parsed.hostname or parsed.netloc or "").lower()
+            if host:
+                override = self.config.head_precheck_host_overrides.get(host)
+                if override is None and host.startswith("www."):
+                    override = self.config.head_precheck_host_overrides.get(host[4:])
+                if override is not None:
+                    return override
         return self.config.enable_head_precheck
 
     def _head_precheck_url(
@@ -3562,6 +3240,7 @@ class ResolverPipeline:
         url = result.url
         if not url:
             return None
+        url = normalize_url(url)
         if self.config.enable_global_url_dedup:
             with self._global_lock:
                 duplicate = url in self._global_seen_urls
@@ -3607,9 +3286,33 @@ class ResolverPipeline:
             return None
 
         state.seen_urls.add(url)
+        if context_data.get("list_only"):
+            self._emit_attempt(
+                AttemptRecord(
+                    work_id=artifact.work_id,
+                    resolver_name=resolver_name,
+                    resolver_order=order_index,
+                    url=url,
+                    status="listed",
+                    http_status=None,
+                    content_type=None,
+                    elapsed_ms=0.0,
+                    reason="list-only",
+                    metadata=result.metadata,
+                    dry_run=True,
+                    resolver_wall_time_ms=resolver_wall_time_ms,
+                )
+            )
+            self.metrics.record_skip(resolver_name, "list-only")
+            return None
+
         download_context = dict(context_data)
+        # Ensure downstream download heuristics are present with config defaults.
+        download_context.setdefault("sniff_bytes", self.config.sniff_bytes)
+        download_context.setdefault("min_pdf_bytes", self.config.min_pdf_bytes)
+        download_context.setdefault("tail_check_bytes", self.config.tail_check_bytes)
         head_precheck_passed = False
-        if self._should_attempt_head_check(resolver_name):
+        if self._should_attempt_head_check(resolver_name, url):
             head_precheck_passed = self._head_precheck_url(
                 session,
                 url,
@@ -3682,16 +3385,17 @@ class ResolverPipeline:
         )
         self.metrics.record_attempt(resolver_name, outcome)
 
-        if outcome.classification == "html" and outcome.path:
+        classification = Classification.from_wire(outcome.classification)
+        if classification is Classification.HTML and outcome.path:
             state.html_paths.append(outcome.path)
 
-        if not outcome.is_pdf and url:
+        if classification not in PDF_LIKE and url:
             if url not in state.failed_urls:
                 state.failed_urls.append(url)
             if url not in artifact.failed_pdf_urls:
                 artifact.failed_pdf_urls.append(url)
 
-        if outcome.is_pdf:
+        if classification in PDF_LIKE:
             return PipelineResult(
                 success=True,
                 resolver_name=resolver_name,

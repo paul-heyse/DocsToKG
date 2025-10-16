@@ -163,6 +163,10 @@ bm25_top_k: Number of BM25 candidates to retrieve (50 default)
 splade_top_k: Number of SPLADE candidates to retrieve (50 default)
 dense_top_k: Number of dense vector candidates to retrieve (50 default)
 dense_overfetch_factor: Multiplier applied to oversampled dense requests (1.5 default)
+dense_oversample: Query-time oversample multiplier for dense retrieval (2.0 default)
+bm25_scoring: "compat" for legacy dot-product, "true" for Okapi BM25
+bm25_k1: Okapi BM25 k1 parameter (used when bm25_scoring == "true")
+bm25_b: Okapi BM25 b parameter (used when bm25_scoring == "true")
 
 Examples:
 >>> config = RetrievalConfig(

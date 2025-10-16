@@ -4,16 +4,18 @@ This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.storage
 
 ## 1. Overview
 
-Storage backend facade for the ontology downloader.
+Storage backend facade retained for backward compatibility.
 
 ## 2. Functions
 
-### `get_storage_backend()`
+### `_load_core()`
 
-Return the active storage backend and sync the core facade.
+*No documentation available.*
 
-Args:
-None
+### `__getattr__(name)`
 
-Returns:
-StorageBackend: Instance implementing storage operations for ontology artifacts.
+*No documentation available.*
+
+### `__dir__()`
+
+*No documentation available.*

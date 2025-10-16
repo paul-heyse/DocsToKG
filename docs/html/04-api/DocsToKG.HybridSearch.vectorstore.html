@@ -147,6 +147,25 @@ resources: FAISS GPU resources backing the kernel.</p>
 <p>Returns:
 numpy.ndarray: Pairwise cosine similarities with shape <code class="docutils literal notranslate"><span class="pre">(N,</span> <span class="pre">M)</span></code>.</p>
 </section>
+<section id="cosine-topk-blockwise-q-c">
+<h3><code class="docutils literal notranslate"><span class="pre">cosine_topk_blockwise(q,</span> <span class="pre">C)</span></code><a class="headerlink" href="#cosine-topk-blockwise-q-c" title="Link to this heading"></a></h3>
+<p>Return Top-K cosine similarities between <code class="docutils literal notranslate"><span class="pre">q</span></code> and <code class="docutils literal notranslate"><span class="pre">C</span></code> using GPU tiling.</p>
+<p>The helper avoids materialising the full <code class="docutils literal notranslate"><span class="pre">(N</span> <span class="pre">×</span> <span class="pre">M)</span></code> similarity matrix by
+iterating over <code class="docutils literal notranslate"><span class="pre">C</span></code> in row blocks and maintaining a running Top-K per query
+row. Inputs are copied and normalised inside the routine so callers retain
+ownership of their buffers.</p>
+<p>Args:
+q: Query vector or matrix (<code class="docutils literal notranslate"><span class="pre">N</span> <span class="pre">×</span> <span class="pre">D</span></code>).
+C: Corpus matrix (<code class="docutils literal notranslate"><span class="pre">M</span> <span class="pre">×</span> <span class="pre">D</span></code>).
+k: Number of neighbours to return per query row.
+device: CUDA device ordinal used for FAISS kernels.
+resources: FAISS GPU resources backing <code class="docutils literal notranslate"><span class="pre">pairwise_distance_gpu</span></code>.
+block_rows: Number of corpus rows processed per iteration.</p>
+<p>Returns:
+Tuple <code class="docutils literal notranslate"><span class="pre">(scores,</span> <span class="pre">indices)</span></code> where each has shape <code class="docutils literal notranslate"><span class="pre">(N</span> <span class="pre">×</span> <span class="pre">K)</span></code>. Scores are
+sorted in descending order for every query row and indices reference rows
+within <code class="docutils literal notranslate"><span class="pre">C</span></code>.</p>
+</section>
 <section id="serialize-state-faiss-index-registry">
 <h3><code class="docutils literal notranslate"><span class="pre">serialize_state(faiss_index,</span> <span class="pre">registry)</span></code><a class="headerlink" href="#serialize-state-faiss-index-registry" title="Link to this heading"></a></h3>
 <p>Serialize the vector store and chunk registry to a JSON-safe payload.</p>

@@ -143,6 +143,22 @@ items: Sequence of string values that may contain duplicates.</p>
 <p>Returns:
 New list with duplicates removed while keeping original ordering.</p>
 </section>
+<section id="normalize-pmid-pmid">
+<h3><code class="docutils literal notranslate"><span class="pre">normalize_pmid(pmid)</span></code><a class="headerlink" href="#normalize-pmid-pmid" title="Link to this heading"></a></h3>
+<p>Extract the numeric PubMed identifier from the supplied string.</p>
+</section>
+<section id="normalize-arxiv-arxiv-id">
+<h3><code class="docutils literal notranslate"><span class="pre">normalize_arxiv(arxiv_id)</span></code><a class="headerlink" href="#normalize-arxiv-arxiv-id" title="Link to this heading"></a></h3>
+<p>Normalize arXiv identifiers by removing common prefixes and whitespace.</p>
+</section>
+<section id="slugify-text-keep">
+<h3><code class="docutils literal notranslate"><span class="pre">slugify(text,</span> <span class="pre">keep)</span></code><a class="headerlink" href="#slugify-text-keep" title="Link to this heading"></a></h3>
+<p>Create a filesystem-friendly slug from the provided text.</p>
+</section>
+<section id="normalize-url-url">
+<h3><code class="docutils literal notranslate"><span class="pre">normalize_url(url)</span></code><a class="headerlink" href="#normalize-url-url" title="Link to this heading"></a></h3>
+<p>Return a canonicalised version of <code class="docutils literal notranslate"><span class="pre">url</span></code> suitable for deduplication.</p>
+</section>
 </section>
 </section>
 

@@ -501,7 +501,10 @@ def test_validate_pronto_handles_exception(monkeypatch, obo_file, tmp_path, conf
 
 
 def test_validate_owlready2_success(monkeypatch, owl_file, tmp_path, config):
-    pytest.importorskip("owlready2")
+    try:
+        pytest.importorskip("owlready2")
+    except Exception as exc:  # pragma: no cover - optional dependency import failed
+        pytest.skip(f"owlready2 unavailable: {exc}")
     pytest.importorskip("ols_client")
     monkeypatch.setenv("PYSTOW_HOME", str(tmp_path / "pystow"))
     request = ValidationRequest("owlready2", owl_file, tmp_path / "norm", tmp_path / "val", config)

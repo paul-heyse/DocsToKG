@@ -20,8 +20,9 @@ The pipeline is composed of three coarse stages that operate on shared storage:
    invariants and emitting manifest telemetry.
 
 Each stage records append-only manifest entries under
-`Data/Manifests/docparse.manifest.jsonl`, enabling resumable execution and
-auditing across the toolchain.
+`Data/Manifests/docparse.<stage>.manifest.jsonl` (for example,
+`docparse.embeddings.manifest.jsonl`), enabling resumable execution and auditing
+across the toolchain.
 
 ## Stage Descriptions
 
@@ -165,15 +166,14 @@ Run these commands from the repository root to inspect manifest telemetry:
 
 ```bash
 # List failed documents with error messages
-jq 'select(.status == "failure") | {doc_id, stage, error}' \
-  Data/Manifests/docparse.manifest.jsonl
+jq 'select(.status == "failure") | {doc_id, stage, error}' Data/Manifests/docparse.*.manifest.jsonl
 
 # Average duration by stage
 jq -s 'group_by(.stage) | map({stage: .[0].stage, avg_duration: (map(.duration_s) | add / length)})' \
-  Data/Manifests/docparse.manifest.jsonl
+  Data/Manifests/docparse.*.manifest.jsonl
 
 # Count of skipped documents per stage
-jq 'select(.status == "skip") | .stage' Data/Manifests/docparse.manifest.jsonl \
+jq 'select(.status == "skip") | .stage' Data/Manifests/docparse.*.manifest.jsonl \
   | sort | uniq -c
 ```
 
@@ -189,19 +189,14 @@ can reason about historical data sets.
   processing aligned with the canonical layout.
 
 
-## Module Removal
+### Deprecations
 
-The legacy module `DocsToKG.DocParsing.pdf_pipeline` has been **removed**. Use the unified CLI and pipeline APIs instead:
+* The legacy module `DocsToKG.DocParsing.pdf_pipeline` remains temporarily available as a
+  compatibility shim. Importing it now emits a :class:`DeprecationWarning`; migrate to the CLI
+  (`python -m DocsToKG.DocParsing.cli doctags --mode pdf`) or the
+  :mod:`DocsToKG.DocParsing.pipelines` APIs instead. The shim will be removed in an upcoming
+  release once downstream consumers have migrated.
 
-* **CLI (recommended)**:
-  ```bash
-  python -m DocsToKG.DocParsing.cli doctags --mode pdf
-  ```
-* **Programmatic**:
-  ```python
-  from DocsToKG.DocParsing import pipelines as dp
-  dp.pdf_main(...)
-  ```
 ## Synthetic Benchmarking & Test Utilities
 
 The test suite ships lightweight fixtures that allow end-to-end validation

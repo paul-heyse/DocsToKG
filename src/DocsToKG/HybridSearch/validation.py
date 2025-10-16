@@ -65,8 +65,8 @@ import numpy as np
 import faiss  # type: ignore
 
 from .config import HybridSearchConfigManager
-from .devtools.features import FeatureGenerator
-from .devtools.opensearch_simulator import OpenSearchSimulator
+from .features import FeatureGenerator
+from .storage import OpenSearchSimulator
 from .ingest import ChunkIngestionPipeline
 from .observability import Observability
 from .service import HybridSearchService
@@ -79,7 +79,12 @@ from .types import (
     ValidationReport,
     ValidationSummary,
 )
-from .vectorstore import FaissVectorStore, pairwise_inner_products
+from .vectorstore import (
+    FaissVectorStore,
+    cosine_topk_blockwise,
+    normalize_rows,
+    pairwise_inner_products,
+)
 from .vectorstore import restore_state as vectorstore_restore_state
 from .vectorstore import serialize_state as vectorstore_serialize_state
 
@@ -750,10 +755,14 @@ class HybridSearchValidator:
         recalls: List[float] = []
 
         # Precompute matrix for brute-force recall estimates.
-        vector_matrix = np.stack(
-            [chunk.features.embedding for chunk in all_chunks], dtype=np.float32
+        vector_matrix = np.ascontiguousarray(
+            np.stack([chunk.features.embedding for chunk in all_chunks], dtype=np.float32)
         )
         vector_ids = [chunk.vector_id for chunk in all_chunks]
+        gpu_resources = self._ingestion.faiss_index.gpu_resources
+        device = self._ingestion.faiss_index.device
+        if gpu_resources is None:
+            vector_matrix = normalize_rows(vector_matrix)
 
         noise_rng = np.random.default_rng(2024)
 
@@ -773,9 +782,22 @@ class HybridSearchValidator:
             ):
                 perturb_hits += 1
 
-            scores = vector_matrix @ query_vec
-            top_indices = np.argpartition(scores, -top_k)[-top_k:]
-            top_indices = top_indices[np.argsort(scores[top_indices])[::-1]]
+            if gpu_resources is not None:
+                _scores, indices_block = cosine_topk_blockwise(
+                    query_vec,
+                    vector_matrix,
+                    k=top_k,
+                    device=device,
+                    resources=gpu_resources,
+                )
+                top_indices = indices_block[0].astype(int, copy=False)
+            else:
+                q = np.ascontiguousarray(query_vec, dtype=np.float32)
+                norm = np.linalg.norm(q) or 1.0
+                q = (q / norm).astype(np.float32, copy=False)
+                scores = vector_matrix @ q
+                top_indices = np.argpartition(scores, -top_k)[-top_k:]
+                top_indices = top_indices[np.argsort(scores[top_indices])[::-1]]
             ground_truth_ids = [vector_ids[idx] for idx in top_indices]
             overlap = len(set(retrieved_ids) & set(ground_truth_ids))
             recalls.append(overlap / min(top_k, len(ground_truth_ids)) if ground_truth_ids else 0.0)

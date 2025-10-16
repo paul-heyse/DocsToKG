@@ -324,6 +324,7 @@ Usage:
 import io
 import json
 import logging
+import stat
 import tarfile
 import threading
 import time
@@ -485,6 +486,111 @@ def test_download_stream_resumes_from_partial(monkeypatch, tmp_path):
     data = destination.read_bytes()
     assert data.endswith(b" world")
     assert result.status == "updated"
+
+
+def test_streaming_downloader_handles_cached_response(monkeypatch, tmp_path):
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    output_file = cache_dir / "cache_entry"
+    part_file = Path(str(output_file) + ".part")
+    initial = b"partial"
+    part_file.write_bytes(initial)
+    destination = tmp_path / "destination.owl"
+    destination.write_bytes(b"existing")
+    previous_manifest = {
+        "etag": "old-tag",
+        "last_modified": "Wed, 01 Jan 2024 00:00:00 GMT",
+    }
+    response = DummyResponse(
+        304,
+        b"",
+        {"ETag": "new-tag", "Last-Modified": "Thu, 02 Jan 2024 00:00:00 GMT"},
+    )
+    session = make_session(monkeypatch, [response])
+    downloader = download.StreamingDownloader(
+        destination=destination,
+        headers={},
+        http_config=DownloadConfiguration(),
+        previous_manifest=previous_manifest,
+        logger=_noop_logger(),
+    )
+    downloader(
+        "https://example.org/file.owl",
+        output_file.as_posix(),
+        logging.getLogger("pooch-test"),
+    )
+
+    assert downloader.status == "cached"
+    assert downloader.response_etag == "new-tag"
+    assert downloader.response_last_modified == "Thu, 02 Jan 2024 00:00:00 GMT"
+    assert not part_file.exists()
+    assert session.calls[0]["If-None-Match"] == "old-tag"
+    assert session.calls[0]["Range"] == f"bytes={len(initial)}-"
+
+
+def test_streaming_downloader_resumes_range_request(monkeypatch, tmp_path):
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    output_file = cache_dir / "resume_entry"
+    part_file = Path(str(output_file) + ".part")
+    initial = b"partial "
+    part_file.write_bytes(initial)
+    response = DummyResponse(
+        206,
+        b"data",
+        {"ETag": "etag-206", "Last-Modified": "Fri, 03 Jan 2024 00:00:00 GMT"},
+    )
+    session = make_session(monkeypatch, [response])
+    downloader = download.StreamingDownloader(
+        destination=tmp_path / "destination.owl",
+        headers={},
+        http_config=DownloadConfiguration(),
+        previous_manifest=None,
+        logger=_noop_logger(),
+    )
+    downloader(
+        "https://example.org/file.owl",
+        output_file.as_posix(),
+        logging.getLogger("pooch-test"),
+    )
+
+    assert downloader.status == "updated"
+    assert downloader.response_etag == "etag-206"
+    assert downloader.response_last_modified == "Fri, 03 Jan 2024 00:00:00 GMT"
+    assert Path(output_file).read_bytes() == initial + b"data"
+    assert not part_file.exists()
+    assert session.calls[0]["Range"] == f"bytes={len(initial)}-"
+
+
+def test_streaming_downloader_records_fresh_response_metadata(monkeypatch, tmp_path):
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    output_file = cache_dir / "fresh_entry"
+    response = DummyResponse(
+        200,
+        b"fresh-data",
+        {"ETag": "fresh-tag", "Last-Modified": "Sat, 04 Jan 2024 00:00:00 GMT"},
+    )
+    session = make_session(monkeypatch, [response])
+    downloader = download.StreamingDownloader(
+        destination=tmp_path / "destination.owl",
+        headers={},
+        http_config=DownloadConfiguration(),
+        previous_manifest=None,
+        logger=_noop_logger(),
+    )
+    downloader(
+        "https://example.org/file.owl",
+        output_file.as_posix(),
+        logging.getLogger("pooch-test"),
+    )
+
+    assert downloader.status == "fresh"
+    assert downloader.response_etag == "fresh-tag"
+    assert downloader.response_last_modified == "Sat, 04 Jan 2024 00:00:00 GMT"
+    assert Path(output_file).read_bytes() == b"fresh-data"
+    assert session.calls[0].get("Range") is None
+    assert session.calls[0].get("If-None-Match") is None
 
 
 def test_download_stream_retries(monkeypatch, tmp_path):
@@ -745,6 +851,18 @@ def test_extract_zip_detects_compression_bomb(tmp_path):
         download.extract_zip_safe(archive, tmp_path / "zip_out")
 
     assert "compression ratio" in str(exc_info.value)
+
+
+def test_extract_zip_rejects_symlink(tmp_path):
+    archive = tmp_path / "bad_symlink.zip"
+    with download.zipfile.ZipFile(archive, "w") as zf:
+        info = download.zipfile.ZipInfo("link")
+        info.create_system = 3  # POSIX
+        info.external_attr = ((stat.S_IFLNK | 0o777) << 16)
+        zf.writestr(info, "target")
+
+    with pytest.raises(download.ConfigError):
+        download.extract_zip_safe(archive, tmp_path / "out")
 # --- Helper Functions ---
 
 
@@ -858,9 +976,9 @@ def test_download_stream_hash_mismatch_triggers_retry(monkeypatch, tmp_path):
         DummyResponse(200, b"first", {}),
         DummyResponse(200, b"second", {}),
     ]
-    make_session(monkeypatch, responses)
+    session = make_session(monkeypatch, responses)
     destination = tmp_path / "file.owl"
-    download.download_stream(
+    result = download.download_stream(
         url="https://example.org/file.owl",
         destination=destination,
         headers={},
@@ -869,6 +987,9 @@ def test_download_stream_hash_mismatch_triggers_retry(monkeypatch, tmp_path):
         cache_dir=tmp_path / "cache",
         logger=_noop_logger(),
     )
+    assert len(session.calls) == 2
+    assert destination.read_bytes() == b"second"
+    assert result.status == "fresh"
 
 
 def test_validate_url_security_rejects_private_ip():

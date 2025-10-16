@@ -70,6 +70,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "derive-doc-id-and-vectors-path",
+#       "name": "derive_doc_id_and_vectors_path",
+#       "anchor": "function-derive-doc-id-and-vectors-path",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "get-logger",
 #       "name": "get_logger",
 #       "anchor": "function-get-logger",
@@ -242,6 +248,7 @@ __all__ = [
     "load_manifest_index",
     "acquire_lock",
     "set_spawn_or_warn",
+    "derive_doc_id_and_vectors_path",
 ]
 
 # --- Path Resolution ---
@@ -463,6 +470,31 @@ def data_html(root: Optional[Path] = None) -> Path:
     return _ensure_dir(detect_data_root(root) / "HTML")
 
 
+def derive_doc_id_and_vectors_path(
+    chunk_file: Path, chunks_root: Path, vectors_root: Path
+) -> tuple[str, Path]:
+    """Return manifest doc identifier and vectors output path for ``chunk_file``.
+
+    Args:
+        chunk_file: Path to the chunk JSONL artefact.
+        chunks_root: Root directory containing chunk artefacts.
+        vectors_root: Root directory where vector outputs should be written.
+
+    Returns:
+        Tuple containing the manifest ``doc_id`` and the full vectors output path.
+    """
+
+    relative = chunk_file.relative_to(chunks_root)
+    base = relative
+    if base.suffix == ".jsonl":
+        base = base.with_suffix("")
+    if base.suffix == ".chunks":
+        base = base.with_suffix("")
+    doc_id = base.with_suffix(".doctags").as_posix()
+    vector_relative = base.with_suffix(".vectors.jsonl")
+    return doc_id, vectors_root / vector_relative
+
+
 # --- Logging and I/O Utilities ---
 
 def get_logger(name: str, level: str = "INFO") -> logging.Logger:
@@ -497,8 +529,6 @@ def get_logger(name: str, level: str = "INFO") -> logging.Logger:
                 True
             """
 
-            converter = time.gmtime
-
             def format(self, record: logging.LogRecord) -> str:
                 """Render a log record as a JSON string.
 
@@ -508,8 +538,13 @@ def get_logger(name: str, level: str = "INFO") -> logging.Logger:
                 Returns:
                     JSON-formatted string containing canonical log fields and optional extras.
                 """
+                ts = datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(
+                    timespec="milliseconds"
+                )
+                if ts.endswith("+00:00"):
+                    ts = ts[:-6] + "Z"
                 payload = {
-                    "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S.%fZ"),
+                    "timestamp": ts,
                     "level": record.levelname,
                     "logger": record.name,
                     "message": record.getMessage(),
@@ -736,22 +771,14 @@ def jsonl_save(
         '{"a": 1}'
     """
 
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    try:
-        with tmp.open("w", encoding="utf-8") as handle:
-            for index, row in enumerate(rows):
-                if validate is not None:
-                    try:
-                        validate(row)
-                    except Exception as exc:  # pragma: no cover - error path exercised
-                        raise ValueError(f"Validation failed for row {index}: {exc}") from exc
-                handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        tmp.replace(path)
-    except Exception:
-        tmp.unlink(missing_ok=True)
-        raise
+    with atomic_write(path) as handle:
+        for index, row in enumerate(rows):
+            if validate is not None:
+                try:
+                    validate(row)
+                except Exception as exc:  # pragma: no cover - error path exercised
+                    raise ValueError(f"Validation failed for row {index}: {exc}") from exc
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
 # --- Collection Utilities ---
@@ -847,7 +874,7 @@ def manifest_append(
 
     Examples:
         >>> manifest_append("chunk", "doc1", "success")
-        >>> (data_manifests() / "docparse.manifest.jsonl").exists()
+        >>> (data_manifests() / "docparse.chunk.manifest.jsonl").exists()
         True
     """
 

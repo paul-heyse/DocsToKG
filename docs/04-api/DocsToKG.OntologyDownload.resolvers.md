@@ -36,9 +36,9 @@ Return a token bucket for resolver API requests respecting rate limits.
 
 Discover resolver plugins registered via Python entry points.
 
-### `_load_resolver_plugins(logger)`
+### `_ensure_plugins_loaded(logger)`
 
-Discover resolver plugins registered via Python entry points.
+Ensure resolver plugins are loaded at most once per interpreter.
 
 ### `_execute_with_retry(self, func)`
 
@@ -199,6 +199,21 @@ ConfigError: If the specification omits the required URL.
 
 ### `plan(self, spec, config, logger)`
 
+Return a fetch plan using the direct URL provided in ``spec.extras``.
+
+Args:
+spec: Fetch specification containing the upstream download details.
+config: Resolved configuration (unused, provided for interface parity).
+logger: Logger adapter used to record telemetry.
+
+Returns:
+FetchPlan referencing the explicit URL.
+
+Raises:
+ConfigError: If the specification omits the required URL or provides invalid extras.
+
+### `plan(self, spec, config, logger)`
+
 Return a fetch plan for XBRL ZIP archives provided via extras.
 
 Args:
@@ -351,6 +366,10 @@ Examples:
 >>> resolver = SKOSResolver()
 >>> callable(getattr(resolver, "plan"))
 True
+
+### `DirectResolver`
+
+Resolver that consumes explicit URLs supplied via ``spec.extras``.
 
 ### `XBRLResolver`
 

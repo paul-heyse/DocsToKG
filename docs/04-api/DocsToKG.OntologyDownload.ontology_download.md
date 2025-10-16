@@ -496,6 +496,10 @@ archive_type: Human readable label for error messages (ZIP/TAR).
 Raises:
 ConfigError: If the archive exceeds the allowed expansion ratio.
 
+### `_is_zip_symlink(info)`
+
+Return True when a ZIP member encodes a symbolic link.
+
 ### `extract_zip_safe(zip_path, destination)`
 
 Extract a ZIP archive while preventing traversal and compression bombs.

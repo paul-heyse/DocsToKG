@@ -595,8 +595,8 @@ import pytest
 import requests
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
+from DocsToKG.ContentDownload.classifier import classify_payload
 from DocsToKG.ContentDownload.download_pyalex_pdfs import (
-    JsonlSink,
     WorkArtifact,
     _build_download_outcome,
     _make_session,
@@ -681,7 +681,8 @@ if HAS_REQUESTS and HAS_PYALEX:
         def head(self, url: str, **kwargs: Any) -> _DummyHead:  # noqa: D401
             return _DummyHead()
 
-        def get(self, url: str, **kwargs: Any) -> _DummyResponse:  # noqa: D401
+        def request(self, method: str, url: str, **kwargs: Any) -> _DummyResponse:
+            assert method.upper() == "GET"
             return self._response
 
     def _make_artifact(tmp_path: Path) -> WorkArtifact:
@@ -1733,23 +1734,16 @@ def test_request_with_retries_requires_method_and_url() -> None:
 # --- test_http_retry.py ---
 
 def test_request_with_retries_uses_method_fallback() -> None:
-    class _MinimalSession:
-        def __init__(self) -> None:
-            self.calls: List[str] = []
-
-        def get(self, url: str, **kwargs: Any):  # noqa: D401
-            self.calls.append(url)
-            response = Mock(spec=requests.Response)
-            response.status_code = 200
-            response.headers = {}
-            return response
-
-    session = _MinimalSession()
+    session = Mock(spec=requests.Session)
+    response = Mock(spec=requests.Response)
+    response.status_code = 200
+    response.headers = {}
+    session.request.return_value = response
 
     response = request_with_retries(session, "GET", "https://example.org/fallback")
 
     assert response.status_code == 200
-    assert session.calls == ["https://example.org/fallback"]
+    session.request.assert_called_once_with(method="GET", url="https://example.org/fallback")
 
 
 # --- test_http_retry.py ---
@@ -2295,7 +2289,7 @@ def test_slugify_truncates_and_normalises():
     ],
 )
 def test_classify_payload_variants(payload, ctype, url, expected):
-    assert downloader.classify_payload(payload, ctype, url) == expected
+    assert classify_payload(payload, ctype, url) == expected
 
 
 # --- test_download_utils.py ---
@@ -2638,6 +2632,7 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
         logger,
         metrics,
         dry_run=False,
+        list_only=False,
         extract_html_text=False,
         previous_lookup={},
         resume_completed=set(),

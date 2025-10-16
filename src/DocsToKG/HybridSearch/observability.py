@@ -57,16 +57,17 @@ from __future__ import annotations
 
 import logging
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from threading import RLock
-from typing import Dict, Iterable, Iterator, Mapping, MutableMapping, Optional, Tuple
+from typing import Deque, Dict, Iterable, Iterator, Mapping, MutableMapping, Optional, Tuple
 
 # --- Globals ---
 
 __all__ = (
     "CounterSample",
+    "GaugeSample",
     "HistogramSample",
     "MetricsCollector",
     "Observability",
@@ -135,6 +136,15 @@ class HistogramSample:
     p99: float
 
 
+@dataclass
+class GaugeSample:
+    """Sample from a gauge metric capturing the latest recorded value."""
+
+    name: str
+    labels: Mapping[str, str]
+    value: float
+
+
 class MetricsCollector:
     """In-memory metrics collector compatible with Prometheus-style summaries.
 
@@ -167,12 +177,18 @@ class MetricsCollector:
         """
 
         self._lock = RLock()
+        self._histogram_window = 512
+
+        def _deque_factory() -> Deque[float]:
+            return deque(maxlen=self._histogram_window)
+
         self._counters: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], float] = (
             defaultdict(float)
         )
-        self._histograms: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], list[float]] = (
-            defaultdict(list)
-        )
+        self._histograms: MutableMapping[
+            Tuple[str, Tuple[Tuple[str, str], ...]], Deque[float]
+        ] = defaultdict(_deque_factory)
+        self._gauges: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], float] = {}
 
     def increment(self, name: str, amount: float = 1.0, **labels: str) -> None:
         """Increase a counter metric by the given amount.
@@ -203,6 +219,26 @@ class MetricsCollector:
         key = (name, tuple(sorted(labels.items())))
         with self._lock:
             self._histograms[key].append(value)
+
+    def set_gauge(self, name: str, value: float, **labels: str) -> None:
+        """Set (or update) the value of a gauge metric."""
+
+        key = (name, tuple(sorted(labels.items())))
+        with self._lock:
+            self._gauges[key] = value
+
+    def percentile(self, name: str, percentile: float, **labels: str) -> Optional[float]:
+        """Return the requested percentile for ``name`` if samples exist."""
+
+        key = (name, tuple(sorted(labels.items())))
+        with self._lock:
+            samples = list(self._histograms.get(key, []))
+        if not samples:
+            return None
+        percentile = min(max(percentile, 0.0), 1.0)
+        sorted_samples = sorted(samples)
+        idx = int(percentile * (len(sorted_samples) - 1))
+        return sorted_samples[idx]
 
     def export_counters(self) -> Iterable[CounterSample]:
         """Iterate over collected counter metrics as structured samples.
@@ -240,6 +276,14 @@ class MetricsCollector:
             yield HistogramSample(
                 name=name, labels=dict(labels), count=count, p50=p50, p95=p95, p99=p99
             )
+
+    def export_gauges(self) -> Iterable[GaugeSample]:
+        """Iterate over gauge metrics as structured samples."""
+
+        with self._lock:
+            items = list(self._gauges.items())
+        for (name, labels), value in items:
+            yield GaugeSample(name=name, labels=dict(labels), value=value)
 
 
 class TraceRecorder:
@@ -376,4 +420,5 @@ class Observability:
         """
         counters = [sample.__dict__ for sample in self._metrics.export_counters()]
         histograms = [sample.__dict__ for sample in self._metrics.export_histograms()]
-        return {"counters": counters, "histograms": histograms}
+        gauges = [sample.__dict__ for sample in self._metrics.export_gauges()]
+        return {"counters": counters, "histograms": histograms, "gauges": gauges}

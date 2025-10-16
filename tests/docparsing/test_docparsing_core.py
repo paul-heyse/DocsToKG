@@ -245,8 +245,8 @@
 #     },
 #     {
 #       "id": "test-derive-doc-id-and-output-path",
-#       "name": "test_derive_doc_id_and_output_path",
-#       "anchor": "function-test-derive-doc-id-and-output-path",
+#       "name": "test_derive_doc_id_and_vectors_path",
+#       "anchor": "function-test-derive-doc-id-and-vectors-path",
 #       "kind": "function"
 #     },
 #     {
@@ -288,11 +288,15 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import socket
 import sys
+import uuid
+import warnings
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -751,8 +755,8 @@ def test_compute_relative_doc_id_handles_subdirectories(tmp_path: Path) -> None:
     assert compute_relative_doc_id(nested, root) == "teamA/report.doctags"
 
 
-def test_derive_doc_id_and_output_path(tmp_path: Path) -> None:
-    from DocsToKG.DocParsing import EmbeddingV2 as embedding
+def test_derive_doc_id_and_vectors_path(tmp_path: Path) -> None:
+    from DocsToKG.DocParsing._common import derive_doc_id_and_vectors_path
 
     chunks_root = tmp_path / "chunks"
     chunk_file = chunks_root / "teamA" / "report.chunks.jsonl"
@@ -760,9 +764,7 @@ def test_derive_doc_id_and_output_path(tmp_path: Path) -> None:
     chunk_file.write_text("{}\n", encoding="utf-8")
     vectors_root = tmp_path / "vectors"
 
-    doc_id, out_path = embedding._derive_doc_id_and_output_path(
-        chunk_file, chunks_root, vectors_root
-    )
+    doc_id, out_path = derive_doc_id_and_vectors_path(chunk_file, chunks_root, vectors_root)
 
     assert doc_id == "teamA/report.doctags"
     assert out_path == vectors_root / "teamA" / "report.vectors.jsonl"
@@ -772,6 +774,69 @@ def test_chunk_row_fields_unique() -> None:
     fields = schemas.ChunkRow.model_fields
     for name in ("has_image_captions", "has_image_classification", "num_images"):
         assert name in fields
+
+
+def test_detect_mode_pdf_only(tmp_path: Path) -> None:
+    from DocsToKG.DocParsing import cli as cli_module
+
+    input_dir = tmp_path / "pdf-only"
+    nested = input_dir / "nested"
+    nested.mkdir(parents=True, exist_ok=True)
+    (nested / "doc.PDF").write_text("content", encoding="utf-8")
+
+    assert cli_module._detect_mode(input_dir) == "pdf"
+
+
+def test_detect_mode_html_only(tmp_path: Path) -> None:
+    from DocsToKG.DocParsing import cli as cli_module
+
+    input_dir = tmp_path / "html-only"
+    nested = input_dir / "nested"
+    nested.mkdir(parents=True, exist_ok=True)
+    (nested / "page.HTM").write_text("<html/>", encoding="utf-8")
+
+    assert cli_module._detect_mode(input_dir) == "html"
+
+
+def test_detect_mode_raises_when_both_present(tmp_path: Path) -> None:
+    from DocsToKG.DocParsing import cli as cli_module
+
+    input_dir = tmp_path / "mixed"
+    nested = input_dir / "nested"
+    nested.mkdir(parents=True, exist_ok=True)
+    (nested / "doc.pdf").write_text("content", encoding="utf-8")
+    (nested / "page.html").write_text("<html/>", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Cannot auto-detect mode"):
+        cli_module._detect_mode(input_dir)
+
+
+def test_ensure_uuid_deterministic_generation() -> None:
+    from DocsToKG.DocParsing import EmbeddingV2 as embedding
+
+    rows = [
+        {
+            "doc_id": "teamA/report.doctags",
+            "source_chunk_idxs": [0, 2],
+            "text": "Chunk content for reproducible UUID.",
+        }
+    ]
+
+    assert embedding.ensure_uuid(rows) is True
+    generated = rows[0]["uuid"]
+    assert uuid.UUID(generated).version == 5
+
+    replica_rows = [
+        {
+            "doc_id": "teamA/report.doctags",
+            "source_chunk_idxs": [0, 2],
+            "text": "Chunk content for reproducible UUID.",
+        }
+    ]
+    embedding.ensure_uuid(replica_rows)
+
+    assert replica_rows[0]["uuid"] == generated
+    assert embedding.ensure_uuid(rows) is False
 
 
 def test_qwen_embed_caches_llm(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -791,7 +856,7 @@ def test_qwen_embed_caches_llm(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
             return [DummyOutput() for _ in batch]
 
     class DummyPoolingParams:
-        def __init__(self, normalize: bool = True) -> None:
+        def __init__(self, normalize: bool = True, **kwargs: Any) -> None:
             self.normalize = normalize
 
     monkeypatch.setattr(embedding, "LLM", DummyLLM)
@@ -1015,4 +1080,26 @@ def test_pdf_pipeline_mirrors_output_paths(tmp_path: Path, monkeypatch: pytest.M
     }
 
 
-# Deprecated pdf_pipeline test removed - module no longer exists
+def test_pdf_pipeline_import_emits_deprecation_warning(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Importing the legacy shim should emit DeprecationWarning."""
+
+    monkeypatch.delenv("DOCSTOKG_DOC_PARSING_DISABLE_SHIMS", raising=False)
+    sys.modules.pop("DocsToKG.DocParsing.pdf_pipeline", None)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DeprecationWarning)
+        module = importlib.import_module("DocsToKG.DocParsing.pdf_pipeline")
+
+    assert any(
+        issubclass(w.category, DeprecationWarning)
+        and "DocsToKG.DocParsing.pdf_pipeline is deprecated" in str(w.message)
+        for w in caught
+    ), "Import should emit DeprecationWarning"
+
+    from DocsToKG.DocParsing import pipelines
+
+    shim_args = module.parse_args([])
+    baseline_args = pipelines.pdf_parse_args([])
+    assert isinstance(shim_args, argparse.Namespace)
+    assert vars(shim_args) == vars(baseline_args)
+    assert module.main.__module__ == "DocsToKG.DocParsing.pdf_pipeline"

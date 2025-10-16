@@ -33,10 +33,6 @@ Usage:
 
 Return ``True`` when ``candidate`` appears to reference a local path.
 
-### `_expand_path(path)`
-
-Expand a filesystem path to an absolute :class:`Path`.
-
 ### `resolve_pdf_model_path(cli_value)`
 
 Determine PDF model path using CLI and environment precedence.

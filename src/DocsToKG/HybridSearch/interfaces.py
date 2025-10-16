@@ -12,10 +12,14 @@ Raises:
 
 from __future__ import annotations
 
-from typing import List, Mapping, Optional, Protocol, Sequence, Tuple
+from typing import TYPE_CHECKING, List, Mapping, Optional, Protocol, Sequence, Tuple
+
+import numpy as np
 
 from .types import ChunkPayload
 
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from .vectorstore import FaissSearchResult
 
 class LexicalIndex(Protocol):
     """Protocol describing the lexical (BM25/SPLADE) index interface.
@@ -27,7 +31,7 @@ class LexicalIndex(Protocol):
         None
 
     Examples:
-        >>> from DocsToKG.HybridSearch.devtools.opensearch_simulator import OpenSearchSimulator
+        >>> from DocsToKG.HybridSearch.storage import OpenSearchSimulator
         >>> simulator: LexicalIndex = OpenSearchSimulator()
         >>> simulator.bulk_upsert([])  # doctest: +SKIP
     """
@@ -50,6 +54,9 @@ class LexicalIndex(Protocol):
 
         Returns:
             None
+
+        Raises:
+            Exception: Implementations may surface provider-specific failures.
         """
 
     def search_bm25(
@@ -90,6 +97,18 @@ class LexicalIndex(Protocol):
             List of ``(chunk, score)`` pairs and an optional cursor for pagination.
         """
 
+    def search_bm25_true(
+        self,
+        query_weights: Mapping[str, float],
+        filters: Mapping[str, object],
+        top_k: int,
+        cursor: Optional[int] = None,
+        *,
+        k1: float = 1.2,
+        b: float = 0.75,
+    ) -> Tuple[List[Tuple[ChunkPayload, float]], Optional[int]]:
+        """Optional Okapi BM25 search supporting DF/length-aware scoring."""
+
     def highlight(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
         """Return highlight snippets for ``chunk`` given ``query_tokens``.
 
@@ -110,3 +129,52 @@ class LexicalIndex(Protocol):
         Returns:
             Mapping containing statistics relevant to the implementation.
         """
+
+
+class DenseVectorStore(Protocol):
+    """Protocol describing the dense vector index surface area.
+
+    Implementations provide GPU-backed vector search with facilities for
+    ingestion, persistence, and statistics reporting. This protocol allows
+    tests to swap lightweight stand-ins without relying on FAISS directly.
+    """
+
+    @property
+    def dim(self) -> int:
+        """Return the embedding dimensionality."""
+
+    @property
+    def ntotal(self) -> int:
+        """Return the number of stored vectors."""
+
+    @property
+    def device(self) -> int:
+        """Return the CUDA device identifier used by the index."""
+
+    @property
+    def gpu_resources(self) -> object | None:
+        """Return GPU resources when available, otherwise ``None``."""
+
+    def add(self, vectors: Sequence[np.ndarray], vector_ids: Sequence[str]) -> None:
+        """Insert dense vectors."""
+
+    def remove(self, vector_ids: Sequence[str]) -> None:
+        """Delete dense vectors referenced by ``vector_ids``."""
+
+    def search(self, query: np.ndarray, top_k: int) -> Sequence["FaissSearchResult"]:
+        """Search for nearest neighbours of ``query``."""
+
+    def search_many(self, queries: np.ndarray, top_k: int) -> Sequence[Sequence["FaissSearchResult"]]:
+        """Search for nearest neighbours of multiple queries."""
+
+    def search_batch(self, queries: np.ndarray, top_k: int) -> Sequence[Sequence["FaissSearchResult"]]:
+        """Optional alias for batched search."""
+
+    def serialize(self) -> bytes:
+        """Return a serialised representation of the index."""
+
+    def restore(self, payload: bytes) -> None:
+        """Restore index state from ``payload``."""
+
+    def stats(self) -> Mapping[str, float | str]:
+        """Return implementation-defined statistics."""

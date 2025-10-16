@@ -59,14 +59,17 @@
 
 from __future__ import annotations
 
+import math
 import time
+
+import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from http import HTTPStatus
 from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Sequence
 
 from .config import HybridSearchConfig, HybridSearchConfigManager
-from .devtools.features import FeatureGenerator
+from .features import FeatureGenerator
 from .interfaces import LexicalIndex
 from .observability import Observability
 from .ranking import ReciprocalRankFusion, ResultShaper, apply_mmr_diversification
@@ -79,7 +82,8 @@ from .types import (
     HybridSearchResponse,
     HybridSearchResult,
 )
-from .vectorstore import FaissVectorStore, FaissSearchResult
+from .interfaces import DenseVectorStore
+from .vectorstore import FaissSearchResult
 
 # --- Globals ---
 
@@ -143,7 +147,7 @@ class HybridSearchService:
         >>> # File-backed config manager (JSON/YAML on disk)
         >>> from pathlib import Path  # doctest: +SKIP
         >>> manager = HybridSearchConfigManager(Path("config.json"))  # doctest: +SKIP
-        >>> from DocsToKG.HybridSearch.devtools.opensearch_simulator import OpenSearchSimulator  # doctest: +SKIP
+        >>> from DocsToKG.HybridSearch.storage import OpenSearchSimulator  # doctest: +SKIP
         >>> service = HybridSearchService(  # doctest: +SKIP
         ...     config_manager=manager,
         ...     feature_generator=FeatureGenerator(embedding_dim=16),
@@ -161,7 +165,7 @@ class HybridSearchService:
         *,
         config_manager: HybridSearchConfigManager,
         feature_generator: FeatureGenerator,
-        faiss_index: FaissVectorStore,
+        faiss_index: DenseVectorStore,
         opensearch: LexicalIndex,
         registry: ChunkRegistry,
         observability: Optional[Observability] = None,
@@ -228,7 +232,6 @@ class HybridSearchService:
                 splade = f_splade.result()
                 dense = f_dense.result()
 
-            fusion_start = time.perf_counter()
             channel_weights = getattr(config.fusion, "channel_weights", None)
             fusion = ReciprocalRankFusion(
                 k0=config.fusion.k0,
@@ -238,6 +241,7 @@ class HybridSearchService:
             fused_scores = fusion.fuse(combined_candidates)
             unique_candidates = self._dedupe_candidates(combined_candidates, fused_scores)
 
+            fusion_start = time.perf_counter()
             if request.diversification and config.fusion.enable_mmr:
                 pool_size = int(
                     max(1, min(getattr(config.fusion, "mmr_pool_size", len(unique_candidates)), len(unique_candidates)))
@@ -333,21 +337,7 @@ class HybridSearchService:
                     continue
                 sliced.append(result)
             return list(results) if skipping else sliced
-        try:
-            vector_id, rank_str = cursor.rsplit(":", 1)
-            target_rank = int(rank_str)
-        except (ValueError, TypeError):
-            return list(results)
-
-        sliced = []
-        skipping = True
-        for result in results:
-            if skipping:
-                if result.vector_id == vector_id and result.fused_rank == target_rank:
-                    skipping = False
-                continue
-            sliced.append(result)
-        return list(results) if skipping else sliced
+        return list(results)
 
     def _build_cursor(self, results: Sequence[HybridSearchResult], page_size: int) -> Optional[str]:
         if len(results) <= page_size:
@@ -364,12 +354,35 @@ class HybridSearchService:
         timings: Dict[str, float],
     ) -> ChannelResults:
         start = time.perf_counter()
-        hits, _ = self._opensearch.search_bm25(
-            query_features.bm25_terms,
-            filters,
-            top_k=config.retrieval.bm25_top_k,
+        use_true_bm25 = (
+            getattr(config.retrieval, "bm25_scoring", "compat") == "true"
+            and hasattr(self._opensearch, "search_bm25_true")
         )
+        if use_true_bm25:
+            hits, _ = getattr(self._opensearch, "search_bm25_true")(
+                query_features.bm25_terms,
+                filters,
+                top_k=config.retrieval.bm25_top_k,
+                k1=getattr(config.retrieval, "bm25_k1", 1.2),
+                b=getattr(config.retrieval, "bm25_b", 0.75),
+            )
+        else:
+            hits, _ = self._opensearch.search_bm25(
+                query_features.bm25_terms,
+                filters,
+                top_k=config.retrieval.bm25_top_k,
+            )
         timings["bm25_ms"] = (time.perf_counter() - start) * 1000
+        self._observability.metrics.observe(
+            "search_channel_latency_ms", timings["bm25_ms"], channel="bm25"
+        )
+        p95_bm25 = self._observability.metrics.percentile(
+            "search_channel_latency_ms", 0.95, channel="bm25"
+        )
+        if p95_bm25 is not None:
+            self._observability.metrics.set_gauge(
+                "search_channel_latency_p95_ms", p95_bm25, channel="bm25"
+            )
         self._observability.metrics.increment("search_channel_requests", channel="bm25")
         self._observability.metrics.observe("search_channel_candidates", len(hits), channel="bm25")
         candidates = [
@@ -394,6 +407,16 @@ class HybridSearchService:
             top_k=config.retrieval.splade_top_k,
         )
         timings["splade_ms"] = (time.perf_counter() - start) * 1000
+        self._observability.metrics.observe(
+            "search_channel_latency_ms", timings["splade_ms"], channel="splade"
+        )
+        p95_splade = self._observability.metrics.percentile(
+            "search_channel_latency_ms", 0.95, channel="splade"
+        )
+        if p95_splade is not None:
+            self._observability.metrics.set_gauge(
+                "search_channel_latency_p95_ms", p95_splade, channel="splade"
+            )
         self._observability.metrics.increment("search_channel_requests", channel="splade")
         self._observability.metrics.observe(
             "search_channel_candidates", len(hits), channel="splade"
@@ -415,11 +438,32 @@ class HybridSearchService:
     ) -> ChannelResults:
         start = time.perf_counter()
         # Over-fetch relative to the page size (not dense_top_k) to leave headroom for filtering.
-        overfetch_factor = max(1.0, float(getattr(config.retrieval, "dense_overfetch_factor", 1.5)))
-        overfetch_candidates = int(max(1, request.page_size) * overfetch_factor)
-        k = max(int(config.retrieval.dense_top_k), overfetch_candidates)
-        hits = self._faiss.search(query_features.embedding, k)
+        page_size = max(1, request.page_size)
+        overfetch = max(1.0, float(getattr(config.retrieval, "dense_overfetch_factor", 1.5)))
+        target = math.ceil(page_size * overfetch)
+        q_oversample = float(
+            getattr(
+                config.retrieval,
+                "dense_oversample",
+                getattr(config.dense, "oversample", 1.0),
+            )
+        )
+        if q_oversample > 1.0:
+            target = max(target, math.ceil(page_size * q_oversample))
+        k = max(int(config.retrieval.dense_top_k), target)
+        batch_hits = self._faiss.search_batch(np.asarray([query_features.embedding]), k)
+        hits = batch_hits[0] if batch_hits else []
         timings["dense_ms"] = (time.perf_counter() - start) * 1000
+        self._observability.metrics.observe(
+            "search_channel_latency_ms", timings["dense_ms"], channel="dense"
+        )
+        p95_dense = self._observability.metrics.percentile(
+            "search_channel_latency_ms", 0.95, channel="dense"
+        )
+        if p95_dense is not None:
+            self._observability.metrics.set_gauge(
+                "search_channel_latency_p95_ms", p95_dense, channel="dense"
+            )
         filtered, payloads = self._filter_dense_hits(hits, filters)
         self._observability.metrics.increment("search_channel_requests", channel="dense")
         self._observability.metrics.observe(
@@ -467,8 +511,10 @@ class HybridSearchService:
                 unique[vector_id] = candidate
         return sorted(
             unique.values(),
-            key=lambda candidate: fused_scores.get(candidate.chunk.vector_id, 0.0),
-            reverse=True,
+            key=lambda candidate: (
+                -fused_scores.get(candidate.chunk.vector_id, 0.0),
+                candidate.chunk.vector_id,
+            ),
         )
 
 
@@ -598,7 +644,7 @@ class PaginationCheckResult:
 # --- Public Functions ---
 
 def build_stats_snapshot(
-    faiss_index: FaissVectorStore,
+    faiss_index: DenseVectorStore,
     opensearch: LexicalIndex,
     registry: ChunkRegistry,
 ) -> Mapping[str, object]:

@@ -53,10 +53,6 @@ model_root: Base directory housing DocsToKG models.
 Returns:
 Absolute path to the SPLADE model directory.
 
-### `_derive_doc_id_and_output_path(chunk_file, chunks_root, vectors_root)`
-
-Return manifest doc_id and vector output path for a chunk artifact.
-
 ### `_expand_optional(path)`
 
 Expand optional :class:`Path` values to absolutes when provided.
@@ -96,13 +92,16 @@ Validate that Qwen/vLLM optional dependencies are importable.
 
 ### `ensure_uuid(rows)`
 
-Populate missing chunk UUIDs in-place.
+Populate missing chunk UUIDs in-place using deterministic UUIDv5 derivation.
 
 Args:
 rows: Chunk dictionaries that should include a `uuid` key.
 
 Returns:
-True when at least one UUID was newly assigned; otherwise False.
+True when at least one UUID was newly assigned; otherwise False. Missing IDs are
+derived from the document ID, ``source_chunk_idxs`` sequence, and the first 16 hex
+characters of the SHA-1 digest of ``text``. A random UUID4 is used only if the
+deterministic derivation cannot be computed.
 
 ### `ensure_chunk_schema(rows, source)`
 
@@ -199,7 +198,12 @@ List of embedding vectors, one per input text.
 
 ### `process_pass_a(files, logger)`
 
-Assign UUIDs and build BM25 statistics for a corpus of chunk files.
+Assign UUIDs and build BM25 statistics (streaming + atomic rewrite).
+
+This implementation streams each JSONL row and writes a temporary file with
+normalised schema/UUIDs. The original file is atomically replaced **only**
+when changes are detected. This bounds memory on huge shards and prevents
+partial writes.
 
 Args:
 files: Sequence of chunk file paths to process.
@@ -209,7 +213,8 @@ Returns:
 Aggregated BM25 statistics for the supplied chunk corpus.
 
 Raises:
-ValueError: Propagated when chunk rows are missing required fields.
+OSError: If chunk files cannot be read or written.
+json.JSONDecodeError: If a chunk row contains invalid JSON.
 
 ### `iter_rows_in_batches(path, batch_size)`
 
@@ -276,12 +281,18 @@ and Qwen vector norms.
 Raises:
 ValueError: If vector lengths are inconsistent or fail validation.
 
-### `_validate_vectors_in_dir(vectors_dir, logger)`
+### `_validate_vectors_for_chunks(chunks_dir, vectors_dir, logger)`
 
-Validate all *.vectors.jsonl files under a directory tree.
+Validate vectors for chunk documents without recomputing embeddings.
+
+Args:
+chunks_dir: Directory containing chunk JSONL artefacts.
+vectors_dir: Directory holding vector outputs.
+logger: Structured logger used for progress reporting.
 
 Returns:
-(files_checked, rows_validated)
+Tuple ``(files_checked, rows_validated)`` describing validation progress.
+Raises ``FileNotFoundError`` when an expected vectors file is missing.
 
 ### `build_parser()`
 

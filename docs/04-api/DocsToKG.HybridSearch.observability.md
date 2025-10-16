@@ -44,6 +44,14 @@ value: Observation value to append to the histogram.
 Returns:
 None
 
+### `set_gauge(self, name, value)`
+
+Set (or update) the value of a gauge metric.
+
+### `percentile(self, name, percentile)`
+
+Return the requested percentile for ``name`` if samples exist.
+
 ### `export_counters(self)`
 
 Iterate over collected counter metrics as structured samples.
@@ -63,6 +71,10 @@ None
 
 Returns:
 Iterable of `HistogramSample` entries containing percentile stats.
+
+### `export_gauges(self)`
+
+Iterate over gauge metrics as structured samples.
 
 ### `span(self, name)`
 
@@ -122,6 +134,10 @@ None
 Returns:
 Dictionary containing lists of counter and histogram samples.
 
+### `_deque_factory()`
+
+*No documentation available.*
+
 ## 3. Classes
 
 ### `CounterSample`
@@ -167,6 +183,10 @@ Examples:
 ...     p95=89.1,
 ...     p99=156.7
 ... )
+
+### `GaugeSample`
+
+Sample from a gauge metric capturing the latest recorded value.
 
 ### `MetricsCollector`
 

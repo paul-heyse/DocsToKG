@@ -119,14 +119,21 @@
 <span class="w">  </span>--staging
 </pre></div>
 </div>
-<ul class="simple">
+<ul>
 <li><p>Configure resolver credentials via environment variables (<code class="docutils literal notranslate"><span class="pre">UNPAYWALL_EMAIL</span></code>,
 <code class="docutils literal notranslate"><span class="pre">CORE_API_KEY</span></code>, <code class="docutils literal notranslate"><span class="pre">S2_API_KEY</span></code>, <code class="docutils literal notranslate"><span class="pre">DOAJ_API_KEY</span></code>) or <code class="docutils literal notranslate"><span class="pre">.envrc</span></code>.</p></li>
-<li><p>Use <code class="docutils literal notranslate"><span class="pre">--staging</span></code> to isolate each run under a timestamped directory with
-derived artifacts (<code class="docutils literal notranslate"><span class="pre">manifest.index.json</span></code>, <code class="docutils literal notranslate"><span class="pre">manifest.metrics.json</span></code>,
-<code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code>).</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">--log-format</span> <span class="pre">csv</span></code> keeps JSONL manifests while adding a consolidated
-<code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code> summary for fast auditing.</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">--staging</span></code> to isolate each run under a timestamped directory. After the
+run, derive sidecars with the post-processing helpers:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>tools/manifest_to_index.py<span class="w"> </span>runs/20250101_1200/manifest.jsonl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>runs/20250101_1200/manifest.index.json
+python<span class="w"> </span>tools/manifest_to_csv.py<span class="w"> </span>runs/20250101_1200/manifest.jsonl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>runs/20250101_1200/manifest.last.csv
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--log-format</span> <span class="pre">csv</span></code> keeps JSONL manifests while adding a consolidated attempts
+CSV; invoke <code class="docutils literal notranslate"><span class="pre">tools/manifest_to_csv.py</span></code> to generate <code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code> after
+the downloader finishes.</p></li>
 <li><p>Review <code class="docutils literal notranslate"><span class="pre">docs/content-download-migration.md</span></code> when upgrading existing
 automation to the new resolver stack and logging surfaces.</p></li>
 </ul>

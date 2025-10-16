@@ -4,9 +4,30 @@ This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.__init_
 
 ## 1. Overview
 
-Public API for the DocsToKG ontology downloader and resolver pipeline.
+Lazy public facade for the DocsToKG ontology downloader.
 
-This facade exposes the primary fetch utilities used by external callers to
-plan resolver fallback chains, download ontologies with hardened validation,
-perform stream normalization, and emit schema-compliant manifests with
-deterministic fingerprints.
+## 2. Functions
+
+### `_load_core()`
+
+*No documentation available.*
+
+### `__getattr__(name)`
+
+*No documentation available.*
+
+### `__dir__()`
+
+*No documentation available.*
+
+### `_warn_deprecated(feature)`
+
+Emit a deprecation warning once when opt-in flag is enabled.
+
+### `list_plugins(kind)`
+
+Return a mapping of registered plugin entry points and their versions.
+
+### `about()`
+
+Return metadata about the ontology downloader environment.

@@ -478,6 +478,10 @@ archive_type: Human readable label for error messages (ZIP/TAR).</p>
 <p>Raises:
 ConfigError: If the archive exceeds the allowed expansion ratio.</p>
 </section>
+<section id="is-zip-symlink-info">
+<h3><code class="docutils literal notranslate"><span class="pre">_is_zip_symlink(info)</span></code><a class="headerlink" href="#is-zip-symlink-info" title="Link to this heading"></a></h3>
+<p>Return True when a ZIP member encodes a symbolic link.</p>
+</section>
 <section id="extract-zip-safe-zip-path-destination">
 <h3><code class="docutils literal notranslate"><span class="pre">extract_zip_safe(zip_path,</span> <span class="pre">destination)</span></code><a class="headerlink" href="#extract-zip-safe-zip-path-destination" title="Link to this heading"></a></h3>
 <p>Extract a ZIP archive while preventing traversal and compression bombs.</p>

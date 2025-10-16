@@ -122,7 +122,7 @@ class ChunkIngestionPipeline:
     Examples:
         >>> pipeline = ChunkIngestionPipeline(
         ...     faiss_index=FaissVectorStore.build_in_memory(),
-        ...     opensearch=OpenSearchSimulator(),  # from DocsToKG.HybridSearch.devtools.opensearch_simulator  # doctest: +SKIP
+        ...     opensearch=OpenSearchSimulator(),  # from DocsToKG.HybridSearch.storage  # doctest: +SKIP
         ...     registry=ChunkRegistry(),
         ... )
         >>> isinstance(pipeline.metrics.chunks_upserted, int)
@@ -299,13 +299,18 @@ class ChunkIngestionPipeline:
             IngestError: If chunk and vector artifacts are inconsistent or missing.
         """
         chunk_entries = self._read_jsonl(document.chunk_path)
-        vector_entries = {entry["UUID"]: entry for entry in self._read_jsonl(document.vector_path)}
+        vector_entries = {
+            str(entry.get("UUID") or entry.get("uuid")): entry
+            for entry in self._read_jsonl(document.vector_path)
+        }
         payloads: List[ChunkPayload] = []
+        missing: List[str] = []
         for entry in chunk_entries:
-            vector_id = str(entry.get("uuid"))
+            vector_id = str(entry.get("uuid") or entry.get("UUID"))
             vector_payload = vector_entries.get(vector_id)
             if vector_payload is None:
-                raise IngestError(f"Missing vector entry for chunk {vector_id}")
+                missing.append(vector_id)
+                continue
             features = self._features_from_vector(vector_payload)
             metadata = dict(document.metadata)
             metadata.update(
@@ -329,6 +334,11 @@ class ChunkIngestionPipeline:
                     doc_items_refs=tuple(str(ref) for ref in entry.get("doc_items_refs", [])),
                     char_offset=(0, len(str(entry.get("text", "")))),
                 )
+            )
+        if missing:
+            raise IngestError(
+                "Missing vector entries for chunk UUIDs: "
+                + ", ".join(sorted(set(missing)))
             )
         return payloads
 
@@ -367,9 +377,14 @@ class ChunkIngestionPipeline:
         splade = payload.get("SpladeV3", {})
         splade_weights = self._weights_from_payload(splade)
         dense = payload.get("Qwen3-4B", {})
-        vector = np.array(dense.get("vector", []), dtype=np.float32)
+        vector = np.asarray(dense.get("vector", []), dtype=np.float32)
         if vector.ndim != 1:
             raise IngestError("Dense vector must be one-dimensional")
+        expected = int(self._faiss.dim)
+        if vector.size != expected:
+            raise IngestError(
+                f"Dense vector dimension mismatch: expected {expected}, got {vector.size}"
+            )
         return ChunkFeatures(
             bm25_terms=bm25_terms,
             splade_weights=splade_weights,

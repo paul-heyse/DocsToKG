@@ -56,11 +56,21 @@ from __future__ import annotations
 
 import re
 from typing import List, Optional
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 
 # --- Globals ---
 
-__all__ = ("normalize_doi", "normalize_pmcid", "strip_prefix", "dedupe")
+__all__ = (
+    "normalize_doi",
+    "normalize_pmcid",
+    "strip_prefix",
+    "dedupe",
+    "normalize_pmid",
+    "normalize_arxiv",
+    "slugify",
+    "normalize_url",
+)
 
 
 # --- Public Functions ---
@@ -158,3 +168,51 @@ def dedupe(items: List[str]) -> List[str]:
             result.append(item)
             seen.add(item)
     return result
+
+
+def normalize_pmid(pmid: Optional[str]) -> Optional[str]:
+    """Extract the numeric PubMed identifier from the supplied string."""
+
+    if not pmid:
+        return None
+    pmid = pmid.strip()
+    match = re.search(r"(\d+)", pmid)
+    return match.group(1) if match else None
+
+
+def normalize_arxiv(arxiv_id: Optional[str]) -> Optional[str]:
+    """Normalize arXiv identifiers by removing common prefixes and whitespace."""
+
+    if not arxiv_id:
+        return None
+    value = strip_prefix(arxiv_id, "arxiv:") or arxiv_id
+    value = value.replace("https://arxiv.org/abs/", "")
+    return value.strip() or None
+
+
+def slugify(text: str, keep: int = 80) -> str:
+    """Create a filesystem-friendly slug from the provided text."""
+
+    text = re.sub(r"[^\w\s]+", "", text or "")
+    text = re.sub(r"\s+", "_", text.strip())
+    return text[:keep] or "untitled"
+
+
+def normalize_url(url: str) -> str:
+    """Return a canonicalised version of ``url`` suitable for deduplication."""
+
+    parts = urlsplit(url)
+    query_pairs = [
+        (key, value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if not key.lower().startswith("utm_")
+    ]
+    return urlunsplit(
+        (
+            parts.scheme.lower(),
+            parts.netloc.lower(),
+            parts.path,
+            urlencode(query_pairs, doseq=True),
+            "",
+        )
+    )

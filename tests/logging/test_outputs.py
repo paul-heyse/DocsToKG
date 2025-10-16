@@ -83,8 +83,7 @@ import pytest
 pytest.importorskip("requests")
 pytest.importorskip("pyalex")
 
-from DocsToKG.ContentDownload.download_pyalex_pdfs import (  # noqa: E402
-    CsvAttemptLoggerAdapter,
+from DocsToKG.ContentDownload.telemetry import (  # noqa: E402
     CsvSink,
     JsonlSink,
     ManifestEntry,
@@ -177,12 +176,13 @@ def test_csv_sink_close_closes_file(tmp_path: Path) -> None:
     assert sink._file.closed  # type: ignore[attr-defined]
 
 
-def test_csv_adapter_close_closes_file(tmp_path: Path) -> None:
+def test_multi_sink_close_closes_files(tmp_path: Path) -> None:
     jsonl_path = tmp_path / "attempts.jsonl"
     csv_path = tmp_path / "attempts.csv"
-    adapter = CsvAttemptLoggerAdapter(JsonlSink(jsonl_path), csv_path)
-
-    adapter.log_attempt(
+    jsonl_sink = JsonlSink(jsonl_path)
+    csv_sink = CsvSink(csv_path)
+    sink = MultiSink([jsonl_sink, csv_sink])
+    sink.log_attempt(
         AttemptRecord(
             work_id="W-close",
             resolver_name="unpaywall",
@@ -199,14 +199,12 @@ def test_csv_adapter_close_closes_file(tmp_path: Path) -> None:
             resolver_wall_time_ms=10.5,
         )
     )
-
-    adapter.close()
-    assert adapter._file.closed  # type: ignore[attr-defined]
-
-    # ``close`` should be idempotent.
-    adapter.close()
-    assert adapter._file.closed  # type: ignore[attr-defined]
-
+    sink.close()
+    assert jsonl_sink._file.closed  # type: ignore[attr-defined]
+    assert csv_sink._file.closed  # type: ignore[attr-defined]
+    sink.close()
+    assert jsonl_sink._file.closed  # type: ignore[attr-defined]
+    assert csv_sink._file.closed  # type: ignore[attr-defined]
 
 def test_jsonl_sink_writes_valid_records(tmp_path: Path) -> None:
     log_path = tmp_path / "attempts.jsonl"

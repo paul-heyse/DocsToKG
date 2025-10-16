@@ -26,11 +26,18 @@ python -m DocsToKG.ContentDownload.download_pyalex_pdfs \
 
 - Configure resolver credentials via environment variables (`UNPAYWALL_EMAIL`,
   `CORE_API_KEY`, `S2_API_KEY`, `DOAJ_API_KEY`) or `.envrc`.
-- Use `--staging` to isolate each run under a timestamped directory with
-  derived artifacts (`manifest.index.json`, `manifest.metrics.json`,
-  `manifest.last.csv`).
-- `--log-format csv` keeps JSONL manifests while adding a consolidated
-  `manifest.last.csv` summary for fast auditing.
+- Use `--staging` to isolate each run under a timestamped directory. After the
+  run, derive sidecars with the post-processing helpers:
+
+  ```bash
+  python tools/manifest_to_index.py runs/20250101_1200/manifest.jsonl \
+    runs/20250101_1200/manifest.index.json
+  python tools/manifest_to_csv.py runs/20250101_1200/manifest.jsonl \
+    runs/20250101_1200/manifest.last.csv
+  ```
+- `--log-format csv` keeps JSONL manifests while adding a consolidated attempts
+  CSV; invoke `tools/manifest_to_csv.py` to generate `manifest.last.csv` after
+  the downloader finishes.
 - Review `docs/content-download-migration.md` when upgrading existing
   automation to the new resolver stack and logging surfaces.
 
