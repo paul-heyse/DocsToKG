@@ -164,15 +164,6 @@ class DenseVectorStore(Protocol):
     def add(self, vectors: Sequence[np.ndarray], vector_ids: Sequence[str]) -> None:
         """Insert dense vectors."""
 
-    def add_batch(
-        self,
-        vectors: Sequence[np.ndarray] | np.ndarray,
-        vector_ids: Sequence[str],
-        *,
-        batch_size: int = 65_536,
-    ) -> None:
-        """Insert vectors in batches; defaults mirror FAISS GPU-friendly chunking."""
-
     def remove(self, vector_ids: Sequence[str]) -> None:
         """Delete dense vectors referenced by ``vector_ids``."""
 
@@ -188,15 +179,6 @@ class DenseVectorStore(Protocol):
         self, queries: np.ndarray, top_k: int
     ) -> Sequence[Sequence["FaissSearchResult"]]:
         """Optional alias for batched search."""
-
-    def range_search(
-        self,
-        query: np.ndarray,
-        min_score: float,
-        *,
-        limit: Optional[int] = None,
-    ) -> Sequence["FaissSearchResult"]:
-        """Return all vectors scoring above ``min_score`` for ``query``."""
 
     def serialize(self) -> bytes:
         """Return a serialised representation of the index."""

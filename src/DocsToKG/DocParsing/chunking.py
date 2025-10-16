@@ -171,6 +171,8 @@ __all__ = (
 from DocsToKG.DocParsing.core import (
     DEFAULT_SERIALIZER_PROVIDER,
     DEFAULT_TOKENIZER,
+    DEFAULT_CAPTION_MARKERS,
+    DEFAULT_HEADING_MARKERS,
     ChunkResult,
     ChunkTask,
     ChunkWorkerConfig,
@@ -182,6 +184,9 @@ from DocsToKG.DocParsing.core import (
     data_chunks,
     data_doctags,
     detect_data_root,
+    dedupe_preserve_order,
+    derive_doc_id_and_chunks_path,
+    ensure_model_environment,
     get_logger,
     iter_doctags,
     load_manifest_index,
@@ -193,6 +198,7 @@ from DocsToKG.DocParsing.core import (
     resolve_pipeline_path,
     set_spawn_or_warn,
     should_skip_output,
+    load_structural_marker_config,
 )
 from DocsToKG.DocParsing.doctags import (
     add_data_root_option,
@@ -204,12 +210,6 @@ from DocsToKG.DocParsing.formats import (
     ProvenanceMetadata,
     get_docling_version,
     validate_chunk_row,
-)
-from DocsToKG.DocParsing.formats.markers import (
-    DEFAULT_CAPTION_MARKERS,
-    DEFAULT_HEADING_MARKERS,
-    dedupe_preserve_order,
-    load_structural_marker_config,
 )
 
 SOFT_BARRIER_MARGIN = 64
@@ -1095,6 +1095,7 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     data_root_override = args.data_root
     data_root_overridden = data_root_override is not None
     resolved_data_root = prepare_data_root(data_root_override, DEFAULT_DATA_ROOT)
+    ensure_model_environment()
 
     html_manifest_index = load_manifest_index("doctags-html", resolved_data_root)
     pdf_manifest_index = load_manifest_index("doctags-pdf", resolved_data_root)
@@ -1269,23 +1270,21 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
 
     tasks: List[ChunkTask] = []
     for path in files:
-        rel_id = compute_relative_doc_id(path, in_dir)
+        doc_id, out_path = derive_doc_id_and_chunks_path(path, in_dir, out_dir)
         name = path.stem
-        relative_target = Path(rel_id)
-        out_path = (out_dir / relative_target).with_suffix(".chunks.jsonl")
         input_hash = compute_content_hash(path)
-        manifest_entry = chunk_manifest_index.get(rel_id)
-        parse_engine = parse_engine_lookup.get(rel_id, "docling-html")
-        if rel_id not in parse_engine_lookup:
+        manifest_entry = chunk_manifest_index.get(doc_id)
+        parse_engine = parse_engine_lookup.get(doc_id, "docling-html")
+        if doc_id not in parse_engine_lookup:
             logger.debug(
                 "Parse engine defaulted to docling-html",
-                extra={"extra_fields": {"doc_id": rel_id}},
+                extra={"extra_fields": {"doc_id": doc_id}},
             )
 
         if should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force):
             manifest_log_skip(
                 stage=MANIFEST_STAGE,
-                doc_id=rel_id,
+                doc_id=doc_id,
                 input_path=path,
                 input_hash=input_hash,
                 output_path=out_path,
@@ -1298,7 +1297,7 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
             ChunkTask(
                 doc_path=path,
                 output_path=out_path,
-                doc_id=rel_id,
+                doc_id=doc_id,
                 doc_stem=name,
                 input_hash=input_hash,
                 parse_engine=parse_engine,

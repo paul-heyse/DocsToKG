@@ -19,6 +19,8 @@ Key Features:
   work across processes, and writes DocTags with manifest telemetry.
 - Utility routines for manifest updates, GPU resource configuration, and
   polite rate control against vLLM endpoints.
+- Path and model resolution live in :mod:`DocsToKG.DocParsing.core`; this
+  module delegates to those helpers to avoid duplicated heuristics.
 
 Usage:
     from DocsToKG.DocParsing import pipelines
@@ -29,10 +31,6 @@ Usage:
 
 ## 2. Functions
 
-### `_looks_like_filesystem_path(candidate)`
-
-Return ``True`` when ``candidate`` appears to reference a local path.
-
 ### `resolve_pdf_model_path(cli_value)`
 
 Determine PDF model path using CLI and environment precedence.
@@ -42,6 +40,11 @@ cli_value: Optional CLI supplied path or model identifier.
 
 Returns:
 str: Absolute filesystem path or HuggingFace model identifier to use.
+
+Notes:
+- The helper delegates path heuristics to
+  :func:`DocsToKG.DocParsing.core.looks_like_filesystem_path` so a single source
+  of truth governs path detection across modules.
 
 ### `add_data_root_option(parser)`
 

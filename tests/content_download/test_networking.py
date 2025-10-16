@@ -3125,7 +3125,7 @@ def test_domain_bytes_budget_skips_over_limit(tmp_path: Path) -> None:
     records = [json.loads(line) for line in logger_path.read_text(encoding="utf-8").splitlines()]
     manifest_records = [entry for entry in records if entry["record_type"] == "manifest"]
     reason_map = {entry["work_id"]: entry.get("reason") for entry in manifest_records}
-    assert reason_map.get("WEDGE-2") == ReasonCode.DOMAIN_BYTES_BUDGET.value
+    assert reason_map.get("WEDGE-2") == ReasonCode.BUDGET_EXHAUSTED.value
 
 
 def test_retry_after_updates_breakers(tmp_path: Path) -> None:

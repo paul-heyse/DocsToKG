@@ -255,13 +255,16 @@ from tqdm import tqdm
 from urllib3.util.retry import Retry
 
 from DocsToKG.DocParsing.core import (
+    PDF_MODEL_SUBDIR,
     acquire_lock,
     compute_content_hash,
     data_doctags,
     data_html,
     data_manifests,
     data_pdfs,
+    derive_doc_id_and_doctags_path,
     detect_data_root,
+    ensure_model_environment,
     find_free_port,
     get_logger,
     load_manifest_index,
@@ -270,11 +273,10 @@ from DocsToKG.DocParsing.core import (
     manifest_log_skip,
     manifest_log_success,
     prepare_data_root,
-    resolve_pdf_model_path,
     resolve_hf_home,
     resolve_model_root,
+    resolve_pdf_model_path,
     resolve_pipeline_path,
-    PDF_MODEL_SUBDIR,
     set_spawn_or_warn,
     should_skip_output,
 )
@@ -1486,6 +1488,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         args.output = DEFAULT_OUTPUT
 
     ensure_docling_dependencies()
+    ensure_model_environment()
 
     served_model_names = _normalize_served_model_names(args.served_model_names)
     inference_model = served_model_names[0]
@@ -1601,9 +1604,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         tasks: List[PdfTask] = []
         ok = fail = skip = 0
         for pdf_path in pdfs:
-            rel_path = pdf_path.relative_to(input_dir)
-            doc_id = rel_path.as_posix()
-            out_path = (output_dir / rel_path).with_suffix(".doctags")
+            doc_id, out_path = derive_doc_id_and_doctags_path(pdf_path, input_dir, output_dir)
             input_hash = compute_content_hash(pdf_path)
             manifest_entry = manifest_index.get(doc_id)
             if should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force):

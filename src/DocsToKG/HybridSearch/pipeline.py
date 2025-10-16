@@ -475,7 +475,7 @@ class ChunkIngestionPipeline:
 
         with self._observability.trace("ingest_dual_write", count=str(len(new_chunks))):
             self._prepare_faiss(new_chunks)
-            self._faiss.add_batch(
+            self._faiss.add(
                 [chunk.features.embedding for chunk in new_chunks],
                 [chunk.vector_id for chunk in new_chunks],
             )

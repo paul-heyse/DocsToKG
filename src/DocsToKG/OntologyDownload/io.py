@@ -1167,192 +1167,231 @@ class StreamingDownloader(pooch.HTTPDownloader):
         if not part_path.exists() and destination_part_path.exists():
             part_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(destination_part_path, part_path)
-        resume_position = part_path.stat().st_size if part_path.exists() else 0
-        if resume_position:
-            request_headers["Range"] = f"bytes={resume_position}-"
-        attempt = 0
+
         self.head_content_type = None
         self.head_content_length = None
         self.response_content_type = None
         self.response_content_length = None
+
         with SESSION_POOL.lease(service=self.service, host=self.origin_host) as session:
             head_content_type, head_content_length = self._preliminary_head_check(url, session)
             self.head_content_type = head_content_type
             self.head_content_length = head_content_length
             if head_content_type:
                 self._validate_media_type(head_content_type, self.expected_media_type, url)
-            while True:
-                attempt += 1
-                try:
-                    with session.get(
-                        url,
-                        headers=request_headers,
-                        stream=True,
-                        timeout=self.http_config.download_timeout_sec,
-                        allow_redirects=True,
-                    ) as response:
-                        if response.status_code == 304 and Path(self.destination).exists():
-                            self.status = "cached"
-                            self.response_etag = response.headers.get(
-                                "ETag"
-                            ) or self.previous_manifest.get("etag")
-                            self.response_last_modified = response.headers.get(
-                                "Last-Modified"
-                            ) or self.previous_manifest.get("last_modified")
-                            manifest_type = self.previous_manifest.get("content_type")
-                            self.response_content_type = (
-                                manifest_type if isinstance(manifest_type, str) else None
-                            )
-                            manifest_length = self.previous_manifest.get("content_length")
-                            try:
-                                self.response_content_length = (
-                                    int(manifest_length) if manifest_length is not None else None
-                                )
-                            except (TypeError, ValueError):
-                                self.response_content_length = None
-                            part_path.unlink(missing_ok=True)
-                            return
-                        if response.status_code in {429, 503}:
-                            retry_after_header = response.headers.get("Retry-After")
-                            retry_after_delay = _parse_retry_after(retry_after_header)
-                            if retry_after_delay is not None:
-                                self.logger.warning(
-                                    "download retry-after",
-                                    extra={
-                                        "stage": "download",
-                                        "status_code": response.status_code,
-                                        "retry_after_sec": round(retry_after_delay, 2),
-                                        "service": self.service,
-                                        "host": self.origin_host,
-                                    },
-                                )
-                                apply_retry_after(
-                                    http_config=self.http_config,
-                                    service=self.service,
-                                    host=self.origin_host,
-                                    delay=retry_after_delay,
-                                )
-                                attempt = max(attempt - 1, 0)
-                                time.sleep(retry_after_delay)
-                                continue
-                        if response.status_code == 206:
-                            self.status = "updated"
-                        response.raise_for_status()
-                        self._validate_media_type(
-                            response.headers.get("Content-Type"),
-                            self.expected_media_type,
-                            url,
+
+            resume_position = part_path.stat().st_size if part_path.exists() else 0
+
+            def _stream_once() -> str:
+                nonlocal resume_position
+                resume_position = part_path.stat().st_size if part_path.exists() else 0
+                if resume_position:
+                    request_headers["Range"] = f"bytes={resume_position}-"
+                else:
+                    request_headers.pop("Range", None)
+
+                with session.get(
+                    url,
+                    headers=request_headers,
+                    stream=True,
+                    timeout=self.http_config.download_timeout_sec,
+                    allow_redirects=True,
+                ) as response:
+                    if response.status_code == 304 and Path(self.destination).exists():
+                        self.status = "cached"
+                        self.response_etag = response.headers.get("ETag") or self.previous_manifest.get(
+                            "etag"
                         )
-                        self.response_content_type = response.headers.get("Content-Type")
-                        length_header = response.headers.get("Content-Length")
-                        total_bytes: Optional[int] = None
-                        next_progress: Optional[float] = 0.1
-                        parsed_length: Optional[int] = None
-                        if length_header:
-                            try:
-                                parsed_length = int(length_header)
-                            except ValueError:
-                                parsed_length = None
-                        self.response_content_length = parsed_length
-                        if parsed_length is not None:
-                            total_bytes = parsed_length
-                        max_bytes = self.http_config.max_download_size_gb * (1024**3)
-                        if total_bytes is not None and total_bytes > max_bytes:
-                            self.logger.error(
-                                "file exceeds size limit",
+                        self.response_last_modified = response.headers.get(
+                            "Last-Modified"
+                        ) or self.previous_manifest.get("last_modified")
+                        manifest_type = self.previous_manifest.get("content_type")
+                        self.response_content_type = (
+                            manifest_type if isinstance(manifest_type, str) else None
+                        )
+                        manifest_length = self.previous_manifest.get("content_length")
+                        try:
+                            self.response_content_length = (
+                                int(manifest_length) if manifest_length is not None else None
+                            )
+                        except (TypeError, ValueError):
+                            self.response_content_length = None
+                        part_path.unlink(missing_ok=True)
+                        return "cached"
+
+                    if response.status_code in {429, 503}:
+                        retry_after_header = response.headers.get("Retry-After")
+                        retry_after_delay = _parse_retry_after(retry_after_header)
+                        if retry_after_delay is not None:
+                            self.logger.warning(
+                                "download retry-after",
                                 extra={
                                     "stage": "download",
-                                    "size": total_bytes,
-                                    "limit": max_bytes,
+                                    "status_code": response.status_code,
+                                    "retry_after_sec": round(retry_after_delay, 2),
+                                    "service": self.service,
+                                    "host": self.origin_host,
                                 },
                             )
-                            raise PolicyError(
-                                f"File size {total_bytes} exceeds configured limit of "
-                                f"{self.http_config.max_download_size_gb} GB"
+                            apply_retry_after(
+                                http_config=self.http_config,
+                                service=self.service,
+                                host=self.origin_host,
+                                delay=retry_after_delay,
                             )
-                        if total_bytes:
-                            completed_fraction = resume_position / total_bytes
-                            if completed_fraction >= 1:
-                                next_progress = None
-                            else:
-                                next_progress = ((int(completed_fraction * 10)) + 1) / 10
-                        self.response_etag = response.headers.get("ETag")
-                        self.response_last_modified = response.headers.get("Last-Modified")
-                        mode = "ab" if resume_position else "wb"
-                        bytes_downloaded = resume_position
-                        part_path.parent.mkdir(parents=True, exist_ok=True)
+                        http_error = requests.HTTPError(
+                            f"HTTP error {response.status_code}", response=response
+                        )
+                        setattr(http_error, "_retry_after_delay", retry_after_delay)
+                        response.close()
+                        raise http_error
+
+                    if response.status_code == 206:
+                        self.status = "updated"
+                    response.raise_for_status()
+
+                    self._validate_media_type(
+                        response.headers.get("Content-Type"),
+                        self.expected_media_type,
+                        url,
+                    )
+                    self.response_content_type = response.headers.get("Content-Type")
+                    length_header = response.headers.get("Content-Length")
+                    total_bytes: Optional[int] = None
+                    next_progress: Optional[float] = 0.1
+                    parsed_length: Optional[int] = None
+                    if length_header:
                         try:
-                            with part_path.open(mode) as fh:
-                                for chunk in response.iter_content(chunk_size=1 << 20):
-                                    if not chunk:
-                                        continue
-                                    fh.write(chunk)
-                                    bytes_downloaded += len(chunk)
-                                    if total_bytes and next_progress:
-                                        progress = bytes_downloaded / total_bytes
-                                        while next_progress and progress >= next_progress:
-                                            self.logger.info(
-                                                "download progress",
-                                                extra={
-                                                    "stage": "download",
-                                                    "status": "in-progress",
-                                                    "progress": {
-                                                        "percent": round(
-                                                            min(progress, 1.0) * 100, 1
-                                                        )
-                                                    },
-                                                },
-                                            )
-                                            next_progress += 0.1
-                                            if next_progress > 1:
-                                                next_progress = None
-                                                break
-                                    if bytes_downloaded > self.http_config.max_download_size_gb * (
-                                        1024**3
-                                    ):
-                                        self.logger.error(
-                                            "download exceeded size limit",
+                            parsed_length = int(length_header)
+                        except ValueError:
+                            parsed_length = None
+                    self.response_content_length = parsed_length
+                    if parsed_length is not None:
+                        total_bytes = parsed_length
+                    max_bytes = self.http_config.max_download_size_gb * (1024**3)
+                    if total_bytes is not None and total_bytes > max_bytes:
+                        self.logger.error(
+                            "file exceeds size limit",
+                            extra={
+                                "stage": "download",
+                                "size": total_bytes,
+                                "limit": max_bytes,
+                            },
+                        )
+                        raise PolicyError(
+                            f"File size {total_bytes} exceeds configured limit of "
+                            f"{self.http_config.max_download_size_gb} GB"
+                        )
+                    if total_bytes:
+                        completed_fraction = resume_position / total_bytes
+                        if completed_fraction >= 1:
+                            next_progress = None
+                        else:
+                            next_progress = ((int(completed_fraction * 10)) + 1) / 10
+                    self.response_etag = response.headers.get("ETag")
+                    self.response_last_modified = response.headers.get("Last-Modified")
+                    mode = "ab" if resume_position else "wb"
+                    bytes_downloaded = resume_position
+                    part_path.parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        with part_path.open(mode) as fh:
+                            for chunk in response.iter_content(chunk_size=1 << 20):
+                                if not chunk:
+                                    continue
+                                fh.write(chunk)
+                                bytes_downloaded += len(chunk)
+                                if total_bytes and next_progress:
+                                    progress = bytes_downloaded / total_bytes
+                                    while next_progress and progress >= next_progress:
+                                        self.logger.info(
+                                            "download progress",
                                             extra={
                                                 "stage": "download",
-                                                "size": bytes_downloaded,
-                                                "limit": self.http_config.max_download_size_gb
-                                                * (1024**3),
+                                                "status": "in-progress",
+                                                "progress": {
+                                                    "percent": round(min(progress, 1.0) * 100, 1)
+                                                },
                                             },
                                         )
-                                        raise PolicyError(
-                                            "Download exceeded maximum configured size while streaming"
-                                        )
-                        except OSError as exc:
-                            part_path.unlink(missing_ok=True)
-                            self.logger.error(
-                                "filesystem error during download",
-                                extra={"stage": "download", "error": str(exc)},
-                            )
-                            if "No space left" in str(exc):
-                                raise OntologyDownloadError(
-                                    "No space left on device while writing download"
-                                ) from exc
-                            raise OntologyDownloadError(f"Failed to write download: {exc}") from exc
-                        break
-                except (
-                    requests.ConnectionError,
-                    requests.Timeout,
-                    requests.HTTPError,
-                    requests.exceptions.SSLError,
-                ) as exc:
-                    if attempt > self.http_config.max_retries:
-                        raise
-                    sleep_time = self.http_config.backoff_factor * (2 ** (attempt - 1))
-                    self.logger.warning(
-                        "download retry",
-                        extra={
-                            "stage": "download",
-                            "attempt": attempt,
-                            "sleep_sec": sleep_time,
-                            "error": str(exc),
-                        },
-                    )
-                    time.sleep(sleep_time)
+                                        next_progress += 0.1
+                                        if next_progress > 1:
+                                            next_progress = None
+                                            break
+                                if bytes_downloaded > self.http_config.max_download_size_gb * (
+                                    1024**3
+                                ):
+                                    self.logger.error(
+                                        "download exceeded size limit",
+                                        extra={
+                                            "stage": "download",
+                                            "size": bytes_downloaded,
+                                            "limit": self.http_config.max_download_size_gb
+                                            * (1024**3),
+                                        },
+                                    )
+                                    raise PolicyError(
+                                        "Download exceeded maximum configured size while streaming"
+                                    )
+                    except OSError as exc:
+                        part_path.unlink(missing_ok=True)
+                        self.logger.error(
+                            "filesystem error during download",
+                            extra={"stage": "download", "error": str(exc)},
+                        )
+                        if "No space left" in str(exc):
+                            raise OntologyDownloadError(
+                                "No space left on device while writing download"
+                            ) from exc
+                        raise OntologyDownloadError(f"Failed to write download: {exc}") from exc
+
+                    return "success"
+
+            def _should_retry(exc: BaseException) -> bool:
+                if isinstance(
+                    exc,
+                    (requests.ConnectionError, requests.Timeout, requests.exceptions.SSLError),
+                ):
+                    return True
+                if isinstance(exc, requests.HTTPError):
+                    response = getattr(exc, "response", None)
+                    status = getattr(response, "status_code", None)
+                    return _is_retryable_status(status)
+                return False
+
+            def _retry_after_hint(exc: BaseException) -> Optional[float]:
+                delay = getattr(exc, "_retry_after_delay", None)
+                if delay is not None:
+                    return delay
+                response = getattr(exc, "response", None)
+                if response is not None:
+                    return _parse_retry_after(response.headers.get("Retry-After"))
+                return None
+
+            def _on_retry(attempt_number: int, exc: BaseException, delay: float) -> None:
+                self.logger.warning(
+                    "download retry",
+                    extra={
+                        "stage": "download",
+                        "attempt": attempt_number,
+                        "sleep_sec": round(delay, 2),
+                        "error": str(exc),
+                    },
+                )
+
+            result_state = retry_with_backoff(
+                _stream_once,
+                retryable=_should_retry,
+                max_attempts=max(1, self.http_config.max_retries),
+                backoff_base=self.http_config.backoff_factor,
+                jitter=self.http_config.backoff_factor,
+                callback=_on_retry,
+                retry_after=_retry_after_hint,
+            )
+
+        if result_state == "cached":
+            destination_part_path.unlink(missing_ok=True)
+            return
+
         part_path.replace(Path(output_file))
         destination_part_path.unlink(missing_ok=True)
 
@@ -1430,12 +1469,14 @@ def download_stream(
 
     cache_dir.mkdir(parents=True, exist_ok=True)
     safe_name = sanitize_filename(destination.name)
+    url_hash = hashlib.sha256(secure_url.encode("utf-8")).hexdigest()[:12]
+    cache_key = f"{url_hash}_{safe_name}"
     try:
         cached_path = Path(
             pooch.retrieve(
                 secure_url,
                 path=cache_dir,
-                fname=safe_name,
+                fname=cache_key,
                 known_hash=expected_hash,
                 downloader=downloader,
                 progressbar=False,

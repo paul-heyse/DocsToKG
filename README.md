@@ -118,6 +118,7 @@ Additional operational flags:
 - ``--max-concurrent-per-host 2`` keeps simultaneous downloads per domain polite.
 - ``--domain-bytes-budget example.com=500MB`` guards against single-host bandwidth drain.
 - ``--log-rotate 250MB`` rotates JSONL attempt logs during long-running crawls.
+- ``--domain-token-bucket example.org=0.5:capacity=2`` enforces host-specific request rates.
 
 **Concurrency recommendations:**
 

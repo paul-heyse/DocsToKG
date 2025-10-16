@@ -323,6 +323,9 @@ from urllib.parse import quote, urljoin, urlparse, urlsplit
 import requests as _requests
 
 from DocsToKG.ContentDownload.core import (
+    DEFAULT_MIN_PDF_BYTES,
+    DEFAULT_SNIFF_BYTES,
+    DEFAULT_TAIL_CHECK_BYTES,
     PDF_LIKE,
     Classification,
     ReasonCode,
@@ -341,7 +344,7 @@ from DocsToKG.ContentDownload.networking import (
 from DocsToKG.ContentDownload.telemetry import AttemptSink
 
 if TYPE_CHECKING:  # pragma: no cover
-    from DocsToKG.ContentDownload.cli import WorkArtifact
+    from DocsToKG.ContentDownload.core import WorkArtifact
 
 try:  # Optional dependency guarded at runtime
     from bs4 import BeautifulSoup  # type: ignore
@@ -379,26 +382,9 @@ DEFAULT_RESOLVER_TOGGLES = MappingProxyType(_DEFAULT_RESOLVER_TOGGLES)
 __all__ = [
     "AttemptRecord",
     "AttemptSink",
-    "ApiResolverBase",
-    "apply_config_overrides",
-    "ArxivResolver",
-    "CoreResolver",
-    "CrossrefResolver",
-    "DEFAULT_RESOLVER_ORDER",
-    "DEFAULT_RESOLVER_TOGGLES",
-    "DoajResolver",
     "DownloadFunc",
     "DownloadOutcome",
-    "EuropePmcResolver",
-    "FigshareResolver",
-    "HalResolver",
-    "LandingPageResolver",
-    "OpenAireResolver",
-    "OpenAlexResolver",
-    "OsfResolver",
-    "PmcResolver",
     "PipelineResult",
-    "read_resolver_config",
     "Resolver",
     "ResolverConfig",
     "ResolverMetrics",
@@ -406,15 +392,10 @@ __all__ = [
     "ResolverRegistry",
     "ResolverResult",
     "RegisteredResolver",
-    "SemanticScholarResolver",
-    "UnpaywallResolver",
-    "WaybackResolver",
-    "ZenodoResolver",
-    "load_resolver_config",
+    "apply_config_overrides",
     "default_resolvers",
-    "find_pdf_via_anchor",
-    "find_pdf_via_link",
-    "find_pdf_via_meta",
+    "load_resolver_config",
+    "read_resolver_config",
 ]
 
 # --- Resolver Configuration ---
@@ -558,9 +539,9 @@ class ResolverConfig:
     domain_bytes_budget: Dict[str, int] = field(default_factory=dict)
     resolver_circuit_breakers: Dict[str, Dict[str, float]] = field(default_factory=dict)
     # Heuristic knobs (defaults preserve current CLI behaviour)
-    sniff_bytes: int = 64 * 1024
-    min_pdf_bytes: int = 1024
-    tail_check_bytes: int = 2048
+    sniff_bytes: int = DEFAULT_SNIFF_BYTES
+    min_pdf_bytes: int = DEFAULT_MIN_PDF_BYTES
+    tail_check_bytes: int = DEFAULT_TAIL_CHECK_BYTES
 
     def get_timeout(self, resolver_name: str) -> float:
         """Return the timeout to use for a resolver, falling back to defaults.
@@ -880,6 +861,11 @@ def load_resolver_config(
         for domain, limit in args.domain_bytes_budget:
             budget_map[domain] = limit
         config.domain_bytes_budget = _normalise_domain_bytes_budget(budget_map)
+    if getattr(args, "domain_token_bucket", None):
+        bucket_map: Dict[str, Dict[str, float]] = dict(config.domain_token_buckets)
+        for domain, spec in args.domain_token_bucket:
+            bucket_map[domain] = dict(spec)
+        config.domain_token_buckets = bucket_map
 
     headers = dict(config.polite_headers)
     existing_mailto = headers.get("mailto")
@@ -913,6 +899,7 @@ class AttemptRecord:
     """Structured log record describing a resolver attempt.
 
     Attributes:
+        run_id: Identifier shared across a downloader run.
         work_id: Identifier of the work being processed.
         resolver_name: Name of the resolver that produced the record.
         resolver_order: Ordinal position of the resolver in the pipeline.
@@ -943,6 +930,7 @@ class AttemptRecord:
         ... )
     """
 
+    run_id: Optional[str] = None
     work_id: str
     resolver_name: str
     resolver_order: Optional[int]
@@ -3489,41 +3477,59 @@ class ResolverPipeline:
         if wait > 0:
             _time.sleep(wait)
 
-    def _respect_domain_limit(self, url: str) -> None:
-        """Enforce per-domain throttling when configured."""
+    def _respect_domain_limit(self, url: str) -> float:
+        """Enforce per-domain throttling when configured.
+
+        Args:
+            url: Candidate URL whose host may be throttled.
+
+        Returns:
+            Total seconds slept enforcing the domain policies.
+        """
 
         if not url:
-            return
+            return 0.0
         host = urlsplit(url).netloc.lower()
         if not host:
-            return
+            return 0.0
+
+        waited = 0.0
         bucket = self._ensure_host_bucket(host)
         if bucket is not None:
             wait_seconds = bucket.acquire()
             if wait_seconds > 0:
                 _time.sleep(wait_seconds)
-        if not self.config.domain_min_interval_s:
-            return
-        interval = self.config.domain_min_interval_s.get(host)
+                waited += wait_seconds
+
+        interval_map = self.config.domain_min_interval_s
+        if not interval_map:
+            return waited
+        interval = interval_map.get(host)
         if not interval:
-            return
+            return waited
+
         now = _time.monotonic()
         wait = 0.0
         with self._host_lock:
             last = self._last_host_hit.get(host)
             if last is None:
                 self._last_host_hit[host] = now if now > 0.0 else 1e-9
-                return
+                return waited
             elapsed = now - last
             if elapsed >= interval:
                 self._last_host_hit[host] = now
-                return
+                return waited
             wait = interval - elapsed
+
         if wait > 0:
             jitter = random.random() * 0.05
-            _time.sleep(wait + jitter)
+            sleep_for = wait + jitter
+            _time.sleep(sleep_for)
+            waited += sleep_for
             with self._host_lock:
                 self._last_host_hit[host] = _time.monotonic()
+
+        return waited
 
     def _ensure_host_bucket(self, host: str) -> Optional[TokenBucket]:
         spec = self.config.domain_token_buckets.get(host)
@@ -4005,6 +4011,7 @@ class ResolverPipeline:
                     reason_detail=f"cooldown-{remaining:.1f}s",
                     dry_run=state.dry_run,
                     resolver_wall_time_ms=0.0,
+                    retry_after=remaining if remaining > 0 else None,
                 )
             )
             self.metrics.record_skip(resolver_name, "breaker-open")
@@ -4229,7 +4236,7 @@ class ResolverPipeline:
                                 http_status=None,
                                 content_type=None,
                                 elapsed_ms=None,
-                                reason=ReasonCode.DOMAIN_BYTES_BUDGET,
+                                reason=ReasonCode.BUDGET_EXHAUSTED,
                                 reason_detail="domain-bytes-budget",
                                 metadata=result.metadata,
                                 dry_run=state.dry_run,
@@ -4237,7 +4244,7 @@ class ResolverPipeline:
                             )
                         )
                         self.metrics.record_skip(resolver_name, "domain-bytes-budget")
-                        state.last_reason = ReasonCode.DOMAIN_BYTES_BUDGET
+                        state.last_reason = ReasonCode.BUDGET_EXHAUSTED
                         state.last_reason_detail = "domain-bytes-budget"
                         if url not in state.failed_urls:
                             state.failed_urls.append(url)
@@ -4260,6 +4267,7 @@ class ResolverPipeline:
                             metadata=result.metadata,
                             dry_run=state.dry_run,
                             resolver_wall_time_ms=resolver_wall_time_ms,
+                            retry_after=remaining if remaining > 0 else None,
                         )
                     )
                     self.metrics.record_skip(resolver_name, "domain-breaker-open")
@@ -4267,7 +4275,7 @@ class ResolverPipeline:
                     state.last_reason_detail = detail
                     return None
                 release_host_slot = self._acquire_host_slot(host_value)
-            self._respect_domain_limit(url)
+            domain_wait = self._respect_domain_limit(url)
             kwargs: Dict[str, Any] = {}
             if self._download_accepts_head_flag:
                 kwargs["head_precheck_passed"] = head_precheck_passed
@@ -4292,6 +4300,10 @@ class ResolverPipeline:
                     **kwargs,
                 )
 
+            retry_after_hint = outcome.retry_after
+            if retry_after_hint is None and domain_wait > 0:
+                retry_after_hint = domain_wait
+
             self._emit_attempt(
                 AttemptRecord(
                     work_id=artifact.work_id,
@@ -4309,7 +4321,7 @@ class ResolverPipeline:
                     content_length=outcome.content_length,
                     dry_run=state.dry_run,
                     resolver_wall_time_ms=resolver_wall_time_ms,
-                    retry_after=outcome.retry_after,
+                    retry_after=retry_after_hint,
                 )
             )
             self.metrics.record_attempt(resolver_name, outcome)

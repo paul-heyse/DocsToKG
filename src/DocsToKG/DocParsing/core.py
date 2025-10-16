@@ -450,10 +450,12 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import importlib
 import hashlib
 import json
 import logging
 import os
+import shutil
 import socket
 import time
 import unicodedata
@@ -476,13 +478,150 @@ from typing import (
     TypeVar,
 )
 
-from DocsToKG.DocParsing.formats.markers import (
-    DEFAULT_CAPTION_MARKERS,
-    DEFAULT_HEADING_MARKERS,
-    load_structural_marker_config,
+T = TypeVar("T")
+
+# Default structural marker configuration shared across stages.
+DEFAULT_HEADING_MARKERS: Tuple[str, ...] = ("#",)
+DEFAULT_CAPTION_MARKERS: Tuple[str, ...] = (
+    "Figure caption:",
+    "Table:",
+    "Picture description:",
+    "<!-- image -->",
 )
 
-T = TypeVar("T")
+
+def dedupe_preserve_order(markers: Sequence[str]) -> Tuple[str, ...]:
+    """Return ``markers`` without duplicates while preserving input order."""
+
+    seen: set[str] = set()
+    ordered: List[str] = []
+    for marker in markers:
+        if not marker:
+            continue
+        if marker in seen:
+            continue
+        seen.add(marker)
+        ordered.append(marker)
+    return tuple(ordered)
+
+
+def _ensure_str_sequence(value: object, label: str) -> List[str]:
+    """Normalise structural marker entries into string lists."""
+
+    if value is None:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"Expected a list of strings for '{label}'")
+    return [item for item in value if item]
+
+
+def _load_yaml_markers(raw: str) -> object:
+    try:
+        import yaml
+    except ImportError as exc:  # pragma: no cover - optional dependency
+        raise RuntimeError(
+            "Loading YAML structural markers requires the 'PyYAML' package (pip install PyYAML)."
+        ) from exc
+    return yaml.safe_load(raw)
+
+
+def _load_toml_markers(raw: str) -> object:
+    try:
+        import tomllib  # Python 3.11+
+    except ModuleNotFoundError:  # pragma: no cover - fallback path
+        try:
+            import tomli as tomllib  # type: ignore[import-not-found]
+        except ImportError as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError(
+                "Loading TOML structural markers requires the 'tomli' package (pip install tomli)."
+            ) from exc
+    return tomllib.loads(raw)
+
+
+def load_structural_marker_profile(path: Path) -> Tuple[List[str], List[str]]:
+    """Load heading/caption marker overrides from JSON, YAML, or TOML files."""
+
+    raw = path.read_text(encoding="utf-8")
+    suffix = path.suffix.lower()
+
+    parsers: List[str] = []
+    if suffix in {".yaml", ".yml"}:
+        parsers = ["yaml"]
+    elif suffix == ".toml":
+        parsers = ["toml"]
+    elif suffix == ".json":
+        parsers = ["json"]
+    else:
+        parsers = ["json", "yaml", "toml"]
+
+    data: object = None
+    last_error: Exception | None = None
+
+    for parser in parsers:
+        try:
+            if parser == "json":
+                data = json.loads(raw)
+            elif parser == "yaml":
+                data = _load_yaml_markers(raw)
+            elif parser == "toml":
+                data = _load_toml_markers(raw)
+            else:  # pragma: no cover - defensive branch
+                continue
+        except (ValueError, json.JSONDecodeError) as exc:
+            last_error = exc
+            data = None
+            continue
+        except Exception as exc:
+            last_error = exc
+            data = None
+            continue
+
+        if data is not None:
+            break
+
+    if data is None:
+        messages = ", ".join(parsers)
+        detail = f"; last error: {last_error}" if last_error else ""
+        raise ValueError(
+            f"Unable to parse structural marker file {path} using supported formats ({messages}){detail}."
+        )
+
+    if isinstance(data, list):
+        headings = _ensure_str_sequence(data, "headings")
+        captions: List[str] = []
+    elif isinstance(data, dict):
+        headings = _ensure_str_sequence(data.get("headings"), "headings")
+        captions = _ensure_str_sequence(data.get("captions"), "captions")
+    else:
+        raise ValueError(f"Unsupported structural marker format in {path}")
+
+    return headings, captions
+
+
+def load_structural_marker_config(path: Path) -> Tuple[List[str], List[str]]:
+    """Backward compatible alias for :func:`load_structural_marker_profile`."""
+
+    return load_structural_marker_profile(path)
+
+
+@dataclass(frozen=True)
+class CLIOption:
+    """Declarative CLI argument specification used by ``build_subcommand``."""
+
+    flags: Tuple[str, ...]
+    kwargs: Dict[str, Any]
+
+
+def build_subcommand(
+    parser: argparse.ArgumentParser, options: Sequence[CLIOption]
+) -> argparse.ArgumentParser:
+    """Attach CLI options described by ``options`` to ``parser``."""
+
+    for option in options:
+        parser.add_argument(*option.flags, **option.kwargs)
+    return parser
 
 # --- Globals ---
 
@@ -517,10 +656,15 @@ __all__ = [
     "acquire_lock",
     "set_spawn_or_warn",
     "derive_doc_id_and_vectors_path",
+    "derive_doc_id_and_doctags_path",
+    "derive_doc_id_and_chunks_path",
     "compute_relative_doc_id",
     "compute_stable_shard",
     "should_skip_output",
     "init_hf_env",
+    "ensure_model_environment",
+    "ensure_splade_dependencies",
+    "ensure_qwen_dependencies",
     "UUID_NAMESPACE",
     "BM25Stats",
     "SpladeCfg",
@@ -532,10 +676,14 @@ __all__ = [
     "DEFAULT_CAPTION_MARKERS",
     "DEFAULT_SERIALIZER_PROVIDER",
     "DEFAULT_TOKENIZER",
+    "dedupe_preserve_order",
+    "CLIOption",
+    "build_subcommand",
     "looks_like_filesystem_path",
     "resolve_pdf_model_path",
     "prepare_data_root",
     "resolve_pipeline_path",
+    "load_structural_marker_profile",
     "load_structural_marker_config",
     "CommandHandler",
     "CLI_DESCRIPTION",
@@ -741,6 +889,56 @@ def init_hf_env(
     return resolved_hf, resolved_model_root
 
 
+_MODEL_ENV: Tuple[Path, Path] | None = None
+
+
+def ensure_model_environment(
+    hf_home: Optional[Path] = None, model_root: Optional[Path] = None
+) -> Tuple[Path, Path]:
+    """Initialise and cache the HuggingFace/model-root environment settings."""
+
+    global _MODEL_ENV
+    if _MODEL_ENV is None or hf_home is not None or model_root is not None:
+        _MODEL_ENV = init_hf_env(hf_home=hf_home, model_root=model_root)
+    return _MODEL_ENV
+
+
+SPLADE_DEPENDENCY_MESSAGE = (
+    "Optional dependency 'sentence-transformers' is required for SPLADE embeddings. "
+    "Install it with `pip install sentence-transformers` or disable SPLADE generation."
+)
+QWEN_DEPENDENCY_MESSAGE = (
+    "Optional dependency 'vllm' is required for Qwen dense embeddings. "
+    "Install it with `pip install vllm` before running the embedding pipeline."
+)
+
+
+def _ensure_optional_dependency(
+    module_name: str, message: str, *, import_error: Exception | None = None
+) -> None:
+    """Import ``module_name`` or raise with ``message``."""
+
+    try:
+        importlib.import_module(module_name)
+    except ImportError as exc:  # pragma: no cover - dependency missing
+        cause = import_error or exc
+        raise ImportError(message) from cause
+
+
+def ensure_splade_dependencies(import_error: Exception | None = None) -> None:
+    """Validate that SPLADE optional dependencies are importable."""
+
+    _ensure_optional_dependency(
+        "sentence_transformers", SPLADE_DEPENDENCY_MESSAGE, import_error=import_error
+    )
+
+
+def ensure_qwen_dependencies(import_error: Exception | None = None) -> None:
+    """Validate that Qwen/vLLM optional dependencies are importable."""
+
+    _ensure_optional_dependency("vllm", QWEN_DEPENDENCY_MESSAGE, import_error=import_error)
+
+
 def detect_data_root(start: Optional[Path] = None) -> Path:
     """Locate the DocsToKG Data directory via env var or ancestor scan.
 
@@ -937,6 +1135,28 @@ def data_html(root: Optional[Path] = None) -> Path:
     """
 
     return _ensure_dir(detect_data_root(root) / "HTML")
+
+
+def derive_doc_id_and_doctags_path(
+    source_pdf: Path, pdfs_root: Path, doctags_root: Path
+) -> tuple[str, Path]:
+    """Return manifest doc identifier and DocTags output path for ``source_pdf``."""
+
+    doc_id = compute_relative_doc_id(source_pdf, pdfs_root)
+    relative = Path(doc_id)
+    doctags_path = (doctags_root / relative).with_suffix(".doctags")
+    return doc_id, doctags_path
+
+
+def derive_doc_id_and_chunks_path(
+    doctags_file: Path, doctags_root: Path, chunks_root: Path
+) -> tuple[str, Path]:
+    """Return manifest doc identifier and chunk output path for ``doctags_file``."""
+
+    doc_id = compute_relative_doc_id(doctags_file, doctags_root)
+    relative = Path(doc_id)
+    chunk_path = (chunks_root / relative).with_suffix(".chunks.jsonl")
+    return doc_id, chunk_path
 
 
 def derive_doc_id_and_vectors_path(
@@ -1249,6 +1469,11 @@ def find_free_port(start: int = 8000, span: int = 32) -> int:
 @contextlib.contextmanager
 def atomic_write(path: Path) -> Iterator[TextIO]:
     """Write to a temporary file and atomically replace the destination.
+
+    Pattern: open a sibling ``*.tmp`` file, write the payload, flush and
+    ``fsync`` the descriptor, then ``rename`` it over the original path. This
+    guarantees that readers never observe a partially written file even if the
+    process crashes mid-write.
 
     Args:
         path: Target path to write.
@@ -2131,9 +2356,7 @@ def _plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
     skipped: List[str] = []
 
     for path in files:
-        rel_path = path.relative_to(input_dir)
-        doc_id = rel_path.as_posix()
-        out_path = (output_dir / rel_path).with_suffix(".doctags")
+        doc_id, out_path = derive_doc_id_and_doctags_path(path, input_dir, output_dir)
         input_hash = compute_content_hash(path)
         manifest_entry = manifest_index.get(doc_id)
         skip = should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force)
@@ -2200,9 +2423,7 @@ def _plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
     skipped: List[str] = []
 
     for path in files:
-        rel_id = compute_relative_doc_id(path, in_dir)
-        relative_target = Path(rel_id)
-        out_path = (out_dir / relative_target).with_suffix(".chunks.jsonl")
+        rel_id, out_path = derive_doc_id_and_chunks_path(path, in_dir, out_dir)
         input_hash = compute_content_hash(path)
         manifest_entry = manifest_index.get(rel_id)
         if should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force):

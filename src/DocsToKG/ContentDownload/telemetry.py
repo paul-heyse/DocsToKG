@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Protocol, Set, Tuple
 
 if TYPE_CHECKING:  # pragma: no cover
-    from DocsToKG.ContentDownload.cli import WorkArtifact
+    from DocsToKG.ContentDownload.core import WorkArtifact
     from DocsToKG.ContentDownload.pipeline import AttemptRecord, DownloadOutcome
 
 from DocsToKG.ContentDownload.core import PDF_LIKE, Classification, ReasonCode

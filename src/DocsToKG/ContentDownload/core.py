@@ -11,15 +11,20 @@ simplifying imports for both the CLI and resolver pipeline.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 
 __all__ = (
     "Classification",
     "PDF_LIKE",
     "ReasonCode",
+    "DEFAULT_SNIFF_BYTES",
+    "DEFAULT_MIN_PDF_BYTES",
+    "DEFAULT_TAIL_CHECK_BYTES",
+    "WorkArtifact",
     "classify_payload",
     "_extract_filename_from_disposition",
     "_infer_suffix",
@@ -34,7 +39,50 @@ __all__ = (
     "normalize_arxiv",
     "slugify",
     "normalize_url",
+    "parse_size",
 )
+
+
+# ---------------------------------------------------------------------------
+# Shared heuristics
+
+
+DEFAULT_SNIFF_BYTES = 64 * 1024
+DEFAULT_MIN_PDF_BYTES = 1024
+DEFAULT_TAIL_CHECK_BYTES = 2048
+
+_SIZE_SUFFIXES = {
+    "b": 1,
+    "kb": 1024,
+    "mb": 1024**2,
+    "gb": 1024**3,
+    "tb": 1024**4,
+}
+
+
+@dataclass
+class WorkArtifact:
+    """Normalized artifact describing an OpenAlex work to process."""
+
+    work_id: str
+    title: str
+    publication_year: Optional[int]
+    doi: Optional[str]
+    pmid: Optional[str]
+    pmcid: Optional[str]
+    arxiv_id: Optional[str]
+    landing_urls: List[str]
+    pdf_urls: List[str]
+    open_access_url: Optional[str]
+    source_display_names: List[str]
+    base_stem: str
+    pdf_dir: Path
+    html_dir: Path
+    failed_pdf_urls: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        self.namespaces: Dict[str, Path] = {"pdf": self.pdf_dir, "html": self.html_dir}
 
 
 # ---------------------------------------------------------------------------
@@ -113,6 +161,7 @@ class ReasonCode(Enum):
     RESOLVER_BREAKER_OPEN = "resolver_breaker_open"
     DOMAIN_BREAKER_OPEN = "domain_breaker_open"
     DOMAIN_BYTES_BUDGET = "domain_bytes_budget"
+    BUDGET_EXHAUSTED = "budget_exhausted"
 
     @classmethod
     def from_wire(cls, value: Union[str, "ReasonCode", None]) -> "ReasonCode":
@@ -190,6 +239,30 @@ def _extract_filename_from_disposition(disposition: Optional[str]) -> Optional[s
             if candidate:
                 return candidate
     return None
+
+
+def parse_size(value: str) -> int:
+    """Parse human-friendly size strings like ``10GB`` into byte counts."""
+
+    text = (value or "").strip().lower().replace(",", "").replace("_", "")
+    if not text:
+        raise ValueError("size value cannot be empty")
+    match = re.fullmatch(r"(?P<amount>\d+(?:\.\d+)?)(?P<suffix>[kmgt]?b)?", text)
+    if not match:
+        raise ValueError(f"invalid size specification: {value!r}")
+    amount_text = match.group("amount")
+    suffix = match.group("suffix") or "b"
+    try:
+        amount = float(amount_text)
+    except ValueError as exc:  # pragma: no cover - defensive
+        raise ValueError(f"invalid numeric amount in {value!r}") from exc
+    factor = _SIZE_SUFFIXES.get(suffix)
+    if factor is None:
+        raise ValueError(f"unsupported size suffix {suffix!r}")
+    bytes_value = int(amount * factor)
+    if bytes_value <= 0:
+        raise ValueError("size value must be positive")
+    return bytes_value
 
 
 def _infer_suffix(

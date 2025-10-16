@@ -265,14 +265,16 @@ from DocsToKG.DocParsing.core import (
     acquire_lock,
     atomic_write,
     compute_content_hash,
+    compute_stable_shard,
     data_chunks,
     data_vectors,
     derive_doc_id_and_vectors_path,
     detect_data_root,
+    ensure_model_environment,
+    ensure_qwen_dependencies,
+    ensure_splade_dependencies,
     expand_path,
-    compute_stable_shard,
     get_logger,
-    init_hf_env,
     iter_chunks,
     jsonl_load,
     load_manifest_index,
@@ -427,7 +429,7 @@ def _resolve_splade_dir(model_root: Path) -> Path:
     return expand_path(env) if env else model_root / "naver" / "splade-v3"
 
 
-HF_HOME, MODEL_ROOT = init_hf_env()
+HF_HOME, MODEL_ROOT = ensure_model_environment()
 QWEN_DIR = expand_path(_resolve_qwen_dir(MODEL_ROOT))
 SPLADE_DIR = expand_path(_resolve_splade_dir(MODEL_ROOT))
 
@@ -469,40 +471,20 @@ MANIFEST_STAGE = "embeddings"
 SPLADE_SPARSITY_WARN_THRESHOLD_PCT = 1.0
 
 
-def _missing_splade_dependency_message() -> str:
-    """Return a human-readable installation hint for SPLADE extras."""
-
-    return (
-        "Optional dependency 'sentence-transformers' is required for SPLADE "
-        "embeddings. Install it with `pip install sentence-transformers` or "
-        "disable SPLADE generation."
-    )
-
-
-def _missing_qwen_dependency_message() -> str:
-    """Return a human-readable installation hint for Qwen/vLLM extras."""
-
-    return (
-        "Optional dependency 'vllm' is required for Qwen dense embeddings. "
-        "Install it with `pip install vllm` and ensure GPU drivers are "
-        "available before running the embedding pipeline."
-    )
-
-
 def _ensure_splade_dependencies() -> None:
-    """Validate that SPLADE optional dependencies are importable."""
+    """Backward-compatible shim that delegates to core.ensure_splade_dependencies."""
 
-    if SparseEncoder is None:
-        raise ImportError(
-            _missing_splade_dependency_message()
-        ) from _SENTENCE_TRANSFORMERS_IMPORT_ERROR
+    if SparseEncoder is not None:
+        return
+    ensure_splade_dependencies(_SENTENCE_TRANSFORMERS_IMPORT_ERROR)
 
 
 def _ensure_qwen_dependencies() -> None:
-    """Validate that Qwen/vLLM optional dependencies are importable."""
+    """Backward-compatible shim that delegates to core.ensure_qwen_dependencies."""
 
-    if LLM is None or PoolingParams is None:
-        raise ImportError(_missing_qwen_dependency_message()) from _VLLM_IMPORT_ERROR
+    if LLM is not None and PoolingParams is not None:
+        return
+    ensure_qwen_dependencies(_VLLM_IMPORT_ERROR)
 
 
 # --- BM25 Tokenizer ---
@@ -1758,7 +1740,7 @@ def main(args: argparse.Namespace | None = None) -> int:
     args.vector_format = vector_format
 
     global HF_HOME, MODEL_ROOT, QWEN_DIR, SPLADE_DIR
-    HF_HOME, MODEL_ROOT = init_hf_env()
+    HF_HOME, MODEL_ROOT = ensure_model_environment()
     QWEN_DIR = expand_path(_resolve_qwen_dir(MODEL_ROOT))
     SPLADE_DIR = expand_path(_resolve_splade_dir(MODEL_ROOT))
     model_root = MODEL_ROOT

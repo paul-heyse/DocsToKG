@@ -332,14 +332,18 @@ def request_with_retries(
     for attempt in range(max_retries + 1):
         try:
             response = request_func(method=method, url=url, **kwargs)
+            status_code = response.status_code
+            retry_after_delay: Optional[float] = None
+            if respect_retry_after and status_code in {429, 503}:
+                retry_after_delay = parse_retry_after_header(response)
 
-            if response.status_code not in retry_statuses:
+            if status_code not in retry_statuses:
                 return response
 
             if attempt >= max_retries:
                 LOGGER.warning(
                     "Received status %s for %s %s after %s attempts; returning response",
-                    response.status_code,
+                    status_code,
                     method,
                     url,
                     attempt + 1,
@@ -350,16 +354,14 @@ def request_with_retries(
             jitter = random.random() * 0.1
             delay = base_delay + jitter
 
-            if respect_retry_after:
-                retry_after_delay = parse_retry_after_header(response)
-                if retry_after_delay is not None and retry_after_delay > delay:
-                    delay = retry_after_delay
+            if retry_after_delay is not None and retry_after_delay > delay:
+                delay = retry_after_delay
 
             LOGGER.debug(
                 "Retrying %s %s after HTTP %s (attempt %s/%s, delay %.2fs)",
                 method,
                 url,
-                response.status_code,
+                status_code,
                 attempt + 1,
                 max_retries + 1,
                 delay,

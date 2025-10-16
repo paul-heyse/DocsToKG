@@ -304,6 +304,7 @@ class HybridSearchDiagnostics:
     bm25_score: Optional[float] = None
     splade_score: Optional[float] = None
     dense_score: Optional[float] = None
+    fusion_weights: Optional[Mapping[str, float]] = None
 
 
 @dataclass(slots=True)
@@ -412,6 +413,8 @@ class HybridSearchResponse:
     next_cursor: Optional[str]
     total_candidates: int
     timings_ms: Mapping[str, float]
+    fusion_weights: Mapping[str, float] = field(default_factory=dict)
+    stats: Mapping[str, object] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

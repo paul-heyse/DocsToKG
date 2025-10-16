@@ -16,10 +16,10 @@ import subprocess
 import sys
 import tempfile
 import zipfile
+from importlib import metadata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
-from importlib import metadata
 from itertools import islice
 from pathlib import Path
 from typing import (
@@ -32,12 +32,58 @@ from typing import (
     List,
     MutableMapping,
     Optional,
-    Protocol,
     Tuple,
     Union,
+    TYPE_CHECKING,
 )
 
+from . import plugins as _plugins
 from .io import log_memory_usage
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from .plugins import ResolverPlugin, ValidatorPlugin
+
+
+_RESOLVER_PLUGINS_LOADED = False
+_VALIDATOR_PLUGINS_LOADED = False
+
+
+def load_resolver_plugins(
+    registry: MutableMapping[str, "ResolverPlugin"],
+    *,
+    logger: Optional[logging.Logger] = None,
+    reload: bool = False,
+) -> None:
+    """Proxy to :mod:`plugins` resolver discovery preserving legacy globals."""
+
+    global _RESOLVER_PLUGINS_LOADED
+    _plugins._RESOLVER_PLUGINS_LOADED = _RESOLVER_PLUGINS_LOADED
+    _plugins.load_resolver_plugins(registry, logger=logger, reload=reload)
+    _RESOLVER_PLUGINS_LOADED = _plugins._RESOLVER_PLUGINS_LOADED
+
+
+def ensure_resolver_plugins(
+    registry: MutableMapping[str, "ResolverPlugin"],
+    *,
+    logger: Optional[logging.Logger] = None,
+) -> None:
+    """Load resolver plugins exactly once per interpreter."""
+
+    load_resolver_plugins(registry, logger=logger, reload=False)
+
+
+def load_validator_plugins(
+    registry: MutableMapping[str, "ValidatorPlugin"],
+    *,
+    logger: Optional[logging.Logger] = None,
+    reload: bool = False,
+) -> None:
+    """Proxy to :mod:`plugins` validator discovery preserving legacy globals."""
+
+    global _VALIDATOR_PLUGINS_LOADED
+    _plugins._VALIDATOR_PLUGINS_LOADED = _VALIDATOR_PLUGINS_LOADED
+    _plugins.load_validator_plugins(registry, logger=logger, reload=reload)
+    _VALIDATOR_PLUGINS_LOADED = _plugins._VALIDATOR_PLUGINS_LOADED
 from .settings import ResolvedConfig, get_owlready2, get_pronto, get_rdflib
 
 rdflib = get_rdflib()
@@ -424,122 +470,9 @@ def normalize_streaming(
     return content_hash
 
 
-class _ResolverLike(Protocol):
-    """Structural protocol describing resolver plugin instances."""
-
-    NAME: str  # pragma: no cover - attribute is optional at runtime
-
-    def plan(self, *args: Any, **kwargs: Any) -> Any:  # pragma: no cover - runtime enforcement
-        """Plan a fetch for the provided ontology specification."""
-
-
-class _ValidatorLike(Protocol):
-    """Structural protocol for validator callables."""
-
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:  # pragma: no cover - runtime enforcement
-        """Execute the validator."""
-
-
-_RESOLVER_PLUGINS_LOADED = False
-_VALIDATOR_PLUGINS_LOADED = False
-
-
-def load_resolver_plugins(
-    registry: MutableMapping[str, _ResolverLike],
-    *,
-    logger: Optional[logging.Logger] = None,
-    reload: bool = False,
-) -> None:
-    """Discover resolver plugins registered via ``entry_points``."""
-
-    global _RESOLVER_PLUGINS_LOADED
-    if _RESOLVER_PLUGINS_LOADED and not reload:
-        return
-
-    log = logger or logging.getLogger(__name__)
-    try:
-        entry_points = metadata.entry_points()
-    except Exception as exc:  # pragma: no cover - defensive guard
-        log.warning(
-            "resolver plugin discovery failed",
-            extra={"stage": "init", "error": str(exc)},
-        )
-        _RESOLVER_PLUGINS_LOADED = True
-        return
-
-    for entry in entry_points.select(group="docstokg.ontofetch.resolver"):
-        try:
-            candidate = entry.load()
-            resolver = candidate() if isinstance(candidate, type) else candidate
-            if not hasattr(resolver, "plan"):
-                raise TypeError("resolver plugin must implement a plan method")
-            name = getattr(resolver, "NAME", entry.name)
-            registry[name] = resolver
-            log.info(
-                "resolver plugin registered",
-                extra={"stage": "init", "resolver": name},
-            )
-        except Exception as exc:  # pragma: no cover - plugin may fail unpredictably
-            log.warning(
-                "resolver plugin failed",
-                extra={"stage": "init", "resolver": entry.name, "error": str(exc)},
-            )
-    _RESOLVER_PLUGINS_LOADED = True
-
-
-def ensure_resolver_plugins(
-    registry: MutableMapping[str, _ResolverLike],
-    *,
-    logger: Optional[logging.Logger] = None,
-) -> None:
-    """Load resolver plugins exactly once per interpreter."""
-
-    load_resolver_plugins(registry, logger=logger, reload=False)
-
-
-def load_validator_plugins(
-    registry: MutableMapping[str, _ValidatorLike],
-    *,
-    logger: Optional[logging.Logger] = None,
-    reload: bool = False,
-) -> None:
-    """Discover validator plugins registered via ``entry_points``."""
-
-    global _VALIDATOR_PLUGINS_LOADED
-    if _VALIDATOR_PLUGINS_LOADED and not reload:
-        return
-
-    log = logger or logging.getLogger(__name__)
-    try:
-        entry_points = metadata.entry_points()
-    except Exception as exc:  # pragma: no cover - defensive guard
-        log.warning(
-            "validator plugin discovery failed",
-            extra={"stage": "init", "error": str(exc)},
-        )
-        _VALIDATOR_PLUGINS_LOADED = True
-        return
-
-    for entry in entry_points.select(group="docstokg.ontofetch.validator"):
-        try:
-            handler = entry.load()
-            if not callable(handler):
-                raise TypeError("validator plugin must be callable")
-            registry[entry.name] = handler
-            log.info(
-                "validator plugin registered",
-                extra={"stage": "init", "validator": entry.name},
-            )
-        except Exception as exc:  # pragma: no cover - plugin may fail unpredictably
-            log.warning(
-                "validator plugin failed",
-                extra={"stage": "init", "validator": entry.name, "error": str(exc)},
-            )
-    _VALIDATOR_PLUGINS_LOADED = True
-
 
 def ensure_validator_plugins(
-    registry: MutableMapping[str, _ValidatorLike],
+    registry: MutableMapping[str, ValidatorPlugin],
     *,
     logger: Optional[logging.Logger] = None,
 ) -> None:

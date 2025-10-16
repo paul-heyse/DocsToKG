@@ -32,7 +32,7 @@ from types import SimpleNamespace
 from DocsToKG.ContentDownload import cli as downloader
 from DocsToKG.ContentDownload.core import Classification, ReasonCode
 from DocsToKG.ContentDownload.core import classify_payload
-from DocsToKG.ContentDownload.cli import WorkArtifact
+from DocsToKG.ContentDownload.core import WorkArtifact
 
 # --- Test Cases ---
 

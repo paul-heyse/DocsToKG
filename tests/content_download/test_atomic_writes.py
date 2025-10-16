@@ -142,7 +142,8 @@ else:  # pragma: no branch - simple fallback
 DOWNLOAD_TESTS_SKIP_REASON = "requests and pyalex required for content download atomic write tests"
 
 if DOWNLOAD_DEPS_AVAILABLE:
-    from DocsToKG.ContentDownload.cli import WorkArtifact, download_candidate
+    from DocsToKG.ContentDownload.cli import download_candidate
+    from DocsToKG.ContentDownload.core import WorkArtifact
 
     class _DummyHeadResponse:
         status_code = 200

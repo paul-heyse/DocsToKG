@@ -48,7 +48,7 @@ across the toolchain.
     across sections when soft-boundary thresholds permit.
   * Chunk rows embed `ProvenanceMetadata` (parse engine, Docling version, image
     flags) to preserve the source context of every span.
-  * Declarative extensions let operators load YAML/JSON structural markers and
+  * Declarative extensions let operators load JSON/YAML/TOML structural markers and
     swap serializer providers (`--structural-markers`, `--serializer-provider`)
     without touching the chunking logic.
   * Document identifiers mirror the relative path within the input directory so
@@ -84,7 +84,7 @@ include:
 | `--vllm-wait-timeout` | DocTags | Seconds to wait for the auxiliary vLLM server before aborting. |
 | `--min-tokens` / `--max-tokens` | Chunker | Token window boundaries for chunk coalescence. |
 | `--tokenizer-model` | Chunker | HuggingFace tokenizer aligning chunk lengths with the dense embedder. |
-| `--structural-markers` | Chunker | Load additional heading/caption prefixes from YAML or JSON configuration files. |
+| `--structural-markers` | Chunker | Load additional heading/caption prefixes from JSON/YAML/TOML configuration files. |
 | `--serializer-provider` | Chunker | Swap in a custom Docling serializer via an import path (`module:Class`). |
 | `--shard-count` / `--shard-index` | Chunker, Embedder | Deterministically partition inputs for distributed processing. |
 | `--validate-only` | Chunker, Embedder | Validate existing chunk or vector JSONL outputs and exit without writing. |

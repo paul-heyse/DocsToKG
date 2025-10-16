@@ -344,11 +344,13 @@ class ResultShaper:
         *,
         device: int = 0,
         resources: Optional["faiss.StandardGpuResources"] = None,
+        channel_weights: Optional[Mapping[str, float]] = None,
     ) -> None:
         self._opensearch = opensearch
         self._fusion_config = fusion_config
         self._gpu_device = int(device)
         self._gpu_resources = resources
+        self._channel_weights = dict(channel_weights or {})
 
     def shape(
         self,
@@ -405,6 +407,7 @@ class ResultShaper:
                 bm25_score=channel_scores.get("bm25", {}).get(chunk.vector_id),
                 splade_score=channel_scores.get("splade", {}).get(chunk.vector_id),
                 dense_score=channel_scores.get("dense", {}).get(chunk.vector_id),
+                fusion_weights=dict(self._channel_weights) if self._channel_weights else None,
             )
             results.append(
                 HybridSearchResult(
@@ -811,6 +814,7 @@ class HybridSearchService:
                 config.fusion,
                 device=(dense_stats.device if dense_stats is not None else dense_store.device),
                 resources=dense_stats.resources if dense_stats is not None else None,
+                channel_weights=adaptive_weights,
             )
             shaped = shaper.shape(
                 ordered_chunks,
@@ -849,6 +853,8 @@ class HybridSearchService:
                 next_cursor=next_cursor,
                 total_candidates=len(unique_candidates),
                 timings_ms=timings,
+                fusion_weights=dict(adaptive_weights),
+                stats=build_stats_snapshot(dense_store, self._opensearch, self._registry),
             )
 
     def _validate_request(self, request: HybridSearchRequest) -> None:
@@ -1127,29 +1133,14 @@ class HybridSearchService:
             Returns:
                 Dense similarity matches ordered by score for the current document search.
             """
-            hits_local: List[FaissSearchResult] = []
-            used_range = False
-            if use_score_floor:
-                try:
-                    limit = current_k if current_k > 0 else None
-                    range_hits = store.range_search(queries[0], score_floor, limit=limit)
-                    hits_local = list(range_hits)
-                    used_range = True
-                except Exception:
-                    hits_local = []
-                    used_range = False
-            if not used_range:
-                batch_hits_local = store.search_batch(queries, current_k)
-                self._observability.metrics.observe(
-                    "faiss_search_batch_size", float(len(batch_hits_local)), channel="dense"
-                )
-                hits_local = batch_hits_local[0] if batch_hits_local else []
+            depth = max(1, int(current_k))
+            batch_hits_local = store.search_batch(queries, depth)
+            self._observability.metrics.observe(
+                "faiss_search_batch_size", float(len(batch_hits_local)), channel="dense"
+            )
+            hits_local = batch_hits_local[0] if batch_hits_local else []
             if use_score_floor:
                 hits_local = [hit for hit in hits_local if hit.score >= score_floor]
-            if used_range:
-                self._observability.metrics.observe(
-                    "faiss_range_hits", float(len(hits_local)), channel="dense"
-                )
             return hits_local
 
         effective_k = initial_k
@@ -1377,6 +1368,9 @@ class HybridSearchAPI:
                         "bm25": result.diagnostics.bm25_score,
                         "splade": result.diagnostics.splade_score,
                         "dense": result.diagnostics.dense_score,
+                        "fusion_weights": dict(result.diagnostics.fusion_weights)
+                        if result.diagnostics.fusion_weights is not None
+                        else None,
                     },
                 }
                 for result in response.results
@@ -1384,6 +1378,8 @@ class HybridSearchAPI:
             "next_cursor": response.next_cursor,
             "total_candidates": response.total_candidates,
             "timings_ms": dict(response.timings_ms),
+            "fusion_weights": dict(response.fusion_weights),
+            "stats": response.stats,
         }
         return HTTPStatus.OK, body
 

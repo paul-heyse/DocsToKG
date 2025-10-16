@@ -10,9 +10,9 @@ from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple, TYPE
 import requests
 
 from .errors import ResolverError, UserConfigError
-from .io import get_bucket, retry_with_backoff, validate_url_security
+from .io import RDF_MIME_FORMAT_LABELS, get_bucket, retry_with_backoff, validate_url_security
+from .plugins import ensure_resolver_plugins
 from .settings import DownloadConfiguration, ResolvedConfig, get_pystow
-from .validation import ensure_resolver_plugins
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
     from .planning import FetchSpec
@@ -39,6 +39,21 @@ except ModuleNotFoundError:  # pragma: no cover - provide actionable error later
 
 OlsClient = _OlsClient
 pystow = get_pystow()
+
+_FORMAT_TO_MEDIA = {
+    "owl": "application/rdf+xml",
+    "rdf": "application/rdf+xml",
+    "rdf/xml": "application/rdf+xml",
+    "rdfxml": "application/rdf+xml",
+    "obo": "text/plain",
+    "ttl": "text/turtle",
+    "turtle": "text/turtle",
+    "jsonld": "application/ld+json",
+    "json-ld": "application/ld+json",
+    "ntriples": "application/n-triples",
+    "nt": "application/n-triples",
+    "trig": "application/trig",
+}
 
 _CHECKSUM_HEX_RE = re.compile(r"^[0-9a-fA-F]{32,128}$")
 _SUPPORTED_CHECKSUM_ALGORITHMS = {"md5", "sha1", "sha256", "sha512"}
@@ -174,6 +189,55 @@ class ResolverCandidate:
 
 class BaseResolver:
     """Shared helpers for resolver implementations."""
+
+    def _normalize_media_type(self, media_type: Optional[str]) -> Optional[str]:
+        if not media_type:
+            return None
+        canonical = media_type.split(";")[0].strip().lower()
+        if not canonical:
+            return None
+        if canonical in RDF_MIME_FORMAT_LABELS:
+            return canonical
+        return canonical
+
+    def _preferred_media_type(
+        self,
+        spec: "FetchSpec",
+        *,
+        default: Optional[str],
+    ) -> Optional[str]:
+        formats = getattr(spec, "target_formats", ()) or ()
+        for value in formats:
+            if not isinstance(value, str):
+                continue
+            candidate = _FORMAT_TO_MEDIA.get(value.strip().lower())
+            if candidate:
+                return candidate
+        return default
+
+    def _negotiate_media_type(
+        self,
+        *,
+        spec: "FetchSpec",
+        default: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> Tuple[Optional[str], Dict[str, str]]:
+        resolved_headers: Dict[str, str] = dict(headers or {})
+        accept_key: Optional[str] = None
+        for key in resolved_headers:
+            if key.lower() == "accept":
+                accept_key = key
+                break
+        if accept_key is not None:
+            media = self._normalize_media_type(resolved_headers[accept_key])
+            if media:
+                resolved_headers[accept_key] = media
+                return media, resolved_headers
+        preferred = self._preferred_media_type(spec, default=default)
+        media_type = self._normalize_media_type(preferred)
+        if media_type:
+            resolved_headers["Accept"] = media_type
+        return media_type, resolved_headers
 
     def _execute_with_retry(
         self,
@@ -337,10 +401,15 @@ class OBOResolver(BaseResolver):
                         "url": url,
                     },
                 )
+                media_type, headers = self._negotiate_media_type(
+                    spec=spec,
+                    default=_FORMAT_TO_MEDIA.get(fmt, "application/rdf+xml"),
+                )
                 return self._build_plan(
                     url=url,
                     http_config=config.defaults.http,
-                    media_type="application/rdf+xml",
+                    headers=headers,
+                    media_type=media_type or _FORMAT_TO_MEDIA.get(fmt, "application/rdf+xml"),
                     service="obo",
                 )
         raise ResolverError(f"No download link found via Bioregistry for {spec.id}")
@@ -412,12 +481,19 @@ class OLSResolver(BaseResolver):
                 "url": download_url,
             },
         )
+        media_type, download_headers = self._negotiate_media_type(
+            spec=spec,
+            default="application/rdf+xml",
+            headers=headers,
+        )
         return self._build_plan(
             url=download_url,
             http_config=config.defaults.http,
+            headers=download_headers,
             filename_hint=filename,
             version=version,
             license=license_value,
+            media_type=media_type,
             service="ols",
         )
 
@@ -499,12 +575,18 @@ class BioPortalResolver(BaseResolver):
                 "url": download_url,
             },
         )
+        media_type, download_headers = self._negotiate_media_type(
+            spec=spec,
+            default="application/rdf+xml",
+            headers=headers,
+        )
         return self._build_plan(
             url=download_url,
             http_config=config.defaults.http,
-            headers=headers,
+            headers=download_headers,
             version=version,
             license=license_value,
+            media_type=media_type,
             service="bioportal",
         )
 
@@ -582,10 +664,15 @@ class LOVResolver(BaseResolver):
                 "url": download_url,
             },
         )
+        media_type, download_headers = self._negotiate_media_type(
+            spec=spec,
+            default=preferred_media,
+        )
         return self._build_plan(
             url=download_url,
             http_config=config.defaults.http,
-            media_type=preferred_media,
+            headers=download_headers,
+            media_type=media_type or preferred_media,
             service="lov",
             license=license_value,
             version=version_value,
@@ -604,11 +691,17 @@ class SKOSResolver(BaseResolver):
             "resolved download url",
             extra={"stage": "plan", "resolver": "skos", "ontology_id": spec.id, "url": url},
         )
+        default_media = spec.extras.get("media_type") if isinstance(spec.extras.get("media_type"), str) else "application/rdf+xml"
+        media_type, download_headers = self._negotiate_media_type(
+            spec=spec,
+            default=default_media,
+            headers=headers,
+        )
         return self._build_plan(
             url=url,
             http_config=config.defaults.http,
-            headers=headers,
-            media_type=spec.extras.get("media_type", "application/rdf+xml"),
+            headers=download_headers,
+            media_type=media_type or default_media,
             service="skos",
             license=spec.extras.get("license"),
         )
@@ -664,14 +757,20 @@ class DirectResolver(BaseResolver):
             "resolved download url",
             extra={"stage": "plan", "resolver": "direct", "ontology_id": spec.id, "url": url},
         )
+        default_media = extras.get("media_type") if isinstance(extras.get("media_type"), str) else None
+        media_type, download_headers = self._negotiate_media_type(
+            spec=spec,
+            default=default_media,
+            headers=headers,
+        )
         return self._build_plan(
             url=url,
             http_config=config.defaults.http,
-            headers=headers,
+            headers=download_headers,
             filename_hint=filename_hint,
             version=version,
             license=license_value,
-            media_type=extras.get("media_type"),
+            media_type=media_type or default_media,
             service=extras.get("service"),
             checksum=checksum_value,
             checksum_algorithm=checksum_algorithm,
@@ -691,12 +790,18 @@ class XBRLResolver(BaseResolver):
             "resolved download url",
             extra={"stage": "plan", "resolver": "xbrl", "ontology_id": spec.id, "url": url},
         )
+        default_media = spec.extras.get("media_type", "application/zip")
+        media_type, download_headers = self._negotiate_media_type(
+            spec=spec,
+            default=default_media,
+            headers=headers,
+        )
         return self._build_plan(
             url=url,
             http_config=config.defaults.http,
-            headers=headers,
+            headers=download_headers,
             filename_hint=spec.extras.get("filename_hint"),
-            media_type=spec.extras.get("media_type", "application/zip"),
+            media_type=media_type or default_media,
             service="xbrl",
         )
 
@@ -733,10 +838,15 @@ class OntobeeResolver(BaseResolver):
                         "url": url,
                     },
                 )
+                negotiated_media, download_headers = self._negotiate_media_type(
+                    spec=spec,
+                    default=media_type,
+                )
                 return self._build_plan(
                     url=url,
                     http_config=config.defaults.http,
-                    media_type=media_type,
+                    headers=download_headers,
+                    media_type=negotiated_media or media_type,
                     service="ontobee",
                 )
 

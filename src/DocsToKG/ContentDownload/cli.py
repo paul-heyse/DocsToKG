@@ -151,7 +151,6 @@ import os
 import shutil
 import threading
 import time
-import re
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -176,11 +175,22 @@ from pyalex import config as oa_config
 
 import DocsToKG.ContentDownload.pipeline as resolvers
 
-from DocsToKG.ContentDownload.core import PDF_LIKE, Classification, ReasonCode
 from DocsToKG.ContentDownload.core import (
+    DEFAULT_MIN_PDF_BYTES,
+    DEFAULT_SNIFF_BYTES,
+    DEFAULT_TAIL_CHECK_BYTES,
+    PDF_LIKE,
+    Classification,
+    ReasonCode,
+    WorkArtifact,
     _infer_suffix,
     classify_payload,
+    dedupe,
     has_pdf_eof,
+    normalize_doi,
+    normalize_pmcid,
+    normalize_url,
+    slugify,
     tail_contains_html,
     update_tail_buffer,
 )
@@ -220,33 +230,10 @@ from DocsToKG.ContentDownload.telemetry import (
     load_manifest_url_index,
     load_previous_manifest,
 )
-from DocsToKG.ContentDownload.core import (
-    dedupe,
-    normalize_doi,
-    normalize_pmcid,
-    normalize_url,
-    slugify,
-)
-from DocsToKG.ContentDownload.core import (
-    normalize_arxiv as _normalize_arxiv,
-)
-from DocsToKG.ContentDownload.core import (
-    normalize_pmid as _normalize_pmid,
-)
+from DocsToKG.ContentDownload.core import normalize_arxiv as _normalize_arxiv
+from DocsToKG.ContentDownload.core import normalize_pmid as _normalize_pmid
 
 # --- Globals ---
-
-DEFAULT_SNIFF_BYTES = 64 * 1024
-DEFAULT_MIN_PDF_BYTES = 1024
-DEFAULT_TAIL_CHECK_BYTES = 2048
-_SIZE_SUFFIXES = {
-    "b": 1,
-    "kb": 1024,
-    "mb": 1024**2,
-    "gb": 1024**3,
-    "tb": 1024**4,
-}
-
 __all__ = (
     "AttemptSink",
     "CsvSink",
@@ -301,32 +288,6 @@ def ensure_dir(path: Path) -> None:
         OSError: If the directory cannot be created because of permissions.
     """
     path.mkdir(parents=True, exist_ok=True)
-
-
-@dataclass
-class WorkArtifact:
-    """Normalized artifact describing an OpenAlex work to process."""
-
-    work_id: str
-    title: str
-    publication_year: Optional[int]
-    doi: Optional[str]
-    pmid: Optional[str]
-    pmcid: Optional[str]
-    arxiv_id: Optional[str]
-    landing_urls: List[str]
-    pdf_urls: List[str]
-    open_access_url: Optional[str]
-    source_display_names: List[str]
-    base_stem: str
-    pdf_dir: Path
-    html_dir: Path
-    failed_pdf_urls: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        self.namespaces: Dict[str, Path] = {"pdf": self.pdf_dir, "html": self.html_dir}
-
 
 @dataclass
 class DownloadOptions:
@@ -553,22 +514,12 @@ def _parse_size(value: str) -> int:
     text = (value or "").strip().lower().replace(",", "").replace("_", "")
     if not text:
         raise argparse.ArgumentTypeError("size value cannot be empty")
-    match = re.fullmatch(r"(?P<amount>\d+(?:\.\d+)?)(?P<suffix>[kmgt]?b)?", text)
-    if not match:
-        raise argparse.ArgumentTypeError(f"invalid size specification: {value!r}")
-    amount_text = match.group("amount")
-    suffix = match.group("suffix") or "b"
+    from DocsToKG.ContentDownload.core import parse_size
+
     try:
-        amount = float(amount_text)
-    except ValueError as exc:  # pragma: no cover - defensive guard
-        raise argparse.ArgumentTypeError(f"invalid numeric amount in {value!r}") from exc
-    factor = _SIZE_SUFFIXES.get(suffix, None)
-    if factor is None:
-        raise argparse.ArgumentTypeError(f"unsupported size suffix {suffix!r}")
-    bytes_value = int(amount * factor)
-    if bytes_value <= 0:
-        raise argparse.ArgumentTypeError("size value must be positive")
-    return bytes_value
+        return parse_size(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
 def _parse_domain_interval(value: str) -> Tuple[str, float]:
@@ -612,6 +563,53 @@ def _parse_domain_bytes_budget(value: str) -> Tuple[str, int]:
         raise argparse.ArgumentTypeError("domain component cannot be empty")
     limit = _parse_size(raw)
     return domain, limit
+
+
+def _parse_domain_token_bucket(value: str) -> Tuple[str, Dict[str, float]]:
+    """Parse ``DOMAIN=RPS[:capacity=X]`` specifications into bucket configs."""
+
+    if "=" not in value:
+        raise argparse.ArgumentTypeError("domain token bucket must use the format domain=rate[:capacity=N]")
+    domain, spec = value.split("=", 1)
+    domain = domain.strip().lower()
+    if not domain:
+        raise argparse.ArgumentTypeError("domain component cannot be empty")
+    rate: Optional[float] = None
+    capacity: Optional[float] = None
+    parts = [segment.strip() for segment in spec.split(":") if segment.strip()]
+    for index, part in enumerate(parts):
+        if "=" in part:
+            key, raw = part.split("=", 1)
+            key = key.strip().lower()
+            raw = raw.strip()
+            try:
+                value_float = float(raw)
+            except ValueError as exc:
+                raise argparse.ArgumentTypeError(f"invalid numeric value '{raw}' in token bucket spec") from exc
+            if key in {"rate", "rps", "rate_per_second"}:
+                rate = value_float
+            elif key in {"capacity", "burst"}:
+                capacity = value_float
+            else:
+                raise argparse.ArgumentTypeError(f"unknown token bucket key '{key}'")
+        else:
+            try:
+                value_float = float(part)
+            except ValueError as exc:
+                raise argparse.ArgumentTypeError(f"invalid token bucket value '{part}'") from exc
+            if rate is None:
+                rate = value_float
+            elif capacity is None:
+                capacity = value_float
+            else:
+                raise argparse.ArgumentTypeError("unexpected extra token bucket value")
+
+    if rate is None or rate <= 0:
+        raise argparse.ArgumentTypeError("token bucket rate must be a positive number")
+    if capacity is None or capacity <= 0:
+        capacity = 1.0
+
+    return domain, {"rate_per_second": float(rate), "capacity": float(capacity)}
 
 
 class RobotsCache:
@@ -1895,6 +1893,18 @@ def main() -> None:
         help=(
             "Cap total bytes downloaded per domain (e.g., example.org=500MB). "
             "Repeat the option to configure multiple domains."
+        ),
+    )
+    resolver_group.add_argument(
+        "--domain-token-bucket",
+        dest="domain_token_bucket",
+        type=_parse_domain_token_bucket,
+        action="append",
+        default=[],
+        metavar="DOMAIN=RPS[:capacity=N]",
+        help=(
+            "Configure per-domain token buckets (e.g., example.org=0.5:capacity=2) to "
+            "enforce request rates."
         ),
     )
     resolver_group.add_argument(

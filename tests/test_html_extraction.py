@@ -49,7 +49,8 @@ import pytest
 pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload.core import Classification
-from DocsToKG.ContentDownload.cli import WorkArtifact, download_candidate
+from DocsToKG.ContentDownload.cli import download_candidate
+from DocsToKG.ContentDownload.core import WorkArtifact
 
 # --- Globals ---
 
