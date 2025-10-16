@@ -151,6 +151,7 @@ __all__ = (
 from DocsToKG.DocParsing._common import (
     atomic_write,
     compute_content_hash,
+    compute_relative_doc_id,
     data_chunks,
     data_doctags,
     detect_data_root,
@@ -258,20 +259,6 @@ _LOGGER = get_logger(__name__)
 
 # --- Public Functions ---
 
-def compute_relative_doc_id(path: Path, root: Path) -> str:
-    """Return POSIX-style relative identifier for a document path.
-
-    Args:
-        path: Absolute path to the document on disk.
-        root: Root directory that anchors relative identifiers.
-
-    Returns:
-        str: POSIX-style relative path suitable for manifest IDs.
-    """
-
-    return path.relative_to(root).as_posix()
-
-
 def read_utf8(p: Path) -> str:
     """Load text from disk using UTF-8 with replacement for invalid bytes.
 
@@ -376,7 +363,7 @@ def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, i
 # --- Public Classes ---
 
 
-@dataclass
+@dataclass(slots=True)
 class Rec:
     """Intermediate record tracking chunk text and provenance.
 

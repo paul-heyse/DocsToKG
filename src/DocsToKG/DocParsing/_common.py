@@ -249,6 +249,7 @@ __all__ = [
     "acquire_lock",
     "set_spawn_or_warn",
     "derive_doc_id_and_vectors_path",
+    "compute_relative_doc_id",
     "init_hf_env",
 ]
 
@@ -526,6 +527,20 @@ def derive_doc_id_and_vectors_path(
     doc_id = base.with_suffix(".doctags").as_posix()
     vector_relative = base.with_suffix(".vectors.jsonl")
     return doc_id, vectors_root / vector_relative
+
+
+def compute_relative_doc_id(path: Path, root: Path) -> str:
+    """Return POSIX-style relative identifier for a document path.
+
+    Args:
+        path: Absolute path to the document on disk.
+        root: Root directory that anchors relative identifiers.
+
+    Returns:
+        str: POSIX-style relative path suitable for manifest IDs.
+    """
+
+    return path.relative_to(root).as_posix()
 
 
 # --- Logging and I/O Utilities ---

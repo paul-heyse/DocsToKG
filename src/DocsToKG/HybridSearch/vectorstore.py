@@ -87,6 +87,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = (
     "FaissVectorStore",
+    "FaissIndexManager",
     "FaissSearchResult",
     "cosine_against_corpus_gpu",
     "cosine_batch",
@@ -396,9 +397,32 @@ class FaissVectorStore(DenseVectorStore):
             ids64 = np.asarray(ids, dtype=np.int64)
             if ids64.size == 0:
                 return 0
-            self._remove_ids(ids64)
-            self._flush_pending_deletes(force=force_flush)
-            return int(ids64.size)
+        self._remove_ids(ids64)
+        self._flush_pending_deletes(force=force_flush)
+        return int(ids64.size)
+
+    def add_batch(
+        self,
+        vectors: Sequence[np.ndarray] | np.ndarray,
+        vector_ids: Sequence[str],
+        *,
+        batch_size: int = 65_536,
+    ) -> None:
+        """Add vectors in batches to minimise host→device churn."""
+
+        if isinstance(vectors, np.ndarray):
+            matrix = np.atleast_2d(vectors)
+            vector_list = [matrix[i] for i in range(matrix.shape[0])]
+        else:
+            vector_list = list(vectors)
+        ids = list(vector_ids)
+        if len(vector_list) != len(ids):
+            raise ValueError("vectors and vector_ids must align")
+        if not vector_list:
+            return
+        for start in range(0, len(vector_list), max(1, int(batch_size))):
+            end = min(len(vector_list), start + int(batch_size))
+            self.add(vector_list[start:end], ids[start:end])
 
     def _current_index_ids(self) -> np.ndarray:
         # Robustly extract id_map across wrappers / GPU clones.
@@ -594,6 +618,7 @@ class FaissVectorStore(DenseVectorStore):
             "gpu_indices_32_bit": bool(self._indices_32_bit and not self._force_64bit_ids),
             "gpu_device": str(getattr(self._config, "device", 0)),
             "device": str(getattr(self._config, "device", 0)),
+            "fp16_enabled": bool(getattr(self._config, "flat_use_fp16", False)),
         }
         if self._temp_memory_bytes is not None:
             stats["gpu_temp_memory_bytes"] = float(self._temp_memory_bytes)
@@ -627,6 +652,21 @@ class FaissVectorStore(DenseVectorStore):
         if self._rebuild_delete_threshold <= 0:
             return False
         return self._dirty_deletes >= self._rebuild_delete_threshold
+
+    def rebuild_if_needed(self) -> bool:
+        """Trigger a rebuild when tombstones exceed thresholds.
+
+        Returns:
+            bool: ``True`` if a rebuild was executed.
+        """
+
+        with self._lock:
+            if not self.rebuild_needed():
+                return False
+            self._rebuild_index()
+            self._set_nprobe()
+            self._needs_rebuild = False
+            return True
 
     def init_gpu(self) -> None:
         """Initialise FAISS GPU resources for the configured CUDA device.
@@ -1281,3 +1321,7 @@ def restore_state(faiss_index: FaissVectorStore, payload: dict[str, object]) -> 
     if not isinstance(encoded, str):
         raise ValueError("Missing FAISS payload")
     faiss_index.restore(base64.b64decode(encoded.encode("ascii")))
+
+
+# Backwards compatibility alias for downstream imports.
+FaissIndexManager = FaissVectorStore

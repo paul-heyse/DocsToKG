@@ -89,6 +89,7 @@ from tqdm import tqdm
 
 from DocsToKG.DocParsing._common import (
     Batcher,
+    acquire_lock,
     atomic_write,
     compute_content_hash,
     data_chunks,
@@ -1323,7 +1324,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--splade-zero-pct-warn-threshold",
+        "--splade-sparsity-warn-pct",
         dest="sparsity_warn_threshold_pct",
         type=float,
         default=SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
@@ -1332,7 +1333,12 @@ def build_parser() -> argparse.ArgumentParser:
             f"(default: {SPLADE_SPARSITY_WARN_THRESHOLD_PCT})."
         ),
     )
-    parser.add_argument("--qwen-dim", type=int, default=2560, help="Expected Qwen output dimension (set when using MRL).")
+    parser.add_argument(
+        "--qwen-dim",
+        type=int,
+        default=2560,
+        help="Dimension of the dense embedding head (model dependent).",
+    )
     parser.add_argument("--tp", type=int, default=1)
     add_resume_force_options(
         parser,
@@ -1607,43 +1613,44 @@ def main(args: argparse.Namespace | None = None) -> int:
     for chunk_file, out_path, input_hash, doc_id in tqdm(
         file_entries, desc="Pass B: Encoding vectors", unit="file"
     ):
-        start = time.perf_counter()
-        try:
-            count, nnz, norms = process_chunk_file_vectors(
-                chunk_file, out_path, stats, args, validator, logger
-            )
-        except Exception as exc:
+        with acquire_lock(out_path):
+            start = time.perf_counter()
+            try:
+                count, nnz, norms = process_chunk_file_vectors(
+                    chunk_file, out_path, stats, args, validator, logger
+                )
+            except Exception as exc:
+                duration = time.perf_counter() - start
+                manifest_append(
+                    stage=MANIFEST_STAGE,
+                    doc_id=doc_id,
+                    status="failure",
+                    duration_s=round(duration, 3),
+                    schema_version="embeddings/1.0.0",
+                    input_path=str(chunk_file),
+                    input_hash=input_hash,
+                    hash_alg=resolve_hash_algorithm(),
+                    output_path=str(out_path),
+                    error=str(exc),
+                )
+                raise
+
             duration = time.perf_counter() - start
+            total_vectors += count
+            splade_nnz_all.extend(nnz)
+            qwen_norms_all.extend(norms)
             manifest_append(
                 stage=MANIFEST_STAGE,
                 doc_id=doc_id,
-                status="failure",
+                status="success",
                 duration_s=round(duration, 3),
                 schema_version="embeddings/1.0.0",
                 input_path=str(chunk_file),
                 input_hash=input_hash,
                 hash_alg=resolve_hash_algorithm(),
                 output_path=str(out_path),
-                error=str(exc),
+                vector_count=count,
             )
-            raise
-
-        duration = time.perf_counter() - start
-        total_vectors += count
-        splade_nnz_all.extend(nnz)
-        qwen_norms_all.extend(norms)
-        manifest_append(
-            stage=MANIFEST_STAGE,
-            doc_id=doc_id,
-            status="success",
-            duration_s=round(duration, 3),
-            schema_version="embeddings/1.0.0",
-            input_path=str(chunk_file),
-            input_hash=input_hash,
-            hash_alg=resolve_hash_algorithm(),
-            output_path=str(out_path),
-            vector_count=count,
-        )
 
     _current, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()

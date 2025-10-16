@@ -84,6 +84,7 @@ import logging
 import os
 import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
+from functools import lru_cache
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
@@ -640,17 +641,9 @@ def build_query(args: argparse.Namespace) -> Works:
     return query
 
 
-def resolve_topic_id_if_needed(topic_text: Optional[str]) -> Optional[str]:
-    """Resolve a textual topic label into an OpenAlex topic identifier.
-
-    Args:
-        topic_text: Free-form topic text supplied via CLI.
-
-    Returns:
-        OpenAlex topic identifier string if resolved, else None.
-    """
-    if not topic_text:
-        return None
+@lru_cache(maxsize=128)
+def _lookup_topic_id(topic_text: str) -> Optional[str]:
+    """Cached helper to resolve an OpenAlex topic identifier."""
     try:
         hits = Topics().search(topic_text).get()
     except requests.RequestException as exc:  # pragma: no cover - network guard
@@ -662,6 +655,23 @@ def resolve_topic_id_if_needed(topic_text: Optional[str]) -> Optional[str]:
     if resolved:
         LOGGER.info("Resolved topic '%s' -> %s", topic_text, resolved)
     return resolved
+
+
+def resolve_topic_id_if_needed(topic_text: Optional[str]) -> Optional[str]:
+    """Resolve a textual topic label into an OpenAlex topic identifier.
+
+    Args:
+        topic_text: Free-form topic text supplied via CLI.
+
+    Returns:
+        OpenAlex topic identifier string if resolved, else None.
+    """
+    if not topic_text:
+        return None
+    normalized = topic_text.strip()
+    if not normalized:
+        return None
+    return _lookup_topic_id(normalized)
 
 
 def create_artifact(work: Dict[str, Any], pdf_dir: Path, html_dir: Path) -> WorkArtifact:
@@ -1246,8 +1256,11 @@ def load_resolver_config(
         headers.pop("mailto", None)
         user_agent = base_agent
     headers["User-Agent"] = user_agent
-    if getattr(args, "accept", None):
-        headers["Accept"] = args.accept
+    accept_override = getattr(args, "accept", None)
+    if accept_override:
+        headers["Accept"] = accept_override
+    elif not headers.get("Accept"):
+        headers["Accept"] = "application/pdf, text/html;q=0.9, */*;q=0.8"
     config.polite_headers = headers
 
     if hasattr(args, "head_precheck") and args.head_precheck is not None:
