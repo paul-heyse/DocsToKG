@@ -27,6 +27,7 @@ The DocsToKG document parsing pipeline currently exhibits several architectural 
 ## Impact
 
 ### Affected Capabilities
+
 - Document Parsing Pipeline (new spec)
 - Chunking Stage
 - Embedding Generation Stage
@@ -34,6 +35,7 @@ The DocsToKG document parsing pipeline currently exhibits several architectural 
 - Schema Validation
 
 ### Affected Code
+
 - `src/DocsToKG/DocParsing/DoclingHybridChunkerPipelineWithMin.py` - document identifier assignment
 - `src/DocsToKG/DocParsing/pipelines.py` - PDF output path construction, model path resolution, logging
 - `src/DocsToKG/DocParsing/EmbeddingV2.py` - LLM caching, iterator consolidation, variable assignments
@@ -43,11 +45,12 @@ The DocsToKG document parsing pipeline currently exhibits several architectural 
 - `src/DocsToKG/DocParsing/pdf_pipeline.py` - deprecation planning
 
 ### Breaking Changes
+
 None. All changes maintain backward compatibility for external consumers while improving internal consistency. Output directory names may change if alignment option is selected, which requires documentation update or code adjustment but does not affect data schemas or APIs.
 
 ### Migration Notes
+
 - Existing chunk files with stem-based doc_id will continue to function but new processing runs will generate relative-path identifiers for improved collision resistance
 - PDF output paths will adopt mirrored directory structure on first run after deployment; existing flat outputs remain valid for HTML pipeline
 - Legacy import paths (`DocsToKG.DocParsing.pdf_pipeline`) will emit deprecation warnings before removal in subsequent release
 - Hard-coded model paths replaced with environment resolution; operators should set `HF_HOME`, `DOCSTOKG_MODEL_ROOT`, or `DOCLING_PDF_MODEL` environment variables for non-standard cache locations
-
