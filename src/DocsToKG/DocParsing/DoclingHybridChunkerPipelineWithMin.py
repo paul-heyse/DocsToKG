@@ -150,6 +150,7 @@ __all__ = (
 )
 
 from DocsToKG.DocParsing._common import (
+    acquire_lock,
     atomic_write,
     compute_content_hash,
     compute_relative_doc_id,
@@ -176,6 +177,7 @@ from DocsToKG.DocParsing.schemas import (
     ChunkRow,
     ProvenanceMetadata,
     get_docling_version,
+    validate_chunk_row,
 )
 from DocsToKG.DocParsing.serializers import RichSerializerProvider
 
@@ -249,6 +251,44 @@ def _load_structural_marker_config(path: Path) -> Tuple[List[str], List[str]]:
         )
 
     return headings, captions
+
+
+def _validate_chunk_files(files: Sequence[Path], logger) -> tuple[int, int]:
+    """Validate chunk JSONL rows across supplied files."""
+
+    total_files = 0
+    total_rows = 0
+    errors: List[str] = []
+
+    for path in files:
+        total_files += 1
+        with path.open("r", encoding="utf-8", errors="replace") as handle:
+            for line_no, line in enumerate(handle, start=1):
+                line = line.strip()
+                if not line:
+                    continue
+                total_rows += 1
+                try:
+                    validate_chunk_row(json.loads(line))
+                except ValueError as exc:
+                    message = f"{path}:{line_no}: {exc}"
+                    logger.error("Chunk validation error: %s", message)
+                    errors.append(message)
+
+    if errors:
+        preview = ", ".join(errors[:5])
+        if len(errors) > 5:
+            preview += ", ..."
+        raise ValueError(
+            "Chunk validation failed; fix the highlighted rows before continuing: " + preview
+        )
+
+    logger.info(
+        "Chunk validation complete",
+        extra={"extra_fields": {"files": total_files, "rows": total_rows}},
+    )
+    print(f"Validated {total_rows} rows across {total_files} chunk files.")
+    return total_files, total_rows
 
 # --- Defaults ---
 
@@ -492,32 +532,33 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
         )
 
         task.output_path.parent.mkdir(parents=True, exist_ok=True)
-        with atomic_write(task.output_path) as handle:
-            for cid, r in enumerate(final_recs):
-                provenance = ProvenanceMetadata(
-                    parse_engine=task.parse_engine,
-                    docling_version=cfg.docling_version,
-                    has_image_captions=r.has_image_captions,
-                    has_image_classification=r.has_image_classification,
-                    num_images=r.num_images,
-                )
-                row = ChunkRow(
-                    doc_id=task.doc_id,
-                    source_path=str(task.doc_path),
-                    chunk_id=cid,
-                    source_chunk_idxs=r.src_idxs,
-                    num_tokens=r.n_tok,
-                    text=r.text,
-                    doc_items_refs=r.refs,
-                    page_nos=r.pages,
-                    schema_version=CHUNK_SCHEMA_VERSION,
-                    has_image_captions=r.has_image_captions,
-                    has_image_classification=r.has_image_classification,
-                    num_images=r.num_images,
-                    provenance=provenance,
-                )
-                payload = row.model_dump(mode="json", exclude_none=True)
-                handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        with acquire_lock(task.output_path):
+            with atomic_write(task.output_path) as handle:
+                for cid, r in enumerate(final_recs):
+                    provenance = ProvenanceMetadata(
+                        parse_engine=task.parse_engine,
+                        docling_version=cfg.docling_version,
+                        has_image_captions=r.has_image_captions,
+                        has_image_classification=r.has_image_classification,
+                        num_images=r.num_images,
+                    )
+                    row = ChunkRow(
+                        doc_id=task.doc_id,
+                        source_path=str(task.doc_path),
+                        chunk_id=cid,
+                        source_chunk_idxs=r.src_idxs,
+                        num_tokens=r.n_tok,
+                        text=r.text,
+                        doc_items_refs=r.refs,
+                        page_nos=r.pages,
+                        schema_version=CHUNK_SCHEMA_VERSION,
+                        has_image_captions=r.has_image_captions,
+                        has_image_classification=r.has_image_classification,
+                        num_images=r.num_images,
+                        provenance=provenance,
+                    )
+                    payload = row.model_dump(mode="json", exclude_none=True)
+                    handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
         duration = time.perf_counter() - start
         return ChunkResult(
@@ -878,6 +919,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=1,
         help="Number of worker processes for chunking (default: 1).",
     )
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Validate chunk files and exit without producing new outputs.",
+    )
     add_resume_force_options(
         parser,
         resume_help="Skip DocTags whose chunk outputs already exist with matching hash",
@@ -1012,6 +1058,14 @@ def main(args: argparse.Namespace | None = None) -> int:
         "Loading tokenizer",
         extra={"extra_fields": {"tokenizer_model": tokenizer_model}},
     )
+
+    chunk_manifest_index = (
+        load_manifest_index(MANIFEST_STAGE, resolved_data_root) if args.resume else {}
+    )
+
+    if getattr(args, "validate_only", False):
+        _validate_chunk_files(files, logger)
+        return 0
 
     chunk_config = ChunkWorkerConfig(
         tokenizer_model=tokenizer_model,

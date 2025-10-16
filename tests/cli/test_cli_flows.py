@@ -1029,9 +1029,7 @@ def test_cli_resume_from_partial_metadata(download_modules, monkeypatch, tmp_pat
 
     assert contexts, "expected pipeline context to be captured"
     previous_map = contexts[0]["previous"]
-    assert previous_entry["url"] in previous_map
-    assert previous_map[previous_entry["url"]]["etag"] == previous_entry["etag"]
-    assert previous_map[previous_entry["url"]]["sha256"] is None
+    assert previous_entry["url"] not in previous_map
 
     new_entries = [
         json.loads(line) for line in manifest_path.read_text(encoding="utf-8").strip().splitlines()

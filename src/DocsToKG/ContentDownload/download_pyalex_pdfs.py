@@ -775,6 +775,7 @@ def download_candidate(
     headers: Dict[str, str] = {}
     if referer:
         headers["Referer"] = referer
+    base_headers = dict(headers)
 
     dry_run = bool(context.get("dry_run", False))
     head_precheck_passed = head_precheck_passed or bool(context.get("head_precheck_passed", False))
@@ -797,200 +798,238 @@ def download_candidate(
         prior_content_length=previous_length,
         prior_path=existing_path,
     )
-    headers.update(cond_helper.build_headers())
-
-    start = time.monotonic()
     content_type_hint = ""
-    try:
-        with request_with_retries(
-            session,
-            "GET",
-            url,
-            stream=True,
-            allow_redirects=True,
-            timeout=timeout,
-            headers=headers,
-        ) as response:
-            elapsed_ms = (time.monotonic() - start) * 1000.0
-            if response.status_code == 304:
-                cached = cond_helper.interpret_response(response)
-                if not isinstance(cached, CachedResult):  # pragma: no cover - defensive
-                    raise TypeError("Expected CachedResult for 304 response")
-                return DownloadOutcome(
-                    classification=Classification.CACHED,
-                    path=cached.path,
-                    http_status=response.status_code,
-                    content_type=response.headers.get("Content-Type") or content_type_hint,
-                    elapsed_ms=elapsed_ms,
-                    error=None,
-                    sha256=cached.sha256,
-                    content_length=cached.content_length,
-                    etag=cached.etag,
-                    last_modified=cached.last_modified,
-                    extracted_text_path=None,
-                )
+    attempt_conditional = True
 
-            if response.status_code != 200:
-                return DownloadOutcome(
-                    classification=Classification.HTTP_ERROR,
-                    path=None,
-                    http_status=response.status_code,
-                    content_type=response.headers.get("Content-Type") or content_type_hint,
-                    elapsed_ms=elapsed_ms,
-                    error=None,
-                    sha256=None,
-                    content_length=None,
-                    etag=None,
-                    last_modified=None,
-                    extracted_text_path=None,
-                )
+    while True:
+        headers = dict(base_headers)
+        if attempt_conditional:
+            headers.update(cond_helper.build_headers())
 
-            modified_result: ModifiedResult = cond_helper.interpret_response(response)
+        start = time.monotonic()
+        try:
+            with request_with_retries(
+                session,
+                "GET",
+                url,
+                stream=True,
+                allow_redirects=True,
+                timeout=timeout,
+                headers=headers,
+            ) as response:
+                elapsed_ms = (time.monotonic() - start) * 1000.0
+                if response.status_code == 304:
+                    if not attempt_conditional:
+                        LOGGER.warning(
+                            "Received HTTP 304 for %s without conditional headers; treating as http_error.",
+                            url,
+                        )
+                        return DownloadOutcome(
+                            classification=Classification.HTTP_ERROR,
+                            path=None,
+                            http_status=response.status_code,
+                            content_type=response.headers.get("Content-Type")
+                            or content_type_hint,
+                            elapsed_ms=elapsed_ms,
+                            error="unexpected-304",
+                            sha256=None,
+                            content_length=None,
+                            etag=None,
+                            last_modified=None,
+                            extracted_text_path=None,
+                        )
 
-            content_type = response.headers.get("Content-Type") or content_type_hint
-            disposition = response.headers.get("Content-Disposition")
-            content_type_lower = content_type.lower() if content_type else ""
-            content_length_header = response.headers.get("Content-Length")
-            content_length_hint: Optional[int] = None
-            if content_length_header:
-                try:
-                    content_length_hint = int(content_length_header.strip())
-                except (TypeError, ValueError):
-                    content_length_hint = None
-            if max_bytes and content_length_hint is not None and content_length_hint > max_bytes:
-                LOGGER.warning(
-                    "Aborting download due to max-bytes limit",
-                    extra={
-                        "extra_fields": {
-                            "url": url,
-                            "work_id": artifact.work_id,
-                            "content_length": content_length_hint,
-                            "max_bytes": max_bytes,
-                        }
-                    },
-                )
-                elapsed_now = (time.monotonic() - start) * 1000.0
-                classification_limit = (
-                    Classification.HTML_TOO_LARGE
-                    if "html" in content_type_lower
-                    else Classification.PAYLOAD_TOO_LARGE
-                )
-                return DownloadOutcome(
-                    classification=classification_limit,
-                    path=None,
-                    http_status=response.status_code,
-                    content_type=content_type,
-                    elapsed_ms=elapsed_now,
-                    error=f"content-length {content_length_hint} exceeds max_bytes {max_bytes}",
-                    sha256=None,
-                    content_length=content_length_hint,
-                    etag=modified_result.etag,
-                    last_modified=modified_result.last_modified,
-                    extracted_text_path=None,
-                )
-            sniff_buffer = bytearray()
-            detected: Optional[Classification] = None
-            flagged_unknown = False
-            dest_path: Optional[Path] = None
-            part_path: Optional[Path] = None
-            handle = None
-            state = DownloadState.PENDING
-            hasher = hashlib.sha256() if not dry_run else None
-            byte_count = 0
-            tail_buffer = bytearray()
-
-            try:
-                for chunk in response.iter_content(chunk_size=1 << 15):
-                    if not chunk:
+                    try:
+                        cached = cond_helper.interpret_response(response)
+                    except (FileNotFoundError, ValueError) as exc:
+                        LOGGER.warning(
+                            "Conditional cache invalid for %s: %s. Refetching without conditional headers.",
+                            url,
+                            exc,
+                        )
+                        attempt_conditional = False
+                        cond_helper = ConditionalRequestHelper()
                         continue
-                    if state is DownloadState.PENDING:
-                        sniff_buffer.extend(chunk)
-                        detected = classify_payload(bytes(sniff_buffer), content_type, url)
-                        if (
-                            detected is None
-                            and sniff_limit
-                            and len(sniff_buffer) >= sniff_limit
-                        ):
-                            detected = Classification.PDF
-                            flagged_unknown = True
 
-                        if detected is not None:
-                            if dry_run:
-                                break
-                            default_suffix = ".html" if detected == Classification.HTML else ".pdf"
-                            suffix = _infer_suffix(
-                                url, content_type, disposition, detected, default_suffix
-                            )
-                            dest_dir = artifact.html_dir if detected == Classification.HTML else artifact.pdf_dir
-                            dest_path = dest_dir / f"{artifact.base_stem}{suffix}"
-                            ensure_dir(dest_path.parent)
-                            part_path = dest_path.with_suffix(dest_path.suffix + ".part")
-                            handle = part_path.open("wb")
-                            initial_bytes = bytes(sniff_buffer)
-                            if initial_bytes:
-                                handle.write(initial_bytes)
-                                if hasher:
-                                    hasher.update(initial_bytes)
-                                byte_count += len(initial_bytes)
-                                _update_tail_buffer(
-                                    tail_buffer, initial_bytes, limit=tail_window_bytes
-                                )
-                            sniff_buffer.clear()
-                            state = DownloadState.WRITING
-                            continue
-                    elif handle is not None:
-                        handle.write(chunk)
-                        if hasher:
-                            hasher.update(chunk)
-                        byte_count += len(chunk)
-                        _update_tail_buffer(tail_buffer, chunk, limit=tail_window_bytes)
-
-                        if max_bytes and byte_count > max_bytes:
-                            LOGGER.warning(
-                                "Aborting download during stream due to max-bytes limit",
-                                extra={
-                                    "extra_fields": {
-                                        "url": url,
-                                        "work_id": artifact.work_id,
-                                        "bytes_downloaded": byte_count,
-                                        "max_bytes": max_bytes,
-                                    }
-                                },
-                            )
-                            if handle is not None:
-                                handle.close()
-                                handle = None
-                            if part_path:
-                                with contextlib.suppress(FileNotFoundError):
-                                    part_path.unlink()
-                            classification_limit = (
-                                Classification.HTML_TOO_LARGE
-                                if detected is Classification.HTML
-                                else Classification.PAYLOAD_TOO_LARGE
-                            )
-                            elapsed_limit = (time.monotonic() - start) * 1000.0
-                            return DownloadOutcome(
-                                classification=classification_limit,
-                                path=None,
-                                http_status=response.status_code,
-                                content_type=content_type,
-                                elapsed_ms=elapsed_limit,
-                                error=f"download exceeded max_bytes {max_bytes}",
-                                sha256=None,
-                                content_length=byte_count,
-                                etag=modified_result.etag,
-                                last_modified=modified_result.last_modified,
-                                extracted_text_path=None,
-                            )
-
-                if detected is None:
+                    if not isinstance(cached, CachedResult):  # pragma: no cover - defensive
+                        raise TypeError("Expected CachedResult for 304 response")
                     return DownloadOutcome(
-                        classification=Classification.MISS,
+                        classification=Classification.CACHED,
+                        path=cached.path,
+                        http_status=response.status_code,
+                        content_type=response.headers.get("Content-Type")
+                        or content_type_hint,
+                        elapsed_ms=elapsed_ms,
+                        error=None,
+                        sha256=cached.sha256,
+                        content_length=cached.content_length,
+                        etag=cached.etag,
+                        last_modified=cached.last_modified,
+                        extracted_text_path=None,
+                    )
+
+                if response.status_code != 200:
+                    return DownloadOutcome(
+                        classification=Classification.HTTP_ERROR,
+                        path=None,
+                        http_status=response.status_code,
+                        content_type=response.headers.get("Content-Type")
+                        or content_type_hint,
+                        elapsed_ms=elapsed_ms,
+                        error=None,
+                        sha256=None,
+                        content_length=None,
+                        etag=None,
+                        last_modified=None,
+                        extracted_text_path=None,
+                    )
+
+                modified_result: ModifiedResult = cond_helper.interpret_response(response)
+
+                content_type = response.headers.get("Content-Type") or content_type_hint
+                disposition = response.headers.get("Content-Disposition")
+                content_type_lower = content_type.lower() if content_type else ""
+                content_length_header = response.headers.get("Content-Length")
+                content_length_hint: Optional[int] = None
+                if content_length_header:
+                    try:
+                        content_length_hint = int(content_length_header.strip())
+                    except (TypeError, ValueError):
+                        content_length_hint = None
+                if max_bytes and content_length_hint is not None and content_length_hint > max_bytes:
+                    LOGGER.warning(
+                        "Aborting download due to max-bytes limit",
+                        extra={
+                            "extra_fields": {
+                                "url": url,
+                                "work_id": artifact.work_id,
+                                "content_length": content_length_hint,
+                                "max_bytes": max_bytes,
+                            }
+                        },
+                    )
+                    elapsed_now = (time.monotonic() - start) * 1000.0
+                    classification_limit = (
+                        Classification.HTML_TOO_LARGE
+                        if "html" in content_type_lower
+                        else Classification.PAYLOAD_TOO_LARGE
+                    )
+                    return DownloadOutcome(
+                        classification=classification_limit,
                         path=None,
                         http_status=response.status_code,
                         content_type=content_type,
-                        elapsed_ms=elapsed_ms,
+                        elapsed_ms=elapsed_now,
+                        error=f"content-length {content_length_hint} exceeds max_bytes {max_bytes}",
+                        sha256=None,
+                        content_length=content_length_hint,
+                        etag=modified_result.etag,
+                        last_modified=modified_result.last_modified,
+                        extracted_text_path=None,
                     )
+                    sniff_buffer = bytearray()
+                detected: Optional[Classification] = None
+                flagged_unknown = False
+                dest_path: Optional[Path] = None
+                part_path: Optional[Path] = None
+                handle = None
+                state = DownloadState.PENDING
+                hasher = hashlib.sha256() if not dry_run else None
+                byte_count = 0
+                tail_buffer = bytearray()
+
+                try:
+                    for chunk in response.iter_content(chunk_size=1 << 15):
+                        if not chunk:
+                            continue
+                        if state is DownloadState.PENDING:
+                            sniff_buffer.extend(chunk)
+                            detected = classify_payload(bytes(sniff_buffer), content_type, url)
+                            if (
+                                detected is None
+                                and sniff_limit
+                                and len(sniff_buffer) >= sniff_limit
+                            ):
+                                detected = Classification.PDF
+                                flagged_unknown = True
+
+                            if detected is not None:
+                                if dry_run:
+                                    break
+                                default_suffix = ".html" if detected == Classification.HTML else ".pdf"
+                                suffix = _infer_suffix(
+                                    url, content_type, disposition, detected, default_suffix
+                                )
+                                dest_dir = artifact.html_dir if detected == Classification.HTML else artifact.pdf_dir
+                                dest_path = dest_dir / f"{artifact.base_stem}{suffix}"
+                                ensure_dir(dest_path.parent)
+                                part_path = dest_path.with_suffix(dest_path.suffix + ".part")
+                                handle = part_path.open("wb")
+                                initial_bytes = bytes(sniff_buffer)
+                                if initial_bytes:
+                                    handle.write(initial_bytes)
+                                    if hasher:
+                                        hasher.update(initial_bytes)
+                                    byte_count += len(initial_bytes)
+                                    _update_tail_buffer(
+                                        tail_buffer, initial_bytes, limit=tail_window_bytes
+                                    )
+                                sniff_buffer.clear()
+                                state = DownloadState.WRITING
+                                continue
+                        elif handle is not None:
+                            handle.write(chunk)
+                            if hasher:
+                                hasher.update(chunk)
+                            byte_count += len(chunk)
+                            _update_tail_buffer(tail_buffer, chunk, limit=tail_window_bytes)
+
+                            if max_bytes and byte_count > max_bytes:
+                                LOGGER.warning(
+                                    "Aborting download during stream due to max-bytes limit",
+                                    extra={
+                                        "extra_fields": {
+                                            "url": url,
+                                            "work_id": artifact.work_id,
+                                            "bytes_downloaded": byte_count,
+                                            "max_bytes": max_bytes,
+                                        }
+                                    },
+                                )
+                                if handle is not None:
+                                    handle.close()
+                                    handle = None
+                                if part_path:
+                                    with contextlib.suppress(FileNotFoundError):
+                                        part_path.unlink()
+                                classification_limit = (
+                                    Classification.HTML_TOO_LARGE
+                                    if detected is Classification.HTML
+                                    else Classification.PAYLOAD_TOO_LARGE
+                                )
+                                elapsed_limit = (time.monotonic() - start) * 1000.0
+                                return DownloadOutcome(
+                                    classification=classification_limit,
+                                    path=None,
+                                    http_status=response.status_code,
+                                    content_type=content_type,
+                                    elapsed_ms=elapsed_limit,
+                                    error=f"download exceeded max_bytes {max_bytes}",
+                                    sha256=None,
+                                    content_length=byte_count,
+                                    etag=modified_result.etag,
+                                    last_modified=modified_result.last_modified,
+                                    extracted_text_path=None,
+                                )
+
+                    if detected is None:
+                        return DownloadOutcome(
+                            classification=Classification.MISS,
+                            path=None,
+                            http_status=response.status_code,
+                            content_type=content_type,
+                            elapsed_ms=elapsed_ms,
+                        )
             finally:
                 if handle is not None:
                     handle.close()
