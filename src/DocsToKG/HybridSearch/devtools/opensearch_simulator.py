@@ -516,6 +516,8 @@ class OpenSearchSimulator(LexicalIndex):
         terms = list(query_weights.keys())
 
         def bm25_score(stored: _StoredChunk) -> float:
+            """Compute BM25 score for ``stored`` using cached statistics."""
+
             dl = max(1.0, float(stored.payload.token_count))
             score = 0.0
             for token in terms:

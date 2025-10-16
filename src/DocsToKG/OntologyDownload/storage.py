@@ -104,17 +104,23 @@ class LocalStorageBackend:
         return self.root / safe_id / safe_version
 
     def prepare_version(self, ontology_id: str, version: str) -> Path:
+        """Create a workspace for ``ontology_id``/``version`` with required subdirs."""
+
         base = self.ensure_local_version(ontology_id, version)
         for subdir in ("original", "normalized", "validation"):
             (base / subdir).mkdir(parents=True, exist_ok=True)
         return base
 
     def ensure_local_version(self, ontology_id: str, version: str) -> Path:
+        """Ensure the version directory exists and return its path."""
+
         base = self._version_dir(ontology_id, version)
         base.mkdir(parents=True, exist_ok=True)
         return base
 
     def available_versions(self, ontology_id: str) -> List[str]:
+        """List version identifiers currently stored for ``ontology_id``."""
+
         safe_id, _ = _safe_identifiers(ontology_id, "unused")
         base = self.root / safe_id
         if not base.exists():
@@ -123,17 +129,25 @@ class LocalStorageBackend:
         return sorted(versions)
 
     def available_ontologies(self) -> List[str]:
+        """List ontology identifiers known to the local backend."""
+
         if not self.root.exists():
             return []
         return sorted([entry.name for entry in self.root.iterdir() if entry.is_dir()])
 
     def finalize_version(self, ontology_id: str, version: str, local_dir: Path) -> None:
+        """Hook for subclasses; local backend writes occur in-place already."""
+
         _ = (ontology_id, version, local_dir)  # pragma: no cover - intentional no-op
 
     def version_path(self, ontology_id: str, version: str) -> Path:
+        """Return the filesystem path holding ``ontology_id``/``version`` data."""
+
         return self._version_dir(ontology_id, version)
 
     def delete_version(self, ontology_id: str, version: str) -> int:
+        """Remove stored data for ``ontology_id``/``version`` and return bytes reclaimed."""
+
         path = self._version_dir(ontology_id, version)
         if not path.exists():
             return 0
@@ -142,6 +156,8 @@ class LocalStorageBackend:
         return reclaimed
 
     def set_latest_version(self, ontology_id: str, version: str) -> None:
+        """Update symbolic links/markers to highlight the latest processed version."""
+
         safe_id, _ = _safe_identifiers(ontology_id, "unused")
         base = self.root / safe_id
         base.mkdir(parents=True, exist_ok=True)
@@ -176,10 +192,14 @@ class FsspecStorageBackend(LocalStorageBackend):
         super().__init__(LOCAL_ONTOLOGY_DIR)
 
     def _remote_version_path(self, ontology_id: str, version: str) -> PurePosixPath:
+        """Return the remote storage path for ``ontology_id``/``version``."""
+
         safe_id, safe_version = _safe_identifiers(ontology_id, version)
         return (self.base_path / safe_id / safe_version).with_suffix("")
 
     def available_versions(self, ontology_id: str) -> List[str]:
+        """Combine local and remote version identifiers for ``ontology_id``."""
+
         local_versions = super().available_versions(ontology_id)
         safe_id, _ = _safe_identifiers(ontology_id, "unused")
         remote_dir = self.base_path / safe_id
@@ -193,6 +213,8 @@ class FsspecStorageBackend(LocalStorageBackend):
         return sorted({*local_versions, *remote_versions})
 
     def available_ontologies(self) -> List[str]:
+        """Return the union of ontology ids present locally and in remote storage."""
+
         local = set(super().available_ontologies())
         try:
             entries = self.fs.ls(str(self.base_path), detail=False)

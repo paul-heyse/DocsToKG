@@ -153,6 +153,8 @@ def _create_pystow_stub(root: Path) -> ModuleType:
     root.mkdir(parents=True, exist_ok=True)
 
     def join(*segments: str) -> Path:
+        """Mimic :func:`pystow.join` by joining segments onto the stub root."""
+
         return root.joinpath(*segments)
 
     module = _create_stub_module("pystow", {"join": join})
@@ -226,6 +228,8 @@ def _create_owlready_stub() -> ModuleType:
 
 
 def get_pystow() -> Any:
+    """Return the ``pystow`` module, supplying a stub when unavailable."""
+
     global _pystow
     if _pystow is not None:
         return _pystow
@@ -239,6 +243,8 @@ def get_pystow() -> Any:
 
 
 def get_rdflib() -> Any:
+    """Return the ``rdflib`` module, supplying a stub when unavailable."""
+
     global _rdflib
     if _rdflib is not None:
         return _rdflib
@@ -251,6 +257,8 @@ def get_rdflib() -> Any:
 
 
 def get_pronto() -> Any:
+    """Return the ``pronto`` module, supplying a stub when unavailable."""
+
     global _pronto
     if _pronto is not None:
         return _pronto
@@ -263,6 +271,8 @@ def get_pronto() -> Any:
 
 
 def get_owlready2() -> Any:
+    """Return the ``owlready2`` module, supplying a stub when unavailable."""
+
     global _owlready2
     if _owlready2 is not None:
         return _owlready2

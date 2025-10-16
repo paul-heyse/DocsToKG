@@ -497,8 +497,8 @@ class ChunkWorkerConfig:
     """
 
     tokenizer_model: str
-   min_tokens: int
-   max_tokens: int
+    min_tokens: int
+    max_tokens: int
     soft_barrier_margin: int
     heading_markers: Tuple[str, ...]
     caption_markers: Tuple[str, ...]
@@ -519,7 +519,7 @@ class ChunkTask:
     """
 
     doc_path: Path
-   output_path: Path
+    output_path: Path
     doc_id: str
     doc_stem: str
     input_hash: str
@@ -544,7 +544,7 @@ class ChunkResult:
     """
 
     doc_id: str
-   doc_stem: str
+    doc_stem: str
     status: str
     duration_s: float
     input_path: Path

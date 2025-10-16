@@ -158,6 +158,8 @@ class JSONFormatter(logging.Formatter):
     """Formatter emitting JSON structured logs."""
 
     def format(self, record: logging.LogRecord) -> str:
+        """Render ``record`` as a JSON string with DocsToKG-specific fields."""
+
         now = datetime.now(timezone.utc)
         payload = {
             "timestamp": now.isoformat().replace("+00:00", "Z"),
@@ -201,6 +203,17 @@ def setup_logging(
     max_log_size_mb: int = 100,
     log_dir: Optional[Path] = None,
 ) -> logging.Logger:
+    """Configure ontology downloader logging with rotation and JSON sidecars.
+
+    Args:
+        level: Logging level name applied to the root ontology logger.
+        retention_days: Number of days to retain historical log files.
+        max_log_size_mb: Threshold triggering log rotation for JSONL outputs.
+        log_dir: Optional directory override for persisted logs.
+
+    Returns:
+        Configured logger instance ready for use by the pipeline.
+    """
     resolved_dir = log_dir or Path(os.environ.get("ONTOFETCH_LOG_DIR", ""))
     if not resolved_dir:
         resolved_dir = LOG_DIR

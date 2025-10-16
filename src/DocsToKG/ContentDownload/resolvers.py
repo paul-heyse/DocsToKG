@@ -791,10 +791,7 @@ class ResolverMetrics:
             if outcome.elapsed_ms is not None:
                 self.latency_ms[resolver_name].append(float(outcome.elapsed_ms))
             reason = outcome.error
-            if not reason and outcome.classification not in {
-                Classification.PDF,
-                Classification.PDF_UNKNOWN,
-            }:
+            if not reason and outcome.classification not in PDF_LIKE:
                 reason = classification_key
             if reason:
                 self.error_reasons[resolver_name][reason] += 1

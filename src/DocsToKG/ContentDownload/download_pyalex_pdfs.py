@@ -404,8 +404,10 @@ def _build_download_outcome(
         classification_code = classification
     else:
         classification_code = Classification.from_wire(classification)
+
+    error_reason: Optional[str] = None
     if flagged_unknown and classification_code is Classification.PDF:
-        classification_code = Classification.PDF_UNKNOWN
+        error_reason = "pdf-sniff-unknown"
 
     path_str = str(dest_path) if dest_path else None
 
@@ -423,12 +425,12 @@ def _build_download_outcome(
             with contextlib.suppress(OSError):
                 dest_path.unlink()
             return DownloadOutcome(
-                classification=Classification.PDF_CORRUPT,
+                classification=Classification.MISS,
                 path=None,
                 http_status=response.status_code,
                 content_type=response.headers.get("Content-Type"),
                 elapsed_ms=elapsed_ms,
-                error=None,
+                error="pdf-too-small",
                 sha256=None,
                 content_length=None,
                 etag=etag,
@@ -440,12 +442,12 @@ def _build_download_outcome(
             with contextlib.suppress(OSError):
                 dest_path.unlink()
             return DownloadOutcome(
-                classification=Classification.PDF_CORRUPT,
+                classification=Classification.MISS,
                 path=None,
                 http_status=response.status_code,
                 content_type=response.headers.get("Content-Type"),
                 elapsed_ms=elapsed_ms,
-                error=None,
+                error="html-tail-detected",
                 sha256=None,
                 content_length=None,
                 etag=etag,
@@ -457,12 +459,12 @@ def _build_download_outcome(
             with contextlib.suppress(OSError):
                 dest_path.unlink()
             return DownloadOutcome(
-                classification=Classification.PDF_CORRUPT,
+                classification=Classification.MISS,
                 path=None,
                 http_status=response.status_code,
                 content_type=response.headers.get("Content-Type"),
                 elapsed_ms=elapsed_ms,
-                error=None,
+                error="pdf-eof-missing",
                 sha256=None,
                 content_length=None,
                 etag=etag,
@@ -476,7 +478,7 @@ def _build_download_outcome(
         http_status=response.status_code,
         content_type=response.headers.get("Content-Type"),
         elapsed_ms=elapsed_ms,
-        error=None,
+        error=error_reason,
         sha256=sha256,
         content_length=content_length,
         etag=etag,
@@ -1231,7 +1233,7 @@ def download_candidate(
     except requests.RequestException as exc:
         elapsed_ms = (time.monotonic() - start) * 1000.0
         return DownloadOutcome(
-            classification=Classification.REQUEST_ERROR,
+            classification=Classification.HTTP_ERROR,
             path=None,
             http_status=None,
             content_type=None,
@@ -1586,7 +1588,7 @@ def process_one_work(
     existing_pdf = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
     if not dry_run and existing_pdf.exists():
         existing_outcome = DownloadOutcome(
-            classification=Classification.EXISTS,
+            classification=Classification.CACHED,
             path=str(existing_pdf),
             http_status=None,
             content_type=None,

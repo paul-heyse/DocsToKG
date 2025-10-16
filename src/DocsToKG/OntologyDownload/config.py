@@ -22,6 +22,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "getattr",
+#       "name": "__getattr__",
+#       "anchor": "function-getattr",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "parse-rate-limit-to-rps",
 #       "name": "parse_rate_limit_to_rps",
 #       "anchor": "function-parse-rate-limit-to-rps",

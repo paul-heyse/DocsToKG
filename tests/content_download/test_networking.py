@@ -2858,14 +2858,12 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
         json.loads(line) for line in logger_path.read_text(encoding="utf-8").strip().splitlines()
     ]
     attempts = [
-        entry
-        for entry in records
-        if entry["record_type"] == "attempt" and entry["status"] in {"pdf", "pdf_unknown"}
+        entry for entry in records if entry["record_type"] == "attempt" and entry["status"] == "pdf"
     ]
     manifests = [
         entry
         for entry in records
-        if entry["record_type"] == "manifest" and entry["classification"] in {"pdf", "pdf_unknown"}
+        if entry["record_type"] == "manifest" and entry["classification"] == "pdf"
     ]
     assert len(attempts) == 1
     assert len(manifests) == 1

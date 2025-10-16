@@ -77,12 +77,6 @@
 #       "kind": "function"
 #     },
 #     {
-#       "id": "bm25stats",
-#       "name": "BM25Stats",
-#       "anchor": "class-bm25stats",
-#       "kind": "class"
-#     },
-#     {
 #       "id": "bm25statsaccumulator",
 #       "name": "BM25StatsAccumulator",
 #       "anchor": "class-bm25statsaccumulator",
@@ -99,12 +93,6 @@
 #       "name": "bm25_vector",
 #       "anchor": "function-bm25-vector",
 #       "kind": "function"
-#     },
-#     {
-#       "id": "spladecfg",
-#       "name": "SpladeCfg",
-#       "anchor": "class-spladecfg",
-#       "kind": "class"
 #     },
 #     {
 #       "id": "splade-encode",
@@ -134,12 +122,6 @@
 #       "id": "spladevalidator",
 #       "name": "SPLADEValidator",
 #       "anchor": "class-spladevalidator",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "qwencfg",
-#       "name": "QwenCfg",
-#       "anchor": "class-qwencfg",
 #       "kind": "class"
 #     },
 #     {
@@ -242,9 +224,9 @@ import re
 import statistics
 import time
 import tracemalloc
+import unicodedata
 import uuid
 from collections import Counter
-from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Dict, Iterator, List, Optional, Sequence, Tuple
@@ -253,6 +235,10 @@ from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 from tqdm import tqdm
 
 from DocsToKG.DocParsing._common import (
+    BM25Stats,
+    QwenCfg,
+    SpladeCfg,
+    UUID_NAMESPACE,
     Batcher,
     acquire_lock,
     atomic_write,
@@ -288,6 +274,7 @@ from DocsToKG.DocParsing.schemas import (
     BM25Vector,
     DenseVector,
     SPLADEVector,
+    VECTOR_SCHEMA_VERSION,
     VectorRow,
     validate_schema_version,
 )
@@ -470,9 +457,6 @@ def _ensure_qwen_dependencies() -> None:
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)?")
 
-# Project-wide namespace for deterministic UUIDv5 generation.
-UUID_NAMESPACE = uuid.UUID("00000000-0000-0000-0000-000000000000")
-
 
 def ensure_uuid(rows: List[dict]) -> bool:
     """Populate missing chunk UUIDs in-place using deterministic UUIDv5 derivation.
@@ -555,30 +539,13 @@ def tokens(text: str) -> List[str]:
     Returns:
         Lowercased alphanumeric tokens extracted from the text.
     """
-    return [t.lower() for t in TOKEN_RE.findall(text)]
+    if not text:
+        return []
+    normalized = unicodedata.normalize("NFKC", text).casefold()
+    return [match.group(0) for match in TOKEN_RE.finditer(normalized)]
 
 
 # --- Public Classes ---
-
-@dataclass
-class BM25Stats:
-    """Corpus-wide statistics required for BM25 weighting.
-
-    Attributes:
-        N: Total number of documents (chunks) in the corpus.
-        avgdl: Average document length in tokens.
-        df: Document frequency per token.
-
-    Examples:
-        >>> stats = BM25Stats(N=100, avgdl=120.5, df={"hybrid": 5})
-        >>> stats.df["hybrid"]
-        5
-    """
-
-    N: int
-    avgdl: float
-    df: Dict[str, int]
-
 
 class BM25StatsAccumulator:
     """Streaming accumulator for BM25 corpus statistics.
@@ -688,35 +655,6 @@ def bm25_vector(
 
 
 # --- SPLADE-v3 (GPU) ---
-
-@dataclass
-class SpladeCfg:
-    """Runtime configuration for SPLADE sparse encoding.
-
-    Attributes:
-        model_dir: Path to the SPLADE model directory.
-        device: Torch device identifier to run inference on.
-        batch_size: Number of texts encoded per batch.
-        cache_folder: Directory where transformer weights are cached.
-        max_active_dims: Optional cap on active sparse dimensions.
-        attn_impl: Preferred attention implementation override.
-        local_files_only: Restrict Hugging Face hub access to local cache.
-
-    Examples:
-        >>> cfg = SpladeCfg(batch_size=8, device="cuda:1")
-        >>> cfg.batch_size
-        8
-    """
-
-    model_dir: Path = SPLADE_DIR
-    device: str = "cuda"
-    batch_size: int = 32
-    cache_folder: Path = MODEL_ROOT
-    max_active_dims: int | None = None
-    # Leave None to let HF/torch pick (usually SDPA); set to "flash_attention_2" if available.
-    attn_impl: str | None = None
-    local_files_only: bool = True
-
 
 def splade_encode(
     cfg: SpladeCfg, texts: List[str], batch_size: Optional[int] = None
@@ -938,34 +876,6 @@ class SPLADEValidator:
 
 
 # --- Qwen3 Embeddings ---
-
-@dataclass
-class QwenCfg:
-    """Configuration for generating dense embeddings with Qwen via vLLM.
-
-    Attributes:
-        model_dir: Path to the local Qwen model.
-        dtype: Torch dtype used during inference.
-        tp: Tensor parallelism degree.
-        gpu_mem_util: Target GPU memory utilization for vLLM.
-        batch_size: Number of texts processed per embedding batch.
-        quantization: Optional quantization mode (e.g., `awq`).
-
-    Examples:
-        >>> cfg = QwenCfg(batch_size=64, tp=2)
-        >>> cfg.tp
-        2
-    """
-
-    model_dir: Path = QWEN_DIR
-    dtype: str = "bfloat16"  # good default on Ada/Hopper
-    tp: int = 1
-    gpu_mem_util: float = 0.60
-    batch_size: int = 32
-    quantization: str | None = None  # 'awq' if you have an AWQ checkpoint
-    dim: int = 2560  # output embedding dimension (MRL-aware)
-
-
 
 def qwen_embed(
     cfg: QwenCfg, texts: List[str], batch_size: Optional[int] = None

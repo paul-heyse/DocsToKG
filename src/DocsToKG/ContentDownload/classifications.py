@@ -10,14 +10,10 @@ class Classification(Enum):
     """Canonical classification codes for download outcomes."""
 
     PDF = "pdf"
-    PDF_UNKNOWN = "pdf_unknown"
-    PDF_CORRUPT = "pdf_corrupt"
     HTML = "html"
     MISS = "miss"
     HTTP_ERROR = "http_error"
-    REQUEST_ERROR = "request_error"
     CACHED = "cached"
-    EXISTS = "exists"
     SKIPPED = "skipped"
     HTML_TOO_LARGE = "html_too_large"
     PAYLOAD_TOO_LARGE = "payload_too_large"
@@ -33,12 +29,22 @@ class Classification(Enum):
         text = str(value).strip().lower()
         if not text:
             return cls.MISS
+
+        legacy_map = {
+            "pdf_unknown": cls.PDF,
+            "pdf_corrupt": cls.MISS,
+            "request_error": cls.HTTP_ERROR,
+            "exists": cls.CACHED,
+        }
+        if text in legacy_map:
+            return legacy_map[text]
+
         for member in cls:
             if member.value == text:
                 return member
         return cls.MISS
 
 
-PDF_LIKE = frozenset({Classification.PDF, Classification.PDF_UNKNOWN, Classification.CACHED})
+PDF_LIKE = frozenset({Classification.PDF, Classification.CACHED})
 
 __all__ = ("Classification", "PDF_LIKE")
