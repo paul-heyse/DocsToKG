@@ -4,11 +4,10 @@ This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.optdeps
 
 ## 1. Overview
 
-Optional dependency helpers retained as a testing shim.
-
-Production code should import optional dependency helpers from
-``DocsToKG.OntologyDownload.ontology_download`` directly. This proxy exists so
-tests can monkeypatch the internal caches without touching private globals.
+Optional dependency helpers that load runtime libraries such as pystow, rdflib,
+pronto, and owlready2. The module provides deterministic stubs when the real
+packages are missing so tests can exercise the downloader without heavyweight
+dependencies.
 
 ## 2. Functions
 
