@@ -2167,37 +2167,9 @@ def main() -> None:
     html_only = 0
     skipped = 0
 
-    with JsonlLogger(manifest_path) as base_logger:
-        attempt_logger: Any = base_logger
-        csv_adapter: Optional[CsvAttemptLoggerAdapter] = None
-        if csv_path:
-            csv_adapter = CsvAttemptLoggerAdapter(base_logger, csv_path)
-            attempt_logger = csv_adapter
-
-        resume_lookup, resume_completed = load_previous_manifest(args.resume_from)
-        if args.resume_from:
-            clear_resolver_caches()
-
-        metrics = ResolverMetrics()
-        pipeline = ResolverPipeline(
-            resolvers=resolver_instances,
-            config=config,
-            download_func=download_candidate,
-            logger=attempt_logger,
-            metrics=metrics,
-        )
-
-        def _session_factory() -> requests.Session:
-            """Build a fresh requests session configured with polite headers."""
-
-    summary_record: Dict[str, Any] = {}
-
     with contextlib.ExitStack() as stack:
         base_logger = stack.enter_context(JsonlLogger(manifest_path))
         attempt_logger: Any = base_logger
-        csv_path = args.log_csv
-        if args.log_format == "csv":
-            csv_path = csv_path or manifest_path.with_suffix(".csv")
         if csv_path:
             attempt_logger = stack.enter_context(CsvAttemptLoggerAdapter(base_logger, csv_path))
 
@@ -2215,9 +2187,12 @@ def main() -> None:
         )
 
         def _session_factory() -> requests.Session:
-            """Build a fresh requests session configured with polite headers."""
+            """Create a session seeded with the resolver polite header defaults.
 
-            return _make_session(config.polite_headers)
+            Returns:
+                requests.Session: Fresh session for resolver download attempts.
+            """
+
             return _make_session(config.polite_headers)
 
         def _record_result(res: Dict[str, Any]) -> None:
@@ -2320,9 +2295,6 @@ def main() -> None:
                 )
             except Exception:
                 LOGGER.warning("Failed to write metrics sidecar %s", metrics_path, exc_info=True)
-        finally:
-            if csv_adapter is not None:
-                csv_adapter.close()
 
     print(
         f"\nDone. Processed {processed} works, saved {saved} PDFs, HTML-only {html_only}, skipped {skipped}."
