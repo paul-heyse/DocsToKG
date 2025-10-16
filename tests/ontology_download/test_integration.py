@@ -29,8 +29,9 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import core, download, resolvers, storage, validators
-from DocsToKG.OntologyDownload.config import DefaultsConfig, ResolvedConfig
+from DocsToKG.OntologyDownload import DefaultsConfig, ResolvedConfig
+from DocsToKG.OntologyDownload import ontology_download as core
+from DocsToKG.OntologyDownload import resolvers
 
 
 @pytest.fixture()
@@ -40,15 +41,25 @@ def patched_dirs(monkeypatch, tmp_path):
     logs = tmp_path / "logs"
     ontologies = tmp_path / "ontologies"
     for directory in (cache, configs, logs, ontologies):
-        directory.mkdir()
+        directory.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(core, "CACHE_DIR", cache, raising=False)
     monkeypatch.setattr(core, "CONFIG_DIR", configs, raising=False)
     monkeypatch.setattr(core, "LOG_DIR", logs, raising=False)
     monkeypatch.setattr(core, "ONTOLOGY_DIR", ontologies, raising=False)
-    monkeypatch.setattr(storage, "CACHE_DIR", cache, raising=False)
-    monkeypatch.setattr(storage, "CONFIG_DIR", configs, raising=False)
-    monkeypatch.setattr(storage, "LOG_DIR", logs, raising=False)
-    monkeypatch.setattr(storage, "LOCAL_ONTOLOGY_DIR", ontologies, raising=False)
+
+    class _StubStorage:
+        def ensure_local_version(self, ontology_id: str, version: str) -> Path:
+            path = ontologies / ontology_id / version
+            path.mkdir(parents=True, exist_ok=True)
+            return path
+
+        def finalize_version(self, ontology_id: str, version: str, base_dir: Path) -> None:
+            pass
+
+        def set_latest_version(self, ontology_id: str, path: Path) -> None:  # pragma: no cover - not used
+            pass
+
+    monkeypatch.setattr(core, "STORAGE", _StubStorage(), raising=False)
     return ontologies
 
 
@@ -82,7 +93,7 @@ def stubbed_validators(monkeypatch):
             details = {"ok": True}
             if req.name == "rdflib":
                 details["normalized_sha256"] = hashlib.sha256(b"normalized").hexdigest()
-            results[req.name] = validators.ValidationResult(
+            results[req.name] = core.ValidationResult(
                 ok=True,
                 details=details,
                 output_files=[str(ttl_path), str(json_path)],
@@ -110,8 +121,8 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
         destination = kwargs["destination"]
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(headers["__fixture__"], destination)
-        sha256 = download.sha256_file(destination)
-        return download.DownloadResult(
+        sha256 = core.sha256_file(destination)
+        return core.DownloadResult(
             path=destination,
             status="fresh",
             sha256=sha256,
@@ -135,7 +146,7 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
         assert manifest["id"] == result.spec.id
         assert manifest["validation"]
         local_file = result.local_path
-        assert manifest["sha256"] == download.sha256_file(local_file)
+        assert manifest["sha256"] == core.sha256_file(local_file)
         assert manifest["normalized_sha256"]
         assert len(manifest["fingerprint"]) == 64
         normalized_dir = result.manifest_path.parent / "normalized"
@@ -150,7 +161,7 @@ def test_force_download_bypasses_manifest(monkeypatch, patched_dirs, stubbed_val
     def _download(**kwargs):
         captured["previous"] = kwargs.get("previous_manifest")
         kwargs["destination"].write_bytes(fixture.read_bytes())
-        return download.DownloadResult(
+        return core.DownloadResult(
             path=kwargs["destination"],
             status="fresh",
             sha256="sha",
@@ -174,7 +185,7 @@ def test_multi_version_storage(monkeypatch, patched_dirs, stubbed_validators):
 
     def _download(**kwargs):
         kwargs["destination"].write_bytes(fixture.read_bytes())
-        return download.DownloadResult(
+        return core.DownloadResult(
             path=kwargs["destination"],
             status="fresh",
             sha256="sha",
@@ -197,7 +208,7 @@ def test_fetch_all_logs_progress(monkeypatch, patched_dirs, stubbed_validators, 
 
     def _download(**kwargs):
         kwargs["destination"].write_bytes(fixture.read_bytes())
-        return download.DownloadResult(
+        return core.DownloadResult(
             path=kwargs["destination"],
             status="fresh",
             sha256="sha",

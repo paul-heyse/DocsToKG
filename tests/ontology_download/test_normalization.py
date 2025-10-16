@@ -11,12 +11,8 @@ pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 pytest.importorskip("rdflib")
 
-from DocsToKG.OntologyDownload.config import DefaultsConfig, ResolvedConfig
-from DocsToKG.OntologyDownload.validators import (
-    ValidationRequest,
-    normalize_streaming,
-    validate_rdflib,
-)
+from DocsToKG.OntologyDownload import DefaultsConfig, ResolvedConfig, ValidationRequest
+from DocsToKG.OntologyDownload.ontology_download import normalize_streaming, validate_rdflib
 
 _COMPLEX_FIXTURE = Path("tests/data/ontology_normalization/complex.ttl")
 _EXPECTED_STREAMING_HASH = "a4455411fb31c754effffaf74218f21304c64a8e6c9a0c72634c2af45fa29bb4"

@@ -2,31 +2,31 @@
 
 ## 1. Legacy Cleanup & Consolidation
 
-- [ ] 1.1 **Remove legacy module import aliases**
-  - [ ] 1.1.1 Delete the `_LEGACY_MODULE_MAP` dictionary and its associated loop in `src/DocsToKG/OntologyDownload/__init__.py`
-  - [ ] 1.1.2 Scan the entire codebase for imports using legacy paths: `rg "from DocsToKG.OntologyDownload\.(core|config|validators|download|storage|optdeps|utils|logging_config|validator_workers|foundation|infrastructure|network|pipeline|settings|validation|cli_utils)" --files-with-matches`
-  - [ ] 1.1.3 Update all found imports to use the public API symbols from `DocsToKG.OntologyDownload.__all__` or `.ontology_download`/`.cli` directly
+- [x] 1.1 **Remove legacy module import aliases**
+  - [x] 1.1.1 Delete the `_LEGACY_MODULE_MAP` dictionary and its associated loop in `src/DocsToKG/OntologyDownload/__init__.py`
+  - [x] 1.1.2 Scan the entire codebase for imports using legacy paths: `rg "from DocsToKG.OntologyDownload\.(core|config|validators|download|storage|optdeps|utils|logging_config|validator_workers|foundation|infrastructure|network|pipeline|settings|validation|cli_utils)" --files-with-matches`
+  - [x] 1.1.3 Update all found imports to use the public API symbols from `DocsToKG.OntologyDownload.__all__` or `.ontology_download`/`.cli` directly
   - [ ] 1.1.4 Run full test suite to verify no import errors remain
-  - [ ] 1.1.5 Update CHANGELOG.md with breaking change notice and migration instructions
+  - [x] 1.1.5 Update CHANGELOG.md with breaking change notice and migration instructions
 
-- [ ] 1.2 **Unify rate-limit pattern utilities**
-  - [ ] 1.2.1 Keep the `_RATE_LIMIT_PATTERN` regex in `ontology_download.py` as the single source of truth
-  - [ ] 1.2.2 Remove `_RATE_LIMIT_RE` from `cli.py`
-  - [ ] 1.2.3 Extract a small helper function `parse_rate_limit_to_rps(limit_str: str) -> Optional[float]` in the core module
-  - [ ] 1.2.4 Update `cli.py` to import and use this shared helper in `_rate_limit_to_rps`
-  - [ ] 1.2.5 Add unit tests verifying rate limit parsing for various formats
+- [x] 1.2 **Unify rate-limit pattern utilities**
+  - [x] 1.2.1 Keep the `_RATE_LIMIT_PATTERN` regex in `ontology_download.py` as the single source of truth
+  - [x] 1.2.2 Remove `_RATE_LIMIT_RE` from `cli.py`
+  - [x] 1.2.3 Extract a small helper function `parse_rate_limit_to_rps(limit_str: str) -> Optional[float]` in the core module
+  - [x] 1.2.4 Update `cli.py` to import and use this shared helper in `_rate_limit_to_rps`
+  - [x] 1.2.5 Add unit tests verifying rate limit parsing for various formats
 
-- [ ] 1.3 **Unify directory size utilities**
-  - [ ] 1.3.1 Keep the `_directory_size` function in `ontology_download.py` as canonical
-  - [ ] 1.3.2 Remove `_directory_size` and `_directory_size_bytes` duplicates from `cli.py`
-  - [ ] 1.3.3 Update all callsites in `cli.py` to import and use the core implementation
-  - [ ] 1.3.4 Add unit tests with temporary directories to verify consistent behavior
+- [x] 1.3 **Unify directory size utilities**
+  - [x] 1.3.1 Keep the `_directory_size` function in `ontology_download.py` as canonical
+  - [x] 1.3.2 Remove `_directory_size` and `_directory_size_bytes` duplicates from `cli.py`
+  - [x] 1.3.3 Update all callsites in `cli.py` to import and use the core implementation
+  - [x] 1.3.4 Add unit tests with temporary directories to verify consistent behavior
 
-- [ ] 1.4 **Unify datetime parsing utilities**
-  - [ ] 1.4.1 Consolidate `_parse_iso_datetime`, `_parse_http_datetime`, `_parse_version_timestamp` from CLI with core's `_coerce_datetime`, `_normalize_timestamp`, `_parse_last_modified`
-  - [ ] 1.4.2 Create a single unified datetime utility section in `ontology_download.py` with clear functions for each use case
-  - [ ] 1.4.3 Update CLI to reuse these core functions
-  - [ ] 1.4.4 Add comprehensive unit tests for ISO, HTTP, and version timestamp formats
+- [x] 1.4 **Unify datetime parsing utilities**
+  - [x] 1.4.1 Consolidate `_parse_iso_datetime`, `_parse_http_datetime`, `_parse_version_timestamp` from CLI with core's `_coerce_datetime`, `_normalize_timestamp`, `_parse_last_modified`
+  - [x] 1.4.2 Create a single unified datetime utility section in `ontology_download.py` with clear functions for each use case
+  - [x] 1.4.3 Update CLI to reuse these core functions
+  - [x] 1.4.4 Add comprehensive unit tests for ISO, HTTP, and version timestamp formats
 
 - [ ] 1.5 **Remove CLI metadata probing duplication**
   - [ ] 1.5.1 Remove calls to `_collect_plan_metadata(plans, config)` from `_handle_plan` and `_handle_plan_diff` in `cli.py`
@@ -42,20 +42,20 @@
   - [ ] 1.6.3 Verify that the storage backend's `set_latest_version` handles both symlinks and fallback text files correctly
   - [ ] 1.6.4 Add integration test for prune operation verifying correct latest marker update
 
-- [ ] 1.7 **Collapse repeated exception blocks**
-  - [ ] 1.7.1 Locate the four consecutive identical `except Exception as exc` blocks in `validate_pronto` function in `ontology_download.py`
-  - [ ] 1.7.2 Reduce to a single exception handler at the appropriate scope
-  - [ ] 1.7.3 Verify behavior is unchanged (writes JSON, logs warning, returns `ok=False`)
-  - [ ] 1.7.4 Add regression test that triggers an exception in Pronto validation
+- [x] 1.7 **Collapse repeated exception blocks**
+  - [x] 1.7.1 Locate the four consecutive identical `except Exception as exc` blocks in `validate_pronto` function in `ontology_download.py`
+  - [x] 1.7.2 Reduce to a single exception handler at the appropriate scope
+  - [x] 1.7.3 Verify behavior is unchanged (writes JSON, logs warning, returns `ok=False`)
+  - [x] 1.7.4 Add regression test that triggers an exception in Pronto validation
 
 ## 2. Correctness & Robustness
 
-- [ ] 2.1 **Fix URL security validation bug**
-  - [ ] 2.1.1 Locate the call to `validate_url_security(planned.plan.url, config.defaults.http.allowed_hosts)` in `_populate_plan_metadata` function
-  - [ ] 2.1.2 Change the second argument from `config.defaults.http.allowed_hosts` to `config.defaults.http` (passing the full `DownloadConfiguration`)
-  - [ ] 2.1.3 Verify that `validate_url_security` signature accepts `Optional[DownloadConfiguration]` as the second parameter
-  - [ ] 2.1.4 Add unit test that creates a config with a non-None allowlist and calls `_populate_plan_metadata` to verify no `AttributeError`
-  - [ ] 2.1.5 Add test verifying that URL security validation correctly rejects URLs not in the allowlist during planning
+- [x] 2.1 **Fix URL security validation bug**
+  - [x] 2.1.1 Locate the call to `validate_url_security(planned.plan.url, config.defaults.http.allowed_hosts)` in `_populate_plan_metadata` function
+  - [x] 2.1.2 Change the second argument from `config.defaults.http.allowed_hosts` to `config.defaults.http` (passing the full `DownloadConfiguration`)
+  - [x] 2.1.3 Verify that `validate_url_security` signature accepts `Optional[DownloadConfiguration]` as the second parameter
+  - [x] 2.1.4 Add unit test that creates a config with a non-None allowlist and calls `_populate_plan_metadata` to verify no `AttributeError`
+  - [x] 2.1.5 Add test verifying that URL security validation correctly rejects URLs not in the allowlist during planning
 
 - [ ] 2.2 **Make validators concurrent with guardrails**
   - [ ] 2.2.1 Add `max_concurrent_validators: int = Field(default=2, ge=1, le=8)` to `ValidationConfig` class in `ontology_download.py`

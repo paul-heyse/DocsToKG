@@ -167,6 +167,22 @@ def _derive_doc_id_and_output_path(
     return doc_id, vectors_root / vector_relative
 
 
+def _derive_doc_id_and_output_path(
+    chunk_file: Path, chunks_root: Path, vectors_root: Path
+) -> tuple[str, Path]:
+    """Return manifest doc_id and vector output path for a chunk artifact."""
+
+    relative = chunk_file.relative_to(chunks_root)
+    base = relative
+    if base.suffix == ".jsonl":
+        base = base.with_suffix("")
+    if base.suffix == ".chunks":
+        base = base.with_suffix("")
+    doc_id = base.with_suffix(".doctags").as_posix()
+    vector_relative = base.with_suffix(".vectors.jsonl")
+    return doc_id, vectors_root / vector_relative
+
+
 def _expand_optional(path: Optional[Path]) -> Optional[Path]:
     """Expand optional :class:`Path` values to absolutes when provided.
 
