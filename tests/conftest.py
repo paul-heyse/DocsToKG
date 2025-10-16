@@ -1,30 +1,30 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "tests.conftest",
-#   "purpose": "Shared pytest fixtures for test suite",
+#   "purpose": "Shared pytest fixtures for suite",
 #   "sections": [
 #     {
-#       "id": "_install_pyalex_stub",
+#       "id": "install-pyalex-stub",
 #       "name": "_install_pyalex_stub",
-#       "anchor": "IPS",
+#       "anchor": "function-install-pyalex-stub",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "pytest_addoption",
+#       "id": "pytest-addoption",
 #       "name": "pytest_addoption",
-#       "anchor": "PA",
+#       "anchor": "function-pytest-addoption",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "pytest_configure",
+#       "id": "pytest-configure",
 #       "name": "pytest_configure",
-#       "anchor": "PC",
+#       "anchor": "function-pytest-configure",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "pytest_collection_modifyitems",
+#       "id": "pytest-collection-modifyitems",
 #       "name": "pytest_collection_modifyitems",
-#       "anchor": "PCM",
+#       "anchor": "function-pytest-collection-modifyitems",
 #       "kind": "function"
 #     }
 #   ]
@@ -57,6 +57,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+# --- Globals ---
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "src"
@@ -81,6 +82,7 @@ if VENV_ROOT.exists():
         site_path = str(site_packages)
         if site_packages.exists() and site_path not in sys.path:
             sys.path.insert(0, site_path)
+# --- Helper Functions ---
 
 
 def _install_pyalex_stub() -> None:
@@ -160,6 +162,7 @@ warnings.filterwarnings(
     message=".*SwigPy.*__module__ attribute",
     category=DeprecationWarning,
 )
+# --- Test Cases ---
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

@@ -4,9 +4,9 @@
 #   "purpose": "Implements DocsToKG.OntologyDownload.optdeps behaviors and helpers",
 #   "sections": [
 #     {
-#       "id": "_opt_deps_proxy",
+#       "id": "optdepsproxy",
 #       "name": "_OptDepsProxy",
-#       "anchor": "OPTD",
+#       "anchor": "class-optdepsproxy",
 #       "kind": "class"
 #     }
 #   ]
@@ -24,6 +24,8 @@ from typing import Any, Iterable
 from . import ontology_download as _core
 
 # Names that should return the corresponding attribute from the core module.
+# --- Globals ---
+
 _FORWARD_EXPORTS = {
     "get_pystow": _core.get_pystow,
     "get_rdflib": _core.get_rdflib,
@@ -41,6 +43,7 @@ _MUTABLE_EXPORTS = {
     "_owlready2",
     "_import_module",
 }
+# --- Private Classes ---
 
 
 class _OptDepsProxy(ModuleType):

@@ -4,45 +4,45 @@
 #   "purpose": "Pytest coverage for ontology download integration scenarios",
 #   "sections": [
 #     {
-#       "id": "patched_dirs",
+#       "id": "patched-dirs",
 #       "name": "patched_dirs",
-#       "anchor": "PD",
+#       "anchor": "function-patched-dirs",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_stub_resolver",
+#       "id": "stubresolver",
 #       "name": "_StubResolver",
-#       "anchor": "STUB",
+#       "anchor": "class-stubresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "stubbed_validators",
+#       "id": "stubbed-validators",
 #       "name": "stubbed_validators",
-#       "anchor": "SV",
+#       "anchor": "function-stubbed-validators",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_fetch_all_writes_manifests",
+#       "id": "test-fetch-all-writes-manifests",
 #       "name": "test_fetch_all_writes_manifests",
-#       "anchor": "TFAWM",
+#       "anchor": "function-test-fetch-all-writes-manifests",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_force_download_bypasses_manifest",
+#       "id": "test-force-download-bypasses-manifest",
 #       "name": "test_force_download_bypasses_manifest",
-#       "anchor": "TFDBM",
+#       "anchor": "function-test-force-download-bypasses-manifest",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_multi_version_storage",
+#       "id": "test-multi-version-storage",
 #       "name": "test_multi_version_storage",
-#       "anchor": "TMVS",
+#       "anchor": "function-test-multi-version-storage",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_fetch_all_logs_progress",
+#       "id": "test-fetch-all-logs-progress",
 #       "name": "test_fetch_all_logs_progress",
-#       "anchor": "TFALP",
+#       "anchor": "function-test-fetch-all-logs-progress",
 #       "kind": "function"
 #     }
 #   ]
@@ -153,6 +153,7 @@ def stubbed_validators(monkeypatch):
         return results
 
     monkeypatch.setattr(core, "run_validators", _runner)
+# --- Test Cases ---
 
 
 def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validators):

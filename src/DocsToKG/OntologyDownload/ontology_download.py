@@ -4,771 +4,771 @@
 #   "purpose": "Implements DocsToKG.OntologyDownload.ontology_download behaviors and helpers",
 #   "sections": [
 #     {
-#       "id": "retry_with_backoff",
+#       "id": "retry-with-backoff",
 #       "name": "retry_with_backoff",
-#       "anchor": "RWB",
+#       "anchor": "function-retry-with-backoff",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "sanitize_filename",
+#       "id": "sanitize-filename",
 #       "name": "sanitize_filename",
-#       "anchor": "SF",
+#       "anchor": "function-sanitize-filename",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "generate_correlation_id",
+#       "id": "generate-correlation-id",
 #       "name": "generate_correlation_id",
-#       "anchor": "GCI",
+#       "anchor": "function-generate-correlation-id",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "mask_sensitive_data",
+#       "id": "mask-sensitive-data",
 #       "name": "mask_sensitive_data",
-#       "anchor": "MSD",
+#       "anchor": "function-mask-sensitive-data",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "config_error",
+#       "id": "configerror",
 #       "name": "ConfigError",
-#       "anchor": "CONF",
+#       "anchor": "class-configerror",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "ensure_python_version",
+#       "id": "ensure-python-version",
 #       "name": "ensure_python_version",
-#       "anchor": "EPV",
+#       "anchor": "function-ensure-python-version",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_coerce_sequence",
+#       "id": "coerce-sequence",
 #       "name": "_coerce_sequence",
-#       "anchor": "CS",
+#       "anchor": "function-coerce-sequence",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "logging_configuration",
+#       "id": "loggingconfiguration",
 #       "name": "LoggingConfiguration",
-#       "anchor": "LOGG",
+#       "anchor": "class-loggingconfiguration",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "validation_config",
+#       "id": "validationconfig",
 #       "name": "ValidationConfig",
-#       "anchor": "VALI",
+#       "anchor": "class-validationconfig",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "parse_rate_limit_to_rps",
+#       "id": "parse-rate-limit-to-rps",
 #       "name": "parse_rate_limit_to_rps",
-#       "anchor": "PRLTR",
+#       "anchor": "function-parse-rate-limit-to-rps",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "download_configuration",
+#       "id": "downloadconfiguration",
 #       "name": "DownloadConfiguration",
-#       "anchor": "DOWN",
+#       "anchor": "class-downloadconfiguration",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "defaults_config",
+#       "id": "defaultsconfig",
 #       "name": "DefaultsConfig",
-#       "anchor": "DEFA",
+#       "anchor": "class-defaultsconfig",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "resolved_config",
+#       "id": "resolvedconfig",
 #       "name": "ResolvedConfig",
-#       "anchor": "RESO",
+#       "anchor": "class-resolvedconfig",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "environment_overrides",
+#       "id": "environmentoverrides",
 #       "name": "EnvironmentOverrides",
-#       "anchor": "ENVI",
+#       "anchor": "class-environmentoverrides",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "get_env_overrides",
+#       "id": "get-env-overrides",
 #       "name": "get_env_overrides",
-#       "anchor": "GEO",
+#       "anchor": "function-get-env-overrides",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_apply_env_overrides",
+#       "id": "apply-env-overrides",
 #       "name": "_apply_env_overrides",
-#       "anchor": "AEO",
+#       "anchor": "function-apply-env-overrides",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_make_fetch_spec",
+#       "id": "make-fetch-spec",
 #       "name": "_make_fetch_spec",
-#       "anchor": "MFS",
+#       "anchor": "function-make-fetch-spec",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "merge_defaults",
+#       "id": "merge-defaults",
 #       "name": "merge_defaults",
-#       "anchor": "MD",
+#       "anchor": "function-merge-defaults",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "build_resolved_config",
+#       "id": "build-resolved-config",
 #       "name": "build_resolved_config",
-#       "anchor": "BRC",
+#       "anchor": "function-build-resolved-config",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_validate_schema",
+#       "id": "validate-schema",
 #       "name": "_validate_schema",
-#       "anchor": "VS",
+#       "anchor": "function-validate-schema",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "load_raw_yaml",
+#       "id": "load-raw-yaml",
 #       "name": "load_raw_yaml",
-#       "anchor": "LRY",
+#       "anchor": "function-load-raw-yaml",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "load_config",
+#       "id": "load-config",
 #       "name": "load_config",
-#       "anchor": "LC",
+#       "anchor": "function-load-config",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "validate_config",
+#       "id": "validate-config",
 #       "name": "validate_config",
-#       "anchor": "VC",
+#       "anchor": "function-validate-config",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "json_formatter",
+#       "id": "jsonformatter",
 #       "name": "JSONFormatter",
-#       "anchor": "JSON",
+#       "anchor": "class-jsonformatter",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_compress_old_log",
+#       "id": "compress-old-log",
 #       "name": "_compress_old_log",
-#       "anchor": "COL",
+#       "anchor": "function-compress-old-log",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_cleanup_logs",
+#       "id": "cleanup-logs",
 #       "name": "_cleanup_logs",
-#       "anchor": "CL",
+#       "anchor": "function-cleanup-logs",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "setup_logging",
+#       "id": "setup-logging",
 #       "name": "setup_logging",
-#       "anchor": "SL",
+#       "anchor": "function-setup-logging",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_create_stub_module",
+#       "id": "create-stub-module",
 #       "name": "_create_stub_module",
-#       "anchor": "CSM",
+#       "anchor": "function-create-stub-module",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_create_stub_bnode",
+#       "id": "create-stub-bnode",
 #       "name": "_create_stub_bnode",
-#       "anchor": "CSB",
+#       "anchor": "function-create-stub-bnode",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_create_stub_literal",
+#       "id": "create-stub-literal",
 #       "name": "_create_stub_literal",
-#       "anchor": "CSL",
+#       "anchor": "function-create-stub-literal",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_create_stub_uri",
+#       "id": "create-stub-uri",
 #       "name": "_create_stub_uri",
-#       "anchor": "CSU",
+#       "anchor": "function-create-stub-uri",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_stub_namespace",
+#       "id": "stubnamespace",
 #       "name": "_StubNamespace",
-#       "anchor": "STUB",
+#       "anchor": "class-stubnamespace",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_stub_namespace_manager",
+#       "id": "stubnamespacemanager",
 #       "name": "_StubNamespaceManager",
-#       "anchor": "STUB1",
+#       "anchor": "class-stubnamespacemanager",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_import_module",
+#       "id": "import-module",
 #       "name": "_import_module",
-#       "anchor": "IM",
+#       "anchor": "function-import-module",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_create_pystow_stub",
+#       "id": "create-pystow-stub",
 #       "name": "_create_pystow_stub",
-#       "anchor": "CPS",
+#       "anchor": "function-create-pystow-stub",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_stub_graph",
+#       "id": "stubgraph",
 #       "name": "_StubGraph",
-#       "anchor": "STUB2",
+#       "anchor": "class-stubgraph",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_create_rdflib_stub",
+#       "id": "create-rdflib-stub",
 #       "name": "_create_rdflib_stub",
-#       "anchor": "CRS",
+#       "anchor": "function-create-rdflib-stub",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_create_pronto_stub",
+#       "id": "create-pronto-stub",
 #       "name": "_create_pronto_stub",
-#       "anchor": "CPS1",
+#       "anchor": "function-create-pronto-stub",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_create_owlready_stub",
+#       "id": "create-owlready-stub",
 #       "name": "_create_owlready_stub",
-#       "anchor": "COS",
+#       "anchor": "function-create-owlready-stub",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "get_pystow",
+#       "id": "get-pystow",
 #       "name": "get_pystow",
-#       "anchor": "GP",
+#       "anchor": "function-get-pystow",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "get_rdflib",
+#       "id": "get-rdflib",
 #       "name": "get_rdflib",
-#       "anchor": "GR",
+#       "anchor": "function-get-rdflib",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "get_pronto",
+#       "id": "get-pronto",
 #       "name": "get_pronto",
-#       "anchor": "GP1",
+#       "anchor": "function-get-pronto",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "get_owlready2",
+#       "id": "get-owlready2",
 #       "name": "get_owlready2",
-#       "anchor": "GO",
+#       "anchor": "function-get-owlready2",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "storage_backend",
+#       "id": "storagebackend",
 #       "name": "StorageBackend",
-#       "anchor": "STOR",
+#       "anchor": "class-storagebackend",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_safe_identifiers",
+#       "id": "safe-identifiers",
 #       "name": "_safe_identifiers",
-#       "anchor": "SI",
+#       "anchor": "function-safe-identifiers",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_directory_size",
+#       "id": "directory-size",
 #       "name": "_directory_size",
-#       "anchor": "DS",
+#       "anchor": "function-directory-size",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "local_storage_backend",
+#       "id": "localstoragebackend",
 #       "name": "LocalStorageBackend",
-#       "anchor": "LOCA",
+#       "anchor": "class-localstoragebackend",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "fsspec_storage_backend",
+#       "id": "fsspecstoragebackend",
 #       "name": "FsspecStorageBackend",
-#       "anchor": "FSSP",
+#       "anchor": "class-fsspecstoragebackend",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "get_storage_backend",
+#       "id": "get-storage-backend",
 #       "name": "get_storage_backend",
-#       "anchor": "GSB",
+#       "anchor": "function-get-storage-backend",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_log_download_memory",
+#       "id": "log-download-memory",
 #       "name": "_log_download_memory",
-#       "anchor": "LDM",
+#       "anchor": "function-log-download-memory",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "download_result",
+#       "id": "downloadresult",
 #       "name": "DownloadResult",
-#       "anchor": "DOWN1",
+#       "anchor": "class-downloadresult",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "download_failure",
+#       "id": "downloadfailure",
 #       "name": "DownloadFailure",
-#       "anchor": "DOWN2",
+#       "anchor": "class-downloadfailure",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "token_bucket",
+#       "id": "tokenbucket",
 #       "name": "TokenBucket",
-#       "anchor": "TOKE",
+#       "anchor": "class-tokenbucket",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_is_retryable_status",
+#       "id": "is-retryable-status",
 #       "name": "_is_retryable_status",
-#       "anchor": "IRS",
+#       "anchor": "function-is-retryable-status",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_enforce_idn_safety",
+#       "id": "enforce-idn-safety",
 #       "name": "_enforce_idn_safety",
-#       "anchor": "EIS",
+#       "anchor": "function-enforce-idn-safety",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_rebuild_netloc",
+#       "id": "rebuild-netloc",
 #       "name": "_rebuild_netloc",
-#       "anchor": "RN",
+#       "anchor": "function-rebuild-netloc",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "validate_url_security",
+#       "id": "validate-url-security",
 #       "name": "validate_url_security",
-#       "anchor": "VUS",
+#       "anchor": "function-validate-url-security",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "sha256_file",
+#       "id": "sha256-file",
 #       "name": "sha256_file",
-#       "anchor": "SF1",
+#       "anchor": "function-sha256-file",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_validate_member_path",
+#       "id": "validate-member-path",
 #       "name": "_validate_member_path",
-#       "anchor": "VMP",
+#       "anchor": "function-validate-member-path",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_check_compression_ratio",
+#       "id": "check-compression-ratio",
 #       "name": "_check_compression_ratio",
-#       "anchor": "CCR",
+#       "anchor": "function-check-compression-ratio",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "extract_zip_safe",
+#       "id": "extract-zip-safe",
 #       "name": "extract_zip_safe",
-#       "anchor": "EZS",
+#       "anchor": "function-extract-zip-safe",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "extract_tar_safe",
+#       "id": "extract-tar-safe",
 #       "name": "extract_tar_safe",
-#       "anchor": "ETS",
+#       "anchor": "function-extract-tar-safe",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "extract_archive_safe",
+#       "id": "extract-archive-safe",
 #       "name": "extract_archive_safe",
-#       "anchor": "EAS",
+#       "anchor": "function-extract-archive-safe",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "streaming_downloader",
+#       "id": "streamingdownloader",
 #       "name": "StreamingDownloader",
-#       "anchor": "STRE",
+#       "anchor": "class-streamingdownloader",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_get_bucket",
+#       "id": "get-bucket",
 #       "name": "_get_bucket",
-#       "anchor": "GB",
+#       "anchor": "function-get-bucket",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "download_stream",
+#       "id": "download-stream",
 #       "name": "download_stream",
-#       "anchor": "DS1",
+#       "anchor": "function-download-stream",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "validation_request",
+#       "id": "validationrequest",
 #       "name": "ValidationRequest",
-#       "anchor": "VALI1",
+#       "anchor": "class-validationrequest",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "validation_result",
+#       "id": "validationresult",
 #       "name": "ValidationResult",
-#       "anchor": "VALI2",
+#       "anchor": "class-validationresult",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "validation_timeout",
+#       "id": "validationtimeout",
 #       "name": "ValidationTimeout",
-#       "anchor": "VALI3",
+#       "anchor": "class-validationtimeout",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_log_validation_memory",
+#       "id": "log-validation-memory",
 #       "name": "_log_validation_memory",
-#       "anchor": "LVM",
+#       "anchor": "function-log-validation-memory",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_write_validation_json",
+#       "id": "write-validation-json",
 #       "name": "_write_validation_json",
-#       "anchor": "WVJ",
+#       "anchor": "function-write-validation-json",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_python_merge_sort",
+#       "id": "python-merge-sort",
 #       "name": "_python_merge_sort",
-#       "anchor": "PMS",
+#       "anchor": "function-python-merge-sort",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_term_to_string",
+#       "id": "term-to-string",
 #       "name": "_term_to_string",
-#       "anchor": "TTS",
+#       "anchor": "function-term-to-string",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_canonicalize_turtle",
+#       "id": "canonicalize-turtle",
 #       "name": "_canonicalize_turtle",
-#       "anchor": "CT",
+#       "anchor": "function-canonicalize-turtle",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_canonicalize_blank_nodes_line",
+#       "id": "canonicalize-blank-nodes-line",
 #       "name": "_canonicalize_blank_nodes_line",
-#       "anchor": "CBNL",
+#       "anchor": "function-canonicalize-blank-nodes-line",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_sort_triple_file",
+#       "id": "sort-triple-file",
 #       "name": "_sort_triple_file",
-#       "anchor": "STF",
+#       "anchor": "function-sort-triple-file",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "normalize_streaming",
+#       "id": "normalize-streaming",
 #       "name": "normalize_streaming",
-#       "anchor": "NS",
+#       "anchor": "function-normalize-streaming",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "validator_subprocess_error",
+#       "id": "validatorsubprocesserror",
 #       "name": "ValidatorSubprocessError",
-#       "anchor": "VALI4",
+#       "anchor": "class-validatorsubprocesserror",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_worker_pronto",
+#       "id": "worker-pronto",
 #       "name": "_worker_pronto",
-#       "anchor": "WP",
+#       "anchor": "function-worker-pronto",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_worker_owlready2",
+#       "id": "worker-owlready2",
 #       "name": "_worker_owlready2",
-#       "anchor": "WO",
+#       "anchor": "function-worker-owlready2",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_run_validator_subprocess",
+#       "id": "run-validator-subprocess",
 #       "name": "_run_validator_subprocess",
-#       "anchor": "RVS",
+#       "anchor": "function-run-validator-subprocess",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_run_with_timeout",
+#       "id": "run-with-timeout",
 #       "name": "_run_with_timeout",
-#       "anchor": "RWT",
+#       "anchor": "function-run-with-timeout",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_prepare_xbrl_package",
+#       "id": "prepare-xbrl-package",
 #       "name": "_prepare_xbrl_package",
-#       "anchor": "PXP",
+#       "anchor": "function-prepare-xbrl-package",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "validate_rdflib",
+#       "id": "validate-rdflib",
 #       "name": "validate_rdflib",
-#       "anchor": "VR",
+#       "anchor": "function-validate-rdflib",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "validate_pronto",
+#       "id": "validate-pronto",
 #       "name": "validate_pronto",
-#       "anchor": "VP",
+#       "anchor": "function-validate-pronto",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "validate_owlready2",
+#       "id": "validate-owlready2",
 #       "name": "validate_owlready2",
-#       "anchor": "VO",
+#       "anchor": "function-validate-owlready2",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "validate_robot",
+#       "id": "validate-robot",
 #       "name": "validate_robot",
-#       "anchor": "VR1",
+#       "anchor": "function-validate-robot",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "validate_arelle",
+#       "id": "validate-arelle",
 #       "name": "validate_arelle",
-#       "anchor": "VA",
+#       "anchor": "function-validate-arelle",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_load_validator_plugins",
+#       "id": "load-validator-plugins",
 #       "name": "_load_validator_plugins",
-#       "anchor": "LVP",
+#       "anchor": "function-load-validator-plugins",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_run_validator_task",
+#       "id": "run-validator-task",
 #       "name": "_run_validator_task",
-#       "anchor": "RVT",
+#       "anchor": "function-run-validator-task",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "run_validators",
+#       "id": "run-validators",
 #       "name": "run_validators",
-#       "anchor": "RV",
+#       "anchor": "function-run-validators",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_run_worker_cli",
+#       "id": "run-worker-cli",
 #       "name": "_run_worker_cli",
-#       "anchor": "RWC",
+#       "anchor": "function-run-worker-cli",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "main",
 #       "name": "main",
-#       "anchor": "MAIN",
+#       "anchor": "function-main",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "get_manifest_schema",
+#       "id": "get-manifest-schema",
 #       "name": "get_manifest_schema",
-#       "anchor": "GMS",
+#       "anchor": "function-get-manifest-schema",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "validate_manifest_dict",
+#       "id": "validate-manifest-dict",
 #       "name": "validate_manifest_dict",
-#       "anchor": "VMD",
+#       "anchor": "function-validate-manifest-dict",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "ontology_download_error",
+#       "id": "ontologydownloaderror",
 #       "name": "OntologyDownloadError",
-#       "anchor": "ONTO",
+#       "anchor": "class-ontologydownloaderror",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "resolver_error",
+#       "id": "resolvererror",
 #       "name": "ResolverError",
-#       "anchor": "RESO1",
+#       "anchor": "class-resolvererror",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "validation_error",
+#       "id": "validationerror",
 #       "name": "ValidationError",
-#       "anchor": "VALI5",
+#       "anchor": "class-validationerror",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "configuration_error",
+#       "id": "configurationerror",
 #       "name": "ConfigurationError",
-#       "anchor": "CONF1",
+#       "anchor": "class-configurationerror",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "fetch_spec",
+#       "id": "fetchspec",
 #       "name": "FetchSpec",
-#       "anchor": "FETC",
+#       "anchor": "class-fetchspec",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "fetch_result",
+#       "id": "fetchresult",
 #       "name": "FetchResult",
-#       "anchor": "FETC1",
+#       "anchor": "class-fetchresult",
 #       "kind": "class"
 #     },
 #     {
 #       "id": "manifest",
 #       "name": "Manifest",
-#       "anchor": "MANI",
+#       "anchor": "class-manifest",
 #       "kind": "class"
 #     },
 #     {
 #       "id": "resolver",
 #       "name": "Resolver",
-#       "anchor": "RESO2",
+#       "anchor": "class-resolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "resolver_candidate",
+#       "id": "resolvercandidate",
 #       "name": "ResolverCandidate",
-#       "anchor": "RESO3",
+#       "anchor": "class-resolvercandidate",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "planned_fetch",
+#       "id": "plannedfetch",
 #       "name": "PlannedFetch",
-#       "anchor": "PLAN",
+#       "anchor": "class-plannedfetch",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "parse_http_datetime",
+#       "id": "parse-http-datetime",
 #       "name": "parse_http_datetime",
-#       "anchor": "PHD",
+#       "anchor": "function-parse-http-datetime",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "parse_iso_datetime",
+#       "id": "parse-iso-datetime",
 #       "name": "parse_iso_datetime",
-#       "anchor": "PID",
+#       "anchor": "function-parse-iso-datetime",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "parse_version_timestamp",
+#       "id": "parse-version-timestamp",
 #       "name": "parse_version_timestamp",
-#       "anchor": "PVT",
+#       "anchor": "function-parse-version-timestamp",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "infer_version_timestamp",
+#       "id": "infer-version-timestamp",
 #       "name": "infer_version_timestamp",
-#       "anchor": "IVT",
+#       "anchor": "function-infer-version-timestamp",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_coerce_datetime",
+#       "id": "coerce-datetime",
 #       "name": "_coerce_datetime",
-#       "anchor": "CD",
+#       "anchor": "function-coerce-datetime",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_normalize_timestamp",
+#       "id": "normalize-timestamp",
 #       "name": "_normalize_timestamp",
-#       "anchor": "NT",
+#       "anchor": "function-normalize-timestamp",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_populate_plan_metadata",
+#       "id": "populate-plan-metadata",
 #       "name": "_populate_plan_metadata",
-#       "anchor": "PPM",
+#       "anchor": "function-populate-plan-metadata",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_migrate_manifest_inplace",
+#       "id": "migrate-manifest-inplace",
 #       "name": "_migrate_manifest_inplace",
-#       "anchor": "MMI",
+#       "anchor": "function-migrate-manifest-inplace",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_read_manifest",
+#       "id": "read-manifest",
 #       "name": "_read_manifest",
-#       "anchor": "RM",
+#       "anchor": "function-read-manifest",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_validate_manifest",
+#       "id": "validate-manifest",
 #       "name": "_validate_manifest",
-#       "anchor": "VM",
+#       "anchor": "function-validate-manifest",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_parse_last_modified",
+#       "id": "parse-last-modified",
 #       "name": "_parse_last_modified",
-#       "anchor": "PLM",
+#       "anchor": "function-parse-last-modified",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_fetch_last_modified",
+#       "id": "fetch-last-modified",
 #       "name": "_fetch_last_modified",
-#       "anchor": "FLM",
+#       "anchor": "function-fetch-last-modified",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_write_manifest",
+#       "id": "write-manifest",
 #       "name": "_write_manifest",
-#       "anchor": "WM",
+#       "anchor": "function-write-manifest",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_build_destination",
+#       "id": "build-destination",
 #       "name": "_build_destination",
-#       "anchor": "BD",
+#       "anchor": "function-build-destination",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_ensure_license_allowed",
+#       "id": "ensure-license-allowed",
 #       "name": "_ensure_license_allowed",
-#       "anchor": "ELA",
+#       "anchor": "function-ensure-license-allowed",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_resolver_candidates",
+#       "id": "resolver-candidates",
 #       "name": "_resolver_candidates",
-#       "anchor": "RC",
+#       "anchor": "function-resolver-candidates",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_resolve_plan_with_fallback",
+#       "id": "resolve-plan-with-fallback",
 #       "name": "_resolve_plan_with_fallback",
-#       "anchor": "RPWF",
+#       "anchor": "function-resolve-plan-with-fallback",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "fetch_one",
+#       "id": "fetch-one",
 #       "name": "fetch_one",
-#       "anchor": "FO",
+#       "anchor": "function-fetch-one",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "plan_one",
+#       "id": "plan-one",
 #       "name": "plan_one",
-#       "anchor": "PO",
+#       "anchor": "function-plan-one",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "plan_all",
+#       "id": "plan-all",
 #       "name": "plan_all",
-#       "anchor": "PA",
+#       "anchor": "function-plan-all",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "fetch_all",
+#       "id": "fetch-all",
 #       "name": "fetch_all",
-#       "anchor": "FA",
+#       "anchor": "function-fetch-all",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_safe_lock_component",
+#       "id": "safe-lock-component",
 #       "name": "_safe_lock_component",
-#       "anchor": "SLC",
+#       "anchor": "function-safe-lock-component",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_version_lock",
+#       "id": "version-lock",
 #       "name": "_version_lock",
-#       "anchor": "VL",
+#       "anchor": "function-version-lock",
 #       "kind": "function"
 #     }
 #   ]
@@ -7067,6 +7067,8 @@ def fetch_all(
     ordered_results = [results_map[i] for i in sorted(results_map)]
     return ordered_results
 
+
+# --- Globals ---
 
 __all__ = [
     # Foundation

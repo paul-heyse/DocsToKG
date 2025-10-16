@@ -162,14 +162,14 @@
 
 ## 7. Unified JSONL Logging
 
-- [x] 7.1 Create `JsonlLogger` class in `download_pyalex_pdfs.py` with methods: `log_attempt(record: AttemptRecord)`, `log_summary(summary: Dict)`
+- [x] 7.1 Create `JsonlSink` class in `download_pyalex_pdfs.py` with methods: `log_attempt(record: AttemptRecord)`, `log_summary(summary: Dict)`
 - [x] 7.2 Implement `log_attempt()` to write JSON line with schema: `{"timestamp": ISO8601, "record_type": "attempt", "work_id": ..., "resolver_name": ..., ...}`
 - [x] 7.3 Implement `log_summary()` to write JSON line with schema: `{"timestamp": ISO8601, "record_type": "summary", "total_works": ..., "success_count": ..., ...}`
-- [x] 7.4 Replace `CsvAttemptLogger` instantiation in `main()` with `JsonlLogger(args.log_jsonl or (pdf_dir / "attempts.jsonl"))`
-- [x] 7.5 Replace `ManifestLogger` instantiation with same `JsonlLogger` instance (unify)
+- [x] 7.4 Replace `CsvAttemptLogger` instantiation in `main()` with `JsonlSink(args.log_jsonl or (pdf_dir / "attempts.jsonl"))`
+- [x] 7.5 Replace `ManifestLogger` instantiation with same `JsonlSink` instance (unify)
 - [x] 7.6 Update `AttemptRecord` logging calls to add `sha256` and `content_length` fields
 - [x] 7.7 Create CSV export script `scripts/export_attempts_csv.py` that reads JSONL and writes CSV with same columns as old CsvAttemptLogger
-- [x] 7.8 Add CLI flag `--log-format [jsonl|csv]` (default: jsonl); if csv, wrap JsonlLogger with CSV adapter
+- [x] 7.8 Add CLI flag `--log-format [jsonl|csv]` (default: jsonl); if csv, wrap JsonlSink with CSV adapter
 - [x] 7.9 Add test in `tests/test_jsonl_logging.py` verifying JSONL lines are valid JSON and contain required fields
 - [x] 7.10 Add test verifying CSV export script produces correct columns and values
 
@@ -195,7 +195,7 @@
       pdf_dir: Path,
       html_dir: Path,
       pipeline: ResolverPipeline,
-      logger: JsonlLogger,
+      logger: JsonlSink,
       metrics: ResolverMetrics,
       sleep_sec: float,
   ) -> Dict[str, Any]:

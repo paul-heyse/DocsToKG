@@ -4,273 +4,279 @@
 #   "purpose": "Pytest coverage for docparsing docparsing core scenarios",
 #   "sections": [
 #     {
-#       "id": "_requests_response",
+#       "id": "requestsresponse",
 #       "name": "_RequestsResponse",
-#       "anchor": "REQU",
+#       "anchor": "class-requestsresponse",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_dummy_tqdm",
+#       "id": "stub-module",
+#       "name": "_stub_module",
+#       "anchor": "function-stub-module",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dummytqdm",
 #       "name": "_DummyTqdm",
-#       "anchor": "DUMM",
+#       "anchor": "class-dummytqdm",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_reset_env",
+#       "id": "reset-env",
 #       "name": "_reset_env",
-#       "anchor": "RE",
+#       "anchor": "function-reset-env",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_detect_data_root_env",
+#       "id": "test-detect-data-root-env",
 #       "name": "test_detect_data_root_env",
-#       "anchor": "TDDRE",
+#       "anchor": "function-test-detect-data-root-env",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_detect_data_root_scan",
+#       "id": "test-detect-data-root-scan",
 #       "name": "test_detect_data_root_scan",
-#       "anchor": "TDDRS",
+#       "anchor": "function-test-detect-data-root-scan",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_detect_data_root_fallback",
+#       "id": "test-detect-data-root-fallback",
 #       "name": "test_detect_data_root_fallback",
-#       "anchor": "TDDRF",
+#       "anchor": "function-test-detect-data-root-fallback",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_data_directories_created",
+#       "id": "test-data-directories-created",
 #       "name": "test_data_directories_created",
-#       "anchor": "TDDC",
+#       "anchor": "function-test-data-directories-created",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_get_logger_idempotent",
+#       "id": "test-get-logger-idempotent",
 #       "name": "test_get_logger_idempotent",
-#       "anchor": "TGLI",
+#       "anchor": "function-test-get-logger-idempotent",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_find_free_port_basic",
+#       "id": "test-find-free-port-basic",
 #       "name": "test_find_free_port_basic",
-#       "anchor": "TFFPB",
+#       "anchor": "function-test-find-free-port-basic",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_find_free_port_fallback",
+#       "id": "test-find-free-port-fallback",
 #       "name": "test_find_free_port_fallback",
-#       "anchor": "TFFPF",
+#       "anchor": "function-test-find-free-port-fallback",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_atomic_write_success",
+#       "id": "test-atomic-write-success",
 #       "name": "test_atomic_write_success",
-#       "anchor": "TAWS",
+#       "anchor": "function-test-atomic-write-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_atomic_write_failure",
+#       "id": "test-atomic-write-failure",
 #       "name": "test_atomic_write_failure",
-#       "anchor": "TAWF",
+#       "anchor": "function-test-atomic-write-failure",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_iter_doctags",
+#       "id": "test-iter-doctags",
 #       "name": "test_iter_doctags",
-#       "anchor": "TID",
+#       "anchor": "function-test-iter-doctags",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_iter_chunks",
+#       "id": "test-iter-chunks",
 #       "name": "test_iter_chunks",
-#       "anchor": "TIC",
+#       "anchor": "function-test-iter-chunks",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_jsonl_load_and_save",
+#       "id": "test-jsonl-load-and-save",
 #       "name": "test_jsonl_load_and_save",
-#       "anchor": "TJLAS",
+#       "anchor": "function-test-jsonl-load-and-save",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_jsonl_load_skip_invalid",
+#       "id": "test-jsonl-load-skip-invalid",
 #       "name": "test_jsonl_load_skip_invalid",
-#       "anchor": "TJLSI",
+#       "anchor": "function-test-jsonl-load-skip-invalid",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_jsonl_save_validation_error",
+#       "id": "test-jsonl-save-validation-error",
 #       "name": "test_jsonl_save_validation_error",
-#       "anchor": "TJSVE",
+#       "anchor": "function-test-jsonl-save-validation-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_batcher",
+#       "id": "test-batcher",
 #       "name": "test_batcher",
-#       "anchor": "TB",
+#       "anchor": "function-test-batcher",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_manifest_append",
+#       "id": "test-manifest-append",
 #       "name": "test_manifest_append",
-#       "anchor": "TMA",
+#       "anchor": "function-test-manifest-append",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "make_chunk_row",
+#       "id": "make-chunk-row",
 #       "name": "make_chunk_row",
-#       "anchor": "MCR",
+#       "anchor": "function-make-chunk-row",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "make_vector_row",
+#       "id": "make-vector-row",
 #       "name": "make_vector_row",
-#       "anchor": "MVR",
+#       "anchor": "function-make-vector-row",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_chunk_row_valid",
+#       "id": "test-chunk-row-valid",
 #       "name": "test_chunk_row_valid",
-#       "anchor": "TCRV",
+#       "anchor": "function-test-chunk-row-valid",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_chunk_row_missing_field",
+#       "id": "test-chunk-row-missing-field",
 #       "name": "test_chunk_row_missing_field",
-#       "anchor": "TCRMF",
+#       "anchor": "function-test-chunk-row-missing-field",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_chunk_row_invalid_num_tokens",
+#       "id": "test-chunk-row-invalid-num-tokens",
 #       "name": "test_chunk_row_invalid_num_tokens",
-#       "anchor": "TCRIN",
+#       "anchor": "function-test-chunk-row-invalid-num-tokens",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_chunk_row_invalid_page_numbers",
+#       "id": "test-chunk-row-invalid-page-numbers",
 #       "name": "test_chunk_row_invalid_page_numbers",
-#       "anchor": "TCRIP",
+#       "anchor": "function-test-chunk-row-invalid-page-numbers",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_provenance_invalid_engine",
+#       "id": "test-provenance-invalid-engine",
 #       "name": "test_provenance_invalid_engine",
-#       "anchor": "TPIE",
+#       "anchor": "function-test-provenance-invalid-engine",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_vector_row_valid",
+#       "id": "test-vector-row-valid",
 #       "name": "test_vector_row_valid",
-#       "anchor": "TVRV",
+#       "anchor": "function-test-vector-row-valid",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_vector_row_mismatched_terms",
+#       "id": "test-vector-row-mismatched-terms",
 #       "name": "test_vector_row_mismatched_terms",
-#       "anchor": "TVRMT",
+#       "anchor": "function-test-vector-row-mismatched-terms",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_vector_row_negative_weights",
+#       "id": "test-vector-row-negative-weights",
 #       "name": "test_vector_row_negative_weights",
-#       "anchor": "TVRNW",
+#       "anchor": "function-test-vector-row-negative-weights",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_dense_vector_dimension_mismatch",
+#       "id": "test-dense-vector-dimension-mismatch",
 #       "name": "test_dense_vector_dimension_mismatch",
-#       "anchor": "TDVDM",
+#       "anchor": "function-test-dense-vector-dimension-mismatch",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_get_docling_version",
+#       "id": "test-get-docling-version",
 #       "name": "test_get_docling_version",
-#       "anchor": "TGDV",
+#       "anchor": "function-test-get-docling-version",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_schema_version",
+#       "id": "test-validate-schema-version",
 #       "name": "test_validate_schema_version",
-#       "anchor": "TVSV",
+#       "anchor": "function-test-validate-schema-version",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_chunk_row_invalid_schema_version",
+#       "id": "test-chunk-row-invalid-schema-version",
 #       "name": "test_chunk_row_invalid_schema_version",
-#       "anchor": "TCRIS",
+#       "anchor": "function-test-chunk-row-invalid-schema-version",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_vector_row_invalid_schema_version",
+#       "id": "test-vector-row-invalid-schema-version",
 #       "name": "test_vector_row_invalid_schema_version",
-#       "anchor": "TVRIS",
+#       "anchor": "function-test-vector-row-invalid-schema-version",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_load_jsonl",
+#       "id": "load-jsonl",
 #       "name": "_load_jsonl",
-#       "anchor": "LJ",
+#       "anchor": "function-load-jsonl",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_chunk_golden_rows_validate",
+#       "id": "test-chunk-golden-rows-validate",
 #       "name": "test_chunk_golden_rows_validate",
-#       "anchor": "TCGRV",
+#       "anchor": "function-test-chunk-golden-rows-validate",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_vector_golden_rows_validate",
+#       "id": "test-vector-golden-rows-validate",
 #       "name": "test_vector_golden_rows_validate",
-#       "anchor": "TVGRV",
+#       "anchor": "function-test-vector-golden-rows-validate",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_set_spawn_or_warn_warns_on_incompatible_method",
+#       "id": "test-set-spawn-or-warn-warns-on-incompatible-method",
 #       "name": "test_set_spawn_or_warn_warns_on_incompatible_method",
-#       "anchor": "TSSOW",
+#       "anchor": "function-test-set-spawn-or-warn-warns-on-incompatible-method",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_compute_relative_doc_id_handles_subdirectories",
+#       "id": "test-compute-relative-doc-id-handles-subdirectories",
 #       "name": "test_compute_relative_doc_id_handles_subdirectories",
-#       "anchor": "TCRDI",
+#       "anchor": "function-test-compute-relative-doc-id-handles-subdirectories",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_derive_doc_id_and_output_path",
+#       "id": "test-derive-doc-id-and-output-path",
 #       "name": "test_derive_doc_id_and_output_path",
-#       "anchor": "TDDIA",
+#       "anchor": "function-test-derive-doc-id-and-output-path",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_chunk_row_fields_unique",
+#       "id": "test-chunk-row-fields-unique",
 #       "name": "test_chunk_row_fields_unique",
-#       "anchor": "TCRFU",
+#       "anchor": "function-test-chunk-row-fields-unique",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_qwen_embed_caches_llm",
+#       "id": "test-qwen-embed-caches-llm",
 #       "name": "test_qwen_embed_caches_llm",
-#       "anchor": "TQECL",
+#       "anchor": "function-test-qwen-embed-caches-llm",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pdf_model_path_resolution_precedence",
+#       "id": "test-pdf-model-path-resolution-precedence",
 #       "name": "test_pdf_model_path_resolution_precedence",
-#       "anchor": "TPMPR",
+#       "anchor": "function-test-pdf-model-path-resolution-precedence",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pdf_model_path_cli_normalization",
+#       "id": "test-pdf-model-path-cli-normalization",
 #       "name": "test_pdf_model_path_cli_normalization",
-#       "anchor": "TPMPC",
+#       "anchor": "function-test-pdf-model-path-cli-normalization",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pdf_pipeline_mirrors_output_paths",
+#       "id": "test-pdf-pipeline-mirrors-output-paths",
 #       "name": "test_pdf_pipeline_mirrors_output_paths",
-#       "anchor": "TPPMO",
+#       "anchor": "function-test-pdf-pipeline-mirrors-output-paths",
 #       "kind": "function"
 #     }
 #   ]
@@ -286,7 +292,7 @@ import json
 import socket
 import sys
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -300,29 +306,49 @@ class _RequestsResponse:
         return {"data": []}
 
 
-sys.modules.setdefault("requests", SimpleNamespace(get=lambda *args, **kwargs: _RequestsResponse()))
+class _StubHuggingFaceTokenizer:
+    def __init__(self, tokenizer, max_tokens):
+        self.tokenizer = tokenizer
+        self.max_tokens = max_tokens
 
-sys.modules.setdefault("tqdm", SimpleNamespace(tqdm=lambda *a, **kw: _DummyTqdm(*a, **kw)))
+
+def _stub_module(name: str, **attrs):
+    module = ModuleType(name)
+    module.__dict__.update(attrs)
+    return module
+
+
+sys.modules.setdefault("requests", _stub_module("requests", get=lambda *args, **kwargs: _RequestsResponse()))
+
+sys.modules.setdefault("tqdm", _stub_module("tqdm", tqdm=lambda *a, **kw: _DummyTqdm(*a, **kw)))
 
 sys.modules.setdefault(
     "docling_core.transforms.chunker.base",
-    SimpleNamespace(BaseChunk=object),
+    _stub_module("docling_core.transforms.chunker.base", BaseChunk=object),
 )
 sys.modules.setdefault(
     "docling_core.transforms.chunker.hybrid_chunker",
-    SimpleNamespace(HybridChunker=object),
+    _stub_module("docling_core.transforms.chunker.hybrid_chunker", HybridChunker=object),
 )
 sys.modules.setdefault(
     "docling_core.transforms.chunker.tokenizer.huggingface",
-    SimpleNamespace(HuggingFaceTokenizer=object),
+    _stub_module(
+        "docling_core.transforms.chunker.tokenizer.huggingface",
+        HuggingFaceTokenizer=_StubHuggingFaceTokenizer,
+    ),
 )
 sys.modules.setdefault(
     "docling_core.transforms.chunker.hierarchical_chunker",
-    SimpleNamespace(ChunkingDocSerializer=object, ChunkingSerializerProvider=object),
+    _stub_module(
+        "docling_core.transforms.chunker.hierarchical_chunker",
+        ChunkingDocSerializer=object,
+        ChunkingSerializerProvider=object,
+    ),
 )
 sys.modules.setdefault(
     "docling_core.types.doc.document",
-    SimpleNamespace(
+    _stub_module(
+        "docling_core.types.doc.document",
         DoclingDocument=object,
         DocTagsDocument=object,
         PictureClassificationData=object,
@@ -333,21 +359,30 @@ sys.modules.setdefault(
 )
 sys.modules.setdefault(
     "transformers",
-    SimpleNamespace(
-        AutoTokenizer=SimpleNamespace(from_pretrained=lambda *a, **k: SimpleNamespace())
+    _stub_module(
+        "transformers",
+        AutoTokenizer=SimpleNamespace(from_pretrained=lambda *a, **k: SimpleNamespace()),
     ),
 )
 sys.modules.setdefault(
     "docling_core.transforms.serializer.base",
-    SimpleNamespace(BaseDocSerializer=object, SerializationResult=object),
+    _stub_module(
+        "docling_core.transforms.serializer.base",
+        BaseDocSerializer=object,
+        SerializationResult=object,
+    ),
 )
 sys.modules.setdefault(
     "docling_core.transforms.serializer.common",
-    SimpleNamespace(create_ser_result=lambda *a, **k: {}),
+    _stub_module(
+        "docling_core.transforms.serializer.common",
+        create_ser_result=lambda *a, **k: {},
+    ),
 )
 sys.modules.setdefault(
     "docling_core.transforms.serializer.markdown",
-    SimpleNamespace(
+    _stub_module(
+        "docling_core.transforms.serializer.markdown",
         MarkdownParams=object,
         MarkdownPictureSerializer=object,
         MarkdownTableSerializer=object,
@@ -377,9 +412,7 @@ from DocsToKG.DocParsing.schemas import (  # noqa: E402
     validate_vector_row,
 )
 
-# ---------------------------------------------------------------------------
-# _common utility tests
-
+# --- _common utility tests ---
 
 @pytest.fixture(autouse=True)
 def _reset_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -535,9 +568,7 @@ def test_manifest_append(tmp_path: Path) -> None:
     assert record["status"] == "success"
 
 
-# ---------------------------------------------------------------------------
-# Schema validation tests
-
+# --- Schema validation tests ---
 
 def make_chunk_row(**overrides):
     base = {
@@ -644,9 +675,7 @@ def test_vector_row_invalid_schema_version() -> None:
         schemas.validate_vector_row(make_vector_row(schema_version="embeddings/0.9.0"))
 
 
-# ---------------------------------------------------------------------------
-# Golden fixture validation
-
+# --- Golden fixture validation ---
 
 FIXTURE_ROOT = Path("tests/data/docparsing/golden")
 
@@ -680,9 +709,7 @@ def test_vector_golden_rows_validate(relative: str) -> None:
         assert validated.schema_version == VECTOR_SCHEMA_VERSION
 
 
-# ---------------------------------------------------------------------------
-# New robustness and configuration tests
-
+# --- New robustness and configuration tests ---
 
 def test_set_spawn_or_warn_warns_on_incompatible_method(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture

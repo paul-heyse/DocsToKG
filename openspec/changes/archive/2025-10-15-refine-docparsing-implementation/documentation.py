@@ -1,19 +1,19 @@
 # === NAVMAP v1 ===
 # {
-#   "module": "openspec.changes.archive.2025-10-15-refine-docparsing-implementation.documentation",
+#   "module": "openspec.changes.archive.2025_10_15_refine_docparsing_implementation.documentation",
 #   "purpose": "Archived OpenSpec helper module openspec.changes.archive.2025_10_15_refine_docparsing_implementation.documentation",
 #   "sections": [
 #     {
-#       "id": "requirement_doc",
-#       "name": "RequirementDoc",
-#       "anchor": "REQU",
-#       "kind": "class"
+#       "id": "public_classes",
+#       "name": "Public Classes",
+#       "anchor": "PC",
+#       "kind": "api"
 #     },
 #     {
-#       "id": "load_requirement_docs",
-#       "name": "load_requirement_docs",
-#       "anchor": "LRD",
-#       "kind": "function"
+#       "id": "public_functions",
+#       "name": "Public Functions",
+#       "anchor": "PF",
+#       "kind": "api"
 #     }
 #   ]
 # }
@@ -49,6 +49,8 @@ from typing import Iterable, List
 
 
 @dataclass(frozen=True)
+# --- Public Classes ---
+
 class RequirementDoc:
     """Human-readable description of a DocParsing refinement requirement.
 
@@ -71,6 +73,7 @@ class RequirementDoc:
     summary: str
     spec_reference: str
     scenarios: List[str]
+# --- Public Functions ---
 
 
 def load_requirement_docs() -> Iterable[RequirementDoc]:

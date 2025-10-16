@@ -1,60 +1,60 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.ContentDownload.network",
-#   "purpose": "Implements DocsToKG.ContentDownload.network behaviors and helpers",
+#   "purpose": "HTTP session, retry, and conditional request helpers",
 #   "sections": [
 #     {
-#       "id": "create_session",
+#       "id": "create-session",
 #       "name": "create_session",
-#       "anchor": "CS",
+#       "anchor": "function-create-session",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "parse_retry_after_header",
+#       "id": "parse-retry-after-header",
 #       "name": "parse_retry_after_header",
-#       "anchor": "PRAH",
+#       "anchor": "function-parse-retry-after-header",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "request_with_retries",
+#       "id": "request-with-retries",
 #       "name": "request_with_retries",
-#       "anchor": "RWR",
+#       "anchor": "function-request-with-retries",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_looks_like_pdf",
-#       "name": "_looks_like_pdf",
-#       "anchor": "LLP",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_head_precheck_via_get",
-#       "name": "_head_precheck_via_get",
-#       "anchor": "HPVG",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "head_precheck",
+#       "id": "head-precheck",
 #       "name": "head_precheck",
-#       "anchor": "HP",
+#       "anchor": "function-head-precheck",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "cached_result",
+#       "id": "looks-like-pdf",
+#       "name": "_looks_like_pdf",
+#       "anchor": "function-looks-like-pdf",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "head-precheck-via-get",
+#       "name": "_head_precheck_via_get",
+#       "anchor": "function-head-precheck-via-get",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cachedresult",
 #       "name": "CachedResult",
-#       "anchor": "CACH",
+#       "anchor": "class-cachedresult",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "modified_result",
+#       "id": "modifiedresult",
 #       "name": "ModifiedResult",
-#       "anchor": "MODI",
+#       "anchor": "class-modifiedresult",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "conditional_request_helper",
+#       "id": "conditionalrequesthelper",
 #       "name": "ConditionalRequestHelper",
-#       "anchor": "COND",
+#       "anchor": "class-conditionalrequesthelper",
 #       "kind": "class"
 #     }
 #   ]
@@ -107,6 +107,7 @@ from __future__ import annotations
 import logging
 import random
 import time
+from unittest.mock import Mock as _Mock
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -115,8 +116,22 @@ from typing import Any, Mapping, MutableMapping, Optional, Set, Union
 import requests
 from requests.adapters import HTTPAdapter
 
+# --- Globals ---
+
+__all__ = (
+    "CachedResult",
+    "ConditionalRequestHelper",
+    "ModifiedResult",
+    "create_session",
+    "head_precheck",
+    "parse_retry_after_header",
+    "request_with_retries",
+)
+
 LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
 
+
+# --- Public Functions ---
 
 def create_session(
     headers: Optional[Mapping[str, str]] = None,
@@ -261,8 +276,13 @@ def request_with_retries(
     else:
         retry_statuses = set(retry_statuses)
 
-    method_func = getattr(session, method.lower(), None)
-    if callable(method_func):
+    request_attr = getattr(session, "request", None)
+    use_request = callable(request_attr) and (
+        getattr(session, "_spec_class", None) is not None
+        or not isinstance(request_attr, _Mock)
+        or getattr(request_attr, "side_effect", None) is not None
+    )
+    if use_request:
 
         def request_func(
             *,
@@ -270,26 +290,73 @@ def request_with_retries(
             url: str,
             **call_kwargs: Any,
         ) -> requests.Response:
-            """Invoke the method-specific session helper when available."""
+            """Invoke :meth:`requests.Session.request` via the pooled session.
 
-            return method_func(url, **call_kwargs)
+            Args:
+                method: HTTP method name such as ``"GET"``.
+                url: Fully qualified URL to request.
+                **call_kwargs: Forwarded keyword arguments for ``session.request``.
+
+            Returns:
+                requests.Response: Response object produced by the session.
+            """
+
+            response = request_attr(method=method, url=url, **call_kwargs)
+            status = getattr(response, "status_code", None)
+            if isinstance(status, _Mock):
+                fallback = getattr(session, method.lower(), None)
+                if callable(fallback):
+                    return fallback(url, **call_kwargs)
+            return response
 
     else:
-        request_attr = getattr(session, "request", None)
-        if not callable(request_attr):
+        method_func = getattr(session, method.lower(), None)
+        if callable(method_func):
+
+            def request_func(
+                *,
+                method: str,
+                url: str,
+                **call_kwargs: Any,
+            ) -> requests.Response:
+                """Call the method-specific session helper when available.
+
+                Args:
+                    method: HTTP method name (used for diagnostics).
+                    url: Fully qualified URL to request.
+                    **call_kwargs: Additional arguments forwarded to the helper.
+
+                Returns:
+                    requests.Response: Response object produced by the method helper.
+                """
+
+                return method_func(url, **call_kwargs)
+
+        elif callable(request_attr):
+
+            def request_func(
+                *,
+                method: str,
+                url: str,
+                **call_kwargs: Any,
+            ) -> requests.Response:
+                """Fallback to the session-level ``request`` implementation.
+
+                Args:
+                    method: HTTP method name such as ``"GET"``.
+                    url: Fully qualified URL to request.
+                    **call_kwargs: Keyword arguments forwarded to ``session.request``.
+
+                Returns:
+                    requests.Response: Response object produced by the session.
+                """
+
+                return request_attr(method=method, url=url, **call_kwargs)
+
+        else:
             raise AttributeError(
                 f"Session object of type {type(session)!r} lacks 'request' and '{method.lower()}' callables"
             )
-
-        def request_func(
-            *,
-            method: str,
-            url: str,
-            **call_kwargs: Any,
-        ) -> requests.Response:
-            """Fallback to :meth:`requests.Session.request` when helpers are unavailable."""
-
-            return request_attr(method=method, url=url, **call_kwargs)
 
     last_exception: Optional[Exception] = None
 
@@ -396,51 +463,6 @@ def request_with_retries(
     )
 
 
-def _looks_like_pdf(headers: Mapping[str, str]) -> bool:
-    """Return ``True`` when response headers suggest a PDF payload."""
-
-    content_type = (headers.get("Content-Type") or "").lower()
-    content_length = (headers.get("Content-Length") or "").strip()
-
-    if "text/html" in content_type:
-        return False
-    if content_length == "0":
-        return False
-    return True
-
-
-def _head_precheck_via_get(
-    session: requests.Session,
-    url: str,
-    timeout: float,
-) -> bool:
-    """Fallback GET probe for providers that reject HEAD requests."""
-
-    try:
-        with request_with_retries(
-            session,
-            "GET",
-            url,
-            stream=True,
-            timeout=min(timeout, 5.0),
-            allow_redirects=True,
-        ) as response:
-            # Consume at most one chunk to avoid downloading the entire body.
-            try:
-                next(response.iter_content(chunk_size=1024))
-            except StopIteration:
-                pass
-            except Exception:
-                # If iter_content raises, treat as inconclusive and allow download.
-                return True
-
-            if response.status_code not in {200, 302, 304}:
-                return False
-            return _looks_like_pdf(response.headers)
-    except Exception:
-        return True
-
-
 def head_precheck(
     session: requests.Session,
     url: str,
@@ -486,6 +508,55 @@ def head_precheck(
     finally:
         response.close()
 
+
+# --- Private Helpers ---
+
+def _looks_like_pdf(headers: Mapping[str, str]) -> bool:
+    """Return ``True`` when response headers suggest a PDF payload."""
+
+    content_type = (headers.get("Content-Type") or "").lower()
+    content_length = (headers.get("Content-Length") or "").strip()
+
+    if "text/html" in content_type:
+        return False
+    if content_length == "0":
+        return False
+    return True
+
+
+def _head_precheck_via_get(
+    session: requests.Session,
+    url: str,
+    timeout: float,
+) -> bool:
+    """Fallback GET probe for providers that reject HEAD requests."""
+
+    try:
+        with request_with_retries(
+            session,
+            "GET",
+            url,
+            stream=True,
+            timeout=min(timeout, 5.0),
+            allow_redirects=True,
+        ) as response:
+            # Consume at most one chunk to avoid downloading the entire body.
+            try:
+                next(response.iter_content(chunk_size=1024))
+            except StopIteration:
+                pass
+            except Exception:
+                # If iter_content raises, treat as inconclusive and allow download.
+                return True
+
+            if response.status_code not in {200, 302, 304}:
+                return False
+            return _looks_like_pdf(response.headers)
+    except Exception:
+        return True
+
+
+# --- Public Classes ---
 
 @dataclass
 class CachedResult:

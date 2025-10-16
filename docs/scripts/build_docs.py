@@ -5,16 +5,22 @@
 #   "purpose": "Documentation tooling for build docs workflows",
 #   "sections": [
 #     {
-#       "id": "docs_builder",
-#       "name": "DocsBuilder",
-#       "anchor": "DOCS",
-#       "kind": "class"
+#       "id": "public_classes",
+#       "name": "Public Classes",
+#       "anchor": "PC",
+#       "kind": "api"
 #     },
 #     {
-#       "id": "main",
-#       "name": "main",
-#       "anchor": "MAIN",
-#       "kind": "function"
+#       "id": "public_functions",
+#       "name": "Public Functions",
+#       "anchor": "PF",
+#       "kind": "api"
+#     },
+#     {
+#       "id": "module_entry_points",
+#       "name": "Module Entry Points",
+#       "anchor": "MEP",
+#       "kind": "cli"
 #     }
 #   ]
 # }
@@ -32,6 +38,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+# --- Public Classes ---
 
 
 class DocsBuilder:
@@ -252,6 +259,8 @@ class DocsBuilder:
             success = False
 
         return success
+# --- Public Functions ---
+# --- Module Entry Points ---
 
 
 def main():

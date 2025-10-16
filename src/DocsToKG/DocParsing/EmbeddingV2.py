@@ -2,206 +2,49 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.DocParsing.EmbeddingV2",
-#   "purpose": "Implements DocsToKG.DocParsing.EmbeddingV2 behaviors and helpers",
+#   "purpose": "Embedding pipelines for DocParsing",
 #   "sections": [
-#     {
-#       "id": "_qwen_cache_key",
-#       "name": "_qwen_cache_key",
-#       "anchor": "QCK",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_resolve_qwen_dir",
-#       "name": "_resolve_qwen_dir",
-#       "anchor": "RQD",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_resolve_splade_dir",
-#       "name": "_resolve_splade_dir",
-#       "anchor": "RSD",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_derive_doc_id_and_output_path",
-#       "name": "_derive_doc_id_and_output_path",
-#       "anchor": "DDIAO",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_derive_doc_id_and_output_path",
-#       "name": "_derive_doc_id_and_output_path",
-#       "anchor": "DIAO1",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_expand_optional",
-#       "name": "_expand_optional",
-#       "anchor": "EO",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_resolve_cli_path",
-#       "name": "_resolve_cli_path",
-#       "anchor": "RCP",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_missing_splade_dependency_message",
-#       "name": "_missing_splade_dependency_message",
-#       "anchor": "MSDM",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_missing_qwen_dependency_message",
-#       "name": "_missing_qwen_dependency_message",
-#       "anchor": "MQDM",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_ensure_splade_dependencies",
-#       "name": "_ensure_splade_dependencies",
-#       "anchor": "ESD",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_ensure_qwen_dependencies",
-#       "name": "_ensure_qwen_dependencies",
-#       "anchor": "EQD",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure_uuid",
-#       "name": "ensure_uuid",
-#       "anchor": "EU",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure_chunk_schema",
-#       "name": "ensure_chunk_schema",
-#       "anchor": "ECS",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "tokens",
-#       "name": "tokens",
-#       "anchor": "TOKE",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "bm25_stats",
-#       "name": "BM25Stats",
-#       "anchor": "BM25",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "bm25_stats_accumulator",
-#       "name": "BM25StatsAccumulator",
-#       "anchor": "BM251",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "print_bm25_summary",
-#       "name": "print_bm25_summary",
-#       "anchor": "PBS",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "bm25_vector",
-#       "name": "bm25_vector",
-#       "anchor": "BV",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "splade_cfg",
-#       "name": "SpladeCfg",
-#       "anchor": "SPLA",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "splade_encode",
-#       "name": "splade_encode",
-#       "anchor": "SE",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_detect_splade_backend",
-#       "name": "_detect_splade_backend",
-#       "anchor": "DSB",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_get_splade_encoder",
-#       "name": "_get_splade_encoder",
-#       "anchor": "GSE",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_get_splade_backend_used",
-#       "name": "_get_splade_backend_used",
-#       "anchor": "GSBU",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "splade_validator",
-#       "name": "SPLADEValidator",
-#       "anchor": "SPLA1",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "qwen_cfg",
-#       "name": "QwenCfg",
-#       "anchor": "QWEN",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "qwen_embed",
-#       "name": "qwen_embed",
-#       "anchor": "QE",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "process_pass_a",
-#       "name": "process_pass_a",
-#       "anchor": "PPA",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "iter_rows_in_batches",
-#       "name": "iter_rows_in_batches",
-#       "anchor": "IRIB",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "process_chunk_file_vectors",
-#       "name": "process_chunk_file_vectors",
-#       "anchor": "PCFV",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "write_vectors",
-#       "name": "write_vectors",
-#       "anchor": "WV",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "build_parser",
-#       "name": "build_parser",
-#       "anchor": "BP",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "parse_args",
-#       "name": "parse_args",
-#       "anchor": "PA",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "main",
-#       "name": "main",
-#       "anchor": "MAIN",
-#       "kind": "function"
-#     }
+#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
+#     {"id": "public-functions", "name": "Public Functions", "anchor": "public-functions", "kind": "api"},
+#     {"id": "public-functions-qwen-cache-key", "name": "_qwen_cache_key", "anchor": "public-functions-qwen-cache-key", "kind": "function"},
+#     {"id": "cache-utilities", "name": "Cache Utilities", "anchor": "cache-utilities", "kind": "internal"},
+#     {"id": "cache-utilities-resolve-qwen-dir", "name": "_resolve_qwen_dir", "anchor": "cache-utilities-resolve-qwen-dir", "kind": "function"},
+#     {"id": "cache-utilities-resolve-splade-dir", "name": "_resolve_splade_dir", "anchor": "cache-utilities-resolve-splade-dir", "kind": "function"},
+#     {"id": "cache-utilities-derive-doc-id-and-output-path", "name": "_derive_doc_id_and_output_path", "anchor": "cache-utilities-derive-doc-id-and-output-path", "kind": "function"},
+#     {"id": "cache-utilities-expand-optional", "name": "_expand_optional", "anchor": "cache-utilities-expand-optional", "kind": "function"},
+#     {"id": "cache-utilities-resolve-cli-path", "name": "_resolve_cli_path", "anchor": "cache-utilities-resolve-cli-path", "kind": "function"},
+#     {"id": "cache-utilities-missing-splade-dependency-message", "name": "_missing_splade_dependency_message", "anchor": "cache-utilities-missing-splade-dependency-message", "kind": "function"},
+#     {"id": "cache-utilities-missing-qwen-dependency-message", "name": "_missing_qwen_dependency_message", "anchor": "cache-utilities-missing-qwen-dependency-message", "kind": "function"},
+#     {"id": "cache-utilities-ensure-splade-dependencies", "name": "_ensure_splade_dependencies", "anchor": "cache-utilities-ensure-splade-dependencies", "kind": "function"},
+#     {"id": "cache-utilities-ensure-qwen-dependencies", "name": "_ensure_qwen_dependencies", "anchor": "cache-utilities-ensure-qwen-dependencies", "kind": "function"},
+#     {"id": "bm25-tokenizer", "name": "BM25 Tokenizer", "anchor": "bm25-tokenizer", "kind": "internal"},
+#     {"id": "bm25-tokenizer-ensure-uuid", "name": "ensure_uuid", "anchor": "bm25-tokenizer-ensure-uuid", "kind": "function"},
+#     {"id": "bm25-tokenizer-ensure-chunk-schema", "name": "ensure_chunk_schema", "anchor": "bm25-tokenizer-ensure-chunk-schema", "kind": "function"},
+#     {"id": "bm25-tokenizer-tokens", "name": "tokens", "anchor": "bm25-tokenizer-tokens", "kind": "function"},
+#     {"id": "public-classes", "name": "Public Classes", "anchor": "public-classes", "kind": "api"},
+#     {"id": "public-classes-bm25stats", "name": "BM25Stats", "anchor": "public-classes-bm25stats", "kind": "class"},
+#     {"id": "public-classes-bm25statsaccumulator", "name": "BM25StatsAccumulator", "anchor": "public-classes-bm25statsaccumulator", "kind": "class"},
+#     {"id": "public-classes-print-bm25-summary", "name": "print_bm25_summary", "anchor": "public-classes-print-bm25-summary", "kind": "function"},
+#     {"id": "public-classes-bm25-vector", "name": "bm25_vector", "anchor": "public-classes-bm25-vector", "kind": "function"},
+#     {"id": "splade-v3-gpu", "name": "SPLADE-v3 (GPU)", "anchor": "splade-v3-gpu", "kind": "api"},
+#     {"id": "splade-v3-gpu-spladecfg", "name": "SpladeCfg", "anchor": "splade-v3-gpu-spladecfg", "kind": "class"},
+#     {"id": "splade-v3-gpu-splade-encode", "name": "splade_encode", "anchor": "splade-v3-gpu-splade-encode", "kind": "function"},
+#     {"id": "splade-v3-gpu-detect-splade-backend", "name": "_detect_splade_backend", "anchor": "splade-v3-gpu-detect-splade-backend", "kind": "function"},
+#     {"id": "splade-v3-gpu-get-splade-encoder", "name": "_get_splade_encoder", "anchor": "splade-v3-gpu-get-splade-encoder", "kind": "function"},
+#     {"id": "splade-v3-gpu-get-splade-backend-used", "name": "_get_splade_backend_used", "anchor": "splade-v3-gpu-get-splade-backend-used", "kind": "function"},
+#     {"id": "splade-v3-gpu-spladevalidator", "name": "SPLADEValidator", "anchor": "splade-v3-gpu-spladevalidator", "kind": "class"},
+#     {"id": "qwen3-embeddings", "name": "Qwen3 Embeddings", "anchor": "qwen3-embeddings", "kind": "api"},
+#     {"id": "qwen3-embeddings-qwencfg", "name": "QwenCfg", "anchor": "qwen3-embeddings-qwencfg", "kind": "class"},
+#     {"id": "qwen3-embeddings-qwen-embed", "name": "qwen_embed", "anchor": "qwen3-embeddings-qwen-embed", "kind": "function"},
+#     {"id": "qwen3-embeddings-process-pass-a", "name": "process_pass_a", "anchor": "qwen3-embeddings-process-pass-a", "kind": "function"},
+#     {"id": "qwen3-embeddings-iter-rows-in-batches", "name": "iter_rows_in_batches", "anchor": "qwen3-embeddings-iter-rows-in-batches", "kind": "function"},
+#     {"id": "qwen3-embeddings-iter-chunk-files", "name": "iter_chunk_files", "anchor": "qwen3-embeddings-iter-chunk-files", "kind": "function"},
+#     {"id": "qwen3-embeddings-process-chunk-file-vectors", "name": "process_chunk_file_vectors", "anchor": "qwen3-embeddings-process-chunk-file-vectors", "kind": "function"},
+#     {"id": "qwen3-embeddings-write-vectors", "name": "write_vectors", "anchor": "qwen3-embeddings-write-vectors", "kind": "function"},
+#     {"id": "main-driver", "name": "Main Driver", "anchor": "main-driver", "kind": "cli"},
+#     {"id": "main-driver-build-parser", "name": "build_parser", "anchor": "main-driver-build-parser", "kind": "function"},
+#     {"id": "main-driver-parse-args", "name": "parse_args", "anchor": "main-driver-parse-args", "kind": "function"},
+#     {"id": "main-driver-main", "name": "main", "anchor": "main-driver-main", "kind": "function"}
 #   ]
 # }
 # === /NAVMAP ===
@@ -284,6 +127,34 @@ from DocsToKG.DocParsing.schemas import (
     validate_schema_version,
 )
 
+# --- Globals ---
+
+__all__ = (
+    "BM25Stats",
+    "BM25StatsAccumulator",
+    "QwenCfg",
+    "SPLADEValidator",
+    "SpladeCfg",
+    "bm25_vector",
+    "build_parser",
+    "ensure_chunk_schema",
+    "ensure_uuid",
+    "iter_chunk_files",
+    "iter_rows_in_batches",
+    "main",
+    "parse_args",
+    "print_bm25_summary",
+    "process_chunk_file_vectors",
+    "process_pass_a",
+    "qwen_embed",
+    "splade_encode",
+    "tokens",
+    "write_vectors",
+)
+
+
+# --- Public Functions ---
+
 try:  # Optional dependency used for SPLADE sparse embeddings
     from sentence_transformers import (
         SparseEncoder,
@@ -323,8 +194,7 @@ def _qwen_cache_key(cfg: QwenCfg) -> Tuple[str, str, int, float, str | None]:
     )
 
 
-# ---- Cache / model path resolution ----
-
+# --- Cache Utilities ---
 
 def _resolve_qwen_dir(model_root: Path) -> Path:
     """Resolve Qwen model directory with ``DOCSTOKG_QWEN_DIR`` override.
@@ -472,7 +342,7 @@ def _ensure_qwen_dependencies() -> None:
         raise ImportError(_missing_qwen_dependency_message()) from _VLLM_IMPORT_ERROR
 
 
-# ---- simple tokenizer for BM25 ----
+# --- BM25 Tokenizer ---
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)?")
 
@@ -537,7 +407,8 @@ def tokens(text: str) -> List[str]:
     return [t.lower() for t in TOKEN_RE.findall(text)]
 
 
-# ---- BM25 (global) ----
+# --- Public Classes ---
+
 @dataclass
 class BM25Stats:
     """Corpus-wide statistics required for BM25 weighting.
@@ -665,7 +536,8 @@ def bm25_vector(
     return terms, weights
 
 
-# ---- SPLADE-v3 (GPU) ----
+# --- SPLADE-v3 (GPU) ---
+
 @dataclass
 class SpladeCfg:
     """Runtime configuration for SPLADE sparse encoding.
@@ -897,7 +769,8 @@ class SPLADEValidator:
             )
 
 
-# ---- Qwen3-Embedding-4B via vLLM (2560-d) ----
+# --- Qwen3 Embeddings ---
+
 @dataclass
 class QwenCfg:
     """Configuration for generating dense embeddings with Qwen via vLLM.
@@ -1033,18 +906,32 @@ def iter_rows_in_batches(path: Path, batch_size: int) -> Iterator[List[dict]]:
         yield buf
 
 
+def iter_chunk_files(directory: Path) -> Iterator[Path]:
+    """Deprecated shim that forwards to :func:`iter_chunks`.
+
+    Args:
+        directory: Directory to scan for chunk artifacts.
+
+    Returns:
+        Iterator over chunk files.
+    """
+
+    yield from iter_chunks(directory)
+
+
 def process_chunk_file_vectors(
     chunk_file: Path,
     out_path: Path,
-    stats: BM25Stats,
-    args: argparse.Namespace,
-    validator: SPLADEValidator,
-    logger,
+    stats: Optional[BM25Stats] = None,
+    args: Optional[argparse.Namespace] = None,
+    validator: Optional[SPLADEValidator] = None,
+    logger=None,
 ) -> Tuple[int, List[int], List[float]]:
     """Generate vectors for a single chunk file and persist them to disk.
 
     Args:
         chunk_file: Chunk JSONL file to process.
+        out_path: Destination path for vectors.
         stats: Precomputed BM25 statistics.
         args: Parsed CLI arguments with runtime configuration.
         validator: SPLADE validator for sparsity metrics.
@@ -1057,6 +944,14 @@ def process_chunk_file_vectors(
         ValueError: Propagated if vector dimensions or norms fail validation.
     """
 
+    if not isinstance(stats, BM25Stats) or args is None or validator is None:
+        raise TypeError("process_chunk_file_vectors received invalid arguments")
+
+    if not isinstance(out_path, Path):
+        raise TypeError("out_path must be a Path")
+    resolved_out_path = out_path
+    resolved_out_path.parent.mkdir(parents=True, exist_ok=True)
+
     # Determine batch size for streaming
     batch_size = max(args.batch_size_qwen, args.batch_size_splade)
 
@@ -1064,7 +959,7 @@ def process_chunk_file_vectors(
     nnz_all: List[int] = []
     norms_all: List[float] = []
 
-    with atomic_write(out_path) as handle:
+    with atomic_write(resolved_out_path) as handle:
         for rows in iter_rows_in_batches(chunk_file, batch_size):
             if not rows:
                 continue
@@ -1113,7 +1008,7 @@ def process_chunk_file_vectors(
         extra={
             "extra_fields": {
                 "chunk_file": str(chunk_file),
-                "vectors_file": str(out_path),
+                "vectors_file": str(resolved_out_path),
                 "rows": total_count,
             }
         },
@@ -1276,7 +1171,8 @@ def write_vectors(
     return len(uuids), splade_nnz, qwen_norms
 
 
-# ---- Main driver ----
+# --- Main Driver ---
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct the CLI parser for the embedding pipeline.
 
@@ -1550,9 +1446,6 @@ def main(args: argparse.Namespace | None = None) -> int:
         doc_id, out_path = _derive_doc_id_and_output_path(chunk_file, chunks_dir, args.out_dir)
         input_hash = compute_content_hash(chunk_file)
         entry = manifest_index.get(doc_id)
-        if entry is None:
-            legacy_key = chunk_file.relative_to(chunks_dir).as_posix()
-            entry = manifest_index.get(legacy_key)
         if (
             args.resume
             and not args.force

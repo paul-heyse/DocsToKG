@@ -1,168 +1,168 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.DocParsing._common",
-#   "purpose": "Shared utilities used across DocsToKG DocParsing pipelines",
+#   "purpose": "Implements DocsToKG.DocParsing._common behaviors and helpers",
 #   "sections": [
 #     {
-#       "id": "expand_path",
+#       "id": "expand-path",
 #       "name": "expand_path",
-#       "anchor": "EP",
+#       "anchor": "function-expand-path",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "resolve_hf_home",
+#       "id": "resolve-hf-home",
 #       "name": "resolve_hf_home",
-#       "anchor": "RHH",
+#       "anchor": "function-resolve-hf-home",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "resolve_model_root",
+#       "id": "resolve-model-root",
 #       "name": "resolve_model_root",
-#       "anchor": "RMR",
+#       "anchor": "function-resolve-model-root",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "detect_data_root",
+#       "id": "detect-data-root",
 #       "name": "detect_data_root",
-#       "anchor": "DDR",
+#       "anchor": "function-detect-data-root",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_ensure_dir",
+#       "id": "ensure-dir",
 #       "name": "_ensure_dir",
-#       "anchor": "ED",
+#       "anchor": "function-ensure-dir",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "data_doctags",
+#       "id": "data-doctags",
 #       "name": "data_doctags",
-#       "anchor": "DD",
+#       "anchor": "function-data-doctags",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "data_chunks",
+#       "id": "data-chunks",
 #       "name": "data_chunks",
-#       "anchor": "DC",
+#       "anchor": "function-data-chunks",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "data_vectors",
+#       "id": "data-vectors",
 #       "name": "data_vectors",
-#       "anchor": "DV",
+#       "anchor": "function-data-vectors",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "data_manifests",
+#       "id": "data-manifests",
 #       "name": "data_manifests",
-#       "anchor": "DM",
+#       "anchor": "function-data-manifests",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "data_pdfs",
+#       "id": "data-pdfs",
 #       "name": "data_pdfs",
-#       "anchor": "DP",
+#       "anchor": "function-data-pdfs",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "data_html",
+#       "id": "data-html",
 #       "name": "data_html",
-#       "anchor": "DH",
+#       "anchor": "function-data-html",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "get_logger",
+#       "id": "get-logger",
 #       "name": "get_logger",
-#       "anchor": "GL",
+#       "anchor": "function-get-logger",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "find_free_port",
+#       "id": "find-free-port",
 #       "name": "find_free_port",
-#       "anchor": "FFP",
+#       "anchor": "function-find-free-port",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "atomic_write",
+#       "id": "atomic-write",
 #       "name": "atomic_write",
-#       "anchor": "AW",
+#       "anchor": "function-atomic-write",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "iter_doctags",
+#       "id": "iter-doctags",
 #       "name": "iter_doctags",
-#       "anchor": "ID",
+#       "anchor": "function-iter-doctags",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "iter_chunks",
+#       "id": "iter-chunks",
 #       "name": "iter_chunks",
-#       "anchor": "IC",
+#       "anchor": "function-iter-chunks",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "jsonl_load",
+#       "id": "jsonl-load",
 #       "name": "jsonl_load",
-#       "anchor": "JL",
+#       "anchor": "function-jsonl-load",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "jsonl_save",
+#       "id": "jsonl-save",
 #       "name": "jsonl_save",
-#       "anchor": "JS",
+#       "anchor": "function-jsonl-save",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "batcher",
 #       "name": "Batcher",
-#       "anchor": "BATC",
+#       "anchor": "class-batcher",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_manifest_filename",
+#       "id": "manifest-filename",
 #       "name": "_manifest_filename",
-#       "anchor": "MF",
+#       "anchor": "function-manifest-filename",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "manifest_append",
+#       "id": "manifest-append",
 #       "name": "manifest_append",
-#       "anchor": "MA",
+#       "anchor": "function-manifest-append",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "resolve_hash_algorithm",
+#       "id": "resolve-hash-algorithm",
 #       "name": "resolve_hash_algorithm",
-#       "anchor": "RHA",
+#       "anchor": "function-resolve-hash-algorithm",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "compute_content_hash",
+#       "id": "compute-content-hash",
 #       "name": "compute_content_hash",
-#       "anchor": "CCH",
+#       "anchor": "function-compute-content-hash",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "load_manifest_index",
+#       "id": "load-manifest-index",
 #       "name": "load_manifest_index",
-#       "anchor": "LMI",
+#       "anchor": "function-load-manifest-index",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "acquire_lock",
+#       "id": "acquire-lock",
 #       "name": "acquire_lock",
-#       "anchor": "AL",
+#       "anchor": "function-acquire-lock",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_pid_is_running",
+#       "id": "pid-is-running",
 #       "name": "_pid_is_running",
-#       "anchor": "PIR",
+#       "anchor": "function-pid-is-running",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "set_spawn_or_warn",
+#       "id": "set-spawn-or-warn",
 #       "name": "set_spawn_or_warn",
-#       "anchor": "SSOW",
+#       "anchor": "function-set-spawn-or-warn",
 #       "kind": "function"
 #     }
 #   ]
@@ -245,7 +245,6 @@ __all__ = [
 ]
 
 # --- Path Resolution ---
-
 
 def expand_path(path: str | Path) -> Path:
     """Return ``path`` expanded to an absolute :class:`Path`.
@@ -803,8 +802,8 @@ class Batcher(Iterable[List[T]]):
             if len(batch) >= self._batch_size:
                 yield batch
                 batch = []
-    if batch:
-        yield batch
+        if batch:
+            yield batch
 
 
 # --- Manifest Utilities ---
@@ -941,33 +940,25 @@ def load_manifest_index(stage: str, root: Optional[Path] = None) -> Dict[str, di
 
     manifest_dir = data_manifests(root)
     stage_path = manifest_dir / _manifest_filename(stage)
-    legacy_path = manifest_dir / "docparse.manifest.jsonl"
     index: Dict[str, dict] = {}
-    if stage_path.exists():
-        candidates = [stage_path]
-    elif legacy_path.exists():
-        candidates = [legacy_path]
-    else:
+    if not stage_path.exists():
         return index
 
-    for manifest_path in candidates:
-        with manifest_path.open("r", encoding="utf-8") as handle:
-            for line in handle:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if entry.get("stage") != stage:
-                    if manifest_path is stage_path:
-                        continue
-                    continue
-                doc_id = entry.get("doc_id")
-                if not doc_id:
-                    continue
-                index[doc_id] = entry
+    with stage_path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if entry.get("stage") != stage:
+                continue
+            doc_id = entry.get("doc_id")
+            if not doc_id:
+                continue
+            index[doc_id] = entry
     return index
 
 

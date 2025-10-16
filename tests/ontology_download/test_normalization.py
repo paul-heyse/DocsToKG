@@ -4,45 +4,45 @@
 #   "purpose": "Pytest coverage for ontology download normalization scenarios",
 #   "sections": [
 #     {
-#       "id": "_make_config",
+#       "id": "make-config",
 #       "name": "_make_config",
-#       "anchor": "MC",
+#       "anchor": "function-make-config",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_noop_logger",
+#       "id": "noop-logger",
 #       "name": "_noop_logger",
-#       "anchor": "NL",
+#       "anchor": "function-noop-logger",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_run_rdflib",
+#       "id": "run-rdflib",
 #       "name": "_run_rdflib",
-#       "anchor": "RR",
+#       "anchor": "function-run-rdflib",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_streaming_hash_is_deterministic",
+#       "id": "test-streaming-hash-is-deterministic",
 #       "name": "test_streaming_hash_is_deterministic",
-#       "anchor": "TSHID",
+#       "anchor": "function-test-streaming-hash-is-deterministic",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_streaming_matches_in_memory",
+#       "id": "test-streaming-matches-in-memory",
 #       "name": "test_streaming_matches_in_memory",
-#       "anchor": "TSMIM",
+#       "anchor": "function-test-streaming-matches-in-memory",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_streaming_edge_cases",
+#       "id": "test-streaming-edge-cases",
 #       "name": "test_streaming_edge_cases",
-#       "anchor": "TSEC",
+#       "anchor": "function-test-streaming-edge-cases",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_streaming_flushes_chunks",
+#       "id": "test-streaming-flushes-chunks",
 #       "name": "test_streaming_flushes_chunks",
-#       "anchor": "TSFC",
+#       "anchor": "function-test-streaming-flushes-chunks",
 #       "kind": "function"
 #     }
 #   ]
@@ -64,9 +64,11 @@ pytest.importorskip("rdflib")
 
 from DocsToKG.OntologyDownload import DefaultsConfig, ResolvedConfig, ValidationRequest
 from DocsToKG.OntologyDownload.ontology_download import normalize_streaming, validate_rdflib
+# --- Globals ---
 
 _COMPLEX_FIXTURE = Path("tests/data/ontology_normalization/complex.ttl")
 _EXPECTED_STREAMING_HASH = "65f80531c7207dc63e0d1eb6c85cae2bcb3d37968ae87b24c9c3858a4d85d449"
+# --- Helper Functions ---
 
 
 def _make_config(threshold_mb: int = 2048) -> ResolvedConfig:
@@ -95,6 +97,7 @@ def _run_rdflib(path: Path, tmp_path: Path, threshold_mb: int) -> dict[str, obje
     result = validate_rdflib(request, _noop_logger())
     assert result.ok
     return result.details
+# --- Test Cases ---
 
 
 def test_streaming_hash_is_deterministic(tmp_path: Path) -> None:

@@ -5,22 +5,28 @@
 #   "purpose": "Documentation tooling for generate all docs workflows",
 #   "sections": [
 #     {
-#       "id": "documentation_generator",
-#       "name": "DocumentationGenerator",
-#       "anchor": "DOCU",
-#       "kind": "class"
+#       "id": "public_classes",
+#       "name": "Public Classes",
+#       "anchor": "PC",
+#       "kind": "api"
 #     },
 #     {
-#       "id": "_maybe_reexec_inside_venv",
-#       "name": "_maybe_reexec_inside_venv",
-#       "anchor": "MRIV",
-#       "kind": "function"
+#       "id": "private_helpers",
+#       "name": "Private Helpers",
+#       "anchor": "PH",
+#       "kind": "internal"
 #     },
 #     {
-#       "id": "main",
-#       "name": "main",
-#       "anchor": "MAIN",
-#       "kind": "function"
+#       "id": "public_functions",
+#       "name": "Public Functions",
+#       "anchor": "PF",
+#       "kind": "api"
+#     },
+#     {
+#       "id": "module_entry_points",
+#       "name": "Module Entry Points",
+#       "anchor": "MEP",
+#       "kind": "cli"
 #     }
 #   ]
 # }
@@ -45,6 +51,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import List
+# --- Public Classes ---
 
 
 class DocumentationGenerator:
@@ -145,6 +152,7 @@ class DocumentationGenerator:
             success = False
 
         return success
+# --- Private Helpers ---
 
 
 def _maybe_reexec_inside_venv(project_root: Path) -> None:
@@ -169,6 +177,8 @@ def _maybe_reexec_inside_venv(project_root: Path) -> None:
     script_path = str(Path(__file__).resolve())
     args = [str(candidate), script_path, *sys.argv[1:]]
     os.execvpe(str(candidate), args, env)
+# --- Public Functions ---
+# --- Module Entry Points ---
 
 
 def main():

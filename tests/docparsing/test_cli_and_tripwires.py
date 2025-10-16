@@ -4,63 +4,63 @@
 #   "purpose": "Pytest coverage for docparsing cli and tripwires scenarios",
 #   "sections": [
 #     {
-#       "id": "_token_counting_stub",
+#       "id": "tokencountingstub",
 #       "name": "_TokenCountingStub",
-#       "anchor": "TOKE",
+#       "anchor": "class-tokencountingstub",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_make_rec",
+#       "id": "make-rec",
 #       "name": "_make_rec",
-#       "anchor": "MR",
+#       "anchor": "function-make-rec",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_reload_cli_modules",
+#       "id": "reload-cli-modules",
 #       "name": "_reload_cli_modules",
-#       "anchor": "RCM",
+#       "anchor": "function-reload-cli-modules",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_chunk_and_embed_cli_with_dependency_stubs",
+#       "id": "test-chunk-and-embed-cli-with-dependency-stubs",
 #       "name": "test_chunk_and_embed_cli_with_dependency_stubs",
-#       "anchor": "TCAEC",
+#       "anchor": "function-test-chunk-and-embed-cli-with-dependency-stubs",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_scripts_respect_data_root",
+#       "id": "test-scripts-respect-data-root",
 #       "name": "test_scripts_respect_data_root",
-#       "anchor": "TSRDR",
+#       "anchor": "function-test-scripts-respect-data-root",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_load_jsonl",
+#       "id": "load-jsonl",
 #       "name": "_load_jsonl",
-#       "anchor": "LJ",
+#       "anchor": "function-load-jsonl",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_golden_chunk_count_and_hash",
+#       "id": "test-golden-chunk-count-and-hash",
 #       "name": "test_golden_chunk_count_and_hash",
-#       "anchor": "TGCCA",
+#       "anchor": "function-test-golden-chunk-count-and-hash",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_golden_vectors_hashes",
+#       "id": "test-golden-vectors-hashes",
 #       "name": "test_golden_vectors_hashes",
-#       "anchor": "TGVH",
+#       "anchor": "function-test-golden-vectors-hashes",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_coalesce_small_runs_idempotent",
+#       "id": "test-coalesce-small-runs-idempotent",
 #       "name": "test_coalesce_small_runs_idempotent",
-#       "anchor": "TCSRI",
+#       "anchor": "function-test-coalesce-small-runs-idempotent",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_coalesce_small_runs_handles_unicode",
+#       "id": "test-coalesce-small-runs-handles-unicode",
 #       "name": "test_coalesce_small_runs_handles_unicode",
-#       "anchor": "TCSRH",
+#       "anchor": "function-test-coalesce-small-runs-handles-unicode",
 #       "kind": "function"
 #     }
 #   ]
@@ -145,9 +145,7 @@ GOLDEN_CHUNKS = GOLDEN_DIR / "sample.chunks.jsonl"
 GOLDEN_VECTORS = GOLDEN_DIR / "sample.vectors.jsonl"
 
 
-# ---------------------------------------------------------------------------
-# CLI entry points
-
+# --- CLI entry points ---
 
 def _reload_cli_modules():
     """Reload CLI modules so newly installed stubs are honoured."""
@@ -210,9 +208,7 @@ def test_chunk_and_embed_cli_with_dependency_stubs(
     assert result == 0
 
 
-# ---------------------------------------------------------------------------
-# CLI path smoke tests
-
+# --- CLI path smoke tests ---
 
 def test_scripts_respect_data_root(tmp_path: Path) -> None:
     """Scripts should honor DOCSTOKG_DATA_ROOT when resolving defaults."""
@@ -250,9 +246,7 @@ def test_scripts_respect_data_root(tmp_path: Path) -> None:
     assert expected <= existing
 
 
-# ---------------------------------------------------------------------------
-# Trip-wire regression checks
-
+# --- Trip-wire regression checks ---
 
 def _load_jsonl(path: Path):
     with path.open("r", encoding="utf-8") as handle:

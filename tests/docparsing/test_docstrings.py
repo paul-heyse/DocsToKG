@@ -4,21 +4,21 @@
 #   "purpose": "Pytest coverage for docparsing docstrings scenarios",
 #   "sections": [
 #     {
-#       "id": "_iter_python_modules",
+#       "id": "iter-python-modules",
 #       "name": "_iter_python_modules",
-#       "anchor": "IPM",
+#       "anchor": "function-iter-python-modules",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_iter_defs",
+#       "id": "iter-defs",
 #       "name": "_iter_defs",
-#       "anchor": "ID",
+#       "anchor": "function-iter-defs",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_module_and_definitions_have_docstrings",
+#       "id": "test-module-and-definitions-have-docstrings",
 #       "name": "test_module_and_definitions_have_docstrings",
-#       "anchor": "TMADH",
+#       "anchor": "function-test-module-and-definitions-have-docstrings",
 #       "kind": "function"
 #     }
 #   ]
@@ -31,8 +31,10 @@ import ast
 from pathlib import Path
 
 import pytest
+# --- Globals ---
 
 DOC_PARSING_ROOT = Path(__file__).resolve().parents[2] / "src" / "DocsToKG" / "DocParsing"
+# --- Helper Functions ---
 
 
 def _iter_python_modules(root: Path) -> list[Path]:
@@ -62,6 +64,8 @@ def _iter_defs(node: ast.AST) -> list[ast.AST]:
         if path.name != "__init__.py" or path.parent.name != "testing"
     ],
 )
+# --- Test Cases ---
+
 def test_module_and_definitions_have_docstrings(module_path: Path) -> None:
     source = module_path.read_text(encoding="utf-8")
     module = ast.parse(source, filename=str(module_path))

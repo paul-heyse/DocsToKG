@@ -4,9 +4,9 @@
 #   "purpose": "Implements DocsToKG.OntologyDownload.storage behaviors and helpers",
 #   "sections": [
 #     {
-#       "id": "get_storage_backend",
+#       "id": "get-storage-backend",
 #       "name": "get_storage_backend",
-#       "anchor": "GSB",
+#       "anchor": "function-get-storage-backend",
 #       "kind": "function"
 #     }
 #   ]
@@ -18,10 +18,13 @@
 from __future__ import annotations
 
 from . import ontology_download as _core
+# --- Globals ---
 
 StorageBackend = _core.StorageBackend
 LocalStorageBackend = _core.LocalStorageBackend
 FsspecStorageBackend = _core.FsspecStorageBackend
+
+# --- Globals ---
 
 __all__ = [
     "StorageBackend",
@@ -30,6 +33,7 @@ __all__ = [
     "STORAGE",
     "get_storage_backend",
 ]
+# --- Public Functions ---
 
 
 def get_storage_backend() -> StorageBackend:

@@ -4,93 +4,93 @@
 #   "purpose": "Pytest coverage for ontology download download concurrency scenarios",
 #   "sections": [
 #     {
-#       "id": "_test_http_server",
+#       "id": "testhttpserver",
 #       "name": "_TestHTTPServer",
-#       "anchor": "TEST",
+#       "anchor": "class-testhttpserver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_request_handler",
+#       "id": "requesthandler",
 #       "name": "_RequestHandler",
-#       "anchor": "REQU",
+#       "anchor": "class-requesthandler",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "http_server",
+#       "id": "http-server",
 #       "name": "http_server",
-#       "anchor": "HS",
+#       "anchor": "function-http-server",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_make_http_config",
+#       "id": "make-http-config",
 #       "name": "_make_http_config",
-#       "anchor": "MHC",
+#       "anchor": "function-make-http-config",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_allow_localhost",
+#       "id": "allow-localhost",
 #       "name": "_allow_localhost",
-#       "anchor": "AL",
+#       "anchor": "function-allow-localhost",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_download",
+#       "id": "download",
 #       "name": "_download",
-#       "anchor": "DOWN",
+#       "anchor": "function-download",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_retry_after_transient_error",
+#       "id": "test-retry-after-transient-error",
 #       "name": "test_retry_after_transient_error",
-#       "anchor": "TRATE",
+#       "anchor": "function-test-retry-after-transient-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_mismatch_logs_warning",
+#       "id": "test-head-mismatch-logs-warning",
 #       "name": "test_head_mismatch_logs_warning",
-#       "anchor": "THMLW",
+#       "anchor": "function-test-head-mismatch-logs-warning",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_conditional_requests_return_cached",
+#       "id": "test-conditional-requests-return-cached",
 #       "name": "test_conditional_requests_return_cached",
-#       "anchor": "TCRRC",
+#       "anchor": "function-test-conditional-requests-return-cached",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_partial_content_resume",
+#       "id": "test-partial-content-resume",
 #       "name": "test_partial_content_resume",
-#       "anchor": "TPCR",
+#       "anchor": "function-test-partial-content-resume",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_etag_change_triggers_full_download",
+#       "id": "test-etag-change-triggers-full-download",
 #       "name": "test_etag_change_triggers_full_download",
-#       "anchor": "TECTF",
+#       "anchor": "function-test-etag-change-triggers-full-download",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_token_bucket_limits_same_service",
+#       "id": "test-token-bucket-limits-same-service",
 #       "name": "test_token_bucket_limits_same_service",
-#       "anchor": "TTBLS",
+#       "anchor": "function-test-token-bucket-limits-same-service",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_token_bucket_allows_parallel_services",
+#       "id": "test-token-bucket-allows-parallel-services",
 #       "name": "test_token_bucket_allows_parallel_services",
-#       "anchor": "TTBAP",
+#       "anchor": "function-test-token-bucket-allows-parallel-services",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_results_to_dict_contains_expected_fields",
+#       "id": "test-cli-results-to-dict-contains-expected-fields",
 #       "name": "test_cli_results_to_dict_contains_expected_fields",
-#       "anchor": "TCRTD",
+#       "anchor": "function-test-cli-results-to-dict-contains-expected-fields",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_results_table_includes_status_and_sha",
+#       "id": "test-cli-results-table-includes-status-and-sha",
 #       "name": "test_cli_results_table_includes_status_and_sha",
-#       "anchor": "TCRTI",
+#       "anchor": "function-test-cli-results-table-includes-status-and-sha",
 #       "kind": "function"
 #     }
 #   ]
@@ -318,6 +318,7 @@ def http_server():
     finally:
         server.shutdown()
         thread.join(timeout=5)
+# --- Helper Functions ---
 
 
 def _make_http_config(**overrides) -> DownloadConfiguration:
@@ -355,6 +356,7 @@ def _download(
         expected_media_type=expected_media_type,
         service=service,
     )
+# --- Test Cases ---
 
 
 def test_retry_after_transient_error(

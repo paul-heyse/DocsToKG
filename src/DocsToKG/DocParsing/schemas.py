@@ -4,69 +4,69 @@
 #   "purpose": "Defines schemas for DocsToKG.DocParsing.schemas",
 #   "sections": [
 #     {
-#       "id": "_missing_pydantic_message",
+#       "id": "missing-pydantic-message",
 #       "name": "_missing_pydantic_message",
-#       "anchor": "MPM",
+#       "anchor": "function-missing-pydantic-message",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "provenance_metadata",
+#       "id": "provenancemetadata",
 #       "name": "ProvenanceMetadata",
-#       "anchor": "PROV",
+#       "anchor": "class-provenancemetadata",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "chunk_row",
+#       "id": "chunkrow",
 #       "name": "ChunkRow",
-#       "anchor": "CHUN",
+#       "anchor": "class-chunkrow",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "bm25_vector",
+#       "id": "bm25vector",
 #       "name": "BM25Vector",
-#       "anchor": "BM25",
+#       "anchor": "class-bm25vector",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "splade_vector",
+#       "id": "spladevector",
 #       "name": "SPLADEVector",
-#       "anchor": "SPLA",
+#       "anchor": "class-spladevector",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "dense_vector",
+#       "id": "densevector",
 #       "name": "DenseVector",
-#       "anchor": "DENS",
+#       "anchor": "class-densevector",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "vector_row",
+#       "id": "vectorrow",
 #       "name": "VectorRow",
-#       "anchor": "VECT",
+#       "anchor": "class-vectorrow",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "validate_chunk_row",
+#       "id": "validate-chunk-row",
 #       "name": "validate_chunk_row",
-#       "anchor": "VCR",
+#       "anchor": "function-validate-chunk-row",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "validate_vector_row",
+#       "id": "validate-vector-row",
 #       "name": "validate_vector_row",
-#       "anchor": "VVR",
+#       "anchor": "function-validate-vector-row",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "get_docling_version",
+#       "id": "get-docling-version",
 #       "name": "get_docling_version",
-#       "anchor": "GDV",
+#       "anchor": "function-get-docling-version",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "validate_schema_version",
+#       "id": "validate-schema-version",
 #       "name": "validate_schema_version",
-#       "anchor": "VSV",
+#       "anchor": "function-validate-schema-version",
 #       "kind": "function"
 #     }
 #   ]
@@ -99,6 +99,7 @@ Dependencies:
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+# --- Globals ---
 
 PYDANTIC_AVAILABLE = True
 
@@ -244,6 +245,7 @@ except Exception as exc:  # pragma: no cover - exercised via tests with stubs
         """
 
         return dict(kwargs)
+# --- Private Helpers ---
 
 
 def _missing_pydantic_message() -> str:
@@ -260,6 +262,8 @@ CHUNK_SCHEMA_VERSION = "docparse/1.1.0"
 VECTOR_SCHEMA_VERSION = "embeddings/1.0.0"
 COMPATIBLE_CHUNK_VERSIONS = ["docparse/1.0.0", "docparse/1.1.0"]
 COMPATIBLE_VECTOR_VERSIONS = ["embeddings/1.0.0"]
+
+# --- Globals ---
 
 __all__ = [
     "PYDANTIC_AVAILABLE",
@@ -278,6 +282,7 @@ __all__ = [
     "get_docling_version",
     "validate_schema_version",
 ]
+# --- Public Classes ---
 
 
 class ProvenanceMetadata(BaseModel):
@@ -640,6 +645,7 @@ class VectorRow(BaseModel):
             COMPATIBLE_VECTOR_VERSIONS,
             kind="vector",
         )
+# --- Public Functions ---
 
 
 def validate_chunk_row(row: dict) -> ChunkRow:

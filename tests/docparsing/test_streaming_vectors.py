@@ -4,39 +4,39 @@
 #   "purpose": "Pytest coverage for docparsing streaming vectors scenarios",
 #   "sections": [
 #     {
-#       "id": "test_iter_rows_in_batches",
+#       "id": "test-iter-rows-in-batches",
 #       "name": "test_iter_rows_in_batches",
-#       "anchor": "TIRIB",
+#       "anchor": "function-test-iter-rows-in-batches",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_iter_rows_in_batches_empty_file",
+#       "id": "test-iter-rows-in-batches-empty-file",
 #       "name": "test_iter_rows_in_batches_empty_file",
-#       "anchor": "IRIB1",
+#       "anchor": "function-test-iter-rows-in-batches-empty-file",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_iter_rows_in_batches_single_row",
+#       "id": "test-iter-rows-in-batches-single-row",
 #       "name": "test_iter_rows_in_batches_single_row",
-#       "anchor": "IRIB2",
+#       "anchor": "function-test-iter-rows-in-batches-single-row",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_iter_rows_in_batches_large_batch_size",
+#       "id": "test-iter-rows-in-batches-large-batch-size",
 #       "name": "test_iter_rows_in_batches_large_batch_size",
-#       "anchor": "IRIB3",
+#       "anchor": "function-test-iter-rows-in-batches-large-batch-size",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_iter_rows_in_batches_skips_empty_lines",
+#       "id": "test-iter-rows-in-batches-skips-empty-lines",
 #       "name": "test_iter_rows_in_batches_skips_empty_lines",
-#       "anchor": "IRIB4",
+#       "anchor": "function-test-iter-rows-in-batches-skips-empty-lines",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_iter_rows_in_batches_memory_efficiency",
+#       "id": "test-iter-rows-in-batches-memory-efficiency",
 #       "name": "test_iter_rows_in_batches_memory_efficiency",
-#       "anchor": "IRIB5",
+#       "anchor": "function-test-iter-rows-in-batches-memory-efficiency",
 #       "kind": "function"
 #     }
 #   ]
@@ -52,6 +52,7 @@ from pathlib import Path
 import pytest
 
 from DocsToKG.DocParsing.EmbeddingV2 import iter_rows_in_batches
+# --- Test Cases ---
 
 
 def test_iter_rows_in_batches():
@@ -196,6 +197,7 @@ def test_iter_rows_in_batches_memory_efficiency():
             total_rows += len(batch)
 
         assert total_rows == num_rows
+# --- Module Entry Points ---
 
 
 if __name__ == "__main__":

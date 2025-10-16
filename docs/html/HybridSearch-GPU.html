@@ -85,7 +85,7 @@ GPU-backed cosine helpers for deduplication and fusion.</p>
 <section id="key-capabilities">
 <h2>2. Key Capabilities<a class="headerlink" href="#key-capabilities" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">FaissIndexManager</span></code> constructs <code class="docutils literal notranslate"><span class="pre">GpuIndexFlat</span></code>, <code class="docutils literal notranslate"><span class="pre">GpuIndexIVFFlat</span></code>, and
+<li><p><code class="docutils literal notranslate"><span class="pre">FaissVectorStore</span></code> constructs <code class="docutils literal notranslate"><span class="pre">GpuIndexFlat</span></code>, <code class="docutils literal notranslate"><span class="pre">GpuIndexIVFFlat</span></code>, and
 <code class="docutils literal notranslate"><span class="pre">GpuIndexIVFPQ</span></code> instances without CPU fallbacks.</p></li>
 <li><p>Training samples are drawn on GPU with configurable oversampling to keep
 IVFFlat/PQ builds fast.</p></li>
@@ -159,11 +159,11 @@ easier to compare recall/latency deltas between experiments.</p>
 <h2>5. Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading"></a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">DenseIndexConfig</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.vectorstore</span><span class="w"> </span><span class="kn">import</span> <span class="n">FaissIndexManager</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.vectorstore</span><span class="w"> </span><span class="kn">import</span> <span class="n">FaissVectorStore</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.ids</span><span class="w"> </span><span class="kn">import</span> <span class="n">vector_uuid_to_faiss_int</span>
 
 <span class="n">cfg</span> <span class="o">=</span> <span class="n">DenseIndexConfig</span><span class="p">(</span><span class="n">index_type</span><span class="o">=</span><span class="s2">&quot;ivf_flat&quot;</span><span class="p">,</span> <span class="n">nlist</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span> <span class="n">nprobe</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-<span class="n">manager</span> <span class="o">=</span> <span class="n">FaissIndexManager</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">768</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">cfg</span><span class="p">)</span>
+<span class="n">manager</span> <span class="o">=</span> <span class="n">FaissVectorStore</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">768</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">cfg</span><span class="p">)</span>
 
 <span class="n">xb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">10_000</span><span class="p">,</span> <span class="mi">768</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;float32&quot;</span><span class="p">)</span>
 <span class="n">ids</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;vec-</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">xb</span><span class="p">))]</span>

@@ -1,10 +1,32 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.HybridSearch.ingest",
-#   "purpose": "Ingestion pipelines feeding hybrid search storage",
+#   "purpose": "Implements DocsToKG.HybridSearch.ingest behaviors and helpers",
 #   "sections": [
-#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
-#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"}
+#     {
+#       "id": "ingesterror",
+#       "name": "IngestError",
+#       "anchor": "class-ingesterror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "retryableingesterror",
+#       "name": "RetryableIngestError",
+#       "anchor": "class-retryableingesterror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ingestmetrics",
+#       "name": "IngestMetrics",
+#       "anchor": "class-ingestmetrics",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunkingestionpipeline",
+#       "name": "ChunkIngestionPipeline",
+#       "anchor": "class-chunkingestionpipeline",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -23,7 +45,7 @@ import numpy as np
 from .observability import Observability
 from .storage import ChunkRegistry, OpenSearchSimulator
 from .types import ChunkFeatures, ChunkPayload, DocumentInput
-from .vectorstore import FaissIndexManager
+from .vectorstore import FaissVectorStore
 
 # --- Globals ---
 
@@ -39,7 +61,6 @@ TRAINING_SAMPLE_RNG = np.random.default_rng(13)
 
 
 # --- Public Classes ---
-
 
 class IngestError(RuntimeError):
     """Base exception for ingestion failures.
@@ -99,7 +120,7 @@ class ChunkIngestionPipeline:
 
     Examples:
         >>> pipeline = ChunkIngestionPipeline(
-        ...     faiss_index=FaissIndexManager.build_in_memory(),
+        ...     faiss_index=FaissVectorStore.build_in_memory(),
         ...     opensearch=OpenSearchSimulator(),
         ...     registry=ChunkRegistry(),
         ... )
@@ -110,7 +131,7 @@ class ChunkIngestionPipeline:
     def __init__(
         self,
         *,
-        faiss_index: FaissIndexManager,
+        faiss_index: FaissVectorStore,
         opensearch: OpenSearchSimulator,
         registry: ChunkRegistry,
         observability: Optional[Observability] = None,
@@ -147,14 +168,14 @@ class ChunkIngestionPipeline:
         return self._metrics
 
     @property
-    def faiss_index(self) -> FaissIndexManager:
+    def faiss_index(self) -> FaissVectorStore:
         """Access the FAISS index manager used for vector persistence.
 
         Args:
             None
 
         Returns:
-            FaissIndexManager associated with the ingestion pipeline.
+            FaissVectorStore associated with the ingestion pipeline.
         """
         return self._faiss
 

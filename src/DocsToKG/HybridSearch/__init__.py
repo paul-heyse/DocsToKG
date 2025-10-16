@@ -1,12 +1,8 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.HybridSearch",
-#   "purpose": "Package exports for the DocsToKG hybrid search subsystem",
-#   "sections": [
-#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
-#     {"id": "exports", "name": "Re-exports", "anchor": "exports", "kind": "api"},
-#     {"id": "package-setup", "name": "Package Setup", "anchor": "setup", "kind": "internal"}
-#   ]
+#   "purpose": "Hybrid search public API facade",
+#   "sections": []
 # }
 # === /NAVMAP ===
 
@@ -60,7 +56,7 @@ __all__ = (
     "ChunkPayload",
     "DocumentInput",
     "FeatureGenerator",
-    "FaissIndexManager",
+    "FaissVectorStore",
     "HybridSearchAPI",
     "HybridSearchConfig",
     "HybridSearchConfigManager",
@@ -110,7 +106,7 @@ from .types import (
     vector_uuid_to_faiss_int,
 )
 from .validation import HybridSearchValidator
-from .vectorstore import FaissIndexManager, restore_state, serialize_state
+from .vectorstore import FaissVectorStore, restore_state, serialize_state
 
 
 # --- Package Setup ---

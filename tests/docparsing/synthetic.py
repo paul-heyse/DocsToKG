@@ -4,33 +4,33 @@
 #   "purpose": "Pytest coverage for docparsing synthetic scenarios",
 #   "sections": [
 #     {
-#       "id": "synthetic_benchmark_result",
+#       "id": "syntheticbenchmarkresult",
 #       "name": "SyntheticBenchmarkResult",
-#       "anchor": "SYNT",
+#       "anchor": "class-syntheticbenchmarkresult",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "generate_synthetic_chunks",
+#       "id": "generate-synthetic-chunks",
 #       "name": "generate_synthetic_chunks",
-#       "anchor": "GSC",
+#       "anchor": "function-generate-synthetic-chunks",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "generate_synthetic_vectors",
+#       "id": "generate-synthetic-vectors",
 #       "name": "generate_synthetic_vectors",
-#       "anchor": "GSV",
+#       "anchor": "function-generate-synthetic-vectors",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "simulate_embedding_benchmark",
+#       "id": "simulate-embedding-benchmark",
 #       "name": "simulate_embedding_benchmark",
-#       "anchor": "SEB",
+#       "anchor": "function-simulate-embedding-benchmark",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "format_benchmark_summary",
+#       "id": "format-benchmark-summary",
 #       "name": "format_benchmark_summary",
-#       "anchor": "FBS",
+#       "anchor": "function-format-benchmark-summary",
 #       "kind": "function"
 #     }
 #   ]
@@ -44,6 +44,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from typing import List, Sequence
+# --- Globals ---
 
 __all__ = [
     "SyntheticBenchmarkResult",
@@ -79,6 +80,7 @@ class SyntheticBenchmarkResult:
         if self.naive_peak_mb == 0:
             return 0.0
         return 1.0 - (self.streaming_peak_mb / self.naive_peak_mb)
+# --- Test Cases ---
 
 
 def generate_synthetic_chunks(

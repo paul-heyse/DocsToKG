@@ -7,7 +7,7 @@ GPU-backed cosine helpers for deduplication and fusion.
 
 ## 2. Key Capabilities
 
-- `FaissIndexManager` constructs `GpuIndexFlat`, `GpuIndexIVFFlat`, and
+- `FaissVectorStore` constructs `GpuIndexFlat`, `GpuIndexIVFFlat`, and
   `GpuIndexIVFPQ` instances without CPU fallbacks.
 - Training samples are drawn on GPU with configurable oversampling to keep
   IVFFlat/PQ builds fast.
@@ -81,11 +81,11 @@ easier to compare recall/latency deltas between experiments.
 ```python
 import numpy as np
 from DocsToKG.HybridSearch.config import DenseIndexConfig
-from DocsToKG.HybridSearch.vectorstore import FaissIndexManager
+from DocsToKG.HybridSearch.vectorstore import FaissVectorStore
 from DocsToKG.HybridSearch.ids import vector_uuid_to_faiss_int
 
 cfg = DenseIndexConfig(index_type="ivf_flat", nlist=1024, nprobe=16, device=0)
-manager = FaissIndexManager(dim=768, config=cfg)
+manager = FaissVectorStore(dim=768, config=cfg)
 
 xb = np.random.rand(10_000, 768).astype("float32")
 ids = [f"vec-{i}" for i in range(len(xb))]

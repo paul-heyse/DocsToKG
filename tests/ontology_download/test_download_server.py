@@ -4,99 +4,99 @@
 #   "purpose": "Pytest coverage for ontology download download server scenarios",
 #   "sections": [
 #     {
-#       "id": "_server_state",
+#       "id": "serverstate",
 #       "name": "_ServerState",
-#       "anchor": "SERV",
+#       "anchor": "class-serverstate",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_stateful_server",
+#       "id": "statefulserver",
 #       "name": "_StatefulServer",
-#       "anchor": "STAT",
+#       "anchor": "class-statefulserver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_handler",
+#       "id": "handler",
 #       "name": "_Handler",
-#       "anchor": "HAND",
+#       "anchor": "class-handler",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "http_server",
+#       "id": "http-server",
 #       "name": "http_server",
-#       "anchor": "HS",
+#       "anchor": "function-http-server",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_reset_token_buckets",
+#       "id": "reset-token-buckets",
 #       "name": "_reset_token_buckets",
-#       "anchor": "RTB",
+#       "anchor": "function-reset-token-buckets",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_allow_local_addresses",
+#       "id": "allow-local-addresses",
 #       "name": "_allow_local_addresses",
-#       "anchor": "ALA",
+#       "anchor": "function-allow-local-addresses",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_download_to_tmp",
+#       "id": "download-to-tmp",
 #       "name": "_download_to_tmp",
-#       "anchor": "DTT",
+#       "anchor": "function-download-to-tmp",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_stub_logger",
+#       "id": "stublogger",
 #       "name": "_StubLogger",
-#       "anchor": "STUB",
+#       "anchor": "class-stublogger",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "test_flaky_server_retry",
+#       "id": "test-flaky-server-retry",
 #       "name": "test_flaky_server_retry",
-#       "anchor": "TFSR",
+#       "anchor": "function-test-flaky-server-retry",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_error_endpoint_raises",
+#       "id": "test-error-endpoint-raises",
 #       "name": "test_error_endpoint_raises",
-#       "anchor": "TEER",
+#       "anchor": "function-test-error-endpoint-raises",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_mismatch_logs_warning",
+#       "id": "test-head-mismatch-logs-warning",
 #       "name": "test_head_mismatch_logs_warning",
-#       "anchor": "THMLW",
+#       "anchor": "function-test-head-mismatch-logs-warning",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cache_hit_uses_304",
+#       "id": "test-cache-hit-uses-304",
 #       "name": "test_cache_hit_uses_304",
-#       "anchor": "TCHU3",
+#       "anchor": "function-test-cache-hit-uses-304",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_partial_resume_handles_range",
+#       "id": "test-partial-resume-handles-range",
 #       "name": "test_partial_resume_handles_range",
-#       "anchor": "TPRHR",
+#       "anchor": "function-test-partial-resume-handles-range",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_etag_flip_updates_etag",
+#       "id": "test-etag-flip-updates-etag",
 #       "name": "test_etag_flip_updates_etag",
-#       "anchor": "TEFUE",
+#       "anchor": "function-test-etag-flip-updates-etag",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_token_bucket_limits_concurrency",
+#       "id": "test-token-bucket-limits-concurrency",
 #       "name": "test_token_bucket_limits_concurrency",
-#       "anchor": "TTBLC",
+#       "anchor": "function-test-token-bucket-limits-concurrency",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_concurrent_hosts_do_not_block",
+#       "id": "test-concurrent-hosts-do-not-block",
 #       "name": "test_concurrent_hosts_do_not_block",
-#       "anchor": "TCHDN",
+#       "anchor": "function-test-concurrent-hosts-do-not-block",
 #       "kind": "function"
 #     }
 #   ]
@@ -268,6 +268,8 @@ def http_server():
 
 
 @pytest.fixture(autouse=True)
+# --- Helper Functions ---
+
 def _reset_token_buckets():
     download._TOKEN_BUCKETS.clear()
     yield
@@ -378,6 +380,7 @@ class _StubLogger:
 
     def debug(self, *args, **kwargs):
         pass
+# --- Test Cases ---
 
 
 def test_flaky_server_retry(http_server, tmp_path):

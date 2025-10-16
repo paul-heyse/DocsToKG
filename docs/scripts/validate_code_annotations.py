@@ -5,16 +5,22 @@
 #   "purpose": "Documentation tooling for validate code annotations workflows",
 #   "sections": [
 #     {
-#       "id": "code_annotation_validator",
-#       "name": "CodeAnnotationValidator",
-#       "anchor": "CODE",
-#       "kind": "class"
+#       "id": "public_classes",
+#       "name": "Public Classes",
+#       "anchor": "PC",
+#       "kind": "api"
 #     },
 #     {
-#       "id": "main",
-#       "name": "main",
-#       "anchor": "MAIN",
-#       "kind": "function"
+#       "id": "public_functions",
+#       "name": "Public Functions",
+#       "anchor": "PF",
+#       "kind": "api"
+#     },
+#     {
+#       "id": "module_entry_points",
+#       "name": "Module Entry Points",
+#       "anchor": "MEP",
+#       "kind": "cli"
 #     }
 #   ]
 # }
@@ -42,6 +48,7 @@ import re
 import sys
 from pathlib import Path
 from typing import Dict, List
+# --- Public Classes ---
 
 
 class CodeAnnotationValidator:
@@ -430,6 +437,8 @@ class CodeAnnotationValidator:
 
         print(f"\n📊 Summary: {total_issues} total issues")
         print("Run this script regularly to maintain code annotation quality")
+# --- Public Functions ---
+# --- Module Entry Points ---
 
 
 def main():

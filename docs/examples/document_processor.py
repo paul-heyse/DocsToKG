@@ -4,64 +4,22 @@
 #   "purpose": "Example workflow for document processor",
 #   "sections": [
 #     {
-#       "id": "processing_config",
-#       "name": "ProcessingConfig",
-#       "anchor": "PROC",
-#       "kind": "class"
+#       "id": "public_classes",
+#       "name": "Public Classes",
+#       "anchor": "PC",
+#       "kind": "api"
 #     },
 #     {
-#       "id": "entity",
-#       "name": "Entity",
-#       "anchor": "ENTI",
-#       "kind": "class"
+#       "id": "public_functions",
+#       "name": "Public Functions",
+#       "anchor": "PF",
+#       "kind": "api"
 #     },
 #     {
-#       "id": "processing_result",
-#       "name": "ProcessingResult",
-#       "anchor": "PROC1",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "document_processor",
-#       "name": "DocumentProcessor",
-#       "anchor": "DOCU",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "example_usage",
-#       "name": "example_usage",
-#       "anchor": "EU",
-#       "kind": "async-function"
-#     },
-#     {
-#       "id": "document_processing_error",
-#       "name": "DocumentProcessingError",
-#       "anchor": "DOCU1",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "configuration_error",
-#       "name": "ConfigurationError",
-#       "anchor": "CONF",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "document_not_found_error",
-#       "name": "DocumentNotFoundError",
-#       "anchor": "DOCU2",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "validation_error",
-#       "name": "ValidationError",
-#       "anchor": "VALI",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "model_load_error",
-#       "name": "ModelLoadError",
-#       "anchor": "MODE",
-#       "kind": "class"
+#       "id": "globals",
+#       "name": "Globals",
+#       "anchor": "GLOB",
+#       "kind": "infra"
 #     }
 #   ]
 # }
@@ -83,6 +41,8 @@ from typing import Any, Dict, List, Optional
 
 
 @dataclass
+# --- Public Classes ---
+
 class ProcessingConfig:
     """Configuration settings for document processing.
 
@@ -515,6 +475,8 @@ class DocumentProcessor:
 
 
 # Example usage and testing
+# --- Public Functions ---
+
 async def example_usage():
     """Example demonstrating proper usage of DocumentProcessor.
 
@@ -551,6 +513,8 @@ async def example_usage():
 
 
 # Constants used throughout the module
+# --- Globals ---
+
 MAX_BATCH_SIZE = 100
 """Maximum number of documents that can be processed in a single batch.
 

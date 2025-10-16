@@ -1259,7 +1259,7 @@
   - Pass `resolver_wall_time_ms=resolver_wall` to relevant `AttemptRecord` instances
 
 - [ ] 11.3 Update JSONL logger to include new field
-  - In `JsonlLogger.log_attempt()` method (line ~262 of `download_pyalex_pdfs.py`), add `"resolver_wall_time_ms"` to output dict
+  - In `JsonlSink.log_attempt()` method (line ~262 of `download_pyalex_pdfs.py`), add `"resolver_wall_time_ms"` to output dict
 
 - [ ] 11.4 Update CSV logger adapter to include new field
   - Add `"resolver_wall_time_ms"` to `CsvAttemptLoggerAdapter.HEADER` list (line ~380)

@@ -4,9 +4,9 @@
 #   "purpose": "Pytest coverage for docparsing stubs scenarios",
 #   "sections": [
 #     {
-#       "id": "dependency_stubs",
+#       "id": "dependency-stubs",
 #       "name": "dependency_stubs",
-#       "anchor": "DS",
+#       "anchor": "function-dependency-stubs",
 #       "kind": "function"
 #     }
 #   ]
@@ -21,11 +21,14 @@ import sys
 from contextlib import contextmanager
 from types import ModuleType, SimpleNamespace
 from typing import Dict, Iterator, List, Sequence
+# --- Globals ---
 
 __all__ = ["dependency_stubs"]
 
 
 @contextmanager
+# --- Test Cases ---
+
 def dependency_stubs(dense_dim: int = 2560) -> Iterator[None]:
     """Install lightweight optional dependency stubs for integration tests."""
 

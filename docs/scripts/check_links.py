@@ -5,16 +5,22 @@
 #   "purpose": "Documentation tooling for check links workflows",
 #   "sections": [
 #     {
-#       "id": "link_checker",
-#       "name": "LinkChecker",
-#       "anchor": "LINK",
-#       "kind": "class"
+#       "id": "public_classes",
+#       "name": "Public Classes",
+#       "anchor": "PC",
+#       "kind": "api"
 #     },
 #     {
-#       "id": "main",
-#       "name": "main",
-#       "anchor": "MAIN",
-#       "kind": "function"
+#       "id": "public_functions",
+#       "name": "Public Functions",
+#       "anchor": "PF",
+#       "kind": "api"
+#     },
+#     {
+#       "id": "module_entry_points",
+#       "name": "Module Entry Points",
+#       "anchor": "MEP",
+#       "kind": "cli"
 #     }
 #   ]
 # }
@@ -46,6 +52,7 @@ except ModuleNotFoundError:  # pragma: no cover - depends on local environment
         "Install it with 'pip install aiohttp' and rerun the script."
     )
     sys.exit(1)
+# --- Public Classes ---
 
 
 class LinkChecker:
@@ -330,6 +337,8 @@ class LinkChecker:
             f.write(report)
 
         print(f"📋 Report saved to: {output_path}")
+# --- Public Functions ---
+# --- Module Entry Points ---
 
 
 def main():

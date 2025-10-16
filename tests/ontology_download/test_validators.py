@@ -6,127 +6,127 @@
 #     {
 #       "id": "config",
 #       "name": "config",
-#       "anchor": "CONF",
+#       "anchor": "function-config",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "ttl_file",
+#       "id": "ttl-file",
 #       "name": "ttl_file",
-#       "anchor": "TF",
+#       "anchor": "function-ttl-file",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "obo_file",
+#       "id": "obo-file",
 #       "name": "obo_file",
-#       "anchor": "OF",
+#       "anchor": "function-obo-file",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "owl_file",
+#       "id": "owl-file",
 #       "name": "owl_file",
-#       "anchor": "OF1",
+#       "anchor": "function-owl-file",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "make_request",
+#       "id": "make-request",
 #       "name": "make_request",
-#       "anchor": "MR",
+#       "anchor": "function-make-request",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "xbrl_package",
+#       "id": "xbrl-package",
 #       "name": "xbrl_package",
-#       "anchor": "XP",
+#       "anchor": "function-xbrl-package",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_rdflib_success",
+#       "id": "test-validate-rdflib-success",
 #       "name": "test_validate_rdflib_success",
-#       "anchor": "TVRS",
+#       "anchor": "function-test-validate-rdflib-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_normalize_streaming_deterministic",
+#       "id": "test-normalize-streaming-deterministic",
 #       "name": "test_normalize_streaming_deterministic",
-#       "anchor": "TNSD",
+#       "anchor": "function-test-normalize-streaming-deterministic",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_streaming_matches_in_memory",
+#       "id": "test-streaming-matches-in-memory",
 #       "name": "test_streaming_matches_in_memory",
-#       "anchor": "TSMIM",
+#       "anchor": "function-test-streaming-matches-in-memory",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_normalize_streaming_edge_cases",
+#       "id": "test-normalize-streaming-edge-cases",
 #       "name": "test_normalize_streaming_edge_cases",
-#       "anchor": "TNSEC",
+#       "anchor": "function-test-normalize-streaming-edge-cases",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_run_validators_respects_concurrency",
+#       "id": "test-run-validators-respects-concurrency",
 #       "name": "test_run_validators_respects_concurrency",
-#       "anchor": "TRVRC",
+#       "anchor": "function-test-run-validators-respects-concurrency",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_run_validators_matches_sequential",
+#       "id": "test-run-validators-matches-sequential",
 #       "name": "test_run_validators_matches_sequential",
-#       "anchor": "TRVMS",
+#       "anchor": "function-test-run-validators-matches-sequential",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_sort_triple_file_falls_back_without_sort",
+#       "id": "test-sort-triple-file-falls-back-without-sort",
 #       "name": "test_sort_triple_file_falls_back_without_sort",
-#       "anchor": "TSTFF",
+#       "anchor": "function-test-sort-triple-file-falls-back-without-sort",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validator_plugin_loader_registers_and_warns",
+#       "id": "test-validator-plugin-loader-registers-and-warns",
 #       "name": "test_validator_plugin_loader_registers_and_warns",
-#       "anchor": "TVPLR",
+#       "anchor": "function-test-validator-plugin-loader-registers-and-warns",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_pronto_success",
+#       "id": "test-validate-pronto-success",
 #       "name": "test_validate_pronto_success",
-#       "anchor": "TVPS",
+#       "anchor": "function-test-validate-pronto-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_pronto_handles_exception",
+#       "id": "test-validate-pronto-handles-exception",
 #       "name": "test_validate_pronto_handles_exception",
-#       "anchor": "TVPHE",
+#       "anchor": "function-test-validate-pronto-handles-exception",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_owlready2_success",
+#       "id": "test-validate-owlready2-success",
 #       "name": "test_validate_owlready2_success",
-#       "anchor": "TVOS",
+#       "anchor": "function-test-validate-owlready2-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_robot_skips_when_missing",
+#       "id": "test-validate-robot-skips-when-missing",
 #       "name": "test_validate_robot_skips_when_missing",
-#       "anchor": "TVRSW",
+#       "anchor": "function-test-validate-robot-skips-when-missing",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_arelle_with_stub",
+#       "id": "test-validate-arelle-with-stub",
 #       "name": "test_validate_arelle_with_stub",
-#       "anchor": "TVAWS",
+#       "anchor": "function-test-validate-arelle-with-stub",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_owlready2_memory_error",
+#       "id": "test-validate-owlready2-memory-error",
 #       "name": "test_validate_owlready2_memory_error",
-#       "anchor": "TVOME",
+#       "anchor": "function-test-validate-owlready2-memory-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_noop_logger",
+#       "id": "noop-logger",
 #       "name": "_noop_logger",
-#       "anchor": "NL",
+#       "anchor": "function-noop-logger",
 #       "kind": "function"
 #     }
 #   ]
@@ -228,6 +228,7 @@ def xbrl_package(tmp_path: Path) -> Path:
             "taxonomy/entrypoint.xsd", '<schema xmlns="http://www.w3.org/2001/XMLSchema" />'
         )
     return archive
+# --- Test Cases ---
 
 
 def test_validate_rdflib_success(ttl_file, tmp_path, config):
@@ -550,6 +551,7 @@ def test_validate_owlready2_memory_error(monkeypatch, owl_file, tmp_path, config
     assert not result.ok
     payload = json.loads((request.validation_dir / "owlready2_parse.json").read_text())
     assert "memory exceeded" in payload["error"].lower()
+# --- Helper Functions ---
 
 
 def _noop_logger():

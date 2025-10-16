@@ -4,297 +4,297 @@
 #   "purpose": "Pytest coverage for ontology download download scenarios",
 #   "sections": [
 #     {
-#       "id": "dummy_response",
+#       "id": "dummyresponse",
 #       "name": "DummyResponse",
-#       "anchor": "DUMM",
+#       "anchor": "class-dummyresponse",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "dummy_session",
+#       "id": "dummysession",
 #       "name": "DummySession",
-#       "anchor": "DUMM1",
+#       "anchor": "class-dummysession",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "make_session",
+#       "id": "make-session",
 #       "name": "make_session",
-#       "anchor": "MS",
+#       "anchor": "function-make-session",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "clear_token_buckets",
+#       "id": "clear-token-buckets",
 #       "name": "clear_token_buckets",
-#       "anchor": "CTB",
+#       "anchor": "function-clear-token-buckets",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_download_stream_success",
+#       "id": "test-download-stream-success",
 #       "name": "test_download_stream_success",
-#       "anchor": "TDSS",
+#       "anchor": "function-test-download-stream-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_download_stream_uses_cache_on_304",
+#       "id": "test-download-stream-uses-cache-on-304",
 #       "name": "test_download_stream_uses_cache_on_304",
-#       "anchor": "TDSUC",
+#       "anchor": "function-test-download-stream-uses-cache-on-304",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_download_stream_resumes_from_partial",
+#       "id": "test-download-stream-resumes-from-partial",
 #       "name": "test_download_stream_resumes_from_partial",
-#       "anchor": "TDSRF",
+#       "anchor": "function-test-download-stream-resumes-from-partial",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_download_stream_retries",
+#       "id": "test-download-stream-retries",
 #       "name": "test_download_stream_retries",
-#       "anchor": "TDSR",
+#       "anchor": "function-test-download-stream-retries",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_download_stream_rate_limiting",
+#       "id": "test-download-stream-rate-limiting",
 #       "name": "test_download_stream_rate_limiting",
-#       "anchor": "TDSRL",
+#       "anchor": "function-test-download-stream-rate-limiting",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_get_bucket_service_specific_rate",
+#       "id": "test-get-bucket-service-specific-rate",
 #       "name": "test_get_bucket_service_specific_rate",
-#       "anchor": "TGBSS",
+#       "anchor": "function-test-get-bucket-service-specific-rate",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_get_bucket_without_service_uses_host_key",
+#       "id": "test-get-bucket-without-service-uses-host-key",
 #       "name": "test_get_bucket_without_service_uses_host_key",
-#       "anchor": "TGBWS",
+#       "anchor": "function-test-get-bucket-without-service-uses-host-key",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_get_bucket_falls_back_to_host_limit",
+#       "id": "test-get-bucket-falls-back-to-host-limit",
 #       "name": "test_get_bucket_falls_back_to_host_limit",
-#       "anchor": "TGBFB",
+#       "anchor": "function-test-get-bucket-falls-back-to-host-limit",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_get_bucket_independent_keys_for_services",
+#       "id": "test-get-bucket-independent-keys-for-services",
 #       "name": "test_get_bucket_independent_keys_for_services",
-#       "anchor": "TGBIK",
+#       "anchor": "function-test-get-bucket-independent-keys-for-services",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_check_success",
+#       "id": "test-head-check-success",
 #       "name": "test_head_check_success",
-#       "anchor": "THCS",
+#       "anchor": "function-test-head-check-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_check_graceful_on_405",
+#       "id": "test-head-check-graceful-on-405",
 #       "name": "test_head_check_graceful_on_405",
-#       "anchor": "THCGO",
+#       "anchor": "function-test-head-check-graceful-on-405",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_check_raises_on_oversized",
+#       "id": "test-head-check-raises-on-oversized",
 #       "name": "test_head_check_raises_on_oversized",
-#       "anchor": "THCRO",
+#       "anchor": "function-test-head-check-raises-on-oversized",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_media_type_match",
+#       "id": "test-validate-media-type-match",
 #       "name": "test_validate_media_type_match",
-#       "anchor": "TVMTM",
+#       "anchor": "function-test-validate-media-type-match",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_media_type_acceptable_variation",
+#       "id": "test-validate-media-type-acceptable-variation",
 #       "name": "test_validate_media_type_acceptable_variation",
-#       "anchor": "TVMTA",
+#       "anchor": "function-test-validate-media-type-acceptable-variation",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_media_type_mismatch_logs_warning",
+#       "id": "test-validate-media-type-mismatch-logs-warning",
 #       "name": "test_validate_media_type_mismatch_logs_warning",
-#       "anchor": "VMTM1",
+#       "anchor": "function-test-validate-media-type-mismatch-logs-warning",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_media_type_disabled",
+#       "id": "test-validate-media-type-disabled",
 #       "name": "test_validate_media_type_disabled",
-#       "anchor": "TVMTD",
+#       "anchor": "function-test-validate-media-type-disabled",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_extract_zip_safe",
+#       "id": "test-extract-zip-safe",
 #       "name": "test_extract_zip_safe",
-#       "anchor": "TEZS",
+#       "anchor": "function-test-extract-zip-safe",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_extract_zip_rejects_traversal",
+#       "id": "test-extract-zip-rejects-traversal",
 #       "name": "test_extract_zip_rejects_traversal",
-#       "anchor": "TEZRT",
+#       "anchor": "function-test-extract-zip-rejects-traversal",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_extract_zip_rejects_absolute",
+#       "id": "test-extract-zip-rejects-absolute",
 #       "name": "test_extract_zip_rejects_absolute",
-#       "anchor": "TEZRA",
+#       "anchor": "function-test-extract-zip-rejects-absolute",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_extract_zip_detects_compression_bomb",
+#       "id": "test-extract-zip-detects-compression-bomb",
 #       "name": "test_extract_zip_detects_compression_bomb",
-#       "anchor": "TEZDC",
+#       "anchor": "function-test-extract-zip-detects-compression-bomb",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_make_tarfile",
+#       "id": "make-tarfile",
 #       "name": "_make_tarfile",
-#       "anchor": "MT",
+#       "anchor": "function-make-tarfile",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_extract_tar_safe",
+#       "id": "test-extract-tar-safe",
 #       "name": "test_extract_tar_safe",
-#       "anchor": "TETS",
+#       "anchor": "function-test-extract-tar-safe",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_extract_tar_rejects_traversal",
+#       "id": "test-extract-tar-rejects-traversal",
 #       "name": "test_extract_tar_rejects_traversal",
-#       "anchor": "TETRT",
+#       "anchor": "function-test-extract-tar-rejects-traversal",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_extract_tar_rejects_absolute",
+#       "id": "test-extract-tar-rejects-absolute",
 #       "name": "test_extract_tar_rejects_absolute",
-#       "anchor": "TETRA",
+#       "anchor": "function-test-extract-tar-rejects-absolute",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_extract_tar_rejects_symlink",
+#       "id": "test-extract-tar-rejects-symlink",
 #       "name": "test_extract_tar_rejects_symlink",
-#       "anchor": "TETRS",
+#       "anchor": "function-test-extract-tar-rejects-symlink",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_extract_tar_detects_compression_bomb",
+#       "id": "test-extract-tar-detects-compression-bomb",
 #       "name": "test_extract_tar_detects_compression_bomb",
-#       "anchor": "TETDC",
+#       "anchor": "function-test-extract-tar-detects-compression-bomb",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_download_stream_http_error",
+#       "id": "test-download-stream-http-error",
 #       "name": "test_download_stream_http_error",
-#       "anchor": "TDSHE",
+#       "anchor": "function-test-download-stream-http-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_download_stream_no_space",
+#       "id": "test-download-stream-no-space",
 #       "name": "test_download_stream_no_space",
-#       "anchor": "TDSNS",
+#       "anchor": "function-test-download-stream-no-space",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_download_stream_hash_mismatch_triggers_retry",
+#       "id": "test-download-stream-hash-mismatch-triggers-retry",
 #       "name": "test_download_stream_hash_mismatch_triggers_retry",
-#       "anchor": "TDSHM",
+#       "anchor": "function-test-download-stream-hash-mismatch-triggers-retry",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_url_security_rejects_private_ip",
+#       "id": "test-validate-url-security-rejects-private-ip",
 #       "name": "test_validate_url_security_rejects_private_ip",
-#       "anchor": "TVUSR",
+#       "anchor": "function-test-validate-url-security-rejects-private-ip",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_url_security_upgrades_http",
+#       "id": "test-validate-url-security-upgrades-http",
 #       "name": "test_validate_url_security_upgrades_http",
-#       "anchor": "TVUSU",
+#       "anchor": "function-test-validate-url-security-upgrades-http",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_url_security_respects_allowlist",
+#       "id": "test-validate-url-security-respects-allowlist",
 #       "name": "test_validate_url_security_respects_allowlist",
-#       "anchor": "VUSR1",
+#       "anchor": "function-test-validate-url-security-respects-allowlist",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_url_security_blocks_disallowed_host",
+#       "id": "test-validate-url-security-blocks-disallowed-host",
 #       "name": "test_validate_url_security_blocks_disallowed_host",
-#       "anchor": "TVUSB",
+#       "anchor": "function-test-validate-url-security-blocks-disallowed-host",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_url_security_normalizes_idn",
+#       "id": "test-validate-url-security-normalizes-idn",
 #       "name": "test_validate_url_security_normalizes_idn",
-#       "anchor": "TVUSN",
+#       "anchor": "function-test-validate-url-security-normalizes-idn",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_url_security_rejects_mixed_script_idn",
+#       "id": "test-validate-url-security-rejects-mixed-script-idn",
 #       "name": "test_validate_url_security_rejects_mixed_script_idn",
-#       "anchor": "VUSR2",
+#       "anchor": "function-test-validate-url-security-rejects-mixed-script-idn",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validate_url_security_respects_wildcard_allowlist",
+#       "id": "test-validate-url-security-respects-wildcard-allowlist",
 #       "name": "test_validate_url_security_respects_wildcard_allowlist",
-#       "anchor": "VUSR3",
+#       "anchor": "function-test-validate-url-security-respects-wildcard-allowlist",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_ensure_license_allowed_normalizes_spdx",
+#       "id": "test-ensure-license-allowed-normalizes-spdx",
 #       "name": "test_ensure_license_allowed_normalizes_spdx",
-#       "anchor": "TELAN",
+#       "anchor": "function-test-ensure-license-allowed-normalizes-spdx",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_sanitize_filename_removes_traversal",
+#       "id": "test-sanitize-filename-removes-traversal",
 #       "name": "test_sanitize_filename_removes_traversal",
-#       "anchor": "TSFRT",
+#       "anchor": "function-test-sanitize-filename-removes-traversal",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_migrate_manifest_sets_default_version",
+#       "id": "test-migrate-manifest-sets-default-version",
 #       "name": "test_migrate_manifest_sets_default_version",
-#       "anchor": "TMMSD",
+#       "anchor": "function-test-migrate-manifest-sets-default-version",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_migrate_manifest_upgrades_old_schema",
+#       "id": "test-migrate-manifest-upgrades-old-schema",
 #       "name": "test_migrate_manifest_upgrades_old_schema",
-#       "anchor": "TMMUO",
+#       "anchor": "function-test-migrate-manifest-upgrades-old-schema",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_migrate_manifest_warns_unknown_version",
+#       "id": "test-migrate-manifest-warns-unknown-version",
 #       "name": "test_migrate_manifest_warns_unknown_version",
-#       "anchor": "TMMWU",
+#       "anchor": "function-test-migrate-manifest-warns-unknown-version",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_read_manifest_applies_migration",
+#       "id": "test-read-manifest-applies-migration",
 #       "name": "test_read_manifest_applies_migration",
-#       "anchor": "TRMAM",
+#       "anchor": "function-test-read-manifest-applies-migration",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_download_stream_rejects_large_content",
+#       "id": "test-download-stream-rejects-large-content",
 #       "name": "test_download_stream_rejects_large_content",
-#       "anchor": "DSRL1",
+#       "anchor": "function-test-download-stream-rejects-large-content",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_version_lock_serializes_concurrent_writers",
+#       "id": "test-version-lock-serializes-concurrent-writers",
 #       "name": "test_version_lock_serializes_concurrent_writers",
-#       "anchor": "TVLSC",
+#       "anchor": "function-test-version-lock-serializes-concurrent-writers",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_noop_logger",
+#       "id": "noop-logger",
 #       "name": "_noop_logger",
-#       "anchor": "NL",
+#       "anchor": "function-noop-logger",
 #       "kind": "function"
 #     }
 #   ]
@@ -425,6 +425,7 @@ def clear_token_buckets():
     download._TOKEN_BUCKETS.clear()
     yield
     download._TOKEN_BUCKETS.clear()
+# --- Test Cases ---
 
 
 def test_download_stream_success(monkeypatch, tmp_path):
@@ -744,6 +745,7 @@ def test_extract_zip_detects_compression_bomb(tmp_path):
         download.extract_zip_safe(archive, tmp_path / "zip_out")
 
     assert "compression ratio" in str(exc_info.value)
+# --- Helper Functions ---
 
 
 def _make_tarfile(path: Path, entries: list[tuple[tarfile.TarInfo, bytes | None]]) -> None:

@@ -4,39 +4,39 @@
 #   "purpose": "Pytest coverage for content download network unit scenarios",
 #   "sections": [
 #     {
-#       "id": "_dummy_response",
+#       "id": "dummyresponse",
 #       "name": "_DummyResponse",
-#       "anchor": "DUMM",
+#       "anchor": "class-dummyresponse",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_session_for_response",
+#       "id": "session-for-response",
 #       "name": "_session_for_response",
-#       "anchor": "SFR",
+#       "anchor": "function-session-for-response",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_accepts_pdf_content",
+#       "id": "test-head-precheck-accepts-pdf-content",
 #       "name": "test_head_precheck_accepts_pdf_content",
-#       "anchor": "THPAP",
+#       "anchor": "function-test-head-precheck-accepts-pdf-content",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_rejects_html_payload",
+#       "id": "test-head-precheck-rejects-html-payload",
 #       "name": "test_head_precheck_rejects_html_payload",
-#       "anchor": "THPRH",
+#       "anchor": "function-test-head-precheck-rejects-html-payload",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_degrades_to_get",
+#       "id": "test-head-precheck-degrades-to-get",
 #       "name": "test_head_precheck_degrades_to_get",
-#       "anchor": "THPDT",
+#       "anchor": "function-test-head-precheck-degrades-to-get",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_conditional_request_helper_requires_complete_metadata",
+#       "id": "test-conditional-request-helper-requires-complete-metadata",
 #       "name": "test_conditional_request_helper_requires_complete_metadata",
-#       "anchor": "TCRHR",
+#       "anchor": "function-test-conditional-request-helper-requires-complete-metadata",
 #       "kind": "function"
 #     }
 #   ]
@@ -62,6 +62,7 @@ class _DummyResponse:
 
     def close(self) -> None:  # noqa: D401
         self.closed = True
+# --- Helper Functions ---
 
 
 def _session_for_response(response: _DummyResponse, *, method: str = "HEAD") -> Mock:
@@ -74,6 +75,7 @@ def _session_for_response(response: _DummyResponse, *, method: str = "HEAD") -> 
         return response
 
     return session, _request_with_retries
+# --- Test Cases ---
 
 
 def test_head_precheck_accepts_pdf_content(monkeypatch):

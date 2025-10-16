@@ -4,9 +4,15 @@
 #   "purpose": "Package initialization for scripts",
 #   "sections": [
 #     {
-#       "id": "module-overview",
-#       "name": "module_overview",
-#       "anchor": "OVR",
+#       "id": "module_body",
+#       "name": "Module Body",
+#       "anchor": "MB",
+#       "kind": "infra"
+#     },
+#     {
+#       "id": "module_body",
+#       "name": "Module Body",
+#       "anchor": "MB1",
 #       "kind": "infra"
 #     }
 #   ]

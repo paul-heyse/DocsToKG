@@ -1,11 +1,56 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.HybridSearch.service",
-#   "purpose": "Hybrid search orchestration, API facade, and pagination utilities",
+#   "purpose": "Hybrid search orchestration, pagination guards, and synchronous API surface",
 #   "sections": [
-#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
-#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"},
-#     {"id": "public-functions", "name": "Public Functions", "anchor": "api", "kind": "api"}
+#     {
+#       "id": "requestvalidationerror",
+#       "name": "RequestValidationError",
+#       "anchor": "class-requestvalidationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "channelresults",
+#       "name": "ChannelResults",
+#       "anchor": "class-channelresults",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "hybridsearchservice",
+#       "name": "HybridSearchService",
+#       "anchor": "class-hybridsearchservice",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "hybridsearchapi",
+#       "name": "HybridSearchAPI",
+#       "anchor": "class-hybridsearchapi",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "paginationcheckresult",
+#       "name": "PaginationCheckResult",
+#       "anchor": "class-paginationcheckresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "build-stats-snapshot",
+#       "name": "build_stats_snapshot",
+#       "anchor": "function-build-stats-snapshot",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "verify-pagination",
+#       "name": "verify_pagination",
+#       "anchor": "function-verify-pagination",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "should-rebuild-index",
+#       "name": "should_rebuild_index",
+#       "anchor": "function-should-rebuild-index",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -33,7 +78,7 @@ from .types import (
     HybridSearchResponse,
     HybridSearchResult,
 )
-from .vectorstore import FaissIndexManager, FaissSearchResult
+from .vectorstore import FaissVectorStore, FaissSearchResult
 
 # --- Globals ---
 
@@ -50,7 +95,6 @@ __all__ = (
 
 
 # --- Public Classes ---
-
 
 class RequestValidationError(ValueError):
     """Raised when the caller submits an invalid search request.
@@ -98,7 +142,7 @@ class HybridSearchService:
         >>> service = HybridSearchService(  # doctest: +SKIP
         ...     config_manager=HybridSearchConfigManager.from_dict({}),
         ...     feature_generator=FeatureGenerator(embedding_dim=16),
-        ...     faiss_index=FaissIndexManager(dim=16, config=HybridSearchConfig().dense),
+        ...     faiss_index=FaissVectorStore(dim=16, config=HybridSearchConfig().dense),
         ...     opensearch=OpenSearchSimulator(),
         ...     registry=ChunkRegistry(),
         ... )
@@ -112,7 +156,7 @@ class HybridSearchService:
         *,
         config_manager: HybridSearchConfigManager,
         feature_generator: FeatureGenerator,
-        faiss_index: FaissIndexManager,
+        faiss_index: FaissVectorStore,
         opensearch: OpenSearchSimulator,
         registry: ChunkRegistry,
         observability: Optional[Observability] = None,
@@ -525,9 +569,8 @@ class PaginationCheckResult:
 
 # --- Public Functions ---
 
-
 def build_stats_snapshot(
-    faiss_index: FaissIndexManager,
+    faiss_index: FaissVectorStore,
     opensearch: OpenSearchSimulator,
     registry: ChunkRegistry,
 ) -> Mapping[str, object]:

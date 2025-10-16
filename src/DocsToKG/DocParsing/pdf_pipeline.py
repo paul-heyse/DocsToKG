@@ -1,18 +1,18 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.DocParsing.pdf_pipeline",
-#   "purpose": "Legacy DocParsing PDF pipeline compatibility surface",
+#   "purpose": "Legacy compatibility facade wrapping the refactored DocParsing pipelines",
 #   "sections": [
 #     {
-#       "id": "parse_args",
+#       "id": "parse-args",
 #       "name": "parse_args",
-#       "anchor": "PA",
+#       "anchor": "function-parse-args",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "main",
 #       "name": "main",
-#       "anchor": "MAIN",
+#       "anchor": "function-main",
 #       "kind": "function"
 #     }
 #   ]
@@ -33,6 +33,28 @@ import argparse
 
 from DocsToKG.DocParsing import pipelines as _pipelines
 
+# --- Re-exported API ---
+
+__all__ = (
+    "legacy_module",
+    "PREFERRED_PORT",
+    "ProcessPoolExecutor",
+    "as_completed",
+    "tqdm",
+    "ensure_vllm",
+    "start_vllm",
+    "wait_for_vllm",
+    "stop_vllm",
+    "validate_served_models",
+    "manifest_append",
+    "list_pdfs",
+    "parse_args",
+    "main",
+    "convert_one",
+    "PdfTask",
+    "PdfConversionResult",
+)
+
 legacy_module = _pipelines
 
 PREFERRED_PORT = _pipelines.PREFERRED_PORT
@@ -49,14 +71,30 @@ manifest_append = _pipelines.manifest_append
 list_pdfs = _pipelines.list_pdfs
 
 
+# --- Legacy CLI Entry Points ---
+
 def parse_args(argv: object | None = None):
-    """Return parsed CLI arguments for the PDF pipeline."""
+    """Return parsed CLI arguments for the legacy PDF pipeline.
+
+    Args:
+        argv: Optional argument vector forwarded to :func:`argparse.ArgumentParser.parse_args`.
+
+    Returns:
+        argparse.Namespace: Parsed argument namespace compatible with the refactored pipeline.
+    """
 
     return _pipelines.pdf_parse_args(argv)
 
 
 def main(args: object | None = None) -> int:
-    """Invoke the refactored PDF pipeline using legacy entrypoints."""
+    """Invoke the refactored PDF pipeline using the legacy facade.
+
+    Args:
+        args: Optional argument namespace or raw argument list compatible with :func:`parse_args`.
+
+    Returns:
+        int: Process exit code returned by :func:`DocsToKG.DocParsing.pipelines.pdf_main`.
+    """
 
     if isinstance(args, argparse.Namespace):
         namespace = args

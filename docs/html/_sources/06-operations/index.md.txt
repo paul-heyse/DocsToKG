@@ -60,7 +60,7 @@ import json
 from pathlib import Path
 
 from DocsToKG.HybridSearch.config import HybridSearchConfigManager
-from DocsToKG.HybridSearch.vectorstore import FaissIndexManager
+from DocsToKG.HybridSearch.vectorstore import FaissVectorStore
 from DocsToKG.HybridSearch.ingest import ChunkIngestionPipeline
 from DocsToKG.HybridSearch.types import DocumentInput
 from DocsToKG.HybridSearch.observability import Observability
@@ -69,7 +69,7 @@ from DocsToKG.HybridSearch.storage import ChunkRegistry, OpenSearchSimulator
 
 config_manager = HybridSearchConfigManager(Path("config/hybrid_config.json"))
 config = config_manager.get()
-faiss = FaissIndexManager(dim=1536, config=config.dense)
+faiss = FaissVectorStore(dim=1536, config=config.dense)
 registry = ChunkRegistry()
 opensearch = OpenSearchSimulator()
 pipeline = ChunkIngestionPipeline(

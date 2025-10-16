@@ -229,12 +229,24 @@ Iterator[List[dict]]: Lazy iterator producing batched chunk rows.
 Yields:
 Lists of row dictionaries, each containing up to batch_size items.
 
+### `iter_chunk_files(directory)`
+
+Deprecated shim that forwards to :func:`iter_chunks`.
+
+Args:
+directory: Directory to scan for chunk artifacts.
+
+Returns:
+Iterator over chunk files.
+
 ### `process_chunk_file_vectors(chunk_file, out_path, stats, args, validator, logger)`
 
 Generate vectors for a single chunk file and persist them to disk.
 
 Args:
 chunk_file: Chunk JSONL file to process.
+out_path: Destination path for vectors or legacy ``BM25Stats`` when
+using the historical call signature.
 stats: Precomputed BM25 statistics.
 args: Parsed CLI arguments with runtime configuration.
 validator: SPLADE validator for sparsity metrics.

@@ -136,6 +136,7 @@ Tuple containing:
 
 Raises:
 json.JSONDecodeError: If the manifest contains invalid JSON.
+ValueError: If entries omit required fields or use deprecated schemas.
 
 ### `build_manifest_entry(artifact, resolver, url, outcome, html_paths)`
 
@@ -458,16 +459,6 @@ None
 Returns:
 None
 
-### `log(self, record)`
-
-Compatibility alias delegating to :meth:`log_attempt`.
-
-Args:
-record: Attempt record to forward to :meth:`log_attempt`.
-
-Returns:
-None
-
 ### `_write(self, payload)`
 
 *No documentation available.*
@@ -479,16 +470,6 @@ Persist a resolver attempt record to the JSONL file.
 Args:
 record: Attempt metadata describing the resolver execution outcome.
 timestamp: Optional override timestamp applied to the JSONL payload.
-
-Returns:
-None
-
-### `log(self, record)`
-
-Forward compatibility shim invoking :meth:`log_attempt`.
-
-Args:
-record: Attempt record to persist.
 
 Returns:
 None
@@ -558,16 +539,6 @@ Ignore summary metrics; CSV sink only records attempt rows.
 
 Args:
 summary: Mapping of summary metrics (unused).
-
-Returns:
-None
-
-### `log(self, record)`
-
-Forward to :meth:`log_attempt` for compatibility with ``AttemptSink``.
-
-Args:
-record: Attempt record to serialize.
 
 Returns:
 None
@@ -665,16 +636,6 @@ summary: Mapping of aggregated metrics to broadcast.
 Returns:
 None
 
-### `log(self, record)`
-
-Forward attempts to :meth:`log_attempt` for compatibility.
-
-Args:
-record: Attempt record to broadcast.
-
-Returns:
-None
-
 ### `close(self)`
 
 Close all sinks, propagating the first raised exception.
@@ -703,16 +664,6 @@ Ignore attempt telemetry; only manifests are indexed.
 Args:
 record: Attempt record supplied by the pipeline.
 timestamp: Optional timestamp provided by the caller.
-
-Returns:
-None
-
-### `log(self, record)`
-
-Compatibility shim deferring to :meth:`log_attempt`.
-
-Args:
-record: Attempt record supplied by the pipeline.
 
 Returns:
 None
@@ -765,16 +716,6 @@ Ignore attempt telemetry; only manifest rows are retained.
 Args:
 record: Attempt record supplied by the pipeline.
 timestamp: Optional timestamp associated with the attempt.
-
-Returns:
-None
-
-### `log(self, record)`
-
-Forward compatibility shim deferring to :meth:`log_attempt`.
-
-Args:
-record: Attempt record supplied by the pipeline.
 
 Returns:
 None
@@ -908,7 +849,6 @@ log_attempt: Callable accepting an :class:`AttemptRecord` plus optional timestam
 log_manifest: Callable that receives :class:`ManifestEntry` objects for storage.
 log_summary: Callable that ingests aggregate metrics collected during a run.
 close: Callable that finalises resources owned by the sink.
-log: Compatibility alias that forwards to :meth:`log_attempt`.
 
 Examples:
 >>> class Collector:
@@ -920,8 +860,6 @@ Examples:
 ...         ...  # doctest: +SKIP
 ...     def close(self):
 ...         ...  # doctest: +SKIP
-...     def log(self, record):
-...         self.log_attempt(record)
 >>> isinstance(Collector(), AttemptSink)  # doctest: +SKIP
 True
 

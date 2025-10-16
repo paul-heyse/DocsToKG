@@ -4,81 +4,81 @@
 #   "purpose": "Pytest coverage for ontology download core logic scenarios",
 #   "sections": [
 #     {
-#       "id": "stub_requests_metadata",
+#       "id": "stub-requests-metadata",
 #       "name": "stub_requests_metadata",
-#       "anchor": "SRM",
+#       "anchor": "function-stub-requests-metadata",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_make_plan",
+#       "id": "make-plan",
 #       "name": "_make_plan",
-#       "anchor": "MP",
+#       "anchor": "function-make-plan",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_run_fetch",
+#       "id": "run-fetch",
 #       "name": "_run_fetch",
-#       "anchor": "RF",
+#       "anchor": "function-run-fetch",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_populate_plan_metadata_uses_http_config",
+#       "id": "test-populate-plan-metadata-uses-http-config",
 #       "name": "test_populate_plan_metadata_uses_http_config",
-#       "anchor": "TPPMU",
+#       "anchor": "function-test-populate-plan-metadata-uses-http-config",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_plan_all_rejects_disallowed_host",
+#       "id": "test-plan-all-rejects-disallowed-host",
 #       "name": "test_plan_all_rejects_disallowed_host",
-#       "anchor": "TPARD",
+#       "anchor": "function-test-plan-all-rejects-disallowed-host",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_immediate_future",
+#       "id": "immediatefuture",
 #       "name": "_ImmediateFuture",
-#       "anchor": "IMME",
+#       "anchor": "class-immediatefuture",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "test_plan_all_honors_concurrent_plan_limit",
+#       "id": "test-plan-all-honors-concurrent-plan-limit",
 #       "name": "test_plan_all_honors_concurrent_plan_limit",
-#       "anchor": "TPAHC",
+#       "anchor": "function-test-plan-all-honors-concurrent-plan-limit",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_plan_all_skips_failures_when_configured",
+#       "id": "test-plan-all-skips-failures-when-configured",
 #       "name": "test_plan_all_skips_failures_when_configured",
-#       "anchor": "TPASF",
+#       "anchor": "function-test-plan-all-skips-failures-when-configured",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_plan_one_uses_fallback",
+#       "id": "test-plan-one-uses-fallback",
 #       "name": "test_plan_one_uses_fallback",
-#       "anchor": "TPOUF",
+#       "anchor": "function-test-plan-one-uses-fallback",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_plan_one_respects_disabled_fallback",
+#       "id": "test-plan-one-respects-disabled-fallback",
 #       "name": "test_plan_one_respects_disabled_fallback",
-#       "anchor": "TPORD",
+#       "anchor": "function-test-plan-one-respects-disabled-fallback",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_fetch_one_download_fallback",
+#       "id": "test-fetch-one-download-fallback",
 #       "name": "test_fetch_one_download_fallback",
-#       "anchor": "TFODF",
+#       "anchor": "function-test-fetch-one-download-fallback",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_manifest_fingerprint_ignores_target_format_order",
+#       "id": "test-manifest-fingerprint-ignores-target-format-order",
 #       "name": "test_manifest_fingerprint_ignores_target_format_order",
-#       "anchor": "TMFIT",
+#       "anchor": "function-test-manifest-fingerprint-ignores-target-format-order",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_manifest_fingerprint_changes_with_normalization_mode",
+#       "id": "test-manifest-fingerprint-changes-with-normalization-mode",
 #       "name": "test_manifest_fingerprint_changes_with_normalization_mode",
-#       "anchor": "TMFCW",
+#       "anchor": "function-test-manifest-fingerprint-changes-with-normalization-mode",
 #       "kind": "function"
 #     }
 #   ]
@@ -130,6 +130,7 @@ def stub_requests_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(core.requests, "head", lambda *args, **kwargs: _Response(), raising=False)
     monkeypatch.setattr(core.requests, "get", lambda *args, **kwargs: _Response(), raising=False)
+# --- Helper Functions ---
 
 
 def _make_plan() -> FetchPlan:
@@ -223,6 +224,7 @@ def _run_fetch(
     logger.setLevel(logging.INFO)
     result = core.fetch_one(spec, config=config, force=True, logger=logger)
     return json.loads(result.manifest_path.read_text())
+# --- Test Cases ---
 
 
 def test_populate_plan_metadata_uses_http_config(monkeypatch: pytest.MonkeyPatch) -> None:

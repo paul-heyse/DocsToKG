@@ -4,921 +4,921 @@
 #   "purpose": "Pytest coverage for resolvers resolvers core scenarios",
 #   "sections": [
 #     {
-#       "id": "clear_cache_between_tests",
+#       "id": "clear-cache-between-tests",
 #       "name": "clear_cache_between_tests",
-#       "anchor": "CCBT",
+#       "anchor": "function-clear-cache-between-tests",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "dummy_api_resolver",
+#       "id": "dummyapiresolver",
 #       "name": "DummyApiResolver",
-#       "anchor": "DUMM",
+#       "anchor": "class-dummyapiresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "test_api_resolver_base_error_handling",
+#       "id": "test-api-resolver-base-error-handling",
 #       "name": "test_api_resolver_base_error_handling",
-#       "anchor": "TARBE",
+#       "anchor": "function-test-api-resolver-base-error-handling",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_landing_page_helpers_extract_expected_urls",
+#       "id": "test-landing-page-helpers-extract-expected-urls",
 #       "name": "test_landing_page_helpers_extract_expected_urls",
-#       "anchor": "TLPHE",
+#       "anchor": "function-test-landing-page-helpers-extract-expected-urls",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_resolvers_use_shared_retry_helper",
+#       "id": "test-resolvers-use-shared-retry-helper",
 #       "name": "test_resolvers_use_shared_retry_helper",
-#       "anchor": "TRUSR",
+#       "anchor": "function-test-resolvers-use-shared-retry-helper",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_legacy_resolver_rate_limits_rejected",
+#       "id": "test-legacy-resolver-rate-limits-rejected",
 #       "name": "test_legacy_resolver_rate_limits_rejected",
-#       "anchor": "TLRRL",
+#       "anchor": "function-test-legacy-resolver-rate-limits-rejected",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_user_agent_includes_mailto",
+#       "id": "test-user-agent-includes-mailto",
 #       "name": "test_user_agent_includes_mailto",
-#       "anchor": "TUAIM",
+#       "anchor": "function-test-user-agent-includes-mailto",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_resolver_toggle_defaults_single_source",
+#       "id": "test-resolver-toggle-defaults-single-source",
 #       "name": "test_resolver_toggle_defaults_single_source",
-#       "anchor": "TRTDS",
+#       "anchor": "function-test-resolver-toggle-defaults-single-source",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_resolvers_apply_polite_headers_and_timeouts",
+#       "id": "test-resolvers-apply-polite-headers-and-timeouts",
 #       "name": "test_resolvers_apply_polite_headers_and_timeouts",
-#       "anchor": "TRAPH",
+#       "anchor": "function-test-resolvers-apply-polite-headers-and-timeouts",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "dummy_session",
+#       "id": "dummysession",
 #       "name": "DummySession",
-#       "anchor": "DUMM1",
+#       "anchor": "class-dummysession",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "dummy_response",
+#       "id": "dummyresponse",
 #       "name": "DummyResponse",
-#       "anchor": "DUMM2",
+#       "anchor": "class-dummyresponse",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "list_logger",
+#       "id": "listlogger",
 #       "name": "ListLogger",
-#       "anchor": "LIST",
+#       "anchor": "class-listlogger",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "stub_resolver",
+#       "id": "stubresolver",
 #       "name": "StubResolver",
-#       "anchor": "STUB",
+#       "anchor": "class-stubresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "build_artifact",
+#       "id": "build-artifact",
 #       "name": "build_artifact",
-#       "anchor": "BA",
+#       "anchor": "function-build-artifact",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_classify_payload_detects_pdf_and_html",
+#       "id": "test-classify-payload-detects-pdf-and-html",
 #       "name": "test_classify_payload_detects_pdf_and_html",
-#       "anchor": "TCPDP",
+#       "anchor": "function-test-classify-payload-detects-pdf-and-html",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_classify_payload_octet_stream_requires_sniff",
+#       "id": "test-classify-payload-octet-stream-requires-sniff",
 #       "name": "test_classify_payload_octet_stream_requires_sniff",
-#       "anchor": "TCPOS",
+#       "anchor": "function-test-classify-payload-octet-stream-requires-sniff",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_classify_payload_octet_stream_with_pdf_signature",
+#       "id": "test-classify-payload-octet-stream-with-pdf-signature",
 #       "name": "test_classify_payload_octet_stream_with_pdf_signature",
-#       "anchor": "CPOS1",
+#       "anchor": "function-test-classify-payload-octet-stream-with-pdf-signature",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_stops_on_first_success",
+#       "id": "test-pipeline-stops-on-first-success",
 #       "name": "test_pipeline_stops_on_first_success",
-#       "anchor": "TPSOF",
+#       "anchor": "function-test-pipeline-stops-on-first-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_records_resolver_exception",
+#       "id": "test-pipeline-records-resolver-exception",
 #       "name": "test_pipeline_records_resolver_exception",
-#       "anchor": "TPRRE",
+#       "anchor": "function-test-pipeline-records-resolver-exception",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_unpaywall_resolver_extracts_candidates",
+#       "id": "test-unpaywall-resolver-extracts-candidates",
 #       "name": "test_unpaywall_resolver_extracts_candidates",
-#       "anchor": "TUREC",
+#       "anchor": "function-test-unpaywall-resolver-extracts-candidates",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_landing_page_resolver_meta_parsing",
+#       "id": "test-landing-page-resolver-meta-parsing",
 #       "name": "test_landing_page_resolver_meta_parsing",
-#       "anchor": "TLPRM",
+#       "anchor": "function-test-landing-page-resolver-meta-parsing",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_allows_redirect",
+#       "id": "test-head-precheck-allows-redirect",
 #       "name": "test_head_precheck_allows_redirect",
-#       "anchor": "THPAR",
+#       "anchor": "function-test-head-precheck-allows-redirect",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_integration_happy_path",
+#       "id": "test-cli-integration-happy-path",
 #       "name": "test_cli_integration_happy_path",
-#       "anchor": "TCIHP",
+#       "anchor": "function-test-cli-integration-happy-path",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "dummy_head_response",
+#       "id": "dummyheadresponse",
 #       "name": "DummyHeadResponse",
-#       "anchor": "DUMM3",
+#       "anchor": "class-dummyheadresponse",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "test_head_precheck_skips_html",
+#       "id": "test-head-precheck-skips-html",
 #       "name": "test_head_precheck_skips_html",
-#       "anchor": "THPSH",
+#       "anchor": "function-test-head-precheck-skips-html",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_skips_zero_length",
+#       "id": "test-head-precheck-skips-zero-length",
 #       "name": "test_head_precheck_skips_zero_length",
-#       "anchor": "THPSZ",
+#       "anchor": "function-test-head-precheck-skips-zero-length",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_skips_error_status",
+#       "id": "test-head-precheck-skips-error-status",
 #       "name": "test_head_precheck_skips_error_status",
-#       "anchor": "THPSE",
+#       "anchor": "function-test-head-precheck-skips-error-status",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_allows_pdf",
+#       "id": "test-head-precheck-allows-pdf",
 #       "name": "test_head_precheck_allows_pdf",
-#       "anchor": "THPAP",
+#       "anchor": "function-test-head-precheck-allows-pdf",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_allows_redirect_to_pdf",
+#       "id": "test-head-precheck-allows-redirect-to-pdf",
 #       "name": "test_head_precheck_allows_redirect_to_pdf",
-#       "anchor": "HPAR1",
+#       "anchor": "function-test-head-precheck-allows-redirect-to-pdf",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_failure_allows_download",
+#       "id": "test-head-precheck-failure-allows-download",
 #       "name": "test_head_precheck_failure_allows_download",
-#       "anchor": "THPFA",
+#       "anchor": "function-test-head-precheck-failure-allows-download",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_respects_global_disable",
+#       "id": "test-head-precheck-respects-global-disable",
 #       "name": "test_head_precheck_respects_global_disable",
-#       "anchor": "THPRG",
+#       "anchor": "function-test-head-precheck-respects-global-disable",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_resolver_override",
+#       "id": "test-head-precheck-resolver-override",
 #       "name": "test_head_precheck_resolver_override",
-#       "anchor": "THPRO",
+#       "anchor": "function-test-head-precheck-resolver-override",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_callable_accepts_argument_handles_noncallable",
+#       "id": "test-callable-accepts-argument-handles-noncallable",
 #       "name": "test_callable_accepts_argument_handles_noncallable",
-#       "anchor": "TCAAH",
+#       "anchor": "function-test-callable-accepts-argument-handles-noncallable",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_logs_missing_resolver",
+#       "id": "test-pipeline-logs-missing-resolver",
 #       "name": "test_pipeline_logs_missing_resolver",
-#       "anchor": "TPLMR",
+#       "anchor": "function-test-pipeline-logs-missing-resolver",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_skips_disabled_resolver",
+#       "id": "test-pipeline-skips-disabled-resolver",
 #       "name": "test_pipeline_skips_disabled_resolver",
-#       "anchor": "TPSDR",
+#       "anchor": "function-test-pipeline-skips-disabled-resolver",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_skips_not_applicable_resolver",
+#       "id": "test-pipeline-skips-not-applicable-resolver",
 #       "name": "test_pipeline_skips_not_applicable_resolver",
-#       "anchor": "TPSNA",
+#       "anchor": "function-test-pipeline-skips-not-applicable-resolver",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_collect_resolver_results_handles_exception",
+#       "id": "test-collect-resolver-results-handles-exception",
 #       "name": "test_collect_resolver_results_handles_exception",
-#       "anchor": "TCRRH",
+#       "anchor": "function-test-collect-resolver-results-handles-exception",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_records_event_and_skip_reason",
+#       "id": "test-pipeline-records-event-and-skip-reason",
 #       "name": "test_pipeline_records_event_and_skip_reason",
-#       "anchor": "TPREA",
+#       "anchor": "function-test-pipeline-records-event-and-skip-reason",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_skips_duplicate_urls",
+#       "id": "test-pipeline-skips-duplicate-urls",
 #       "name": "test_pipeline_skips_duplicate_urls",
-#       "anchor": "TPSDU",
+#       "anchor": "function-test-pipeline-skips-duplicate-urls",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_head_precheck_failure_skips_attempt",
+#       "id": "test-pipeline-head-precheck-failure-skips-attempt",
 #       "name": "test_pipeline_head_precheck_failure_skips_attempt",
-#       "anchor": "TPHPF",
+#       "anchor": "function-test-pipeline-head-precheck-failure-skips-attempt",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_event_without_reason",
+#       "id": "test-pipeline-event-without-reason",
 #       "name": "test_pipeline_event_without_reason",
-#       "anchor": "TPEWR",
+#       "anchor": "function-test-pipeline-event-without-reason",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_downloads_with_context_argument",
+#       "id": "test-pipeline-downloads-with-context-argument",
 #       "name": "test_pipeline_downloads_with_context_argument",
-#       "anchor": "TPDWC",
+#       "anchor": "function-test-pipeline-downloads-with-context-argument",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_respects_max_attempts",
+#       "id": "test-pipeline-respects-max-attempts",
 #       "name": "test_pipeline_respects_max_attempts",
-#       "anchor": "TPRMA",
+#       "anchor": "function-test-pipeline-respects-max-attempts",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_jitter_sleep_no_delay",
+#       "id": "test-pipeline-jitter-sleep-no-delay",
 #       "name": "test_pipeline_jitter_sleep_no_delay",
-#       "anchor": "TPJSN",
+#       "anchor": "function-test-pipeline-jitter-sleep-no-delay",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_concurrent_skips_missing_resolver",
+#       "id": "test-pipeline-concurrent-skips-missing-resolver",
 #       "name": "test_pipeline_concurrent_skips_missing_resolver",
-#       "anchor": "TPCSM",
+#       "anchor": "function-test-pipeline-concurrent-skips-missing-resolver",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_ignores_empty_url",
+#       "id": "test-pipeline-ignores-empty-url",
 #       "name": "test_pipeline_ignores_empty_url",
-#       "anchor": "TPIEU",
+#       "anchor": "function-test-pipeline-ignores-empty-url",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_concurrent_execution",
+#       "id": "test-pipeline-concurrent-execution",
 #       "name": "test_pipeline_concurrent_execution",
-#       "anchor": "TPCE",
+#       "anchor": "function-test-pipeline-concurrent-execution",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_global_deduplication_skips_repeat_urls",
+#       "id": "test-pipeline-global-deduplication-skips-repeat-urls",
 #       "name": "test_pipeline_global_deduplication_skips_repeat_urls",
-#       "anchor": "TPGDS",
+#       "anchor": "function-test-pipeline-global-deduplication-skips-repeat-urls",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_domain_rate_limiting_enforces_interval",
+#       "id": "test-pipeline-domain-rate-limiting-enforces-interval",
 #       "name": "test_pipeline_domain_rate_limiting_enforces_interval",
-#       "anchor": "TPDRL",
+#       "anchor": "function-test-pipeline-domain-rate-limiting-enforces-interval",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_domain_limit_includes_jitter_component",
+#       "id": "test-domain-limit-includes-jitter-component",
 #       "name": "test_domain_limit_includes_jitter_component",
-#       "anchor": "TDLIJ",
+#       "anchor": "function-test-domain-limit-includes-jitter-component",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_stub_response",
+#       "id": "stubresponse",
 #       "name": "_StubResponse",
-#       "anchor": "STUB1",
+#       "anchor": "class-stubresponse",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_artifact",
+#       "id": "artifact",
 #       "name": "_artifact",
-#       "anchor": "ARTI",
+#       "anchor": "function-artifact",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_arxiv_resolver_skips_missing_identifier",
+#       "id": "test-arxiv-resolver-skips-missing-identifier",
 #       "name": "test_arxiv_resolver_skips_missing_identifier",
-#       "anchor": "TARSM",
+#       "anchor": "function-test-arxiv-resolver-skips-missing-identifier",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_arxiv_resolver_strips_prefix",
+#       "id": "test-arxiv-resolver-strips-prefix",
 #       "name": "test_arxiv_resolver_strips_prefix",
-#       "anchor": "TARSP",
+#       "anchor": "function-test-arxiv-resolver-strips-prefix",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_openalex_resolver_skip",
+#       "id": "test-openalex-resolver-skip",
 #       "name": "test_openalex_resolver_skip",
-#       "anchor": "TORS",
+#       "anchor": "function-test-openalex-resolver-skip",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_openalex_resolver_dedupes",
+#       "id": "test-openalex-resolver-dedupes",
 #       "name": "test_openalex_resolver_dedupes",
-#       "anchor": "TORD",
+#       "anchor": "function-test-openalex-resolver-dedupes",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_landing_page_resolver_meta_pattern",
+#       "id": "test-landing-page-resolver-meta-pattern",
 #       "name": "test_landing_page_resolver_meta_pattern",
-#       "anchor": "LPRM1",
+#       "anchor": "function-test-landing-page-resolver-meta-pattern",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_landing_page_resolver_link_pattern",
+#       "id": "test-landing-page-resolver-link-pattern",
 #       "name": "test_landing_page_resolver_link_pattern",
-#       "anchor": "TLPRL",
+#       "anchor": "function-test-landing-page-resolver-link-pattern",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_landing_page_resolver_anchor_pattern",
+#       "id": "test-landing-page-resolver-anchor-pattern",
 #       "name": "test_landing_page_resolver_anchor_pattern",
-#       "anchor": "TLPRA",
+#       "anchor": "function-test-landing-page-resolver-anchor-pattern",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_landing_page_resolver_http_error",
+#       "id": "test-landing-page-resolver-http-error",
 #       "name": "test_landing_page_resolver_http_error",
-#       "anchor": "TLPRH",
+#       "anchor": "function-test-landing-page-resolver-http-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_landing_page_resolver_request_errors",
+#       "id": "test-landing-page-resolver-request-errors",
 #       "name": "test_landing_page_resolver_request_errors",
-#       "anchor": "TLPRR",
+#       "anchor": "function-test-landing-page-resolver-request-errors",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_core_resolver_http_error",
+#       "id": "test-core-resolver-http-error",
 #       "name": "test_core_resolver_http_error",
-#       "anchor": "TCRHE",
+#       "anchor": "function-test-core-resolver-http-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_core_resolver_json_error",
+#       "id": "test-core-resolver-json-error",
 #       "name": "test_core_resolver_json_error",
-#       "anchor": "TCRJE",
+#       "anchor": "function-test-core-resolver-json-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_core_resolver_emits_results",
+#       "id": "test-core-resolver-emits-results",
 #       "name": "test_core_resolver_emits_results",
-#       "anchor": "TCRER",
+#       "anchor": "function-test-core-resolver-emits-results",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_core_resolver_error_paths",
+#       "id": "test-core-resolver-error-paths",
 #       "name": "test_core_resolver_error_paths",
-#       "anchor": "TCREP",
+#       "anchor": "function-test-core-resolver-error-paths",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_core_resolver_skips_when_no_doi",
+#       "id": "test-core-resolver-skips-when-no-doi",
 #       "name": "test_core_resolver_skips_when_no_doi",
-#       "anchor": "TCRSW",
+#       "anchor": "function-test-core-resolver-skips-when-no-doi",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_core_resolver_is_enabled_requires_key",
+#       "id": "test-core-resolver-is-enabled-requires-key",
 #       "name": "test_core_resolver_is_enabled_requires_key",
-#       "anchor": "TCRIE",
+#       "anchor": "function-test-core-resolver-is-enabled-requires-key",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_core_resolver_ignores_non_dict_hits",
+#       "id": "test-core-resolver-ignores-non-dict-hits",
 #       "name": "test_core_resolver_ignores_non_dict_hits",
-#       "anchor": "TCRIN",
+#       "anchor": "function-test-core-resolver-ignores-non-dict-hits",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_crossref_resolver_http_error",
+#       "id": "test-crossref-resolver-http-error",
 #       "name": "test_crossref_resolver_http_error",
-#       "anchor": "CRHE1",
+#       "anchor": "function-test-crossref-resolver-http-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_crossref_resolver_success",
+#       "id": "test-crossref-resolver-success",
 #       "name": "test_crossref_resolver_success",
-#       "anchor": "TCRS",
+#       "anchor": "function-test-crossref-resolver-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_crossref_resolver_link_not_list",
+#       "id": "test-crossref-resolver-link-not-list",
 #       "name": "test_crossref_resolver_link_not_list",
-#       "anchor": "TCRLN",
+#       "anchor": "function-test-crossref-resolver-link-not-list",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_crossref_resolver_skip_without_doi",
+#       "id": "test-crossref-resolver-skip-without-doi",
 #       "name": "test_crossref_resolver_skip_without_doi",
-#       "anchor": "CRSW1",
+#       "anchor": "function-test-crossref-resolver-skip-without-doi",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_crossref_resolver_is_enabled",
+#       "id": "test-crossref-resolver-is-enabled",
 #       "name": "test_crossref_resolver_is_enabled",
-#       "anchor": "CRIE1",
+#       "anchor": "function-test-crossref-resolver-is-enabled",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_crossref_resolver_session_success",
+#       "id": "test-crossref-resolver-session-success",
 #       "name": "test_crossref_resolver_session_success",
-#       "anchor": "TCRSS",
+#       "anchor": "function-test-crossref-resolver-session-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_crossref_resolver_cached_request_error",
+#       "id": "test-crossref-resolver-cached-request-error",
 #       "name": "test_crossref_resolver_cached_request_error",
-#       "anchor": "TCRCR",
+#       "anchor": "function-test-crossref-resolver-cached-request-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_crossref_resolver_session_errors",
+#       "id": "test-crossref-resolver-session-errors",
 #       "name": "test_crossref_resolver_session_errors",
-#       "anchor": "TCRSE",
+#       "anchor": "function-test-crossref-resolver-session-errors",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_crossref_resolver_session_http_error",
+#       "id": "test-crossref-resolver-session-http-error",
 #       "name": "test_crossref_resolver_session_http_error",
-#       "anchor": "TCRSH",
+#       "anchor": "function-test-crossref-resolver-session-http-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_crossref_resolver_session_json_error",
+#       "id": "test-crossref-resolver-session-json-error",
 #       "name": "test_crossref_resolver_session_json_error",
-#       "anchor": "TCRSJ",
+#       "anchor": "function-test-crossref-resolver-session-json-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_crossref_resolver_uses_central_retry_logic",
+#       "id": "test-crossref-resolver-uses-central-retry-logic",
 #       "name": "test_crossref_resolver_uses_central_retry_logic",
-#       "anchor": "TCRUC",
+#       "anchor": "function-test-crossref-resolver-uses-central-retry-logic",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_doaj_resolver_http_error",
+#       "id": "test-doaj-resolver-http-error",
 #       "name": "test_doaj_resolver_http_error",
-#       "anchor": "TDRHE",
+#       "anchor": "function-test-doaj-resolver-http-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_doaj_resolver_emits_candidate",
+#       "id": "test-doaj-resolver-emits-candidate",
 #       "name": "test_doaj_resolver_emits_candidate",
-#       "anchor": "TDREC",
+#       "anchor": "function-test-doaj-resolver-emits-candidate",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_doaj_resolver_json_error",
+#       "id": "test-doaj-resolver-json-error",
 #       "name": "test_doaj_resolver_json_error",
-#       "anchor": "TDRJE",
+#       "anchor": "function-test-doaj-resolver-json-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_doaj_resolver_error_paths",
+#       "id": "test-doaj-resolver-error-paths",
 #       "name": "test_doaj_resolver_error_paths",
-#       "anchor": "TDREP",
+#       "anchor": "function-test-doaj-resolver-error-paths",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_doaj_resolver_includes_api_key",
+#       "id": "test-doaj-resolver-includes-api-key",
 #       "name": "test_doaj_resolver_includes_api_key",
-#       "anchor": "TDRIA",
+#       "anchor": "function-test-doaj-resolver-includes-api-key",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_doaj_resolver_skip_no_doi",
+#       "id": "test-doaj-resolver-skip-no-doi",
 #       "name": "test_doaj_resolver_skip_no_doi",
-#       "anchor": "TDRSN",
+#       "anchor": "function-test-doaj-resolver-skip-no-doi",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_europe_pmc_resolver_http_error",
+#       "id": "test-europe-pmc-resolver-http-error",
 #       "name": "test_europe_pmc_resolver_http_error",
-#       "anchor": "TEPRH",
+#       "anchor": "function-test-europe-pmc-resolver-http-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_europe_pmc_resolver_json_error",
+#       "id": "test-europe-pmc-resolver-json-error",
 #       "name": "test_europe_pmc_resolver_json_error",
-#       "anchor": "TEPRJ",
+#       "anchor": "function-test-europe-pmc-resolver-json-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_europe_pmc_resolver_emits_pdf",
+#       "id": "test-europe-pmc-resolver-emits-pdf",
 #       "name": "test_europe_pmc_resolver_emits_pdf",
-#       "anchor": "TEPRE",
+#       "anchor": "function-test-europe-pmc-resolver-emits-pdf",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_europe_pmc_resolver_error_paths",
+#       "id": "test-europe-pmc-resolver-error-paths",
 #       "name": "test_europe_pmc_resolver_error_paths",
-#       "anchor": "EPRE1",
+#       "anchor": "function-test-europe-pmc-resolver-error-paths",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_hal_resolver_emits_urls",
+#       "id": "test-hal-resolver-emits-urls",
 #       "name": "test_hal_resolver_emits_urls",
-#       "anchor": "THREU",
+#       "anchor": "function-test-hal-resolver-emits-urls",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_hal_resolver_json_error",
+#       "id": "test-hal-resolver-json-error",
 #       "name": "test_hal_resolver_json_error",
-#       "anchor": "THRJE",
+#       "anchor": "function-test-hal-resolver-json-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_hal_resolver_error_paths",
+#       "id": "test-hal-resolver-error-paths",
 #       "name": "test_hal_resolver_error_paths",
-#       "anchor": "THREP",
+#       "anchor": "function-test-hal-resolver-error-paths",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_hal_resolver_is_enabled",
+#       "id": "test-hal-resolver-is-enabled",
 #       "name": "test_hal_resolver_is_enabled",
-#       "anchor": "THRIE",
+#       "anchor": "function-test-hal-resolver-is-enabled",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_hal_resolver_skip_no_doi",
+#       "id": "test-hal-resolver-skip-no-doi",
 #       "name": "test_hal_resolver_skip_no_doi",
-#       "anchor": "THRSN",
+#       "anchor": "function-test-hal-resolver-skip-no-doi",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_openaire_resolver_emits_pdf",
+#       "id": "test-openaire-resolver-emits-pdf",
 #       "name": "test_openaire_resolver_emits_pdf",
-#       "anchor": "TOREP",
+#       "anchor": "function-test-openaire-resolver-emits-pdf",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_openaire_resolver_json_error",
+#       "id": "test-openaire-resolver-json-error",
 #       "name": "test_openaire_resolver_json_error",
-#       "anchor": "TORJE",
+#       "anchor": "function-test-openaire-resolver-json-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_openaire_resolver_fallback_json_load",
+#       "id": "test-openaire-resolver-fallback-json-load",
 #       "name": "test_openaire_resolver_fallback_json_load",
-#       "anchor": "TORFJ",
+#       "anchor": "function-test-openaire-resolver-fallback-json-load",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_openaire_resolver_error_paths",
+#       "id": "test-openaire-resolver-error-paths",
 #       "name": "test_openaire_resolver_error_paths",
-#       "anchor": "OREP1",
+#       "anchor": "function-test-openaire-resolver-error-paths",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_osf_resolver_emits_urls",
+#       "id": "test-osf-resolver-emits-urls",
 #       "name": "test_osf_resolver_emits_urls",
-#       "anchor": "TOREU",
+#       "anchor": "function-test-osf-resolver-emits-urls",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_osf_resolver_json_error",
+#       "id": "test-osf-resolver-json-error",
 #       "name": "test_osf_resolver_json_error",
-#       "anchor": "ORJE1",
+#       "anchor": "function-test-osf-resolver-json-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_osf_resolver_error_paths",
+#       "id": "test-osf-resolver-error-paths",
 #       "name": "test_osf_resolver_error_paths",
-#       "anchor": "OREP2",
+#       "anchor": "function-test-osf-resolver-error-paths",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_osf_resolver_skip_no_doi",
+#       "id": "test-osf-resolver-skip-no-doi",
 #       "name": "test_osf_resolver_skip_no_doi",
-#       "anchor": "TORSN",
+#       "anchor": "function-test-osf-resolver-skip-no-doi",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_unpaywall_resolver_cached_http_error",
+#       "id": "test-unpaywall-resolver-cached-http-error",
 #       "name": "test_unpaywall_resolver_cached_http_error",
-#       "anchor": "TURCH",
+#       "anchor": "function-test-unpaywall-resolver-cached-http-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_unpaywall_resolver_cached_success",
+#       "id": "test-unpaywall-resolver-cached-success",
 #       "name": "test_unpaywall_resolver_cached_success",
-#       "anchor": "TURCS",
+#       "anchor": "function-test-unpaywall-resolver-cached-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_unpaywall_resolver_session_errors",
+#       "id": "test-unpaywall-resolver-session-errors",
 #       "name": "test_unpaywall_resolver_session_errors",
-#       "anchor": "TURSE",
+#       "anchor": "function-test-unpaywall-resolver-session-errors",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_unpaywall_resolver_session_json_error",
+#       "id": "test-unpaywall-resolver-session-json-error",
 #       "name": "test_unpaywall_resolver_session_json_error",
-#       "anchor": "TURSJ",
+#       "anchor": "function-test-unpaywall-resolver-session-json-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_unpaywall_resolver_is_enabled",
+#       "id": "test-unpaywall-resolver-is-enabled",
 #       "name": "test_unpaywall_resolver_is_enabled",
-#       "anchor": "TURIE",
+#       "anchor": "function-test-unpaywall-resolver-is-enabled",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_unpaywall_resolver_session_success",
+#       "id": "test-unpaywall-resolver-session-success",
 #       "name": "test_unpaywall_resolver_session_success",
-#       "anchor": "TURSS",
+#       "anchor": "function-test-unpaywall-resolver-session-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_semantic_scholar_resolver_http_error",
+#       "id": "test-semantic-scholar-resolver-http-error",
 #       "name": "test_semantic_scholar_resolver_http_error",
-#       "anchor": "TSSRH",
+#       "anchor": "function-test-semantic-scholar-resolver-http-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_semantic_scholar_resolver_errors",
+#       "id": "test-semantic-scholar-resolver-errors",
 #       "name": "test_semantic_scholar_resolver_errors",
-#       "anchor": "TSSRE",
+#       "anchor": "function-test-semantic-scholar-resolver-errors",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_semantic_scholar_resolver_json_error",
+#       "id": "test-semantic-scholar-resolver-json-error",
 #       "name": "test_semantic_scholar_resolver_json_error",
-#       "anchor": "TSSRJ",
+#       "anchor": "function-test-semantic-scholar-resolver-json-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_semantic_scholar_resolver_no_open_access",
+#       "id": "test-semantic-scholar-resolver-no-open-access",
 #       "name": "test_semantic_scholar_resolver_no_open_access",
-#       "anchor": "TSSRN",
+#       "anchor": "function-test-semantic-scholar-resolver-no-open-access",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pmc_resolver_no_identifiers",
+#       "id": "test-pmc-resolver-no-identifiers",
 #       "name": "test_pmc_resolver_no_identifiers",
-#       "anchor": "TPRNI",
+#       "anchor": "function-test-pmc-resolver-no-identifiers",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pmc_resolver_timeout_fallback",
+#       "id": "test-pmc-resolver-timeout-fallback",
 #       "name": "test_pmc_resolver_timeout_fallback",
-#       "anchor": "TPRTF",
+#       "anchor": "function-test-pmc-resolver-timeout-fallback",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pmc_resolver_other_errors",
+#       "id": "test-pmc-resolver-other-errors",
 #       "name": "test_pmc_resolver_other_errors",
-#       "anchor": "TPROE",
+#       "anchor": "function-test-pmc-resolver-other-errors",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pmc_resolver_success",
+#       "id": "test-pmc-resolver-success",
 #       "name": "test_pmc_resolver_success",
-#       "anchor": "TPRS",
+#       "anchor": "function-test-pmc-resolver-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pmc_lookup_pmcids_success",
+#       "id": "test-pmc-lookup-pmcids-success",
 #       "name": "test_pmc_lookup_pmcids_success",
-#       "anchor": "TPLPS",
+#       "anchor": "function-test-pmc-lookup-pmcids-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pmc_lookup_pmcids_handles_json_error",
+#       "id": "test-pmc-lookup-pmcids-handles-json-error",
 #       "name": "test_pmc_lookup_pmcids_handles_json_error",
-#       "anchor": "TPLPH",
+#       "anchor": "function-test-pmc-lookup-pmcids-handles-json-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_wayback_resolver_handles_http_error",
+#       "id": "test-wayback-resolver-handles-http-error",
 #       "name": "test_wayback_resolver_handles_http_error",
-#       "anchor": "TWRHH",
+#       "anchor": "function-test-wayback-resolver-handles-http-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_wayback_resolver_returns_archive",
+#       "id": "test-wayback-resolver-returns-archive",
 #       "name": "test_wayback_resolver_returns_archive",
-#       "anchor": "TWRRA",
+#       "anchor": "function-test-wayback-resolver-returns-archive",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_wayback_resolver_json_error",
+#       "id": "test-wayback-resolver-json-error",
 #       "name": "test_wayback_resolver_json_error",
-#       "anchor": "TWRJE",
+#       "anchor": "function-test-wayback-resolver-json-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_wayback_resolver_error_paths",
+#       "id": "test-wayback-resolver-error-paths",
 #       "name": "test_wayback_resolver_error_paths",
-#       "anchor": "TWREP",
+#       "anchor": "function-test-wayback-resolver-error-paths",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_wayback_resolver_no_snapshot",
+#       "id": "test-wayback-resolver-no-snapshot",
 #       "name": "test_wayback_resolver_no_snapshot",
-#       "anchor": "TWRNS",
+#       "anchor": "function-test-wayback-resolver-no-snapshot",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_zenodo_resolver_no_doi",
+#       "id": "test-zenodo-resolver-no-doi",
 #       "name": "test_zenodo_resolver_no_doi",
-#       "anchor": "TZRND",
+#       "anchor": "function-test-zenodo-resolver-no-doi",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_zenodo_resolver_errors",
+#       "id": "test-zenodo-resolver-errors",
 #       "name": "test_zenodo_resolver_errors",
-#       "anchor": "TZRE",
+#       "anchor": "function-test-zenodo-resolver-errors",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_zenodo_resolver_http_error",
+#       "id": "test-zenodo-resolver-http-error",
 #       "name": "test_zenodo_resolver_http_error",
-#       "anchor": "TZRHE",
+#       "anchor": "function-test-zenodo-resolver-http-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_zenodo_resolver_json_error",
+#       "id": "test-zenodo-resolver-json-error",
 #       "name": "test_zenodo_resolver_json_error",
-#       "anchor": "TZRJE",
+#       "anchor": "function-test-zenodo-resolver-json-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_zenodo_resolver_emits_urls",
+#       "id": "test-zenodo-resolver-emits-urls",
 #       "name": "test_zenodo_resolver_emits_urls",
-#       "anchor": "TZREU",
+#       "anchor": "function-test-zenodo-resolver-emits-urls",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_zenodo_resolver_is_enabled",
+#       "id": "test-zenodo-resolver-is-enabled",
 #       "name": "test_zenodo_resolver_is_enabled",
-#       "anchor": "TZRIE",
+#       "anchor": "function-test-zenodo-resolver-is-enabled",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_zenodo_resolver_malformed_hits",
+#       "id": "test-zenodo-resolver-malformed-hits",
 #       "name": "test_zenodo_resolver_malformed_hits",
-#       "anchor": "TZRMH",
+#       "anchor": "function-test-zenodo-resolver-malformed-hits",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "make_artifact",
+#       "id": "make-artifact",
 #       "name": "make_artifact",
-#       "anchor": "MA",
+#       "anchor": "function-make-artifact",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "build_config",
+#       "id": "build-config",
 #       "name": "build_config",
-#       "anchor": "BC",
+#       "anchor": "function-build-config",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_unpaywall_resolver_success",
+#       "id": "test-unpaywall-resolver-success",
 #       "name": "test_unpaywall_resolver_success",
-#       "anchor": "TURS",
+#       "anchor": "function-test-unpaywall-resolver-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_unpaywall_resolver_http_error",
+#       "id": "test-unpaywall-resolver-http-error",
 #       "name": "test_unpaywall_resolver_http_error",
-#       "anchor": "TURHE",
+#       "anchor": "function-test-unpaywall-resolver-http-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_crossref_resolver_includes_mailto",
+#       "id": "test-crossref-resolver-includes-mailto",
 #       "name": "test_crossref_resolver_includes_mailto",
-#       "anchor": "TCRIM",
+#       "anchor": "function-test-crossref-resolver-includes-mailto",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_crossref_resolver_handles_json_error",
+#       "id": "test-crossref-resolver-handles-json-error",
 #       "name": "test_crossref_resolver_handles_json_error",
-#       "anchor": "TCRHJ",
+#       "anchor": "function-test-crossref-resolver-handles-json-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_landing_page_resolver_patterns",
+#       "id": "test-landing-page-resolver-patterns",
 #       "name": "test_landing_page_resolver_patterns",
-#       "anchor": "TLPRP",
+#       "anchor": "function-test-landing-page-resolver-patterns",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_landing_page_resolver_http_error",
+#       "id": "test-landing-page-resolver-http-error",
 #       "name": "test_landing_page_resolver_http_error",
-#       "anchor": "LPRH1",
+#       "anchor": "function-test-landing-page-resolver-http-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pmc_resolver_uses_id_converter",
+#       "id": "test-pmc-resolver-uses-id-converter",
 #       "name": "test_pmc_resolver_uses_id_converter",
-#       "anchor": "TPRUI",
+#       "anchor": "function-test-pmc-resolver-uses-id-converter",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pmc_resolver_handles_request_error",
+#       "id": "test-pmc-resolver-handles-request-error",
 #       "name": "test_pmc_resolver_handles_request_error",
-#       "anchor": "TPRHR",
+#       "anchor": "function-test-pmc-resolver-handles-request-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_europe_pmc_resolver_filters_pdf",
+#       "id": "test-europe-pmc-resolver-filters-pdf",
 #       "name": "test_europe_pmc_resolver_filters_pdf",
-#       "anchor": "TEPRF",
+#       "anchor": "function-test-europe-pmc-resolver-filters-pdf",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_europe_pmc_resolver_http_error",
+#       "id": "test-europe-pmc-resolver-http-error",
 #       "name": "test_europe_pmc_resolver_http_error",
-#       "anchor": "EPRH1",
+#       "anchor": "function-test-europe-pmc-resolver-http-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_openaire_resolver_collects_pdf_candidates",
+#       "id": "test-openaire-resolver-collects-pdf-candidates",
 #       "name": "test_openaire_resolver_collects_pdf_candidates",
-#       "anchor": "TORCP",
+#       "anchor": "function-test-openaire-resolver-collects-pdf-candidates",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_hal_resolver_uses_file_fields",
+#       "id": "test-hal-resolver-uses-file-fields",
 #       "name": "test_hal_resolver_uses_file_fields",
-#       "anchor": "THRUF",
+#       "anchor": "function-test-hal-resolver-uses-file-fields",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_osf_resolver_merges_download_links",
+#       "id": "test-osf-resolver-merges-download-links",
 #       "name": "test_osf_resolver_merges_download_links",
-#       "anchor": "TORMD",
+#       "anchor": "function-test-osf-resolver-merges-download-links",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_core_resolver_success",
+#       "id": "test-core-resolver-success",
 #       "name": "test_core_resolver_success",
-#       "anchor": "TCRS1",
+#       "anchor": "function-test-core-resolver-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_core_resolver_handles_failure",
+#       "id": "test-core-resolver-handles-failure",
 #       "name": "test_core_resolver_handles_failure",
-#       "anchor": "TCRHF",
+#       "anchor": "function-test-core-resolver-handles-failure",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_doaj_resolver_filters_pdf",
+#       "id": "test-doaj-resolver-filters-pdf",
 #       "name": "test_doaj_resolver_filters_pdf",
-#       "anchor": "TDRFP",
+#       "anchor": "function-test-doaj-resolver-filters-pdf",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_doaj_resolver_handles_error",
+#       "id": "test-doaj-resolver-handles-error",
 #       "name": "test_doaj_resolver_handles_error",
-#       "anchor": "DRHE1",
+#       "anchor": "function-test-doaj-resolver-handles-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_semantic_scholar_resolver_handles_error",
+#       "id": "test-semantic-scholar-resolver-handles-error",
 #       "name": "test_semantic_scholar_resolver_handles_error",
-#       "anchor": "SSRH1",
+#       "anchor": "function-test-semantic-scholar-resolver-handles-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_semantic_scholar_resolver_success",
+#       "id": "test-semantic-scholar-resolver-success",
 #       "name": "test_semantic_scholar_resolver_success",
-#       "anchor": "TSSRS",
+#       "anchor": "function-test-semantic-scholar-resolver-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_wayback_resolver_success",
+#       "id": "test-wayback-resolver-success",
 #       "name": "test_wayback_resolver_success",
-#       "anchor": "TWRS",
+#       "anchor": "function-test-wayback-resolver-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_wayback_resolver_handles_missing_snapshot",
+#       "id": "test-wayback-resolver-handles-missing-snapshot",
 #       "name": "test_wayback_resolver_handles_missing_snapshot",
-#       "anchor": "TWRHM",
+#       "anchor": "function-test-wayback-resolver-handles-missing-snapshot",
 #       "kind": "function"
 #     }
 #   ]
@@ -987,11 +987,13 @@ except ModuleNotFoundError:  # pragma: no cover
 _bs4 = pytest.importorskip("bs4")
 from bs4 import BeautifulSoup  # type: ignore  # noqa: E402
 
-# ---- test_resolver_caching.py -----------------------------
+# --- test_resolver_caching.py ---
+
 pytest.importorskip("requests")
 
 
-# ---- test_resolver_caching.py -----------------------------
+# --- test_resolver_caching.py ---
+
 @pytest.fixture(autouse=True)
 def clear_cache_between_tests():
     yield
@@ -1150,7 +1152,8 @@ def test_landing_page_helpers_extract_expected_urls() -> None:
     assert find_pdf_via_anchor(soup_anchor_text, base) is None
 
 
-# ---- test_resolver_caching.py -----------------------------
+# --- test_resolver_caching.py ---
+
 def test_resolvers_use_shared_retry_helper(monkeypatch):
     calls: list[str] = []
 
@@ -1211,14 +1214,17 @@ def test_resolvers_use_shared_retry_helper(monkeypatch):
         "https://api.semanticscholar.org/graph/v1/paper/DOI:10.1234/test",
     ]
 
-# ---- test_resolver_config.py -----------------------------
+# --- test_resolver_config.py ---
+
 pytest.importorskip("requests")
 
-# ---- test_resolver_config.py -----------------------------
+# --- test_resolver_config.py ---
+
 pytest.importorskip("pyalex")
 
 
-# ---- test_resolver_config.py -----------------------------
+# --- test_resolver_config.py ---
+
 def test_legacy_resolver_rate_limits_rejected(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text("{" '"resolver_rate_limits": {"unpaywall": 2.0}' "}")
@@ -1241,7 +1247,8 @@ def test_legacy_resolver_rate_limits_rejected(tmp_path: Path) -> None:
         load_resolver_config(args, ["unpaywall"], None)
 
 
-# ---- test_resolver_config.py -----------------------------
+# --- test_resolver_config.py ---
+
 def test_user_agent_includes_mailto(tmp_path: Path) -> None:
     args = Namespace(
         resolver_config=None,
@@ -1428,11 +1435,13 @@ def test_resolvers_apply_polite_headers_and_timeouts(
     assert record["kwargs"]["timeout"] == pytest.approx(override)
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 pytest.importorskip("pyalex")
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 class DummySession:
     def __init__(self, responses):
         self._responses = responses
@@ -1448,7 +1457,8 @@ class DummySession:
         return response
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 class DummyResponse:
     def __init__(self, status_code=200, json_data=None, text="", headers=None):
         self.status_code = status_code
@@ -1462,7 +1472,8 @@ class DummyResponse:
         return self._json_data
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 class ListLogger:
     def __init__(self):
         self.records = []
@@ -1471,7 +1482,8 @@ class ListLogger:
         self.records.append(record)
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 class StubResolver:
     def __init__(self, name, urls):
         self.name = name
@@ -1488,7 +1500,8 @@ class StubResolver:
                 yield ResolverResult(url=url)
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def build_artifact(tmp_path: Path) -> WorkArtifact:
     return WorkArtifact(
         work_id="W123",
@@ -1508,7 +1521,8 @@ def build_artifact(tmp_path: Path) -> WorkArtifact:
     )
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_classify_payload_detects_pdf_and_html():
     html = b"<html><body>Hello</body></html>"
     pdf = b"%PDF-sample"
@@ -1530,7 +1544,8 @@ def test_classify_payload_octet_stream_with_pdf_signature() -> None:
     )
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_stops_on_first_success(tmp_path):
     artifact = build_artifact(tmp_path)
 
@@ -1566,7 +1581,8 @@ def test_pipeline_stops_on_first_success(tmp_path):
     assert metrics.successes["resolver_b"] == 1
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_records_resolver_exception(tmp_path):
     artifact = build_artifact(tmp_path)
 
@@ -1598,7 +1614,8 @@ def test_pipeline_records_resolver_exception(tmp_path):
     assert metrics.failures["exploder"] == 1
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_unpaywall_resolver_extracts_candidates(tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = UnpaywallResolver()
@@ -1621,7 +1638,8 @@ def test_unpaywall_resolver_extracts_candidates(tmp_path):
     ]
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_landing_page_resolver_meta_parsing(tmp_path, monkeypatch):
     pytest.importorskip("bs4")
     artifact = build_artifact(tmp_path)
@@ -1635,7 +1653,8 @@ def test_landing_page_resolver_meta_parsing(tmp_path, monkeypatch):
     assert results[0].url == "https://example.com/files/paper.pdf"
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_head_precheck_allows_redirect(monkeypatch, tmp_path):
     resolver = StubResolver("stub", ["https://example.org/file.pdf"])
     config = ResolverConfig(
@@ -1670,7 +1689,8 @@ def test_head_precheck_allows_redirect(monkeypatch, tmp_path):
     assert not pipeline._head_precheck_url(object(), "https://example.org/file.pdf", timeout=5.0)
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_cli_integration_happy_path(monkeypatch, tmp_path):
     from DocsToKG.ContentDownload import download_pyalex_pdfs as module
 
@@ -1788,7 +1808,8 @@ def test_cli_integration_happy_path(monkeypatch, tmp_path):
     assert len(rows) >= 2  # header + attempts
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 class DummyHeadResponse:
     def __init__(self, status_code: int = 200, headers: Optional[Dict[str, str]] = None):
         self.status_code = status_code
@@ -1798,7 +1819,8 @@ class DummyHeadResponse:
         return None
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_head_precheck_skips_html(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
@@ -1828,7 +1850,8 @@ def test_head_precheck_skips_html(monkeypatch, tmp_path):
     assert any(record.reason == "head-precheck-failed" for record in logger.records)
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_head_precheck_skips_zero_length(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
@@ -1857,7 +1880,8 @@ def test_head_precheck_skips_zero_length(monkeypatch, tmp_path):
     assert download_calls == []
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_head_precheck_skips_error_status(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
@@ -1886,7 +1910,8 @@ def test_head_precheck_skips_error_status(monkeypatch, tmp_path):
     assert download_calls == []
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_head_precheck_allows_pdf(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
@@ -1914,7 +1939,8 @@ def test_head_precheck_allows_pdf(monkeypatch, tmp_path):
     assert download_calls == ["https://example.org/pdf"]
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_head_precheck_allows_redirect_to_pdf(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
@@ -1945,7 +1971,8 @@ def test_head_precheck_allows_redirect_to_pdf(monkeypatch, tmp_path):
     assert download_calls == ["https://example.org/pdf"]
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_head_precheck_failure_allows_download(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
@@ -1973,7 +2000,8 @@ def test_head_precheck_failure_allows_download(monkeypatch, tmp_path):
     assert download_calls == ["https://example.org/pdf"]
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_head_precheck_respects_global_disable(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
@@ -2007,7 +2035,8 @@ def test_head_precheck_respects_global_disable(monkeypatch, tmp_path):
     assert download_calls == ["https://example.org/pdf"]
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_head_precheck_resolver_override(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
     skip_resolver = StubResolver("skip", [ResolverResult(url="https://example.org/skip.pdf")])
@@ -2047,7 +2076,8 @@ def test_head_precheck_resolver_override(monkeypatch, tmp_path):
     assert head_calls == ["https://example.org/enforce.pdf"]
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_callable_accepts_argument_handles_noncallable():
     from DocsToKG.ContentDownload.resolvers import _callable_accepts_argument
 
@@ -2056,7 +2086,8 @@ def test_callable_accepts_argument_handles_noncallable():
     assert _callable_accepts_argument(sentinel, "context") is True
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_logs_missing_resolver(tmp_path):
     artifact = build_artifact(tmp_path)
     config = ResolverConfig(resolver_order=["ghost"], resolver_toggles={"ghost": True})
@@ -2072,7 +2103,8 @@ def test_pipeline_logs_missing_resolver(tmp_path):
     assert metrics.skips["ghost:missing"] == 1
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_skips_disabled_resolver(tmp_path):
     artifact = build_artifact(tmp_path)
 
@@ -2094,7 +2126,8 @@ def test_pipeline_skips_disabled_resolver(tmp_path):
     assert metrics.skips["disabled:disabled"] == 1
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_skips_not_applicable_resolver(tmp_path):
     artifact = build_artifact(tmp_path)
 
@@ -2117,7 +2150,8 @@ def test_pipeline_skips_not_applicable_resolver(tmp_path):
     assert metrics.skips["inapplicable:not-applicable"] == 1
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_collect_resolver_results_handles_exception(tmp_path):
     artifact = build_artifact(tmp_path)
 
@@ -2143,7 +2177,8 @@ def test_collect_resolver_results_handles_exception(tmp_path):
     assert metrics.failures["boom"] == 1
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_records_event_and_skip_reason(tmp_path):
     artifact = build_artifact(tmp_path)
     event_result = ResolverResult(url=None, event="info", event_reason="rate-limit")
@@ -2159,7 +2194,8 @@ def test_pipeline_records_event_and_skip_reason(tmp_path):
     assert metrics.skips["stub:rate-limit"] == 1
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_skips_duplicate_urls(tmp_path):
     artifact = build_artifact(tmp_path)
     duplicated = ResolverResult(url="https://example.org/dup.pdf")
@@ -2178,7 +2214,8 @@ def test_pipeline_skips_duplicate_urls(tmp_path):
     assert reasons and metrics.skips["dup:duplicate-url"] == 1
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_head_precheck_failure_skips_attempt(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
@@ -2197,7 +2234,8 @@ def test_pipeline_head_precheck_failure_skips_attempt(monkeypatch, tmp_path):
     assert metrics.skips["stub:head-precheck-failed"] == 1
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_event_without_reason(tmp_path):
     artifact = build_artifact(tmp_path)
     event_result = ResolverResult(url=None, event="info", event_reason=None)
@@ -2213,7 +2251,8 @@ def test_pipeline_event_without_reason(tmp_path):
     assert metrics.skips == {}
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_downloads_with_context_argument(tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
@@ -2233,7 +2272,8 @@ def test_pipeline_downloads_with_context_argument(tmp_path):
     assert logger.records[-1].status == "http_error"
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_respects_max_attempts(tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
@@ -2251,7 +2291,8 @@ def test_pipeline_respects_max_attempts(tmp_path):
     assert result.reason == "max-attempts-reached"
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_jitter_sleep_no_delay():
     config = ResolverConfig()
     config.sleep_jitter = 0.0
@@ -2263,7 +2304,8 @@ def test_pipeline_jitter_sleep_no_delay():
     mock_sleep.assert_not_called()
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_concurrent_skips_missing_resolver(tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("available", [ResolverResult(url="https://example.org/file.pdf")])
@@ -2285,7 +2327,8 @@ def test_pipeline_concurrent_skips_missing_resolver(tmp_path):
     assert any(record.reason == "resolver-missing" for record in logger.records)
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_ignores_empty_url(tmp_path):
     artifact = build_artifact(tmp_path)
 
@@ -2310,7 +2353,8 @@ def test_pipeline_ignores_empty_url(tmp_path):
     assert result.success is False
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_concurrent_execution(tmp_path):
     artifact = build_artifact(tmp_path)
     resolver_a = StubResolver("a", [ResolverResult(url="https://example.org/a.pdf")])
@@ -2340,7 +2384,8 @@ def test_pipeline_concurrent_execution(tmp_path):
     assert result.resolver_name in {"a", "b"}
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_global_deduplication_skips_repeat_urls(tmp_path):
     artifact = build_artifact(tmp_path)
     artifact.metadata["target_url"] = "https://example.org/shared.pdf"
@@ -2389,7 +2434,8 @@ def test_pipeline_global_deduplication_skips_repeat_urls(tmp_path):
     assert metrics.skips["static:duplicate-url-global"] == 1
 
 
-# ---- test_resolver_pipeline.py -----------------------------
+# --- test_resolver_pipeline.py ---
+
 def test_pipeline_domain_rate_limiting_enforces_interval(monkeypatch, tmp_path):
     class FakeClock:
         def __init__(self) -> None:
@@ -2476,7 +2522,8 @@ def test_pipeline_domain_rate_limiting_enforces_interval(monkeypatch, tmp_path):
     assert len(fake.sleeps) == 1
 
 
-# ---- new jitter test -----------------------------
+# --- new jitter test ---
+
 def test_domain_limit_includes_jitter_component(monkeypatch, tmp_path: Path) -> None:
     class FakeClock:
         def __init__(self) -> None:
@@ -2510,17 +2557,20 @@ def test_domain_limit_includes_jitter_component(monkeypatch, tmp_path: Path) -> 
     assert fake.sleeps == [pytest.approx(expected_wait + jitter)]
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 try:  # pragma: no cover - requests is an optional dependency in the test env
     import requests  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover
     requests = pytest.importorskip("requests")  # type: ignore
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 pytest.importorskip("bs4")
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 class _StubResponse:
     def __init__(
         self,
@@ -2543,7 +2593,8 @@ class _StubResponse:
         return None
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def _artifact(tmp_path: Any, **overrides: Any) -> WorkArtifact:
     base_kwargs: Dict[str, Any] = dict(
         work_id="W1",
@@ -2565,7 +2616,8 @@ def _artifact(tmp_path: Any, **overrides: Any) -> WorkArtifact:
     return WorkArtifact(**base_kwargs)
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_arxiv_resolver_skips_missing_identifier(tmp_path) -> None:
     resolver = ArxivResolver()
     artifact = _artifact(tmp_path, arxiv_id=None)
@@ -2576,7 +2628,8 @@ def test_arxiv_resolver_skips_missing_identifier(tmp_path) -> None:
     assert results[0].event_reason == "no-arxiv-id"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_arxiv_resolver_strips_prefix(tmp_path) -> None:
     resolver = ArxivResolver()
     artifact = _artifact(tmp_path, arxiv_id="arXiv:2301.12345")
@@ -2587,7 +2640,8 @@ def test_arxiv_resolver_strips_prefix(tmp_path) -> None:
     assert result.url.endswith("/2301.12345.pdf")
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_openalex_resolver_skip(tmp_path) -> None:
     resolver = OpenAlexResolver()
     artifact = _artifact(tmp_path, pdf_urls=[], open_access_url=None)
@@ -2598,7 +2652,8 @@ def test_openalex_resolver_skip(tmp_path) -> None:
     assert result.event_reason == "no-openalex-urls"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_openalex_resolver_dedupes(tmp_path) -> None:
     resolver = OpenAlexResolver()
     artifact = _artifact(
@@ -2613,7 +2668,8 @@ def test_openalex_resolver_dedupes(tmp_path) -> None:
     assert urls == ["https://openalex.example/a.pdf", "https://openalex.example/oa.pdf"]
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_landing_page_resolver_meta_pattern(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     artifact.landing_urls = ["https://example.org/article"]
@@ -2635,7 +2691,8 @@ def test_landing_page_resolver_meta_pattern(monkeypatch, tmp_path) -> None:
     assert result.url.endswith("/files/paper.pdf")
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_landing_page_resolver_link_pattern(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     artifact.landing_urls = ["https://example.org/article"]
@@ -2658,7 +2715,8 @@ def test_landing_page_resolver_link_pattern(monkeypatch, tmp_path) -> None:
     assert result.metadata["pattern"] == "link"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_landing_page_resolver_anchor_pattern(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     artifact.landing_urls = ["https://example.org/article"]
@@ -2681,7 +2739,8 @@ def test_landing_page_resolver_anchor_pattern(monkeypatch, tmp_path) -> None:
     assert result.metadata["pattern"] == "anchor"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_landing_page_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     artifact.landing_urls = ["https://example.org/article"]
@@ -2698,7 +2757,8 @@ def test_landing_page_resolver_http_error(monkeypatch, tmp_path) -> None:
     assert result.event_reason == "http-error"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 @pytest.mark.parametrize(
     "exception,reason",
     [
@@ -2723,7 +2783,8 @@ def test_landing_page_resolver_request_errors(monkeypatch, tmp_path, exception, 
     assert result.event_reason == reason
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_core_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -2740,7 +2801,8 @@ def test_core_resolver_http_error(monkeypatch, tmp_path) -> None:
     assert results[0].http_status == 503
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_core_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -2756,7 +2818,8 @@ def test_core_resolver_json_error(monkeypatch, tmp_path) -> None:
     assert results[0].event_reason == "json-error"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_core_resolver_emits_results(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -2785,7 +2848,8 @@ def test_core_resolver_emits_results(monkeypatch, tmp_path) -> None:
     assert "https://core.example/alternate.pdf" in urls
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 @pytest.mark.parametrize(
     "exception,reason",
     [
@@ -2809,7 +2873,8 @@ def test_core_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> 
     assert result.event_reason == reason
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_core_resolver_skips_when_no_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
     config = ResolverConfig()
@@ -2820,7 +2885,8 @@ def test_core_resolver_skips_when_no_doi(tmp_path) -> None:
     assert result.event_reason == "no-doi"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_core_resolver_is_enabled_requires_key(tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -2829,7 +2895,8 @@ def test_core_resolver_is_enabled_requires_key(tmp_path) -> None:
     assert CoreResolver().is_enabled(config, artifact) is False
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_core_resolver_ignores_non_dict_hits(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -2847,7 +2914,8 @@ def test_core_resolver_ignores_non_dict_hits(monkeypatch, tmp_path) -> None:
     assert urls == []
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_crossref_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -2863,7 +2931,8 @@ def test_crossref_resolver_http_error(monkeypatch, tmp_path) -> None:
     assert results[0].http_status == 429
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_crossref_resolver_success(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -2890,7 +2959,8 @@ def test_crossref_resolver_success(monkeypatch, tmp_path) -> None:
     assert "https://publisher.example/landing.html" in urls
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_crossref_resolver_link_not_list(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -2907,7 +2977,8 @@ def test_crossref_resolver_link_not_list(monkeypatch, tmp_path) -> None:
     assert results == []
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_crossref_resolver_skip_without_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
     config = ResolverConfig()
@@ -2919,7 +2990,8 @@ def test_crossref_resolver_skip_without_doi(tmp_path) -> None:
     assert result.event_reason == "no-doi"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_crossref_resolver_is_enabled(tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -2929,7 +3001,8 @@ def test_crossref_resolver_is_enabled(tmp_path) -> None:
     assert resolver.is_enabled(config, _artifact(tmp_path, doi=None)) is False
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_crossref_resolver_session_success(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -2969,7 +3042,8 @@ def test_crossref_resolver_session_success(monkeypatch, tmp_path) -> None:
     assert len(results) == 1
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_crossref_resolver_cached_request_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -2984,7 +3058,8 @@ def test_crossref_resolver_cached_request_error(monkeypatch, tmp_path) -> None:
     assert result.event_reason == "request-error"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 @pytest.mark.parametrize(
     "exception,reason",
     [
@@ -3011,7 +3086,8 @@ def test_crossref_resolver_session_errors(monkeypatch, tmp_path, exception, reas
     mock_request.assert_called_once()
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_crossref_resolver_session_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3031,7 +3107,8 @@ def test_crossref_resolver_session_http_error(monkeypatch, tmp_path) -> None:
     mock_request.assert_called_once()
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_crossref_resolver_session_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3051,7 +3128,8 @@ def test_crossref_resolver_session_json_error(monkeypatch, tmp_path) -> None:
     mock_request.assert_called_once()
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_crossref_resolver_uses_central_retry_logic(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3107,7 +3185,8 @@ def test_crossref_resolver_uses_central_retry_logic(monkeypatch, tmp_path) -> No
     assert sleep_calls[1] == pytest.approx(1.5, abs=0.05)
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_doaj_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3122,7 +3201,8 @@ def test_doaj_resolver_http_error(monkeypatch, tmp_path) -> None:
     assert result.event_reason == "http-error"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_doaj_resolver_emits_candidate(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3151,7 +3231,8 @@ def test_doaj_resolver_emits_candidate(monkeypatch, tmp_path) -> None:
     assert urls == ["https://doaj.example/file.pdf"]
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_doaj_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3166,7 +3247,8 @@ def test_doaj_resolver_json_error(monkeypatch, tmp_path) -> None:
     assert result.event_reason == "json-error"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 @pytest.mark.parametrize(
     "exception,reason",
     [
@@ -3189,7 +3271,8 @@ def test_doaj_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> 
     assert result.event_reason == reason
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_doaj_resolver_includes_api_key(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3212,7 +3295,8 @@ def test_doaj_resolver_includes_api_key(monkeypatch, tmp_path) -> None:
     assert captured_headers.get("X-API-KEY") == "secret"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_doaj_resolver_skip_no_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
     config = ResolverConfig()
@@ -3222,7 +3306,8 @@ def test_doaj_resolver_skip_no_doi(tmp_path) -> None:
     assert result.event_reason == "no-doi"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_europe_pmc_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3237,7 +3322,8 @@ def test_europe_pmc_resolver_http_error(monkeypatch, tmp_path) -> None:
     assert results == []
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_europe_pmc_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3252,7 +3338,8 @@ def test_europe_pmc_resolver_json_error(monkeypatch, tmp_path) -> None:
     assert result.event_reason == "json-error"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_europe_pmc_resolver_emits_pdf(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3282,7 +3369,8 @@ def test_europe_pmc_resolver_emits_pdf(monkeypatch, tmp_path) -> None:
     assert urls == ["https://epmc.example/file.pdf"]
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 @pytest.mark.parametrize(
     "exception",
     [requests.Timeout("slow"), requests.ConnectionError("down"), requests.RequestException("boom")],
@@ -3301,7 +3389,8 @@ def test_europe_pmc_resolver_error_paths(monkeypatch, tmp_path, exception) -> No
     assert results[0].event_reason in {"timeout", "connection-error", "request-error"}
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_hal_resolver_emits_urls(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3330,7 +3419,8 @@ def test_hal_resolver_emits_urls(monkeypatch, tmp_path) -> None:
     assert urls == ["https://hal.example/main.pdf", "https://hal.example/supp.pdf"]
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_hal_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3345,7 +3435,8 @@ def test_hal_resolver_json_error(monkeypatch, tmp_path) -> None:
     assert result.event_reason == "json-error"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 @pytest.mark.parametrize(
     "exception,reason",
     [
@@ -3368,7 +3459,8 @@ def test_hal_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> N
     assert result.event_reason == reason
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_hal_resolver_is_enabled(tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3378,7 +3470,8 @@ def test_hal_resolver_is_enabled(tmp_path) -> None:
     assert resolver.is_enabled(config, _artifact(tmp_path, doi=None)) is False
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_hal_resolver_skip_no_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
     config = ResolverConfig()
@@ -3388,7 +3481,8 @@ def test_hal_resolver_skip_no_doi(tmp_path) -> None:
     assert result.event_reason == "no-doi"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_openaire_resolver_emits_pdf(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3420,7 +3514,8 @@ def test_openaire_resolver_emits_pdf(monkeypatch, tmp_path) -> None:
     assert urls == ["https://openaire.example/paper.pdf"]
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_openaire_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3435,7 +3530,8 @@ def test_openaire_resolver_json_error(monkeypatch, tmp_path) -> None:
     assert result.event_reason == "json-error"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_openaire_resolver_fallback_json_load(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3468,7 +3564,8 @@ def test_openaire_resolver_fallback_json_load(monkeypatch, tmp_path) -> None:
     assert urls == ["https://openaire.example/alt.pdf"]
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 @pytest.mark.parametrize(
     "exception,reason",
     [
@@ -3491,7 +3588,8 @@ def test_openaire_resolver_error_paths(monkeypatch, tmp_path, exception, reason)
     assert result.event_reason == reason
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_osf_resolver_emits_urls(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3520,7 +3618,8 @@ def test_osf_resolver_emits_urls(monkeypatch, tmp_path) -> None:
     ]
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_osf_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3535,7 +3634,8 @@ def test_osf_resolver_json_error(monkeypatch, tmp_path) -> None:
     assert result.event_reason == "json-error"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 @pytest.mark.parametrize(
     "exception,reason",
     [
@@ -3558,7 +3658,8 @@ def test_osf_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> N
     assert result.event_reason == reason
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_osf_resolver_skip_no_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
     config = ResolverConfig()
@@ -3568,7 +3669,8 @@ def test_osf_resolver_skip_no_doi(tmp_path) -> None:
     assert result.event_reason == "no-doi"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_unpaywall_resolver_cached_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3590,7 +3692,8 @@ def test_unpaywall_resolver_cached_http_error(monkeypatch, tmp_path) -> None:
     assert results[0].http_status == 404
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_unpaywall_resolver_cached_success(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3621,7 +3724,8 @@ def test_unpaywall_resolver_cached_success(monkeypatch, tmp_path) -> None:
     ]
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 @pytest.mark.parametrize(
     "exception,reason",
     [
@@ -3643,7 +3747,8 @@ def test_unpaywall_resolver_session_errors(monkeypatch, tmp_path, exception, rea
     assert result.event_reason == reason
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_unpaywall_resolver_session_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3657,7 +3762,8 @@ def test_unpaywall_resolver_session_json_error(monkeypatch, tmp_path) -> None:
     assert result.event_reason == "json-error"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_unpaywall_resolver_is_enabled(tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3670,7 +3776,8 @@ def test_unpaywall_resolver_is_enabled(tmp_path) -> None:
     assert resolver.is_enabled(config, artifact) is False
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_unpaywall_resolver_session_success(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3690,7 +3797,8 @@ def test_unpaywall_resolver_session_success(monkeypatch, tmp_path) -> None:
     assert results[0].url == "https://unpaywall.example/best.pdf"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_semantic_scholar_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3711,7 +3819,8 @@ def test_semantic_scholar_resolver_http_error(monkeypatch, tmp_path) -> None:
     assert result.http_status == 503
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 @pytest.mark.parametrize(
     "exception,reason",
     [
@@ -3737,7 +3846,8 @@ def test_semantic_scholar_resolver_errors(monkeypatch, tmp_path, exception, reas
     assert result.event_reason == reason
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_semantic_scholar_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3755,7 +3865,8 @@ def test_semantic_scholar_resolver_json_error(monkeypatch, tmp_path) -> None:
     assert result.event_reason == "json-error"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_semantic_scholar_resolver_no_open_access(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3773,7 +3884,8 @@ def test_semantic_scholar_resolver_no_open_access(monkeypatch, tmp_path) -> None
     assert result.event_reason == "no-openaccess-pdf"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_pmc_resolver_no_identifiers(tmp_path) -> None:
     resolver = PmcResolver()
     artifact = _artifact(tmp_path, pmcid=None, pmid=None, doi=None)
@@ -3784,7 +3896,8 @@ def test_pmc_resolver_no_identifiers(tmp_path) -> None:
     assert result.event_reason == "no-pmcid"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_pmc_resolver_timeout_fallback(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3800,7 +3913,8 @@ def test_pmc_resolver_timeout_fallback(monkeypatch, tmp_path) -> None:
     assert results[1].metadata["source"] == "pdf-fallback"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 @pytest.mark.parametrize(
     "exception,reason",
     [
@@ -3822,7 +3936,8 @@ def test_pmc_resolver_other_errors(monkeypatch, tmp_path, exception, reason) -> 
     assert results[0].event_reason == reason
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_pmc_resolver_success(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path, pmcid="PMC123456")
     config = ResolverConfig()
@@ -3840,7 +3955,8 @@ def test_pmc_resolver_success(monkeypatch, tmp_path) -> None:
     assert urls[-1] == "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC123456/pdf/"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_pmc_lookup_pmcids_success(monkeypatch, tmp_path) -> None:
     resolver = PmcResolver()
     config = ResolverConfig()
@@ -3863,7 +3979,8 @@ def test_pmc_lookup_pmcids_success(monkeypatch, tmp_path) -> None:
     assert ids == ["PMC123", "PMC456"]
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_pmc_lookup_pmcids_handles_json_error(monkeypatch, tmp_path) -> None:
     resolver = PmcResolver()
     config = ResolverConfig()
@@ -3878,7 +3995,8 @@ def test_pmc_lookup_pmcids_handles_json_error(monkeypatch, tmp_path) -> None:
     assert ids == []
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_wayback_resolver_handles_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     artifact.failed_pdf_urls = ["https://example.org/pdf"]
@@ -3894,7 +4012,8 @@ def test_wayback_resolver_handles_http_error(monkeypatch, tmp_path) -> None:
     assert result.event_reason == "http-error"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_wayback_resolver_returns_archive(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     artifact.failed_pdf_urls = ["https://example.org/pdf"]
@@ -3921,7 +4040,8 @@ def test_wayback_resolver_returns_archive(monkeypatch, tmp_path) -> None:
     assert results[0].metadata["timestamp"] == "20200101000000"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_wayback_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     artifact.failed_pdf_urls = ["https://example.org/pdf"]
@@ -3937,7 +4057,8 @@ def test_wayback_resolver_json_error(monkeypatch, tmp_path) -> None:
     assert result.event_reason == "json-error"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 @pytest.mark.parametrize(
     "exception,reason",
     [
@@ -3961,7 +4082,8 @@ def test_wayback_resolver_error_paths(monkeypatch, tmp_path, exception, reason) 
     assert result.event_reason == reason
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_wayback_resolver_no_snapshot(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     artifact.failed_pdf_urls = ["https://example.org/pdf"]
@@ -3979,7 +4101,8 @@ def test_wayback_resolver_no_snapshot(monkeypatch, tmp_path) -> None:
     assert results == []
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_zenodo_resolver_no_doi(tmp_path) -> None:
     resolver = ZenodoResolver()
     artifact = _artifact(tmp_path, doi=None)
@@ -3990,7 +4113,8 @@ def test_zenodo_resolver_no_doi(tmp_path) -> None:
     assert result.event_reason == "no-doi"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 @pytest.mark.parametrize(
     "exception,reason",
     [
@@ -4012,7 +4136,8 @@ def test_zenodo_resolver_errors(monkeypatch, tmp_path, exception, reason) -> Non
     assert result.event_reason == reason
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_zenodo_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -4027,7 +4152,8 @@ def test_zenodo_resolver_http_error(monkeypatch, tmp_path) -> None:
     assert result.event_reason == "http-error"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_zenodo_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -4042,7 +4168,8 @@ def test_zenodo_resolver_json_error(monkeypatch, tmp_path) -> None:
     assert result.event_reason == "json-error"
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_zenodo_resolver_emits_urls(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -4079,7 +4206,8 @@ def test_zenodo_resolver_emits_urls(monkeypatch, tmp_path) -> None:
     assert urls == ["https://zenodo.example/paper.pdf"]
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_zenodo_resolver_is_enabled(tmp_path) -> None:
     artifact = _artifact(tmp_path)
     resolver = ZenodoResolver()
@@ -4089,7 +4217,8 @@ def test_zenodo_resolver_is_enabled(tmp_path) -> None:
     assert resolver.is_enabled(config, _artifact(tmp_path, doi=None)) is False
 
 
-# ---- test_resolver_providers_additional.py -----------------------------
+# --- test_resolver_providers_additional.py ---
+
 def test_zenodo_resolver_malformed_hits(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -4103,17 +4232,21 @@ def test_zenodo_resolver_malformed_hits(monkeypatch, tmp_path) -> None:
 
     assert results == []
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 pytest.importorskip("pyalex")
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 requests = pytest.importorskip("requests")
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 responses = pytest.importorskip("responses")
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 def make_artifact(tmp_path: Path, **overrides: object) -> downloader.WorkArtifact:
     base_kwargs = dict(
         work_id="W1",
@@ -4135,7 +4268,8 @@ def make_artifact(tmp_path: Path, **overrides: object) -> downloader.WorkArtifac
     return downloader.WorkArtifact(**base_kwargs)
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 def build_config(**overrides: object) -> ResolverConfig:
     config = ResolverConfig()
     for key, value in overrides.items():
@@ -4143,7 +4277,8 @@ def build_config(**overrides: object) -> ResolverConfig:
     return config
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_unpaywall_resolver_success(tmp_path):
     session = requests.Session()
@@ -4167,7 +4302,8 @@ def test_unpaywall_resolver_success(tmp_path):
     assert urls == ["https://oa.example/best.pdf", "https://oa.example/extra.pdf"]
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_unpaywall_resolver_http_error(tmp_path):
     session = requests.Session()
@@ -4183,7 +4319,8 @@ def test_unpaywall_resolver_http_error(tmp_path):
     assert results[0].event_reason == "http-error"
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_crossref_resolver_includes_mailto(tmp_path):
     session = requests.Session()
@@ -4210,7 +4347,8 @@ def test_crossref_resolver_includes_mailto(tmp_path):
     assert "mailto=tester%40example.org" in responses.calls[0].request.url
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_crossref_resolver_handles_json_error(tmp_path):
     session = requests.Session()
@@ -4227,7 +4365,8 @@ def test_crossref_resolver_handles_json_error(tmp_path):
     assert results[0].event_reason == "json-error"
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_landing_page_resolver_patterns(tmp_path):
     pytest.importorskip("bs4")
@@ -4256,7 +4395,8 @@ def test_landing_page_resolver_patterns(tmp_path):
     assert results[0].metadata["pattern"] == "anchor"
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_landing_page_resolver_http_error(tmp_path):  # noqa: F811
     pytest.importorskip("bs4")
@@ -4268,7 +4408,8 @@ def test_landing_page_resolver_http_error(tmp_path):  # noqa: F811
     assert events[0].event_reason == "http-error"
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_pmc_resolver_uses_id_converter(tmp_path):
     session = requests.Session()
@@ -4301,7 +4442,8 @@ def test_pmc_resolver_uses_id_converter(tmp_path):
     assert "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC777/pdf/" in results
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_pmc_resolver_handles_request_error(tmp_path):
     session = requests.Session()
@@ -4316,7 +4458,8 @@ def test_pmc_resolver_handles_request_error(tmp_path):
     assert results[-1].url.endswith("PMC123/pdf/")
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_europe_pmc_resolver_filters_pdf(tmp_path):
     session = requests.Session()
@@ -4345,7 +4488,8 @@ def test_europe_pmc_resolver_filters_pdf(tmp_path):
     assert urls == ["https://epmc.org/pdf1"]
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_europe_pmc_resolver_http_error(tmp_path):  # noqa: F811
     session = requests.Session()
@@ -4360,7 +4504,8 @@ def test_europe_pmc_resolver_http_error(tmp_path):  # noqa: F811
     assert urls == []
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_openaire_resolver_collects_pdf_candidates(tmp_path):
     session = requests.Session()
@@ -4395,7 +4540,8 @@ def test_openaire_resolver_collects_pdf_candidates(tmp_path):
     assert urls == ["https://openaire.example/paper.pdf"]
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_hal_resolver_uses_file_fields(tmp_path):
     session = requests.Session()
@@ -4427,7 +4573,8 @@ def test_hal_resolver_uses_file_fields(tmp_path):
     ]
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_osf_resolver_merges_download_links(tmp_path):
     session = requests.Session()
@@ -4453,7 +4600,8 @@ def test_osf_resolver_merges_download_links(tmp_path):
     assert urls == ["https://osf.io/download1", "https://osf.io/download2"]
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_core_resolver_success(tmp_path):
     session = requests.Session()
@@ -4474,7 +4622,8 @@ def test_core_resolver_success(tmp_path):
     assert urls == ["https://core.org/paper.pdf", "https://core.org/extra.pdf"]
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_core_resolver_handles_failure(tmp_path):
     session = requests.Session()
@@ -4489,7 +4638,8 @@ def test_core_resolver_handles_failure(tmp_path):
     assert "CORE API returned" in events[0].metadata["error_detail"]
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_doaj_resolver_filters_pdf(tmp_path):
     session = requests.Session()
@@ -4516,7 +4666,8 @@ def test_doaj_resolver_filters_pdf(tmp_path):
     assert urls == ["https://doaj.org/paper.pdf"]
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_doaj_resolver_handles_error(tmp_path):
     session = requests.Session()
@@ -4531,7 +4682,8 @@ def test_doaj_resolver_handles_error(tmp_path):
     assert "DOAJ API returned" in events[0].metadata["error_detail"]
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_semantic_scholar_resolver_handles_error(tmp_path):
     session = requests.Session()
@@ -4549,7 +4701,8 @@ def test_semantic_scholar_resolver_handles_error(tmp_path):
     assert "Semantic Scholar HTTPError" in error.metadata["error_detail"]
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_semantic_scholar_resolver_success(tmp_path):
     session = requests.Session()
@@ -4565,7 +4718,8 @@ def test_semantic_scholar_resolver_success(tmp_path):
     assert urls == ["https://s2.org/paper.pdf"]
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_wayback_resolver_success(tmp_path):
     session = requests.Session()
@@ -4589,7 +4743,8 @@ def test_wayback_resolver_success(tmp_path):
     assert urls == ["https://web.archive.org/web/20200101/https://dead.example/file.pdf"]
 
 
-# ---- test_resolvers_unit.py -----------------------------
+# --- test_resolvers_unit.py ---
+
 @responses.activate
 def test_wayback_resolver_handles_missing_snapshot(tmp_path):
     session = requests.Session()

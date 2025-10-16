@@ -1,15 +1,8 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "tests",
-#   "purpose": "Pytest coverage for init scenarios",
-#   "sections": [
-#     {
-#       "id": "module-overview",
-#       "name": "module_overview",
-#       "anchor": "OVR",
-#       "kind": "infra"
-#     }
-#   ]
+#   "purpose": "Pytest coverage for   init   scenarios",
+#   "sections": []
 # }
 # === /NAVMAP ===
 

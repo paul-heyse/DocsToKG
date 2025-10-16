@@ -4,15 +4,15 @@
 #   "purpose": "Pytest coverage for docparsing synthetic benchmark scenarios",
 #   "sections": [
 #     {
-#       "id": "test_simulate_embedding_benchmark_reports_speedup",
+#       "id": "test-simulate-embedding-benchmark-reports-speedup",
 #       "name": "test_simulate_embedding_benchmark_reports_speedup",
-#       "anchor": "TSEBR",
+#       "anchor": "function-test-simulate-embedding-benchmark-reports-speedup",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_generate_synthetic_vectors_aligns_with_chunks",
+#       "id": "test-generate-synthetic-vectors-aligns-with-chunks",
 #       "name": "test_generate_synthetic_vectors_aligns_with_chunks",
-#       "anchor": "TGSVA",
+#       "anchor": "function-test-generate-synthetic-vectors-aligns-with-chunks",
 #       "kind": "function"
 #     }
 #   ]
@@ -29,6 +29,7 @@ from tests.docparsing.synthetic import (
     generate_synthetic_vectors,
     simulate_embedding_benchmark,
 )
+# --- Test Cases ---
 
 
 def test_simulate_embedding_benchmark_reports_speedup() -> None:

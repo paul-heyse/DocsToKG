@@ -4,81 +4,81 @@
 #   "purpose": "Implements DocsToKG.OntologyDownload.resolvers behaviors and helpers",
 #   "sections": [
 #     {
-#       "id": "normalize_license_to_spdx",
+#       "id": "normalize-license-to-spdx",
 #       "name": "normalize_license_to_spdx",
-#       "anchor": "NLTS",
+#       "anchor": "function-normalize-license-to-spdx",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_get_service_bucket",
+#       "id": "get-service-bucket",
 #       "name": "_get_service_bucket",
-#       "anchor": "GSB",
+#       "anchor": "function-get-service-bucket",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "fetch_plan",
+#       "id": "fetchplan",
 #       "name": "FetchPlan",
-#       "anchor": "FETC",
+#       "anchor": "class-fetchplan",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "base_resolver",
+#       "id": "baseresolver",
 #       "name": "BaseResolver",
-#       "anchor": "BASE",
+#       "anchor": "class-baseresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "obo_resolver",
+#       "id": "oboresolver",
 #       "name": "OBOResolver",
-#       "anchor": "OBOR",
+#       "anchor": "class-oboresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "ols_resolver",
+#       "id": "olsresolver",
 #       "name": "OLSResolver",
-#       "anchor": "OLSR",
+#       "anchor": "class-olsresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "bio_portal_resolver",
+#       "id": "bioportalresolver",
 #       "name": "BioPortalResolver",
-#       "anchor": "BIOP",
+#       "anchor": "class-bioportalresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "lov_resolver",
+#       "id": "lovresolver",
 #       "name": "LOVResolver",
-#       "anchor": "LOVR",
+#       "anchor": "class-lovresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "skos_resolver",
+#       "id": "skosresolver",
 #       "name": "SKOSResolver",
-#       "anchor": "SKOS",
+#       "anchor": "class-skosresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "xbrl_resolver",
+#       "id": "xbrlresolver",
 #       "name": "XBRLResolver",
-#       "anchor": "XBRL",
+#       "anchor": "class-xbrlresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "ontobee_resolver",
+#       "id": "ontobeeresolver",
 #       "name": "OntobeeResolver",
-#       "anchor": "ONTO",
+#       "anchor": "class-ontobeeresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_load_resolver_plugins",
+#       "id": "load-resolver-plugins",
 #       "name": "_load_resolver_plugins",
-#       "anchor": "LRP",
+#       "anchor": "function-load-resolver-plugins",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_load_resolver_plugins",
+#       "id": "load-resolver-plugins",
 #       "name": "_load_resolver_plugins",
-#       "anchor": "LRP1",
+#       "anchor": "function-load-resolver-plugins",
 #       "kind": "function"
 #     }
 #   ]
@@ -133,6 +133,7 @@ from .ontology_download import (
     get_pystow,
     retry_with_backoff,
 )
+# --- Globals ---
 
 OlsClient = _OlsClient
 pystow = get_pystow()
@@ -140,6 +141,7 @@ pystow = get_pystow()
 
 _SERVICE_BUCKETS: Dict[str, TokenBucket] = {}
 _SERVICE_BUCKET_LOCK = threading.Lock()
+# --- Public Functions ---
 
 
 def normalize_license_to_spdx(value: Optional[str]) -> Optional[str]:
@@ -189,6 +191,7 @@ def normalize_license_to_spdx(value: Optional[str]) -> Optional[str]:
     if "apache" in lower and "2" in lower:
         return "Apache-2.0"
     return cleaned
+# --- Private Helpers ---
 
 
 def _get_service_bucket(service: str, config: ResolvedConfig) -> TokenBucket:
@@ -207,6 +210,8 @@ def _get_service_bucket(service: str, config: ResolvedConfig) -> TokenBucket:
 
 
 @dataclass(slots=True)
+# --- Public Classes ---
+
 class FetchPlan:
     """Concrete plan output from a resolver.
 
@@ -1070,6 +1075,8 @@ else:  # pragma: no cover - depends on optional dependency presence
 
 _load_resolver_plugins()
 
+
+# --- Globals ---
 
 __all__ = [
     "FetchPlan",

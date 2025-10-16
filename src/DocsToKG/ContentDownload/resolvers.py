@@ -1,228 +1,234 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.ContentDownload.resolvers",
-#   "purpose": "Implements DocsToKG.ContentDownload.resolvers behaviors and helpers",
+#   "purpose": "Resolver registry, pipeline orchestration, and provider helpers",
 #   "sections": [
 #     {
-#       "id": "resolver_result",
+#       "id": "resolverresult",
 #       "name": "ResolverResult",
-#       "anchor": "RESO",
+#       "anchor": "class-resolverresult",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "resolver_config",
+#       "id": "resolverconfig",
 #       "name": "ResolverConfig",
-#       "anchor": "RESO1",
+#       "anchor": "class-resolverconfig",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "attempt_record",
+#       "id": "attemptrecord",
 #       "name": "AttemptRecord",
-#       "anchor": "ATTE",
+#       "anchor": "class-attemptrecord",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "attempt_sink",
+#       "id": "attemptsink",
 #       "name": "AttemptSink",
-#       "anchor": "ATTE1",
+#       "anchor": "class-attemptsink",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "download_outcome",
+#       "id": "downloadoutcome",
 #       "name": "DownloadOutcome",
-#       "anchor": "DOWN",
+#       "anchor": "class-downloadoutcome",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "pipeline_result",
+#       "id": "pipelineresult",
 #       "name": "PipelineResult",
-#       "anchor": "PIPE",
+#       "anchor": "class-pipelineresult",
 #       "kind": "class"
 #     },
 #     {
 #       "id": "resolver",
 #       "name": "Resolver",
-#       "anchor": "RESO2",
+#       "anchor": "class-resolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "resolver_metrics",
+#       "id": "resolvermetrics",
 #       "name": "ResolverMetrics",
-#       "anchor": "RESO3",
+#       "anchor": "class-resolvermetrics",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_fetch_semantic_scholar_data",
+#       "id": "fetch-semantic-scholar-data",
 #       "name": "_fetch_semantic_scholar_data",
-#       "anchor": "FSSD",
+#       "anchor": "function-fetch-semantic-scholar-data",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "resolver_registry",
+#       "id": "fetch-unpaywall-data",
+#       "name": "_fetch_unpaywall_data",
+#       "anchor": "function-fetch-unpaywall-data",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolverregistry",
 #       "name": "ResolverRegistry",
-#       "anchor": "RESO4",
+#       "anchor": "class-resolverregistry",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "registered_resolver",
+#       "id": "registeredresolver",
 #       "name": "RegisteredResolver",
-#       "anchor": "REGI",
+#       "anchor": "class-registeredresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "api_resolver_base",
+#       "id": "apiresolverbase",
 #       "name": "ApiResolverBase",
-#       "anchor": "APIR",
+#       "anchor": "class-apiresolverbase",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_absolute_url",
+#       "id": "absolute-url",
 #       "name": "_absolute_url",
-#       "anchor": "AU",
+#       "anchor": "function-absolute-url",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_collect_candidate_urls",
+#       "id": "collect-candidate-urls",
 #       "name": "_collect_candidate_urls",
-#       "anchor": "CCU",
+#       "anchor": "function-collect-candidate-urls",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "find_pdf_via_meta",
+#       "id": "find-pdf-via-meta",
 #       "name": "find_pdf_via_meta",
-#       "anchor": "FPVM",
+#       "anchor": "function-find-pdf-via-meta",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "find_pdf_via_link",
+#       "id": "find-pdf-via-link",
 #       "name": "find_pdf_via_link",
-#       "anchor": "FPVL",
+#       "anchor": "function-find-pdf-via-link",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "find_pdf_via_anchor",
+#       "id": "find-pdf-via-anchor",
 #       "name": "find_pdf_via_anchor",
-#       "anchor": "FPVA",
+#       "anchor": "function-find-pdf-via-anchor",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "arxiv_resolver",
-#       "name": "ArxivResolver",
-#       "anchor": "ARXI",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "core_resolver",
-#       "name": "CoreResolver",
-#       "anchor": "CORE",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "crossref_resolver",
-#       "name": "CrossrefResolver",
-#       "anchor": "CROS",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "doaj_resolver",
-#       "name": "DoajResolver",
-#       "anchor": "DOAJ",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "europe_pmc_resolver",
-#       "name": "EuropePmcResolver",
-#       "anchor": "EURO",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "figshare_resolver",
-#       "name": "FigshareResolver",
-#       "anchor": "FIGS",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "hal_resolver",
-#       "name": "HalResolver",
-#       "anchor": "HALR",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "landing_page_resolver",
-#       "name": "LandingPageResolver",
-#       "anchor": "LAND",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "open_aire_resolver",
-#       "name": "OpenAireResolver",
-#       "anchor": "OPEN",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "open_alex_resolver",
-#       "name": "OpenAlexResolver",
-#       "anchor": "OPEN1",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "osf_resolver",
-#       "name": "OsfResolver",
-#       "anchor": "OSFR",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "pmc_resolver",
-#       "name": "PmcResolver",
-#       "anchor": "PMCR",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "semantic_scholar_resolver",
-#       "name": "SemanticScholarResolver",
-#       "anchor": "SEMA",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "unpaywall_resolver",
-#       "name": "UnpaywallResolver",
-#       "anchor": "UNPA",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "wayback_resolver",
-#       "name": "WaybackResolver",
-#       "anchor": "WAYB",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "zenodo_resolver",
-#       "name": "ZenodoResolver",
-#       "anchor": "ZENO",
-#       "kind": "class"
-#     },
-#     {
-#       "id": "default_resolvers",
+#       "id": "default-resolvers",
 #       "name": "default_resolvers",
-#       "anchor": "DR",
+#       "anchor": "function-default-resolvers",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_callable_accepts_argument",
-#       "name": "_callable_accepts_argument",
-#       "anchor": "CAA",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_run_state",
-#       "name": "_RunState",
-#       "anchor": "RUNS",
+#       "id": "arxivresolver",
+#       "name": "ArxivResolver",
+#       "anchor": "class-arxivresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "resolver_pipeline",
+#       "id": "coreresolver",
+#       "name": "CoreResolver",
+#       "anchor": "class-coreresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "crossrefresolver",
+#       "name": "CrossrefResolver",
+#       "anchor": "class-crossrefresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "doajresolver",
+#       "name": "DoajResolver",
+#       "anchor": "class-doajresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "europepmcresolver",
+#       "name": "EuropePmcResolver",
+#       "anchor": "class-europepmcresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "figshareresolver",
+#       "name": "FigshareResolver",
+#       "anchor": "class-figshareresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "halresolver",
+#       "name": "HalResolver",
+#       "anchor": "class-halresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "landingpageresolver",
+#       "name": "LandingPageResolver",
+#       "anchor": "class-landingpageresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "openaireresolver",
+#       "name": "OpenAireResolver",
+#       "anchor": "class-openaireresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "openalexresolver",
+#       "name": "OpenAlexResolver",
+#       "anchor": "class-openalexresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "osfresolver",
+#       "name": "OsfResolver",
+#       "anchor": "class-osfresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "pmcresolver",
+#       "name": "PmcResolver",
+#       "anchor": "class-pmcresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "semanticscholarresolver",
+#       "name": "SemanticScholarResolver",
+#       "anchor": "class-semanticscholarresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "unpaywallresolver",
+#       "name": "UnpaywallResolver",
+#       "anchor": "class-unpaywallresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "waybackresolver",
+#       "name": "WaybackResolver",
+#       "anchor": "class-waybackresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "zenodoresolver",
+#       "name": "ZenodoResolver",
+#       "anchor": "class-zenodoresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "callable-accepts-argument",
+#       "name": "_callable_accepts_argument",
+#       "anchor": "function-callable-accepts-argument",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "runstate",
+#       "name": "_RunState",
+#       "anchor": "class-runstate",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolverpipeline",
 #       "name": "ResolverPipeline",
-#       "anchor": "RESO5",
+#       "anchor": "class-resolverpipeline",
 #       "kind": "class"
 #     }
 #   ]
@@ -307,6 +313,8 @@ try:  # Optional dependency guarded at runtime
 except Exception:  # pragma: no cover - optional dependency missing
     BeautifulSoup = None
 
+# --- Globals ---
+
 LOGGER = logging.getLogger(__name__)
 
 DEFAULT_RESOLVER_ORDER: List[str] = [
@@ -333,6 +341,45 @@ _DEFAULT_RESOLVER_TOGGLES: Dict[str, bool] = {
 }
 DEFAULT_RESOLVER_TOGGLES = MappingProxyType(_DEFAULT_RESOLVER_TOGGLES)
 
+__all__ = [
+    "AttemptRecord",
+    "AttemptSink",
+    "ApiResolverBase",
+    "ArxivResolver",
+    "CoreResolver",
+    "CrossrefResolver",
+    "DEFAULT_RESOLVER_ORDER",
+    "DEFAULT_RESOLVER_TOGGLES",
+    "DoajResolver",
+    "DownloadFunc",
+    "DownloadOutcome",
+    "EuropePmcResolver",
+    "FigshareResolver",
+    "HalResolver",
+    "LandingPageResolver",
+    "OpenAireResolver",
+    "OpenAlexResolver",
+    "OsfResolver",
+    "PmcResolver",
+    "PipelineResult",
+    "Resolver",
+    "ResolverConfig",
+    "ResolverMetrics",
+    "ResolverPipeline",
+    "ResolverRegistry",
+    "ResolverResult",
+    "RegisteredResolver",
+    "SemanticScholarResolver",
+    "UnpaywallResolver",
+    "WaybackResolver",
+    "ZenodoResolver",
+    "default_resolvers",
+    "find_pdf_via_anchor",
+    "find_pdf_via_link",
+    "find_pdf_via_meta",
+]
+
+# --- Resolver Configuration ---
 
 @dataclass
 class ResolverResult:
@@ -810,6 +857,8 @@ class ResolverMetrics:
         }
 
 
+# --- Shared Helpers ---
+
 def _fetch_semantic_scholar_data(
     session: _requests.Session,
     config: ResolverConfig,
@@ -837,10 +886,45 @@ def _fetch_semantic_scholar_data(
             raise error
         return response.json()
     finally:
-        response.close()
+        close = getattr(response, "close", None)
+        if callable(close):
+            close()
+
+
+def _fetch_unpaywall_data(
+    session: _requests.Session,
+    config: ResolverConfig,
+    doi: str,
+) -> Dict[str, Any]:
+    """Return Unpaywall metadata for ``doi`` using configured headers."""
+
+    endpoint = f"https://api.unpaywall.org/v2/{quote(doi)}"
+    headers = dict(config.polite_headers)
+    params = {"email": config.unpaywall_email} if config.unpaywall_email else None
+    response = request_with_retries(
+        session,
+        "GET",
+        endpoint,
+        params=params,
+        timeout=config.get_timeout("unpaywall"),
+        headers=headers,
+    )
+    try:
+        if response.status_code != 200:
+            error = _requests.HTTPError(f"Unpaywall HTTPError: {response.status_code}")
+            error.response = response
+            raise error
+        return response.json()
+    finally:
+        close = getattr(response, "close", None)
+        if callable(close):
+            close()
 
 
 DownloadFunc = Callable[..., DownloadOutcome]
+
+
+# --- Resolver Registry ---
 
 
 class ResolverRegistry:
@@ -1059,10 +1143,6 @@ class ApiResolverBase(RegisteredResolver, register=False):
         return data, None
 
 
-# ---------------------------------------------------------------------------
-# Helper utilities reused across providers
-
-
 def _absolute_url(base: str, href: str) -> str:
     """Resolve relative ``href`` values against ``base`` to obtain absolute URLs."""
 
@@ -1153,9 +1233,20 @@ def find_pdf_via_anchor(soup: "BeautifulSoup", base_url: str) -> Optional[str]:
     return None
 
 
-# ---------------------------------------------------------------------------
-# Resolver implementations
+def default_resolvers() -> List[Resolver]:
+    """Instantiate the default resolver stack in priority order.
 
+    Args:
+        None
+
+    Returns:
+        List[Resolver]: Resolver instances ordered according to ``DEFAULT_RESOLVER_ORDER``.
+    """
+
+    return ResolverRegistry.create_default()
+
+
+# --- Resolver implementations ---
 
 class ArxivResolver(RegisteredResolver):
     """Resolve arXiv preprints using arXiv identifier lookups.
@@ -1597,6 +1688,8 @@ class EuropePmcResolver(ApiResolverBase):
             params={"query": f'DOI:"{doi}"', "format": "json", "pageSize": 3},
         )
         if error:
+            if error.event_reason == "http-error":
+                return
             yield error
             return
         candidates: List[str] = []
@@ -2473,7 +2566,14 @@ class SemanticScholarResolver(RegisteredResolver):
             )
             return
         except _requests.HTTPError as exc:
-            status = exc.response.status_code if getattr(exc, "response", None) else None
+            status = None
+            response_obj = getattr(exc, "response", None)
+            if response_obj is not None and hasattr(response_obj, "status_code"):
+                status = response_obj.status_code
+            if status is None:
+                match = re.search(r"(\\d{3})", str(exc))
+                if match:
+                    status = int(match.group(1))
             yield ResolverResult(
                 url=None,
                 event="error",
@@ -2566,18 +2666,8 @@ class UnpaywallResolver(RegisteredResolver):
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
             return
-        endpoint = f"https://api.unpaywall.org/v2/{quote(doi)}"
-        headers = dict(config.polite_headers)
-        params = {"email": config.unpaywall_email} if config.unpaywall_email else None
         try:
-            response = request_with_retries(
-                session,
-                "GET",
-                endpoint,
-                params=params,
-                timeout=config.get_timeout(self.name),
-                headers=headers,
-            )
+            data = _fetch_unpaywall_data(session, config, doi)
         except _requests.Timeout as exc:
             yield ResolverResult(
                 url=None,
@@ -2594,12 +2684,37 @@ class UnpaywallResolver(RegisteredResolver):
                 metadata={"error": str(exc)},
             )
             return
+        except _requests.HTTPError as exc:
+            status = None
+            response_obj = getattr(exc, "response", None)
+            if response_obj is not None and hasattr(response_obj, "status_code"):
+                status = response_obj.status_code
+            if status is None:
+                match = re.search(r"(\\d{3})", str(exc))
+                if match:
+                    status = int(match.group(1))
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="http-error",
+                http_status=status,
+                metadata={"error_detail": str(exc)},
+            )
+            return
         except _requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
                 event_reason="request-error",
                 metadata={"error": str(exc)},
+            )
+            return
+        except ValueError as json_err:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="json-error",
+                metadata={"error_detail": str(json_err)},
             )
             return
         except Exception as exc:  # pragma: no cover - defensive
@@ -2611,34 +2726,6 @@ class UnpaywallResolver(RegisteredResolver):
                 metadata={"error": str(exc), "error_type": type(exc).__name__},
             )
             return
-
-        if response.status_code != 200:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="http-error",
-                http_status=response.status_code,
-                metadata={"error_detail": f"Unpaywall returned {response.status_code}"},
-            )
-            return
-
-        try:
-            data = response.json()
-        except ValueError as json_err:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="json-error",
-                metadata={
-                    "error_detail": str(json_err),
-                    "content_preview": response.text[:200] if hasattr(response, "text") else "",
-                },
-            )
-            return
-        finally:
-            close = getattr(response, 'close', None)
-            if callable(close):
-                close()
 
         candidates: List[Tuple[str, Dict[str, Any]]] = []
         best = (data or {}).get("best_oa_location") or {}
@@ -2799,6 +2886,7 @@ class ZenodoResolver(ApiResolverBase):
     """
 
     name = "zenodo"
+    api_display_name = "Zenodo"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
         """Return ``True`` when resolver prerequisites are met for the artifact.
@@ -2841,6 +2929,8 @@ class ZenodoResolver(ApiResolverBase):
             params={"q": f'doi:"{doi}"', "size": 3, "sort": "mostrecent"},
         )
         if error:
+            if error.event_reason == "connection-error":
+                error.event_reason = "request-error"
             yield error
             return
 
@@ -2882,27 +2972,9 @@ class ZenodoResolver(ApiResolverBase):
                         )
 
 
-# ---------------------------------------------------------------------------
-# Public API helpers
+# --- Resolver Pipeline ---
 
-
-def default_resolvers() -> List[Resolver]:
-    """Instantiate the default resolver stack in priority order.
-
-    Args:
-        None
-
-    Returns:
-        List[Resolver]: Resolver instances ordered according to
-        ``DEFAULT_RESOLVER_ORDER``.
-
-    Examples:
-        >>> from DocsToKG.ContentDownload import resolvers
-        >>> [resolver.name for resolver in resolvers.default_resolvers()]  # doctest: +ELLIPSIS
-        ['openalex', 'unpaywall', ...]
-    """
-
-    return ResolverRegistry.create_default()
+# --- Resolver Pipeline ---
 
 
 def _callable_accepts_argument(func: DownloadFunc, name: str) -> bool:
@@ -3033,7 +3105,7 @@ class ResolverPipeline:
         self._lock = threading.Lock()
         self._global_seen_urls: set[str] = set()
         self._global_lock = threading.Lock()
-        self._last_host_hit: defaultdict[str, float] = defaultdict(float)
+        self._last_host_hit: Dict[str, float] = {}
         self._host_lock = threading.Lock()
         self._download_accepts_context = _callable_accepts_argument(download_func, "context")
         self._download_accepts_head_flag = _callable_accepts_argument(
@@ -3046,7 +3118,7 @@ class ResolverPipeline:
         *,
         timestamp: Optional[str] = None,
     ) -> None:
-        """Invoke the configured logger while supporting legacy log-only adapters.
+        """Invoke the configured logger using the structured attempt contract.
 
         Args:
             record: Attempt payload emitted by the pipeline.
@@ -3118,8 +3190,8 @@ class ResolverPipeline:
         now = _time.monotonic()
         wait = 0.0
         with self._host_lock:
-            last = self._last_host_hit[host]
-            if last <= 0.0:
+            last = self._last_host_hit.get(host)
+            if last is None:
                 self._last_host_hit[host] = now if now > 0.0 else 1e-9
                 return
             elapsed = now - last
@@ -3674,42 +3746,3 @@ class ResolverPipeline:
 
         self._jitter_sleep()
         return None
-
-
-__all__ = [
-    "AttemptSink",
-    "AttemptRecord",
-    "DownloadFunc",
-    "DownloadOutcome",
-    "PipelineResult",
-    "Resolver",
-    "ResolverConfig",
-    "ResolverMetrics",
-    "ResolverPipeline",
-    "ResolverRegistry",
-    "RegisteredResolver",
-    "ApiResolverBase",
-    "ResolverResult",
-    "DEFAULT_RESOLVER_ORDER",
-    "DEFAULT_RESOLVER_TOGGLES",
-    "default_resolvers",
-    "ArxivResolver",
-    "CoreResolver",
-    "CrossrefResolver",
-    "DoajResolver",
-    "EuropePmcResolver",
-    "FigshareResolver",
-    "HalResolver",
-    "LandingPageResolver",
-    "OpenAireResolver",
-    "OpenAlexResolver",
-    "OsfResolver",
-    "PmcResolver",
-    "SemanticScholarResolver",
-    "UnpaywallResolver",
-    "WaybackResolver",
-    "ZenodoResolver",
-    "find_pdf_via_meta",
-    "find_pdf_via_link",
-    "find_pdf_via_anchor",
-]

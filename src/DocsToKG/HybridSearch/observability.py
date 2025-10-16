@@ -1,10 +1,38 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.HybridSearch.observability",
-#   "purpose": "Observability helpers for hybrid search telemetry",
+#   "purpose": "Metrics collection and tracing helpers for hybrid search",
 #   "sections": [
-#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
-#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"}
+#     {
+#       "id": "countersample",
+#       "name": "CounterSample",
+#       "anchor": "class-countersample",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "histogramsample",
+#       "name": "HistogramSample",
+#       "anchor": "class-histogramsample",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "metricscollector",
+#       "name": "MetricsCollector",
+#       "anchor": "class-metricscollector",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "tracerecorder",
+#       "name": "TraceRecorder",
+#       "anchor": "class-tracerecorder",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "observability",
+#       "name": "Observability",
+#       "anchor": "class-observability",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -47,7 +75,6 @@ __all__ = (
 
 
 # --- Public Classes ---
-
 
 @dataclass
 class CounterSample:

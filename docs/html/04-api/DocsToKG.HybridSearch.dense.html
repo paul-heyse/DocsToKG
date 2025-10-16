@@ -221,7 +221,7 @@ path: Filesystem path pointing to a serialized FAISS index.
 config: Dense index configuration used to rebuild runtime properties.
 dim: Dimensionality of the vectors contained in the index.</p>
 <p>Returns:
-Instance of <code class="docutils literal notranslate"><span class="pre">FaissIndexManager</span></code> with GPU state initialised.</p>
+Instance of <code class="docutils literal notranslate"><span class="pre">FaissVectorStore</span></code> with GPU state initialised.</p>
 <p>Raises:
 RuntimeError: If the FAISS index cannot be read or promoted to GPU memory.</p>
 </section>
@@ -409,7 +409,7 @@ result.vector_id
 </div></blockquote>
 </section>
 <section id="faissindexmanager">
-<h3><code class="docutils literal notranslate"><span class="pre">FaissIndexManager</span></code><a class="headerlink" href="#faissindexmanager" title="Link to this heading"></a></h3>
+<h3><code class="docutils literal notranslate"><span class="pre">FaissVectorStore</span></code><a class="headerlink" href="#faissindexmanager" title="Link to this heading"></a></h3>
 <p>Manage lifecycle of a GPU-resident FAISS index.</p>
 <p>Attributes:
 _dim: Dimensionality of vectors stored in the index.
@@ -420,7 +420,7 @@ _gpu_resources: FAISS GPU resources allocated for the index.</p>
 <blockquote>
 <div><blockquote>
 <div><blockquote>
-<div><p>manager = FaissIndexManager(dim=128, config=DenseIndexConfig())  # doctest: +SKIP
+<div><p>manager = FaissVectorStore(dim=128, config=DenseIndexConfig())  # doctest: +SKIP
 manager.ntotal  # doctest: +SKIP
 0</p>
 </div></blockquote>

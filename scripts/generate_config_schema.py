@@ -4,10 +4,22 @@
 #   "purpose": "Utility script for generate config schema workflows",
 #   "sections": [
 #     {
-#       "id": "main",
-#       "name": "main",
-#       "anchor": "MAIN",
-#       "kind": "function"
+#       "id": "globals",
+#       "name": "Globals",
+#       "anchor": "GLOB",
+#       "kind": "infra"
+#     },
+#     {
+#       "id": "public_functions",
+#       "name": "Public Functions",
+#       "anchor": "PF",
+#       "kind": "api"
+#     },
+#     {
+#       "id": "module_entry_points",
+#       "name": "Module Entry Points",
+#       "anchor": "MEP",
+#       "kind": "cli"
 #     }
 #   ]
 # }
@@ -21,6 +33,7 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
+# --- Globals ---
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = PROJECT_ROOT / "src"
@@ -35,6 +48,8 @@ if spec is None or spec.loader is None:  # pragma: no cover - defensive
 config_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(config_module)
 ResolvedConfig = config_module.ResolvedConfig
+# --- Public Functions ---
+# --- Module Entry Points ---
 
 
 def main() -> None:

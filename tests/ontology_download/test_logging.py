@@ -4,15 +4,15 @@
 #   "purpose": "Pytest coverage for ontology download logging scenarios",
 #   "sections": [
 #     {
-#       "id": "test_mask_sensitive_data_masks_tokens",
+#       "id": "test-mask-sensitive-data-masks-tokens",
 #       "name": "test_mask_sensitive_data_masks_tokens",
-#       "anchor": "TMSDM",
+#       "anchor": "function-test-mask-sensitive-data-masks-tokens",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_setup_logging_emits_structured_json",
+#       "id": "test-setup-logging-emits-structured-json",
 #       "name": "test_setup_logging_emits_structured_json",
-#       "anchor": "TSLES",
+#       "anchor": "function-test-setup-logging-emits-structured-json",
 #       "kind": "function"
 #     }
 #   ]
@@ -49,6 +49,7 @@ from DocsToKG.OntologyDownload import (
     mask_sensitive_data,
     setup_logging,
 )
+# --- Test Cases ---
 
 
 def test_mask_sensitive_data_masks_tokens():

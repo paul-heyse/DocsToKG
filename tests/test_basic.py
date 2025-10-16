@@ -4,9 +4,9 @@
 #   "purpose": "Pytest coverage for basic scenarios",
 #   "sections": [
 #     {
-#       "id": "test_ping",
+#       "id": "test-ping",
 #       "name": "test_ping",
-#       "anchor": "TP",
+#       "anchor": "function-test-ping",
 #       "kind": "function"
 #     }
 #   ]
@@ -25,6 +25,7 @@ Usage:
 """
 
 from DocsToKG import ping
+# --- Test Cases ---
 
 
 def test_ping():

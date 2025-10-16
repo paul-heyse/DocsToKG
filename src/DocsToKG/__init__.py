@@ -6,7 +6,7 @@
 #     {
 #       "id": "ping",
 #       "name": "ping",
-#       "anchor": "PING",
+#       "anchor": "function-ping",
 #       "kind": "function"
 #     }
 #   ]
@@ -42,6 +42,12 @@ Usage:
 
 For detailed API documentation, see the docs/04-api/ directory.
 """
+
+# --- Globals ---
+
+__all__ = ("ping",)
+
+# --- Public Functions ---
 
 
 def ping() -> str:

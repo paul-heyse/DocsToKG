@@ -4,15 +4,15 @@
 #   "purpose": "Pytest coverage for html extraction scenarios",
 #   "sections": [
 #     {
-#       "id": "_fake_trafilatura",
+#       "id": "faketrafilatura",
 #       "name": "_FakeTrafilatura",
-#       "anchor": "FAKE",
+#       "anchor": "class-faketrafilatura",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "test_html_extraction_creates_text_file",
+#       "id": "test-html-extraction-creates-text-file",
 #       "name": "test_html_extraction_creates_text_file",
-#       "anchor": "THECT",
+#       "anchor": "function-test-html-extraction-creates-text-file",
 #       "kind": "function"
 #     }
 #   ]
@@ -49,6 +49,7 @@ import pytest
 pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact, download_candidate
+# --- Globals ---
 
 requests = pytest.importorskip("requests")
 responses = pytest.importorskip("responses")
@@ -61,6 +62,8 @@ class _FakeTrafilatura:
 
 
 @responses.activate
+# --- Test Cases ---
+
 def test_html_extraction_creates_text_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     artifact = WorkArtifact(
         work_id="WHTML",

@@ -1,18 +1,18 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.DocParsing.serializers",
-#   "purpose": "Serialization helpers for DocsToKG DocParsing pipelines",
+#   "purpose": "Implements DocsToKG.DocParsing.serializers behaviors and helpers",
 #   "sections": [
 #     {
-#       "id": "caption_plus_annotation_picture_serializer",
+#       "id": "captionplusannotationpictureserializer",
 #       "name": "CaptionPlusAnnotationPictureSerializer",
-#       "anchor": "CAPT",
+#       "anchor": "class-captionplusannotationpictureserializer",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "rich_serializer_provider",
+#       "id": "richserializerprovider",
 #       "name": "RichSerializerProvider",
-#       "anchor": "RICH",
+#       "anchor": "class-richserializerprovider",
 #       "kind": "class"
 #     }
 #   ]
@@ -76,7 +76,6 @@ __all__ = [
 ]
 
 # --- Public API ---
-
 
 class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
     """Serialize picture items with captions and rich annotation metadata.

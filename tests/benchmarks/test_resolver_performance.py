@@ -4,57 +4,57 @@
 #   "purpose": "Pytest coverage for benchmarks resolver performance scenarios",
 #   "sections": [
 #     {
-#       "id": "dummy_artifact",
+#       "id": "dummyartifact",
 #       "name": "DummyArtifact",
-#       "anchor": "DUMM",
+#       "anchor": "class-dummyartifact",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "null_logger",
+#       "id": "nulllogger",
 #       "name": "NullLogger",
-#       "anchor": "NULL",
+#       "anchor": "class-nulllogger",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "slow_resolver",
+#       "id": "slowresolver",
 #       "name": "SlowResolver",
-#       "anchor": "SLOW",
+#       "anchor": "class-slowresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_html_outcome",
+#       "id": "html-outcome",
 #       "name": "_html_outcome",
-#       "anchor": "HO",
+#       "anchor": "function-html-outcome",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_make_config",
+#       "id": "make-config",
 #       "name": "_make_config",
-#       "anchor": "MC",
+#       "anchor": "function-make-config",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_sequential_vs_concurrent_execution",
+#       "id": "test-sequential-vs-concurrent-execution",
 #       "name": "test_sequential_vs_concurrent_execution",
-#       "anchor": "TSVCE",
+#       "anchor": "function-test-sequential-vs-concurrent-execution",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_overhead_vs_savings",
+#       "id": "test-head-precheck-overhead-vs-savings",
 #       "name": "test_head_precheck_overhead_vs_savings",
-#       "anchor": "THPOV",
+#       "anchor": "function-test-head-precheck-overhead-vs-savings",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_retry_backoff_timing",
+#       "id": "test-retry-backoff-timing",
 #       "name": "test_retry_backoff_timing",
-#       "anchor": "TRBT",
+#       "anchor": "function-test-retry-backoff-timing",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_memory_usage_large_batch",
+#       "id": "test-memory-usage-large-batch",
 #       "name": "test_memory_usage_large_batch",
-#       "anchor": "TMULB",
+#       "anchor": "function-test-memory-usage-large-batch",
 #       "kind": "function"
 #     }
 #   ]
@@ -106,6 +106,7 @@ class SlowResolver:
     ) -> Iterable[ResolverResult]:
         time.sleep(self.delay)
         yield ResolverResult(url=f"https://{self.name}.example/pdf")
+# --- Helper Functions ---
 
 
 def _html_outcome() -> DownloadOutcome:
@@ -128,6 +129,8 @@ def _make_config(names: List[str], max_workers: int) -> ResolverConfig:
 
 
 @pytest.mark.benchmark
+# --- Test Cases ---
+
 def test_sequential_vs_concurrent_execution() -> None:
     artifact = DummyArtifact("W-bench")
     resolvers = [SlowResolver(f"resolver_{i}", delay=0.1) for i in range(6)]

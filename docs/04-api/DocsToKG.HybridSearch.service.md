@@ -151,7 +151,7 @@ Examples:
 >>> service = HybridSearchService(  # doctest: +SKIP
 ...     config_manager=HybridSearchConfigManager.from_dict({}),
 ...     feature_generator=FeatureGenerator(embedding_dim=16),
-...     faiss_index=FaissIndexManager(dim=16, config=HybridSearchConfig().dense),
+...     faiss_index=FaissVectorStore(dim=16, config=HybridSearchConfig().dense),
 ...     opensearch=OpenSearchSimulator(),
 ...     registry=ChunkRegistry(),
 ... )

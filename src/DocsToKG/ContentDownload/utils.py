@@ -1,30 +1,30 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.ContentDownload.utils",
-#   "purpose": "Utility helpers for DocsToKG.ContentDownload.utils",
+#   "purpose": "Utility helpers for DocsToKG content download",
 #   "sections": [
 #     {
-#       "id": "normalize_doi",
+#       "id": "normalize-doi",
 #       "name": "normalize_doi",
-#       "anchor": "ND",
+#       "anchor": "function-normalize-doi",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "normalize_pmcid",
+#       "id": "normalize-pmcid",
 #       "name": "normalize_pmcid",
-#       "anchor": "NP",
+#       "anchor": "function-normalize-pmcid",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "strip_prefix",
+#       "id": "strip-prefix",
 #       "name": "strip_prefix",
-#       "anchor": "SP",
+#       "anchor": "function-strip-prefix",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "dedupe",
 #       "name": "dedupe",
-#       "anchor": "DEDU",
+#       "anchor": "function-dedupe",
 #       "kind": "function"
 #     }
 #   ]
@@ -57,6 +57,13 @@ from __future__ import annotations
 import re
 from typing import List, Optional
 
+
+# --- Globals ---
+
+__all__ = ("normalize_doi", "normalize_pmcid", "strip_prefix", "dedupe")
+
+
+# --- Public Functions ---
 
 def normalize_doi(doi: Optional[str]) -> Optional[str]:
     """Normalize DOI identifiers by stripping common prefixes and whitespace.

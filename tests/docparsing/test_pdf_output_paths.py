@@ -4,15 +4,15 @@
 #   "purpose": "Pytest coverage for docparsing pdf output paths scenarios",
 #   "sections": [
 #     {
-#       "id": "test_pdf_output_path_mirroring",
+#       "id": "test-pdf-output-path-mirroring",
 #       "name": "test_pdf_output_path_mirroring",
-#       "anchor": "TPOPM",
+#       "anchor": "function-test-pdf-output-path-mirroring",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pdf_task_vlm_parameters",
+#       "id": "test-pdf-task-vlm-parameters",
 #       "name": "test_pdf_task_vlm_parameters",
-#       "anchor": "TPTVP",
+#       "anchor": "function-test-pdf-task-vlm-parameters",
 #       "kind": "function"
 #     }
 #   ]
@@ -27,6 +27,7 @@ from pathlib import Path
 import pytest
 
 from DocsToKG.DocParsing.pipelines import PdfTask
+# --- Test Cases ---
 
 
 def test_pdf_output_path_mirroring():
@@ -114,6 +115,7 @@ def test_pdf_task_vlm_parameters():
         assert len(task.vlm_stop) == 2
         assert "custom_stop1" in task.vlm_stop
         assert "custom_stop2" in task.vlm_stop
+# --- Module Entry Points ---
 
 
 if __name__ == "__main__":

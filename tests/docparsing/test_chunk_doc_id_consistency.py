@@ -4,21 +4,21 @@
 #   "purpose": "Pytest coverage for docparsing chunk doc id consistency scenarios",
 #   "sections": [
 #     {
-#       "id": "test_compute_relative_doc_id",
+#       "id": "test-compute-relative-doc-id",
 #       "name": "test_compute_relative_doc_id",
-#       "anchor": "TCRDI",
+#       "anchor": "function-test-compute-relative-doc-id",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_relative_doc_id_uniqueness",
+#       "id": "test-relative-doc-id-uniqueness",
 #       "name": "test_relative_doc_id_uniqueness",
-#       "anchor": "TRDIU",
+#       "anchor": "function-test-relative-doc-id-uniqueness",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_relative_doc_id_edge_cases",
+#       "id": "test-relative-doc-id-edge-cases",
 #       "name": "test_relative_doc_id_edge_cases",
-#       "anchor": "TRDIE",
+#       "anchor": "function-test-relative-doc-id-edge-cases",
 #       "kind": "function"
 #     }
 #   ]
@@ -33,6 +33,7 @@ from pathlib import Path
 import pytest
 
 from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import compute_relative_doc_id
+# --- Test Cases ---
 
 
 def test_compute_relative_doc_id():
@@ -134,6 +135,7 @@ def test_relative_doc_id_edge_cases():
 
         rel_id = compute_relative_doc_id(special_file, root_dir)
         assert rel_id == "file with spaces & symbols.pdf"
+# --- Module Entry Points ---
 
 
 if __name__ == "__main__":

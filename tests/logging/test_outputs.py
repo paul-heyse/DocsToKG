@@ -4,69 +4,69 @@
 #   "purpose": "Pytest coverage for logging outputs scenarios",
 #   "sections": [
 #     {
-#       "id": "test_jsonl_sink_attempt_records_include_wall_time",
+#       "id": "test-jsonl-sink-attempt-records-include-wall-time",
 #       "name": "test_jsonl_sink_attempt_records_include_wall_time",
-#       "anchor": "TJSAR",
+#       "anchor": "function-test-jsonl-sink-attempt-records-include-wall-time",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_multi_sink_synchronizes_timestamps",
+#       "id": "test-multi-sink-synchronizes-timestamps",
 #       "name": "test_multi_sink_synchronizes_timestamps",
-#       "anchor": "TMSST",
+#       "anchor": "function-test-multi-sink-synchronizes-timestamps",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_csv_sink_close_closes_file",
+#       "id": "test-csv-sink-close-closes-file",
 #       "name": "test_csv_sink_close_closes_file",
-#       "anchor": "TCSCC",
+#       "anchor": "function-test-csv-sink-close-closes-file",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_csv_adapter_close_closes_file",
+#       "id": "test-csv-adapter-close-closes-file",
 #       "name": "test_csv_adapter_close_closes_file",
-#       "anchor": "TCACC",
+#       "anchor": "function-test-csv-adapter-close-closes-file",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_jsonl_sink_writes_valid_records",
+#       "id": "test-jsonl-sink-writes-valid-records",
 #       "name": "test_jsonl_sink_writes_valid_records",
-#       "anchor": "TJSWV",
+#       "anchor": "function-test-jsonl-sink-writes-valid-records",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_export_attempts_csv",
+#       "id": "test-export-attempts-csv",
 #       "name": "test_export_attempts_csv",
-#       "anchor": "TEAC",
+#       "anchor": "function-test-export-attempts-csv",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_attempt_record",
+#       "id": "attempt-record",
 #       "name": "_attempt_record",
-#       "anchor": "AR",
+#       "anchor": "function-attempt-record",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_jsonl_sink_thread_safety",
+#       "id": "test-jsonl-sink-thread-safety",
 #       "name": "test_jsonl_sink_thread_safety",
-#       "anchor": "TJSTS",
+#       "anchor": "function-test-jsonl-sink-thread-safety",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_multi_sink_thread_safety",
+#       "id": "test-multi-sink-thread-safety",
 #       "name": "test_multi_sink_thread_safety",
-#       "anchor": "TMSTS",
+#       "anchor": "function-test-multi-sink-thread-safety",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_manifest_index_sink_writes_sorted_index",
+#       "id": "test-manifest-index-sink-writes-sorted-index",
 #       "name": "test_manifest_index_sink_writes_sorted_index",
-#       "anchor": "TMISW",
+#       "anchor": "function-test-manifest-index-sink-writes-sorted-index",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_last_attempt_csv_sink_writes_latest_entries",
+#       "id": "test-last-attempt-csv-sink-writes-latest-entries",
 #       "name": "test_last_attempt_csv_sink_writes_latest_entries",
-#       "anchor": "TLACS",
+#       "anchor": "function-test-last-attempt-csv-sink-writes-latest-entries",
 #       "kind": "function"
 #     }
 #   ]
@@ -86,7 +86,6 @@ pytest.importorskip("pyalex")
 from DocsToKG.ContentDownload.download_pyalex_pdfs import (  # noqa: E402
     CsvAttemptLoggerAdapter,
     CsvSink,
-    JsonlLogger,
     JsonlSink,
     LastAttemptCsvSink,
     ManifestEntry,
@@ -95,6 +94,7 @@ from DocsToKG.ContentDownload.download_pyalex_pdfs import (  # noqa: E402
 )
 from DocsToKG.ContentDownload.resolvers import AttemptRecord  # noqa: E402
 from scripts.export_attempts_csv import export_attempts_jsonl_to_csv  # noqa: E402
+# --- Test Cases ---
 
 
 def test_jsonl_sink_attempt_records_include_wall_time(tmp_path: Path) -> None:
@@ -180,7 +180,7 @@ def test_csv_sink_close_closes_file(tmp_path: Path) -> None:
 def test_csv_adapter_close_closes_file(tmp_path: Path) -> None:
     jsonl_path = tmp_path / "attempts.jsonl"
     csv_path = tmp_path / "attempts.csv"
-    adapter = CsvAttemptLoggerAdapter(JsonlLogger(jsonl_path), csv_path)
+    adapter = CsvAttemptLoggerAdapter(JsonlSink(jsonl_path), csv_path)
 
     adapter.log_attempt(
         AttemptRecord(
@@ -299,6 +299,7 @@ def test_export_attempts_csv(tmp_path: Path) -> None:
     assert row["status"] == "http_error"
     assert row["dry_run"] == "True"
     assert row["metadata"] == json.dumps({"status": 404}, sort_keys=True)
+# --- Helper Functions ---
 
 
 def _attempt_record(index: int) -> AttemptRecord:

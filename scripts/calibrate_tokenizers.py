@@ -5,16 +5,22 @@
 #   "purpose": "Utility script for calibrate tokenizers workflows",
 #   "sections": [
 #     {
-#       "id": "_load_sample_texts",
-#       "name": "_load_sample_texts",
-#       "anchor": "LST",
-#       "kind": "function"
+#       "id": "private_helpers",
+#       "name": "Private Helpers",
+#       "anchor": "PH",
+#       "kind": "internal"
 #     },
 #     {
-#       "id": "main",
-#       "name": "main",
-#       "anchor": "MAIN",
-#       "kind": "function"
+#       "id": "public_functions",
+#       "name": "Public Functions",
+#       "anchor": "PF",
+#       "kind": "api"
+#     },
+#     {
+#       "id": "module_entry_points",
+#       "name": "Module Entry Points",
+#       "anchor": "MEP",
+#       "kind": "cli"
 #     }
 #   ]
 # }
@@ -32,6 +38,7 @@ from typing import List
 from transformers import AutoTokenizer
 
 from DocsToKG.DocParsing._common import get_logger, iter_doctags
+# --- Private Helpers ---
 
 
 def _load_sample_texts(doctags_dir: Path, sample_size: int) -> List[str]:
@@ -43,6 +50,8 @@ def _load_sample_texts(doctags_dir: Path, sample_size: int) -> List[str]:
             break
         texts.append(path.read_text(encoding="utf-8", errors="replace")[:5000])
     return texts
+# --- Public Functions ---
+# --- Module Entry Points ---
 
 
 def main() -> None:

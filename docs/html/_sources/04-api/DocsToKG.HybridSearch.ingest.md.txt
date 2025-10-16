@@ -26,7 +26,7 @@ Args:
 None
 
 Returns:
-FaissIndexManager associated with the ingestion pipeline.
+FaissVectorStore associated with the ingestion pipeline.
 
 ### `upsert_documents(self, documents)`
 
@@ -189,7 +189,7 @@ _observability: Observability facade for tracing and logging.
 
 Examples:
 >>> pipeline = ChunkIngestionPipeline(
-...     faiss_index=FaissIndexManager.build_in_memory(),
+...     faiss_index=FaissVectorStore.build_in_memory(),
 ...     opensearch=OpenSearchSimulator(),
 ...     registry=ChunkRegistry(),
 ... )

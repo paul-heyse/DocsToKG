@@ -4,45 +4,45 @@
 #   "purpose": "Pytest coverage for ontology download cli utils scenarios",
 #   "sections": [
 #     {
-#       "id": "test_format_table_basic",
+#       "id": "test-format-table-basic",
 #       "name": "test_format_table_basic",
-#       "anchor": "TFTB",
+#       "anchor": "function-test-format-table-basic",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_format_table_column_alignment",
+#       "id": "test-format-table-column-alignment",
 #       "name": "test_format_table_column_alignment",
-#       "anchor": "TFTCA",
+#       "anchor": "function-test-format-table-column-alignment",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_format_table_empty_rows",
+#       "id": "test-format-table-empty-rows",
 #       "name": "test_format_table_empty_rows",
-#       "anchor": "TFTER",
+#       "anchor": "function-test-format-table-empty-rows",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_format_validation_summary_success",
+#       "id": "test-format-validation-summary-success",
 #       "name": "test_format_validation_summary_success",
-#       "anchor": "TFVSS",
+#       "anchor": "function-test-format-validation-summary-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_format_validation_summary_error",
+#       "id": "test-format-validation-summary-error",
 #       "name": "test_format_validation_summary_error",
-#       "anchor": "TFVSE",
+#       "anchor": "function-test-format-validation-summary-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_format_validation_summary_multiple",
+#       "id": "test-format-validation-summary-multiple",
 #       "name": "test_format_validation_summary_multiple",
-#       "anchor": "TFVSM",
+#       "anchor": "function-test-format-validation-summary-multiple",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_format_validation_summary_non_dict_details",
+#       "id": "test-format-validation-summary-non-dict-details",
 #       "name": "test_format_validation_summary_non_dict_details",
-#       "anchor": "TFVSN",
+#       "anchor": "function-test-format-validation-summary-non-dict-details",
 #       "kind": "function"
 #     }
 #   ]
@@ -59,6 +59,7 @@ pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
 from DocsToKG.OntologyDownload.cli import format_table, format_validation_summary
+# --- Test Cases ---
 
 
 def test_format_table_basic() -> None:

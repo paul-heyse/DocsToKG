@@ -4,7 +4,7 @@
 
 ## 2. ID Lifecycle & Delete Path
 - [x] 2.1 Swap `_remove_ids` to use `faiss.IDSelectorBatch`, preserve CPU fallback, and clean up bookkeeping in one place.
-- [x] 2.2 Introduce a FAISS-ID→vector-ID bridge inside `ChunkRegistry`, refactor `FaissIndexManager` to drop `_id_lookup`, and adjust serialization/restore accordingly.
+- [x] 2.2 Introduce a FAISS-ID→vector-ID bridge inside `ChunkRegistry`, refactor `FaissVectorStore` to drop `_id_lookup`, and adjust serialization/restore accordingly.
 
 ## 3. GPU-Assisted Similarity
 - [x] 3.1 Update MMR diversification to batch compute cosine similarities via `faiss.pairwise_distance_gpu`, with NumPy fallback for CPU-only runs.

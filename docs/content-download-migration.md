@@ -1,4 +1,4 @@
-# Content Download Migration Guide
+# 1. Content Download Migration Guide
 
 This brief guide helps downstream consumers migrate to the refactored content
 download pipeline introduced in the `refactor-content-download-robustness`

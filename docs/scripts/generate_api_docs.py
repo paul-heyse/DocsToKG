@@ -5,16 +5,22 @@
 #   "purpose": "Documentation tooling for generate api docs workflows",
 #   "sections": [
 #     {
-#       "id": "api_doc_generator",
-#       "name": "APIDocGenerator",
-#       "anchor": "APID",
-#       "kind": "class"
+#       "id": "public_classes",
+#       "name": "Public Classes",
+#       "anchor": "PC",
+#       "kind": "api"
 #     },
 #     {
-#       "id": "main",
-#       "name": "main",
-#       "anchor": "MAIN",
-#       "kind": "function"
+#       "id": "public_functions",
+#       "name": "Public Functions",
+#       "anchor": "PF",
+#       "kind": "api"
+#     },
+#     {
+#       "id": "module_entry_points",
+#       "name": "Module Entry Points",
+#       "anchor": "MEP",
+#       "kind": "cli"
 #     }
 #   ]
 # }
@@ -33,6 +39,7 @@ import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
+# --- Public Classes ---
 
 
 class APIDocGenerator:
@@ -219,6 +226,8 @@ class APIDocGenerator:
 
         print(f"\n🎉 Generated documentation for {len(generated_files)} modules")
         return generated_files
+# --- Public Functions ---
+# --- Module Entry Points ---
 
 
 def main():

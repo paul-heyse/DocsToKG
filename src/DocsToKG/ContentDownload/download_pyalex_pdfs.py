@@ -2,228 +2,228 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.ContentDownload.download_pyalex_pdfs",
-#   "purpose": "Implements DocsToKG.ContentDownload.download_pyalex_pdfs behaviors and helpers",
+#   "purpose": "OpenAlex PDF download CLI and supporting utilities",
 #   "sections": [
 #     {
-#       "id": "_utc_timestamp",
+#       "id": "utc-timestamp",
 #       "name": "_utc_timestamp",
-#       "anchor": "UT",
+#       "anchor": "function-utc-timestamp",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_has_pdf_eof",
+#       "id": "has-pdf-eof",
 #       "name": "_has_pdf_eof",
-#       "anchor": "HPE",
+#       "anchor": "function-has-pdf-eof",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "slugify",
 #       "name": "slugify",
-#       "anchor": "SLUG",
+#       "anchor": "function-slugify",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "ensure_dir",
+#       "id": "ensure-dir",
 #       "name": "ensure_dir",
-#       "anchor": "ED",
+#       "anchor": "function-ensure-dir",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_parse_domain_interval",
+#       "id": "parse-domain-interval",
 #       "name": "_parse_domain_interval",
-#       "anchor": "PDI",
+#       "anchor": "function-parse-domain-interval",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_make_session",
+#       "id": "make-session",
 #       "name": "_make_session",
-#       "anchor": "MS",
+#       "anchor": "function-make-session",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "manifest_entry",
+#       "id": "manifestentry",
 #       "name": "ManifestEntry",
-#       "anchor": "MANI",
+#       "anchor": "class-manifestentry",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "attempt_sink",
+#       "id": "attemptsink",
 #       "name": "AttemptSink",
-#       "anchor": "ATTE",
+#       "anchor": "class-attemptsink",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "jsonl_sink",
+#       "id": "jsonlsink",
 #       "name": "JsonlSink",
-#       "anchor": "JSON",
+#       "anchor": "class-jsonlsink",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "csv_sink",
+#       "id": "csvsink",
 #       "name": "CsvSink",
-#       "anchor": "CSVS",
+#       "anchor": "class-csvsink",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "csv_attempt_logger_adapter",
+#       "id": "csvattemptloggeradapter",
 #       "name": "CsvAttemptLoggerAdapter",
-#       "anchor": "CSVA",
+#       "anchor": "class-csvattemptloggeradapter",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "multi_sink",
+#       "id": "multisink",
 #       "name": "MultiSink",
-#       "anchor": "MULT",
+#       "anchor": "class-multisink",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "manifest_index_sink",
+#       "id": "manifestindexsink",
 #       "name": "ManifestIndexSink",
-#       "anchor": "MANI1",
+#       "anchor": "class-manifestindexsink",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "last_attempt_csv_sink",
+#       "id": "lastattemptcsvsink",
 #       "name": "LastAttemptCsvSink",
-#       "anchor": "LAST",
+#       "anchor": "class-lastattemptcsvsink",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "load_previous_manifest",
+#       "id": "load-previous-manifest",
 #       "name": "load_previous_manifest",
-#       "anchor": "LPM",
+#       "anchor": "function-load-previous-manifest",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "build_manifest_entry",
+#       "id": "build-manifest-entry",
 #       "name": "build_manifest_entry",
-#       "anchor": "BME",
+#       "anchor": "function-build-manifest-entry",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "classify_payload",
+#       "id": "classify-payload",
 #       "name": "classify_payload",
-#       "anchor": "CP",
+#       "anchor": "function-classify-payload",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_extract_filename_from_disposition",
+#       "id": "extract-filename-from-disposition",
 #       "name": "_extract_filename_from_disposition",
-#       "anchor": "EFFD",
+#       "anchor": "function-extract-filename-from-disposition",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_infer_suffix",
+#       "id": "infer-suffix",
 #       "name": "_infer_suffix",
-#       "anchor": "IS",
+#       "anchor": "function-infer-suffix",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_update_tail_buffer",
+#       "id": "update-tail-buffer",
 #       "name": "_update_tail_buffer",
-#       "anchor": "UTB",
+#       "anchor": "function-update-tail-buffer",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "work_artifact",
+#       "id": "workartifact",
 #       "name": "WorkArtifact",
-#       "anchor": "WORK",
+#       "anchor": "class-workartifact",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "download_state",
+#       "id": "downloadstate",
 #       "name": "DownloadState",
-#       "anchor": "DOWN",
+#       "anchor": "class-downloadstate",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_build_download_outcome",
+#       "id": "build-download-outcome",
 #       "name": "_build_download_outcome",
-#       "anchor": "BDO",
+#       "anchor": "function-build-download-outcome",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_normalize_pmid",
+#       "id": "normalize-pmid",
 #       "name": "_normalize_pmid",
-#       "anchor": "NP",
+#       "anchor": "function-normalize-pmid",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_normalize_arxiv",
+#       "id": "normalize-arxiv",
 #       "name": "_normalize_arxiv",
-#       "anchor": "NA",
+#       "anchor": "function-normalize-arxiv",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_collect_location_urls",
+#       "id": "collect-location-urls",
 #       "name": "_collect_location_urls",
-#       "anchor": "CLU",
+#       "anchor": "function-collect-location-urls",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "build_query",
+#       "id": "build-query",
 #       "name": "build_query",
-#       "anchor": "BQ",
+#       "anchor": "function-build-query",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "resolve_topic_id_if_needed",
+#       "id": "resolve-topic-id-if-needed",
 #       "name": "resolve_topic_id_if_needed",
-#       "anchor": "RTIIN",
+#       "anchor": "function-resolve-topic-id-if-needed",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "create_artifact",
+#       "id": "create-artifact",
 #       "name": "create_artifact",
-#       "anchor": "CA",
+#       "anchor": "function-create-artifact",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "download_candidate",
+#       "id": "download-candidate",
 #       "name": "download_candidate",
-#       "anchor": "DC",
+#       "anchor": "function-download-candidate",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "read_resolver_config",
+#       "id": "read-resolver-config",
 #       "name": "read_resolver_config",
-#       "anchor": "RRC",
+#       "anchor": "function-read-resolver-config",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_seed_resolver_toggle_defaults",
+#       "id": "seed-resolver-toggle-defaults",
 #       "name": "_seed_resolver_toggle_defaults",
-#       "anchor": "SRTD",
+#       "anchor": "function-seed-resolver-toggle-defaults",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "apply_config_overrides",
+#       "id": "apply-config-overrides",
 #       "name": "apply_config_overrides",
-#       "anchor": "ACO",
+#       "anchor": "function-apply-config-overrides",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "load_resolver_config",
+#       "id": "load-resolver-config",
 #       "name": "load_resolver_config",
-#       "anchor": "LRC",
+#       "anchor": "function-load-resolver-config",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "iterate_openalex",
+#       "id": "iterate-openalex",
 #       "name": "iterate_openalex",
-#       "anchor": "IO",
+#       "anchor": "function-iterate-openalex",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "process_one_work",
+#       "id": "process-one-work",
 #       "name": "process_one_work",
-#       "anchor": "POW",
+#       "anchor": "function-process-one-work",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "main",
 #       "name": "main",
-#       "anchor": "MAIN",
+#       "anchor": "function-main",
 #       "kind": "function"
 #     }
 #   ]
@@ -317,9 +317,41 @@ DownloadOutcome = resolvers.DownloadOutcome
 AttemptRecord = resolvers.AttemptRecord
 default_resolvers = resolvers.default_resolvers
 
+# --- Globals ---
+
+__all__ = (
+    "AttemptSink",
+    "CsvAttemptLoggerAdapter",
+    "CsvSink",
+    "DownloadState",
+    "JsonlSink",
+    "LastAttemptCsvSink",
+    "ManifestEntry",
+    "ManifestIndexSink",
+    "MultiSink",
+    "WorkArtifact",
+    "apply_config_overrides",
+    "build_manifest_entry",
+    "build_query",
+    "classify_payload",
+    "create_artifact",
+    "download_candidate",
+    "ensure_dir",
+    "iterate_openalex",
+    "load_previous_manifest",
+    "load_resolver_config",
+    "main",
+    "process_one_work",
+    "read_resolver_config",
+    "resolve_topic_id_if_needed",
+    "slugify",
+)
+
 MAX_SNIFF_BYTES = 64 * 1024
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
 
+
+# --- Pipeline Helpers ---
 
 def _utc_timestamp() -> str:
     """Return the current time as an ISO 8601 UTC timestamp.
@@ -352,6 +384,8 @@ def _has_pdf_eof(path: Path) -> bool:
     except OSError:
         return False
 
+
+# --- Public Functions ---
 
 def slugify(text: str, keep: int = 80) -> str:
     """Create a filesystem-friendly slug for a work title.
@@ -447,6 +481,8 @@ def _make_session(headers: Dict[str, str]) -> requests.Session:
     return create_session(headers)
 
 
+# --- Data Models ---
+
 @dataclass
 class ManifestEntry:
     """Structured record capturing the outcome of a resolver attempt.
@@ -514,7 +550,6 @@ class AttemptSink(Protocol):
         log_manifest: Callable that receives :class:`ManifestEntry` objects for storage.
         log_summary: Callable that ingests aggregate metrics collected during a run.
         close: Callable that finalises resources owned by the sink.
-        log: Compatibility alias that forwards to :meth:`log_attempt`.
 
     Examples:
         >>> class Collector:
@@ -526,8 +561,6 @@ class AttemptSink(Protocol):
         ...         ...  # doctest: +SKIP
         ...     def close(self):
         ...         ...  # doctest: +SKIP
-        ...     def log(self, record):
-        ...         self.log_attempt(record)
         >>> isinstance(Collector(), AttemptSink)  # doctest: +SKIP
         True
     """
@@ -573,16 +606,8 @@ class AttemptSink(Protocol):
             None
         """
 
-    def log(self, record: AttemptRecord) -> None:
-        """Compatibility alias delegating to :meth:`log_attempt`.
 
-        Args:
-            record: Attempt record to forward to :meth:`log_attempt`.
-
-        Returns:
-            None
-        """
-
+# --- Logging Sinks ---
 
 class JsonlSink:
     """Thread-safe sink that streams attempt, manifest, and summary events to JSONL files.
@@ -653,18 +678,6 @@ class JsonlSink:
             }
         )
 
-    def log(self, record: AttemptRecord) -> None:
-        """Forward compatibility shim invoking :meth:`log_attempt`.
-
-        Args:
-            record: Attempt record to persist.
-
-        Returns:
-            None
-        """
-
-        self.log_attempt(record)
-
     def log_manifest(self, entry: ManifestEntry) -> None:
         """Persist a manifest entry describing a resolved document.
 
@@ -734,9 +747,6 @@ class JsonlSink:
 
     def __exit__(self, exc_type, exc, tb) -> None:
         self.close()
-
-
-JsonlLogger = JsonlSink  # Backwards compatibility alias from the previous name.
 
 
 class CsvSink:
@@ -846,18 +856,6 @@ class CsvSink:
 
         return None
 
-    def log(self, record: AttemptRecord) -> None:
-        """Forward to :meth:`log_attempt` for compatibility with ``AttemptSink``.
-
-        Args:
-            record: Attempt record to serialize.
-
-        Returns:
-            None
-        """
-
-        self.log_attempt(record)
-
     def close(self) -> None:
         """Flush and close the CSV file handle.
 
@@ -877,6 +875,8 @@ class CsvSink:
 
     def __exit__(self, exc_type, exc, tb) -> None:
         self.close()
+
+    DictReader = staticmethod(csv.DictReader)
 
 
 class CsvAttemptLoggerAdapter(CsvSink):
@@ -1030,18 +1030,6 @@ class MultiSink:
         for sink in self._sinks:
             sink.log_summary(summary)
 
-    def log(self, record: AttemptRecord) -> None:
-        """Forward attempts to :meth:`log_attempt` for compatibility.
-
-        Args:
-            record: Attempt record to broadcast.
-
-        Returns:
-            None
-        """
-
-        self.log_attempt(record)
-
     def close(self) -> None:
         """Close all sinks, propagating the first raised exception.
 
@@ -1107,18 +1095,6 @@ class ManifestIndexSink:
         Args:
             record: Attempt record supplied by the pipeline.
             timestamp: Optional timestamp provided by the caller.
-
-        Returns:
-            None
-        """
-
-        return None
-
-    def log(self, record: AttemptRecord) -> None:
-        """Compatibility shim deferring to :meth:`log_attempt`.
-
-        Args:
-            record: Attempt record supplied by the pipeline.
 
         Returns:
             None
@@ -1247,18 +1223,6 @@ class LastAttemptCsvSink:
 
         return None
 
-    def log(self, record: AttemptRecord) -> None:
-        """Forward compatibility shim deferring to :meth:`log_attempt`.
-
-        Args:
-            record: Attempt record supplied by the pipeline.
-
-        Returns:
-            None
-        """
-
-        return None
-
     def log_manifest(self, entry: ManifestEntry) -> None:
         """Record the manifest entry so the latest attempt is written at close.
 
@@ -1331,6 +1295,8 @@ class LastAttemptCsvSink:
         self.close()
 
 
+# --- Manifest Utilities ---
+
 def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
     """Load manifest JSONL entries indexed by work identifier.
 
@@ -1344,6 +1310,7 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
 
     Raises:
         json.JSONDecodeError: If the manifest contains invalid JSON.
+        ValueError: If entries omit required fields or use deprecated schemas.
     """
 
     per_work: Dict[str, Dict[str, Any]] = {}
@@ -1356,23 +1323,29 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
             line = raw.strip()
             if not line:
                 continue
-            try:
-                data = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if data.get("record_type") and data.get("record_type") != "manifest":
+            data = json.loads(line)
+            record_type = data.get("record_type")
+            if record_type is None:
+                raise ValueError(
+                    "Legacy manifest entries without record_type are no longer supported."
+                )
+            if record_type != "manifest":
                 continue
             work_id = data.get("work_id")
             url = data.get("url")
             if not work_id or not url:
-                continue
+                raise ValueError("Manifest entries must include work_id and url fields.")
             per_work.setdefault(work_id, {})[url] = data
             classification = (data.get("classification") or "").lower()
+            if not classification:
+                raise ValueError("Manifest entries must declare a classification.")
             if classification in {"pdf", "pdf_unknown", "cached"}:
                 completed.add(work_id)
 
     return per_work, completed
 
+
+# --- Download Pipeline ---
 
 def build_manifest_entry(
     artifact: WorkArtifact,
@@ -1845,7 +1818,6 @@ def _collect_location_urls(work: Dict[str, Any]) -> Dict[str, List[str]]:
         "pdf": dedupe(pdf_urls),
         "sources": dedupe(sources),
     }
-
 
 def build_query(args: argparse.Namespace) -> Works:
     """Build a pyalex Works query based on CLI arguments.
@@ -2595,6 +2567,8 @@ def process_one_work(
     logger.log_manifest(entry)
     return result
 
+
+# --- CLI Entry Points ---
 
 def main() -> None:
     """Parse CLI arguments, configure resolvers, and execute downloads.

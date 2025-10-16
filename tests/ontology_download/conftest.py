@@ -1,72 +1,72 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "tests.ontology_download.conftest",
-#   "purpose": "Shared pytest fixtures for ontology download",
+#   "purpose": "Shared pytest fixtures for ontology_download",
 #   "sections": [
 #     {
-#       "id": "_stub_requests_module",
+#       "id": "stubrequestsmodule",
 #       "name": "_StubRequestsModule",
-#       "anchor": "STUB",
+#       "anchor": "class-stubrequestsmodule",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_request_exception",
+#       "id": "requestexception",
 #       "name": "_RequestException",
-#       "anchor": "REQU",
+#       "anchor": "class-requestexception",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_http_error",
+#       "id": "httperror",
 #       "name": "_HTTPError",
-#       "anchor": "HTTP",
+#       "anchor": "class-httperror",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_timeout",
+#       "id": "timeout",
 #       "name": "_Timeout",
-#       "anchor": "TIME",
+#       "anchor": "class-timeout",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_connection_error",
+#       "id": "connectionerror",
 #       "name": "_ConnectionError",
-#       "anchor": "CONN",
+#       "anchor": "class-connectionerror",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_ssl_error",
+#       "id": "sslerror",
 #       "name": "_SSLError",
-#       "anchor": "SSLE",
+#       "anchor": "class-sslerror",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_stub_session",
+#       "id": "stubsession",
 #       "name": "_StubSession",
-#       "anchor": "STUB1",
+#       "anchor": "class-stubsession",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_stub_response",
+#       "id": "stubresponse",
 #       "name": "_StubResponse",
-#       "anchor": "STUB2",
+#       "anchor": "class-stubresponse",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_placeholder_client",
+#       "id": "placeholderclient",
 #       "name": "_PlaceholderClient",
-#       "anchor": "PLAC",
+#       "anchor": "class-placeholderclient",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_reset_build_destination",
+#       "id": "reset-build-destination",
 #       "name": "_reset_build_destination",
-#       "anchor": "RBD",
+#       "anchor": "function-reset-build-destination",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_ontology_env",
+#       "id": "ontology-env",
 #       "name": "_ontology_env",
-#       "anchor": "OE",
+#       "anchor": "function-ontology-env",
 #       "kind": "function"
 #     }
 #   ]
@@ -228,11 +228,14 @@ if "pooch" not in sys.modules:
     sys.modules["pooch"] = _stub_pooch
 
 from DocsToKG.OntologyDownload import ontology_download as core  # noqa: E402  (after stubs)
+# --- Globals ---
 
 _ORIGINAL_BUILD_DESTINATION = core._build_destination
 
 
 @pytest.fixture(autouse=True)
+# --- Helper Functions ---
+
 def _reset_build_destination(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure tests see the canonical _build_destination implementation."""
 

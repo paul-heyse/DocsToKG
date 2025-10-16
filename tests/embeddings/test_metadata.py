@@ -4,105 +4,105 @@
 #   "purpose": "Pytest coverage for embeddings metadata scenarios",
 #   "sections": [
 #     {
-#       "id": "_install_minimal_stubs",
+#       "id": "install-minimal-stubs",
 #       "name": "_install_minimal_stubs",
-#       "anchor": "IMS",
+#       "anchor": "function-install-minimal-stubs",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_process_pass_a_returns_stats_only",
+#       "id": "test-process-pass-a-returns-stats-only",
 #       "name": "test_process_pass_a_returns_stats_only",
-#       "anchor": "TPPAR",
+#       "anchor": "function-test-process-pass-a-returns-stats-only",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_process_chunk_file_vectors_reads_texts",
+#       "id": "test-process-chunk-file-vectors-reads-texts",
 #       "name": "test_process_chunk_file_vectors_reads_texts",
-#       "anchor": "TPCFV",
+#       "anchor": "function-test-process-chunk-file-vectors-reads-texts",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_path_overrides_take_precedence",
+#       "id": "test-cli-path-overrides-take-precedence",
 #       "name": "test_cli_path_overrides_take_precedence",
-#       "anchor": "TCPOT",
+#       "anchor": "function-test-cli-path-overrides-take-precedence",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_offline_mode_requires_local_models",
+#       "id": "test-offline-mode-requires-local-models",
 #       "name": "test_offline_mode_requires_local_models",
-#       "anchor": "TOMRL",
+#       "anchor": "function-test-offline-mode-requires-local-models",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_find_action",
+#       "id": "find-action",
 #       "name": "_find_action",
-#       "anchor": "FA",
+#       "anchor": "function-find-action",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_splade_attn_help_text_describes_fallbacks",
+#       "id": "test-splade-attn-help-text-describes-fallbacks",
 #       "name": "test_splade_attn_help_text_describes_fallbacks",
-#       "anchor": "TSAHT",
+#       "anchor": "function-test-splade-attn-help-text-describes-fallbacks",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_summary_manifest_includes_splade_backend_metadata",
+#       "id": "test-summary-manifest-includes-splade-backend-metadata",
 #       "name": "test_summary_manifest_includes_splade_backend_metadata",
-#       "anchor": "TSMIS",
+#       "anchor": "function-test-summary-manifest-includes-splade-backend-metadata",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_model_dirs_follow_environment_defaults",
+#       "id": "test-model-dirs-follow-environment-defaults",
 #       "name": "test_model_dirs_follow_environment_defaults",
-#       "anchor": "TMDFE",
+#       "anchor": "function-test-model-dirs-follow-environment-defaults",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_model_dirs_override_environment",
+#       "id": "test-cli-model-dirs-override-environment",
 #       "name": "test_cli_model_dirs_override_environment",
-#       "anchor": "TCMDO",
+#       "anchor": "function-test-cli-model-dirs-override-environment",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_offline_requires_local_models",
+#       "id": "test-offline-requires-local-models",
 #       "name": "test_offline_requires_local_models",
-#       "anchor": "TORLM",
+#       "anchor": "function-test-offline-requires-local-models",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pass_a_rejects_incompatible_chunk_schema",
+#       "id": "test-pass-a-rejects-incompatible-chunk-schema",
 #       "name": "test_pass_a_rejects_incompatible_chunk_schema",
-#       "anchor": "TPARI",
+#       "anchor": "function-test-pass-a-rejects-incompatible-chunk-schema",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_reload_embedding_module",
+#       "id": "reload-embedding-module",
 #       "name": "_reload_embedding_module",
-#       "anchor": "REM",
+#       "anchor": "function-reload-embedding-module",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_dummy_bm25",
+#       "id": "dummybm25",
 #       "name": "_DummyBM25",
-#       "anchor": "DUMM",
+#       "anchor": "class-dummybm25",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_dummy_splade",
+#       "id": "dummysplade",
 #       "name": "_DummySPLADE",
-#       "anchor": "DUMM1",
+#       "anchor": "class-dummysplade",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_dummy_dense",
+#       "id": "dummydense",
 #       "name": "_DummyDense",
-#       "anchor": "DUMM2",
+#       "anchor": "class-dummydense",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_dummy_vector_row",
+#       "id": "dummyvectorrow",
 #       "name": "_DummyVectorRow",
-#       "anchor": "DUMM3",
+#       "anchor": "class-dummyvectorrow",
 #       "kind": "class"
 #     }
 #   ]
@@ -123,6 +123,7 @@ from typing import Any, Dict, List
 import pytest
 
 from tests._stubs import dependency_stubs
+# --- Helper Functions ---
 
 
 def _install_minimal_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -201,6 +202,7 @@ def _install_minimal_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
         return original_write_text(path_self, data, **kwargs)
 
     monkeypatch.setattr(Path, "write_text", _write_text)
+# --- Test Cases ---
 
 
 def test_process_pass_a_returns_stats_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -276,10 +278,16 @@ def test_process_chunk_file_vectors_reads_texts(
     args.out_dir = tmp_path
 
     stats = embed_module.BM25Stats(N=1, avgdl=1.0, df={})
+    out_path = tmp_path / "doc.vectors.jsonl"
     validator = embed_module.SPLADEValidator()
 
     embed_module.process_chunk_file_vectors(
-        chunk_file, stats, args, validator, embed_module.get_logger(__name__)
+        chunk_file,
+        out_path,
+        stats,
+        args,
+        validator,
+        embed_module.get_logger(__name__),
     )
 
     assert captured_texts == ["Hello world"]
@@ -310,7 +318,7 @@ def test_cli_path_overrides_take_precedence(
 
     captured: Dict[str, Path] = {}
 
-    def _capture(chunk_file, stats, args, validator, logger) -> tuple[int, List[int], List[float]]:
+    def _capture(chunk_file, out_path, stats, args, validator, logger) -> tuple[int, List[int], List[float]]:
         captured["splade"] = args.splade_cfg.model_dir
         captured["qwen"] = args.qwen_cfg.model_dir
         return 0, [], []
@@ -476,7 +484,7 @@ def test_summary_manifest_includes_splade_backend_metadata(
     )
 
     def fake_process_chunk_file_vectors(
-        chunk_file, stats, args, validator, logger
+        chunk_file, out_path, stats, args, validator, logger
     ) -> tuple[int, list[int], list[float]]:
         validator.validate("chunk-1", ["tok"], [1.0])
         return 1, [1], [1.0]

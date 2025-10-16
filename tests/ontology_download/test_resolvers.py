@@ -4,159 +4,159 @@
 #   "purpose": "Pytest coverage for ontology download resolvers scenarios",
 #   "sections": [
 #     {
-#       "id": "resolved_config",
+#       "id": "resolved-config",
 #       "name": "resolved_config",
-#       "anchor": "RC",
+#       "anchor": "function-resolved-config",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "load_cassette",
+#       "id": "load-cassette",
 #       "name": "load_cassette",
-#       "anchor": "LC",
+#       "anchor": "function-load-cassette",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_obo_resolver_prefers_requested_format",
+#       "id": "test-obo-resolver-prefers-requested-format",
 #       "name": "test_obo_resolver_prefers_requested_format",
-#       "anchor": "TORPR",
+#       "anchor": "function-test-obo-resolver-prefers-requested-format",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_obo_resolver_contract",
+#       "id": "test-obo-resolver-contract",
 #       "name": "test_obo_resolver_contract",
-#       "anchor": "TORC",
+#       "anchor": "function-test-obo-resolver-contract",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_ols_resolver_uses_download_link",
+#       "id": "test-ols-resolver-uses-download-link",
 #       "name": "test_ols_resolver_uses_download_link",
-#       "anchor": "TORUD",
+#       "anchor": "function-test-ols-resolver-uses-download-link",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_ols_resolver_contract",
+#       "id": "test-ols-resolver-contract",
 #       "name": "test_ols_resolver_contract",
-#       "anchor": "TORC1",
+#       "anchor": "function-test-ols-resolver-contract",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_ols_resolver_applies_polite_headers",
+#       "id": "test-ols-resolver-applies-polite-headers",
 #       "name": "test_ols_resolver_applies_polite_headers",
-#       "anchor": "TORAP",
+#       "anchor": "function-test-ols-resolver-applies-polite-headers",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_bioportal_resolver_includes_api_key",
+#       "id": "test-bioportal-resolver-includes-api-key",
 #       "name": "test_bioportal_resolver_includes_api_key",
-#       "anchor": "TBRIA",
+#       "anchor": "function-test-bioportal-resolver-includes-api-key",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_bioportal_resolver_contract",
+#       "id": "test-bioportal-resolver-contract",
 #       "name": "test_bioportal_resolver_contract",
-#       "anchor": "TBRC",
+#       "anchor": "function-test-bioportal-resolver-contract",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_bioportal_resolver_applies_polite_headers",
+#       "id": "test-bioportal-resolver-applies-polite-headers",
 #       "name": "test_bioportal_resolver_applies_polite_headers",
-#       "anchor": "TBRAP",
+#       "anchor": "function-test-bioportal-resolver-applies-polite-headers",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_lov_resolver_contract",
+#       "id": "test-lov-resolver-contract",
 #       "name": "test_lov_resolver_contract",
-#       "anchor": "TLRC",
+#       "anchor": "function-test-lov-resolver-contract",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_skos_resolver_requires_url",
+#       "id": "test-skos-resolver-requires-url",
 #       "name": "test_skos_resolver_requires_url",
-#       "anchor": "TSRRU",
+#       "anchor": "function-test-skos-resolver-requires-url",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_xbrl_resolver_success",
+#       "id": "test-xbrl-resolver-success",
 #       "name": "test_xbrl_resolver_success",
-#       "anchor": "TXRS",
+#       "anchor": "function-test-xbrl-resolver-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_bioportal_resolver_auth_error",
+#       "id": "test-bioportal-resolver-auth-error",
 #       "name": "test_bioportal_resolver_auth_error",
-#       "anchor": "TBRAE",
+#       "anchor": "function-test-bioportal-resolver-auth-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_ols_resolver_timeout_retry",
+#       "id": "test-ols-resolver-timeout-retry",
 #       "name": "test_ols_resolver_timeout_retry",
-#       "anchor": "TORTR",
+#       "anchor": "function-test-ols-resolver-timeout-retry",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_ontobee_resolver_contract",
+#       "id": "test-ontobee-resolver-contract",
 #       "name": "test_ontobee_resolver_contract",
-#       "anchor": "TORC2",
+#       "anchor": "function-test-ontobee-resolver-contract",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_resolver_uses_service_rate_limit",
+#       "id": "test-resolver-uses-service-rate-limit",
 #       "name": "test_resolver_uses_service_rate_limit",
-#       "anchor": "TRUSR",
+#       "anchor": "function-test-resolver-uses-service-rate-limit",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_lov_resolver_respects_timeout_and_rate_limit",
+#       "id": "test-lov-resolver-respects-timeout-and-rate-limit",
 #       "name": "test_lov_resolver_respects_timeout_and_rate_limit",
-#       "anchor": "TLRRT",
+#       "anchor": "function-test-lov-resolver-respects-timeout-and-rate-limit",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_normalize_license_to_spdx_variants",
+#       "id": "test-normalize-license-to-spdx-variants",
 #       "name": "test_normalize_license_to_spdx_variants",
-#       "anchor": "TNLTS",
+#       "anchor": "function-test-normalize-license-to-spdx-variants",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_lov_resolver_parses_metadata",
+#       "id": "test-lov-resolver-parses-metadata",
 #       "name": "test_lov_resolver_parses_metadata",
-#       "anchor": "TLRPM",
+#       "anchor": "function-test-lov-resolver-parses-metadata",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_lov_resolver_requires_uri",
+#       "id": "test-lov-resolver-requires-uri",
 #       "name": "test_lov_resolver_requires_uri",
-#       "anchor": "TLRRU",
+#       "anchor": "function-test-lov-resolver-requires-uri",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_ontobee_resolver_prefers_format",
+#       "id": "test-ontobee-resolver-prefers-format",
 #       "name": "test_ontobee_resolver_prefers_format",
-#       "anchor": "TORPF",
+#       "anchor": "function-test-ontobee-resolver-prefers-format",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_ontobee_resolver_validates_identifier",
+#       "id": "test-ontobee-resolver-validates-identifier",
 #       "name": "test_ontobee_resolver_validates_identifier",
-#       "anchor": "TORVI",
+#       "anchor": "function-test-ontobee-resolver-validates-identifier",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_resolver_registry_includes_new_entries",
+#       "id": "test-resolver-registry-includes-new-entries",
 #       "name": "test_resolver_registry_includes_new_entries",
-#       "anchor": "TRRIN",
+#       "anchor": "function-test-resolver-registry-includes-new-entries",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_resolver_fallback_chain_on_failure",
+#       "id": "test-resolver-fallback-chain-on-failure",
 #       "name": "test_resolver_fallback_chain_on_failure",
-#       "anchor": "TRFCO",
+#       "anchor": "function-test-resolver-fallback-chain-on-failure",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_resolver_plugin_loader_registers_and_warns",
+#       "id": "test-resolver-plugin-loader-registers-and-warns",
 #       "name": "test_resolver_plugin_loader_registers_and_warns",
-#       "anchor": "TRPLR",
+#       "anchor": "function-test-resolver-plugin-loader-registers-and-warns",
 #       "kind": "function"
 #     }
 #   ]
@@ -200,6 +200,7 @@ def load_cassette():
         return json.loads(path.read_text())
 
     return _load
+# --- Test Cases ---
 
 
 def test_obo_resolver_prefers_requested_format(monkeypatch, resolved_config):

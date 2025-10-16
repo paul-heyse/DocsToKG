@@ -4,93 +4,93 @@
 #   "purpose": "Pytest coverage for ontology download cli scenarios",
 #   "sections": [
 #     {
-#       "id": "stub_logger",
+#       "id": "stub-logger",
 #       "name": "stub_logger",
-#       "anchor": "SL",
+#       "anchor": "function-stub-logger",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_default_config",
+#       "id": "default-config",
 #       "name": "_default_config",
-#       "anchor": "DC",
+#       "anchor": "function-default-config",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_planned_fetch",
+#       "id": "planned-fetch",
 #       "name": "_planned_fetch",
-#       "anchor": "PF",
+#       "anchor": "function-planned-fetch",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_pull_json_output",
+#       "id": "test-cli-pull-json-output",
 #       "name": "test_cli_pull_json_output",
-#       "anchor": "TCPJO",
+#       "anchor": "function-test-cli-pull-json-output",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_pull_table_output",
+#       "id": "test-cli-pull-table-output",
 #       "name": "test_cli_pull_table_output",
-#       "anchor": "TCPTO",
+#       "anchor": "function-test-cli-pull-table-output",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_pull_dry_run",
+#       "id": "test-cli-pull-dry-run",
 #       "name": "test_cli_pull_dry_run",
-#       "anchor": "TCPDR",
+#       "anchor": "function-test-cli-pull-dry-run",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_pull_concurrency_and_hosts",
+#       "id": "test-cli-pull-concurrency-and-hosts",
 #       "name": "test_cli_pull_concurrency_and_hosts",
-#       "anchor": "TCPCA",
+#       "anchor": "function-test-cli-pull-concurrency-and-hosts",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_plan_json_output",
+#       "id": "test-cli-plan-json-output",
 #       "name": "test_cli_plan_json_output",
-#       "anchor": "CPJO1",
+#       "anchor": "function-test-cli-plan-json-output",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_plan_since_passed_to_plan_all",
+#       "id": "test-cli-plan-since-passed-to-plan-all",
 #       "name": "test_cli_plan_since_passed_to_plan_all",
-#       "anchor": "TCPSP",
+#       "anchor": "function-test-cli-plan-since-passed-to-plan-all",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_plan_concurrency_override",
+#       "id": "test-cli-plan-concurrency-override",
 #       "name": "test_cli_plan_concurrency_override",
-#       "anchor": "TCPCO",
+#       "anchor": "function-test-cli-plan-concurrency-override",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_plan_diff_outputs",
+#       "id": "test-cli-plan-diff-outputs",
 #       "name": "test_cli_plan_diff_outputs",
-#       "anchor": "TCPDO",
+#       "anchor": "function-test-cli-plan-diff-outputs",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_prune_dry_run_json",
+#       "id": "test-cli-prune-dry-run-json",
 #       "name": "test_cli_prune_dry_run_json",
-#       "anchor": "CPDR1",
+#       "anchor": "function-test-cli-prune-dry-run-json",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_prune_updates_latest_marker",
+#       "id": "test-cli-prune-updates-latest-marker",
 #       "name": "test_cli_prune_updates_latest_marker",
-#       "anchor": "TCPUL",
+#       "anchor": "function-test-cli-prune-updates-latest-marker",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_plan_serializes_enriched_metadata",
+#       "id": "test-cli-plan-serializes-enriched-metadata",
 #       "name": "test_cli_plan_serializes_enriched_metadata",
-#       "anchor": "TCPSE",
+#       "anchor": "function-test-cli-plan-serializes-enriched-metadata",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_doctor_reports_diagnostics",
+#       "id": "test-cli-doctor-reports-diagnostics",
 #       "name": "test_cli_doctor_reports_diagnostics",
-#       "anchor": "TCDRD",
+#       "anchor": "function-test-cli-doctor-reports-diagnostics",
 #       "kind": "function"
 #     }
 #   ]
@@ -137,6 +137,7 @@ def stub_logger():
             pass
 
     return _Logger()
+# --- Helper Functions ---
 
 
 def _default_config() -> ResolvedConfig:
@@ -163,6 +164,7 @@ def _planned_fetch(ontology_id: str, url: str = "https://example.org/doc.owl") -
         last_modified="2024-01-01T00:00:00Z",
         size=128,
     )
+# --- Test Cases ---
 
 
 def test_cli_pull_json_output(monkeypatch, stub_logger, tmp_path, capsys):

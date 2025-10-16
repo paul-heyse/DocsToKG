@@ -4,51 +4,51 @@
 #   "purpose": "Pytest coverage for ontology download utilities scenarios",
 #   "sections": [
 #     {
-#       "id": "test_parse_rate_limit_to_rps_formats",
+#       "id": "test-parse-rate-limit-to-rps-formats",
 #       "name": "test_parse_rate_limit_to_rps_formats",
-#       "anchor": "TPRLT",
+#       "anchor": "function-test-parse-rate-limit-to-rps-formats",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_parse_rate_limit_to_rps_invalid",
+#       "id": "test-parse-rate-limit-to-rps-invalid",
 #       "name": "test_parse_rate_limit_to_rps_invalid",
-#       "anchor": "PRLT1",
+#       "anchor": "function-test-parse-rate-limit-to-rps-invalid",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_directory_size_counts_all_files",
+#       "id": "test-directory-size-counts-all-files",
 #       "name": "test_directory_size_counts_all_files",
-#       "anchor": "TDSCA",
+#       "anchor": "function-test-directory-size-counts-all-files",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_directory_size_handles_empty_directory",
+#       "id": "test-directory-size-handles-empty-directory",
 #       "name": "test_directory_size_handles_empty_directory",
-#       "anchor": "TDSHE",
+#       "anchor": "function-test-directory-size-handles-empty-directory",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_parse_iso_datetime_normalizes_timezone",
+#       "id": "test-parse-iso-datetime-normalizes-timezone",
 #       "name": "test_parse_iso_datetime_normalizes_timezone",
-#       "anchor": "TPIDN",
+#       "anchor": "function-test-parse-iso-datetime-normalizes-timezone",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_parse_http_datetime_handles_gmt_header",
+#       "id": "test-parse-http-datetime-handles-gmt-header",
 #       "name": "test_parse_http_datetime_handles_gmt_header",
-#       "anchor": "TPHDH",
+#       "anchor": "function-test-parse-http-datetime-handles-gmt-header",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_parse_version_timestamp_variants",
+#       "id": "test-parse-version-timestamp-variants",
 #       "name": "test_parse_version_timestamp_variants",
-#       "anchor": "TPVTV",
+#       "anchor": "function-test-parse-version-timestamp-variants",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_infer_version_timestamp_from_composite_strings",
+#       "id": "test-infer-version-timestamp-from-composite-strings",
 #       "name": "test_infer_version_timestamp_from_composite_strings",
-#       "anchor": "TIVTF",
+#       "anchor": "function-test-infer-version-timestamp-from-composite-strings",
 #       "kind": "function"
 #     }
 #   ]
@@ -83,6 +83,8 @@ from DocsToKG.OntologyDownload.ontology_download import (
         ("7200/h", pytest.approx(2.0)),
     ],
 )
+# --- Test Cases ---
+
 def test_parse_rate_limit_to_rps_formats(limit, expected):
     assert parse_rate_limit_to_rps(limit) == expected
 

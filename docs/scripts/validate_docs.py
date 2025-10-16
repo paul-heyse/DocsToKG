@@ -5,16 +5,22 @@
 #   "purpose": "Documentation tooling for validate docs workflows",
 #   "sections": [
 #     {
-#       "id": "documentation_validator",
-#       "name": "DocumentationValidator",
-#       "anchor": "DOCU",
-#       "kind": "class"
+#       "id": "public_classes",
+#       "name": "Public Classes",
+#       "anchor": "PC",
+#       "kind": "api"
 #     },
 #     {
-#       "id": "main",
-#       "name": "main",
-#       "anchor": "MAIN",
-#       "kind": "function"
+#       "id": "public_functions",
+#       "name": "Public Functions",
+#       "anchor": "PF",
+#       "kind": "api"
+#     },
+#     {
+#       "id": "module_entry_points",
+#       "name": "Module Entry Points",
+#       "anchor": "MEP",
+#       "kind": "cli"
 #     }
 #   ]
 # }
@@ -35,6 +41,7 @@ import re
 import sys
 from pathlib import Path
 from typing import Dict, List
+# --- Public Classes ---
 
 
 class DocumentationValidator:
@@ -377,6 +384,8 @@ class DocumentationValidator:
 
         print(f"\n📊 Summary: {total_issues} total issues")
         print("Run 'python docs/scripts/generate_all_docs.py --validate-only' to see all details")
+# --- Public Functions ---
+# --- Module Entry Points ---
 
 
 def main():

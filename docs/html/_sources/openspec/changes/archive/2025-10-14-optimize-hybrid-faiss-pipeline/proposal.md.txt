@@ -16,7 +16,7 @@ With chunking handled upstream via `DoclingHybridChunkerPipelineWithMin.py`, the
 - Replace manual FAISS index construction with factory strings (`IVF{nlist},Flat`, `IVF{nlist},PQ…`) and GPU-native constructors (`GpuIndexFlatIP`) so build/promote occurs in ≤3 lines while keeping `IndexIDMap2` wrapping.
 - Apply IVF tuning parameters (`nprobe`, later PQ knobs) through `faiss.GpuParameterSpace().set_index_parameter(...)`, falling back to `faiss.ParameterSpace` when GPU resources are absent, ensuring config changes take effect automatically.
 - Simplify `_remove_ids` by switching to `faiss.IDSelectorBatch`, retaining the existing CPU fallback but removing SWIG pointer glue and consolidating ID bookkeeping.
-- Move FAISS int→vector ID mapping into `ChunkRegistry` (bridge map) and update `FaissIndexManager` to consult the registry instead of persisting a second `_id_lookup`, shrinking serialized payloads and eliminating double accounting.
+- Move FAISS int→vector ID mapping into `ChunkRegistry` (bridge map) and update `FaissVectorStore` to consult the registry instead of persisting a second `_id_lookup`, shrinking serialized payloads and eliminating double accounting.
 - Accelerate MMR diversification and near-duplicate checks by batching embeddings and using `faiss.pairwise_distance_gpu(..., METRIC_INNER_PRODUCT)` when GPU resources are available (with NumPy CPU fallback for test environments).
 - DRY up sparse search in `OpenSearchSimulator` by introducing a shared `_search_sparse` helper invoked by both BM25 and SPLADE paths, leaving only the scoring lambda unique.
 - Log the effective FAISS configuration (index type, `nlist`, `nprobe`, PQ parameters, GPU device) at startup so operational tooling can confirm tuning.

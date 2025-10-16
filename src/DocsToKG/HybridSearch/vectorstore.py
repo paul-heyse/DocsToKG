@@ -1,11 +1,62 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.HybridSearch.vectorstore",
-#   "purpose": "Vector store interfaces and similarity utilities for hybrid search",
+#   "purpose": "FAISS vector store orchestration, GPU similarity utilities, and persistence helpers",
 #   "sections": [
-#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
-#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"},
-#     {"id": "public-functions", "name": "Public Functions", "anchor": "api", "kind": "api"}
+#     {
+#       "id": "faisssearchresult",
+#       "name": "FaissSearchResult",
+#       "anchor": "class-faisssearchresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "faissvectorstore",
+#       "name": "FaissVectorStore",
+#       "anchor": "class-faissvectorstore",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "normalize-rows",
+#       "name": "normalize_rows",
+#       "anchor": "function-normalize-rows",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cosine-against-corpus-gpu",
+#       "name": "cosine_against_corpus_gpu",
+#       "anchor": "function-cosine-against-corpus-gpu",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pairwise-inner-products",
+#       "name": "pairwise_inner_products",
+#       "anchor": "function-pairwise-inner-products",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "max-inner-product",
+#       "name": "max_inner_product",
+#       "anchor": "function-max-inner-product",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cosine-batch",
+#       "name": "cosine_batch",
+#       "anchor": "function-cosine-batch",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "serialize-state",
+#       "name": "serialize_state",
+#       "anchor": "function-serialize-state",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "restore-state",
+#       "name": "restore_state",
+#       "anchor": "function-restore-state",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -33,9 +84,8 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 logger = logging.getLogger(__name__)
 
 __all__ = (
-    "FaissIndexManager",
-    "FaissSearchResult",
     "FaissVectorStore",
+    "FaissSearchResult",
     "cosine_against_corpus_gpu",
     "cosine_batch",
     "max_inner_product",
@@ -880,7 +930,6 @@ class FaissVectorStore:
 
 # --- Public Functions ---
 
-
 def normalize_rows(matrix: np.ndarray) -> np.ndarray:
     """L2-normalise each row of ``matrix`` in-place.
 
@@ -895,12 +944,11 @@ def normalize_rows(matrix: np.ndarray) -> np.ndarray:
     """
     if matrix.dtype != np.float32 or not matrix.flags.c_contiguous:
         raise TypeError("normalize_rows expects a contiguous float32 array")
-    if hasattr(faiss, "normalize_L2"):
-        faiss.normalize_L2(matrix)
-        return matrix
-    norms = np.linalg.norm(matrix, axis=1, keepdims=True)
-    norms[norms == 0.0] = 1.0
-    matrix /= norms
+    if not hasattr(faiss, "normalize_L2"):
+        raise RuntimeError(
+            "FAISS normalize_L2 unavailable; ensure faiss-gpu is installed with CUDA support."
+        )
+    faiss.normalize_L2(matrix)
     return matrix
 
 
@@ -1069,9 +1117,3 @@ def restore_state(faiss_index: FaissVectorStore, payload: dict[str, object]) -> 
     if not isinstance(encoded, str):
         raise ValueError("Missing FAISS payload")
     faiss_index.restore(base64.b64decode(encoded.encode("ascii")))
-
-
-# --- Compatibility ---
-
-# Backwards compatibility alias for legacy imports.
-FaissIndexManager = FaissVectorStore

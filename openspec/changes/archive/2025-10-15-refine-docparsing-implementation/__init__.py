@@ -1,12 +1,12 @@
 # === NAVMAP v1 ===
 # {
-#   "module": "openspec.changes.archive.2025-10-15-refine-docparsing-implementation",
+#   "module": "openspec.changes.archive.2025_10_15_refine_docparsing_implementation",
 #   "purpose": "Archived OpenSpec helper module openspec.changes.archive.2025_10_15_refine_docparsing_implementation",
 #   "sections": [
 #     {
-#       "id": "module-overview",
-#       "name": "module_overview",
-#       "anchor": "OVR",
+#       "id": "globals",
+#       "name": "Globals",
+#       "anchor": "GLOB",
 #       "kind": "infra"
 #     }
 #   ]
@@ -36,5 +36,6 @@ DocsToKG DocParsing Refinement Documentation Package.
 """
 
 from .documentation import RequirementDoc, load_requirement_docs
+# --- Globals ---
 
 __all__ = ["RequirementDoc", "load_requirement_docs"]

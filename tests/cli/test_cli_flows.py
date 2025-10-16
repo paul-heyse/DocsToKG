@@ -4,129 +4,129 @@
 #   "purpose": "Pytest coverage for cli cli flows scenarios",
 #   "sections": [
 #     {
-#       "id": "download_modules",
+#       "id": "download-modules",
 #       "name": "download_modules",
-#       "anchor": "DM",
+#       "anchor": "function-download-modules",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_read_resolver_config_yaml_requires_pyyaml",
+#       "id": "test-read-resolver-config-yaml-requires-pyyaml",
 #       "name": "test_read_resolver_config_yaml_requires_pyyaml",
-#       "anchor": "TRRCY",
+#       "anchor": "function-test-read-resolver-config-yaml-requires-pyyaml",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_load_resolver_config_applies_mailto",
+#       "id": "test-load-resolver-config-applies-mailto",
 #       "name": "test_load_resolver_config_applies_mailto",
-#       "anchor": "TLRCA",
+#       "anchor": "function-test-load-resolver-config-applies-mailto",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_main_writes_manifest_and_sets_mailto",
+#       "id": "test-main-writes-manifest-and-sets-mailto",
 #       "name": "test_main_writes_manifest_and_sets_mailto",
-#       "anchor": "TMWMA",
+#       "anchor": "function-test-main-writes-manifest-and-sets-mailto",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_main_with_csv_writes_last_attempt_csv",
+#       "id": "test-main-with-csv-writes-last-attempt-csv",
 #       "name": "test_main_with_csv_writes_last_attempt_csv",
-#       "anchor": "TMWCW",
+#       "anchor": "function-test-main-with-csv-writes-last-attempt-csv",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_main_with_staging_creates_timestamped_directories",
+#       "id": "test-main-with-staging-creates-timestamped-directories",
 #       "name": "test_main_with_staging_creates_timestamped_directories",
-#       "anchor": "TMWSC",
+#       "anchor": "function-test-main-with-staging-creates-timestamped-directories",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_main_dry_run_skips_writing_files",
+#       "id": "test-main-dry-run-skips-writing-files",
 #       "name": "test_main_dry_run_skips_writing_files",
-#       "anchor": "TMDRS",
+#       "anchor": "function-test-main-dry-run-skips-writing-files",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_main_requires_topic_or_topic_id",
+#       "id": "test-main-requires-topic-or-topic-id",
 #       "name": "test_main_requires_topic_or_topic_id",
-#       "anchor": "TMRTO",
+#       "anchor": "function-test-main-requires-topic-or-topic-id",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_flag_propagation_and_metrics_export",
+#       "id": "test-cli-flag-propagation-and-metrics-export",
 #       "name": "test_cli_flag_propagation_and_metrics_export",
-#       "anchor": "TCFPA",
+#       "anchor": "function-test-cli-flag-propagation-and-metrics-export",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_download_candidate_dry_run_does_not_create_files",
+#       "id": "test-download-candidate-dry-run-does-not-create-files",
 #       "name": "test_download_candidate_dry_run_does_not_create_files",
-#       "anchor": "TDCDR",
+#       "anchor": "function-test-download-candidate-dry-run-does-not-create-files",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_process_one_work_logs_manifest_in_dry_run",
+#       "id": "test-process-one-work-logs-manifest-in-dry-run",
 #       "name": "test_process_one_work_logs_manifest_in_dry_run",
-#       "anchor": "TPOWL",
+#       "anchor": "function-test-process-one-work-logs-manifest-in-dry-run",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_noop_pipeline",
+#       "id": "nooppipeline",
 #       "name": "_NoopPipeline",
-#       "anchor": "NOOP",
+#       "anchor": "class-nooppipeline",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "test_resume_skips_completed_work",
+#       "id": "test-resume-skips-completed-work",
 #       "name": "test_resume_skips_completed_work",
-#       "anchor": "TRSCW",
+#       "anchor": "function-test-resume-skips-completed-work",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_resume_from_partial_metadata",
+#       "id": "test-cli-resume-from-partial-metadata",
 #       "name": "test_cli_resume_from_partial_metadata",
-#       "anchor": "TCRFP",
+#       "anchor": "function-test-cli-resume-from-partial-metadata",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_workers_apply_domain_jitter",
+#       "id": "test-cli-workers-apply-domain-jitter",
 #       "name": "test_cli_workers_apply_domain_jitter",
-#       "anchor": "TCWAD",
+#       "anchor": "function-test-cli-workers-apply-domain-jitter",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_head_precheck_handles_head_hostile",
+#       "id": "test-cli-head-precheck-handles-head-hostile",
 #       "name": "test_cli_head_precheck_handles_head_hostile",
-#       "anchor": "TCHPH",
+#       "anchor": "function-test-cli-head-precheck-handles-head-hostile",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_attempt_records_cover_all_resolvers",
+#       "id": "test-cli-attempt-records-cover-all-resolvers",
 #       "name": "test_cli_attempt_records_cover_all_resolvers",
-#       "anchor": "TCARC",
+#       "anchor": "function-test-cli-attempt-records-cover-all-resolvers",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cli_dry_run_metrics_align",
+#       "id": "test-cli-dry-run-metrics-align",
 #       "name": "test_cli_dry_run_metrics_align",
-#       "anchor": "TCDRM",
+#       "anchor": "function-test-cli-dry-run-metrics-align",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_envrc_configures_virtualenv_and_pythonpath",
+#       "id": "test-envrc-configures-virtualenv-and-pythonpath",
 #       "name": "test_envrc_configures_virtualenv_and_pythonpath",
-#       "anchor": "TECVA",
+#       "anchor": "function-test-envrc-configures-virtualenv-and-pythonpath",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_bootstrap_script_installs_project",
+#       "id": "test-bootstrap-script-installs-project",
 #       "name": "test_bootstrap_script_installs_project",
-#       "anchor": "TBSIP",
+#       "anchor": "function-test-bootstrap-script-installs-project",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_documentation_mentions_bootstrap_and_direnv",
+#       "id": "test-documentation-mentions-bootstrap-and-direnv",
 #       "name": "test_documentation_mentions_bootstrap_and_direnv",
-#       "anchor": "TDMBA",
+#       "anchor": "function-test-documentation-mentions-bootstrap-and-direnv",
 #       "kind": "function"
 #     }
 #   ]
@@ -147,6 +147,7 @@ from types import SimpleNamespace
 from typing import Any, Dict, List
 
 import pytest
+# --- Globals ---
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ENVRC = REPO_ROOT / ".envrc"
@@ -157,6 +158,8 @@ AGENTS = REPO_ROOT / "openspec" / "AGENTS.md"
 
 
 @pytest.fixture
+# --- Test Fixtures ---
+
 def download_modules():
     """Provide downloader/resolver modules guarded by optional dependencies."""
 
@@ -166,6 +169,7 @@ def download_modules():
     from DocsToKG.ContentDownload import resolvers
 
     return SimpleNamespace(downloader=downloader, resolvers=resolvers, requests=requests)
+# --- Test Cases ---
 
 
 def test_read_resolver_config_yaml_requires_pyyaml(download_modules, monkeypatch, tmp_path):

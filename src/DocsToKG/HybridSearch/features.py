@@ -1,11 +1,32 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.HybridSearch.features",
-#   "purpose": "Feature extraction utilities for hybrid search pipelines",
+#   "purpose": "Tokenization utilities and feature generation helpers",
 #   "sections": [
-#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
-#     {"id": "public-functions", "name": "Public Functions", "anchor": "api", "kind": "api"},
-#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"}
+#     {
+#       "id": "tokenize",
+#       "name": "tokenize",
+#       "anchor": "function-tokenize",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "tokenize-with-spans",
+#       "name": "tokenize_with_spans",
+#       "anchor": "function-tokenize-with-spans",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sliding-window",
+#       "name": "sliding_window",
+#       "anchor": "function-sliding-window",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "featuregenerator",
+#       "name": "FeatureGenerator",
+#       "anchor": "class-featuregenerator",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -37,7 +58,6 @@ _TOKEN_PATTERN = re.compile(r"[\w']+")
 
 
 # --- Public Functions ---
-
 
 def tokenize(text: str) -> List[str]:
     """Tokenize text into lowercase alphanumeric tokens.
@@ -105,7 +125,6 @@ def sliding_window(tokens: Sequence[str], window: int, overlap: int) -> Iterator
 
 
 # --- Public Classes ---
-
 
 class FeatureGenerator:
     """Derive sparse and dense features for chunk text.

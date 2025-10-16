@@ -39,6 +39,10 @@ Usage:
 
 Return Semantic Scholar metadata for ``doi`` using configured headers.
 
+### `_fetch_unpaywall_data(session, config, doi)`
+
+Return Unpaywall metadata for ``doi`` using configured headers.
+
 ### `_absolute_url(base, href)`
 
 Resolve relative ``href`` values against ``base`` to obtain absolute URLs.

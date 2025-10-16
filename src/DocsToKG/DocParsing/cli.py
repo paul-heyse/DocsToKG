@@ -1,72 +1,72 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.DocParsing.cli",
-#   "purpose": "CLI entry points for DocsToKG.DocParsing.cli workflows",
+#   "purpose": "CLI entry points for DocParsing workflows",
 #   "sections": [
 #     {
-#       "id": "_run_chunk",
+#       "id": "run-chunk",
 #       "name": "_run_chunk",
-#       "anchor": "RC",
+#       "anchor": "function-run-chunk",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_run_embed",
+#       "id": "run-embed",
 #       "name": "_run_embed",
-#       "anchor": "RE",
+#       "anchor": "function-run-embed",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_build_doctags_parser",
+#       "id": "build-doctags-parser",
 #       "name": "_build_doctags_parser",
-#       "anchor": "BDP",
+#       "anchor": "function-build-doctags-parser",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_detect_mode",
+#       "id": "detect-mode",
 #       "name": "_detect_mode",
-#       "anchor": "DM",
+#       "anchor": "function-detect-mode",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_merge_args",
+#       "id": "merge-args",
 #       "name": "_merge_args",
-#       "anchor": "MA",
+#       "anchor": "function-merge-args",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_run_doctags",
+#       "id": "run-doctags",
 #       "name": "_run_doctags",
-#       "anchor": "RD",
+#       "anchor": "function-run-doctags",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_command",
+#       "id": "command",
 #       "name": "_Command",
-#       "anchor": "COMM",
+#       "anchor": "class-command",
 #       "kind": "class"
 #     },
 #     {
 #       "id": "main",
 #       "name": "main",
-#       "anchor": "MAIN",
+#       "anchor": "function-main",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "chunk",
 #       "name": "chunk",
-#       "anchor": "CHUN",
+#       "anchor": "function-chunk",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "embed",
 #       "name": "embed",
-#       "anchor": "EMBE",
+#       "anchor": "function-embed",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "doctags",
 #       "name": "doctags",
-#       "anchor": "DOCT",
+#       "anchor": "function-doctags",
 #       "kind": "function"
 #     }
 #   ]
@@ -110,6 +110,9 @@ from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (
 from DocsToKG.DocParsing.EmbeddingV2 import build_parser as embed_build_parser
 from DocsToKG.DocParsing.EmbeddingV2 import main as embed_pipeline_main
 
+
+# --- Globals ---
+
 CommandHandler = Callable[[Sequence[str]], int]
 
 CLI_DESCRIPTION = """\
@@ -121,11 +124,10 @@ Examples:
   python -m DocsToKG.DocParsing.cli doctags --mode pdf --workers 2
 """
 
+__all__ = ["main", "chunk", "embed", "doctags"]
 
-# --------------------------------------------------------------------------- #
-# Chunk command
-# --------------------------------------------------------------------------- #
 
+# --- Chunk Command ---
 
 def _run_chunk(argv: Sequence[str]) -> int:
     """Execute the Docling chunker subcommand.
@@ -142,10 +144,7 @@ def _run_chunk(argv: Sequence[str]) -> int:
     return chunk_pipeline_main(args)
 
 
-# --------------------------------------------------------------------------- #
-# Embed command
-# --------------------------------------------------------------------------- #
-
+# --- Embed Command ---
 
 def _run_embed(argv: Sequence[str]) -> int:
     """Execute the embedding pipeline subcommand.
@@ -162,10 +161,7 @@ def _run_embed(argv: Sequence[str]) -> int:
     return embed_pipeline_main(args)
 
 
-# --------------------------------------------------------------------------- #
-# Doctags command
-# --------------------------------------------------------------------------- #
-
+# --- Doctags Command ---
 
 def _build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentParser:
     """Create an :mod:`argparse` parser configured for DocTags conversion.
@@ -390,10 +386,7 @@ def _run_doctags(argv: Sequence[str]) -> int:
     return pipeline_backend.pdf_main(pdf_args)
 
 
-# --------------------------------------------------------------------------- #
-# Dispatcher
-# --------------------------------------------------------------------------- #
-
+# --- Dispatcher ---
 
 class _Command:
     """Callable wrapper storing handler metadata for subcommands.
@@ -498,9 +491,6 @@ def doctags(argv: Sequence[str] | None = None) -> int:
     """
 
     return _run_doctags([] if argv is None else list(argv))
-
-
-__all__ = ["main", "chunk", "embed", "doctags"]
 
 
 if __name__ == "__main__":

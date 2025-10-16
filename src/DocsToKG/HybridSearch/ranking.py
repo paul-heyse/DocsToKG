@@ -1,11 +1,26 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.HybridSearch.ranking",
-#   "purpose": "Ranking and reranking helpers for hybrid search",
+#   "purpose": "Implements DocsToKG.HybridSearch.ranking behaviors and helpers",
 #   "sections": [
-#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
-#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"},
-#     {"id": "public-functions", "name": "Public Functions", "anchor": "api", "kind": "api"}
+#     {
+#       "id": "reciprocalrankfusion",
+#       "name": "ReciprocalRankFusion",
+#       "anchor": "class-reciprocalrankfusion",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resultshaper",
+#       "name": "ResultShaper",
+#       "anchor": "class-resultshaper",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "apply-mmr-diversification",
+#       "name": "apply_mmr_diversification",
+#       "anchor": "function-apply-mmr-diversification",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -44,7 +59,6 @@ __all__ = (
 
 
 # --- Public Classes ---
-
 
 class ReciprocalRankFusion:
     """Combine ranked lists using Reciprocal Rank Fusion.
@@ -250,7 +264,6 @@ class ResultShaper:
 
 
 # --- Public Functions ---
-
 
 def apply_mmr_diversification(
     fused_candidates: Sequence[FusionCandidate],

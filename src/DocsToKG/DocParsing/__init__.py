@@ -2,14 +2,7 @@
 # {
 #   "module": "DocsToKG.DocParsing",
 #   "purpose": "Package initialization for DocsToKG.DocParsing",
-#   "sections": [
-#     {
-#       "id": "module-overview",
-#       "name": "module_overview",
-#       "anchor": "OVR",
-#       "kind": "infra"
-#     }
-#   ]
+#   "sections": []
 # }
 # === /NAVMAP ===
 
@@ -18,6 +11,7 @@
 from __future__ import annotations
 
 from . import pipelines as _pipelines
+# --- Globals ---
 
 __all__ = [
     "pipelines",

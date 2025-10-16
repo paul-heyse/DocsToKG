@@ -2,14 +2,7 @@
 # {
 #   "module": "DocsToKG.OntologyDownload",
 #   "purpose": "Package initialization for DocsToKG.OntologyDownload",
-#   "sections": [
-#     {
-#       "id": "module-overview",
-#       "name": "module_overview",
-#       "anchor": "OVR",
-#       "kind": "infra"
-#     }
-#   ]
+#   "sections": []
 # }
 # === /NAVMAP ===
 
@@ -79,6 +72,9 @@ from .ontology_download import (
     validate_manifest_dict,
     validate_url_security,
 )
+# --- Globals ---
+
+# --- Globals ---
 
 __all__ = [
     "FetchSpec",

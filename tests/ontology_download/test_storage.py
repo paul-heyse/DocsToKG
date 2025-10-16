@@ -4,9 +4,9 @@
 #   "purpose": "Pytest coverage for ontology download storage scenarios",
 #   "sections": [
 #     {
-#       "id": "test_fsspec_storage_roundtrip",
+#       "id": "test-fsspec-storage-roundtrip",
 #       "name": "test_fsspec_storage_roundtrip",
-#       "anchor": "TFSR",
+#       "anchor": "function-test-fsspec-storage-roundtrip",
 #       "kind": "function"
 #     }
 #   ]
@@ -29,6 +29,8 @@ from DocsToKG.OntologyDownload import storage
 
 
 @pytest.mark.skipif(importlib.util.find_spec("fsspec") is None, reason="fsspec not installed")
+# --- Test Cases ---
+
 def test_fsspec_storage_roundtrip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Remote storage should mirror uploads and allow subsequent retrievals."""
 

@@ -4,27 +4,27 @@
 #   "purpose": "Pytest coverage for docparsing llm caching scenarios",
 #   "sections": [
 #     {
-#       "id": "test_qwen_cache_key_generation",
+#       "id": "test-qwen-cache-key-generation",
 #       "name": "test_qwen_cache_key_generation",
-#       "anchor": "TQCKG",
+#       "anchor": "function-test-qwen-cache-key-generation",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_qwen_cache_initialization",
+#       "id": "test-qwen-cache-initialization",
 #       "name": "test_qwen_cache_initialization",
-#       "anchor": "TQCI",
+#       "anchor": "function-test-qwen-cache-initialization",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_qwen_cache_functionality",
+#       "id": "test-qwen-cache-functionality",
 #       "name": "test_qwen_cache_functionality",
-#       "anchor": "TQCF",
+#       "anchor": "function-test-qwen-cache-functionality",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_qwen_cache_key_uniqueness",
+#       "id": "test-qwen-cache-key-uniqueness",
 #       "name": "test_qwen_cache_key_uniqueness",
-#       "anchor": "TQCKU",
+#       "anchor": "function-test-qwen-cache-key-uniqueness",
 #       "kind": "function"
 #     }
 #   ]
@@ -40,6 +40,7 @@ from unittest.mock import Mock
 import pytest
 
 from DocsToKG.DocParsing.EmbeddingV2 import _QWEN_LLM_CACHE, _qwen_cache_key
+# --- Test Cases ---
 
 
 def test_qwen_cache_key_generation():
@@ -217,6 +218,7 @@ def test_qwen_cache_key_uniqueness():
             assert isinstance(key[2], int)  # tp
             assert isinstance(key[3], float)  # gpu_mem_util
             # quantization can be None or string
+# --- Module Entry Points ---
 
 
 if __name__ == "__main__":

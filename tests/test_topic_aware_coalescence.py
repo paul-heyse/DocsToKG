@@ -4,33 +4,33 @@
 #   "purpose": "Pytest coverage for topic aware coalescence scenarios",
 #   "sections": [
 #     {
-#       "id": "_dummy_tokenizer",
+#       "id": "dummytokenizer",
 #       "name": "_DummyTokenizer",
-#       "anchor": "DUMM",
+#       "anchor": "class-dummytokenizer",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "test_is_structural_boundary_detects_headings",
+#       "id": "test-is-structural-boundary-detects-headings",
 #       "name": "test_is_structural_boundary_detects_headings",
-#       "anchor": "TISBD",
+#       "anchor": "function-test-is-structural-boundary-detects-headings",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_is_structural_boundary_detects_captions",
+#       "id": "test-is-structural-boundary-detects-captions",
 #       "name": "test_is_structural_boundary_detects_captions",
-#       "anchor": "ISBD1",
+#       "anchor": "function-test-is-structural-boundary-detects-captions",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_is_structural_boundary_handles_non_markers",
+#       "id": "test-is-structural-boundary-handles-non-markers",
 #       "name": "test_is_structural_boundary_handles_non_markers",
-#       "anchor": "TISBH",
+#       "anchor": "function-test-is-structural-boundary-handles-non-markers",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_topic_aware_coalescence_respects_section_boundaries",
+#       "id": "test-topic-aware-coalescence-respects-section-boundaries",
 #       "name": "test_topic_aware_coalescence_respects_section_boundaries",
-#       "anchor": "TTACR",
+#       "anchor": "function-test-topic-aware-coalescence-respects-section-boundaries",
 #       "kind": "function"
 #     }
 #   ]
@@ -59,6 +59,8 @@ class _DummyTokenizer:
     "text",
     ["# Heading", "## Subheading", "### Deep", "#### Outline"],
 )
+# --- Test Cases ---
+
 def test_is_structural_boundary_detects_headings(text: str) -> None:
     rec = Rec(text=text, n_tok=1, src_idxs=[], refs=[], pages=[])
     assert is_structural_boundary(rec)

@@ -4,219 +4,213 @@
 #   "purpose": "CLI entry points for DocsToKG.OntologyDownload.cli workflows",
 #   "sections": [
 #     {
-#       "id": "format_table",
+#       "id": "format-table",
 #       "name": "format_table",
-#       "anchor": "FT",
+#       "anchor": "function-format-table",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "format_plan_rows",
+#       "id": "format-plan-rows",
 #       "name": "format_plan_rows",
-#       "anchor": "FPR",
+#       "anchor": "function-format-plan-rows",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "format_results_table",
+#       "id": "format-results-table",
 #       "name": "format_results_table",
-#       "anchor": "FRT",
+#       "anchor": "function-format-results-table",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "format_validation_summary",
+#       "id": "format-validation-summary",
 #       "name": "format_validation_summary",
-#       "anchor": "FVS",
+#       "anchor": "function-format-validation-summary",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_build_parser",
+#       "id": "build-parser",
 #       "name": "_build_parser",
-#       "anchor": "BP",
+#       "anchor": "function-build-parser",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_parse_target_formats",
+#       "id": "parse-target-formats",
 #       "name": "_parse_target_formats",
-#       "anchor": "PTF",
+#       "anchor": "function-parse-target-formats",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_parse_positive_int",
+#       "id": "parse-positive-int",
 #       "name": "_parse_positive_int",
-#       "anchor": "PPI",
+#       "anchor": "function-parse-positive-int",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_parse_allowed_hosts",
+#       "id": "parse-allowed-hosts",
 #       "name": "_parse_allowed_hosts",
-#       "anchor": "PAH",
+#       "anchor": "function-parse-allowed-hosts",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_normalize_plan_args",
+#       "id": "normalize-plan-args",
 #       "name": "_normalize_plan_args",
-#       "anchor": "NPA",
+#       "anchor": "function-normalize-plan-args",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_parse_since_arg",
+#       "id": "parse-since-arg",
 #       "name": "_parse_since_arg",
-#       "anchor": "PSA",
+#       "anchor": "function-parse-since-arg",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_parse_since",
+#       "id": "parse-since",
 #       "name": "_parse_since",
-#       "anchor": "PS",
+#       "anchor": "function-parse-since",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_format_bytes",
+#       "id": "format-bytes",
 #       "name": "_format_bytes",
-#       "anchor": "FB",
+#       "anchor": "function-format-bytes",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_apply_cli_overrides",
+#       "id": "apply-cli-overrides",
 #       "name": "_apply_cli_overrides",
-#       "anchor": "ACO",
+#       "anchor": "function-apply-cli-overrides",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_results_to_dict",
+#       "id": "results-to-dict",
 #       "name": "_results_to_dict",
-#       "anchor": "RTD",
+#       "anchor": "function-results-to-dict",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_compute_plan_diff",
+#       "id": "compute-plan-diff",
 #       "name": "_compute_plan_diff",
-#       "anchor": "CPD",
+#       "anchor": "function-compute-plan-diff",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_format_plan_diff",
+#       "id": "format-plan-diff",
 #       "name": "_format_plan_diff",
-#       "anchor": "FPD",
+#       "anchor": "function-format-plan-diff",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_plan_to_dict",
+#       "id": "plan-to-dict",
 #       "name": "_plan_to_dict",
-#       "anchor": "PTD",
+#       "anchor": "function-plan-to-dict",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_infer_version_timestamp",
+#       "id": "infer-version-timestamp",
 #       "name": "_infer_version_timestamp",
-#       "anchor": "IVT",
+#       "anchor": "function-infer-version-timestamp",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_resolve_version_metadata",
+#       "id": "resolve-version-metadata",
 #       "name": "_resolve_version_metadata",
-#       "anchor": "RVM",
+#       "anchor": "function-resolve-version-metadata",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_ensure_manifest_path",
+#       "id": "ensure-manifest-path",
 #       "name": "_ensure_manifest_path",
-#       "anchor": "EMP",
+#       "anchor": "function-ensure-manifest-path",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_load_manifest",
+#       "id": "load-manifest",
 #       "name": "_load_manifest",
-#       "anchor": "LM",
+#       "anchor": "function-load-manifest",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_collect_version_metadata",
+#       "id": "collect-version-metadata",
 #       "name": "_collect_version_metadata",
-#       "anchor": "CVM",
+#       "anchor": "function-collect-version-metadata",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_resolve_specs_from_args",
+#       "id": "resolve-specs-from-args",
 #       "name": "_resolve_specs_from_args",
-#       "anchor": "RSFA",
+#       "anchor": "function-resolve-specs-from-args",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_handle_pull",
+#       "id": "handle-pull",
 #       "name": "_handle_pull",
-#       "anchor": "HP",
+#       "anchor": "function-handle-pull",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_handle_plan",
+#       "id": "handle-plan",
 #       "name": "_handle_plan",
-#       "anchor": "HP1",
+#       "anchor": "function-handle-plan",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_handle_plan_diff",
+#       "id": "handle-plan-diff",
 #       "name": "_handle_plan_diff",
-#       "anchor": "HPD",
+#       "anchor": "function-handle-plan-diff",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_handle_prune",
+#       "id": "handle-prune",
 #       "name": "_handle_prune",
-#       "anchor": "HP2",
+#       "anchor": "function-handle-prune",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_doctor_report",
+#       "id": "doctor-report",
 #       "name": "_doctor_report",
-#       "anchor": "DR",
+#       "anchor": "function-doctor-report",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_print_doctor_report",
+#       "id": "print-doctor-report",
 #       "name": "_print_doctor_report",
-#       "anchor": "PDR",
+#       "anchor": "function-print-doctor-report",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_handle_show",
+#       "id": "handle-show",
 #       "name": "_handle_show",
-#       "anchor": "HS",
+#       "anchor": "function-handle-show",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_selected_validators",
+#       "id": "selected-validators",
 #       "name": "_selected_validators",
-#       "anchor": "SV",
+#       "anchor": "function-selected-validators",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_handle_validate",
+#       "id": "handle-validate",
 #       "name": "_handle_validate",
-#       "anchor": "HV",
+#       "anchor": "function-handle-validate",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_handle_init",
+#       "id": "handle-init",
 #       "name": "_handle_init",
-#       "anchor": "HI",
+#       "anchor": "function-handle-init",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_handle_config_validate",
+#       "id": "handle-config-validate",
 #       "name": "_handle_config_validate",
-#       "anchor": "HCV",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_normalize_argv",
-#       "name": "_normalize_argv",
-#       "anchor": "NA",
+#       "anchor": "function-handle-config-validate",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "main",
 #       "name": "main",
-#       "anchor": "MAIN",
+#       "anchor": "function-main",
 #       "kind": "function"
 #     }
 #   ]
@@ -282,6 +276,15 @@ from .ontology_download import (
     validate_config,
     validate_manifest_dict,
 )
+# --- Globals ---
+
+__all__ = (
+    "format_plan_rows",
+    "format_results_table",
+    "format_table",
+    "format_validation_summary",
+    "main",
+)
 
 ONTOLOGY_DIR = LOCAL_ONTOLOGY_DIR
 
@@ -296,6 +299,7 @@ PLAN_DIFF_FIELDS = (
     "last_modified",
     "content_length",
 )
+# --- Public Functions ---
 
 
 def format_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
@@ -392,6 +396,7 @@ def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
                 message = ", ".join(f"{key}={value}" for key, value in details.items())
         formatted.append((name, status, message))
     return format_table(("validator", "status", "details"), formatted)
+# --- Private Helpers ---
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -1621,23 +1626,7 @@ def _handle_config_validate(path: Path) -> dict:
         "ontologies": len(config.specs),
         "path": str(path),
     }
-
-
-def _normalize_argv(argv: Sequence[str]) -> List[str]:
-    """Rewrite legacy aliases to the canonical subcommand syntax.
-
-    Args:
-        argv: Raw argument vector supplied by the user.
-
-    Returns:
-        Adjusted argument list with legacy ``plan diff`` rewired to ``plan-diff``.
-    """
-
-    tokens = list(argv)
-    for index in range(len(tokens) - 1):
-        if tokens[index] == "plan" and tokens[index + 1] == "diff":
-            return tokens[:index] + ["plan-diff"] + tokens[index + 2 :]
-    return tokens
+# --- Module Entry Points ---
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -1654,7 +1643,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         OntologyDownloadError: If download or validation operations fail.
     """
     raw_args = list(argv or sys.argv[1:])
-    arg_list = _normalize_plan_args(_normalize_argv(raw_args))
+    arg_list = _normalize_plan_args(raw_args)
     parser = _build_parser()
     args = parser.parse_args(arg_list)
     try:

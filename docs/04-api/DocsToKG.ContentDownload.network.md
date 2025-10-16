@@ -175,15 +175,11 @@ TypeError: If ``response`` lacks ``status_code`` or ``headers``.
 
 ### `request_func()`
 
-Invoke the fallback HTTP method when ``Session.request`` is unavailable.
+Invoke :meth:`requests.Session.request` with keyword arguments.
 
-Args:
-method: HTTP method name forwarded for logging parity.
-url: Target URL for the request.
-**call_kwargs: Keyword arguments forwarded to the fallback request callable.
+### `request_func()`
 
-Returns:
-requests.Response: Response returned by the fallback HTTP method.
+Invoke the method-specific session helper when ``request`` is absent.
 
 ## 3. Classes
 

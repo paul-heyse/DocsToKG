@@ -4,51 +4,51 @@
 #   "purpose": "Pytest coverage for content download cli context management scenarios",
 #   "sections": [
 #     {
-#       "id": "_recording_sink",
+#       "id": "recordingsink",
 #       "name": "_RecordingSink",
-#       "anchor": "RECO",
+#       "anchor": "class-recordingsink",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_recording_last_attempt_sink",
+#       "id": "recordinglastattemptsink",
 #       "name": "_RecordingLastAttemptSink",
-#       "anchor": "RECO1",
+#       "anchor": "class-recordinglastattemptsink",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_recording_csv_sink",
+#       "id": "recordingcsvsink",
 #       "name": "_RecordingCsvSink",
-#       "anchor": "RECO2",
+#       "anchor": "class-recordingcsvsink",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_recording_index_sink",
+#       "id": "recordingindexsink",
 #       "name": "_RecordingIndexSink",
-#       "anchor": "RECO3",
+#       "anchor": "class-recordingindexsink",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_base_args",
+#       "id": "base-args",
 #       "name": "_base_args",
-#       "anchor": "BA",
+#       "anchor": "function-base-args",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_single_work",
+#       "id": "single-work",
 #       "name": "_single_work",
-#       "anchor": "SW",
+#       "anchor": "function-single-work",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_main_closes_sinks_when_pipeline_raises",
+#       "id": "test-main-closes-sinks-when-pipeline-raises",
 #       "name": "test_main_closes_sinks_when_pipeline_raises",
-#       "anchor": "TMCSW",
+#       "anchor": "function-test-main-closes-sinks-when-pipeline-raises",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_main_with_csv_releases_attempt_files",
+#       "id": "test-main-with-csv-releases-attempt-files",
 #       "name": "test_main_with_csv_releases_attempt_files",
-#       "anchor": "TMWCR",
+#       "anchor": "function-test-main-with-csv-releases-attempt-files",
 #       "kind": "function"
 #     }
 #   ]
@@ -103,6 +103,7 @@ class _RecordingCsvSink(_RecordingSink):
 
 class _RecordingIndexSink(_RecordingSink):
     pass
+# --- Helper Functions ---
 
 
 def _base_args(tmp_path: Path) -> list[str]:
@@ -137,6 +138,7 @@ def _single_work() -> Dict[str, Any]:
         "primary_location": {},
         "locations": [],
     }
+# --- Test Cases ---
 
 
 def test_main_closes_sinks_when_pipeline_raises(monkeypatch, tmp_path):

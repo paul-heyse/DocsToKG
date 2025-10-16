@@ -5,112 +5,34 @@
 #   "purpose": "Utility script for build real hybrid fixture workflows",
 #   "sections": [
 #     {
-#       "id": "fixture_document",
-#       "name": "FixtureDocument",
-#       "anchor": "FIXT",
-#       "kind": "class"
+#       "id": "globals",
+#       "name": "Globals",
+#       "anchor": "GLOB",
+#       "kind": "infra"
 #     },
 #     {
-#       "id": "_parse_namespaces",
-#       "name": "_parse_namespaces",
-#       "anchor": "PN",
-#       "kind": "function"
+#       "id": "public_classes",
+#       "name": "Public Classes",
+#       "anchor": "PC",
+#       "kind": "api"
 #     },
 #     {
-#       "id": "parse_args",
-#       "name": "parse_args",
-#       "anchor": "PA",
-#       "kind": "function"
+#       "id": "private_helpers",
+#       "name": "Private Helpers",
+#       "anchor": "PH",
+#       "kind": "internal"
 #     },
 #     {
-#       "id": "list_candidate_docs",
-#       "name": "list_candidate_docs",
-#       "anchor": "LCD",
-#       "kind": "function"
+#       "id": "public_functions",
+#       "name": "Public Functions",
+#       "anchor": "PF",
+#       "kind": "api"
 #     },
 #     {
-#       "id": "load_jsonl",
-#       "name": "load_jsonl",
-#       "anchor": "LJ",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "write_jsonl",
-#       "name": "write_jsonl",
-#       "anchor": "WJ",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "sha256_digest",
-#       "name": "sha256_digest",
-#       "anchor": "SD",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "repo_relative",
-#       "name": "repo_relative",
-#       "anchor": "RR",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "clean_chunk_records",
-#       "name": "clean_chunk_records",
-#       "anchor": "CCR",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "derive_title",
-#       "name": "derive_title",
-#       "anchor": "DT",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "derive_query",
-#       "name": "derive_query",
-#       "anchor": "DQ",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "build_fixture_document",
-#       "name": "build_fixture_document",
-#       "anchor": "BFD",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "write_manifest",
-#       "name": "write_manifest",
-#       "anchor": "WM",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "write_queries",
-#       "name": "write_queries",
-#       "anchor": "WQ",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "write_dataset_jsonl",
-#       "name": "write_dataset_jsonl",
-#       "anchor": "WDJ",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "write_readme",
-#       "name": "write_readme",
-#       "anchor": "WR",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "ensure_output_dir",
-#       "name": "ensure_output_dir",
-#       "anchor": "EOD",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "main",
-#       "name": "main",
-#       "anchor": "MAIN",
-#       "kind": "function"
+#       "id": "module_entry_points",
+#       "name": "Module Entry Points",
+#       "anchor": "MEP",
+#       "kind": "cli"
 #     }
 #   ]
 # }
@@ -135,6 +57,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Sequence
 
 import numpy as np
+# --- Globals ---
 
 DEFAULT_CHUNKS_DIR = Path("Data/ChunkedDocTagFiles")
 DEFAULT_VECTORS_DIR = Path("Data/Vectors")
@@ -148,6 +71,8 @@ DEFAULT_MAX_CHUNKS_PER_DOC = 0
 
 
 @dataclass(frozen=True)
+# --- Public Classes ---
+
 class FixtureDocument:
     doc_id: str
     title: str
@@ -160,6 +85,7 @@ class FixtureDocument:
     queries: Sequence[Mapping[str, object]]
     metadata: Mapping[str, object]
     chunk_count: int
+# --- Private Helpers ---
 
 
 def _parse_namespaces(raw: str | None) -> List[str]:
@@ -167,6 +93,7 @@ def _parse_namespaces(raw: str | None) -> List[str]:
         return []
     parts = [part.strip() for part in raw.split(",")]
     return [part for part in parts if part]
+# --- Public Functions ---
 
 
 def parse_args() -> argparse.Namespace:
@@ -500,6 +427,7 @@ def ensure_output_dir(path: Path, overwrite: bool) -> None:
                         descendant.rmdir()
                 child.rmdir()
     path.mkdir(parents=True, exist_ok=True)
+# --- Module Entry Points ---
 
 
 def main() -> None:

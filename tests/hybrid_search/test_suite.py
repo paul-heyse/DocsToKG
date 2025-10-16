@@ -4,261 +4,261 @@
 #   "purpose": "Pytest coverage for hybrid search suite scenarios",
 #   "sections": [
 #     {
-#       "id": "_build_config",
+#       "id": "build-config",
 #       "name": "_build_config",
-#       "anchor": "BC",
+#       "anchor": "function-build-config",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "dataset",
 #       "name": "dataset",
-#       "anchor": "DATA",
+#       "anchor": "function-dataset",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "stack",
 #       "name": "stack",
-#       "anchor": "STAC",
+#       "anchor": "function-stack",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_to_documents",
+#       "id": "to-documents",
 #       "name": "_to_documents",
-#       "anchor": "TD",
+#       "anchor": "function-to-documents",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_write_document_artifacts",
+#       "id": "write-document-artifacts",
 #       "name": "_write_document_artifacts",
-#       "anchor": "WDA",
+#       "anchor": "function-write-document-artifacts",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_hybrid_retrieval_end_to_end",
+#       "id": "test-hybrid-retrieval-end-to-end",
 #       "name": "test_hybrid_retrieval_end_to_end",
-#       "anchor": "THRET",
+#       "anchor": "function-test-hybrid-retrieval-end-to-end",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_reingest_updates_dense_and_sparse_channels",
+#       "id": "test-reingest-updates-dense-and-sparse-channels",
 #       "name": "test_reingest_updates_dense_and_sparse_channels",
-#       "anchor": "TRUDA",
+#       "anchor": "function-test-reingest-updates-dense-and-sparse-channels",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_validation_harness_reports",
+#       "id": "test-validation-harness-reports",
 #       "name": "test_validation_harness_reports",
-#       "anchor": "TVHR",
+#       "anchor": "function-test-validation-harness-reports",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_schema_manager_bootstrap_and_registration",
+#       "id": "test-schema-manager-bootstrap-and-registration",
 #       "name": "test_schema_manager_bootstrap_and_registration",
-#       "anchor": "TSMBA",
+#       "anchor": "function-test-schema-manager-bootstrap-and-registration",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_api_post_hybrid_search_success_and_validation",
+#       "id": "test-api-post-hybrid-search-success-and-validation",
 #       "name": "test_api_post_hybrid_search_success_and_validation",
-#       "anchor": "TAPHS",
+#       "anchor": "function-test-api-post-hybrid-search-success-and-validation",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_operations_snapshot_and_restore_roundtrip",
+#       "id": "test-operations-snapshot-and-restore-roundtrip",
 #       "name": "test_operations_snapshot_and_restore_roundtrip",
-#       "anchor": "TOSAR",
+#       "anchor": "function-test-operations-snapshot-and-restore-roundtrip",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_ingest_missing_vector_raises",
+#       "id": "test-ingest-missing-vector-raises",
 #       "name": "test_ingest_missing_vector_raises",
-#       "anchor": "TIMVR",
+#       "anchor": "function-test-ingest-missing-vector-raises",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_faiss_index_uses_registry_bridge",
+#       "id": "test-faiss-index-uses-registry-bridge",
 #       "name": "test_faiss_index_uses_registry_bridge",
-#       "anchor": "TFIUR",
+#       "anchor": "function-test-faiss-index-uses-registry-bridge",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_build_config",
+#       "id": "build-config",
 #       "name": "_build_config",
-#       "anchor": "BC1",
+#       "anchor": "function-build-config",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "real_dataset",
+#       "id": "real-dataset",
 #       "name": "real_dataset",
-#       "anchor": "RD",
+#       "anchor": "function-real-dataset",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_to_documents",
+#       "id": "to-documents",
 #       "name": "_to_documents",
-#       "anchor": "TD1",
+#       "anchor": "function-to-documents",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "stack",
 #       "name": "stack",
-#       "anchor": "STAC1",
+#       "anchor": "function-stack",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_real_fixture_ingest_and_search",
+#       "id": "test-real-fixture-ingest-and-search",
 #       "name": "test_real_fixture_ingest_and_search",
-#       "anchor": "TRFIA",
+#       "anchor": "function-test-real-fixture-ingest-and-search",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_real_fixture_reingest_and_reports",
+#       "id": "test-real-fixture-reingest-and-reports",
 #       "name": "test_real_fixture_reingest_and_reports",
-#       "anchor": "TRFRA",
+#       "anchor": "function-test-real-fixture-reingest-and-reports",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_real_fixture_api_roundtrip",
+#       "id": "test-real-fixture-api-roundtrip",
 #       "name": "test_real_fixture_api_roundtrip",
-#       "anchor": "TRFAR",
+#       "anchor": "function-test-real-fixture-api-roundtrip",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_remove_ids_cpu_fallback",
+#       "id": "test-remove-ids-cpu-fallback",
 #       "name": "test_remove_ids_cpu_fallback",
-#       "anchor": "TRICF",
+#       "anchor": "function-test-remove-ids-cpu-fallback",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "scale_dataset",
+#       "id": "scale-dataset",
 #       "name": "scale_dataset",
-#       "anchor": "SD",
+#       "anchor": "function-scale-dataset",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_build_config",
+#       "id": "build-config",
 #       "name": "_build_config",
-#       "anchor": "BC2",
+#       "anchor": "function-build-config",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "scale_stack",
+#       "id": "scale-stack",
 #       "name": "scale_stack",
-#       "anchor": "SS",
+#       "anchor": "function-scale-stack",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_hybrid_scale_suite",
+#       "id": "test-hybrid-scale-suite",
 #       "name": "test_hybrid_scale_suite",
-#       "anchor": "THSS",
+#       "anchor": "function-test-hybrid-scale-suite",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_toy_data",
+#       "id": "toy-data",
 #       "name": "_toy_data",
-#       "anchor": "TD2",
+#       "anchor": "function-toy-data",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_target_device",
+#       "id": "target-device",
 #       "name": "_target_device",
-#       "anchor": "TD3",
+#       "anchor": "function-target-device",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_make_id_resolver",
+#       "id": "make-id-resolver",
 #       "name": "_make_id_resolver",
-#       "anchor": "MIR",
+#       "anchor": "function-make-id-resolver",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_emit_vectors",
+#       "id": "emit-vectors",
 #       "name": "_emit_vectors",
-#       "anchor": "EV",
+#       "anchor": "function-emit-vectors",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_assert_gpu_index",
+#       "id": "assert-gpu-index",
 #       "name": "_assert_gpu_index",
-#       "anchor": "AGI",
+#       "anchor": "function-assert-gpu-index",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_gpu_flat_end_to_end",
+#       "id": "test-gpu-flat-end-to-end",
 #       "name": "test_gpu_flat_end_to_end",
-#       "anchor": "TGFET",
+#       "anchor": "function-test-gpu-flat-end-to-end",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_gpu_ivf_flat_build_and_search",
+#       "id": "test-gpu-ivf-flat-build-and-search",
 #       "name": "test_gpu_ivf_flat_build_and_search",
-#       "anchor": "TGIFB",
+#       "anchor": "function-test-gpu-ivf-flat-build-and-search",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_gpu_ivfpq_build_and_search",
+#       "id": "test-gpu-ivfpq-build-and-search",
 #       "name": "test_gpu_ivfpq_build_and_search",
-#       "anchor": "TGIBA",
+#       "anchor": "function-test-gpu-ivfpq-build-and-search",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_gpu_cosine_against_corpus",
+#       "id": "test-gpu-cosine-against-corpus",
 #       "name": "test_gpu_cosine_against_corpus",
-#       "anchor": "TGCAC",
+#       "anchor": "function-test-gpu-cosine-against-corpus",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_gpu_clone_strict_coarse_quantizer",
+#       "id": "test-gpu-clone-strict-coarse-quantizer",
 #       "name": "test_gpu_clone_strict_coarse_quantizer",
-#       "anchor": "TGCSC",
+#       "anchor": "function-test-gpu-clone-strict-coarse-quantizer",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_gpu_near_duplicate_detection_filters_duplicates",
+#       "id": "test-gpu-near-duplicate-detection-filters-duplicates",
 #       "name": "test_gpu_near_duplicate_detection_filters_duplicates",
-#       "anchor": "TGNDD",
+#       "anchor": "function-test-gpu-near-duplicate-detection-filters-duplicates",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_gpu_nprobe_applied_during_search",
+#       "id": "test-gpu-nprobe-applied-during-search",
 #       "name": "test_gpu_nprobe_applied_during_search",
-#       "anchor": "TGNAD",
+#       "anchor": "function-test-gpu-nprobe-applied-during-search",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_gpu_similarity_uses_supplied_device",
+#       "id": "test-gpu-similarity-uses-supplied-device",
 #       "name": "test_gpu_similarity_uses_supplied_device",
-#       "anchor": "TGSUS",
+#       "anchor": "function-test-gpu-similarity-uses-supplied-device",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_operations_shim_emits_warning_and_reexports",
+#       "id": "test-operations-shim-emits-warning-and-reexports",
 #       "name": "test_operations_shim_emits_warning_and_reexports",
-#       "anchor": "TOSEW",
+#       "anchor": "function-test-operations-shim-emits-warning-and-reexports",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_results_shim_emits_warning_and_reexports",
+#       "id": "test-results-shim-emits-warning-and-reexports",
 #       "name": "test_results_shim_emits_warning_and_reexports",
-#       "anchor": "TRSEW",
+#       "anchor": "function-test-results-shim-emits-warning-and-reexports",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_similarity_shim_emits_warning_and_reexports",
+#       "id": "test-similarity-shim-emits-warning-and-reexports",
 #       "name": "test_similarity_shim_emits_warning_and_reexports",
-#       "anchor": "TSSEW",
+#       "anchor": "function-test-similarity-shim-emits-warning-and-reexports",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_retrieval_shim_emits_warning_and_reexports",
+#       "id": "test-retrieval-shim-emits-warning-and-reexports",
 #       "name": "test_retrieval_shim_emits_warning_and_reexports",
-#       "anchor": "RSEW1",
+#       "anchor": "function-test-retrieval-shim-emits-warning-and-reexports",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_schema_shim_emits_warning_and_reexports",
+#       "id": "test-schema-shim-emits-warning-and-reexports",
 #       "name": "test_schema_shim_emits_warning_and_reexports",
-#       "anchor": "SSEW1",
+#       "anchor": "function-test-schema-shim-emits-warning-and-reexports",
 #       "kind": "function"
 #     }
 #   ]
@@ -315,7 +315,7 @@ from DocsToKG.HybridSearch.types import (
 )
 from DocsToKG.HybridSearch.validation import infer_embedding_dim, load_dataset
 from DocsToKG.HybridSearch.vectorstore import (
-    FaissIndexManager,
+    FaissVectorStore,
     cosine_against_corpus_gpu,
     max_inner_product,
     normalize_rows,
@@ -335,7 +335,8 @@ REAL_VECTOR_MARK = pytest.mark.real_vectors
 GPU_MARK = pytest.mark.skipif(faiss.get_num_gpus() < 1, reason="FAISS GPU device required")
 
 
-# ---- test_hybrid_search.py -----------------------------
+# --- test_hybrid_search.py ---
+
 def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
     config_payload = {
         "dense": {"index_type": "flat", "oversample": 3},
@@ -352,13 +353,15 @@ def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
     return HybridSearchConfigManager(path)
 
 
-# ---- test_hybrid_search.py -----------------------------
+# --- test_hybrid_search.py ---
+
 @pytest.fixture
 def dataset() -> Sequence[Mapping[str, object]]:
     return load_dataset(Path("tests/data/hybrid_dataset.jsonl"))
 
 
-# ---- test_hybrid_search.py -----------------------------
+# --- test_hybrid_search.py ---
+
 @pytest.fixture
 def stack(
     tmp_path: Path,
@@ -384,7 +387,7 @@ def stack(
         manager = _build_config(tmp_path)
         config = manager.get()
         feature_generator = FeatureGenerator()
-        faiss_index = FaissIndexManager(dim=feature_generator.embedding_dim, config=config.dense)
+        faiss_index = FaissVectorStore(dim=feature_generator.embedding_dim, config=config.dense)
         assert (
             faiss_index.dim == feature_generator.embedding_dim
         ), "Faiss index dimensionality must match feature generator"
@@ -416,7 +419,8 @@ def stack(
     return factory
 
 
-# ---- test_hybrid_search.py -----------------------------
+# --- test_hybrid_search.py ---
+
 def _to_documents(entries: Sequence[Mapping[str, object]]) -> List[DocumentInput]:
     documents: List[DocumentInput] = []
     for entry in entries:
@@ -433,7 +437,8 @@ def _to_documents(entries: Sequence[Mapping[str, object]]) -> List[DocumentInput
     return documents
 
 
-# ---- test_hybrid_search.py -----------------------------
+# --- test_hybrid_search.py ---
+
 def _write_document_artifacts(
     base_dir: Path,
     *,
@@ -502,7 +507,8 @@ def _write_document_artifacts(
     )
 
 
-# ---- test_hybrid_search.py -----------------------------
+# --- test_hybrid_search.py ---
+
 def test_hybrid_retrieval_end_to_end(
     stack: Callable[
         [],
@@ -535,7 +541,8 @@ def test_hybrid_retrieval_end_to_end(
     assert response.timings_ms["total_ms"] > 0.0
 
 
-# ---- test_hybrid_search.py -----------------------------
+# --- test_hybrid_search.py ---
+
 def test_reingest_updates_dense_and_sparse_channels(
     stack: Callable[
         [],
@@ -583,7 +590,8 @@ def test_reingest_updates_dense_and_sparse_channels(
     assert ingestion.metrics.chunks_upserted >= 2
 
 
-# ---- test_hybrid_search.py -----------------------------
+# --- test_hybrid_search.py ---
+
 def test_validation_harness_reports(
     stack: Callable[
         [],
@@ -612,7 +620,8 @@ def test_validation_harness_reports(
     assert summary_file.exists()
 
 
-# ---- test_hybrid_search.py -----------------------------
+# --- test_hybrid_search.py ---
+
 def test_schema_manager_bootstrap_and_registration() -> None:
     manager = OpenSearchSchemaManager()
     template = manager.bootstrap_template("research")
@@ -626,7 +635,8 @@ def test_schema_manager_bootstrap_and_registration() -> None:
     assert "author" in metadata_props and metadata_props["tags"]["type"] == "keyword"
 
 
-# ---- test_hybrid_search.py -----------------------------
+# --- test_hybrid_search.py ---
+
 def test_api_post_hybrid_search_success_and_validation(
     stack: Callable[
         [],
@@ -662,7 +672,8 @@ def test_api_post_hybrid_search_success_and_validation(
     assert "error" in error_body
 
 
-# ---- test_hybrid_search.py -----------------------------
+# --- test_hybrid_search.py ---
+
 def test_operations_snapshot_and_restore_roundtrip(
     stack: Callable[
         [],
@@ -696,7 +707,8 @@ def test_operations_snapshot_and_restore_roundtrip(
     )
 
 
-# ---- test_hybrid_search.py -----------------------------
+# --- test_hybrid_search.py ---
+
 def test_ingest_missing_vector_raises(
     stack: Callable[
         [],
@@ -735,10 +747,11 @@ def test_ingest_missing_vector_raises(
         ingestion.upsert_documents([doc])
 
 
-# ---- test_hybrid_search.py -----------------------------
+# --- test_hybrid_search.py ---
+
 def test_faiss_index_uses_registry_bridge(tmp_path: Path) -> None:
     config = DenseIndexConfig(index_type="flat")
-    manager = FaissIndexManager(dim=4, config=config)
+    manager = FaissVectorStore(dim=4, config=config)
     registry = ChunkRegistry()
     manager.set_id_resolver(registry.resolve_faiss_id)
 
@@ -765,11 +778,13 @@ def test_faiss_index_uses_registry_bridge(tmp_path: Path) -> None:
     assert hits and hits[0].vector_id == chunk.vector_id
 
 
-# ---- test_hybrid_search_real_vectors.py -----------------------------
+# --- test_hybrid_search_real_vectors.py ---
+
 DATASET_PATH = Path("Data/HybridScaleFixture/dataset.jsonl")
 
 
-# ---- test_hybrid_search_real_vectors.py -----------------------------
+# --- test_hybrid_search_real_vectors.py ---
+
 def _build_config(tmp_path: Path, *, oversample: int = 3) -> HybridSearchConfigManager:
     config_payload = {
         "dense": {"index_type": "flat", "oversample": oversample},
@@ -786,7 +801,8 @@ def _build_config(tmp_path: Path, *, oversample: int = 3) -> HybridSearchConfigM
     return HybridSearchConfigManager(config_path)
 
 
-# ---- test_hybrid_search_real_vectors.py -----------------------------
+# --- test_hybrid_search_real_vectors.py ---
+
 @REAL_VECTOR_MARK
 @pytest.fixture(scope="session")
 def real_dataset() -> Sequence[Mapping[str, object]]:
@@ -795,7 +811,8 @@ def real_dataset() -> Sequence[Mapping[str, object]]:
     return load_dataset(DATASET_PATH)
 
 
-# ---- test_hybrid_search_real_vectors.py -----------------------------
+# --- test_hybrid_search_real_vectors.py ---
+
 def _to_documents(entries: Sequence[Mapping[str, object]]) -> List[DocumentInput]:
     documents: List[DocumentInput] = []
     for entry in entries:
@@ -812,7 +829,8 @@ def _to_documents(entries: Sequence[Mapping[str, object]]) -> List[DocumentInput
     return documents
 
 
-# ---- test_hybrid_search_real_vectors.py -----------------------------
+# --- test_hybrid_search_real_vectors.py ---
+
 @REAL_VECTOR_MARK
 @pytest.fixture
 def stack(tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]) -> Callable[  # noqa: F811
@@ -822,7 +840,7 @@ def stack(tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]) -> Calla
         HybridSearchService,
         ChunkRegistry,
         HybridSearchValidator,
-        FaissIndexManager,
+        FaissVectorStore,
         OpenSearchSimulator,
     ],
 ]:
@@ -831,14 +849,14 @@ def stack(tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]) -> Calla
         HybridSearchService,
         ChunkRegistry,
         HybridSearchValidator,
-        FaissIndexManager,
+        FaissVectorStore,
         OpenSearchSimulator,
     ]:
         manager = _build_config(tmp_path)
         config = manager.get()
         embedding_dim = infer_embedding_dim(real_dataset)
         feature_generator = FeatureGenerator(embedding_dim=embedding_dim)
-        faiss_index = FaissIndexManager(dim=embedding_dim, config=config.dense)
+        faiss_index = FaissVectorStore(dim=embedding_dim, config=config.dense)
         opensearch = OpenSearchSimulator()
         registry = ChunkRegistry()
         observability = Observability()
@@ -867,7 +885,8 @@ def stack(tmp_path: Path, real_dataset: Sequence[Mapping[str, object]]) -> Calla
     return factory
 
 
-# ---- test_hybrid_search_real_vectors.py -----------------------------
+# --- test_hybrid_search_real_vectors.py ---
+
 @REAL_VECTOR_MARK
 def test_real_fixture_ingest_and_search(
     stack: Callable[
@@ -877,7 +896,7 @@ def test_real_fixture_ingest_and_search(
             HybridSearchService,
             ChunkRegistry,
             HybridSearchValidator,
-            FaissIndexManager,
+            FaissVectorStore,
             OpenSearchSimulator,
         ],
     ],
@@ -905,7 +924,8 @@ def test_real_fixture_ingest_and_search(
             assert response.results[0].diagnostics is not None
 
 
-# ---- test_hybrid_search_real_vectors.py -----------------------------
+# --- test_hybrid_search_real_vectors.py ---
+
 @REAL_VECTOR_MARK
 def test_real_fixture_reingest_and_reports(
     stack: Callable[
@@ -915,7 +935,7 @@ def test_real_fixture_reingest_and_reports(
             HybridSearchService,
             ChunkRegistry,
             HybridSearchValidator,
-            FaissIndexManager,
+            FaissVectorStore,
             OpenSearchSimulator,
         ],
     ],
@@ -988,7 +1008,8 @@ def test_real_fixture_reingest_and_reports(
     assert not should_rebuild_index(registry, deleted_since_snapshot=0, threshold=0.5)
 
 
-# ---- test_hybrid_search_real_vectors.py -----------------------------
+# --- test_hybrid_search_real_vectors.py ---
+
 @REAL_VECTOR_MARK
 def test_real_fixture_api_roundtrip(
     stack: Callable[
@@ -998,7 +1019,7 @@ def test_real_fixture_api_roundtrip(
             HybridSearchService,
             ChunkRegistry,
             HybridSearchValidator,
-            FaissIndexManager,
+            FaissVectorStore,
             OpenSearchSimulator,
         ],
     ],
@@ -1022,9 +1043,10 @@ def test_real_fixture_api_roundtrip(
     assert body["results"][0]["doc_id"] == query["expected_doc_id"]
 
 
-# ---- test_hybrid_search_real_vectors.py -----------------------------
+# --- test_hybrid_search_real_vectors.py ---
+
 def test_remove_ids_cpu_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
-    manager = FaissIndexManager(dim=8, config=DenseIndexConfig())
+    manager = FaissVectorStore(dim=8, config=DenseIndexConfig())
     vector = np.ones(8, dtype=np.float32)
     manager.add([vector], ["00000000-0000-4000-8000-000000000001"])
 
@@ -1048,11 +1070,13 @@ def test_remove_ids_cpu_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     assert manager.ntotal == 0
 
 
-# ---- test_hybrid_search_scale.py -----------------------------
+# --- test_hybrid_search_scale.py ---
+
 DATASET_PATH = Path("Data/HybridScaleFixture/dataset.jsonl")
 
 
-# ---- test_hybrid_search_scale.py -----------------------------
+# --- test_hybrid_search_scale.py ---
+
 @pytest.fixture(scope="session")
 def scale_dataset() -> Sequence[Mapping[str, object]]:
     if not DATASET_PATH.exists():
@@ -1060,7 +1084,8 @@ def scale_dataset() -> Sequence[Mapping[str, object]]:
     return load_dataset(DATASET_PATH)
 
 
-# ---- test_hybrid_search_scale.py -----------------------------
+# --- test_hybrid_search_scale.py ---
+
 def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
     config_payload = {
         "dense": {"index_type": "flat", "oversample": 3},
@@ -1077,7 +1102,8 @@ def _build_config(tmp_path: Path) -> HybridSearchConfigManager:
     return HybridSearchConfigManager(config_path)
 
 
-# ---- test_hybrid_search_scale.py -----------------------------
+# --- test_hybrid_search_scale.py ---
+
 @pytest.fixture
 def scale_stack(tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]) -> Callable[
     [],
@@ -1086,7 +1112,7 @@ def scale_stack(tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]) -
         HybridSearchService,
         ChunkRegistry,
         HybridSearchValidator,
-        FaissIndexManager,
+        FaissVectorStore,
         OpenSearchSimulator,
     ],
 ]:
@@ -1095,14 +1121,14 @@ def scale_stack(tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]) -
         HybridSearchService,
         ChunkRegistry,
         HybridSearchValidator,
-        FaissIndexManager,
+        FaissVectorStore,
         OpenSearchSimulator,
     ]:
         manager = _build_config(tmp_path)
         config = manager.get()
         embedding_dim = infer_embedding_dim(scale_dataset)
         feature_generator = FeatureGenerator(embedding_dim=embedding_dim)
-        faiss_index = FaissIndexManager(dim=embedding_dim, config=config.dense)
+        faiss_index = FaissVectorStore(dim=embedding_dim, config=config.dense)
         opensearch = OpenSearchSimulator()
         registry = ChunkRegistry()
         observability = Observability()
@@ -1131,7 +1157,8 @@ def scale_stack(tmp_path: Path, scale_dataset: Sequence[Mapping[str, object]]) -
     return factory
 
 
-# ---- test_hybrid_search_scale.py -----------------------------
+# --- test_hybrid_search_scale.py ---
+
 @pytest.mark.real_vectors
 @pytest.mark.scale_vectors
 def test_hybrid_scale_suite(
@@ -1142,7 +1169,7 @@ def test_hybrid_scale_suite(
             HybridSearchService,
             ChunkRegistry,
             HybridSearchValidator,
-            FaissIndexManager,
+            FaissVectorStore,
             OpenSearchSimulator,
         ],
     ],
@@ -1185,14 +1212,16 @@ def test_hybrid_scale_suite(
     assert "scale_dense_metrics" in metrics_payload
 
 
-# ---- test_hybridsearch_gpu_only.py -----------------------------
+# --- test_hybridsearch_gpu_only.py ---
+
 try:
     import faiss  # type: ignore
 except ImportError:  # pragma: no cover - optional dependency
     pytest.skip("faiss is required for these tests", allow_module_level=True)
 
 
-# ---- test_hybridsearch_gpu_only.py -----------------------------
+# --- test_hybridsearch_gpu_only.py ---
+
 def _toy_data(n: int = 2048, d: int = 128) -> tuple[np.ndarray, np.ndarray]:
     rng = np.random.default_rng(7)
     xb = rng.standard_normal((n, d), dtype=np.float32)
@@ -1200,26 +1229,30 @@ def _toy_data(n: int = 2048, d: int = 128) -> tuple[np.ndarray, np.ndarray]:
     return xb, xq
 
 
-# ---- test_hybridsearch_gpu_only.py -----------------------------
+# --- test_hybridsearch_gpu_only.py ---
+
 def _target_device() -> int:
     return int(os.getenv("HYBRIDSEARCH_FAISS_DEVICE", "0"))
 
 
-# ---- test_hybridsearch_gpu_only.py -----------------------------
+# --- test_hybridsearch_gpu_only.py ---
+
 def _make_id_resolver(vector_ids: list[str]) -> Callable[[int], str | None]:
     bridge = {vector_uuid_to_faiss_int(vid): vid for vid in vector_ids}
     return bridge.get
 
 
-# ---- test_hybridsearch_gpu_only.py -----------------------------
+# --- test_hybridsearch_gpu_only.py ---
+
 def _emit_vectors(xb: np.ndarray) -> tuple[list[np.ndarray], list[str]]:
     vectors = [row.copy() for row in xb]
     vector_ids = [str(uuid.uuid4()) for _ in vectors]
     return vectors, vector_ids
 
 
-# ---- test_hybridsearch_gpu_only.py -----------------------------
-def _assert_gpu_index(manager: FaissIndexManager) -> None:
+# --- test_hybridsearch_gpu_only.py ---
+
+def _assert_gpu_index(manager: FaissVectorStore) -> None:
     stats = manager.stats()
     device = stats.get("device")
     assert device not in (None, "*"), f"Expected GPU device assignment, stats={stats}"
@@ -1237,12 +1270,13 @@ def _assert_gpu_index(manager: FaissIndexManager) -> None:
     assert float(stats.get("gpu_remove_fallbacks", 0.0)) == 0.0
 
 
-# ---- test_hybridsearch_gpu_only.py -----------------------------
+# --- test_hybridsearch_gpu_only.py ---
+
 @GPU_MARK
 def test_gpu_flat_end_to_end() -> None:
     xb, xq = _toy_data()
     cfg = DenseIndexConfig(index_type="flat", nprobe=1, device=_target_device())
-    manager = FaissIndexManager(dim=xb.shape[1], config=cfg)
+    manager = FaissVectorStore(dim=xb.shape[1], config=cfg)
     vectors, vector_ids = _emit_vectors(xb)
     manager.set_id_resolver(_make_id_resolver(vector_ids))
     manager.add(vectors, vector_ids)
@@ -1251,12 +1285,13 @@ def test_gpu_flat_end_to_end() -> None:
     _assert_gpu_index(manager)
 
 
-# ---- test_hybridsearch_gpu_only.py -----------------------------
+# --- test_hybridsearch_gpu_only.py ---
+
 @GPU_MARK
 def test_gpu_ivf_flat_build_and_search() -> None:
     xb, xq = _toy_data()
     cfg = DenseIndexConfig(index_type="ivf_flat", nlist=256, nprobe=8, device=_target_device())
-    manager = FaissIndexManager(dim=xb.shape[1], config=cfg)
+    manager = FaissVectorStore(dim=xb.shape[1], config=cfg)
     vectors, vector_ids = _emit_vectors(xb)
     manager.set_id_resolver(_make_id_resolver(vector_ids))
     manager.add(vectors, vector_ids)
@@ -1265,7 +1300,8 @@ def test_gpu_ivf_flat_build_and_search() -> None:
     _assert_gpu_index(manager)
 
 
-# ---- test_hybridsearch_gpu_only.py -----------------------------
+# --- test_hybridsearch_gpu_only.py ---
+
 @GPU_MARK
 def test_gpu_ivfpq_build_and_search() -> None:
     xb, xq = _toy_data()
@@ -1277,7 +1313,7 @@ def test_gpu_ivfpq_build_and_search() -> None:
         pq_bits=8,
         device=_target_device(),
     )
-    manager = FaissIndexManager(dim=xb.shape[1], config=cfg)
+    manager = FaissVectorStore(dim=xb.shape[1], config=cfg)
     vectors, vector_ids = _emit_vectors(xb)
     manager.set_id_resolver(_make_id_resolver(vector_ids))
     manager.add(vectors, vector_ids)
@@ -1286,7 +1322,8 @@ def test_gpu_ivfpq_build_and_search() -> None:
     _assert_gpu_index(manager)
 
 
-# ---- test_hybridsearch_gpu_only.py -----------------------------
+# --- test_hybridsearch_gpu_only.py ---
+
 @GPU_MARK
 def test_gpu_cosine_against_corpus() -> None:
     xb, xq = _toy_data(n=512)
@@ -1305,10 +1342,11 @@ def test_gpu_cosine_against_corpus() -> None:
     assert 0.98 <= self_sim <= 1.001
 
 
-# ---- test_hybridsearch_gpu_only.py -----------------------------
+# --- test_hybridsearch_gpu_only.py ---
+
 def test_gpu_clone_strict_coarse_quantizer() -> None:
     cfg = DenseIndexConfig(index_type="flat", device=_target_device())
-    manager = FaissIndexManager(dim=32, config=cfg)
+    manager = FaissVectorStore(dim=32, config=cfg)
     cpu_index = faiss.IndexFlatIP(32)
     mapped = faiss.IndexIDMap2(cpu_index)
     gpu_index = manager._maybe_to_gpu(mapped)
@@ -1318,7 +1356,8 @@ def test_gpu_clone_strict_coarse_quantizer() -> None:
     assert "Gpu" in type(base).__name__, "Expected GPU index after strict cloning"
 
 
-# ---- test_hybridsearch_gpu_only.py -----------------------------
+# --- test_hybridsearch_gpu_only.py ---
+
 def test_gpu_near_duplicate_detection_filters_duplicates() -> None:
     embedding = np.ones(16, dtype=np.float32)
     features = ChunkFeatures({}, {}, embedding)
@@ -1361,11 +1400,12 @@ def test_gpu_near_duplicate_detection_filters_duplicates() -> None:
     assert len(results) == 1, "GPU near-duplicate detection should filter duplicates"
 
 
-# ---- test_hybridsearch_gpu_only.py -----------------------------
+# --- test_hybridsearch_gpu_only.py ---
+
 def test_gpu_nprobe_applied_during_search() -> None:
     xb, xq = _toy_data(n=512, d=64)
     cfg = DenseIndexConfig(index_type="ivf_flat", nlist=64, nprobe=32, device=_target_device())
-    manager = FaissIndexManager(dim=xb.shape[1], config=cfg)
+    manager = FaissVectorStore(dim=xb.shape[1], config=cfg)
     vectors, vector_ids = _emit_vectors(xb)
     manager.set_id_resolver(_make_id_resolver(vector_ids))
     manager.add(vectors, vector_ids)
@@ -1377,10 +1417,11 @@ def test_gpu_nprobe_applied_during_search() -> None:
     assert int(base.nprobe) == cfg.nprobe
 
 
-# ---- test_hybridsearch_gpu_only.py -----------------------------
+# --- test_hybridsearch_gpu_only.py ---
+
 def test_gpu_similarity_uses_supplied_device(monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = DenseIndexConfig(index_type="flat", device=_target_device())
-    manager = FaissIndexManager(dim=32, config=cfg)
+    manager = FaissVectorStore(dim=32, config=cfg)
 
     captured: dict[str, object] = {}
 

@@ -4,9 +4,15 @@
 #   "purpose": "Utility script for torchcheck workflows",
 #   "sections": [
 #     {
-#       "id": "module-overview",
-#       "name": "module_overview",
-#       "anchor": "OVR",
+#       "id": "module_body",
+#       "name": "Module Body",
+#       "anchor": "MB",
+#       "kind": "infra"
+#     },
+#     {
+#       "id": "module_body",
+#       "name": "Module Body",
+#       "anchor": "MB1",
 #       "kind": "infra"
 #     }
 #   ]
@@ -27,7 +33,6 @@ Usage:
 Dependencies:
 - torch: Used for runtime introspection of CUDA capabilities
 """
-
 import torch
 
 print(torch.__version__, torch.version.cuda)

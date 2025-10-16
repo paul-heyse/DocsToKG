@@ -4,567 +4,567 @@
 #   "purpose": "Pytest coverage for content download networking scenarios",
 #   "sections": [
 #     {
-#       "id": "_helper_response",
+#       "id": "helperresponse",
 #       "name": "_HelperResponse",
-#       "anchor": "HELP",
+#       "anchor": "class-helperresponse",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_make_helper_response",
+#       "id": "make-helper-response",
 #       "name": "_make_helper_response",
-#       "anchor": "MHR",
+#       "anchor": "function-make-helper-response",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_build_headers_empty_metadata",
+#       "id": "test-build-headers-empty-metadata",
 #       "name": "test_build_headers_empty_metadata",
-#       "anchor": "TBHEM",
+#       "anchor": "function-test-build-headers-empty-metadata",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_build_headers_etag_only",
+#       "id": "test-build-headers-etag-only",
 #       "name": "test_build_headers_etag_only",
-#       "anchor": "TBHEO",
+#       "anchor": "function-test-build-headers-etag-only",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_build_headers_last_modified_only",
+#       "id": "test-build-headers-last-modified-only",
 #       "name": "test_build_headers_last_modified_only",
-#       "anchor": "TBHLM",
+#       "anchor": "function-test-build-headers-last-modified-only",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_build_headers_with_both_headers",
+#       "id": "test-build-headers-with-both-headers",
 #       "name": "test_build_headers_with_both_headers",
-#       "anchor": "TBHWB",
+#       "anchor": "function-test-build-headers-with-both-headers",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_interpret_response_cached_returns_cached_result",
+#       "id": "test-interpret-response-cached-returns-cached-result",
 #       "name": "test_interpret_response_cached_returns_cached_result",
-#       "anchor": "TIRCR",
+#       "anchor": "function-test-interpret-response-cached-returns-cached-result",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_interpret_response_cached_missing_metadata_raises",
+#       "id": "test-interpret-response-cached-missing-metadata-raises",
 #       "name": "test_interpret_response_cached_missing_metadata_raises",
-#       "anchor": "TIRCM",
+#       "anchor": "function-test-interpret-response-cached-missing-metadata-raises",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_interpret_response_modified_returns_modified_result",
+#       "id": "test-interpret-response-modified-returns-modified-result",
 #       "name": "test_interpret_response_modified_returns_modified_result",
-#       "anchor": "TIRMR",
+#       "anchor": "function-test-interpret-response-modified-returns-modified-result",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_interpret_response_modified_extracts_headers",
+#       "id": "test-interpret-response-modified-extracts-headers",
 #       "name": "test_interpret_response_modified_extracts_headers",
-#       "anchor": "TIRME",
+#       "anchor": "function-test-interpret-response-modified-extracts-headers",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_interpret_response_missing_metadata_lists_fields",
+#       "id": "test-interpret-response-missing-metadata-lists-fields",
 #       "name": "test_interpret_response_missing_metadata_lists_fields",
-#       "anchor": "TIRMM",
+#       "anchor": "function-test-interpret-response-missing-metadata-lists-fields",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_build_headers_property",
+#       "id": "test-build-headers-property",
 #       "name": "test_build_headers_property",
-#       "anchor": "TBHP",
+#       "anchor": "function-test-build-headers-property",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_interpret_response_cached_property",
+#       "id": "test-interpret-response-cached-property",
 #       "name": "test_interpret_response_cached_property",
-#       "anchor": "TIRCP",
+#       "anchor": "function-test-interpret-response-cached-property",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_conditional_helper_rejects_negative_length",
+#       "id": "test-conditional-helper-rejects-negative-length",
 #       "name": "test_conditional_helper_rejects_negative_length",
-#       "anchor": "TCHRN",
+#       "anchor": "function-test-conditional-helper-rejects-negative-length",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_interpret_response_requires_response_shape",
+#       "id": "test-interpret-response-requires-response-shape",
 #       "name": "test_interpret_response_requires_response_shape",
-#       "anchor": "TIRRR",
+#       "anchor": "function-test-interpret-response-requires-response-shape",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_sequenced_handler",
+#       "id": "sequencedhandler",
 #       "name": "_SequencedHandler",
-#       "anchor": "SEQU",
+#       "anchor": "class-sequencedhandler",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "http_server",
+#       "id": "http-server",
 #       "name": "http_server",
-#       "anchor": "HS",
+#       "anchor": "function-http-server",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_make_artifact",
+#       "id": "make-artifact",
 #       "name": "_make_artifact",
-#       "anchor": "MA",
+#       "anchor": "function-make-artifact",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_download",
+#       "id": "download",
 #       "name": "_download",
-#       "anchor": "DOWN",
+#       "anchor": "function-download",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_download_candidate_retries_on_transient_errors",
+#       "id": "test-download-candidate-retries-on-transient-errors",
 #       "name": "test_download_candidate_retries_on_transient_errors",
-#       "anchor": "TDCRO",
+#       "anchor": "function-test-download-candidate-retries-on-transient-errors",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_retry_after_header_respected",
+#       "id": "test-retry-after-header-respected",
 #       "name": "test_retry_after_header_respected",
-#       "anchor": "TRAHR",
+#       "anchor": "function-test-retry-after-header-respected",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_non_retryable_errors_do_not_retry",
+#       "id": "test-non-retryable-errors-do-not-retry",
 #       "name": "test_non_retryable_errors_do_not_retry",
-#       "anchor": "TNRED",
+#       "anchor": "function-test-non-retryable-errors-do-not-retry",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_download_candidate_avoids_per_request_head",
+#       "id": "test-download-candidate-avoids-per-request-head",
 #       "name": "test_download_candidate_avoids_per_request_head",
-#       "anchor": "TDCAP",
+#       "anchor": "function-test-download-candidate-avoids-per-request-head",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_allows_pdf",
+#       "id": "test-head-precheck-allows-pdf",
 #       "name": "test_head_precheck_allows_pdf",
-#       "anchor": "THPAP",
+#       "anchor": "function-test-head-precheck-allows-pdf",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_rejects_html",
+#       "id": "test-head-precheck-rejects-html",
 #       "name": "test_head_precheck_rejects_html",
-#       "anchor": "THPRH",
+#       "anchor": "function-test-head-precheck-rejects-html",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_degrades_to_get_pdf",
+#       "id": "test-head-precheck-degrades-to-get-pdf",
 #       "name": "test_head_precheck_degrades_to_get_pdf",
-#       "anchor": "THPDT",
+#       "anchor": "function-test-head-precheck-degrades-to-get-pdf",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_degrades_to_get_html",
+#       "id": "test-head-precheck-degrades-to-get-html",
 #       "name": "test_head_precheck_degrades_to_get_html",
-#       "anchor": "HPDT1",
+#       "anchor": "function-test-head-precheck-degrades-to-get-html",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_head_precheck_returns_true_on_exception",
+#       "id": "test-head-precheck-returns-true-on-exception",
 #       "name": "test_head_precheck_returns_true_on_exception",
-#       "anchor": "THPRT",
+#       "anchor": "function-test-head-precheck-returns-true-on-exception",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_conditional_request_build_headers_requires_complete_metadata",
+#       "id": "test-conditional-request-build-headers-requires-complete-metadata",
 #       "name": "test_conditional_request_build_headers_requires_complete_metadata",
-#       "anchor": "TCRBH",
+#       "anchor": "function-test-conditional-request-build-headers-requires-complete-metadata",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_conditional_request_build_headers_accepts_complete_metadata",
+#       "id": "test-conditional-request-build-headers-accepts-complete-metadata",
 #       "name": "test_conditional_request_build_headers_accepts_complete_metadata",
-#       "anchor": "CRBH1",
+#       "anchor": "function-test-conditional-request-build-headers-accepts-complete-metadata",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_retry_determinism_matches_request_with_retries",
+#       "id": "test-retry-determinism-matches-request-with-retries",
 #       "name": "test_retry_determinism_matches_request_with_retries",
-#       "anchor": "TRDMR",
+#       "anchor": "function-test-retry-determinism-matches-request-with-retries",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_mock_response",
+#       "id": "mock-response",
 #       "name": "_mock_response",
-#       "anchor": "MR",
+#       "anchor": "function-mock-response",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_successful_request_no_retries",
+#       "id": "test-successful-request-no-retries",
 #       "name": "test_successful_request_no_retries",
-#       "anchor": "TSRNR",
+#       "anchor": "function-test-successful-request-no-retries",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_transient_503_with_exponential_backoff",
+#       "id": "test-transient-503-with-exponential-backoff",
 #       "name": "test_transient_503_with_exponential_backoff",
-#       "anchor": "TT5WE",
+#       "anchor": "function-test-transient-503-with-exponential-backoff",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_parse_retry_after_header_integer",
+#       "id": "test-parse-retry-after-header-integer",
 #       "name": "test_parse_retry_after_header_integer",
-#       "anchor": "TPRAH",
+#       "anchor": "function-test-parse-retry-after-header-integer",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_parse_retry_after_header_http_date",
+#       "id": "test-parse-retry-after-header-http-date",
 #       "name": "test_parse_retry_after_header_http_date",
-#       "anchor": "PRAH1",
+#       "anchor": "function-test-parse-retry-after-header-http-date",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_parse_retry_after_header_invalid_date",
+#       "id": "test-parse-retry-after-header-invalid-date",
 #       "name": "test_parse_retry_after_header_invalid_date",
-#       "anchor": "PRAH2",
+#       "anchor": "function-test-parse-retry-after-header-invalid-date",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_retry_after_header_overrides_backoff",
+#       "id": "test-retry-after-header-overrides-backoff",
 #       "name": "test_retry_after_header_overrides_backoff",
-#       "anchor": "TRAHO",
+#       "anchor": "function-test-retry-after-header-overrides-backoff",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_request_exception_raises_after_retries",
+#       "id": "test-request-exception-raises-after-retries",
 #       "name": "test_request_exception_raises_after_retries",
-#       "anchor": "TRERA",
+#       "anchor": "function-test-request-exception-raises-after-retries",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_timeout_retry_handling",
+#       "id": "test-timeout-retry-handling",
 #       "name": "test_timeout_retry_handling",
-#       "anchor": "TTRH",
+#       "anchor": "function-test-timeout-retry-handling",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_connection_error_retry_handling",
+#       "id": "test-connection-error-retry-handling",
 #       "name": "test_connection_error_retry_handling",
-#       "anchor": "TCERH",
+#       "anchor": "function-test-connection-error-retry-handling",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_timeout_raises_after_exhaustion",
+#       "id": "test-timeout-raises-after-exhaustion",
 #       "name": "test_timeout_raises_after_exhaustion",
-#       "anchor": "TTRAE",
+#       "anchor": "function-test-timeout-raises-after-exhaustion",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_connection_error_raises_after_exhaustion",
+#       "id": "test-connection-error-raises-after-exhaustion",
 #       "name": "test_connection_error_raises_after_exhaustion",
-#       "anchor": "TCERA",
+#       "anchor": "function-test-connection-error-raises-after-exhaustion",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_parse_retry_after_header_property",
+#       "id": "test-parse-retry-after-header-property",
 #       "name": "test_parse_retry_after_header_property",
-#       "anchor": "PRAH3",
+#       "anchor": "function-test-parse-retry-after-header-property",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_request_with_custom_retry_statuses",
+#       "id": "test-request-with-custom-retry-statuses",
 #       "name": "test_request_with_custom_retry_statuses",
-#       "anchor": "TRWCR",
+#       "anchor": "function-test-request-with-custom-retry-statuses",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_request_returns_after_exhausting_single_attempt",
+#       "id": "test-request-returns-after-exhausting-single-attempt",
 #       "name": "test_request_returns_after_exhausting_single_attempt",
-#       "anchor": "TRRAE",
+#       "anchor": "function-test-request-returns-after-exhausting-single-attempt",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_request_with_retries_rejects_negative_retries",
+#       "id": "test-request-with-retries-rejects-negative-retries",
 #       "name": "test_request_with_retries_rejects_negative_retries",
-#       "anchor": "TRWRR",
+#       "anchor": "function-test-request-with-retries-rejects-negative-retries",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_request_with_retries_rejects_negative_backoff",
+#       "id": "test-request-with-retries-rejects-negative-backoff",
 #       "name": "test_request_with_retries_rejects_negative_backoff",
-#       "anchor": "RWRR1",
+#       "anchor": "function-test-request-with-retries-rejects-negative-backoff",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_request_with_retries_requires_method_and_url",
+#       "id": "test-request-with-retries-requires-method-and-url",
 #       "name": "test_request_with_retries_requires_method_and_url",
-#       "anchor": "RWRR2",
+#       "anchor": "function-test-request-with-retries-requires-method-and-url",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_request_with_retries_uses_method_fallback",
+#       "id": "test-request-with-retries-uses-method-fallback",
 #       "name": "test_request_with_retries_uses_method_fallback",
-#       "anchor": "TRWRU",
+#       "anchor": "function-test-request-with-retries-uses-method-fallback",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_request_with_retries_errors_when_no_callable_available",
+#       "id": "test-request-with-retries-errors-when-no-callable-available",
 #       "name": "test_request_with_retries_errors_when_no_callable_available",
-#       "anchor": "TRWRE",
+#       "anchor": "function-test-request-with-retries-errors-when-no-callable-available",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_retry_after_header_prefers_longer_delay",
+#       "id": "test-retry-after-header-prefers-longer-delay",
 #       "name": "test_retry_after_header_prefers_longer_delay",
-#       "anchor": "TRAHP",
+#       "anchor": "function-test-retry-after-header-prefers-longer-delay",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_respect_retry_after_false_skips_header",
+#       "id": "test-respect-retry-after-false-skips-header",
 #       "name": "test_respect_retry_after_false_skips_header",
-#       "anchor": "TRRAF",
+#       "anchor": "function-test-respect-retry-after-false-skips-header",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_parse_retry_after_header_naive_datetime",
+#       "id": "test-parse-retry-after-header-naive-datetime",
 #       "name": "test_parse_retry_after_header_naive_datetime",
-#       "anchor": "PRAH4",
+#       "anchor": "function-test-parse-retry-after-header-naive-datetime",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_parse_retry_after_header_handles_parse_errors",
+#       "id": "test-parse-retry-after-header-handles-parse-errors",
 #       "name": "test_parse_retry_after_header_handles_parse_errors",
-#       "anchor": "PRAH5",
+#       "anchor": "function-test-parse-retry-after-header-handles-parse-errors",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_parse_retry_after_header_returns_none_when_parser_returns_none",
+#       "id": "test-parse-retry-after-header-returns-none-when-parser-returns-none",
 #       "name": "test_parse_retry_after_header_returns_none_when_parser_returns_none",
-#       "anchor": "PRAH6",
+#       "anchor": "function-test-parse-retry-after-header-returns-none-when-parser-returns-none",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "fake_response",
+#       "id": "fakeresponse",
 #       "name": "FakeResponse",
-#       "anchor": "FAKE",
+#       "anchor": "class-fakeresponse",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "make_artifact",
+#       "id": "make-artifact",
 #       "name": "make_artifact",
-#       "anchor": "MA1",
+#       "anchor": "function-make-artifact",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "stub_requests",
+#       "id": "stub-requests",
 #       "name": "stub_requests",
-#       "anchor": "SR",
+#       "anchor": "function-stub-requests",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_successful_pdf_download_populates_metadata",
+#       "id": "test-successful-pdf-download-populates-metadata",
 #       "name": "test_successful_pdf_download_populates_metadata",
-#       "anchor": "TSPDP",
+#       "anchor": "function-test-successful-pdf-download-populates-metadata",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_cached_response_preserves_prior_metadata",
+#       "id": "test-cached-response-preserves-prior-metadata",
 #       "name": "test_cached_response_preserves_prior_metadata",
-#       "anchor": "TCRPP",
+#       "anchor": "function-test-cached-response-preserves-prior-metadata",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_http_error_sets_metadata_to_none",
+#       "id": "test-http-error-sets-metadata-to-none",
 #       "name": "test_http_error_sets_metadata_to_none",
-#       "anchor": "THESM",
+#       "anchor": "function-test-http-error-sets-metadata-to-none",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_html_download_with_text_extraction",
+#       "id": "test-html-download-with-text-extraction",
 #       "name": "test_html_download_with_text_extraction",
-#       "anchor": "THDWT",
+#       "anchor": "function-test-html-download-with-text-extraction",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_dry_run_preserves_metadata_without_files",
+#       "id": "test-dry-run-preserves-metadata-without-files",
 #       "name": "test_dry_run_preserves_metadata_without_files",
-#       "anchor": "TDRPM",
+#       "anchor": "function-test-dry-run-preserves-metadata-without-files",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_small_pdf_detected_as_corrupt",
+#       "id": "test-small-pdf-detected-as-corrupt",
 #       "name": "test_small_pdf_detected_as_corrupt",
-#       "anchor": "TSPDA",
+#       "anchor": "function-test-small-pdf-detected-as-corrupt",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_html_tail_in_pdf_marks_corruption",
+#       "id": "test-html-tail-in-pdf-marks-corruption",
 #       "name": "test_html_tail_in_pdf_marks_corruption",
-#       "anchor": "THTIP",
+#       "anchor": "function-test-html-tail-in-pdf-marks-corruption",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_build_manifest_entry_includes_download_metadata",
+#       "id": "test-build-manifest-entry-includes-download-metadata",
 #       "name": "test_build_manifest_entry_includes_download_metadata",
-#       "anchor": "TBMEI",
+#       "anchor": "function-test-build-manifest-entry-includes-download-metadata",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_rfc5987_filename_suffix",
+#       "id": "test-rfc5987-filename-suffix",
 #       "name": "test_rfc5987_filename_suffix",
-#       "anchor": "TRFS",
+#       "anchor": "function-test-rfc5987-filename-suffix",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_html_filename_suffix_from_disposition",
+#       "id": "test-html-filename-suffix-from-disposition",
 #       "name": "test_html_filename_suffix_from_disposition",
-#       "anchor": "THFSF",
+#       "anchor": "function-test-html-filename-suffix-from-disposition",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_slugify_truncates_and_normalises",
+#       "id": "test-slugify-truncates-and-normalises",
 #       "name": "test_slugify_truncates_and_normalises",
-#       "anchor": "TSTAN",
+#       "anchor": "function-test-slugify-truncates-and-normalises",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_classify_payload_variants",
+#       "id": "test-classify-payload-variants",
 #       "name": "test_classify_payload_variants",
-#       "anchor": "TCPV",
+#       "anchor": "function-test-classify-payload-variants",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_collect_location_urls_dedupes_and_tracks_sources",
+#       "id": "test-collect-location-urls-dedupes-and-tracks-sources",
 #       "name": "test_collect_location_urls_dedupes_and_tracks_sources",
-#       "anchor": "TCLUD",
+#       "anchor": "function-test-collect-location-urls-dedupes-and-tracks-sources",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_normalize_doi",
+#       "id": "test-normalize-doi",
 #       "name": "test_normalize_doi",
-#       "anchor": "TND",
+#       "anchor": "function-test-normalize-doi",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_normalize_pmid",
+#       "id": "test-normalize-pmid",
 #       "name": "test_normalize_pmid",
-#       "anchor": "TNP",
+#       "anchor": "function-test-normalize-pmid",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_normalize_pmcid",
+#       "id": "test-normalize-pmcid",
 #       "name": "test_normalize_pmcid",
-#       "anchor": "TNP1",
+#       "anchor": "function-test-normalize-pmcid",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_normalize_arxiv",
+#       "id": "test-normalize-arxiv",
 #       "name": "test_normalize_arxiv",
-#       "anchor": "TNA",
+#       "anchor": "function-test-normalize-arxiv",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_normalize_doi_with_https_prefix",
+#       "id": "test-normalize-doi-with-https-prefix",
 #       "name": "test_normalize_doi_with_https_prefix",
-#       "anchor": "TNDWH",
+#       "anchor": "function-test-normalize-doi-with-https-prefix",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_normalize_doi_without_prefix",
+#       "id": "test-normalize-doi-without-prefix",
 #       "name": "test_normalize_doi_without_prefix",
-#       "anchor": "TNDWP",
+#       "anchor": "function-test-normalize-doi-without-prefix",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_normalize_doi_with_whitespace",
+#       "id": "test-normalize-doi-with-whitespace",
 #       "name": "test_normalize_doi_with_whitespace",
-#       "anchor": "TNDWW",
+#       "anchor": "function-test-normalize-doi-with-whitespace",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_normalize_doi_none",
+#       "id": "test-normalize-doi-none",
 #       "name": "test_normalize_doi_none",
-#       "anchor": "TNDN",
+#       "anchor": "function-test-normalize-doi-none",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_normalize_doi_prefix_variants",
+#       "id": "test-normalize-doi-prefix-variants",
 #       "name": "test_normalize_doi_prefix_variants",
-#       "anchor": "TNDPV",
+#       "anchor": "function-test-normalize-doi-prefix-variants",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_normalize_pmcid_with_pmc_prefix",
+#       "id": "test-normalize-pmcid-with-pmc-prefix",
 #       "name": "test_normalize_pmcid_with_pmc_prefix",
-#       "anchor": "TNPWP",
+#       "anchor": "function-test-normalize-pmcid-with-pmc-prefix",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_normalize_pmcid_without_prefix_adds_prefix",
+#       "id": "test-normalize-pmcid-without-prefix-adds-prefix",
 #       "name": "test_normalize_pmcid_without_prefix_adds_prefix",
-#       "anchor": "NPWP1",
+#       "anchor": "function-test-normalize-pmcid-without-prefix-adds-prefix",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_normalize_pmcid_lowercase",
+#       "id": "test-normalize-pmcid-lowercase",
 #       "name": "test_normalize_pmcid_lowercase",
-#       "anchor": "TNPL",
+#       "anchor": "function-test-normalize-pmcid-lowercase",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_strip_prefix_case_insensitive",
+#       "id": "test-strip-prefix-case-insensitive",
 #       "name": "test_strip_prefix_case_insensitive",
-#       "anchor": "TSPCI",
+#       "anchor": "function-test-strip-prefix-case-insensitive",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_dedupe_preserves_order",
+#       "id": "test-dedupe-preserves-order",
 #       "name": "test_dedupe_preserves_order",
-#       "anchor": "TDPO",
+#       "anchor": "function-test-dedupe-preserves-order",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_dedupe_filters_falsey_values",
+#       "id": "test-dedupe-filters-falsey-values",
 #       "name": "test_dedupe_filters_falsey_values",
-#       "anchor": "TDFFV",
+#       "anchor": "function-test-dedupe-filters-falsey-values",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_dedupe_property",
+#       "id": "test-dedupe-property",
 #       "name": "test_dedupe_property",
-#       "anchor": "TDP",
+#       "anchor": "function-test-dedupe-property",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_make_artifact",
+#       "id": "make-artifact",
 #       "name": "_make_artifact",
-#       "anchor": "MA2",
+#       "anchor": "function-make-artifact",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_html_classification_overrides_misleading_content_type",
+#       "id": "test-html-classification-overrides-misleading-content-type",
 #       "name": "test_html_classification_overrides_misleading_content_type",
-#       "anchor": "THCOM",
+#       "anchor": "function-test-html-classification-overrides-misleading-content-type",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_wayback_resolver_skips_unavailable_archives",
+#       "id": "test-wayback-resolver-skips-unavailable-archives",
 #       "name": "test_wayback_resolver_skips_unavailable_archives",
-#       "anchor": "TWRSU",
+#       "anchor": "function-test-wayback-resolver-skips-unavailable-archives",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_manifest_and_attempts_single_success",
+#       "id": "test-manifest-and-attempts-single-success",
 #       "name": "test_manifest_and_attempts_single_success",
-#       "anchor": "TMAAS",
+#       "anchor": "function-test-manifest-and-attempts-single-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_openalex_attempts_use_session_headers",
+#       "id": "test-openalex-attempts-use-session-headers",
 #       "name": "test_openalex_attempts_use_session_headers",
-#       "anchor": "TOAUS",
+#       "anchor": "function-test-openalex-attempts-use-session-headers",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_retry_budget_honours_max_attempts",
+#       "id": "test-retry-budget-honours-max-attempts",
 #       "name": "test_retry_budget_honours_max_attempts",
-#       "anchor": "TRBHM",
+#       "anchor": "function-test-retry-budget-honours-max-attempts",
 #       "kind": "function"
 #     }
 #   ]
@@ -622,23 +622,28 @@ from DocsToKG.ContentDownload.resolvers import (
 )
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 try:
     import hypothesis
     from hypothesis import strategies as st  # type: ignore
 except ImportError:  # pragma: no cover - optional dependency
     pytest.skip("hypothesis is required for these tests", allow_module_level=True)
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 HAS_REQUESTS = find_spec("requests") is not None
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 HAS_PYALEX = find_spec("pyalex") is not None
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 given = hypothesis.given
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 if HAS_REQUESTS and HAS_PYALEX:
     from DocsToKG.ContentDownload.download_pyalex_pdfs import (
         ManifestEntry,
@@ -868,42 +873,48 @@ if HAS_REQUESTS and HAS_PYALEX:
         assert entry.last_modified == "Mon, 01 Jan 2024 00:00:00 GMT"
 
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 @dataclass
 class _HelperResponse:
     status_code: int
     headers: Dict[str, str]
 
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 def _make_helper_response(
     status_code: int, headers: Optional[Dict[str, str]] = None
 ) -> _HelperResponse:
     return _HelperResponse(status_code=status_code, headers=headers or {})
 
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 def test_build_headers_empty_metadata() -> None:
     helper = ConditionalRequestHelper()
 
     assert helper.build_headers() == {}
 
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 def test_build_headers_etag_only() -> None:
     helper = ConditionalRequestHelper(prior_etag="abc123")
 
     assert helper.build_headers() == {}
 
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 def test_build_headers_last_modified_only() -> None:
     helper = ConditionalRequestHelper(prior_last_modified="Wed, 21 Oct 2015 07:28:00 GMT")
 
     assert helper.build_headers() == {}
 
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 def test_build_headers_with_both_headers() -> None:
     helper = ConditionalRequestHelper(
         prior_etag="abc123",
@@ -913,7 +924,8 @@ def test_build_headers_with_both_headers() -> None:
     assert helper.build_headers() == {}
 
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 def test_interpret_response_cached_returns_cached_result() -> None:
     helper = ConditionalRequestHelper(
         prior_etag="abc123",
@@ -934,7 +946,8 @@ def test_interpret_response_cached_returns_cached_result() -> None:
     assert result.last_modified == "Wed, 21 Oct 2015 07:28:00 GMT"
 
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 def test_interpret_response_cached_missing_metadata_raises() -> None:
     helper = ConditionalRequestHelper(prior_etag="abc123")
     response = _make_helper_response(304)
@@ -943,7 +956,8 @@ def test_interpret_response_cached_missing_metadata_raises() -> None:
         helper.interpret_response(response)  # type: ignore[arg-type]
 
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 def test_interpret_response_modified_returns_modified_result() -> None:
     helper = ConditionalRequestHelper()
     response = _make_helper_response(200)
@@ -955,7 +969,8 @@ def test_interpret_response_modified_returns_modified_result() -> None:
     assert result.last_modified is None
 
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 def test_interpret_response_modified_extracts_headers() -> None:
     helper = ConditionalRequestHelper()
     response = _make_helper_response(
@@ -973,7 +988,8 @@ def test_interpret_response_modified_extracts_headers() -> None:
     assert result.last_modified == "Thu, 01 Jan 1970 00:00:00 GMT"
 
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 def test_interpret_response_missing_metadata_lists_fields() -> None:
     helper = ConditionalRequestHelper(prior_etag="tag-only")
     response = _make_helper_response(304)
@@ -987,7 +1003,8 @@ def test_interpret_response_missing_metadata_lists_fields() -> None:
     assert "content_length" in message
 
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 @given(
     etag=st.one_of(st.none(), st.text(min_size=1)),
     last_modified=st.one_of(st.none(), st.text(min_size=1)),
@@ -1021,7 +1038,8 @@ def test_build_headers_property(
         assert headers == {}
 
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 @given(
     path=st.text(min_size=1),
     sha=st.text(min_size=1),
@@ -1045,13 +1063,15 @@ def test_interpret_response_cached_property(path: str, sha: str, size: int) -> N
     assert result.content_length == size
 
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 def test_conditional_helper_rejects_negative_length() -> None:
     with pytest.raises(ValueError):
         ConditionalRequestHelper(prior_content_length=-1)
 
 
-# ---- test_conditional_requests.py -----------------------------
+# --- test_conditional_requests.py ---
+
 def test_interpret_response_requires_response_shape() -> None:
     helper = ConditionalRequestHelper()
 
@@ -1059,14 +1079,17 @@ def test_interpret_response_requires_response_shape() -> None:
         helper.interpret_response(object())  # type: ignore[arg-type]
 
 
-# ---- test_download_retries.py -----------------------------
+# --- test_download_retries.py ---
+
 pytest.importorskip("requests")
 
-# ---- test_download_retries.py -----------------------------
+# --- test_download_retries.py ---
+
 pytest.importorskip("pyalex")
 
 
-# ---- test_download_retries.py -----------------------------
+# --- test_download_retries.py ---
+
 class _SequencedHandler(BaseHTTPRequestHandler):
     statuses: list[int] = []
     retry_after: int | None = None
@@ -1101,7 +1124,8 @@ class _SequencedHandler(BaseHTTPRequestHandler):
         return
 
 
-# ---- test_download_retries.py -----------------------------
+# --- test_download_retries.py ---
+
 @pytest.fixture
 def http_server():
     handler = _SequencedHandler
@@ -1121,7 +1145,8 @@ def http_server():
         thread.join(timeout=1)
 
 
-# ---- test_download_retries.py -----------------------------
+# --- test_download_retries.py ---
+
 def _make_artifact(base_dir: Path) -> WorkArtifact:
     pdf_dir = base_dir / "pdfs"
     html_dir = base_dir / "html"
@@ -1145,7 +1170,8 @@ def _make_artifact(base_dir: Path) -> WorkArtifact:
     )
 
 
-# ---- test_download_retries.py -----------------------------
+# --- test_download_retries.py ---
+
 def _download(
     url: str, tmp_path: Path
 ) -> Tuple[WorkArtifact, requests.Session, Dict[str, Any], DownloadOutcome]:
@@ -1172,7 +1198,8 @@ def _download(
     )
 
 
-# ---- test_download_retries.py -----------------------------
+# --- test_download_retries.py ---
+
 @pytest.mark.parametrize("statuses", [[503, 503, 200]])
 def test_download_candidate_retries_on_transient_errors(http_server, tmp_path, statuses):
     handler, server = http_server
@@ -1191,7 +1218,8 @@ def test_download_candidate_retries_on_transient_errors(http_server, tmp_path, s
         session.close()
 
 
-# ---- test_download_retries.py -----------------------------
+# --- test_download_retries.py ---
+
 def test_retry_after_header_respected(monkeypatch, http_server, tmp_path):
     handler, server = http_server
     handler.statuses = [429, 200]
@@ -1214,7 +1242,8 @@ def test_retry_after_header_respected(monkeypatch, http_server, tmp_path):
         session.close()
 
 
-# ---- test_download_retries.py -----------------------------
+# --- test_download_retries.py ---
+
 def test_non_retryable_errors_do_not_retry(http_server, tmp_path):
     handler, server = http_server
     handler.statuses = [404]
@@ -1239,7 +1268,8 @@ def test_non_retryable_errors_do_not_retry(http_server, tmp_path):
     assert handler.calls == [404]
 
 
-# ---- test_download_retries.py -----------------------------
+# --- test_download_retries.py ---
+
 def test_download_candidate_avoids_per_request_head(http_server, tmp_path):
     """Ensure download path relies solely on GET without redundant HEAD calls."""
 
@@ -1257,7 +1287,8 @@ def test_download_candidate_avoids_per_request_head(http_server, tmp_path):
         session.close()
 
 
-# ---- test_head_precheck.py -----------------------------
+# --- test_head_precheck.py ---
+
 def test_head_precheck_allows_pdf(monkeypatch):
     head_response = Mock(status_code=200, headers={"Content-Type": "application/pdf"})
     head_response.close = Mock()
@@ -1394,7 +1425,8 @@ def test_conditional_request_build_headers_accepts_complete_metadata() -> None:
     }
 
 
-# ---- test_download_retries.py -----------------------------
+# --- test_download_retries.py ---
+
 def test_retry_determinism_matches_request_with_retries(monkeypatch, http_server, tmp_path):
     """Verify retry budget and timing are governed exclusively by the helper."""
 
@@ -1423,24 +1455,28 @@ def test_retry_determinism_matches_request_with_retries(monkeypatch, http_server
         session.close()
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 try:  # pragma: no cover - dependency optional in CI
     import requests  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover - skip if requests missing
     requests = pytest.importorskip("requests")  # type: ignore
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 try:
     import hypothesis
     from hypothesis import strategies as st  # type: ignore
 except ImportError:  # pragma: no cover - optional dependency
     pytest.skip("hypothesis is required for these tests", allow_module_level=True)
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 given = hypothesis.given
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 def _mock_response(status: int, headers: Optional[Dict[str, str]] = None) -> Mock:
     response = Mock(spec=requests.Response)
     response.status_code = status
@@ -1448,7 +1484,8 @@ def _mock_response(status: int, headers: Optional[Dict[str, str]] = None) -> Moc
     return response
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 def test_successful_request_no_retries():
     """Verify successful request completes immediately without retries."""
 
@@ -1462,7 +1499,8 @@ def test_successful_request_no_retries():
     session.request.assert_called_once_with(method="GET", url="https://example.org/test")
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 @patch("DocsToKG.ContentDownload.network.random.random", return_value=0.0)
 @patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_transient_503_with_exponential_backoff(mock_sleep: Mock, _: Mock) -> None:
@@ -1486,7 +1524,8 @@ def test_transient_503_with_exponential_backoff(mock_sleep: Mock, _: Mock) -> No
     assert mock_sleep.call_args_list == [call(0.5), call(1.0)]
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 def test_parse_retry_after_header_integer() -> None:
     response = requests.Response()
     response.headers = {"Retry-After": "5"}
@@ -1494,7 +1533,8 @@ def test_parse_retry_after_header_integer() -> None:
     assert parse_retry_after_header(response) == 5.0
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 def test_parse_retry_after_header_http_date() -> None:
     future = datetime.now(timezone.utc) + timedelta(seconds=30)
     header_value = future.strftime("%a, %d %b %Y %H:%M:%S GMT")
@@ -1506,7 +1546,8 @@ def test_parse_retry_after_header_http_date() -> None:
     assert 0.0 <= wait <= 30.0
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 def test_parse_retry_after_header_invalid_date() -> None:
     response = requests.Response()
     response.headers = {"Retry-After": "Thu, 32 Foo 2024 00:00:00 GMT"}
@@ -1514,7 +1555,8 @@ def test_parse_retry_after_header_invalid_date() -> None:
     assert parse_retry_after_header(response) is None
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 @patch("DocsToKG.ContentDownload.network.random.random", return_value=0.0)
 @patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_retry_after_header_overrides_backoff(mock_sleep: Mock, _: Mock) -> None:
@@ -1536,7 +1578,8 @@ def test_retry_after_header_overrides_backoff(mock_sleep: Mock, _: Mock) -> None
     assert mock_sleep.call_args_list == [call(10.0)]
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 @patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_request_exception_raises_after_retries(mock_sleep: Mock) -> None:
     session = Mock(spec=requests.Session)
@@ -1550,7 +1593,8 @@ def test_request_exception_raises_after_retries(mock_sleep: Mock) -> None:
     assert session.request.call_count == 2
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 @patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_timeout_retry_handling(mock_sleep: Mock) -> None:
     session = Mock(spec=requests.Session)
@@ -1562,7 +1606,8 @@ def test_timeout_retry_handling(mock_sleep: Mock) -> None:
     assert mock_sleep.call_count == 1
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 @patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_connection_error_retry_handling(mock_sleep: Mock) -> None:
     session = Mock(spec=requests.Session)
@@ -1574,7 +1619,8 @@ def test_connection_error_retry_handling(mock_sleep: Mock) -> None:
     assert mock_sleep.call_count == 1
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 @patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_timeout_raises_after_exhaustion(mock_sleep: Mock) -> None:
     """Ensure timeout retries raise after exhausting the retry budget."""
@@ -1589,7 +1635,8 @@ def test_timeout_raises_after_exhaustion(mock_sleep: Mock) -> None:
     assert mock_sleep.call_count == 1
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 @patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_connection_error_raises_after_exhaustion(mock_sleep: Mock) -> None:
     """Ensure connection errors propagate when retries are exhausted."""
@@ -1603,7 +1650,8 @@ def test_connection_error_raises_after_exhaustion(mock_sleep: Mock) -> None:
     assert mock_sleep.call_count == 1
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 @given(st.text())
 def test_parse_retry_after_header_property(value: str) -> None:
     response = requests.Response()
@@ -1615,7 +1663,8 @@ def test_parse_retry_after_header_property(value: str) -> None:
         assert result >= 0.0 or math.isnan(result)
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 def test_request_with_custom_retry_statuses() -> None:
     session = Mock(spec=requests.Session)
     failing = _mock_response(404)
@@ -1634,7 +1683,8 @@ def test_request_with_custom_retry_statuses() -> None:
     assert session.request.call_count == 2
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 def test_request_returns_after_exhausting_single_attempt() -> None:
     session = Mock(spec=requests.Session)
     retry_response = _mock_response(503)
@@ -1650,7 +1700,8 @@ def test_request_returns_after_exhausting_single_attempt() -> None:
     assert result is retry_response
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 def test_request_with_retries_rejects_negative_retries() -> None:
     session = Mock(spec=requests.Session)
 
@@ -1658,7 +1709,8 @@ def test_request_with_retries_rejects_negative_retries() -> None:
         request_with_retries(session, "GET", "https://example.org/test", max_retries=-1)
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 def test_request_with_retries_rejects_negative_backoff() -> None:
     session = Mock(spec=requests.Session)
 
@@ -1666,7 +1718,8 @@ def test_request_with_retries_rejects_negative_backoff() -> None:
         request_with_retries(session, "GET", "https://example.org/test", backoff_factor=-0.1)
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 def test_request_with_retries_requires_method_and_url() -> None:
     session = Mock(spec=requests.Session)
 
@@ -1677,7 +1730,8 @@ def test_request_with_retries_requires_method_and_url() -> None:
         request_with_retries(session, "GET", "")
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 def test_request_with_retries_uses_method_fallback() -> None:
     class _MinimalSession:
         def __init__(self) -> None:
@@ -1698,7 +1752,8 @@ def test_request_with_retries_uses_method_fallback() -> None:
     assert session.calls == ["https://example.org/fallback"]
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 def test_request_with_retries_errors_when_no_callable_available() -> None:
     class _MinimalSession:
         pass
@@ -1707,7 +1762,8 @@ def test_request_with_retries_errors_when_no_callable_available() -> None:
         request_with_retries(_MinimalSession(), "GET", "https://example.org/fail")
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 @patch("DocsToKG.ContentDownload.network.time.sleep")
 def test_retry_after_header_prefers_longer_delay(mock_sleep: Mock) -> None:
     """Verify Retry-After header longer than backoff takes precedence."""
@@ -1738,7 +1794,8 @@ def test_retry_after_header_prefers_longer_delay(mock_sleep: Mock) -> None:
     assert pytest.approx(sleep_arg, rel=0.01) == 4.0
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 @patch("DocsToKG.ContentDownload.network.time.sleep")
 @patch("DocsToKG.ContentDownload.network.parse_retry_after_header")
 def test_respect_retry_after_false_skips_header(mock_parse: Mock, mock_sleep: Mock) -> None:
@@ -1763,7 +1820,8 @@ def test_respect_retry_after_false_skips_header(mock_parse: Mock, mock_sleep: Mo
     mock_sleep.assert_called_once()
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 def test_parse_retry_after_header_naive_datetime() -> None:
     response = requests.Response()
     response.headers = {"Retry-After": "Mon, 01 Jan 2024 00:00:00"}
@@ -1773,7 +1831,8 @@ def test_parse_retry_after_header_naive_datetime() -> None:
     assert wait >= 0.0
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 def test_parse_retry_after_header_handles_parse_errors(monkeypatch) -> None:
     response = requests.Response()
     response.headers = {"Retry-After": "Mon, 01 Jan 2024 00:00:00 GMT"}
@@ -1786,7 +1845,8 @@ def test_parse_retry_after_header_handles_parse_errors(monkeypatch) -> None:
     assert parse_retry_after_header(response) is None
 
 
-# ---- test_http_retry.py -----------------------------
+# --- test_http_retry.py ---
+
 def test_parse_retry_after_header_returns_none_when_parser_returns_none(monkeypatch) -> None:
     response = requests.Response()
     response.headers = {"Retry-After": "Mon, 01 Jan 2024 00:00:00 GMT"}
@@ -1799,7 +1859,8 @@ def test_parse_retry_after_header_returns_none_when_parser_returns_none(monkeypa
     assert parse_retry_after_header(response) is None
 
 
-# ---- test_download_outcomes.py -----------------------------
+# --- test_download_outcomes.py ---
+
 if "pyalex" not in sys.modules:
     pyalex_stub = types.ModuleType("pyalex")
     pyalex_stub.Topics = object
@@ -1811,7 +1872,8 @@ if "pyalex" not in sys.modules:
     sys.modules["pyalex.config"] = config_stub
 
 
-# ---- test_download_outcomes.py -----------------------------
+# --- test_download_outcomes.py ---
+
 class FakeResponse:
     def __init__(self, status_code: int, headers=None, chunks=None):
         self.status_code = status_code
@@ -1833,7 +1895,8 @@ class FakeResponse:
         pass
 
 
-# ---- test_download_outcomes.py -----------------------------
+# --- test_download_outcomes.py ---
+
 def make_artifact(tmp_path: Path) -> downloader.WorkArtifact:
     artifact = downloader.WorkArtifact(
         work_id="W-DOWNLOAD",
@@ -1856,7 +1919,8 @@ def make_artifact(tmp_path: Path) -> downloader.WorkArtifact:
     return artifact
 
 
-# ---- test_download_outcomes.py -----------------------------
+# --- test_download_outcomes.py ---
+
 def stub_requests(
     monkeypatch, mapping: Dict[Tuple[str, str], Callable[[], FakeResponse] | FakeResponse]
 ):
@@ -1870,7 +1934,8 @@ def stub_requests(
     monkeypatch.setattr(downloader, "request_with_retries", fake_request)
 
 
-# ---- test_download_outcomes.py -----------------------------
+# --- test_download_outcomes.py ---
+
 def test_successful_pdf_download_populates_metadata(tmp_path, monkeypatch):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/paper.pdf"
@@ -1914,7 +1979,8 @@ def test_successful_pdf_download_populates_metadata(tmp_path, monkeypatch):
     assert rehashed == expected_sha
 
 
-# ---- test_download_outcomes.py -----------------------------
+# --- test_download_outcomes.py ---
+
 def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/paper.pdf"
@@ -1953,7 +2019,8 @@ def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
     assert outcome.error is None
 
 
-# ---- test_download_outcomes.py -----------------------------
+# --- test_download_outcomes.py ---
+
 def test_http_error_sets_metadata_to_none(tmp_path, monkeypatch):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/paper.pdf"
@@ -1975,7 +2042,8 @@ def test_http_error_sets_metadata_to_none(tmp_path, monkeypatch):
     assert outcome.error is None
 
 
-# ---- test_download_outcomes.py -----------------------------
+# --- test_download_outcomes.py ---
+
 def test_html_download_with_text_extraction(tmp_path, monkeypatch):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/page.html"
@@ -2018,7 +2086,8 @@ def test_html_download_with_text_extraction(tmp_path, monkeypatch):
     assert outcome.last_modified == "Wed, 03 Jan 2024 00:00:00 GMT"
 
 
-# ---- test_download_outcomes.py -----------------------------
+# --- test_download_outcomes.py ---
+
 def test_dry_run_preserves_metadata_without_files(tmp_path, monkeypatch):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/paper.pdf"
@@ -2056,7 +2125,8 @@ def test_dry_run_preserves_metadata_without_files(tmp_path, monkeypatch):
     assert outcome.last_modified == "Thu, 04 Jan 2024 00:00:00 GMT"
 
 
-# ---- test_download_outcomes.py -----------------------------
+# --- test_download_outcomes.py ---
+
 def test_small_pdf_detected_as_corrupt(tmp_path, monkeypatch):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/tiny.pdf"
@@ -2086,7 +2156,8 @@ def test_small_pdf_detected_as_corrupt(tmp_path, monkeypatch):
     assert not any(artifact.pdf_dir.glob("*.pdf"))
 
 
-# ---- test_download_outcomes.py -----------------------------
+# --- test_download_outcomes.py ---
+
 def test_html_tail_in_pdf_marks_corruption(tmp_path, monkeypatch):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/error.pdf"
@@ -2109,7 +2180,8 @@ def test_html_tail_in_pdf_marks_corruption(tmp_path, monkeypatch):
     assert not any(artifact.pdf_dir.glob("*.pdf"))
 
 
-# ---- test_download_outcomes.py -----------------------------
+# --- test_download_outcomes.py ---
+
 def test_build_manifest_entry_includes_download_metadata(tmp_path):
     artifact = make_artifact(tmp_path)
     download_path = str(artifact.pdf_dir / "saved.pdf")
@@ -2143,7 +2215,8 @@ def test_build_manifest_entry_includes_download_metadata(tmp_path):
     assert entry.extracted_text_path == str(artifact.html_dir / "saved.txt")
 
 
-# ---- test_download_outcomes.py -----------------------------
+# --- test_download_outcomes.py ---
+
 def test_rfc5987_filename_suffix(tmp_path, monkeypatch):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/no-extension"
@@ -2169,7 +2242,8 @@ def test_rfc5987_filename_suffix(tmp_path, monkeypatch):
     assert outcome.path.endswith(".pdf")
 
 
-# ---- test_download_outcomes.py -----------------------------
+# --- test_download_outcomes.py ---
+
 def test_html_filename_suffix_from_disposition(tmp_path, monkeypatch):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/content"
@@ -2195,18 +2269,21 @@ def test_html_filename_suffix_from_disposition(tmp_path, monkeypatch):
     assert outcome.path.endswith(".xhtml")
 
 
-# ---- test_download_utils.py -----------------------------
+# --- test_download_utils.py ---
+
 pytest.importorskip("pyalex")
 
 
-# ---- test_download_utils.py -----------------------------
+# --- test_download_utils.py ---
+
 def test_slugify_truncates_and_normalises():
     assert downloader.slugify("Hello, World!", keep=8) == "Hello_Wo"
     assert downloader.slugify("   ", keep=10) == "untitled"
     assert downloader.slugify("Study: B-cells & growth", keep=40) == "Study_Bcells_growth"
 
 
-# ---- test_download_utils.py -----------------------------
+# --- test_download_utils.py ---
+
 @pytest.mark.parametrize(
     "payload,ctype,url,expected",
     [
@@ -2221,7 +2298,8 @@ def test_classify_payload_variants(payload, ctype, url, expected):
     assert downloader.classify_payload(payload, ctype, url) == expected
 
 
-# ---- test_download_utils.py -----------------------------
+# --- test_download_utils.py ---
+
 def test_collect_location_urls_dedupes_and_tracks_sources():
     work = {
         "best_oa_location": {
@@ -2256,7 +2334,8 @@ def test_collect_location_urls_dedupes_and_tracks_sources():
     assert collected["sources"] == ["Host", "Mirror"]
 
 
-# ---- test_download_utils.py -----------------------------
+# --- test_download_utils.py ---
+
 @pytest.mark.parametrize(
     "value,expected",
     [
@@ -2269,7 +2348,8 @@ def test_normalize_doi(value, expected):
     assert normalize_doi(value) == expected
 
 
-# ---- test_download_utils.py -----------------------------
+# --- test_download_utils.py ---
+
 @pytest.mark.parametrize(
     "value,expected",
     [
@@ -2282,7 +2362,8 @@ def test_normalize_pmid(value, expected):
     assert downloader._normalize_pmid(value) == expected
 
 
-# ---- test_download_utils.py -----------------------------
+# --- test_download_utils.py ---
+
 @pytest.mark.parametrize(
     "value,expected",
     [
@@ -2296,7 +2377,8 @@ def test_normalize_pmcid(value, expected):
     assert normalize_pmcid(value) == expected
 
 
-# ---- test_download_utils.py -----------------------------
+# --- test_download_utils.py ---
+
 @pytest.mark.parametrize(
     "value,expected",
     [
@@ -2309,38 +2391,45 @@ def test_normalize_arxiv(value, expected):
     assert downloader._normalize_arxiv(value) == expected
 
 
-# ---- test_content_download_utils.py -----------------------------
+# --- test_content_download_utils.py ---
+
 try:
     import hypothesis
     from hypothesis import strategies as st  # type: ignore
 except ImportError:  # pragma: no cover - optional dependency
     pytest.skip("hypothesis is required for these tests", allow_module_level=True)
 
-# ---- test_content_download_utils.py -----------------------------
+# --- test_content_download_utils.py ---
+
 given = hypothesis.given
 
 
-# ---- test_content_download_utils.py -----------------------------
+# --- test_content_download_utils.py ---
+
 def test_normalize_doi_with_https_prefix() -> None:
     assert normalize_doi("https://doi.org/10.1234/abc") == "10.1234/abc"
 
 
-# ---- test_content_download_utils.py -----------------------------
+# --- test_content_download_utils.py ---
+
 def test_normalize_doi_without_prefix() -> None:
     assert normalize_doi("10.1234/abc") == "10.1234/abc"
 
 
-# ---- test_content_download_utils.py -----------------------------
+# --- test_content_download_utils.py ---
+
 def test_normalize_doi_with_whitespace() -> None:
     assert normalize_doi("  10.1234/abc  ") == "10.1234/abc"
 
 
-# ---- test_content_download_utils.py -----------------------------
+# --- test_content_download_utils.py ---
+
 def test_normalize_doi_none() -> None:
     assert normalize_doi(None) is None
 
 
-# ---- test_content_download_utils.py -----------------------------
+# --- test_content_download_utils.py ---
+
 @pytest.mark.parametrize(
     "prefix",
     [
@@ -2357,37 +2446,44 @@ def test_normalize_doi_prefix_variants(prefix: str) -> None:
     assert normalize_doi(f"{prefix}{canonical}") == canonical
 
 
-# ---- test_content_download_utils.py -----------------------------
+# --- test_content_download_utils.py ---
+
 def test_normalize_pmcid_with_pmc_prefix() -> None:
     assert normalize_pmcid("PMC123456") == "PMC123456"
 
 
-# ---- test_content_download_utils.py -----------------------------
+# --- test_content_download_utils.py ---
+
 def test_normalize_pmcid_without_prefix_adds_prefix() -> None:
     assert normalize_pmcid("123456") == "PMC123456"
 
 
-# ---- test_content_download_utils.py -----------------------------
+# --- test_content_download_utils.py ---
+
 def test_normalize_pmcid_lowercase() -> None:
     assert normalize_pmcid("pmc123456") == "PMC123456"
 
 
-# ---- test_content_download_utils.py -----------------------------
+# --- test_content_download_utils.py ---
+
 def test_strip_prefix_case_insensitive() -> None:
     assert strip_prefix("ARXIV:2301.12345", "arxiv:") == "2301.12345"
 
 
-# ---- test_content_download_utils.py -----------------------------
+# --- test_content_download_utils.py ---
+
 def test_dedupe_preserves_order() -> None:
     assert dedupe(["b", "a", "b", "c"]) == ["b", "a", "c"]
 
 
-# ---- test_content_download_utils.py -----------------------------
+# --- test_content_download_utils.py ---
+
 def test_dedupe_filters_falsey_values() -> None:
     assert dedupe(["a", "", None, "a"]) == ["a"]
 
 
-# ---- test_content_download_utils.py -----------------------------
+# --- test_content_download_utils.py ---
+
 @given(st.lists(st.text()))
 def test_dedupe_property(values: List[str]) -> None:
     expected = []
@@ -2400,17 +2496,21 @@ def test_dedupe_property(values: List[str]) -> None:
     assert dedupe(values) == expected
 
 
-# ---- test_edge_cases.py -----------------------------
+# --- test_edge_cases.py ---
+
 pytest.importorskip("pyalex")
 
-# ---- test_edge_cases.py -----------------------------
+# --- test_edge_cases.py ---
+
 requests = pytest.importorskip("requests")
 
-# ---- test_edge_cases.py -----------------------------
+# --- test_edge_cases.py ---
+
 responses = pytest.importorskip("responses")
 
 
-# ---- test_edge_cases.py -----------------------------
+# --- test_edge_cases.py ---
+
 def _make_artifact(tmp_path: Path, **overrides: Any) -> WorkArtifact:
     params: Dict[str, Any] = dict(
         work_id="WEDGE",
@@ -2432,7 +2532,8 @@ def _make_artifact(tmp_path: Path, **overrides: Any) -> WorkArtifact:
     return WorkArtifact(**params)
 
 
-# ---- test_edge_cases.py -----------------------------
+# --- test_edge_cases.py ---
+
 @responses.activate
 def test_html_classification_overrides_misleading_content_type(tmp_path: Path) -> None:
     artifact = _make_artifact(tmp_path)
@@ -2453,7 +2554,8 @@ def test_html_classification_overrides_misleading_content_type(tmp_path: Path) -
     assert outcome.path and outcome.path.endswith(".html")
 
 
-# ---- test_edge_cases.py -----------------------------
+# --- test_edge_cases.py ---
+
 @responses.activate
 def test_wayback_resolver_skips_unavailable_archives(tmp_path: Path) -> None:
     artifact = _make_artifact(tmp_path, pdf_urls=[])
@@ -2473,7 +2575,8 @@ def test_wayback_resolver_skips_unavailable_archives(tmp_path: Path) -> None:
     assert results == []
 
 
-# ---- test_edge_cases.py -----------------------------
+# --- test_edge_cases.py ---
+
 def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
     work = {
         "id": "https://openalex.org/WEDGE",
@@ -2564,7 +2667,8 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
     assert Path(manifests[0]["path"]).exists()
 
 
-# ---- test_edge_cases.py -----------------------------
+# --- test_edge_cases.py ---
+
 def test_openalex_attempts_use_session_headers(tmp_path: Path) -> None:
     artifact = _make_artifact(tmp_path)
     logger_path = tmp_path / "attempts.jsonl"
@@ -2604,7 +2708,8 @@ def test_openalex_attempts_use_session_headers(tmp_path: Path) -> None:
     logger.close()
 
 
-# ---- test_edge_cases.py -----------------------------
+# --- test_edge_cases.py ---
+
 def test_retry_budget_honours_max_attempts(tmp_path: Path) -> None:
     artifact = _make_artifact(tmp_path)
     config = ResolverConfig(

@@ -326,16 +326,6 @@ path: Filesystem path to the configuration file under validation.
 Returns:
 Dictionary describing validation status, ontology count, and file path.
 
-### `_normalize_argv(argv)`
-
-Rewrite legacy aliases to the canonical subcommand syntax.
-
-Args:
-argv: Raw argument vector supplied by the user.
-
-Returns:
-Adjusted argument list with legacy ``plan diff`` rewired to ``plan-diff``.
-
 ### `main(argv)`
 
 Entry point for the ontology downloader CLI.

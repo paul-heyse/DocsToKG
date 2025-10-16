@@ -4,105 +4,105 @@
 #   "purpose": "Pytest coverage for content download atomic writes scenarios",
 #   "sections": [
 #     {
-#       "id": "_stub_module",
+#       "id": "stub-module",
 #       "name": "_stub_module",
-#       "anchor": "SM",
+#       "anchor": "function-stub-module",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "dummy_tokenizer",
+#       "id": "dummytokenizer",
 #       "name": "DummyTokenizer",
-#       "anchor": "DUMM",
+#       "anchor": "class-dummytokenizer",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "dummy_hybrid_chunker",
+#       "id": "dummyhybridchunker",
 #       "name": "DummyHybridChunker",
-#       "anchor": "DUMM1",
+#       "anchor": "class-dummyhybridchunker",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "configure_chunker_stubs",
+#       "id": "configure-chunker-stubs",
 #       "name": "configure_chunker_stubs",
-#       "anchor": "CCS",
+#       "anchor": "function-configure-chunker-stubs",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "crashing_atomic_write",
+#       "id": "crashing-atomic-write",
 #       "name": "crashing_atomic_write",
-#       "anchor": "CAW",
+#       "anchor": "function-crashing-atomic-write",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "prepare_data_root",
+#       "id": "prepare-data-root",
 #       "name": "prepare_data_root",
-#       "anchor": "PDR",
+#       "anchor": "function-prepare-data-root",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "chunker_args",
+#       "id": "chunker-args",
 #       "name": "chunker_args",
-#       "anchor": "CA",
+#       "anchor": "function-chunker-args",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "embeddings_args",
+#       "id": "embeddings-args",
 #       "name": "embeddings_args",
-#       "anchor": "EA",
+#       "anchor": "function-embeddings-args",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "write_dummy_doctags",
+#       "id": "write-dummy-doctags",
 #       "name": "write_dummy_doctags",
-#       "anchor": "WDD",
+#       "anchor": "function-write-dummy-doctags",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "write_dummy_chunks",
+#       "id": "write-dummy-chunks",
 #       "name": "write_dummy_chunks",
-#       "anchor": "WDC",
+#       "anchor": "function-write-dummy-chunks",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "configure_embeddings_stubs",
+#       "id": "configure-embeddings-stubs",
 #       "name": "configure_embeddings_stubs",
-#       "anchor": "CES",
+#       "anchor": "function-configure-embeddings-stubs",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_chunker_failure_leaves_no_partial_files",
+#       "id": "test-chunker-failure-leaves-no-partial-files",
 #       "name": "test_chunker_failure_leaves_no_partial_files",
-#       "anchor": "TCFLN",
+#       "anchor": "function-test-chunker-failure-leaves-no-partial-files",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_embeddings_failure_cleans_temporary_files",
+#       "id": "test-embeddings-failure-cleans-temporary-files",
 #       "name": "test_embeddings_failure_cleans_temporary_files",
-#       "anchor": "TEFCT",
+#       "anchor": "function-test-embeddings-failure-cleans-temporary-files",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_chunker_success_outputs_readable_file",
+#       "id": "test-chunker-success-outputs-readable-file",
 #       "name": "test_chunker_success_outputs_readable_file",
-#       "anchor": "TCSOR",
+#       "anchor": "function-test-chunker-success-outputs-readable-file",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_chunker_promotes_image_metadata",
+#       "id": "test-chunker-promotes-image-metadata",
 #       "name": "test_chunker_promotes_image_metadata",
-#       "anchor": "TCPIM",
+#       "anchor": "function-test-chunker-promotes-image-metadata",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_chunker_resume_after_failure",
+#       "id": "test-chunker-resume-after-failure",
 #       "name": "test_chunker_resume_after_failure",
-#       "anchor": "TCRAF",
+#       "anchor": "function-test-chunker-resume-after-failure",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_chunker_concurrent_writes_isolated",
+#       "id": "test-chunker-concurrent-writes-isolated",
 #       "name": "test_chunker_concurrent_writes_isolated",
-#       "anchor": "TCCWI",
+#       "anchor": "function-test-chunker-concurrent-writes-isolated",
 #       "kind": "function"
 #     }
 #   ]
@@ -124,6 +124,7 @@ from types import ModuleType, SimpleNamespace
 from typing import Any, Dict, Iterable, List
 
 import pytest
+# --- Globals ---
 
 DOWNLOAD_DEPS_AVAILABLE = True
 try:  # pragma: no cover - optional dependency wire-up
@@ -254,6 +255,7 @@ if DOWNLOAD_DEPS_AVAILABLE:
 
 chunker_manifest_log: List[dict] = []
 embeddings_manifest_log: List[dict] = []
+# --- Helper Functions ---
 
 
 def _stub_module(
@@ -563,6 +565,8 @@ def configure_embeddings_stubs(monkeypatch):
 
 
 @pytest.mark.usefixtures("monkeypatch")
+# --- Test Cases ---
+
 def test_chunker_failure_leaves_no_partial_files(tmp_path, monkeypatch):
     env = prepare_data_root(tmp_path)
     configure_chunker_stubs(monkeypatch, {"sample": ["alpha beta", "gamma delta"]})

@@ -4,15 +4,15 @@
 #   "purpose": "Pytest coverage for stubs scenarios",
 #   "sections": [
 #     {
-#       "id": "test_promote_simple_namespace",
+#       "id": "testpromotesimplenamespace",
 #       "name": "TestPromoteSimpleNamespace",
-#       "anchor": "TEST",
+#       "anchor": "class-testpromotesimplenamespace",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "test_dependency_stubs",
+#       "id": "testdependencystubs",
 #       "name": "TestDependencyStubs",
-#       "anchor": "TEST1",
+#       "anchor": "class-testdependencystubs",
 #       "kind": "class"
 #     }
 #   ]
@@ -20,7 +20,6 @@
 # === /NAVMAP ===
 
 """Tests for DocParsing test stub utilities."""
-
 import sys
 from types import ModuleType, SimpleNamespace
 

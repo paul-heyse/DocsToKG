@@ -1,11 +1,44 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.HybridSearch.storage",
-#   "purpose": "OpenSearch storage adapters for hybrid search",
+#   "purpose": "OpenSearch simulators, registry helpers, and filter utilities",
 #   "sections": [
-#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
-#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"},
-#     {"id": "public-functions", "name": "Public Functions", "anchor": "api", "kind": "api"}
+#     {
+#       "id": "opensearchindextemplate",
+#       "name": "OpenSearchIndexTemplate",
+#       "anchor": "class-opensearchindextemplate",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "opensearchschemamanager",
+#       "name": "OpenSearchSchemaManager",
+#       "anchor": "class-opensearchschemamanager",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "storedchunk",
+#       "name": "StoredChunk",
+#       "anchor": "class-storedchunk",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunkregistry",
+#       "name": "ChunkRegistry",
+#       "anchor": "class-chunkregistry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "opensearchsimulator",
+#       "name": "OpenSearchSimulator",
+#       "anchor": "class-opensearchsimulator",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "matches-filters",
+#       "name": "matches_filters",
+#       "anchor": "function-matches-filters",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -32,7 +65,6 @@ __all__ = (
 
 
 # --- Public Classes ---
-
 
 @dataclass(slots=True)
 class OpenSearchIndexTemplate:
@@ -617,7 +649,6 @@ class OpenSearchSimulator:
 
 
 # --- Public Functions ---
-
 
 def matches_filters(chunk: ChunkPayload, filters: Mapping[str, object]) -> bool:
     """Check whether a chunk satisfies OpenSearch-style filter conditions.

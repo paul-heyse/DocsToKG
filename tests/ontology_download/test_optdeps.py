@@ -4,63 +4,63 @@
 #   "purpose": "Pytest coverage for ontology download optdeps scenarios",
 #   "sections": [
 #     {
-#       "id": "_reset_caches",
+#       "id": "reset-caches",
 #       "name": "_reset_caches",
-#       "anchor": "RC",
+#       "anchor": "function-reset-caches",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_fake_import",
+#       "id": "fake-import",
 #       "name": "_fake_import",
-#       "anchor": "FI",
+#       "anchor": "function-fake-import",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_failing_import",
+#       "id": "failing-import",
 #       "name": "_failing_import",
-#       "anchor": "FI1",
+#       "anchor": "function-failing-import",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_get_pystow_with_real_module",
+#       "id": "test-get-pystow-with-real-module",
 #       "name": "test_get_pystow_with_real_module",
-#       "anchor": "TGPWR",
+#       "anchor": "function-test-get-pystow-with-real-module",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_get_pystow_fallback_when_missing",
+#       "id": "test-get-pystow-fallback-when-missing",
 #       "name": "test_get_pystow_fallback_when_missing",
-#       "anchor": "TGPFW",
+#       "anchor": "function-test-get-pystow-fallback-when-missing",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pystow_fallback_respects_env_var",
+#       "id": "test-pystow-fallback-respects-env-var",
 #       "name": "test_pystow_fallback_respects_env_var",
-#       "anchor": "TPFRE",
+#       "anchor": "function-test-pystow-fallback-respects-env-var",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_get_rdflib_with_real_module",
+#       "id": "test-get-rdflib-with-real-module",
 #       "name": "test_get_rdflib_with_real_module",
-#       "anchor": "TGRWR",
+#       "anchor": "function-test-get-rdflib-with-real-module",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_rdflib_stub_parse_and_serialize",
+#       "id": "test-rdflib-stub-parse-and-serialize",
 #       "name": "test_rdflib_stub_parse_and_serialize",
-#       "anchor": "TRSPA",
+#       "anchor": "function-test-rdflib-stub-parse-and-serialize",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pronto_stub_behaviour",
+#       "id": "test-pronto-stub-behaviour",
 #       "name": "test_pronto_stub_behaviour",
-#       "anchor": "TPSB",
+#       "anchor": "function-test-pronto-stub-behaviour",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_owlready2_stub_load",
+#       "id": "test-owlready2-stub-load",
 #       "name": "test_owlready2_stub_load",
-#       "anchor": "TOSL",
+#       "anchor": "function-test-owlready2-stub-load",
 #       "kind": "function"
 #     }
 #   ]
@@ -87,6 +87,8 @@ from DocsToKG.OntologyDownload import optdeps
 
 
 @pytest.fixture(autouse=True)
+# --- Helper Functions ---
+
 def _reset_caches() -> None:
     """Ensure module caches are reset before each test."""
 
@@ -118,6 +120,7 @@ def _failing_import(module_name: str):
         return importlib.import_module(name)
 
     return _import
+# --- Test Cases ---
 
 
 def test_get_pystow_with_real_module(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

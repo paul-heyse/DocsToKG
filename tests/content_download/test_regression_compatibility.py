@@ -4,27 +4,27 @@
 #   "purpose": "Pytest coverage for content download regression compatibility scenarios",
 #   "sections": [
 #     {
-#       "id": "test_default_resolver_order_remains_stable",
+#       "id": "test-default-resolver-order-remains-stable",
 #       "name": "test_default_resolver_order_remains_stable",
-#       "anchor": "TDROR",
+#       "anchor": "function-test-default-resolver-order-remains-stable",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_manifest_entry_schema_backward_compatible",
+#       "id": "test-manifest-entry-schema-backward-compatible",
 #       "name": "test_manifest_entry_schema_backward_compatible",
-#       "anchor": "TMESB",
+#       "anchor": "function-test-manifest-entry-schema-backward-compatible",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_load_previous_manifest_accepts_legacy_entries",
-#       "name": "test_load_previous_manifest_accepts_legacy_entries",
-#       "anchor": "TLPMA",
+#       "id": "test-load-previous-manifest-rejects-legacy-entries",
+#       "name": "test_load_previous_manifest_rejects_legacy_entries",
+#       "anchor": "function-test-load-previous-manifest-rejects-legacy-entries",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_load_resolver_config_rejects_legacy_rate_limits",
+#       "id": "test-load-resolver-config-rejects-legacy-rate-limits",
 #       "name": "test_load_resolver_config_rejects_legacy_rate_limits",
-#       "anchor": "TLRCR",
+#       "anchor": "function-test-load-resolver-config-rejects-legacy-rate-limits",
 #       "kind": "function"
 #     }
 #   ]
@@ -45,6 +45,7 @@ import pytest
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
 from DocsToKG.ContentDownload import resolvers
+# --- Test Cases ---
 
 
 def test_default_resolver_order_remains_stable():
@@ -112,9 +113,9 @@ def test_manifest_entry_schema_backward_compatible(tmp_path: Path):
     assert set(payload.keys()) == expected_keys
 
 
-def test_load_previous_manifest_accepts_legacy_entries(tmp_path: Path):
+def test_load_previous_manifest_rejects_legacy_entries(tmp_path: Path) -> None:
     manifest_path = tmp_path / "legacy.jsonl"
-    legacy_lines = [
+    manifest_path.write_text(
         json.dumps(
             {
                 "work_id": "https://openalex.org/WLEGACY",
@@ -122,23 +123,13 @@ def test_load_previous_manifest_accepts_legacy_entries(tmp_path: Path):
                 "classification": "pdf",
                 "path": "/tmp/legacy.pdf",
             }
-        ),
-        json.dumps(
-            {
-                "record_type": "attempt",
-                "work_id": "https://openalex.org/WLEGACY",
-                "resolver_name": "legacy",
-            }
-        ),
-    ]
-    manifest_path.write_text("\n".join(legacy_lines) + "\n", encoding="utf-8")
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
-    lookup, completed = downloader.load_previous_manifest(manifest_path)
-
-    assert "https://openalex.org/WLEGACY" in completed
-    entry = lookup["https://openalex.org/WLEGACY"]["https://example.org/legacy.pdf"]
-    assert entry["classification"] == "pdf"
-    assert entry["path"] == "/tmp/legacy.pdf"
+    with pytest.raises(ValueError, match="Legacy manifest entries"):
+        downloader.load_previous_manifest(manifest_path)
 
 
 def test_load_resolver_config_rejects_legacy_rate_limits(tmp_path: Path):

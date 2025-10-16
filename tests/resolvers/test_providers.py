@@ -4,117 +4,117 @@
 #   "purpose": "Pytest coverage for resolvers providers scenarios",
 #   "sections": [
 #     {
-#       "id": "load_fixture",
+#       "id": "load-fixture",
 #       "name": "load_fixture",
-#       "anchor": "LF",
+#       "anchor": "function-load-fixture",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "make_artifact",
+#       "id": "make-artifact",
 #       "name": "make_artifact",
-#       "anchor": "MA",
+#       "anchor": "function-make-artifact",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_figshare_resolver_success",
+#       "id": "test-figshare-resolver-success",
 #       "name": "test_figshare_resolver_success",
-#       "anchor": "TFRS",
+#       "anchor": "function-test-figshare-resolver-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_figshare_resolver_filters_non_pdf_files",
+#       "id": "test-figshare-resolver-filters-non-pdf-files",
 #       "name": "test_figshare_resolver_filters_non_pdf_files",
-#       "anchor": "TFRFN",
+#       "anchor": "function-test-figshare-resolver-filters-non-pdf-files",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_figshare_resolver_multiple_pdfs",
+#       "id": "test-figshare-resolver-multiple-pdfs",
 #       "name": "test_figshare_resolver_multiple_pdfs",
-#       "anchor": "TFRMP",
+#       "anchor": "function-test-figshare-resolver-multiple-pdfs",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_figshare_resolver_no_matches",
+#       "id": "test-figshare-resolver-no-matches",
 #       "name": "test_figshare_resolver_no_matches",
-#       "anchor": "TFRNM",
+#       "anchor": "function-test-figshare-resolver-no-matches",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_figshare_resolver_http_error",
+#       "id": "test-figshare-resolver-http-error",
 #       "name": "test_figshare_resolver_http_error",
-#       "anchor": "TFRHE",
+#       "anchor": "function-test-figshare-resolver-http-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_figshare_resolver_json_error",
+#       "id": "test-figshare-resolver-json-error",
 #       "name": "test_figshare_resolver_json_error",
-#       "anchor": "TFRJE",
+#       "anchor": "function-test-figshare-resolver-json-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_figshare_resolver_network_error",
+#       "id": "test-figshare-resolver-network-error",
 #       "name": "test_figshare_resolver_network_error",
-#       "anchor": "TFRNE",
+#       "anchor": "function-test-figshare-resolver-network-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_figshare_resolver_disabled_without_doi",
+#       "id": "test-figshare-resolver-disabled-without-doi",
 #       "name": "test_figshare_resolver_disabled_without_doi",
-#       "anchor": "TFRDW",
+#       "anchor": "function-test-figshare-resolver-disabled-without-doi",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "load_fixture",
+#       "id": "load-fixture",
 #       "name": "load_fixture",
-#       "anchor": "LF1",
+#       "anchor": "function-load-fixture",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "make_artifact",
+#       "id": "make-artifact",
 #       "name": "make_artifact",
-#       "anchor": "MA1",
+#       "anchor": "function-make-artifact",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_zenodo_resolver_success",
+#       "id": "test-zenodo-resolver-success",
 #       "name": "test_zenodo_resolver_success",
-#       "anchor": "TZRS",
+#       "anchor": "function-test-zenodo-resolver-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_zenodo_resolver_filters_non_pdf_files",
+#       "id": "test-zenodo-resolver-filters-non-pdf-files",
 #       "name": "test_zenodo_resolver_filters_non_pdf_files",
-#       "anchor": "TZRFN",
+#       "anchor": "function-test-zenodo-resolver-filters-non-pdf-files",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_zenodo_resolver_no_matches",
+#       "id": "test-zenodo-resolver-no-matches",
 #       "name": "test_zenodo_resolver_no_matches",
-#       "anchor": "TZRNM",
+#       "anchor": "function-test-zenodo-resolver-no-matches",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_zenodo_resolver_http_error",
+#       "id": "test-zenodo-resolver-http-error",
 #       "name": "test_zenodo_resolver_http_error",
-#       "anchor": "TZRHE",
+#       "anchor": "function-test-zenodo-resolver-http-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_zenodo_resolver_json_error",
+#       "id": "test-zenodo-resolver-json-error",
 #       "name": "test_zenodo_resolver_json_error",
-#       "anchor": "TZRJE",
+#       "anchor": "function-test-zenodo-resolver-json-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_zenodo_resolver_network_error",
+#       "id": "test-zenodo-resolver-network-error",
 #       "name": "test_zenodo_resolver_network_error",
-#       "anchor": "TZRNE",
+#       "anchor": "function-test-zenodo-resolver-network-error",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_zenodo_resolver_disabled_without_doi",
+#       "id": "test-zenodo-resolver-disabled-without-doi",
 #       "name": "test_zenodo_resolver_disabled_without_doi",
-#       "anchor": "TZRDW",
+#       "anchor": "function-test-zenodo-resolver-disabled-without-doi",
 #       "kind": "function"
 #     }
 #   ]
@@ -137,7 +137,8 @@ from DocsToKG.ContentDownload.resolvers import FigshareResolver, ResolverConfig,
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
-# ---- test_figshare_resolver.py -----------------------------
+# --- test_figshare_resolver.py ---
+
 if "pyalex" not in sys.modules:
     pyalex_stub = types.ModuleType("pyalex")
     pyalex_stub.Topics = object
@@ -148,24 +149,29 @@ if "pyalex" not in sys.modules:
     sys.modules["pyalex"] = pyalex_stub
     sys.modules["pyalex.config"] = config_stub
 
-# ---- test_figshare_resolver.py -----------------------------
+# --- test_figshare_resolver.py ---
+
 pytest.importorskip("pyalex")
 
-# ---- test_figshare_resolver.py -----------------------------
+# --- test_figshare_resolver.py ---
+
 requests = pytest.importorskip("requests")
 
-# ---- test_figshare_resolver.py -----------------------------
+# --- test_figshare_resolver.py ---
+
 responses = pytest.importorskip("responses")
 
 
-# ---- test_figshare_resolver.py -----------------------------
+# --- test_figshare_resolver.py ---
+
 def load_fixture(name: str):
     fixture_path = DATA_DIR / name
     with fixture_path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
 
 
-# ---- test_figshare_resolver.py -----------------------------
+# --- test_figshare_resolver.py ---
+
 def make_artifact(tmp_path: Path, **overrides):
     base_kwargs = dict(
         work_id="W-FIGSHARE",
@@ -187,7 +193,8 @@ def make_artifact(tmp_path: Path, **overrides):
     return downloader.WorkArtifact(**base_kwargs)
 
 
-# ---- test_figshare_resolver.py -----------------------------
+# --- test_figshare_resolver.py ---
+
 @responses.activate
 def test_figshare_resolver_success(tmp_path):
     session = requests.Session()
@@ -213,7 +220,8 @@ def test_figshare_resolver_success(tmp_path):
     assert results[0].metadata["article_id"] == 123456
 
 
-# ---- test_figshare_resolver.py -----------------------------
+# --- test_figshare_resolver.py ---
+
 @responses.activate
 def test_figshare_resolver_filters_non_pdf_files(tmp_path):
     session = requests.Session()
@@ -237,7 +245,8 @@ def test_figshare_resolver_filters_non_pdf_files(tmp_path):
     assert urls == ["https://figshare.com/ndownloader/files/45678"]
 
 
-# ---- test_figshare_resolver.py -----------------------------
+# --- test_figshare_resolver.py ---
+
 @responses.activate
 def test_figshare_resolver_multiple_pdfs(tmp_path):
     session = requests.Session()
@@ -263,7 +272,8 @@ def test_figshare_resolver_multiple_pdfs(tmp_path):
     ]
 
 
-# ---- test_figshare_resolver.py -----------------------------
+# --- test_figshare_resolver.py ---
+
 @responses.activate
 def test_figshare_resolver_no_matches(tmp_path):
     session = requests.Session()
@@ -281,7 +291,8 @@ def test_figshare_resolver_no_matches(tmp_path):
     assert results == []
 
 
-# ---- test_figshare_resolver.py -----------------------------
+# --- test_figshare_resolver.py ---
+
 @responses.activate
 def test_figshare_resolver_http_error(tmp_path):
     session = requests.Session()
@@ -306,7 +317,8 @@ def test_figshare_resolver_http_error(tmp_path):
     assert "Figshare API returned" in events[0].metadata["error_detail"]
 
 
-# ---- test_figshare_resolver.py -----------------------------
+# --- test_figshare_resolver.py ---
+
 @responses.activate
 def test_figshare_resolver_json_error(tmp_path):
     session = requests.Session()
@@ -331,7 +343,8 @@ def test_figshare_resolver_json_error(tmp_path):
     assert "content_preview" in events[0].metadata
 
 
-# ---- test_figshare_resolver.py -----------------------------
+# --- test_figshare_resolver.py ---
+
 @responses.activate
 def test_figshare_resolver_network_error(tmp_path):
     session = requests.Session()
@@ -355,7 +368,8 @@ def test_figshare_resolver_network_error(tmp_path):
     assert "boom" in events[0].metadata["error"]
 
 
-# ---- test_figshare_resolver.py -----------------------------
+# --- test_figshare_resolver.py ---
+
 def test_figshare_resolver_disabled_without_doi(tmp_path):
     artifact = make_artifact(tmp_path, doi=None)
     config = ResolverConfig()
@@ -369,7 +383,8 @@ def test_figshare_resolver_disabled_without_doi(tmp_path):
     assert results[0].event_reason == "no-doi"
 
 
-# ---- test_zenodo_resolver.py -----------------------------
+# --- test_zenodo_resolver.py ---
+
 def load_fixture(name: str) -> dict:  # noqa: F811
     """Load JSON fixture data from the shared tests/data directory."""
 
@@ -378,7 +393,8 @@ def load_fixture(name: str) -> dict:  # noqa: F811
         return json.load(handle)
 
 
-# ---- test_zenodo_resolver.py -----------------------------
+# --- test_zenodo_resolver.py ---
+
 def make_artifact(tmp_path: Path, **overrides: object) -> downloader.WorkArtifact:  # noqa: F811
     """Create a WorkArtifact populated with sensible defaults for testing."""
 
@@ -402,7 +418,8 @@ def make_artifact(tmp_path: Path, **overrides: object) -> downloader.WorkArtifac
     return downloader.WorkArtifact(**base_kwargs)
 
 
-# ---- test_zenodo_resolver.py -----------------------------
+# --- test_zenodo_resolver.py ---
+
 @responses.activate
 def test_zenodo_resolver_success(tmp_path):
     session = requests.Session()
@@ -433,7 +450,8 @@ def test_zenodo_resolver_success(tmp_path):
     assert results[0].metadata["record_id"] == "1234567"
 
 
-# ---- test_zenodo_resolver.py -----------------------------
+# --- test_zenodo_resolver.py ---
+
 @responses.activate
 def test_zenodo_resolver_filters_non_pdf_files(tmp_path):
     session = requests.Session()
@@ -457,7 +475,8 @@ def test_zenodo_resolver_filters_non_pdf_files(tmp_path):
     assert urls == ["https://zenodo.org/api/files/abc123/paper.pdf"]
 
 
-# ---- test_zenodo_resolver.py -----------------------------
+# --- test_zenodo_resolver.py ---
+
 @responses.activate
 def test_zenodo_resolver_no_matches(tmp_path):
     session = requests.Session()
@@ -475,7 +494,8 @@ def test_zenodo_resolver_no_matches(tmp_path):
     assert results == []
 
 
-# ---- test_zenodo_resolver.py -----------------------------
+# --- test_zenodo_resolver.py ---
+
 @responses.activate
 def test_zenodo_resolver_http_error(tmp_path):
     session = requests.Session()
@@ -500,7 +520,8 @@ def test_zenodo_resolver_http_error(tmp_path):
     assert "Zenodo API returned" in events[0].metadata["error_detail"]
 
 
-# ---- test_zenodo_resolver.py -----------------------------
+# --- test_zenodo_resolver.py ---
+
 @responses.activate
 def test_zenodo_resolver_json_error(tmp_path):
     session = requests.Session()
@@ -525,7 +546,8 @@ def test_zenodo_resolver_json_error(tmp_path):
     assert "error_detail" in events[0].metadata
 
 
-# ---- test_zenodo_resolver.py -----------------------------
+# --- test_zenodo_resolver.py ---
+
 @responses.activate
 def test_zenodo_resolver_network_error(tmp_path):
     session = requests.Session()
@@ -549,7 +571,8 @@ def test_zenodo_resolver_network_error(tmp_path):
     assert "boom" in events[0].metadata["error"]
 
 
-# ---- test_zenodo_resolver.py -----------------------------
+# --- test_zenodo_resolver.py ---
+
 def test_zenodo_resolver_disabled_without_doi(tmp_path):
     artifact = make_artifact(tmp_path, doi=None)
     config = ResolverConfig()

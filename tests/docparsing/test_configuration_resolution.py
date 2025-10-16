@@ -4,33 +4,33 @@
 #   "purpose": "Pytest coverage for docparsing configuration resolution scenarios",
 #   "sections": [
 #     {
-#       "id": "test_resolve_hf_home",
+#       "id": "test-resolve-hf-home",
 #       "name": "test_resolve_hf_home",
-#       "anchor": "TRHH",
+#       "anchor": "function-test-resolve-hf-home",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_resolve_model_root",
+#       "id": "test-resolve-model-root",
 #       "name": "test_resolve_model_root",
-#       "anchor": "TRMR",
+#       "anchor": "function-test-resolve-model-root",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_resolve_pdf_model_path",
+#       "id": "test-resolve-pdf-model-path",
 #       "name": "test_resolve_pdf_model_path",
-#       "anchor": "TRPMP",
+#       "anchor": "function-test-resolve-pdf-model-path",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_environment_variable_precedence",
+#       "id": "test-environment-variable-precedence",
 #       "name": "test_environment_variable_precedence",
-#       "anchor": "TEVP",
+#       "anchor": "function-test-environment-variable-precedence",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_path_resolution_edge_cases",
+#       "id": "test-path-resolution-edge-cases",
 #       "name": "test_path_resolution_edge_cases",
-#       "anchor": "TPREC",
+#       "anchor": "function-test-path-resolution-edge-cases",
 #       "kind": "function"
 #     }
 #   ]
@@ -51,6 +51,7 @@ from DocsToKG.DocParsing.pipelines import (
     resolve_model_root,
     resolve_pdf_model_path,
 )
+# --- Test Cases ---
 
 
 def test_resolve_hf_home():
@@ -190,6 +191,7 @@ def test_path_resolution_edge_cases():
         result = resolve_pdf_model_path(cli_value="")
         assert isinstance(result, str)
         assert len(result) > 0  # Should not be empty
+# --- Module Entry Points ---
 
 
 if __name__ == "__main__":

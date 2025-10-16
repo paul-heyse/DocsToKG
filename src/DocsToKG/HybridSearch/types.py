@@ -1,11 +1,74 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.HybridSearch.types",
-#   "purpose": "Data contracts shared across hybrid search workflows",
+#   "purpose": "Typed payloads and request/response contracts",
 #   "sections": [
-#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
-#     {"id": "public-functions", "name": "Public Functions", "anchor": "api", "kind": "api"},
-#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"}
+#     {
+#       "id": "vector-uuid-to-faiss-int",
+#       "name": "vector_uuid_to_faiss_int",
+#       "anchor": "function-vector-uuid-to-faiss-int",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "documentinput",
+#       "name": "DocumentInput",
+#       "anchor": "class-documentinput",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunkfeatures",
+#       "name": "ChunkFeatures",
+#       "anchor": "class-chunkfeatures",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunkpayload",
+#       "name": "ChunkPayload",
+#       "anchor": "class-chunkpayload",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "hybridsearchdiagnostics",
+#       "name": "HybridSearchDiagnostics",
+#       "anchor": "class-hybridsearchdiagnostics",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "hybridsearchresult",
+#       "name": "HybridSearchResult",
+#       "anchor": "class-hybridsearchresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "hybridsearchrequest",
+#       "name": "HybridSearchRequest",
+#       "anchor": "class-hybridsearchrequest",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "hybridsearchresponse",
+#       "name": "HybridSearchResponse",
+#       "anchor": "class-hybridsearchresponse",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "fusioncandidate",
+#       "name": "FusionCandidate",
+#       "anchor": "class-fusioncandidate",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationreport",
+#       "name": "ValidationReport",
+#       "anchor": "class-validationreport",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationsummary",
+#       "name": "ValidationSummary",
+#       "anchor": "class-validationsummary",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -60,7 +123,6 @@ _MASK_63_BITS = (1 << 63) - 1
 
 # --- Public Functions ---
 
-
 def vector_uuid_to_faiss_int(vector_id: str) -> int:
     """Return the FAISS-compatible integer identifier for a vector UUID.
 
@@ -75,7 +137,6 @@ def vector_uuid_to_faiss_int(vector_id: str) -> int:
 
 
 # --- Public Classes ---
-
 
 @dataclass(slots=True)
 class DocumentInput:

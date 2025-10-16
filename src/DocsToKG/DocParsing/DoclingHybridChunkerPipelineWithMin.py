@@ -5,75 +5,75 @@
 #   "purpose": "CLI entry points for DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin workflows",
 #   "sections": [
 #     {
-#       "id": "compute_relative_doc_id",
+#       "id": "compute-relative-doc-id",
 #       "name": "compute_relative_doc_id",
-#       "anchor": "CRDI",
+#       "anchor": "function-compute-relative-doc-id",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "read_utf8",
+#       "id": "read-utf8",
 #       "name": "read_utf8",
-#       "anchor": "RU",
+#       "anchor": "function-read-utf8",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "build_doc",
+#       "id": "build-doc",
 #       "name": "build_doc",
-#       "anchor": "BD",
+#       "anchor": "function-build-doc",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "extract_refs_and_pages",
+#       "id": "extract-refs-and-pages",
 #       "name": "extract_refs_and_pages",
-#       "anchor": "ERAP",
+#       "anchor": "function-extract-refs-and-pages",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "summarize_image_metadata",
+#       "id": "summarize-image-metadata",
 #       "name": "summarize_image_metadata",
-#       "anchor": "SIM",
+#       "anchor": "function-summarize-image-metadata",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "rec",
 #       "name": "Rec",
-#       "anchor": "REC",
+#       "anchor": "class-rec",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "merge_rec",
+#       "id": "merge-rec",
 #       "name": "merge_rec",
-#       "anchor": "MR",
+#       "anchor": "function-merge-rec",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "is_structural_boundary",
+#       "id": "is-structural-boundary",
 #       "name": "is_structural_boundary",
-#       "anchor": "ISB",
+#       "anchor": "function-is-structural-boundary",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "coalesce_small_runs",
+#       "id": "coalesce-small-runs",
 #       "name": "coalesce_small_runs",
-#       "anchor": "CSR",
+#       "anchor": "function-coalesce-small-runs",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "build_parser",
+#       "id": "build-parser",
 #       "name": "build_parser",
-#       "anchor": "BP",
+#       "anchor": "function-build-parser",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "parse_args",
+#       "id": "parse-args",
 #       "name": "parse_args",
-#       "anchor": "PA",
+#       "anchor": "function-parse-args",
 #       "kind": "function"
 #     },
 #     {
 #       "id": "main",
 #       "name": "main",
-#       "anchor": "MAIN",
+#       "anchor": "function-main",
 #       "kind": "function"
 #     }
 #   ]
@@ -130,6 +130,24 @@ from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTok
 from docling_core.types.doc.document import DoclingDocument, DocTagsDocument
 from transformers import AutoTokenizer
 
+
+# --- Globals ---
+
+__all__ = (
+    "Rec",
+    "build_doc",
+    "build_parser",
+    "coalesce_small_runs",
+    "compute_relative_doc_id",
+    "extract_refs_and_pages",
+    "is_structural_boundary",
+    "main",
+    "merge_rec",
+    "parse_args",
+    "read_utf8",
+    "summarize_image_metadata",
+)
+
 from DocsToKG.DocParsing._common import (
     atomic_write,
     compute_content_hash,
@@ -158,16 +176,19 @@ from DocsToKG.DocParsing.serializers import RichSerializerProvider
 
 SOFT_BARRIER_MARGIN = 64
 
-# ---------- Defaults ----------
+# --- Defaults ---
+
 DEFAULT_DATA_ROOT = detect_data_root()
 DEFAULT_IN_DIR = data_doctags(DEFAULT_DATA_ROOT)
 DEFAULT_OUT_DIR = data_chunks(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "chunks"
 
+
 _LOGGER = get_logger(__name__)
 
 
-# ---------- Helpers ----------
+# --- Public Functions ---
+
 def compute_relative_doc_id(path: Path, root: Path) -> str:
     """Return POSIX-style relative identifier for a document path.
 
@@ -283,6 +304,9 @@ def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, i
     return has_caption, has_classification, num_images
 
 
+# --- Public Classes ---
+
+
 @dataclass
 class Rec:
     """Intermediate record tracking chunk text and provenance.
@@ -337,7 +361,8 @@ def merge_rec(a: Rec, b: Rec, tokenizer: HuggingFaceTokenizer) -> Rec:
     )
 
 
-# ---------- Topic-aware boundary detection ----------
+# --- Topic-aware boundary detection ---
+
 def is_structural_boundary(rec: Rec) -> bool:
     """Detect whether a chunk begins with a structural heading or caption marker.
 
@@ -368,7 +393,8 @@ def is_structural_boundary(rec: Rec) -> bool:
     return any(text.startswith(marker) for marker in caption_markers)
 
 
-# ---------- Smart coalescence of SMALL-RUNS (< min_tokens) ----------
+# --- Smart coalescence of SMALL-RUNS (< min_tokens) ---
+
 def coalesce_small_runs(
     records: List[Rec],
     tokenizer: HuggingFaceTokenizer,
@@ -549,7 +575,8 @@ def coalesce_small_runs(
     return out
 
 
-# ---------- Main ----------
+# --- Main ---
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct an argument parser for the chunking pipeline.
 

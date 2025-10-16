@@ -181,7 +181,7 @@ config: Dense index configuration used to rebuild runtime properties.
 dim: Dimensionality of the vectors contained in the index.
 
 Returns:
-Instance of ``FaissIndexManager`` with GPU state initialised.
+Instance of ``FaissVectorStore`` with GPU state initialised.
 
 Raises:
 RuntimeError: If the FAISS index cannot be read or promoted to GPU memory.
@@ -409,7 +409,7 @@ Examples:
 >>> result.vector_id
 'vec-1'
 
-### `FaissIndexManager`
+### `FaissVectorStore`
 
 Manage lifecycle of a GPU-resident FAISS index.
 
@@ -420,6 +420,6 @@ _device: GPU device identifier used for FAISS operations.
 _gpu_resources: FAISS GPU resources allocated for the index.
 
 Examples:
->>> manager = FaissIndexManager(dim=128, config=DenseIndexConfig())  # doctest: +SKIP
+>>> manager = FaissVectorStore(dim=128, config=DenseIndexConfig())  # doctest: +SKIP
 >>> manager.ntotal  # doctest: +SKIP
 0

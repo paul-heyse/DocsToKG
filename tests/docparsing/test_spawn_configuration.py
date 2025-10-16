@@ -4,45 +4,45 @@
 #   "purpose": "Pytest coverage for docparsing spawn configuration scenarios",
 #   "sections": [
 #     {
-#       "id": "test_set_spawn_or_warn_success",
+#       "id": "test-set-spawn-or-warn-success",
 #       "name": "test_set_spawn_or_warn_success",
-#       "anchor": "TSSOW",
+#       "anchor": "function-test-set-spawn-or-warn-success",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_set_spawn_or_warn_already_spawn",
+#       "id": "test-set-spawn-or-warn-already-spawn",
 #       "name": "test_set_spawn_or_warn_already_spawn",
-#       "anchor": "SSOW1",
+#       "anchor": "function-test-set-spawn-or-warn-already-spawn",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_set_spawn_or_warn_incompatible_method",
+#       "id": "test-set-spawn-or-warn-incompatible-method",
 #       "name": "test_set_spawn_or_warn_incompatible_method",
-#       "anchor": "SSOW2",
+#       "anchor": "function-test-set-spawn-or-warn-incompatible-method",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_set_spawn_or_warn_unset_method",
+#       "id": "test-set-spawn-or-warn-unset-method",
 #       "name": "test_set_spawn_or_warn_unset_method",
-#       "anchor": "SSOW3",
+#       "anchor": "function-test-set-spawn-or-warn-unset-method",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_set_spawn_or_warn_no_logger",
+#       "id": "test-set-spawn-or-warn-no-logger",
 #       "name": "test_set_spawn_or_warn_no_logger",
-#       "anchor": "SSOW4",
+#       "anchor": "function-test-set-spawn-or-warn-no-logger",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_set_spawn_or_warn_cuda_safety",
+#       "id": "test-set-spawn-or-warn-cuda-safety",
 #       "name": "test_set_spawn_or_warn_cuda_safety",
-#       "anchor": "SSOW5",
+#       "anchor": "function-test-set-spawn-or-warn-cuda-safety",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_multiprocessing_import_safety",
+#       "id": "test-multiprocessing-import-safety",
 #       "name": "test_multiprocessing_import_safety",
-#       "anchor": "TMIS",
+#       "anchor": "function-test-multiprocessing-import-safety",
 #       "kind": "function"
 #     }
 #   ]
@@ -57,6 +57,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from DocsToKG.DocParsing._common import set_spawn_or_warn
+# --- Test Cases ---
 
 
 def test_set_spawn_or_warn_success():
@@ -160,6 +161,7 @@ def test_multiprocessing_import_safety():
         assert True  # If we get here, no exception was raised
     except ImportError as e:
         pytest.fail(f"Multiprocessing import failed: {e}")
+# --- Module Entry Points ---
 
 
 if __name__ == "__main__":

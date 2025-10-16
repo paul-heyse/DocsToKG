@@ -99,7 +99,7 @@ IngestMetrics capturing counts of upserts and deletions.</p>
 <p>Args:
 None</p>
 <p>Returns:
-FaissIndexManager associated with the ingestion pipeline.</p>
+FaissVectorStore associated with the ingestion pipeline.</p>
 </section>
 <section id="upsert-documents-self-documents">
 <h3><code class="docutils literal notranslate"><span class="pre">upsert_documents(self,</span> <span class="pre">documents)</span></code><a class="headerlink" href="#upsert-documents-self-documents" title="Link to this heading"></a></h3>
@@ -253,7 +253,7 @@ _observability: Observability facade for tracing and logging.</p>
 <div><blockquote>
 <div><blockquote>
 <div><p>pipeline = ChunkIngestionPipeline(
-…     faiss_index=FaissIndexManager.build_in_memory(),
+…     faiss_index=FaissVectorStore.build_in_memory(),
 …     opensearch=OpenSearchSimulator(),
 …     registry=ChunkRegistry(),
 … )

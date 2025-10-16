@@ -5,28 +5,28 @@
 #   "purpose": "Utility script for export attempts csv workflows",
 #   "sections": [
 #     {
-#       "id": "_iter_attempt_records",
-#       "name": "_iter_attempt_records",
-#       "anchor": "IAR",
-#       "kind": "function"
+#       "id": "globals",
+#       "name": "Globals",
+#       "anchor": "GLOB",
+#       "kind": "infra"
 #     },
 #     {
-#       "id": "export_attempts_jsonl_to_csv",
-#       "name": "export_attempts_jsonl_to_csv",
-#       "anchor": "EAJTC",
-#       "kind": "function"
+#       "id": "private_helpers",
+#       "name": "Private Helpers",
+#       "anchor": "PH",
+#       "kind": "internal"
 #     },
 #     {
-#       "id": "_parse_args",
-#       "name": "_parse_args",
-#       "anchor": "PA",
-#       "kind": "function"
+#       "id": "public_functions",
+#       "name": "Public Functions",
+#       "anchor": "PF",
+#       "kind": "api"
 #     },
 #     {
-#       "id": "main",
-#       "name": "main",
-#       "anchor": "MAIN",
-#       "kind": "function"
+#       "id": "module_entry_points",
+#       "name": "Module Entry Points",
+#       "anchor": "MEP",
+#       "kind": "cli"
 #     }
 #   ]
 # }
@@ -41,6 +41,7 @@ import csv
 import json
 from pathlib import Path
 from typing import Iterable, List, Optional
+# --- Globals ---
 
 CSV_HEADER: List[str] = [
     "timestamp",
@@ -59,6 +60,7 @@ CSV_HEADER: List[str] = [
     "dry_run",
     "metadata",
 ]
+# --- Private Helpers ---
 
 
 def _iter_attempt_records(path: Path) -> Iterable[dict]:
@@ -74,6 +76,7 @@ def _iter_attempt_records(path: Path) -> Iterable[dict]:
             if data.get("record_type") != "attempt":
                 continue
             yield data
+# --- Public Functions ---
 
 
 def export_attempts_jsonl_to_csv(input_path: Path, output_path: Path) -> None:
@@ -112,6 +115,7 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument("input", type=Path, help="Path to attempts JSONL file")
     parser.add_argument("output", type=Path, help="Path to CSV output file")
     return parser.parse_args(argv)
+# --- Module Entry Points ---
 
 
 def main(argv: Optional[list[str]] = None) -> None:

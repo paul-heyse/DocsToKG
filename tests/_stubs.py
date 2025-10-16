@@ -1,18 +1,18 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "tests._stubs",
-#   "purpose": "Pytest coverage for stubs scenarios",
+#   "purpose": "Pytest coverage for  stubs scenarios",
 #   "sections": [
 #     {
-#       "id": "promote_simple_namespace_modules",
+#       "id": "promote-simple-namespace-modules",
 #       "name": "promote_simple_namespace_modules",
-#       "anchor": "PSNM",
+#       "anchor": "function-promote-simple-namespace-modules",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "dependency_stubs",
+#       "id": "dependency-stubs",
 #       "name": "dependency_stubs",
-#       "anchor": "DS",
+#       "anchor": "function-dependency-stubs",
 #       "kind": "function"
 #     }
 #   ]
@@ -26,8 +26,10 @@ from __future__ import annotations
 import sys
 from types import ModuleType, SimpleNamespace
 from typing import Any, Dict
+# --- Globals ---
 
 __all__ = ["promote_simple_namespace_modules", "dependency_stubs"]
+# --- Test Cases ---
 
 
 def promote_simple_namespace_modules() -> None:

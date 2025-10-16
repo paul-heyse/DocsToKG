@@ -1,12 +1,44 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.HybridSearch.validation",
-#   "purpose": "Validation harness for DocsToKG hybrid search",
+#   "purpose": "Validation CLI and dataset utilities for hybrid search",
 #   "sections": [
-#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
-#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"},
-#     {"id": "public-functions", "name": "Public Functions", "anchor": "api", "kind": "api"},
-#     {"id": "entry-points", "name": "Module Entry Points", "anchor": "entry", "kind": "infra"}
+#     {
+#       "id": "hybridsearchvalidator",
+#       "name": "HybridSearchValidator",
+#       "anchor": "class-hybridsearchvalidator",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "load-dataset",
+#       "name": "load_dataset",
+#       "anchor": "function-load-dataset",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "infer-embedding-dim",
+#       "name": "infer_embedding_dim",
+#       "anchor": "function-infer-embedding-dim",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-pytest-suites",
+#       "name": "run_pytest_suites",
+#       "anchor": "function-run-pytest-suites",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-real-vector-ci",
+#       "name": "run_real_vector_ci",
+#       "anchor": "function-run-real-vector-ci",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -46,7 +78,7 @@ from .types import (
     ValidationReport,
     ValidationSummary,
 )
-from .vectorstore import FaissIndexManager, pairwise_inner_products
+from .vectorstore import FaissVectorStore, pairwise_inner_products
 from .vectorstore import restore_state as vectorstore_restore_state
 from .vectorstore import serialize_state as vectorstore_serialize_state
 
@@ -83,7 +115,6 @@ BASIC_SPARSE_RELEVANCE_THRESHOLD = 0.90
 
 
 # --- Public Classes ---
-
 
 class HybridSearchValidator:
     """Execute validation sweeps and persist reports.
@@ -1450,7 +1481,6 @@ class HybridSearchValidator:
 
 # --- Public Functions ---
 
-
 def load_dataset(path: Path) -> List[Mapping[str, object]]:
     """Load a JSONL dataset describing documents and queries.
 
@@ -1652,7 +1682,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     config = manager.get()
     embedding_dim = infer_embedding_dim(dataset)
     feature_generator = FeatureGenerator(embedding_dim=embedding_dim)
-    faiss_index = FaissIndexManager(dim=embedding_dim, config=config.dense)
+    faiss_index = FaissVectorStore(dim=embedding_dim, config=config.dense)
     opensearch = OpenSearchSimulator()
     registry = ChunkRegistry()
     observability = Observability()

@@ -1,10 +1,44 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.HybridSearch.config",
-#   "purpose": "Hybrid search configuration models and file-backed manager",
+#   "purpose": "Hybrid search configuration models and manager",
 #   "sections": [
-#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
-#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"}
+#     {
+#       "id": "chunkingconfig",
+#       "name": "ChunkingConfig",
+#       "anchor": "class-chunkingconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "denseindexconfig",
+#       "name": "DenseIndexConfig",
+#       "anchor": "class-denseindexconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "fusionconfig",
+#       "name": "FusionConfig",
+#       "anchor": "class-fusionconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "retrievalconfig",
+#       "name": "RetrievalConfig",
+#       "anchor": "class-retrievalconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "hybridsearchconfig",
+#       "name": "HybridSearchConfig",
+#       "anchor": "class-hybridsearchconfig",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "hybridsearchconfigmanager",
+#       "name": "HybridSearchConfigManager",
+#       "anchor": "class-hybridsearchconfigmanager",
+#       "kind": "class"
+#     }
 #   ]
 # }
 # === /NAVMAP ===
@@ -38,7 +72,6 @@ __all__ = (
 
 
 # --- Public Classes ---
-
 
 @dataclass(frozen=True)
 class ChunkingConfig:

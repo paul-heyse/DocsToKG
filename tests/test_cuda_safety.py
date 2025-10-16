@@ -4,57 +4,57 @@
 #   "purpose": "Pytest coverage for cuda safety scenarios",
 #   "sections": [
 #     {
-#       "id": "reset_start_method",
+#       "id": "reset-start-method",
 #       "name": "reset_start_method",
-#       "anchor": "RSM",
+#       "anchor": "function-reset-start-method",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_dummy_future",
+#       "id": "dummyfuture",
 #       "name": "_DummyFuture",
-#       "anchor": "DUMM",
+#       "anchor": "class-dummyfuture",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_dummy_executor",
+#       "id": "dummyexecutor",
 #       "name": "_DummyExecutor",
-#       "anchor": "DUMM1",
+#       "anchor": "class-dummyexecutor",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_dummy_as_completed",
+#       "id": "dummy-as-completed",
 #       "name": "_dummy_as_completed",
-#       "anchor": "DAC",
+#       "anchor": "function-dummy-as-completed",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_dummy_tqdm",
+#       "id": "dummytqdm",
 #       "name": "_DummyTqdm",
-#       "anchor": "DUMM2",
+#       "anchor": "class-dummytqdm",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_stub_main_setup",
+#       "id": "stub-main-setup",
 #       "name": "_stub_main_setup",
-#       "anchor": "SMS",
+#       "anchor": "function-stub-main-setup",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_import_pdf_module",
+#       "id": "import-pdf-module",
 #       "name": "_import_pdf_module",
-#       "anchor": "IPM",
+#       "anchor": "function-import-pdf-module",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_spawn_enforced_on_main",
+#       "id": "test-spawn-enforced-on-main",
 #       "name": "test_spawn_enforced_on_main",
-#       "anchor": "TSEOM",
+#       "anchor": "function-test-spawn-enforced-on-main",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_spawn_prevents_cuda_reinitialization",
+#       "id": "test-spawn-prevents-cuda-reinitialization",
 #       "name": "test_spawn_prevents_cuda_reinitialization",
-#       "anchor": "TSPCR",
+#       "anchor": "function-test-spawn-prevents-cuda-reinitialization",
 #       "kind": "function"
 #     }
 #   ]
@@ -114,6 +114,7 @@ class _DummyExecutor:
         future = _DummyFuture(fn(arg))
         self.submitted.append(future)
         return future
+# --- Helper Functions ---
 
 
 def _dummy_as_completed(futures: Iterable[_DummyFuture]) -> Iterator[_DummyFuture]:
@@ -141,22 +142,20 @@ class _DummyTqdm:
 def _stub_main_setup(monkeypatch, module, tmp_path, list_return: List) -> SimpleNamespace:
     """Prepare patched environment for invoking the PDF conversion main()."""
 
-    args = SimpleNamespace(
-        data_root=None,
-        input=tmp_path / "input",
-        output=tmp_path / "output",
-    )
-    monkeypatch.setattr(module, "parse_args", lambda: args)
+    args = module.pdf_parse_args([])
+    args.data_root = None
+    args.input = tmp_path / "input"
+    args.output = tmp_path / "output"
+    args.model = str(tmp_path / "model")
+    args.served_model_names = ("granite-docling-258M",)
     monkeypatch.setattr(
         module, "ensure_vllm", lambda *_a, **_k: (module.PREFERRED_PORT, None, False)
     )
-    target_module = getattr(module, "legacy_module", module)
     monkeypatch.setattr(
-        target_module, "start_vllm", lambda *_a, **_k: SimpleNamespace(poll=lambda: None)
+        module, "start_vllm", lambda *_a, **_k: SimpleNamespace(poll=lambda: None)
     )
-    monkeypatch.setattr(target_module, "wait_for_vllm", lambda *_a, **_k: ["stub-model"])
-    monkeypatch.setattr(target_module, "validate_served_models", lambda *_a, **_k: None)
-    monkeypatch.setattr(target_module, "manifest_append", lambda *_a, **_k: None)
+    monkeypatch.setattr(module, "wait_for_vllm", lambda *_a, **_k: ["stub-model"])
+    monkeypatch.setattr(module, "validate_served_models", lambda *_a, **_k: None)
     monkeypatch.setattr(module, "stop_vllm", lambda *_a, **_k: None)
     monkeypatch.setattr(module, "list_pdfs", lambda _dir: list_return)
     monkeypatch.setattr(module, "manifest_append", lambda *a, **k: None)
@@ -185,8 +184,9 @@ def _import_pdf_module(monkeypatch):
             return None
 
     monkeypatch.setitem(sys.modules, "tqdm", mock.MagicMock(tqdm=_TqdmStub()))
-    module = importlib.import_module("DocsToKG.DocParsing.pdf_pipeline")
+    module = importlib.import_module("DocsToKG.DocParsing.pipelines")
     return importlib.reload(module)
+# --- Test Cases ---
 
 
 def test_spawn_enforced_on_main(monkeypatch, tmp_path, reset_start_method):
@@ -194,9 +194,9 @@ def test_spawn_enforced_on_main(monkeypatch, tmp_path, reset_start_method):
 
     module = _import_pdf_module(monkeypatch)
 
-    _stub_main_setup(monkeypatch, module, tmp_path, list_return=[])
+    args = _stub_main_setup(monkeypatch, module, tmp_path, list_return=[])
 
-    module.main()
+    module.pdf_main(args)
 
     assert mp.get_start_method() == "spawn"
 
@@ -211,17 +211,24 @@ def test_spawn_prevents_cuda_reinitialization(monkeypatch, tmp_path, reset_start
     pdf_path = pdf_dir / "sample.pdf"
     pdf_path.write_bytes(b"%PDF-1.4 test")
 
-    _stub_main_setup(monkeypatch, module, tmp_path, list_return=[pdf_path])
+    args = _stub_main_setup(monkeypatch, module, tmp_path, list_return=[pdf_path])
 
     calls = []
 
     def _fake_convert(task):
         calls.append(task)
-        return task[0].name, "ok"
+        return module.PdfConversionResult(
+            doc_id=task.doc_id,
+            status="success",
+            duration_s=0.1,
+            input_path=str(task.pdf_path),
+            input_hash=task.input_hash,
+            output_path=str(task.output_path),
+        )
 
-    monkeypatch.setattr(module, "convert_one", _fake_convert)
+    monkeypatch.setattr(module, "pdf_convert_one", _fake_convert)
 
-    module.main()
+    module.pdf_main(args)
 
     assert mp.get_start_method() == "spawn"
     assert len(calls) == 1

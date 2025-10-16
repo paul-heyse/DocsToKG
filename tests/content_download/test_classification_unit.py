@@ -4,21 +4,21 @@
 #   "purpose": "Pytest coverage for content download classification unit scenarios",
 #   "sections": [
 #     {
-#       "id": "test_classify_payload_octet_stream_requires_sniff",
+#       "id": "test-classify-payload-octet-stream-requires-sniff",
 #       "name": "test_classify_payload_octet_stream_requires_sniff",
-#       "anchor": "TCPOS",
+#       "anchor": "function-test-classify-payload-octet-stream-requires-sniff",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_classify_payload_octet_stream_pdf_signature",
+#       "id": "test-classify-payload-octet-stream-pdf-signature",
 #       "name": "test_classify_payload_octet_stream_pdf_signature",
-#       "anchor": "CPOS1",
+#       "anchor": "function-test-classify-payload-octet-stream-pdf-signature",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_build_download_outcome_respects_head_flag",
+#       "id": "test-build-download-outcome-respects-head-flag",
 #       "name": "test_build_download_outcome_respects_head_flag",
-#       "anchor": "TBDOR",
+#       "anchor": "function-test-build-download-outcome-respects-head-flag",
 #       "kind": "function"
 #     }
 #   ]
@@ -31,6 +31,7 @@ from types import SimpleNamespace
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
 from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
+# --- Test Cases ---
 
 
 def test_classify_payload_octet_stream_requires_sniff():

@@ -4,219 +4,219 @@
 #   "purpose": "Pytest coverage for pipeline execution scenarios",
 #   "sections": [
 #     {
-#       "id": "recording_logger",
+#       "id": "recordinglogger",
 #       "name": "RecordingLogger",
-#       "anchor": "RECO",
+#       "anchor": "class-recordinglogger",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "dummy_artifact",
+#       "id": "dummyartifact",
 #       "name": "DummyArtifact",
-#       "anchor": "DUMM",
+#       "anchor": "class-dummyartifact",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "delay_resolver",
+#       "id": "delayresolver",
 #       "name": "DelayResolver",
-#       "anchor": "DELA",
+#       "anchor": "class-delayresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "failing_resolver",
+#       "id": "failingresolver",
 #       "name": "FailingResolver",
-#       "anchor": "FAIL",
+#       "anchor": "class-failingresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_make_artifact",
+#       "id": "make-artifact",
 #       "name": "_make_artifact",
-#       "anchor": "MA",
+#       "anchor": "function-make-artifact",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_make_config",
+#       "id": "make-config",
 #       "name": "_make_config",
-#       "anchor": "MC",
+#       "anchor": "function-make-config",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_html_outcome",
+#       "id": "html-outcome",
 #       "name": "_html_outcome",
-#       "anchor": "HO",
+#       "anchor": "function-html-outcome",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_sequential_execution_when_max_concurrent_is_one",
+#       "id": "test-sequential-execution-when-max-concurrent-is-one",
 #       "name": "test_sequential_execution_when_max_concurrent_is_one",
-#       "anchor": "TSEWM",
+#       "anchor": "function-test-sequential-execution-when-max-concurrent-is-one",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_concurrent_execution_with_three_workers",
+#       "id": "test-concurrent-execution-with-three-workers",
 #       "name": "test_concurrent_execution_with_three_workers",
-#       "anchor": "TCEWT",
+#       "anchor": "function-test-concurrent-execution-with-three-workers",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_rate_limits_enforced_under_concurrency",
+#       "id": "test-rate-limits-enforced-under-concurrency",
 #       "name": "test_rate_limits_enforced_under_concurrency",
-#       "anchor": "TRLEU",
+#       "anchor": "function-test-rate-limits-enforced-under-concurrency",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_early_stop_cancels_remaining_resolvers",
+#       "id": "test-early-stop-cancels-remaining-resolvers",
 #       "name": "test_early_stop_cancels_remaining_resolvers",
-#       "anchor": "TESCR",
+#       "anchor": "function-test-early-stop-cancels-remaining-resolvers",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_resolver_failure_does_not_abort_concurrency",
+#       "id": "test-resolver-failure-does-not-abort-concurrency",
 #       "name": "test_resolver_failure_does_not_abort_concurrency",
-#       "anchor": "TRFDN",
+#       "anchor": "function-test-resolver-failure-does-not-abort-concurrency",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_null_logger",
+#       "id": "nulllogger",
 #       "name": "_NullLogger",
-#       "anchor": "NULL",
+#       "anchor": "class-nulllogger",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "test_rate_limiting_with_parallel_workers",
+#       "id": "test-rate-limiting-with-parallel-workers",
 #       "name": "test_rate_limiting_with_parallel_workers",
-#       "anchor": "TRLWP",
+#       "anchor": "function-test-rate-limiting-with-parallel-workers",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_slow_resolver",
+#       "id": "slowresolver",
 #       "name": "_SlowResolver",
-#       "anchor": "SLOW",
+#       "anchor": "class-slowresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_memory_logger",
+#       "id": "memorylogger",
 #       "name": "_MemoryLogger",
-#       "anchor": "MEMO",
+#       "anchor": "class-memorylogger",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_stub_artifact",
+#       "id": "stubartifact",
 #       "name": "_StubArtifact",
-#       "anchor": "STUB",
+#       "anchor": "class-stubartifact",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_download_stub",
+#       "id": "download-stub",
 #       "name": "_download_stub",
-#       "anchor": "DS",
+#       "anchor": "function-download-stub",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_concurrent_pipeline_reduces_wall_time",
+#       "id": "test-concurrent-pipeline-reduces-wall-time",
 #       "name": "test_concurrent_pipeline_reduces_wall_time",
-#       "anchor": "TCPRW",
+#       "anchor": "function-test-concurrent-pipeline-reduces-wall-time",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "memory_logger",
+#       "id": "memorylogger",
 #       "name": "MemoryLogger",
-#       "anchor": "MEMO1",
+#       "anchor": "class-memorylogger",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "stub_resolver",
+#       "id": "stubresolver",
 #       "name": "StubResolver",
-#       "anchor": "STUB1",
+#       "anchor": "class-stubresolver",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "make_artifact",
+#       "id": "make-artifact",
 #       "name": "make_artifact",
-#       "anchor": "MA1",
+#       "anchor": "function-make-artifact",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "build_outcome",
+#       "id": "build-outcome",
 #       "name": "build_outcome",
-#       "anchor": "BO",
+#       "anchor": "function-build-outcome",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_respects_custom_order",
+#       "id": "test-pipeline-respects-custom-order",
 #       "name": "test_pipeline_respects_custom_order",
-#       "anchor": "TPRCO",
+#       "anchor": "function-test-pipeline-respects-custom-order",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_stops_after_max_attempts",
+#       "id": "test-pipeline-stops-after-max-attempts",
 #       "name": "test_pipeline_stops_after_max_attempts",
-#       "anchor": "TPSAM",
+#       "anchor": "function-test-pipeline-stops-after-max-attempts",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_deduplicates_urls",
+#       "id": "test-pipeline-deduplicates-urls",
 #       "name": "test_pipeline_deduplicates_urls",
-#       "anchor": "TPDU",
+#       "anchor": "function-test-pipeline-deduplicates-urls",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_collects_html_paths",
+#       "id": "test-pipeline-collects-html-paths",
 #       "name": "test_pipeline_collects_html_paths",
-#       "anchor": "TPCHP",
+#       "anchor": "function-test-pipeline-collects-html-paths",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_rate_limit_enforced",
+#       "id": "test-pipeline-rate-limit-enforced",
 #       "name": "test_pipeline_rate_limit_enforced",
-#       "anchor": "TPRLE",
+#       "anchor": "function-test-pipeline-rate-limit-enforced",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_openalex_resolver_executes_first",
+#       "id": "test-openalex-resolver-executes-first",
 #       "name": "test_openalex_resolver_executes_first",
-#       "anchor": "TOREF",
+#       "anchor": "function-test-openalex-resolver-executes-first",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_openalex_respects_rate_limit",
+#       "id": "test-openalex-respects-rate-limit",
 #       "name": "test_openalex_respects_rate_limit",
-#       "anchor": "TORRL",
+#       "anchor": "function-test-openalex-respects-rate-limit",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_records_failed_urls",
+#       "id": "test-pipeline-records-failed-urls",
 #       "name": "test_pipeline_records_failed_urls",
-#       "anchor": "TPRFU",
+#       "anchor": "function-test-pipeline-records-failed-urls",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_make_artifact",
+#       "id": "make-artifact",
 #       "name": "_make_artifact",
-#       "anchor": "MA2",
+#       "anchor": "function-make-artifact",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_pipeline_executes_resolvers_in_expected_order",
+#       "id": "test-pipeline-executes-resolvers-in-expected-order",
 #       "name": "test_pipeline_executes_resolvers_in_expected_order",
-#       "anchor": "TPERI",
+#       "anchor": "function-test-pipeline-executes-resolvers-in-expected-order",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_real_network_download",
+#       "id": "test-real-network-download",
 #       "name": "test_real_network_download",
-#       "anchor": "TRND",
+#       "anchor": "function-test-real-network-download",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_resolver_pipeline_downloads_pdf_end_to_end",
+#       "id": "test-resolver-pipeline-downloads-pdf-end-to-end",
 #       "name": "test_resolver_pipeline_downloads_pdf_end_to_end",
-#       "anchor": "TRPDP",
+#       "anchor": "function-test-resolver-pipeline-downloads-pdf-end-to-end",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_download_candidate_marks_corrupt_without_eof",
+#       "id": "test-download-candidate-marks-corrupt-without-eof",
 #       "name": "test_download_candidate_marks_corrupt_without_eof",
-#       "anchor": "TDCMC",
+#       "anchor": "function-test-download-candidate-marks-corrupt-without-eof",
 #       "kind": "function"
 #     }
 #   ]
@@ -254,7 +254,8 @@ from DocsToKG.ContentDownload.resolvers import (
 )
 
 
-# ---- test_bounded_concurrency.py -----------------------------
+# --- test_bounded_concurrency.py ---
+
 class RecordingLogger:
     """Collect attempt records emitted by the pipeline during tests."""
 
@@ -267,7 +268,8 @@ class RecordingLogger:
             self.records.append(record)
 
 
-# ---- test_bounded_concurrency.py -----------------------------
+# --- test_bounded_concurrency.py ---
+
 @dataclass
 class DummyArtifact:
     work_id: str
@@ -276,7 +278,8 @@ class DummyArtifact:
     failed_pdf_urls: List[str] = field(default_factory=list)
 
 
-# ---- test_bounded_concurrency.py -----------------------------
+# --- test_bounded_concurrency.py ---
+
 class DelayResolver:
     """Resolver that sleeps before yielding URLs to simulate slow sources."""
 
@@ -303,7 +306,8 @@ class DelayResolver:
             yield ResolverResult(url=url)
 
 
-# ---- test_bounded_concurrency.py -----------------------------
+# --- test_bounded_concurrency.py ---
+
 class FailingResolver:
     """Resolver that raises an exception to test error isolation."""
 
@@ -317,7 +321,8 @@ class FailingResolver:
         raise RuntimeError("boom")
 
 
-# ---- test_bounded_concurrency.py -----------------------------
+# --- test_bounded_concurrency.py ---
+
 def _make_artifact(tmp_path) -> DummyArtifact:
     return DummyArtifact(
         work_id="W-test",
@@ -326,7 +331,8 @@ def _make_artifact(tmp_path) -> DummyArtifact:
     )
 
 
-# ---- test_bounded_concurrency.py -----------------------------
+# --- test_bounded_concurrency.py ---
+
 def _make_config(names: Iterable[str], **kwargs) -> ResolverConfig:
     names = list(names)
     toggles = {name: True for name in names}
@@ -338,7 +344,8 @@ def _make_config(names: Iterable[str], **kwargs) -> ResolverConfig:
     )
 
 
-# ---- test_bounded_concurrency.py -----------------------------
+# --- test_bounded_concurrency.py ---
+
 def _html_outcome() -> DownloadOutcome:
     return DownloadOutcome(
         classification="html",
@@ -349,7 +356,8 @@ def _html_outcome() -> DownloadOutcome:
     )
 
 
-# ---- test_bounded_concurrency.py -----------------------------
+# --- test_bounded_concurrency.py ---
+
 def test_sequential_execution_when_max_concurrent_is_one(tmp_path):
     artifact = _make_artifact(tmp_path)
     resolvers = [
@@ -374,7 +382,8 @@ def test_sequential_execution_when_max_concurrent_is_one(tmp_path):
     assert elapsed >= 0.5, f"Sequential execution finished too quickly: {elapsed:.3f}s"
 
 
-# ---- test_bounded_concurrency.py -----------------------------
+# --- test_bounded_concurrency.py ---
+
 def test_concurrent_execution_with_three_workers(tmp_path):
     artifact = _make_artifact(tmp_path)
     seq_resolvers = [
@@ -420,7 +429,8 @@ def test_concurrent_execution_with_three_workers(tmp_path):
     assert start_spread < 0.15
 
 
-# ---- test_bounded_concurrency.py -----------------------------
+# --- test_bounded_concurrency.py ---
+
 def test_rate_limits_enforced_under_concurrency(tmp_path):
     artifact = _make_artifact(tmp_path)
     resolvers = [
@@ -453,7 +463,8 @@ def test_rate_limits_enforced_under_concurrency(tmp_path):
             assert delta >= 0.19, f"Rate limit gap too small: {delta:.3f}s for {resolver.name}"
 
 
-# ---- test_bounded_concurrency.py -----------------------------
+# --- test_bounded_concurrency.py ---
+
 def test_early_stop_cancels_remaining_resolvers(tmp_path):
     artifact = _make_artifact(tmp_path)
     fast = DelayResolver("fast", ["https://fast.example/pdf"], delay=0.0)
@@ -486,7 +497,8 @@ def test_early_stop_cancels_remaining_resolvers(tmp_path):
     assert downloaded == ["https://fast.example/pdf"]
 
 
-# ---- test_bounded_concurrency.py -----------------------------
+# --- test_bounded_concurrency.py ---
+
 def test_resolver_failure_does_not_abort_concurrency(tmp_path):
     artifact = _make_artifact(tmp_path)
     failing = FailingResolver("failing")
@@ -512,20 +524,24 @@ def test_resolver_failure_does_not_abort_concurrency(tmp_path):
     assert error_records[0].reason == "resolver-exception"
 
 
-# ---- test_parallel_execution.py -----------------------------
+# --- test_parallel_execution.py ---
+
 pytest.importorskip("requests")
 
-# ---- test_parallel_execution.py -----------------------------
+# --- test_parallel_execution.py ---
+
 pytest.importorskip("pyalex")
 
 
-# ---- test_parallel_execution.py -----------------------------
+# --- test_parallel_execution.py ---
+
 class _NullLogger:
     def log(self, record):  # pragma: no cover - no-op sink
         pass
 
 
-# ---- test_parallel_execution.py -----------------------------
+# --- test_parallel_execution.py ---
+
 def test_rate_limiting_with_parallel_workers():
     config = ResolverConfig()
     config.resolver_min_interval_s = {"test": 0.1}
@@ -546,7 +562,8 @@ def test_rate_limiting_with_parallel_workers():
         assert second - first >= 0.09
 
 
-# ---- test_parallel_execution.py -----------------------------
+# --- test_parallel_execution.py ---
+
 class _SlowResolver:
     def __init__(self, name: str, delay: float) -> None:
         self.name = name
@@ -560,7 +577,8 @@ class _SlowResolver:
         yield ResolverResult(url=f"https://example.org/{self.name}.html")
 
 
-# ---- test_parallel_execution.py -----------------------------
+# --- test_parallel_execution.py ---
+
 class _MemoryLogger:
     def __init__(self) -> None:
         self.records = []
@@ -573,14 +591,16 @@ class _MemoryLogger:
         self.log(record)
 
 
-# ---- test_parallel_execution.py -----------------------------
+# --- test_parallel_execution.py ---
+
 class _StubArtifact:
     def __init__(self) -> None:
         self.work_id = "W-concurrency"
         self.failed_pdf_urls = []
 
 
-# ---- test_parallel_execution.py -----------------------------
+# --- test_parallel_execution.py ---
+
 def _download_stub(session, artifact, url, referer, timeout, context=None):
     del session, artifact, url, referer, timeout, context
     return DownloadOutcome(
@@ -591,7 +611,8 @@ def _download_stub(session, artifact, url, referer, timeout, context=None):
     )
 
 
-# ---- test_parallel_execution.py -----------------------------
+# --- test_parallel_execution.py ---
+
 def test_concurrent_pipeline_reduces_wall_time(monkeypatch):
     monkeypatch.setattr("DocsToKG.ContentDownload.resolvers.random.random", lambda: 0.0)
     resolver_count = 4
@@ -642,11 +663,13 @@ def test_concurrent_pipeline_reduces_wall_time(monkeypatch):
     assert len(concurrent_logger.records) == resolver_count
 
 
-# ---- test_pipeline_behaviour.py -----------------------------
+# --- test_pipeline_behaviour.py ---
+
 pytest.importorskip("pyalex")
 
 
-# ---- test_pipeline_behaviour.py -----------------------------
+# --- test_pipeline_behaviour.py ---
+
 class MemoryLogger:
     def __init__(self, records: Optional[List[AttemptRecord]] = None) -> None:
         self.records = records or []
@@ -659,7 +682,8 @@ class MemoryLogger:
         self.log(record)
 
 
-# ---- test_pipeline_behaviour.py -----------------------------
+# --- test_pipeline_behaviour.py ---
+
 class StubResolver:
     def __init__(self, name: str, results):
         self.name = name
@@ -673,7 +697,8 @@ class StubResolver:
             yield result
 
 
-# ---- test_pipeline_behaviour.py -----------------------------
+# --- test_pipeline_behaviour.py ---
+
 def make_artifact(tmp_path: Path) -> downloader.WorkArtifact:
     return downloader.WorkArtifact(
         work_id="W1",
@@ -693,7 +718,8 @@ def make_artifact(tmp_path: Path) -> downloader.WorkArtifact:
     )
 
 
-# ---- test_pipeline_behaviour.py -----------------------------
+# --- test_pipeline_behaviour.py ---
+
 def build_outcome(classification: str, path: str | None = None) -> DownloadOutcome:
     return DownloadOutcome(
         classification=classification,
@@ -705,7 +731,8 @@ def build_outcome(classification: str, path: str | None = None) -> DownloadOutco
     )
 
 
-# ---- test_pipeline_behaviour.py -----------------------------
+# --- test_pipeline_behaviour.py ---
+
 def test_pipeline_respects_custom_order(tmp_path):
     artifact = make_artifact(tmp_path)
     attempts: List[str] = []
@@ -738,7 +765,8 @@ def test_pipeline_respects_custom_order(tmp_path):
     assert logger.records[0].resolver_name == "beta"
 
 
-# ---- test_pipeline_behaviour.py -----------------------------
+# --- test_pipeline_behaviour.py ---
+
 def test_pipeline_stops_after_max_attempts(tmp_path):
     artifact = make_artifact(tmp_path)
 
@@ -772,7 +800,8 @@ def test_pipeline_stops_after_max_attempts(tmp_path):
     assert len(logger.records) == 1
 
 
-# ---- test_pipeline_behaviour.py -----------------------------
+# --- test_pipeline_behaviour.py ---
+
 def test_pipeline_deduplicates_urls(tmp_path):
     artifact = make_artifact(tmp_path)
     resolver = StubResolver(
@@ -804,7 +833,8 @@ def test_pipeline_deduplicates_urls(tmp_path):
     assert duplicates == ["duplicate-url"]
 
 
-# ---- test_pipeline_behaviour.py -----------------------------
+# --- test_pipeline_behaviour.py ---
+
 def test_pipeline_collects_html_paths(tmp_path):
     artifact = make_artifact(tmp_path)
 
@@ -833,7 +863,8 @@ def test_pipeline_collects_html_paths(tmp_path):
     assert result.html_paths and Path(result.html_paths[0]).name == "example.html"
 
 
-# ---- test_pipeline_behaviour.py -----------------------------
+# --- test_pipeline_behaviour.py ---
+
 def test_pipeline_rate_limit_enforced(monkeypatch, tmp_path):
     artifact = make_artifact(tmp_path)
     timeline = [0.0, 0.2, 0.2, 1.2, 2.0, 2.8]
@@ -875,7 +906,8 @@ def test_pipeline_rate_limit_enforced(monkeypatch, tmp_path):
     assert pytest.approx(sleeps[1], rel=0.01) == 0.8
 
 
-# ---- test_pipeline_behaviour.py -----------------------------
+# --- test_pipeline_behaviour.py ---
+
 def test_openalex_resolver_executes_first(tmp_path):
     artifact = make_artifact(tmp_path)
     artifact.pdf_urls = ["https://openalex.org/direct.pdf"]
@@ -914,7 +946,8 @@ def test_openalex_resolver_executes_first(tmp_path):
     assert metrics.successes["openalex"] == 1
 
 
-# ---- test_pipeline_behaviour.py -----------------------------
+# --- test_pipeline_behaviour.py ---
+
 def test_openalex_respects_rate_limit(monkeypatch, tmp_path):
     artifact = make_artifact(tmp_path)
     artifact.pdf_urls = ["https://openalex.org/pdf-one"]
@@ -954,7 +987,8 @@ def test_openalex_respects_rate_limit(monkeypatch, tmp_path):
     assert sleeps and pytest.approx(sleeps[0], rel=0.05) == 0.8
 
 
-# ---- test_pipeline_behaviour.py -----------------------------
+# --- test_pipeline_behaviour.py ---
+
 def test_pipeline_records_failed_urls(tmp_path):
     artifact = make_artifact(tmp_path)
     artifact.pdf_urls = ["https://openalex.org/broken.pdf"]
@@ -983,11 +1017,13 @@ def test_pipeline_records_failed_urls(tmp_path):
     assert artifact.failed_pdf_urls == ["https://openalex.org/broken.pdf"]
 
 
-# ---- test_full_pipeline_integration.py -----------------------------
+# --- test_full_pipeline_integration.py ---
+
 pytest.importorskip("pyalex")
 
 
-# ---- test_full_pipeline_integration.py -----------------------------
+# --- test_full_pipeline_integration.py ---
+
 def _make_artifact(tmp_path: Path) -> WorkArtifact:  # noqa: F811
     return WorkArtifact(
         work_id="W-integration",
@@ -1007,7 +1043,8 @@ def _make_artifact(tmp_path: Path) -> WorkArtifact:  # noqa: F811
     )
 
 
-# ---- test_full_pipeline_integration.py -----------------------------
+# --- test_full_pipeline_integration.py ---
+
 def test_pipeline_executes_resolvers_in_expected_order(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -1085,7 +1122,8 @@ def test_pipeline_executes_resolvers_in_expected_order(
     assert respect_calls[: len(expected_prefix)] == expected_prefix
 
 
-# ---- test_full_pipeline_integration.py -----------------------------
+# --- test_full_pipeline_integration.py ---
+
 @pytest.mark.integration
 def test_real_network_download(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     if not os.environ.get("DOCSTOKG_RUN_NETWORK_TESTS"):
@@ -1119,14 +1157,17 @@ def test_real_network_download(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     assert isinstance(result.success, bool)
 
 
-# ---- test_end_to_end_offline.py -----------------------------
+# --- test_end_to_end_offline.py ---
+
 pytest.importorskip("pyalex")
 
-# ---- test_end_to_end_offline.py -----------------------------
+# --- test_end_to_end_offline.py ---
+
 responses = pytest.importorskip("responses")
 
 
-# ---- test_end_to_end_offline.py -----------------------------
+# --- test_end_to_end_offline.py ---
+
 @responses.activate
 def test_resolver_pipeline_downloads_pdf_end_to_end(tmp_path):
     work = {
@@ -1186,7 +1227,8 @@ def test_resolver_pipeline_downloads_pdf_end_to_end(tmp_path):
     assert pdf_path.read_bytes().startswith(b"%PDF")
 
 
-# ---- test_end_to_end_offline.py -----------------------------
+# --- test_end_to_end_offline.py ---
+
 @responses.activate
 def test_download_candidate_marks_corrupt_without_eof(tmp_path):
     work = {

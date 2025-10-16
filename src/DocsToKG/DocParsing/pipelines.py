@@ -4,237 +4,231 @@
 #   "purpose": "Implements DocsToKG.DocParsing.pipelines behaviors and helpers",
 #   "sections": [
 #     {
-#       "id": "_looks_like_filesystem_path",
+#       "id": "looks-like-filesystem-path",
 #       "name": "_looks_like_filesystem_path",
-#       "anchor": "LLFP",
+#       "anchor": "function-looks-like-filesystem-path",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_expand_path",
+#       "id": "expand-path",
 #       "name": "_expand_path",
-#       "anchor": "EP",
+#       "anchor": "function-expand-path",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "resolve_hf_home",
+#       "id": "resolve-hf-home",
 #       "name": "resolve_hf_home",
-#       "anchor": "RHH",
+#       "anchor": "function-resolve-hf-home",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "resolve_model_root",
+#       "id": "resolve-model-root",
 #       "name": "resolve_model_root",
-#       "anchor": "RMR",
+#       "anchor": "function-resolve-model-root",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "resolve_pdf_model_path",
+#       "id": "resolve-pdf-model-path",
 #       "name": "resolve_pdf_model_path",
-#       "anchor": "RPMP",
+#       "anchor": "function-resolve-pdf-model-path",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "add_data_root_option",
+#       "id": "add-data-root-option",
 #       "name": "add_data_root_option",
-#       "anchor": "ADRO",
+#       "anchor": "function-add-data-root-option",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "add_resume_force_options",
+#       "id": "add-resume-force-options",
 #       "name": "add_resume_force_options",
-#       "anchor": "ARFO",
+#       "anchor": "function-add-resume-force-options",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "prepare_data_root",
+#       "id": "prepare-data-root",
 #       "name": "prepare_data_root",
-#       "anchor": "PDR",
+#       "anchor": "function-prepare-data-root",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "resolve_pipeline_path",
+#       "id": "resolve-pipeline-path",
 #       "name": "resolve_pipeline_path",
-#       "anchor": "RPP",
+#       "anchor": "function-resolve-pipeline-path",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_dedupe_preserve_order",
+#       "id": "dedupe-preserve-order",
 #       "name": "_dedupe_preserve_order",
-#       "anchor": "DPO",
+#       "anchor": "function-dedupe-preserve-order",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "_normalize_served_model_names",
+#       "id": "normalize-served-model-names",
 #       "name": "_normalize_served_model_names",
-#       "anchor": "NSMN",
+#       "anchor": "function-normalize-served-model-names",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "detect_vllm_version",
+#       "id": "detect-vllm-version",
 #       "name": "detect_vllm_version",
-#       "anchor": "DVV",
+#       "anchor": "function-detect-vllm-version",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "validate_served_models",
+#       "id": "validate-served-models",
 #       "name": "validate_served_models",
-#       "anchor": "VSM",
+#       "anchor": "function-validate-served-models",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "pdf_build_parser",
+#       "id": "pdf-build-parser",
 #       "name": "pdf_build_parser",
-#       "anchor": "PBP",
+#       "anchor": "function-pdf-build-parser",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "pdf_parse_args",
+#       "id": "pdf-parse-args",
 #       "name": "pdf_parse_args",
-#       "anchor": "PPA",
+#       "anchor": "function-pdf-parse-args",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "pdf_task",
+#       "id": "pdftask",
 #       "name": "PdfTask",
-#       "anchor": "PDFT",
+#       "anchor": "class-pdftask",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "pdf_conversion_result",
+#       "id": "pdfconversionresult",
 #       "name": "PdfConversionResult",
-#       "anchor": "PDFC",
+#       "anchor": "class-pdfconversionresult",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_normalize_status",
-#       "name": "_normalize_status",
-#       "anchor": "NS",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "_safe_float",
+#       "id": "safe-float",
 #       "name": "_safe_float",
-#       "anchor": "SF",
+#       "anchor": "function-safe-float",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "normalize_conversion_result",
+#       "id": "normalize-conversion-result",
 #       "name": "normalize_conversion_result",
-#       "anchor": "NCR",
+#       "anchor": "function-normalize-conversion-result",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "port_is_free",
+#       "id": "port-is-free",
 #       "name": "port_is_free",
-#       "anchor": "PIF",
+#       "anchor": "function-port-is-free",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "probe_models",
+#       "id": "probe-models",
 #       "name": "probe_models",
-#       "anchor": "PM",
+#       "anchor": "function-probe-models",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "probe_metrics",
+#       "id": "probe-metrics",
 #       "name": "probe_metrics",
-#       "anchor": "PM1",
+#       "anchor": "function-probe-metrics",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "stream_logs",
+#       "id": "stream-logs",
 #       "name": "stream_logs",
-#       "anchor": "SL",
+#       "anchor": "function-stream-logs",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "start_vllm",
+#       "id": "start-vllm",
 #       "name": "start_vllm",
-#       "anchor": "SV",
+#       "anchor": "function-start-vllm",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "wait_for_vllm",
+#       "id": "wait-for-vllm",
 #       "name": "wait_for_vllm",
-#       "anchor": "WFV",
+#       "anchor": "function-wait-for-vllm",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "stop_vllm",
+#       "id": "stop-vllm",
 #       "name": "stop_vllm",
-#       "anchor": "SV1",
+#       "anchor": "function-stop-vllm",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "ensure_vllm",
+#       "id": "ensure-vllm",
 #       "name": "ensure_vllm",
-#       "anchor": "EV",
+#       "anchor": "function-ensure-vllm",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "list_pdfs",
+#       "id": "list-pdfs",
 #       "name": "list_pdfs",
-#       "anchor": "LP",
+#       "anchor": "function-list-pdfs",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "pdf_convert_one",
+#       "id": "pdf-convert-one",
 #       "name": "pdf_convert_one",
-#       "anchor": "PCO",
+#       "anchor": "function-pdf-convert-one",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "pdf_main",
+#       "id": "pdf-main",
 #       "name": "pdf_main",
-#       "anchor": "PM2",
+#       "anchor": "function-pdf-main",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "html_build_parser",
+#       "id": "html-build-parser",
 #       "name": "html_build_parser",
-#       "anchor": "HBP",
+#       "anchor": "function-html-build-parser",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "html_parse_args",
+#       "id": "html-parse-args",
 #       "name": "html_parse_args",
-#       "anchor": "HPA",
+#       "anchor": "function-html-parse-args",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "html_task",
+#       "id": "htmltask",
 #       "name": "HtmlTask",
-#       "anchor": "HTML",
+#       "anchor": "class-htmltask",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "html_conversion_result",
+#       "id": "htmlconversionresult",
 #       "name": "HtmlConversionResult",
-#       "anchor": "HTML1",
+#       "anchor": "class-htmlconversionresult",
 #       "kind": "class"
 #     },
 #     {
-#       "id": "_get_converter",
+#       "id": "get-converter",
 #       "name": "_get_converter",
-#       "anchor": "GC",
+#       "anchor": "function-get-converter",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "list_htmls",
+#       "id": "list-htmls",
 #       "name": "list_htmls",
-#       "anchor": "LH",
+#       "anchor": "function-list-htmls",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "html_convert_one",
+#       "id": "html-convert-one",
 #       "name": "html_convert_one",
-#       "anchor": "HCO",
+#       "anchor": "function-html-convert-one",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "html_main",
+#       "id": "html-main",
 #       "name": "html_main",
-#       "anchor": "HM",
+#       "anchor": "function-html-main",
 #       "kind": "function"
 #     }
 #   ]
@@ -290,6 +284,7 @@ from DocsToKG.DocParsing._common import (
     acquire_lock,
     compute_content_hash,
     data_doctags,
+    data_html,
     data_manifests,
     data_pdfs,
     detect_data_root,
@@ -310,11 +305,52 @@ except Exception:  # pragma: no cover - guard for stripped-down runtime
 
 _LOGGER = get_logger(__name__)
 
+# --- Globals ---
 
-# -------- Model path resolution helpers --------
+__all__ = (
+    "add_data_root_option",
+    "add_resume_force_options",
+    "detect_vllm_version",
+    "ensure_vllm",
+    "html_build_parser",
+    "html_main",
+    "html_parse_args",
+    "normalize_conversion_result",
+    "pdf_build_parser",
+    "pdf_main",
+    "pdf_parse_args",
+    "prepare_data_root",
+    "resolve_hf_home",
+    "resolve_model_root",
+    "resolve_pdf_model_path",
+    "resolve_pipeline_path",
+    "validate_served_models",
+)
 
 PDF_MODEL_SUBDIR = Path("granite-docling-258M")
 
+# Default data directories resolved relative to the workspace.
+DEFAULT_DATA_ROOT = detect_data_root()
+DEFAULT_INPUT = data_pdfs(DEFAULT_DATA_ROOT)
+DEFAULT_OUTPUT = data_doctags(DEFAULT_DATA_ROOT)
+MANIFEST_STAGE = "doctags-pdf"
+
+# Execution defaults for the vLLM-backed conversion pipeline.
+PREFERRED_PORT = 8000
+PORT_SCAN_SPAN = 32
+DEFAULT_WORKERS = min(12, (os.cpu_count() or 16) - 4)
+WAIT_TIMEOUT_S = 300
+
+# Thread hygiene for CPU libs
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("DOCLING_CUDA_USE_FLASH_ATTENTION2", "1")
+
+ARTIFACTS = os.environ.get("DOCLING_ARTIFACTS_PATH", "")
+
+
+# --- Model Path Utilities ---
 
 def _looks_like_filesystem_path(candidate: str) -> bool:
     """Return ``True`` when ``candidate`` appears to reference a local path."""
@@ -393,12 +429,7 @@ def resolve_pdf_model_path(cli_value: str | None = None) -> str:
     return str(expand_path(model_root / PDF_MODEL_SUBDIR))
 
 
-# -------- Paths --------
-DEFAULT_DATA_ROOT = detect_data_root()
-DEFAULT_INPUT = data_pdfs(DEFAULT_DATA_ROOT)
-DEFAULT_OUTPUT = data_doctags(DEFAULT_DATA_ROOT)
-MANIFEST_STAGE = "doctags-pdf"
-
+# --- CLI Helpers ---
 
 def add_data_root_option(parser: argparse.ArgumentParser) -> None:
     """Attach the shared ``--data-root`` option to a CLI parser.
@@ -526,6 +557,8 @@ def resolve_pipeline_path(
         return default_path
     return cli_value
 
+
+# --- vLLM Lifecycle ---
 
 def _dedupe_preserve_order(names: Iterable[str]) -> List[str]:
     """Return a list containing ``names`` without duplicates while preserving order.
@@ -757,22 +790,8 @@ DEFAULT_SERVED_MODEL_NAMES: Tuple[str, ...] = (
 )
 DEFAULT_GPU_MEMORY_UTILIZATION = 0.30
 
-# -------- Settings --------
-PREFERRED_PORT = 8000
-PORT_SCAN_SPAN = 32
-DEFAULT_WORKERS = min(12, (os.cpu_count() or 16) - 4)
-WAIT_TIMEOUT_S = 300
+# --- PDF Pipeline ---
 
-# Thread hygiene for CPU libs
-os.environ.setdefault("OMP_NUM_THREADS", "1")
-os.environ.setdefault("MKL_NUM_THREADS", "1")
-os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-os.environ.setdefault("DOCLING_CUDA_USE_FLASH_ATTENTION2", "1")
-
-ARTIFACTS = os.environ.get("DOCLING_ARTIFACTS_PATH", "")
-
-
-# -------- Utilities --------
 @dataclass
 class PdfTask:
     """Work item representing a single PDF conversion request.
@@ -817,24 +836,6 @@ class PdfTask:
     vlm_prompt: str
     vlm_stop: Tuple[str, ...]
 
-    def __getitem__(self, index: int) -> Path:
-        """Provide tuple-like access for compatibility with legacy tests.
-
-        Args:
-            index: Position requested by tuple-style accessors.
-
-        Returns:
-            PDF path when ``index`` is ``0``.
-
-        Raises:
-            IndexError: If ``index`` is not ``0``.
-        """
-
-        if index == 0:
-            return self.pdf_path
-        raise IndexError("PdfTask only supports index 0")
-
-
 @dataclass
 class PdfConversionResult:
     """Structured result returned by worker processes.
@@ -862,29 +863,6 @@ class PdfConversionResult:
     error: Optional[str] = None
 
 
-def _normalize_status(raw: Optional[str]) -> str:
-    """Coerce legacy status strings into the canonical vocabulary.
-
-    Args:
-        raw: Status string emitted by historical workers or manifests.
-
-    Returns:
-        Canonical status string (``"success"``, ``"skip"``, or ``"failure"``).
-    """
-
-    if not raw:
-        return "success"
-
-    normalized = raw.strip().lower()
-    if normalized in {"ok", "success", "succeeded", "done"}:
-        return "success"
-    if normalized in {"skip", "skipped", "skipping"}:
-        return "skip"
-    if normalized in {"fail", "failed", "error", "exception"}:
-        return "failure"
-    return normalized
-
-
 def _safe_float(value: Any) -> float:
     """Convert the supplied value to ``float`` when possible.
 
@@ -902,85 +880,23 @@ def _safe_float(value: Any) -> float:
 
 
 def normalize_conversion_result(result: Any, task: Optional[PdfTask] = None) -> PdfConversionResult:
-    """Adapt heterogeneous worker return values into :class:`PdfConversionResult`.
-
-    Historically the converter returned a tuple ``(doc_id, status)``.  The
-    refactor switched to ``PdfConversionResult`` which broke a regression test
-    that still emits tuples.  This helper accepts both shapes—as well as dicts
-    produced by ad-hoc stubs—and populates missing metadata from the associated
-    :class:`PdfTask` when available.
+    """Validate that worker results conform to :class:`PdfConversionResult`.
 
     Args:
         result: Object returned by a worker invocation.
-        task: Related :class:`PdfTask` used to back-fill metadata when needed.
+        task: Deprecated parameter retained for API stability; ignored.
 
     Returns:
-        Normalised :class:`PdfConversionResult` instance encapsulating the
-        conversion outcome.
+        The original :class:`PdfConversionResult` when the type check passes.
+
+    Raises:
+        TypeError: If the worker returned an unexpected result type.
     """
 
     if isinstance(result, PdfConversionResult):
         return result
-
-    if isinstance(result, dict):
-        payload: Dict[str, Any] = dict(result)
-        doc_id = payload.get("doc_id") or (task.doc_id if task else "unknown")
-        status = _normalize_status(payload.get("status"))
-        return PdfConversionResult(
-            doc_id=str(doc_id),
-            status=status,
-            duration_s=_safe_float(payload.get("duration_s", 0.0)),
-            input_path=str(payload.get("input_path") or (task.pdf_path if task else "")),
-            input_hash=str(payload.get("input_hash") or (task.input_hash if task else "")),
-            output_path=str(payload.get("output_path") or (task.output_path if task else "")),
-            error=payload.get("error"),
-        )
-
-    if isinstance(result, (tuple, list)):
-        doc_id = (
-            result[0]
-            if len(result) > 0 and result[0] is not None
-            else (task.doc_id if task else "unknown")
-        )
-        status = _normalize_status(result[1] if len(result) > 1 else None)
-        duration = _safe_float(result[2] if len(result) > 2 else 0.0)
-        input_path = (
-            result[3]
-            if len(result) > 3 and result[3] is not None
-            else (task.pdf_path if task else "")
-        )
-        output_path = (
-            result[4]
-            if len(result) > 4 and result[4] is not None
-            else (task.output_path if task else "")
-        )
-        input_hash = (
-            result[5]
-            if len(result) > 5 and result[5] is not None
-            else (task.input_hash if task else "")
-        )
-        error = result[6] if len(result) > 6 else None
-
-        return PdfConversionResult(
-            doc_id=str(doc_id),
-            status=status,
-            duration_s=duration,
-            input_path=str(input_path),
-            input_hash=str(input_hash),
-            output_path=str(output_path),
-            error=None if error is None else str(error),
-        )
-
-    # Fallback for unexpected return types
-    doc_id = task.doc_id if task else "unknown"
-    return PdfConversionResult(
-        doc_id=doc_id,
-        status="failure",
-        duration_s=0.0,
-        input_path=str(task.pdf_path if task else ""),
-        input_hash=str(task.input_hash if task else ""),
-        output_path=str(task.output_path if task else ""),
-        error=f"Unsupported result type: {type(result)!r}",
+    raise TypeError(
+        f"pdf_convert_one must return PdfConversionResult, received {type(result).__name__}"
     )
 
 
@@ -1302,7 +1218,7 @@ def list_pdfs(root: Path) -> List[Path]:
     return sorted([p for p in root.rglob("*.pdf") if p.is_file()])
 
 
-# -------- Docling worker --------
+# PDF worker helpers
 def pdf_convert_one(task: PdfTask) -> PdfConversionResult:
     """Convert a single PDF into DocTags using a remote vLLM-backed pipeline.
 
@@ -1458,7 +1374,6 @@ def pdf_convert_one(task: PdfTask) -> PdfConversionResult:
         )
 
 
-# -------- Main --------
 def pdf_main(args: argparse.Namespace | None = None) -> int:
     """Coordinate vLLM startup and parallel DocTags conversion.
 
@@ -1746,30 +1661,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
     return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(pdf_main())
-
-
-# --------------------------------------------------------------------------- #
-# HTML Pipeline
-# --------------------------------------------------------------------------- #
-
-"""
-Parallel HTML → DocTags conversion pipeline.
-
-Implements Docling HTML conversions across multiple processes while tracking
-manifests, resume/force semantics, and advisory file locks. The pipeline is
-used by the DocsToKG CLI to transform raw HTML corpora into DocTags ready for
-chunking and embedding.
-"""
-
-
-from DocsToKG.DocParsing._common import (
-    data_doctags,
-    data_html,
-    detect_data_root,
-    get_logger,
-)
+# --- HTML Pipeline ---
 
 HTML_DEFAULT_INPUT_DIR = data_html()
 HTML_DEFAULT_OUTPUT_DIR = data_doctags()
@@ -1778,16 +1670,9 @@ HTML_MANIFEST_STAGE = "doctags-html"
 if TYPE_CHECKING:
     from docling.document_converter import DocumentConverter
 
-_LOGGER = get_logger(__name__)
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")  # ensure CPU-only HTML conversions
 
-# keep numeric libs polite; also ensure nothing touches CUDA by mistake
-os.environ.setdefault("OMP_NUM_THREADS", "1")
-os.environ.setdefault("MKL_NUM_THREADS", "1")
-os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")  # CPU-only
-
-# per-process converter cache
-_CONVERTER = None
+_CONVERTER: "DocumentConverter | None" = None
 
 
 def html_build_parser() -> argparse.ArgumentParser:
@@ -1916,21 +1801,13 @@ class HtmlConversionResult:
 
 
 def _get_converter() -> "DocumentConverter":
-    """Instantiate and cache a Docling HTML converter per worker process.
+    """Instantiate and cache a Docling HTML converter per worker process."""
 
-    Returns:
-        DocumentConverter configured for HTML input, cached for reuse within
-        the worker process.
-    """
-    from docling.backend.html_backend import HTMLDocumentBackend
-    from docling.datamodel.base_models import InputFormat
-    from docling.document_converter import DocumentConverter, HTMLFormatOption
+    from docling.document_converter import DocumentConverter
 
     global _CONVERTER
     if _CONVERTER is None:
-        _CONVERTER = DocumentConverter(
-            format_options={InputFormat.HTML: HTMLFormatOption(backend=HTMLDocumentBackend)}
-        )
+        _CONVERTER = DocumentConverter(use_vision=False)
     return _CONVERTER
 
 
@@ -2223,6 +2100,8 @@ def html_main(args: argparse.Namespace | None = None) -> int:
 
     return 0
 
+
+# --- Entry Points ---
 
 if __name__ == "__main__":
     import sys as _sys

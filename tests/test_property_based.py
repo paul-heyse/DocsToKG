@@ -4,21 +4,21 @@
 #   "purpose": "Pytest coverage for property based scenarios",
 #   "sections": [
 #     {
-#       "id": "test_conditional_request_helper_build_headers",
+#       "id": "test-conditional-request-helper-build-headers",
 #       "name": "test_conditional_request_helper_build_headers",
-#       "anchor": "TCRHB",
+#       "anchor": "function-test-conditional-request-helper-build-headers",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_request_with_retries_backoff_sequence",
+#       "id": "test-request-with-retries-backoff-sequence",
 #       "name": "test_request_with_retries_backoff_sequence",
-#       "anchor": "TRWRB",
+#       "anchor": "function-test-request-with-retries-backoff-sequence",
 #       "kind": "function"
 #     },
 #     {
-#       "id": "test_dedupe_preserves_first_occurrence",
+#       "id": "test-dedupe-preserves-first-occurrence",
 #       "name": "test_dedupe_preserves_first_occurrence",
-#       "anchor": "TDPFO",
+#       "anchor": "function-test-dedupe-preserves-first-occurrence",
 #       "kind": "function"
 #     }
 #   ]
@@ -47,10 +47,15 @@ from DocsToKG.ContentDownload.utils import dedupe
     etag=st.one_of(st.none(), st.text(max_size=20)),
     last_modified=st.one_of(st.none(), st.text(max_size=30)),
 )
+# --- Test Cases ---
+
 def test_conditional_request_helper_build_headers(etag, last_modified):
     helper = ConditionalRequestHelper(
         prior_etag=etag,
         prior_last_modified=last_modified,
+        prior_sha256="sha256" if etag or last_modified else None,
+        prior_content_length=128 if etag or last_modified else None,
+        prior_path="/tmp/attempt.jsonl" if etag or last_modified else None,
     )
 
     headers = helper.build_headers()
