@@ -32,7 +32,7 @@ from pathlib import Path
 
 import pytest
 
-from DocsToKG.DocParsing._common import compute_relative_doc_id
+from DocsToKG.DocParsing.core import compute_relative_doc_id
 
 # --- Test Cases ---
 

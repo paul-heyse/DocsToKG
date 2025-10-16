@@ -596,7 +596,7 @@ import pytest
 import requests
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload.classifications import Classification
+from DocsToKG.ContentDownload.classifications import Classification, ReasonCode
 from DocsToKG.ContentDownload.classifier import classify_payload
 from DocsToKG.ContentDownload.download_pyalex_pdfs import (
     DEFAULT_MIN_PDF_BYTES,
@@ -604,7 +604,6 @@ from DocsToKG.ContentDownload.download_pyalex_pdfs import (
     DEFAULT_TAIL_CHECK_BYTES,
     WorkArtifact,
     _build_download_outcome,
-    _make_session,
     download_candidate,
     process_one_work,
 )
@@ -612,6 +611,7 @@ from DocsToKG.ContentDownload.network import (
     CachedResult,
     ConditionalRequestHelper,
     ModifiedResult,
+    create_session,
     head_precheck,
     parse_retry_after_header,
     request_with_retries,
@@ -625,8 +625,14 @@ from DocsToKG.ContentDownload.resolvers import (
     ResolverResult,
     WaybackResolver,
 )
-from DocsToKG.ContentDownload.telemetry import JsonlSink
-from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
+from DocsToKG.ContentDownload.telemetry import JsonlSink, SqliteSink, load_manifest_url_index
+from DocsToKG.ContentDownload.utils import (
+    dedupe,
+    normalize_doi,
+    normalize_pmcid,
+    normalize_url,
+    strip_prefix,
+)
 
 # --- test_conditional_requests.py ---
 
@@ -961,7 +967,7 @@ if HAS_REQUESTS and HAS_PYALEX:
 
         assert outcome.classification is Classification.HTML_TOO_LARGE
         assert outcome.path is None
-        assert outcome.error and "max_bytes" in outcome.error
+        assert outcome.reason is ReasonCode.MAX_BYTES_HEADER
 
     def test_download_candidate_respects_max_bytes_streaming(tmp_path: Path) -> None:
         artifact = _make_artifact(tmp_path)
@@ -1003,7 +1009,7 @@ if HAS_REQUESTS and HAS_PYALEX:
 
         assert outcome.classification is Classification.PAYLOAD_TOO_LARGE
         assert outcome.path is None
-        assert outcome.error and "max_bytes" in outcome.error
+        assert outcome.reason is ReasonCode.MAX_BYTES_STREAM
         assert not any(pdf_dir.glob("*.pdf"))
 
     def test_build_download_outcome_accepts_small_pdf_with_head_pass(tmp_path: Path) -> None:
@@ -1014,7 +1020,7 @@ if HAS_REQUESTS and HAS_PYALEX:
         response = SimpleNamespace(status_code=200, headers={"Content-Type": "application/pdf"})
         outcome = _build_download_outcome(
             artifact=artifact,
-            classification="pdf",
+            classification=Classification.PDF,
             dest_path=pdf_path,
             response=response,
             elapsed_ms=5.0,
@@ -1055,7 +1061,7 @@ if HAS_REQUESTS and HAS_PYALEX:
         )
         assert outcome.classification is Classification.MISS
         assert outcome.path is None
-        assert outcome.error == "pdf-too-small"
+        assert outcome.reason is ReasonCode.PDF_TOO_SMALL
 
     def test_manifest_entry_preserves_conditional_headers() -> None:
         outcome = DownloadOutcome(
@@ -1153,20 +1159,22 @@ def test_build_headers_with_both_headers() -> None:
 # --- test_conditional_requests.py ---
 
 
-def test_interpret_response_cached_returns_cached_result() -> None:
+def test_interpret_response_cached_returns_cached_result(tmp_path: Path) -> None:
+    cached_file = tmp_path / "file.pdf"
+    cached_file.write_text("cached", encoding="utf-8")
     helper = ConditionalRequestHelper(
         prior_etag="abc123",
         prior_last_modified="Wed, 21 Oct 2015 07:28:00 GMT",
         prior_sha256="deadbeef",
         prior_content_length=1024,
-        prior_path="/tmp/file.pdf",
+        prior_path=str(cached_file),
     )
     response = _make_helper_response(304)
 
     result = helper.interpret_response(response)  # type: ignore[arg-type]
 
     assert isinstance(result, CachedResult)
-    assert result.path == "/tmp/file.pdf"
+    assert result.path == str(cached_file)
     assert result.sha256 == "deadbeef"
     assert result.content_length == 1024
     assert result.etag == "abc123"
@@ -1288,7 +1296,8 @@ def test_interpret_response_cached_property(path: str, sha: str, size: int) -> N
     )
     response = _make_helper_response(304)
 
-    result = helper.interpret_response(response)  # type: ignore[arg-type]
+    with patch("DocsToKG.ContentDownload.network.Path.exists", return_value=True):
+        result = helper.interpret_response(response)  # type: ignore[arg-type]
 
     assert isinstance(result, CachedResult)
     assert result.path == path
@@ -1421,7 +1430,7 @@ def _download(
         "previous": {},
         "skip_head_precheck": True,
     }
-    session = _make_session({})
+    session = create_session({})
     return (
         artifact,
         session,
@@ -1494,7 +1503,7 @@ def test_non_retryable_errors_do_not_retry(http_server, tmp_path):
 
     artifact = _make_artifact(tmp_path)
     context = {"dry_run": False, "extract_html_text": False, "previous": {}}
-    session = _make_session({})
+    session = create_session({})
     try:
         outcome = download_candidate(
             session,
@@ -2240,7 +2249,7 @@ def test_successful_pdf_download_populates_metadata(tmp_path, monkeypatch):
     assert outcome.content_length == stored.stat().st_size
     assert outcome.etag == '"etag-123"'
     assert outcome.last_modified == "Mon, 01 Jan 2024 00:00:00 GMT"
-    assert outcome.error is None
+    assert outcome.reason is None
     assert outcome.extracted_text_path is None
     rehashed = hashlib.sha256(stored.read_bytes()).hexdigest()
     assert rehashed == expected_sha
@@ -2252,13 +2261,16 @@ def test_successful_pdf_download_populates_metadata(tmp_path, monkeypatch):
 def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
     artifact = make_artifact(tmp_path)
     url = "https://example.org/paper.pdf"
-    cached_path = str(artifact.pdf_dir / "cached.pdf")
+    cached_file = artifact.pdf_dir / "cached.pdf"
+    cached_bytes = b"%PDF-1.4\n%EOF\n"
+    cached_file.write_bytes(cached_bytes)
+    cached_sha = hashlib.sha256(cached_bytes).hexdigest()
     context = {
         "previous": {
             url: {
-                "path": cached_path,
-                "sha256": "cached-sha",
-                "content_length": 1024,
+                "path": str(cached_file),
+                "sha256": cached_sha,
+                "content_length": len(cached_bytes),
                 "etag": '"etag-cached"',
                 "last_modified": "Tue, 02 Jan 2024 00:00:00 GMT",
             }
@@ -2284,7 +2296,7 @@ def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
     assert outcome.content_length == 1024
     assert outcome.etag == '"etag-cached"'
     assert outcome.last_modified == "Tue, 02 Jan 2024 00:00:00 GMT"
-    assert outcome.error is None
+    assert outcome.reason is None
 
 
 # --- test_download_outcomes.py ---
@@ -2300,7 +2312,14 @@ def test_http_error_sets_metadata_to_none(tmp_path, monkeypatch):
     stub_requests(monkeypatch, mapping)
 
     session = requests.Session()
-    outcome = downloader.download_candidate(session, artifact, url, None, timeout=10.0)
+    outcome = downloader.download_candidate(
+        session,
+        artifact,
+        url,
+        None,
+        timeout=10.0,
+        context={"min_pdf_bytes": 1, "previous": {}},
+    )
 
     assert outcome.classification is Classification.HTTP_ERROR
     assert outcome.path is None
@@ -2308,7 +2327,7 @@ def test_http_error_sets_metadata_to_none(tmp_path, monkeypatch):
     assert outcome.content_length is None
     assert outcome.etag is None
     assert outcome.last_modified is None
-    assert outcome.error is None
+    assert outcome.reason is None
 
 
 # --- test_download_outcomes.py ---
@@ -2425,7 +2444,7 @@ def test_small_pdf_detected_as_corrupt(tmp_path, monkeypatch):
 
     assert outcome.classification is Classification.MISS
     assert outcome.path is None
-    assert outcome.error == "pdf-too-small"
+    assert outcome.reason is ReasonCode.PDF_TOO_SMALL
     assert not any(artifact.pdf_dir.glob("*.pdf"))
 
 
@@ -2447,11 +2466,18 @@ def test_html_tail_in_pdf_marks_corruption(tmp_path, monkeypatch):
     stub_requests(monkeypatch, mapping)
 
     session = requests.Session()
-    outcome = downloader.download_candidate(session, artifact, url, None, timeout=10.0)
+    outcome = downloader.download_candidate(
+        session,
+        artifact,
+        url,
+        None,
+        timeout=10.0,
+        context={"min_pdf_bytes": 1, "previous": {}},
+    )
 
     assert outcome.classification is Classification.MISS
     assert outcome.path is None
-    assert outcome.error == "html-tail-detected"
+    assert outcome.reason is ReasonCode.HTML_TAIL_DETECTED
     assert not any(artifact.pdf_dir.glob("*.pdf"))
 
 
@@ -2467,7 +2493,6 @@ def test_build_manifest_entry_includes_download_metadata(tmp_path):
         http_status=200,
         content_type="application/pdf",
         elapsed_ms=150.0,
-        error=None,
         sha256="abc123",
         content_length=4096,
         etag='"etag-manifest"',
@@ -2512,7 +2537,14 @@ def test_rfc5987_filename_suffix(tmp_path, monkeypatch):
     stub_requests(monkeypatch, mapping)
 
     session = requests.Session()
-    outcome = downloader.download_candidate(session, artifact, url, None, timeout=10.0)
+    outcome = downloader.download_candidate(
+        session,
+        artifact,
+        url,
+        None,
+        timeout=10.0,
+        context={"min_pdf_bytes": 1, "previous": {}},
+    )
 
     assert outcome.classification is Classification.PDF
     assert outcome.path is not None
@@ -2540,7 +2572,14 @@ def test_html_filename_suffix_from_disposition(tmp_path, monkeypatch):
     stub_requests(monkeypatch, mapping)
 
     session = requests.Session()
-    outcome = downloader.download_candidate(session, artifact, url, None, timeout=10.0)
+    outcome = downloader.download_candidate(
+        session,
+        artifact,
+        url,
+        None,
+        timeout=10.0,
+        context={"min_pdf_bytes": 1, "previous": {}},
+    )
 
     assert outcome.classification is Classification.HTML
     assert outcome.path is not None
@@ -2987,12 +3026,12 @@ def test_openalex_attempts_use_session_headers(tmp_path: Path) -> None:
     def fake_download(session_obj, art, url, referer, timeout, context=None):
         observed.append(session_obj.headers.get("User-Agent"))
         return DownloadOutcome(
-            classification="request_error",
+            classification=Classification.HTTP_ERROR.value,
             path=None,
             http_status=None,
             content_type=None,
             elapsed_ms=1.0,
-            error="failed",
+            reason=ReasonCode.REQUEST_EXCEPTION,
         )
 
     config = ResolverConfig(
@@ -3052,7 +3091,7 @@ def test_retry_budget_honours_max_attempts(tmp_path: Path) -> None:
             http_status=503,
             content_type="text/plain",
             elapsed_ms=1.0,
-            error="server-error",
+            reason=ReasonCode.HTTP_STATUS,
         )
 
     class ListLogger:
@@ -3082,3 +3121,37 @@ def test_retry_budget_honours_max_attempts(tmp_path: Path) -> None:
     result = pipeline.run(requests.Session(), artifact)
     assert result.success is False
     assert len(calls) == config.max_attempts_per_work
+
+
+def test_load_manifest_url_index_reads_sqlite(tmp_path: Path) -> None:
+    db_path = tmp_path / "manifest.sqlite3"
+    sink = SqliteSink(db_path)
+    entry = ManifestEntry(
+        schema_version=downloader.MANIFEST_SCHEMA_VERSION,
+        timestamp="2025-01-01T00:00:00Z",
+        work_id="W-index",
+        title="Index Test",
+        publication_year=2024,
+        resolver="resolver",
+        url="https://example.org/resource",
+        path=str(tmp_path / "file.pdf"),
+        classification=Classification.PDF.value,
+        content_type="application/pdf",
+        reason=None,
+        html_paths=[],
+        sha256="deadbeef",
+        content_length=123,
+        etag='"etag"',
+        last_modified="Wed, 01 May 2024 00:00:00 GMT",
+        extracted_text_path=None,
+        dry_run=False,
+    )
+    sink.log_manifest(entry)
+    sink.close()
+    mapping = load_manifest_url_index(db_path)
+    normalised = normalize_url(entry.url)
+    assert normalised in mapping
+    record = mapping[normalised]
+    assert record["sha256"] == entry.sha256
+    assert record["etag"] == entry.etag
+    assert record["content_length"] == entry.content_length

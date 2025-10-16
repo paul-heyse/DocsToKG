@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.DocParsing.EmbeddingV2",
+#   "module": "DocsToKG.DocParsing.embedding",
 #   "purpose": "Embedding pipelines for DocParsing",
 #   "sections": [
 #     {
@@ -223,7 +223,7 @@ Key Features:
 - Explain SPLADE attention backend fallbacks (auto→FlashAttention2→SDPA→eager)
 
 Usage:
-    python -m DocsToKG.DocParsing.EmbeddingV2 --resume
+    python -m DocsToKG.DocParsing.embedding --resume
 
 Dependencies:
 - sentence_transformers (optional): Provides SPLADE sparse encoders.
@@ -255,7 +255,7 @@ from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 # Third-party imports
 from tqdm import tqdm
 
-from DocsToKG.DocParsing._common import (
+from DocsToKG.DocParsing.core import (
     UUID_NAMESPACE,
     Batcher,
     BM25Stats,
@@ -282,13 +282,13 @@ from DocsToKG.DocParsing._common import (
     manifest_log_success,
     should_skip_output,
 )
-from DocsToKG.DocParsing.pipelines import (
+from DocsToKG.DocParsing.doctags import (
     add_data_root_option,
     add_resume_force_options,
     prepare_data_root,
     resolve_pipeline_path,
 )
-from DocsToKG.DocParsing.schemas import (
+from DocsToKG.DocParsing.formats import (
     COMPATIBLE_CHUNK_VERSIONS,
     VECTOR_SCHEMA_VERSION,
     BM25Vector,
@@ -1402,7 +1402,7 @@ def _validate_vectors_for_chunks(chunks_dir: Path, vectors_dir: Path, logger) ->
     Returns:
         (files_checked, rows_validated)
     """
-    from DocsToKG.DocParsing.schemas import validate_vector_row
+    from DocsToKG.DocParsing.formats import validate_vector_row
 
     files_checked = 0
     rows_validated = 0

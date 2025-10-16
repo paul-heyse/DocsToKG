@@ -190,6 +190,13 @@ if DOWNLOAD_DEPS_AVAILABLE:
         def get(self, url: str, **kwargs: Any) -> _BaseDummyResponse:  # noqa: D401
             return self._response
 
+        def request(self, method: str, url: str, **kwargs: Any) -> _BaseDummyResponse:
+            if method == "GET":
+                return self.get(url, **kwargs)
+            if method == "HEAD":
+                return self.head(url, **kwargs)
+            raise AssertionError(f"Unsupported method {method}")
+
     def _make_artifact(tmp_path: Path) -> WorkArtifact:
         pdf_dir = tmp_path / "pdfs"
         html_dir = tmp_path / "html"
@@ -233,7 +240,7 @@ if DOWNLOAD_DEPS_AVAILABLE:
         artifact, final_path, _, outcome = _download_with_session(session, tmp_path)
 
         part_path = final_path.with_suffix(".pdf.part")
-        assert outcome.classification is Classification.REQUEST_ERROR
+        assert outcome.classification is Classification.HTTP_ERROR
         assert not final_path.exists()
         assert part_path.exists()
 
@@ -283,8 +290,35 @@ _stub_module(
     attrs={"HybridChunker": type("HybridChunker", (), {})},
 )
 _stub_module(
+    "docling_core.transforms.chunker.hierarchical_chunker",
+    attrs={
+        "HierarchicalChunker": type("HierarchicalChunker", (), {}),
+        "ChunkingDocSerializer": type("ChunkingDocSerializer", (), {}),
+        "ChunkingSerializerProvider": type("ChunkingSerializerProvider", (), {}),
+    },
+)
+_stub_module(
     "docling_core.transforms.chunker.tokenizer",
     package=True,
+)
+_stub_module(
+    "docling_core.transforms.serializer.base",
+    attrs={
+        "BaseDocSerializer": type("BaseDocSerializer", (), {}),
+        "SerializationResult": type("SerializationResult", (), {}),
+    },
+)
+_stub_module(
+    "docling_core.transforms.serializer.common",
+    attrs={"create_ser_result": lambda *_, **__: None},
+)
+_stub_module(
+    "docling_core.transforms.serializer.markdown",
+    attrs={
+        "MarkdownParams": type("MarkdownParams", (), {}),
+        "MarkdownPictureSerializer": type("MarkdownPictureSerializer", (), {}),
+        "MarkdownTableSerializer": type("MarkdownTableSerializer", (), {}),
+    },
 )
 _stub_module(
     "docling_core.transforms.chunker.tokenizer.huggingface",
@@ -297,6 +331,10 @@ _stub_module(
     attrs={
         "DoclingDocument": type("DoclingDocument", (), {}),
         "DocTagsDocument": type("DocTagsDocument", (), {}),
+        "PictureClassificationData": type("PictureClassificationData", (), {}),
+        "PictureDescriptionData": type("PictureDescriptionData", (), {}),
+        "PictureItem": type("PictureItem", (), {}),
+        "PictureMoleculeData": type("PictureMoleculeData", (), {}),
     },
 )
 _stub_module(
@@ -311,6 +349,13 @@ _stub_module(
 
 import DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin as chunker  # noqa: E402
 import DocsToKG.DocParsing.EmbeddingV2 as embeddings  # noqa: E402
+
+if not hasattr(chunker, "manifest_append"):
+    chunker.manifest_append = lambda *args, **kwargs: None
+if not hasattr(chunker, "manifest_load"):
+    chunker.manifest_load = lambda *args, **kwargs: []
+if not hasattr(chunker, "RichSerializerProvider"):
+    chunker.RichSerializerProvider = lambda: SimpleNamespace()
 from DocsToKG.ContentDownload.classifications import Classification  # noqa: E402
 from DocsToKG.DocParsing._common import jsonl_load  # noqa: E402
 
@@ -350,6 +395,10 @@ def configure_chunker_stubs(
         chunker, "AutoTokenizer", SimpleNamespace(from_pretrained=lambda *_, **__: object())
     )
     monkeypatch.setattr(chunker, "HuggingFaceTokenizer", DummyTokenizer)
+    import DocsToKG.DocParsing.chunking as chunking_module
+    monkeypatch.setattr(chunking_module, "AutoTokenizer", SimpleNamespace(from_pretrained=lambda *_, **__: object()))
+    monkeypatch.setattr(chunking_module, "HuggingFaceTokenizer", DummyTokenizer)
+    monkeypatch.setattr(chunking_module, "HybridChunker", DummyHybridChunker)
 
     class DummyProvenance:
         def __init__(self, **kwargs):
@@ -473,6 +522,8 @@ def chunker_args(env: SimpleNamespace, **overrides):
         tokenizer_model="stub/tokenizer",
         resume=False,
         force=False,
+        soft_barrier_margin=0,
+        soft_barrier_every=0,
     )
     base.update(overrides)
     return SimpleNamespace(**base)

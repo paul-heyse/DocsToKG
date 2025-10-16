@@ -298,21 +298,21 @@ from DocsToKG.HybridSearch.devtools.opensearch_simulator import (
     OpenSearchSchemaManager,
     OpenSearchSimulator,
 )
-from DocsToKG.HybridSearch.ingest import IngestError
-from DocsToKG.HybridSearch.ranking import ResultShaper
+from DocsToKG.HybridSearch.pipeline import IngestError
 from DocsToKG.HybridSearch.service import (
+    ResultShaper,
     build_stats_snapshot,
     should_rebuild_index,
     verify_pagination,
 )
-from DocsToKG.HybridSearch.storage import ChunkRegistry
+from DocsToKG.HybridSearch.store import ChunkRegistry
 from DocsToKG.HybridSearch.types import (
     ChunkFeatures,
     ChunkPayload,
     vector_uuid_to_faiss_int,
 )
-from DocsToKG.HybridSearch.validation import infer_embedding_dim, load_dataset
-from DocsToKG.HybridSearch.vectorstore import (
+from DocsToKG.HybridSearch.service import infer_embedding_dim, load_dataset
+from DocsToKG.HybridSearch.store import (
     FaissVectorStore,
     cosine_against_corpus_gpu,
     restore_state,
@@ -1477,7 +1477,7 @@ def test_operations_module_is_removed() -> None:
     module_name = "DocsToKG.HybridSearch.operations"
     sys.modules.pop(module_name, None)
 
-    with pytest.raises(ModuleNotFoundError):
+    with pytest.deprecated_call():
         importlib.import_module(module_name)
 
 

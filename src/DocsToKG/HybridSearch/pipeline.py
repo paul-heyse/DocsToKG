@@ -1,7 +1,7 @@
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.HybridSearch.ingest",
-#   "purpose": "Implements DocsToKG.HybridSearch.ingest behaviors and helpers",
+#   "module": "DocsToKG.HybridSearch.pipeline",
+#   "purpose": "Ingestion pipeline, feature generation, and observability helpers",
 #   "sections": [
 #     {
 #       "id": "ingesterror",
@@ -31,25 +31,59 @@
 # }
 # === /NAVMAP ===
 
-"""Ingestion pipeline that materializes pre-computed chunk artifacts."""
+"""Ingestion pipeline, feature generation, and observability utilities."""
 
 from __future__ import annotations
 
 import json
+import logging
+import time
+from collections import defaultdict, deque
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Sequence
+from threading import RLock
+from typing import (
+    Deque,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Tuple,
+    TYPE_CHECKING,
+)
 
 import numpy as np
 
 from .interfaces import DenseVectorStore, LexicalIndex
-from .observability import Observability
-from .storage import ChunkRegistry
 from .types import ChunkFeatures, ChunkPayload, DocumentInput
+from .devtools.features import (  # noqa: F401
+    FeatureGenerator,
+    sliding_window,
+    tokenize,
+    tokenize_with_spans,
+)
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from .store import ChunkRegistry
 
 # --- Globals ---
 
 __all__ = (
+    "CounterSample",
+    "GaugeSample",
+    "HistogramSample",
+    "MetricsCollector",
+    "Observability",
+    "TraceRecorder",
+    "FeatureGenerator",
+    "sliding_window",
+    "tokenize",
+    "tokenize_with_spans",
     "ChunkIngestionPipeline",
     "IngestError",
     "IngestMetrics",
@@ -61,6 +95,158 @@ TRAINING_SAMPLE_RNG = np.random.default_rng(13)
 
 
 # --- Public Classes ---
+
+
+@dataclass
+class CounterSample:
+    """Sample from a counter metric with labels and value."""
+
+    name: str
+    labels: Mapping[str, str]
+    value: float
+
+
+@dataclass
+class HistogramSample:
+    """Sample from a histogram metric with percentile statistics."""
+
+    name: str
+    labels: Mapping[str, str]
+    count: int
+    p50: float
+    p95: float
+    p99: float
+
+
+@dataclass
+class GaugeSample:
+    """Sample from a gauge metric capturing the latest recorded value."""
+
+    name: str
+    labels: Mapping[str, str]
+    value: float
+
+
+class MetricsCollector:
+    """In-memory metrics collector compatible with Prometheus-style summaries."""
+
+    def __init__(self) -> None:
+        self._lock = RLock()
+        self._histogram_window = 512
+
+        def _deque_factory() -> Deque[float]:
+            return deque(maxlen=self._histogram_window)
+
+        self._counters: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], float] = (
+            defaultdict(float)
+        )
+        self._histograms: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], Deque[float]] = (
+            defaultdict(_deque_factory)
+        )
+        self._gauges: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], float] = {}
+
+    def increment(self, name: str, amount: float = 1.0, **labels: str) -> None:
+        key = (name, tuple(sorted(labels.items())))
+        with self._lock:
+            self._counters[key] += amount
+
+    def observe(self, name: str, value: float, **labels: str) -> None:
+        key = (name, tuple(sorted(labels.items())))
+        with self._lock:
+            self._histograms[key].append(value)
+
+    def set_gauge(self, name: str, value: float, **labels: str) -> None:
+        key = (name, tuple(sorted(labels.items())))
+        with self._lock:
+            self._gauges[key] = value
+
+    def percentile(self, name: str, percentile: float, **labels: str) -> Optional[float]:
+        key = (name, tuple(sorted(labels.items())))
+        with self._lock:
+            samples = list(self._histograms.get(key, []))
+        if not samples:
+            return None
+        percentile = min(max(percentile, 0.0), 1.0)
+        sorted_samples = sorted(samples)
+        idx = int(percentile * (len(sorted_samples) - 1))
+        return sorted_samples[idx]
+
+    def export_counters(self) -> Iterable[CounterSample]:
+        with self._lock:
+            items = list(self._counters.items())
+        for (name, labels), value in items:
+            yield CounterSample(name=name, labels=dict(labels), value=value)
+
+    def export_histograms(self) -> Iterable[HistogramSample]:
+        with self._lock:
+            items = list(self._histograms.items())
+        for (name, labels), samples in items:
+            sorted_samples = sorted(samples)
+            count = len(sorted_samples)
+            if count == 0:
+                continue
+            p50 = sorted_samples[int(0.5 * (count - 1))]
+            p95 = sorted_samples[int(0.95 * (count - 1))]
+            p99 = sorted_samples[int(0.99 * (count - 1))]
+            yield HistogramSample(
+                name=name, labels=dict(labels), count=count, p50=p50, p95=p95, p99=p99
+            )
+
+    def export_gauges(self) -> Iterable[GaugeSample]:
+        with self._lock:
+            items = list(self._gauges.items())
+        for (name, labels), value in items:
+            yield GaugeSample(name=name, labels=dict(labels), value=value)
+
+
+class TraceRecorder:
+    """Context manager producing timing spans for tracing."""
+
+    def __init__(self, metrics: MetricsCollector, logger: logging.Logger) -> None:
+        self._metrics = metrics
+        self._logger = logger
+
+    @contextmanager
+    def span(self, name: str, **attributes: str) -> Iterator[None]:
+        start = time.perf_counter()
+        try:
+            yield
+            status = "ok"
+        except Exception:
+            status = "error"
+            raise
+        finally:
+            duration_ms = (time.perf_counter() - start) * 1000
+            self._metrics.observe(f"trace_{name}_ms", duration_ms, **attributes)
+            payload = {"span": name, "duration_ms": round(duration_ms, 3), "status": status}
+            payload.update(attributes)
+            self._logger.info("hybrid-trace", extra={"event": payload})
+
+
+class Observability:
+    """Facade for metrics, structured logging, and tracing."""
+
+    def __init__(self, *, logger: Optional[logging.Logger] = None) -> None:
+        self._metrics = MetricsCollector()
+        self._logger = logger or logging.getLogger("DocsToKG.HybridSearch")
+        self._tracer = TraceRecorder(self._metrics, self._logger)
+
+    @property
+    def metrics(self) -> MetricsCollector:
+        return self._metrics
+
+    @property
+    def logger(self) -> logging.Logger:
+        return self._logger
+
+    def trace(self, name: str, **attributes: str) -> Iterator[None]:
+        return self._tracer.span(name, **attributes)
+
+    def metrics_snapshot(self) -> Dict[str, list[Mapping[str, object]]]:
+        counters = [sample.__dict__ for sample in self._metrics.export_counters()]
+        histograms = [sample.__dict__ for sample in self._metrics.export_histograms()]
+        gauges = [sample.__dict__ for sample in self._metrics.export_gauges()]
+        return {"counters": counters, "histograms": histograms, "gauges": gauges}
 
 
 class IngestError(RuntimeError):
@@ -122,7 +308,7 @@ class ChunkIngestionPipeline:
     Examples:
         >>> pipeline = ChunkIngestionPipeline(
         ...     faiss_index=DenseVectorStore(...),
-        ...     opensearch=OpenSearchSimulator(),  # from DocsToKG.HybridSearch.storage  # doctest: +SKIP
+        ...     opensearch=OpenSearchSimulator(),  # from DocsToKG.HybridSearch.store  # doctest: +SKIP
         ...     registry=ChunkRegistry(),
         ... )
         >>> isinstance(pipeline.metrics.chunks_upserted, int)

@@ -16,7 +16,7 @@ deterministic fingerprints.
 
 from __future__ import annotations
 
-from .ontology_download import (
+from .api import (
     CACHE_DIR,
     CONFIG_DIR,
     LOCAL_ONTOLOGY_DIR,
@@ -44,6 +44,7 @@ from .ontology_download import (
     ValidatorSubprocessError,
     __version__,
     about,
+    cli_main,
     build_resolved_config,
     download_stream,
     ensure_python_version,
@@ -155,6 +156,7 @@ __all__ = [
     "mask_sensitive_data",
     "list_plugins",
     "about",
+    "cli_main",
     "__version__",
     "PUBLIC_API_MANIFEST",
 ]
@@ -189,12 +191,23 @@ PUBLIC_API_MANIFEST = {
     "download_stream": "function",
     "extract_archive_safe": "function",
     "run_validators": "function",
+    "normalize_streaming": "function",
+    "validate_rdflib": "function",
+    "validate_pronto": "function",
+    "validate_owlready2": "function",
+    "validate_robot": "function",
+    "validate_arelle": "function",
     "setup_logging": "function",
     "validate_manifest_dict": "function",
     "validate_url_security": "function",
     "mask_sensitive_data": "function",
     "list_plugins": "function",
     "about": "function",
+    "cli_main": "function",
+    "format_table": "function",
+    "format_plan_rows": "function",
+    "format_results_table": "function",
+    "format_validation_summary": "function",
     "CACHE_DIR": "const",
     "CONFIG_DIR": "const",
     "LOG_DIR": "const",
@@ -204,3 +217,68 @@ PUBLIC_API_MANIFEST = {
     "MANIFEST_SCHEMA_VERSION": "const",
     "PUBLIC_API_MANIFEST": "const",
 }
+
+
+def _install_legacy_aliases() -> None:
+    """Populate ``sys.modules`` with legacy module aliases for backwards compatibility."""
+
+    import sys
+    import types
+
+    from . import api as _api
+    from . import io as _io
+    from . import planning as _planning
+    from . import settings as _settings
+    from . import validation as _validation
+
+    alias_map = {
+        "DocsToKG.OntologyDownload.ontology_download": _api,
+        "DocsToKG.OntologyDownload.config": _settings,
+        "DocsToKG.OntologyDownload.storage": _settings,
+        "DocsToKG.OntologyDownload.optdeps": _settings,
+        "DocsToKG.OntologyDownload.errors": _settings,
+        "DocsToKG.OntologyDownload.io_safe": _io,
+        "DocsToKG.OntologyDownload.net": _io,
+        "DocsToKG.OntologyDownload.ratelimit": _io,
+        "DocsToKG.OntologyDownload.utils": _io,
+        "DocsToKG.OntologyDownload.pipeline": _planning,
+        "DocsToKG.OntologyDownload.resolvers": _planning,
+        "DocsToKG.OntologyDownload.plugins": _validation,
+        "DocsToKG.OntologyDownload.validation_core": _validation,
+    }
+
+    for name, module in alias_map.items():
+        sys.modules.setdefault(name, module)
+
+    class _LegacyModule(types.ModuleType):
+        def __getattr__(self, name: str):  # pragma: no cover - thin wrapper
+            if name == "main":
+                return _api.cli_main
+            return getattr(_api, name)
+
+        def __setattr__(self, name: str, value) -> None:  # pragma: no cover - thin wrapper
+            setattr(_api, name, value)
+            super().__setattr__(name, value)
+
+    cli_module = _LegacyModule("DocsToKG.OntologyDownload.cli")
+    original_main = _api.main
+    cli_module.main = _api.cli_main
+    cli_module.cli_main = _api.cli_main
+    cli_module.format_table = _api.format_table
+    cli_module.format_plan_rows = _api.format_plan_rows
+    cli_module.format_results_table = _api.format_results_table
+    cli_module.format_validation_summary = _api.format_validation_summary
+    cli_module.CACHE_DIR = CACHE_DIR
+    cli_module.CONFIG_DIR = CONFIG_DIR
+    cli_module.LOCAL_ONTOLOGY_DIR = LOCAL_ONTOLOGY_DIR
+    cli_module.LOG_DIR = LOG_DIR
+    cli_module.ONTOLOGY_DIR = getattr(_api, "ONTOLOGY_DIR", LOCAL_ONTOLOGY_DIR)
+    if hasattr(_api, "DEFAULT_PLAN_BASELINE"):
+        cli_module.DEFAULT_PLAN_BASELINE = getattr(_api, "DEFAULT_PLAN_BASELINE")
+    if hasattr(_api, "PLAN_DIFF_FIELDS"):
+        cli_module.PLAN_DIFF_FIELDS = getattr(_api, "PLAN_DIFF_FIELDS")
+    _api.main = original_main
+    sys.modules.setdefault("DocsToKG.OntologyDownload.cli", cli_module)
+
+
+_install_legacy_aliases()

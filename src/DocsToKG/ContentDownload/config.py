@@ -83,6 +83,10 @@ def apply_config_overrides(
         "resolver_min_interval_s",
         "mailto",
         "resolver_head_precheck",
+        "head_precheck_host_overrides",
+        "host_accept_overrides",
+        "domain_token_buckets",
+        "resolver_circuit_breakers",
     ):
         if field_name in data and data[field_name] is not None:
             setattr(config, field_name, data[field_name])
@@ -179,4 +183,3 @@ def load_resolver_config(
     config.resolver_min_interval_s.setdefault("unpaywall", 1.0)
 
     return config
-

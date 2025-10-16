@@ -1,8 +1,14 @@
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.DocParsing.pipelines",
-#   "purpose": "Implements DocsToKG.DocParsing.pipelines behaviors and helpers",
+#   "module": "DocsToKG.DocParsing.doctags",
+#   "purpose": "Implements DocsToKG.DocParsing.doctags behaviors and helpers",
 #   "sections": [
+#     {
+#       "id": "http-session",
+#       "name": "_http_session",
+#       "anchor": "function-http-session",
+#       "kind": "function"
+#     },
 #     {
 #       "id": "looks-like-filesystem-path",
 #       "name": "_looks_like_filesystem_path",
@@ -217,10 +223,10 @@
 # }
 # === /NAVMAP ===
 
-"""DocParsing Pipeline Utilities
+"""DocParsing Doctags Pipeline Utilities
 
 This module hosts the PDF → DocTags conversion workflow _and_ shared helpers
-used by other DocParsing pipelines. It coordinates vLLM server lifecycle,
+used by other DocParsing doctags pipelines. It coordinates vLLM server lifecycle,
 manifest bookkeeping, and CLI argument scaffolding so chunking and embedding
 components can import consistent behaviours.
 
@@ -234,11 +240,11 @@ Key Features:
   polite rate control against vLLM endpoints.
 
 Usage:
-    from DocsToKG.DocParsing import pipelines
+    from DocsToKG.DocParsing import doctags as doctags_module
 
-    parser = pipelines.pdf_build_parser()
+    parser = doctags_module.pdf_build_parser()
     args = parser.parse_args(["--data-root", "/datasets/Data"])
-    exit_code = pipelines.pdf_main(args)
+    exit_code = doctags_module.pdf_main(args)
 """
 
 # ruff: noqa: E402
@@ -265,7 +271,7 @@ from requests.adapters import HTTPAdapter
 from tqdm import tqdm
 from urllib3.util.retry import Retry
 
-from DocsToKG.DocParsing._common import (
+from DocsToKG.DocParsing.core import (
     acquire_lock,
     compute_content_hash,
     data_doctags,

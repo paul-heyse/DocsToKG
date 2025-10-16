@@ -31,7 +31,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.resolvers import AttemptRecord, DownloadOutcome
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
-from DocsToKG.ContentDownload.classifications import PDF_LIKE, Classification
+from DocsToKG.ContentDownload.classifications import PDF_LIKE, Classification, ReasonCode
 from DocsToKG.ContentDownload.utils import normalize_url
 
 MANIFEST_SCHEMA_VERSION = 2
@@ -52,7 +52,8 @@ class ManifestEntry:
         path: Local filesystem path where the artifact is stored.
         classification: Classifier label describing the download outcome.
         content_type: MIME type or equivalent classification when available.
-        reason: Diagnostic reason for failure or classification notes.
+        reason: Diagnostic reason code (see :class:`ReasonCode`).
+        reason_detail: Optional human-readable diagnostic detail.
         html_paths: Any extracted HTML content paths stored alongside the PDF.
         sha256: Optional SHA256 digest of the stored artifact.
         content_length: Content size in bytes when reported by the server.
@@ -90,6 +91,7 @@ class ManifestEntry:
     classification: str
     content_type: Optional[str]
     reason: Optional[str]
+    reason_detail: Optional[str] = None
     html_paths: List[str] = field(default_factory=list)
     sha256: Optional[str] = None
     content_length: Optional[int] = None
@@ -214,6 +216,7 @@ class JsonlSink:
             timestamp: Optional ISO-8601 timestamp overriding the current time.
         """
         ts = timestamp or _utc_timestamp()
+        status_text = record.status.value if isinstance(record.status, Classification) else str(record.status)
         self._write(
             {
                 "record_type": "attempt",
@@ -222,12 +225,13 @@ class JsonlSink:
                 "resolver_name": record.resolver_name,
                 "resolver_order": record.resolver_order,
                 "url": record.url,
-                "status": str(record.status),
+                "status": status_text,
                 "http_status": record.http_status,
                 "content_type": record.content_type,
                 "elapsed_ms": record.elapsed_ms,
                 "resolver_wall_time_ms": record.resolver_wall_time_ms,
-                "reason": record.reason,
+                "reason": record.reason.value if record.reason else None,
+                "reason_detail": getattr(record, "reason_detail", None),
                 "metadata": record.metadata,
                 "sha256": record.sha256,
                 "content_length": record.content_length,
@@ -255,6 +259,7 @@ class JsonlSink:
                 "classification": str(entry.classification),
                 "content_type": entry.content_type,
                 "reason": entry.reason,
+                "reason_detail": entry.reason_detail,
                 "html_paths": entry.html_paths,
                 "sha256": entry.sha256,
                 "content_length": entry.content_length,
@@ -303,6 +308,7 @@ class CsvSink:
         "elapsed_ms",
         "resolver_wall_time_ms",
         "reason",
+        "reason_detail",
         "sha256",
         "content_length",
         "dry_run",
@@ -332,12 +338,13 @@ class CsvSink:
             "resolver_name": record.resolver_name,
             "resolver_order": record.resolver_order,
             "url": record.url,
-            "status": str(record.status),
+            "status": record.status.value if isinstance(record.status, Classification) else str(record.status),
             "http_status": record.http_status,
             "content_type": record.content_type,
             "elapsed_ms": record.elapsed_ms,
             "resolver_wall_time_ms": record.resolver_wall_time_ms,
-            "reason": record.reason,
+            "reason": record.reason.value if record.reason else None,
+            "reason_detail": getattr(record, "reason_detail", None) or "",
             "sha256": record.sha256,
             "content_length": record.content_length,
             "dry_run": record.dry_run,
@@ -642,6 +649,7 @@ class SqliteSink:
                 elapsed_ms REAL,
                 resolver_wall_time_ms REAL,
                 reason TEXT,
+                reason_detail TEXT,
                 metadata TEXT,
                 sha256 TEXT,
                 content_length INTEGER,
@@ -664,6 +672,7 @@ class SqliteSink:
                 classification TEXT,
                 content_type TEXT,
                 reason TEXT,
+                reason_detail TEXT,
                 html_paths TEXT,
                 sha256 TEXT,
                 content_length INTEGER,
@@ -674,6 +683,16 @@ class SqliteSink:
             )
             """
         )
+        attempt_columns = {
+            row[1] for row in self._conn.execute("PRAGMA table_info(attempts)")
+        }
+        if "reason_detail" not in attempt_columns:
+            self._conn.execute("ALTER TABLE attempts ADD COLUMN reason_detail TEXT")
+        manifest_columns = {
+            row[1] for row in self._conn.execute("PRAGMA table_info(manifests)")
+        }
+        if "reason_detail" not in manifest_columns:
+            self._conn.execute("ALTER TABLE manifests ADD COLUMN reason_detail TEXT")
         self._conn.execute(
             """
             CREATE TABLE IF NOT EXISTS summaries (
@@ -715,11 +734,12 @@ class SqliteSink:
                     elapsed_ms,
                     resolver_wall_time_ms,
                     reason,
+                    reason_detail,
                     metadata,
                     sha256,
                     content_length,
                     dry_run
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     ts,
@@ -727,12 +747,13 @@ class SqliteSink:
                     record.resolver_name,
                     record.resolver_order,
                     record.url,
-                    str(record.status),
+                    record.status.value if isinstance(record.status, Classification) else str(record.status),
                     record.http_status,
                     record.content_type,
                     record.elapsed_ms,
                     record.resolver_wall_time_ms,
-                    record.reason,
+                    record.reason.value if record.reason else None,
+                    getattr(record, "reason_detail", None),
                     metadata_json,
                     record.sha256,
                     record.content_length,
@@ -766,6 +787,7 @@ class SqliteSink:
                     classification,
                     content_type,
                     reason,
+                    reason_detail,
                     html_paths,
                     sha256,
                     content_length,
@@ -773,7 +795,7 @@ class SqliteSink:
                     last_modified,
                     extracted_text_path,
                     dry_run
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     entry.timestamp,
@@ -787,6 +809,7 @@ class SqliteSink:
                     entry.classification,
                     entry.content_type,
                     entry.reason,
+                    entry.reason_detail,
                     html_paths_json,
                     entry.sha256,
                     entry.content_length,
@@ -896,7 +919,48 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
             if classification_code in PDF_LIKE:
                 completed.add(work_id)
 
+            raw_reason = data.get("reason")
+            if raw_reason is not None:
+                data["reason"] = ReasonCode.from_wire(raw_reason).value
+            if data.get("reason_detail") is not None:
+                detail = data["reason_detail"]
+                if detail == "":
+                    data["reason_detail"] = None
+
     return per_work, completed
+
+
+def load_manifest_url_index(path: Optional[Path]) -> Dict[str, Dict[str, Any]]:
+    """Return a mapping of normalised URLs to manifest metadata from SQLite."""
+
+    if not path or not path.exists():
+        return {}
+    conn = sqlite3.connect(path)
+    try:
+        try:
+            cursor = conn.execute(
+                "SELECT url, path, sha256, classification, etag, last_modified, content_length "
+                "FROM manifests ORDER BY timestamp"
+            )
+        except sqlite3.OperationalError:
+            return {}
+        mapping: Dict[str, Dict[str, Any]] = {}
+        for url, stored_path, sha256, classification, etag, last_modified, content_length in cursor:
+            if not url:
+                continue
+            normalised = normalize_url(url)
+            mapping[normalised] = {
+                "url": url,
+                "path": stored_path,
+                "sha256": sha256,
+                "classification": classification,
+                "etag": etag,
+                "last_modified": last_modified,
+                "content_length": content_length,
+            }
+        return mapping
+    finally:
+        conn.close()
 
 
 def build_manifest_entry(
@@ -907,16 +971,20 @@ def build_manifest_entry(
     html_paths: List[str],
     *,
     dry_run: bool,
-    reason: Optional[str] = None,
+    reason: Optional[ReasonCode | str] = None,
+    reason_detail: Optional[str] = None,
 ) -> ManifestEntry:
     """Create a manifest entry summarising a download attempt."""
 
     timestamp = _utc_timestamp()
+    outcome_reason: Optional[ReasonCode | str] = None
+    outcome_detail: Optional[str] = None
     if outcome:
         classification = outcome.classification.value
         path = outcome.path
         content_type = outcome.content_type
-        error = outcome.error
+        outcome_reason = getattr(outcome, "reason", None)
+        outcome_detail = getattr(outcome, "reason_detail", None)
         sha256 = outcome.sha256
         content_length = outcome.content_length
         etag = outcome.etag
@@ -933,7 +1001,22 @@ def build_manifest_entry(
         last_modified = None
         extracted_text_path = None
 
-    resolved_reason = reason or error
+    resolved_reason_code: Optional[ReasonCode]
+    if isinstance(reason, ReasonCode):
+        resolved_reason_code = reason
+    elif reason is not None:
+        resolved_reason_code = ReasonCode.from_wire(reason)
+    elif outcome:
+        resolved_reason_code = (
+            outcome_reason if isinstance(outcome_reason, ReasonCode) else ReasonCode.from_wire(outcome_reason)
+        )
+    else:
+        resolved_reason_code = None
+
+    resolved_detail = reason_detail
+    if resolved_detail is None:
+        resolved_detail = outcome_detail if outcome_detail else None
+
     return ManifestEntry(
         schema_version=MANIFEST_SCHEMA_VERSION,
         timestamp=timestamp,
@@ -945,7 +1028,8 @@ def build_manifest_entry(
         path=path,
         classification=classification,
         content_type=content_type,
-        reason=resolved_reason,
+        reason=resolved_reason_code.value if resolved_reason_code else None,
+        reason_detail=resolved_detail,
         html_paths=list(html_paths),
         sha256=sha256,
         content_length=content_length,
@@ -969,4 +1053,5 @@ __all__ = [
     "SqliteSink",
     "build_manifest_entry",
     "load_previous_manifest",
+    "load_manifest_url_index",
 ]

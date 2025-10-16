@@ -355,6 +355,27 @@ def test_cli_plan_diff_outputs(monkeypatch, stub_logger, tmp_path, capsys):
     assert "+ hp" in output or "~ hp" in output
 
 
+def test_cli_plan_diff_updates_baseline(monkeypatch, stub_logger, tmp_path, capsys):
+    baseline_path = tmp_path / "baseline.json"
+    plan = _planned_fetch("hp", url="https://example.org/new.owl")
+
+    monkeypatch.setattr(cli, "plan_all", lambda specs, *, config=None, since=None: [plan])
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    monkeypatch.setattr(
+        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+    )
+
+    exit_code = cli.main(
+        ["plan-diff", "hp", "--baseline", str(baseline_path), "--update-baseline"]
+    )
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Updated baseline" in output
+    assert baseline_path.exists()
+    baseline_payload = json.loads(baseline_path.read_text())
+    assert baseline_payload[0]["url"] == "https://example.org/new.owl"
+
+
 def test_cli_prune_dry_run_json(monkeypatch, stub_logger, capsys):
     metadata = [
         {
@@ -388,6 +409,46 @@ def test_cli_prune_dry_run_json(monkeypatch, stub_logger, capsys):
     assert payload["dry_run"] is True
     assert payload["total_deleted"] == 1
     assert payload["total_reclaimed_bytes"] == 1024
+
+
+def test_cli_prune_older_than(monkeypatch, stub_logger, capsys):
+    metadata = [
+        {
+            "version": "2024",
+            "path": Path("/tmp/hp/2024"),
+            "size": 2048,
+            "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
+        },
+        {
+            "version": "2023",
+            "path": Path("/tmp/hp/2023"),
+            "size": 1024,
+            "timestamp": datetime(2023, 1, 1, tzinfo=timezone.utc),
+        },
+        {
+            "version": "2022",
+            "path": Path("/tmp/hp/2022"),
+            "size": 512,
+            "timestamp": datetime(2022, 1, 1, tzinfo=timezone.utc),
+        },
+    ]
+
+    monkeypatch.setattr(cli, "_collect_version_metadata", lambda oid: list(metadata))
+    monkeypatch.setattr(
+        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+    )
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    monkeypatch.setattr(cli.STORAGE, "available_ontologies", lambda: ["hp"])
+    monkeypatch.setattr(cli.STORAGE, "delete_version", lambda *_, **__: 0)
+    monkeypatch.setattr(cli.STORAGE, "set_latest_version", lambda *_, **__: None)
+
+    exit_code = cli.main(
+        ["prune", "--keep", "1", "--older-than", "2023-06-01", "--dry-run", "--json"]
+    )
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["total_deleted"] == 2
+    assert payload["total_reclaimed_bytes"] == 1024 + 512
 
 
 def test_cli_prune_updates_latest_marker(monkeypatch, stub_logger):
@@ -560,6 +621,47 @@ def test_cli_doctor_reports_diagnostics(monkeypatch, stub_logger, tmp_path, caps
     assert payload["rate_limits"]["configured"]["ols"]["value"] == "10/minute"
     assert "invalid" in payload["rate_limits"]["invalid"]
     assert payload["manifest_schema"]["sample"]["valid"] is True
+
+
+def test_cli_doctor_fix_applies_actions(monkeypatch, stub_logger, tmp_path, capsys):
+    config_dir = tmp_path / "configs"
+    cache_dir = tmp_path / "cache"
+    log_dir = tmp_path / "logs"
+    ontology_dir = tmp_path / "ontologies"
+
+    monkeypatch.setattr(cli, "CONFIG_DIR", config_dir)
+    monkeypatch.setattr(cli, "CACHE_DIR", cache_dir)
+    monkeypatch.setattr(cli, "LOG_DIR", log_dir)
+    monkeypatch.setattr(cli, "LOCAL_ONTOLOGY_DIR", ontology_dir)
+    monkeypatch.setattr(cli, "ONTOLOGY_DIR", ontology_dir)
+
+    log_dir.mkdir(parents=True)
+    (log_dir / "ontofetch.log").write_text("log")
+
+    monkeypatch.setattr(
+        cli.shutil,
+        "disk_usage",
+        lambda path: SimpleNamespace(total=10_000_000_000, used=4_000_000_000, free=6_000_000_000),
+    )
+    monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+    monkeypatch.setattr(cli.requests, "head", lambda *_, **__: SimpleNamespace(status_code=200, ok=True, reason="OK"))
+    monkeypatch.setattr(cli.requests, "get", lambda *_, **__: SimpleNamespace(status_code=200, ok=True, reason="OK"))
+    monkeypatch.setattr(cli.importlib.util, "find_spec", lambda name: object())
+    monkeypatch.setattr(cli, "validate_manifest_dict", lambda payload, source=None: None)
+    monkeypatch.setattr(cli, "get_manifest_schema", lambda: {"type": "object"})
+    monkeypatch.setattr(cli.Draft202012Validator, "check_schema", lambda schema: None)
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+
+    exit_code = cli.main(["doctor", "--fix"])
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Applied fixes" in output
+    assert config_dir.exists()
+    assert cache_dir.exists()
+    assert ontology_dir.exists()
+    assert (config_dir / "bioportal_api_key.txt").exists()
+    assert (config_dir / "ols_api_token.txt").exists()
+    assert (log_dir / "ontofetch.log.1").exists()
 
 
 def test_cli_plugins_json(monkeypatch, capsys):

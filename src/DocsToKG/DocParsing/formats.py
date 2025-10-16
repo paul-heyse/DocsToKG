@@ -1,7 +1,7 @@
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.DocParsing.schemas",
-#   "purpose": "Defines schemas for DocsToKG.DocParsing.schemas",
+#   "module": "DocsToKG.DocParsing.formats",
+#   "purpose": "Schema definitions and serializer providers for DocParsing formats",
 #   "sections": [
 #     {
 #       "id": "missing-pydantic-message",
@@ -74,12 +74,12 @@
 # === /NAVMAP ===
 
 """
-DocParsing Schema Definitions
+DocParsing Formats
 
-This module defines Pydantic models and helpers that validate chunk and vector
-payloads across the DocsToKG pipeline. By enforcing consistent schemas prior to
-persistence or downstream processing, the utilities safeguard search, indexing,
-and analytics stages from malformed data.
+This module defines Pydantic models, validation helpers, and Docling serializer
+providers used throughout the DocParsing pipeline. By gathering schema
+definitions alongside the Markdown-aware serializers, downstream stages can
+import one module for all data contract needs.
 
 Key Features:
 - Strict schemas for chunk JSONL rows and embedding vector rows
@@ -87,18 +87,41 @@ Key Features:
 - Convenience validators for schema versions and provenance metadata
 
 Usage:
-    from DocsToKG.DocParsing import schemas
+    from DocsToKG.DocParsing import formats
 
-    validated = schemas.validate_chunk_row(raw_row)
+    validated = formats.validate_chunk_row(raw_row)
+    provider = formats.RichSerializerProvider()
 
 Dependencies:
 - pydantic (optional): Offers model validation when available; graceful fallbacks
   raise informative errors otherwise.
+- docling_core: Supplies serializer base classes consumed by DocsToKG.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+
+from docling_core.transforms.chunker.hierarchical_chunker import (
+    ChunkingDocSerializer,
+    ChunkingSerializerProvider,
+)
+from docling_core.transforms.serializer.base import BaseDocSerializer, SerializationResult
+from docling_core.transforms.serializer.common import create_ser_result
+from docling_core.transforms.serializer.markdown import (
+    MarkdownParams,
+    MarkdownPictureSerializer,
+    MarkdownTableSerializer,
+)
+from docling_core.types.doc.document import (
+    DoclingDocument,
+    PictureClassificationData,
+    PictureDescriptionData,
+    PictureItem,
+    PictureMoleculeData,
+)
+from docling_core.types.doc.document import DoclingDocument as _Doc
+from typing_extensions import override
 
 # --- Globals ---
 
@@ -284,6 +307,8 @@ __all__ = [
     "validate_vector_row",
     "get_docling_version",
     "validate_schema_version",
+    "CaptionPlusAnnotationPictureSerializer",
+    "RichSerializerProvider",
 ]
 # --- Public Classes ---
 
@@ -798,6 +823,183 @@ def validate_schema_version(
             f"Supported versions: {expected}"
         )
     return version
+
+
+# --- Serializer Helpers ---
+
+
+class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
+    """Serialize picture items with captions and rich annotation metadata.
+
+    Attributes:
+        image_placeholder: Fallback marker inserted when an image lacks metadata.
+
+    Examples:
+        >>> serializer = CaptionPlusAnnotationPictureSerializer()
+        >>> isinstance(serializer, CaptionPlusAnnotationPictureSerializer)
+        True
+    """
+
+    @override
+    def serialize(
+        self,
+        *,
+        item: PictureItem,
+        doc_serializer: BaseDocSerializer,
+        doc: _Doc,
+        **_: Any,
+    ) -> SerializationResult:
+        """Render picture metadata into Markdown-friendly text.
+
+        Args:
+            item: Picture element extracted from the Docling document.
+            doc_serializer: Serializer orchestrating the chunking pipeline.
+            doc: Source document providing contextual accessors.
+            **_: Additional keyword arguments ignored by this implementation.
+
+        Returns:
+            Serialization result containing Markdown-ready text and spans.
+        """
+
+        parts: List[str] = []
+        annotations: List[object] = []
+        try:
+            annotations = list(item.annotations or [])
+        except Exception:  # pragma: no cover - defensive catch
+            annotations = []
+
+        try:
+            caption = (item.caption_text(doc) or "").strip()
+            if caption:
+                parts.append(f"Figure caption: {caption}")
+        except Exception:  # pragma: no cover - defensive catch
+            pass
+
+        confidence_candidates: List[float] = []
+
+        def _maybe_add_conf(value: object) -> None:
+            """Collect numeric confidence scores when they can be coerced to float."""
+            try:
+                if value is None:
+                    return
+                confidence_candidates.append(float(value))
+            except (TypeError, ValueError):
+                pass
+
+        for annotation in annotations:
+            try:
+                _maybe_add_conf(getattr(annotation, "confidence", None))
+                _maybe_add_conf(getattr(annotation, "score", None))
+                predicted = getattr(annotation, "predicted_classes", None)
+                if predicted:
+                    for cls in predicted:
+                        _maybe_add_conf(getattr(cls, "confidence", None))
+                        _maybe_add_conf(getattr(cls, "probability", None))
+                if isinstance(annotation, PictureDescriptionData) and annotation.text:
+                    parts.append(f"Picture description: {annotation.text}")
+                elif (
+                    isinstance(annotation, PictureClassificationData)
+                    and annotation.predicted_classes
+                ):
+                    parts.append(f"Picture type: {annotation.predicted_classes[0].class_name}")
+                elif isinstance(annotation, PictureMoleculeData) and annotation.smi:
+                    parts.append(f"SMILES: {annotation.smi}")
+            except Exception:  # pragma: no cover - defensive catch
+                continue
+        if not parts:
+            parts.append("<!-- image -->")
+
+        has_caption = len(parts) > 1 or (parts and parts[0] != "<!-- image -->")
+        has_classification = any(
+            isinstance(annotation, PictureClassificationData)
+            and getattr(annotation, "predicted_classes", None)
+            for annotation in annotations
+        )
+        try:  # pragma: no cover - metadata enrichment best effort
+            flags = getattr(item, "_docstokg_flags", {})
+            if not isinstance(flags, dict):
+                flags = {}
+            flags.setdefault("has_image_captions", False)
+            flags.setdefault("has_image_classification", False)
+            flags["has_image_captions"] = flags["has_image_captions"] or has_caption
+            flags["has_image_classification"] = (
+                flags["has_image_classification"] or has_classification
+            )
+            if confidence_candidates:
+                candidate = max(confidence_candidates)
+                existing = flags.get("image_confidence")
+                try:
+                    existing_val = float(existing) if existing is not None else None
+                except (TypeError, ValueError):
+                    existing_val = None
+                if existing_val is None or candidate > existing_val:
+                    flags["image_confidence"] = candidate
+            setattr(item, "_docstokg_flags", flags)
+        except Exception:
+            pass
+
+        text = doc_serializer.post_process(text="\n".join(parts))
+        return create_ser_result(text=text, span_source=item)
+
+
+class RichSerializerProvider(ChunkingSerializerProvider):
+    """Provide a serializer that augments tables and pictures with Markdown.
+
+    Attributes:
+        markdown_params: Default Markdown parameters passed to serializers.
+
+    Examples:
+        >>> provider = RichSerializerProvider()
+        >>> isinstance(provider.get_serializer(DoclingDocument()), ChunkingDocSerializer)  # doctest: +SKIP
+        True  # doctest: +SKIP
+    """
+
+    markdown_params: MarkdownParams
+
+    def __init__(self, markdown_params: Optional[MarkdownParams] = None) -> None:
+        """Initialise the serializer provider with Markdown defaults.
+
+        Args:
+            markdown_params: Optional override for Markdown rendering parameters.
+        """
+
+        self.markdown_params = markdown_params or MarkdownParams()
+
+    def _build_picture_serializer(self) -> MarkdownPictureSerializer:
+        """Construct the picture serializer enriched with annotations."""
+
+        params = getattr(self.markdown_params, "picture", None)
+        if params is None:
+            return CaptionPlusAnnotationPictureSerializer()
+        return CaptionPlusAnnotationPictureSerializer(params=params)
+
+    def _build_table_serializer(self) -> MarkdownTableSerializer:
+        """Construct the Markdown table serializer."""
+
+        params = getattr(self.markdown_params, "table", None)
+        if params is None:
+            return MarkdownTableSerializer()
+        return MarkdownTableSerializer(params=params)
+
+    @override
+    def get_serializer(self, doc: DoclingDocument) -> ChunkingDocSerializer:
+        """Return a chunking serializer configured for ``doc``.
+
+        Args:
+            doc: Docling document whose metadata informs serializer selection.
+
+        Returns:
+            ChunkingDocSerializer: Serializer capable of producing DocTags with
+            caption and annotation metadata.
+        """
+
+        serializer = ChunkingDocSerializer(
+            doc=doc,
+            picture_serializer=self._build_picture_serializer(),
+            table_serializer=self._build_table_serializer(),
+            params=getattr(self.markdown_params, "core", None),
+        )
+        return serializer
 
 
 if PYDANTIC_AVAILABLE:

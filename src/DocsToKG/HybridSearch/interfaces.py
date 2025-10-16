@@ -20,7 +20,7 @@ from .config import DenseIndexConfig
 from .types import ChunkPayload
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from .vectorstore import AdapterStats, FaissSearchResult
+    from .store import AdapterStats, FaissSearchResult
 
 
 class LexicalIndex(Protocol):
@@ -33,7 +33,7 @@ class LexicalIndex(Protocol):
         None
 
     Examples:
-        >>> from DocsToKG.HybridSearch.storage import OpenSearchSimulator
+        >>> from DocsToKG.HybridSearch.store import OpenSearchSimulator
         >>> simulator: LexicalIndex = OpenSearchSimulator()
         >>> simulator.bulk_upsert([])  # doctest: +SKIP
     """

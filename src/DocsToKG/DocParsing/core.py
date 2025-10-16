@@ -1,7 +1,7 @@
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.DocParsing._common",
-#   "purpose": "Implements DocsToKG.DocParsing._common behaviors and helpers",
+#   "module": "DocsToKG.DocParsing.core",
+#   "purpose": "Shared utilities and CLI glue for DocParsing workflows",
 #   "sections": [
 #     {
 #       "id": "bm25stats",
@@ -278,13 +278,13 @@
 # === /NAVMAP ===
 
 """
-DocParsing Shared Utilities
+DocParsing Core Utilities
 
-This module consolidates lightweight helpers that power multiple DocParsing
+This module centralises lightweight helpers that power multiple DocParsing
 pipeline stages. Utilities span path discovery, atomic file writes, JSONL
-parsing, manifest bookkeeping, and structured logging so that chunking,
-embedding, and conversion scripts can share consistent behaviour without an
-additional dependency layer.
+parsing, manifest bookkeeping, CLI glue, and structured logging so that
+chunking, embedding, and conversion scripts can share consistent behaviour
+without an additional dependency layer.
 
 Key Features:
 - Resolve DocsToKG data directories with environment and ancestor discovery
@@ -293,10 +293,10 @@ Key Features:
 - Manage pipeline manifests, batching helpers, and advisory file locks
 
 Usage:
-    from DocsToKG.DocParsing import _common as common_util
+    from DocsToKG.DocParsing import core
 
-    chunks_dir = common_util.data_chunks()
-    with common_util.atomic_write(chunks_dir / \"example.jsonl\") as handle:
+    chunks_dir = core.data_chunks()
+    with core.atomic_write(chunks_dir / \"example.jsonl\") as handle:
         handle.write(\"{}\")
 
 Dependencies:
@@ -310,6 +310,7 @@ third-party dependencies beyond the standard library.
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import hashlib
 import json
@@ -322,18 +323,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import (
-    Callable,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
-    TextIO,
-    Tuple,
-    TypeVar,
-)
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, TextIO, Tuple, TypeVar
 
 T = TypeVar("T")
 
@@ -384,6 +374,13 @@ __all__ = [
     "DEFAULT_CAPTION_MARKERS",
     "DEFAULT_SERIALIZER_PROVIDER",
     "load_structural_marker_config",
+    "CommandHandler",
+    "CLI_DESCRIPTION",
+    "main",
+    "run_all",
+    "chunk",
+    "embed",
+    "doctags",
 ]
 
 # --- Data Containers ---
@@ -396,7 +393,7 @@ DEFAULT_CAPTION_MARKERS: Tuple[str, ...] = (
     "Picture description:",
     "<!-- image -->",
 )
-DEFAULT_SERIALIZER_PROVIDER = "DocsToKG.DocParsing.serializers:RichSerializerProvider"
+DEFAULT_SERIALIZER_PROVIDER = "DocsToKG.DocParsing.formats:RichSerializerProvider"
 
 
 @dataclass(slots=True)
@@ -1616,3 +1613,868 @@ def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:
             logger.warning(message)
         else:
             logging.getLogger(__name__).warning(message)
+
+
+# --- Unified CLI ---
+
+
+CommandHandler = Callable[[Sequence[str]], int]
+
+CLI_DESCRIPTION = """\
+Unified DocParsing CLI
+
+Examples:
+  python -m DocsToKG.DocParsing.cli all --resume
+  python -m DocsToKG.DocParsing.cli chunk --data-root Data
+  python -m DocsToKG.DocParsing.cli embed --resume
+  python -m DocsToKG.DocParsing.cli doctags --mode pdf --workers 2
+"""
+
+_PDF_SUFFIXES: tuple[str, ...] = (".pdf",)
+_HTML_SUFFIXES: tuple[str, ...] = (".html", ".htm")
+
+
+def _run_chunk(argv: Sequence[str]) -> int:
+    """Execute the Docling chunker subcommand."""
+
+    from DocsToKG.DocParsing import chunking as chunk_module
+
+    parser = chunk_module.build_parser()
+    parser.prog = "docparse chunk"
+    args = parser.parse_args(argv)
+    return chunk_module.main(args)
+
+
+def _run_embed(argv: Sequence[str]) -> int:
+    """Execute the embedding pipeline subcommand."""
+
+    from DocsToKG.DocParsing import embedding as embedding_module
+
+    parser = embedding_module.build_parser()
+    parser.prog = "docparse embed"
+    args = parser.parse_args(argv)
+    return embedding_module.main(args)
+
+
+def _build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentParser:
+    """Create an :mod:`argparse` parser configured for DocTags conversion."""
+
+    from DocsToKG.DocParsing import doctags as doctags_module
+
+    examples = """Examples:
+  docparse doctags --input Data/HTML
+  docparse doctags --mode pdf --workers 4
+  docparse doctags --mode html --overwrite
+"""
+    parser = argparse.ArgumentParser(
+        prog=prog,
+        description="Convert HTML or PDF corpora to DocTags using Docling",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=examples,
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["auto", "html", "pdf"],
+        default="auto",
+        help="Select conversion backend; auto infers from input directory",
+    )
+    doctags_module.add_data_root_option(parser)
+    parser.add_argument(
+        "--in-dir",
+        "--input",
+        dest="in_dir",
+        type=Path,
+        default=None,
+        help="Directory containing HTML or PDF sources (defaults vary by mode)",
+    )
+    parser.add_argument(
+        "--out-dir",
+        "--output",
+        dest="out_dir",
+        type=Path,
+        default=None,
+        help="Destination for generated .doctags files (defaults vary by mode)",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Worker processes to launch; backend defaults used when omitted",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Override vLLM model path or identifier for PDF conversion",
+    )
+    parser.add_argument(
+        "--served-model-name",
+        dest="served_model_names",
+        action="append",
+        nargs="+",
+        default=None,
+        help="Model alias to expose from vLLM (repeatable)",
+    )
+    parser.add_argument(
+        "--gpu-memory-utilization",
+        type=float,
+        default=None,
+        help="Fraction of GPU memory allocated to the vLLM server",
+    )
+    doctags_module.add_resume_force_options(
+        parser,
+        resume_help="Skip documents whose outputs already exist with matching content hash",
+        force_help="Force reprocessing even when resume criteria are satisfied",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing DocTags files (HTML mode only)",
+    )
+    return parser
+
+
+def _scan_pdf_html(input_dir: Path) -> tuple[bool, bool]:
+    """Return booleans indicating whether PDFs or HTML files exist beneath ``input_dir``."""
+
+    has_pdf = False
+    has_html = False
+
+    if not input_dir.exists():
+        return has_pdf, has_html
+
+    for root, _dirs, files in os.walk(input_dir):
+        if not files:
+            continue
+        for name in files:
+            lower = name.lower()
+            if not has_pdf and lower.endswith(_PDF_SUFFIXES):
+                has_pdf = True
+            elif not has_html and lower.endswith(_HTML_SUFFIXES):
+                has_html = True
+            if has_pdf and has_html:
+                return has_pdf, has_html
+    return has_pdf, has_html
+
+
+def _directory_contains_suffixes(directory: Path, suffixes: tuple[str, ...]) -> bool:
+    """Return True when ``directory`` contains at least one file ending with ``suffixes``."""
+
+    if not directory.exists():
+        return False
+    suffixes_lower = tuple(s.lower() for s in suffixes)
+    for root, _dirs, files in os.walk(directory):
+        if not files:
+            continue
+        for name in files:
+            if name.lower().endswith(suffixes_lower):
+                return True
+    return False
+
+
+def _detect_mode(input_dir: Path) -> str:
+    """Infer conversion mode based on the contents of ``input_dir``."""
+
+    if not input_dir.exists():
+        raise ValueError(f"Cannot auto-detect mode in {input_dir}: directory not found")
+
+    has_pdf, has_html = _scan_pdf_html(input_dir)
+    if has_pdf and not has_html:
+        return "pdf"
+    if has_html and not has_pdf:
+        return "html"
+    if has_pdf and has_html:
+        raise ValueError(f"Cannot auto-detect mode in {input_dir}: found both PDF and HTML files")
+    raise ValueError(f"Cannot auto-detect mode in {input_dir}: no PDF or HTML files found")
+
+
+def _merge_args(parser: argparse.ArgumentParser, overrides: Dict[str, Any]) -> argparse.Namespace:
+    """Merge override values into the default parser namespace."""
+
+    base = parser.parse_args([])
+    for key, value in overrides.items():
+        if value is not None:
+            setattr(base, key, value)
+    return base
+
+
+def _run_doctags(argv: Sequence[str]) -> int:
+    """Execute the DocTags conversion subcommand."""
+
+    from DocsToKG.DocParsing import doctags as doctags_module
+
+    parser = _build_doctags_parser()
+    args = parser.parse_args(argv)
+    logger = get_logger(__name__)
+
+    resolved_root = (
+        detect_data_root(args.data_root) if args.data_root is not None else detect_data_root()
+    )
+
+    html_default_in = data_html(resolved_root)
+    pdf_default_in = data_pdfs(resolved_root)
+    doctags_default_out = data_doctags(resolved_root)
+
+    mode = args.mode
+    if args.in_dir is not None:
+        input_dir = args.in_dir.resolve()
+        if mode == "auto":
+            mode = _detect_mode(input_dir)
+    else:
+        if mode == "auto":
+            html_present = _directory_contains_suffixes(html_default_in, _HTML_SUFFIXES)
+            pdf_present = _directory_contains_suffixes(pdf_default_in, _PDF_SUFFIXES)
+            if html_present and not pdf_present:
+                mode = "html"
+            elif pdf_present and not html_present:
+                mode = "pdf"
+            else:
+                raise ValueError("Cannot auto-detect mode: specify --mode or --input explicitly")
+        input_dir = html_default_in if mode == "html" else pdf_default_in
+
+    output_dir = args.out_dir.resolve() if args.out_dir is not None else doctags_default_out
+
+    args.in_dir = input_dir
+    args.out_dir = output_dir
+
+    logger.info(
+        "Unified DocTags conversion",
+        extra={
+            "extra_fields": {
+                "mode": mode,
+                "data_root": str(resolved_root),
+                "input_dir": str(input_dir),
+                "output_dir": str(output_dir),
+                "workers": args.workers,
+                "resume": args.resume,
+                "force": args.force,
+                "overwrite": args.overwrite,
+                "model": args.model,
+                "served_model_names": args.served_model_names,
+                "gpu_memory_utilization": args.gpu_memory_utilization,
+            }
+        },
+    )
+
+    base_overrides = {
+        "data_root": args.data_root,
+        "input": input_dir,
+        "output": output_dir,
+        "workers": args.workers,
+        "resume": args.resume,
+        "force": args.force,
+    }
+
+    if mode == "html":
+        html_overrides = {
+            **base_overrides,
+            "overwrite": args.overwrite,
+        }
+        html_args = _merge_args(doctags_module.html_build_parser(), html_overrides)
+        return doctags_module.html_main(html_args)
+
+    overrides = {
+        **base_overrides,
+        "model": args.model,
+        "served_model_names": args.served_model_names,
+        "gpu_memory_utilization": args.gpu_memory_utilization,
+    }
+    pdf_args = _merge_args(doctags_module.pdf_build_parser(), overrides)
+    return doctags_module.pdf_main(pdf_args)
+
+
+def _preview_list(items: List[str], limit: int = 5) -> List[str]:
+    """Return a truncated preview list with remainder hint."""
+
+    if len(items) <= limit:
+        return list(items)
+    preview = list(items[:limit])
+    preview.append(f"... (+{len(items) - limit} more)")
+    return preview
+
+
+def _plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
+    """Compute which DocTags inputs would be processed."""
+
+    from DocsToKG.DocParsing import doctags as doctags_module
+
+    parser = _build_doctags_parser()
+    args = parser.parse_args(argv)
+    resolved_root = (
+        detect_data_root(args.data_root) if args.data_root is not None else detect_data_root()
+    )
+
+    html_default_in = data_html(resolved_root)
+    pdf_default_in = data_pdfs(resolved_root)
+    doctags_default_out = data_doctags(resolved_root)
+
+    mode = args.mode
+    if args.in_dir is not None:
+        input_dir = args.in_dir.resolve()
+        if mode == "auto":
+            mode = _detect_mode(input_dir)
+    else:
+        if mode == "auto":
+            html_present = _directory_contains_suffixes(html_default_in, _HTML_SUFFIXES)
+            pdf_present = _directory_contains_suffixes(pdf_default_in, _PDF_SUFFIXES)
+            if html_present and not pdf_present:
+                mode = "html"
+            elif pdf_present and not html_present:
+                mode = "pdf"
+            else:
+                raise ValueError("Cannot auto-detect mode: specify --mode or --input explicitly")
+        input_dir = html_default_in if mode == "html" else pdf_default_in
+
+    output_dir = args.out_dir.resolve() if args.out_dir is not None else doctags_default_out
+
+    if not input_dir.exists():
+        return {
+            "stage": "doctags",
+            "mode": mode,
+            "input_dir": str(input_dir),
+            "output_dir": str(output_dir),
+            "process": [],
+            "skip": [],
+            "notes": ["Input directory missing"],
+        }
+
+    if mode == "html":
+        files = doctags_module.list_htmls(input_dir)
+        manifest_stage = getattr(doctags_module, "HTML_MANIFEST_STAGE", "doctags-html")
+        overwrite = bool(getattr(args, "overwrite", False))
+    else:
+        files = doctags_module.list_pdfs(input_dir)
+        manifest_stage = doctags_module.MANIFEST_STAGE
+        overwrite = False
+
+    manifest_index = load_manifest_index(manifest_stage, resolved_root) if args.resume else {}
+    planned: List[str] = []
+    skipped: List[str] = []
+
+    for path in files:
+        rel_path = path.relative_to(input_dir)
+        doc_id = rel_path.as_posix()
+        out_path = (output_dir / rel_path).with_suffix(".doctags")
+        input_hash = compute_content_hash(path)
+        manifest_entry = manifest_index.get(doc_id)
+        skip = should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force)
+        if mode == "html" and overwrite:
+            skip = False
+        if skip:
+            skipped.append(doc_id)
+        else:
+            planned.append(doc_id)
+
+    return {
+        "stage": "doctags",
+        "mode": mode,
+        "input_dir": str(input_dir),
+        "output_dir": str(output_dir),
+        "process": planned,
+        "skip": skipped,
+        "notes": [],
+    }
+
+
+def _plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
+    """Compute which DocTags files the chunk stage would touch."""
+
+    from DocsToKG.DocParsing import chunking as chunk_module
+    from DocsToKG.DocParsing import doctags as doctags_module
+
+    parser = chunk_module.build_parser()
+    args = parser.parse_args(argv)
+    resolved_root = doctags_module.prepare_data_root(args.data_root, chunk_module.DEFAULT_DATA_ROOT)
+    data_root_overridden = args.data_root is not None
+
+    in_dir = doctags_module.resolve_pipeline_path(
+        cli_value=args.in_dir,
+        default_path=chunk_module.DEFAULT_IN_DIR,
+        resolved_data_root=resolved_root,
+        data_root_overridden=data_root_overridden,
+        resolver=data_doctags,
+    ).resolve()
+
+    out_dir = doctags_module.resolve_pipeline_path(
+        cli_value=args.out_dir,
+        default_path=chunk_module.DEFAULT_OUT_DIR,
+        resolved_data_root=resolved_root,
+        data_root_overridden=data_root_overridden,
+        resolver=data_chunks,
+    ).resolve()
+
+    if not in_dir.exists():
+        return {
+            "stage": "chunk",
+            "input_dir": str(in_dir),
+            "output_dir": str(out_dir),
+            "process": [],
+            "skip": [],
+            "notes": ["DocTags directory missing"],
+        }
+
+    files = list(iter_doctags(in_dir))
+    manifest_index = (
+        load_manifest_index(chunk_module.MANIFEST_STAGE, resolved_root) if args.resume else {}
+    )
+    planned: List[str] = []
+    skipped: List[str] = []
+
+    for path in files:
+        rel_id = compute_relative_doc_id(path, in_dir)
+        relative_target = Path(rel_id)
+        out_path = (out_dir / relative_target).with_suffix(".chunks.jsonl")
+        input_hash = compute_content_hash(path)
+        manifest_entry = manifest_index.get(rel_id)
+        if should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force):
+            skipped.append(rel_id)
+        else:
+            planned.append(rel_id)
+
+    return {
+        "stage": "chunk",
+        "input_dir": str(in_dir),
+        "output_dir": str(out_dir),
+        "process": planned,
+        "skip": skipped,
+        "notes": [],
+    }
+
+
+def _plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
+    """Compute which chunk files the embed stage would process or validate."""
+
+    from DocsToKG.DocParsing import doctags as doctags_module
+    from DocsToKG.DocParsing import embedding as embedding_module
+
+    parser = embedding_module.build_parser()
+    args = parser.parse_args(argv)
+    resolved_root = doctags_module.prepare_data_root(
+        args.data_root, embedding_module.DEFAULT_DATA_ROOT
+    )
+    data_root_overridden = args.data_root is not None
+
+    chunks_dir = doctags_module.resolve_pipeline_path(
+        cli_value=args.chunks_dir,
+        default_path=embedding_module.DEFAULT_CHUNKS_DIR,
+        resolved_data_root=resolved_root,
+        data_root_overridden=data_root_overridden,
+        resolver=data_chunks,
+    ).resolve()
+
+    vectors_dir = doctags_module.resolve_pipeline_path(
+        cli_value=args.out_dir,
+        default_path=embedding_module.DEFAULT_VECTORS_DIR,
+        resolved_data_root=resolved_root,
+        data_root_overridden=data_root_overridden,
+        resolver=data_vectors,
+    ).resolve()
+
+    if args.validate_only:
+        validate: List[str] = []
+        missing: List[str] = []
+        for chunk_path in iter_chunks(chunks_dir):
+            doc_id, vector_path = derive_doc_id_and_vectors_path(chunk_path, chunks_dir, vectors_dir)
+            if vector_path.exists():
+                validate.append(doc_id)
+            else:
+                missing.append(doc_id)
+        return {
+            "stage": "embed",
+            "action": "validate",
+            "chunks_dir": str(chunks_dir),
+            "vectors_dir": str(vectors_dir),
+            "validate": validate,
+            "missing": missing,
+            "notes": [],
+        }
+
+    files = list(iter_chunks(chunks_dir))
+    manifest_index = (
+        load_manifest_index(embedding_module.MANIFEST_STAGE, resolved_root)
+        if args.resume
+        else {}
+    )
+    planned: List[str] = []
+    skipped: List[str] = []
+
+    for chunk_path in files:
+        doc_id, vector_path = derive_doc_id_and_vectors_path(chunk_path, chunks_dir, vectors_dir)
+        input_hash = compute_content_hash(chunk_path)
+        manifest_entry = manifest_index.get(doc_id)
+        if should_skip_output(vector_path, manifest_entry, input_hash, args.resume, args.force):
+            skipped.append(doc_id)
+        else:
+            planned.append(doc_id)
+
+    return {
+        "stage": "embed",
+        "action": "generate",
+        "chunks_dir": str(chunks_dir),
+        "vectors_dir": str(vectors_dir),
+        "process": planned,
+        "skip": skipped,
+        "notes": [],
+    }
+
+
+def _display_plan(plans: Sequence[Dict[str, Any]]) -> None:
+    """Pretty-print plan summaries to stdout."""
+
+    print("docparse all plan")
+    for entry in plans:
+        stage = entry.get("stage", "unknown")
+        notes = entry.get("notes", [])
+        if stage == "doctags":
+            desc = f"doctags (mode={entry.get('mode')})"
+            process = entry.get("process", [])
+            skip = entry.get("skip", [])
+            print(f"- {desc}: process {len(process)}, skip {len(skip)}")
+            print(f"  input:  {entry.get('input_dir')}")
+            print(f"  output: {entry.get('output_dir')}")
+            if process:
+                print("  process preview:", ", ".join(_preview_list(process)))
+            if skip:
+                print("  skip preview:", ", ".join(_preview_list(skip)))
+        elif stage == "chunk":
+            process = entry.get("process", [])
+            skip = entry.get("skip", [])
+            print(f"- chunk: process {len(process)}, skip {len(skip)}")
+            print(f"  input:  {entry.get('input_dir')}")
+            print(f"  output: {entry.get('output_dir')}")
+            if process:
+                print("  process preview:", ", ".join(_preview_list(process)))
+            if skip:
+                print("  skip preview:", ", ".join(_preview_list(skip)))
+        elif stage == "embed" and entry.get("action") == "validate":
+            validate = entry.get("validate", [])
+            missing = entry.get("missing", [])
+            print(
+                f"- embed (validate-only): validate {len(validate)}, missing vectors {len(missing)}"
+            )
+            print(f"  chunks:  {entry.get('chunks_dir')}")
+            print(f"  vectors: {entry.get('vectors_dir')}")
+            if validate:
+                print("  validate preview:", ", ".join(_preview_list(validate)))
+            if missing:
+                print("  missing preview:", ", ".join(_preview_list(missing)))
+        elif stage == "embed":
+            process = entry.get("process", [])
+            skip = entry.get("skip", [])
+            print(f"- embed: process {len(process)}, skip {len(skip)}")
+            print(f"  chunks:  {entry.get('chunks_dir')}")
+            print(f"  vectors: {entry.get('vectors_dir')}")
+            if process:
+                print("  process preview:", ", ".join(_preview_list(process)))
+            if skip:
+                print("  skip preview:", ", ".join(_preview_list(skip)))
+        else:
+            print(f"- {stage}: no actionable items")
+        if notes:
+            print("  notes:", "; ".join(notes))
+    print()
+
+
+def _run_all(argv: Sequence[str]) -> int:
+    """Execute DocTags conversion, chunking, and embedding sequentially."""
+
+    parser = argparse.ArgumentParser(
+        description="Run doctags → chunk → embed in sequence",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--data-root",
+        type=Path,
+        default=None,
+        help="DocsToKG data root override passed to all stages",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume each stage by skipping outputs with matching manifests",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force regeneration in each stage even when outputs exist",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["auto", "html", "pdf"],
+        default="auto",
+        help="DocTags conversion mode",
+    )
+    parser.add_argument(
+        "--doctags-in-dir",
+        type=Path,
+        default=None,
+        help="Override DocTags input directory",
+    )
+    parser.add_argument(
+        "--doctags-out-dir",
+        type=Path,
+        default=None,
+        help="Override DocTags output directory",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Allow rewriting DocTags outputs (HTML mode only)",
+    )
+    parser.add_argument(
+        "--chunk-out-dir",
+        type=Path,
+        default=None,
+        help="Output directory override for chunk JSONL files",
+    )
+    parser.add_argument(
+        "--chunk-workers",
+        type=int,
+        default=None,
+        help="Worker processes for the chunk stage",
+    )
+    parser.add_argument(
+        "--chunk-min-tokens",
+        type=int,
+        default=None,
+        help="Minimum tokens per chunk passed to the chunk stage",
+    )
+    parser.add_argument(
+        "--chunk-max-tokens",
+        type=int,
+        default=None,
+        help="Maximum tokens per chunk passed to the chunk stage",
+    )
+    parser.add_argument(
+        "--structural-markers",
+        type=Path,
+        default=None,
+        help="Structural marker configuration forwarded to the chunk stage",
+    )
+    parser.add_argument(
+        "--embed-out-dir",
+        type=Path,
+        default=None,
+        help="Output directory override for embedding JSONL files",
+    )
+    parser.add_argument(
+        "--embed-offline",
+        action="store_true",
+        help="Run the embedding stage with TRANSFORMERS_OFFLINE=1",
+    )
+    parser.add_argument(
+        "--embed-validate-only",
+        action="store_true",
+        help="Skip embedding generation and only validate existing vectors",
+    )
+    parser.add_argument(
+        "--splade-zero-pct-warn-threshold",
+        type=float,
+        default=None,
+        help="Override SPLADE sparsity warning threshold for the embed stage",
+    )
+    parser.add_argument(
+        "--plan",
+        action="store_true",
+        help="Show a plan of the files each stage would touch instead of running",
+    )
+
+    args = parser.parse_args(argv)
+    logger = get_logger(__name__)
+
+    extra = {
+        "resume": bool(args.resume),
+        "force": bool(args.force),
+        "mode": args.mode,
+    }
+    if args.data_root:
+        extra["data_root"] = str(args.data_root)
+    logger.info("docparse all starting", extra={"extra_fields": extra})
+
+    doctags_args: List[str] = []
+    if args.data_root:
+        doctags_args.extend(["--data-root", str(args.data_root)])
+    if args.resume:
+        doctags_args.append("--resume")
+    if args.force:
+        doctags_args.append("--force")
+    if args.mode != "auto":
+        doctags_args.extend(["--mode", args.mode])
+    if args.doctags_in_dir:
+        doctags_args.extend(["--in-dir", str(args.doctags_in_dir)])
+    if args.doctags_out_dir:
+        doctags_args.extend(["--out-dir", str(args.doctags_out_dir)])
+    if args.overwrite:
+        doctags_args.append("--overwrite")
+
+    chunk_args: List[str] = []
+    if args.data_root:
+        chunk_args.extend(["--data-root", str(args.data_root)])
+    if args.resume:
+        chunk_args.append("--resume")
+    if args.force:
+        chunk_args.append("--force")
+    if args.doctags_out_dir:
+        chunk_args.extend(["--in-dir", str(args.doctags_out_dir)])
+    if args.chunk_out_dir:
+        chunk_args.extend(["--out-dir", str(args.chunk_out_dir)])
+    if args.chunk_workers:
+        chunk_args.extend(["--workers", str(args.chunk_workers)])
+    if args.chunk_min_tokens:
+        chunk_args.extend(["--min-tokens", str(args.chunk_min_tokens)])
+    if args.chunk_max_tokens:
+        chunk_args.extend(["--max-tokens", str(args.chunk_max_tokens)])
+    if args.structural_markers:
+        chunk_args.extend(["--structural-markers", str(args.structural_markers)])
+
+    embed_args: List[str] = []
+    if args.data_root:
+        embed_args.extend(["--data-root", str(args.data_root)])
+    if args.resume:
+        embed_args.append("--resume")
+    if args.force:
+        embed_args.append("--force")
+    if args.chunk_out_dir:
+        embed_args.extend(["--chunks-dir", str(args.chunk_out_dir)])
+    if args.embed_out_dir:
+        embed_args.extend(["--out-dir", str(args.embed_out_dir)])
+    if args.embed_offline:
+        embed_args.append("--offline")
+    if args.embed_validate_only:
+        embed_args.append("--validate-only")
+    if args.splade_zero_pct_warn_threshold is not None:
+        embed_args.extend(
+            ["--splade-zero-pct-warn-threshold", str(args.splade_zero_pct_warn_threshold)]
+        )
+
+    if args.plan:
+        plans: List[Dict[str, Any]] = []
+        try:
+            plans.append(_plan_doctags(doctags_args))
+        except Exception as exc:  # pragma: no cover - plan path should handle gracefully
+            plans.append(
+                {
+                    "stage": "doctags",
+                    "mode": args.mode,
+                    "input_dir": None,
+                    "output_dir": None,
+                    "total": 0,
+                    "process": [],
+                    "skip": [],
+                    "notes": [f"DocTags plan unavailable ({exc})"],
+                }
+            )
+        try:
+            plans.append(_plan_chunk(chunk_args))
+        except Exception as exc:  # pragma: no cover
+            plans.append(
+                {
+                    "stage": "chunk",
+                    "input_dir": None,
+                    "output_dir": None,
+                    "total": 0,
+                    "process": [],
+                    "skip": [],
+                    "notes": [f"Chunk plan unavailable ({exc})"],
+                }
+            )
+        try:
+            plans.append(_plan_embed(embed_args))
+        except Exception as exc:  # pragma: no cover
+            plans.append(
+                {
+                    "stage": "embed",
+                    "operation": "unknown",
+                    "chunks_dir": None,
+                    "vectors_dir": None,
+                    "total": 0,
+                    "process": [],
+                    "skip": [],
+                    "notes": [f"Embed plan unavailable ({exc})"],
+                }
+            )
+        _display_plan(plans)
+        return 0
+
+    exit_code = _run_doctags(doctags_args)
+    if exit_code != 0:
+        logger.error(
+            "DocTags stage failed",
+            extra={"extra_fields": {"exit_code": exit_code}},
+        )
+        return exit_code
+
+    exit_code = _run_chunk(chunk_args)
+    if exit_code != 0:
+        logger.error(
+            "Chunk stage failed",
+            extra={"extra_fields": {"exit_code": exit_code}},
+        )
+        return exit_code
+
+    exit_code = _run_embed(embed_args)
+    if exit_code != 0:
+        logger.error(
+            "Embedding stage failed",
+            extra={"extra_fields": {"exit_code": exit_code}},
+        )
+        return exit_code
+
+    logger.info("docparse all completed", extra={"extra_fields": {"status": "success"}})
+    return 0
+
+
+class _Command:
+    """Callable wrapper storing handler metadata for subcommands."""
+
+    __slots__ = ("handler", "help")
+
+    def __init__(self, handler: CommandHandler, help: str) -> None:
+        self.handler = handler
+        self.help = help
+
+
+COMMANDS: Dict[str, _Command] = {
+    "all": _Command(_run_all, "Run doctags → chunk → embed sequentially"),
+    "chunk": _Command(_run_chunk, "Run the Docling hybrid chunker"),
+    "embed": _Command(_run_embed, "Generate BM25/SPLADE/dense vectors"),
+    "doctags": _Command(_run_doctags, "Convert HTML/PDF corpora into DocTags"),
+}
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Dispatch to one of the DocParsing subcommands."""
+
+    parser = argparse.ArgumentParser(
+        description=CLI_DESCRIPTION,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("command", choices=COMMANDS.keys(), help="CLI to execute")
+    parser.add_argument("args", nargs=argparse.REMAINDER, help="Arguments passed to the command")
+    parsed = parser.parse_args(argv)
+    command = COMMANDS[parsed.command]
+    return command.handler(parsed.args)
+
+
+def run_all(argv: Sequence[str] | None = None) -> int:
+    """Public wrapper for the ``all`` subcommand."""
+
+    return _run_all([] if argv is None else list(argv))
+
+
+def chunk(argv: Sequence[str] | None = None) -> int:
+    """Public wrapper for the ``chunk`` subcommand."""
+
+    return _run_chunk([] if argv is None else list(argv))
+
+
+def embed(argv: Sequence[str] | None = None) -> int:
+    """Public wrapper for the ``embed`` subcommand."""
+
+    return _run_embed([] if argv is None else list(argv))
+
+
+def doctags(argv: Sequence[str] | None = None) -> int:
+    """Public wrapper for the ``doctags`` subcommand."""
+
+    return _run_doctags([] if argv is None else list(argv))

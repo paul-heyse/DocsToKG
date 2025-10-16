@@ -107,12 +107,13 @@ from __future__ import annotations
 import hashlib
 import logging
 import random
+import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Any, Mapping, MutableMapping, Optional, Set, Union
+from typing import Any, Callable, Mapping, MutableMapping, Optional, Set, Union
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -123,6 +124,8 @@ __all__ = (
     "CachedResult",
     "ConditionalRequestHelper",
     "ModifiedResult",
+    "CircuitBreaker",
+    "TokenBucket",
     "create_session",
     "head_precheck",
     "parse_retry_after_header",
@@ -723,10 +726,126 @@ class ConditionalRequestHelper:
         )
 
 
+class CircuitBreaker:
+    """Circuit breaker that opens after repeated failures for a cooldown period."""
+
+    def __init__(
+        self,
+        *,
+        failure_threshold: int = 5,
+        cooldown_seconds: float = 60.0,
+        name: str = "circuit",
+    ) -> None:
+        if failure_threshold < 1:
+            raise ValueError("failure_threshold must be >= 1")
+        if cooldown_seconds < 0:
+            raise ValueError("cooldown_seconds must be >= 0")
+        self.failure_threshold = failure_threshold
+        self.cooldown_seconds = float(cooldown_seconds)
+        self.name = name
+        self._lock = threading.Lock()
+        self._failures = 0
+        self._open_until: float = 0.0
+
+    def allow(self, *, now: Optional[float] = None) -> bool:
+        """Return ``True`` when the breaker permits a new attempt."""
+
+        ts = now if now is not None else time.monotonic()
+        with self._lock:
+            return ts >= self._open_until
+
+    def record_success(self) -> None:
+        """Reset the breaker following a successful attempt."""
+
+        with self._lock:
+            self._failures = 0
+            self._open_until = 0.0
+
+    def record_failure(self, *, retry_after: Optional[float] = None) -> None:
+        """Record a failure and open the breaker if the threshold is reached."""
+
+        with self._lock:
+            self._failures += 1
+            if self._failures < self.failure_threshold:
+                return
+            cooldown = retry_after if retry_after is not None else self.cooldown_seconds
+            self._open_until = time.monotonic() + max(cooldown, 0.0)
+            self._failures = 0
+
+    def cooldown_remaining(self, *, now: Optional[float] = None) -> float:
+        """Return seconds remaining until the breaker closes."""
+
+        ts = now if now is not None else time.monotonic()
+        with self._lock:
+            remaining = self._open_until - ts
+            return remaining if remaining > 0 else 0.0
+
+
+class TokenBucket:
+    """Thread-safe token bucket for per-host rate limiting."""
+
+    def __init__(
+        self,
+        *,
+        rate_per_second: float,
+        capacity: float,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        if rate_per_second <= 0:
+            raise ValueError("rate_per_second must be > 0")
+        if capacity <= 0:
+            raise ValueError("capacity must be > 0")
+        self.rate_per_second = float(rate_per_second)
+        self.capacity = float(capacity)
+        self.clock = clock
+        self._tokens = capacity
+        self._lock = threading.Lock()
+        self._last = clock()
+
+    def _refill_locked(self, now: float) -> None:
+        elapsed = max(now - self._last, 0.0)
+        if elapsed <= 0:
+            return
+        self._tokens = min(self.capacity, self._tokens + elapsed * self.rate_per_second)
+        self._last = now
+
+    def acquire(self, tokens: float = 1.0, *, now: Optional[float] = None) -> float:
+        """Consume tokens and return wait seconds required before proceeding."""
+
+        if tokens <= 0:
+            return 0.0
+        ts = now if now is not None else self.clock()
+        with self._lock:
+            self._refill_locked(ts)
+            if self._tokens >= tokens:
+                self._tokens -= tokens
+                return 0.0
+            deficit = tokens - self._tokens
+            wait = deficit / self.rate_per_second
+            self._tokens = 0.0
+            self._last = ts
+            return wait
+
+    def offer(self, tokens: float = 1.0, *, now: Optional[float] = None) -> bool:
+        """Attempt to consume tokens without blocking; return ``True`` if granted."""
+
+        if tokens <= 0:
+            return True
+        ts = now if now is not None else self.clock()
+        with self._lock:
+            self._refill_locked(ts)
+            if self._tokens >= tokens:
+                self._tokens -= tokens
+                return True
+            return False
+
+
 __all__ = [
     "CachedResult",
     "ConditionalRequestHelper",
     "ModifiedResult",
+    "CircuitBreaker",
+    "TokenBucket",
     "head_precheck",
     "create_session",
     "parse_retry_after_header",

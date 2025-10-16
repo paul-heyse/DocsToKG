@@ -226,7 +226,7 @@ def test_main_with_csv_releases_attempt_files(monkeypatch, tmp_path):
     csv_path = manifest.with_suffix(".csv")
 
     assert csv_path.exists()
-    assert not manifest.with_name("manifest.last.csv").exists()
+    assert manifest.with_name("manifest.last.csv").exists()
 
     moved = csv_path.with_name(csv_path.name + ".moved")
     csv_path.rename(moved)

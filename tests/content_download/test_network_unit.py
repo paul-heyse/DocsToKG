@@ -49,7 +49,9 @@ from typing import Dict
 from unittest.mock import Mock
 
 from DocsToKG.ContentDownload.network import (
+    CircuitBreaker,
     ConditionalRequestHelper,
+    TokenBucket,
     head_precheck,
 )
 
@@ -148,3 +150,38 @@ def test_conditional_request_helper_requires_complete_metadata(caplog):
 
     assert headers == {}
     assert any("resume-metadata-incomplete" in rec.message for rec in caplog.records)
+
+
+def test_token_bucket_enforces_capacity():
+    current = [0.0]
+
+    def clock():
+        return current[0]
+
+    bucket = TokenBucket(rate_per_second=1.0, capacity=1.0, clock=clock)
+    assert bucket.acquire() == 0.0
+    wait = bucket.acquire()
+    assert wait > 0.0
+    current[0] += wait
+    assert bucket.acquire() == 0.0
+
+
+def test_circuit_breaker_open_and_cooldown(monkeypatch):
+    current = [0.0]
+
+    def fake_monotonic():
+        return current[0]
+
+    monkeypatch.setattr("DocsToKG.ContentDownload.network.time.monotonic", fake_monotonic)
+    breaker = CircuitBreaker(failure_threshold=2, cooldown_seconds=5.0)
+    assert breaker.allow()
+    breaker.record_failure()
+    assert breaker.allow()
+    breaker.record_failure()
+    assert not breaker.allow()
+    remaining = breaker.cooldown_remaining()
+    assert remaining == 5.0
+    current[0] += 5.0
+    assert breaker.allow()
+    breaker.record_success()
+    assert breaker.allow()

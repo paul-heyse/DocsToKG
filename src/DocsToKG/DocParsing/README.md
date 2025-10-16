@@ -111,7 +111,7 @@ row is missing the field or advertises an unsupported version. This fail-fast
 behaviour allows us to introduce future schema revisions without corrupting
 downstream consumers. When incrementing a schema version:
 
-1. Extend the compatibility matrix in `DocsToKG.DocParsing.schemas`.
+1. Extend the compatibility matrix in `DocsToKG.DocParsing.formats`.
 2. Preserve validation helpers for older versions until consumers are migrated.
 3. Document migration guidance (see below) to keep operators informed.
 
@@ -195,7 +195,7 @@ can reason about historical data sets.
 > `DocsToKG.DocParsing.pdf_pipeline` remains temporarily available as a compatibility shim.
 > Importing it now emits a :class:`DeprecationWarning`; migrate to the CLI
 > (`python -m DocsToKG.DocParsing.cli doctags --mode pdf`) or the
-> :mod:`DocsToKG.DocParsing.pipelines` APIs instead. The shim is scheduled for removal after
+> :mod:`DocsToKG.DocParsing.doctags` APIs instead. The shim is scheduled for removal after
 > two minor releases once downstream consumers have migrated.
 
 ## Synthetic Benchmarking & Test Utilities

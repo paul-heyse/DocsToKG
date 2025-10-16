@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin",
-#   "purpose": "CLI entry points for DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin workflows",
+#   "module": "DocsToKG.DocParsing.chunking",
+#   "purpose": "CLI entry points for DocsToKG.DocParsing.chunking workflows",
 #   "sections": [
 #     {
 #       "id": "dedupe-preserve-order",
@@ -11,15 +11,9 @@
 #       "kind": "function"
 #     },
 #     {
-#       "id": "ensure-str-list",
-#       "name": "_ensure_str_list",
-#       "anchor": "function-ensure-str-list",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "load-structural-marker-config",
-#       "name": "_load_structural_marker_config",
-#       "anchor": "function-load-structural-marker-config",
+#       "id": "resolve-serializer-provider",
+#       "name": "_resolve_serializer_provider",
+#       "anchor": "function-resolve-serializer-provider",
 #       "kind": "function"
 #     },
 #     {
@@ -114,12 +108,12 @@
 Docling Hybrid Chunker with Minimum Token Coalescence
 
 Transforms DocTags documents into chunked records with topic-aware coalescence.
-The module exposes a CLI (`python -m DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin`)
+The module exposes a CLI (`python -m DocsToKG.DocParsing.chunking`)
 and reusable helpers for other pipelines.
 
 Key Features:
 - Token-aware chunk merging that respects structural boundaries and image metadata.
-- Shared CLI configuration via :func:`DocsToKG.DocParsing.pipelines.add_data_root_option`.
+- Shared CLI configuration via :func:`DocsToKG.DocParsing.doctags.add_data_root_option`.
 - Manifest logging that records chunk counts, parsing engines, and durations.
 
 Dependencies:
@@ -128,7 +122,7 @@ Dependencies:
 - tqdm: Optional progress reporting when imported by callers.
 
 Usage:
-    python -m DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin \\
+    python -m DocsToKG.DocParsing.chunking \\
         --data-root /datasets/Data --min-tokens 256 --max-tokens 512
 
 Tokenizer Alignment:
@@ -179,7 +173,7 @@ __all__ = (
     "summarize_image_metadata",
 )
 
-from DocsToKG.DocParsing._common import (
+from DocsToKG.DocParsing.core import (
     ChunkResult,
     ChunkTask,
     ChunkWorkerConfig,
@@ -204,13 +198,13 @@ from DocsToKG.DocParsing._common import (
     set_spawn_or_warn,
     should_skip_output,
 )
-from DocsToKG.DocParsing.pipelines import (
+from DocsToKG.DocParsing.doctags import (
     add_data_root_option,
     add_resume_force_options,
     prepare_data_root,
     resolve_pipeline_path,
 )
-from DocsToKG.DocParsing.schemas import (
+from DocsToKG.DocParsing.formats import (
     CHUNK_SCHEMA_VERSION,
     ChunkRow,
     ProvenanceMetadata,

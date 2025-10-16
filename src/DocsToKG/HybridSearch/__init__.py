@@ -59,6 +59,7 @@ __all__ = (
     "FaissIndexManager",
     "ManagedFaissAdapter",
     "AdapterStats",
+    "OpenSearchSimulator",
     "FaissRouter",
     "HybridSearchAPI",
     "HybridSearchConfig",
@@ -79,6 +80,8 @@ __all__ = (
     "serialize_state",
     "should_rebuild_index",
     "verify_pagination",
+    "load_dataset",
+    "infer_embedding_dim",
     "vector_uuid_to_faiss_int",
 )
 
@@ -86,18 +89,31 @@ __all__ = (
 # --- Re-exports ---
 
 from .config import HybridSearchConfig, HybridSearchConfigManager
-from .ingest import ChunkIngestionPipeline
 from .interfaces import LexicalIndex
-from .observability import Observability
-from .ranking import ReciprocalRankFusion, ResultShaper, apply_mmr_diversification
+from .pipeline import ChunkIngestionPipeline, Observability
 from .router import FaissRouter
 from .service import (
     HybridSearchAPI,
     HybridSearchService,
+    HybridSearchValidator,
     PaginationCheckResult,
+    ReciprocalRankFusion,
+    ResultShaper,
+    apply_mmr_diversification,
     build_stats_snapshot,
+    infer_embedding_dim,
+    load_dataset,
     should_rebuild_index,
     verify_pagination,
+)
+from .store import (
+    AdapterStats,
+    FaissIndexManager,
+    FaissVectorStore,
+    ManagedFaissAdapter,
+    OpenSearchSimulator,
+    restore_state,
+    serialize_state,
 )
 from .types import (
     ChunkPayload,
@@ -107,18 +123,17 @@ from .types import (
     HybridSearchResult,
     vector_uuid_to_faiss_int,
 )
-from .validation import HybridSearchValidator
-from .vectorstore import (
-    AdapterStats,
-    FaissIndexManager,
-    FaissVectorStore,
-    ManagedFaissAdapter,
-    restore_state,
-    serialize_state,
-)
 
 # --- Package Setup ---
 
 _package = sys.modules[__name__]
 sys.modules.setdefault(__name__ + ".ids", sys.modules[__name__ + ".types"])
-sys.modules.setdefault(__name__ + ".similarity_gpu", sys.modules[__name__ + ".vectorstore"])
+sys.modules.setdefault(__name__ + ".similarity_gpu", sys.modules[__name__ + ".store"])
+sys.modules.setdefault(__name__ + ".vectorstore", sys.modules[__name__ + ".store"])
+sys.modules.setdefault(__name__ + ".storage", sys.modules[__name__ + ".store"])
+sys.modules.setdefault(__name__ + ".operations", sys.modules[__name__ + ".store"])
+sys.modules.setdefault(__name__ + ".ingest", sys.modules[__name__ + ".pipeline"])
+sys.modules.setdefault(__name__ + ".observability", sys.modules[__name__ + ".pipeline"])
+sys.modules.setdefault(__name__ + ".features", sys.modules[__name__ + ".pipeline"])
+sys.modules.setdefault(__name__ + ".ranking", sys.modules[__name__ + ".service"])
+sys.modules.setdefault(__name__ + ".validation", sys.modules[__name__ + ".service"])

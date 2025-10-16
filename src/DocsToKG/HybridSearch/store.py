@@ -1,12 +1,18 @@
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.HybridSearch.vectorstore",
-#   "purpose": "FAISS vector store orchestration, GPU similarity utilities, and persistence helpers",
+#   "module": "DocsToKG.HybridSearch.store",
+#   "purpose": "Vector store orchestration, OpenSearch helpers, GPU similarity utilities, and persistence",
 #   "sections": [
 #     {
 #       "id": "faisssearchresult",
 #       "name": "FaissSearchResult",
 #       "anchor": "class-faisssearchresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "adapterstats",
+#       "name": "AdapterStats",
+#       "anchor": "class-adapterstats",
 #       "kind": "class"
 #     },
 #     {
@@ -64,6 +70,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "getattr",
+#       "name": "__getattr__",
+#       "anchor": "function-getattr",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "managedfaissadapter",
 #       "name": "ManagedFaissAdapter",
 #       "anchor": "class-managedfaissadapter",
@@ -83,17 +95,15 @@ import warnings
 from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import RLock
-from typing import TYPE_CHECKING, Callable, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Callable, Dict, Iterator, List, Mapping, Optional, Sequence
 
 import numpy as np
 
 from .config import DenseIndexConfig
 from .interfaces import DenseVectorStore
-from .observability import Observability
-from .types import vector_uuid_to_faiss_int
-
-if TYPE_CHECKING:  # pragma: no cover - typing only
-    from .storage import ChunkRegistry
+from .pipeline import Observability
+from .types import ChunkPayload, vector_uuid_to_faiss_int
+from .devtools.opensearch_simulator import OpenSearchSimulator
 
 # --- Globals ---
 
@@ -105,6 +115,9 @@ __all__ = (
     "ManagedFaissAdapter",
     "AdapterStats",
     "FaissSearchResult",
+    "ChunkRegistry",
+    "OpenSearchSimulator",
+    "matches_filters",
     "cosine_against_corpus_gpu",
     "cosine_batch",
     "cosine_topk_blockwise",
@@ -245,6 +258,7 @@ class FaissVectorStore(DenseVectorStore):
         self._replicated = False
         self._gpu_resources: Optional["faiss.StandardGpuResources"] = None
         self._pinned_buffers: list[object] = []
+        self._observability = observability or Observability()
         self.init_gpu()
         self._lock = RLock()
         self._index = self._create_index()
@@ -252,7 +266,6 @@ class FaissVectorStore(DenseVectorStore):
             raise RuntimeError(
                 f"HybridSearch initialised with dim={dim} but created index expects {self._dim}"
             )
-        self._emit_gpu_state("bootstrap", level="info")
         self._id_resolver: Optional[Callable[[int], Optional[str]]] = None
         self._remove_fallbacks = 0
         self._tombstones: set[int] = set()
@@ -260,7 +273,7 @@ class FaissVectorStore(DenseVectorStore):
         self._needs_rebuild = False
         self._supports_remove_ids: Optional[bool] = None
         self._set_nprobe()
-        self._observability = observability or Observability()
+        self._emit_gpu_state("bootstrap", level="info")
 
     @property
     def ntotal(self) -> int:
@@ -705,7 +718,7 @@ class FaissVectorStore(DenseVectorStore):
         return int(getattr(self._config, "nprobe", 0))
 
     def _update_gpu_metrics(self) -> None:
-        stats = self.adapter_stats()
+        stats = self.adapter_stats
         self._observability.metrics.set_gauge("faiss_ntotal", float(stats.ntotal))
         self._observability.metrics.set_gauge("faiss_nprobe_effective", float(stats.nprobe))
         resources = stats.resources
@@ -722,7 +735,7 @@ class FaissVectorStore(DenseVectorStore):
 
     def _emit_gpu_state(self, action: str, *, level: str = "debug") -> None:
         self._update_gpu_metrics()
-        stats = self.adapter_stats()
+        stats = self.adapter_stats
         payload = {
             "action": action,
             "device": stats.device,
@@ -1687,6 +1700,85 @@ def restore_state(
         return
     faiss_index.restore(base64.b64decode(encoded.encode("ascii")), meta=dict(meta))
 
+
+class ChunkRegistry:
+    """Durable mapping of vector identifiers to chunk payloads."""
+
+    def __init__(self) -> None:
+        self._chunks: Dict[str, ChunkPayload] = {}
+        self._bridge: Dict[int, str] = {}
+
+    def upsert(self, chunks: Sequence[ChunkPayload]) -> None:
+        """Insert or update registry entries for ``chunks``."""
+
+        for chunk in chunks:
+            self._chunks[chunk.vector_id] = chunk
+            self._bridge[vector_uuid_to_faiss_int(chunk.vector_id)] = chunk.vector_id
+
+    def delete(self, vector_ids: Sequence[str]) -> None:
+        """Remove registry entries for the supplied vector identifiers."""
+
+        for vector_id in vector_ids:
+            self._chunks.pop(vector_id, None)
+            self._bridge.pop(vector_uuid_to_faiss_int(vector_id), None)
+
+    def get(self, vector_id: str) -> Optional[ChunkPayload]:
+        """Return the chunk payload for ``vector_id`` when available."""
+
+        return self._chunks.get(vector_id)
+
+    def bulk_get(self, vector_ids: Sequence[str]) -> List[ChunkPayload]:
+        """Return chunk payloads for identifiers present in the registry."""
+
+        return [self._chunks[vid] for vid in vector_ids if vid in self._chunks]
+
+    def resolve_faiss_id(self, internal_id: int) -> Optional[str]:
+        """Translate a FAISS integer id back to the original vector identifier."""
+
+        return self._bridge.get(internal_id)
+
+    def all(self) -> List[ChunkPayload]:
+        """Return all cached chunk payloads."""
+
+        return list(self._chunks.values())
+
+    def iter_all(self) -> Iterator[ChunkPayload]:
+        """Yield chunk payloads without materialising the full list."""
+
+        return iter(self._chunks.values())
+
+    def count(self) -> int:
+        """Return the number of chunks tracked by the registry."""
+
+        return len(self._chunks)
+
+    def vector_ids(self) -> List[str]:
+        """Return all vector identifiers in insertion order."""
+
+        return list(self._chunks.keys())
+
+
+def matches_filters(chunk: ChunkPayload, filters: Mapping[str, object]) -> bool:
+    """Check whether ``chunk`` satisfies the provided OpenSearch-style filters."""
+
+    for key, expected in filters.items():
+        if key == "namespace":
+            if chunk.namespace != expected:
+                return False
+            continue
+
+        value = chunk.metadata.get(key)
+        if isinstance(expected, list):
+            if isinstance(value, list):
+                if not any(item in value for item in expected):
+                    return False
+            else:
+                if value not in expected:
+                    return False
+        else:
+            if value != expected:
+                return False
+    return True
 
 
 def __getattr__(name: str):

@@ -56,7 +56,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from DocsToKG.DocParsing._common import set_spawn_or_warn
+from DocsToKG.DocParsing.core import set_spawn_or_warn
 
 # --- Test Cases ---
 

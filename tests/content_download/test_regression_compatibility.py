@@ -76,7 +76,6 @@ def test_manifest_entry_schema_backward_compatible(tmp_path: Path):
         http_status=200,
         content_type="application/pdf",
         elapsed_ms=12.0,
-        error=None,
         sha256="deadbeef",
         content_length=1024,
         etag='"etag-value"',
@@ -94,6 +93,7 @@ def test_manifest_entry_schema_backward_compatible(tmp_path: Path):
     payload = asdict(entry)
     expected_keys = {
         "timestamp",
+        "schema_version",
         "work_id",
         "title",
         "publication_year",
@@ -103,6 +103,7 @@ def test_manifest_entry_schema_backward_compatible(tmp_path: Path):
         "classification",
         "content_type",
         "reason",
+        "reason_detail",
         "html_paths",
         "sha256",
         "content_length",

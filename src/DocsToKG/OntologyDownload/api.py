@@ -1,3 +1,222 @@
+"""Public facade aggregating ontology downloader modules."""
+
+from __future__ import annotations
+
+import hashlib as _hashlib
+from collections import OrderedDict
+from importlib import metadata as importlib_metadata
+from typing import Dict
+
+from .io import (
+    RDF_MIME_ALIASES,
+    DownloadFailure,
+    DownloadResult,
+    download_stream,
+    extract_archive_safe,
+    generate_correlation_id,
+    mask_sensitive_data,
+    retry_with_backoff,
+    sanitize_filename,
+    validate_url_security,
+)
+from .planning import (
+    MANIFEST_JSON_SCHEMA,
+    MANIFEST_SCHEMA_VERSION,
+    ConfigurationError,
+    FetchResult,
+    FetchSpec,
+    OntologyDownloadError,
+    PlannedFetch,
+    ResolverCandidate,
+    RESOLVERS,
+    _build_destination,
+    fetch_all,
+    fetch_one,
+    get_manifest_schema,
+    infer_version_timestamp,
+    merge_defaults,
+    parse_http_datetime,
+    parse_iso_datetime,
+    parse_version_timestamp,
+    plan_all,
+    plan_one,
+    setup_logging,
+    validate_manifest_dict,
+)
+from .settings import (
+    CACHE_DIR,
+    CONFIG_DIR,
+    LOCAL_ONTOLOGY_DIR,
+    LOG_DIR,
+    STORAGE,
+    ConfigError,
+    DefaultsConfig,
+    DownloadConfiguration,
+    LoggingConfiguration,
+    ResolvedConfig,
+    ValidationConfig,
+    build_resolved_config,
+    ensure_python_version,
+    get_env_overrides,
+    get_owlready2,
+    get_pronto,
+    get_pystow,
+    get_rdflib,
+    load_config,
+    load_raw_yaml,
+    parse_rate_limit_to_rps,
+    validate_config,
+)
+from .validation import (
+    VALIDATORS,
+    ValidationRequest,
+    ValidationResult,
+    ValidationTimeout,
+    ValidatorSubprocessError,
+    main as validation_main,
+    normalize_streaming,
+    run_validators,
+    validate_arelle,
+    validate_owlready2,
+    validate_pronto,
+    validate_rdflib,
+    validate_robot,
+)
+
+hashlib = _hashlib
+
+try:  # pragma: no cover - metadata may be unavailable during development
+    _PACKAGE_VERSION = importlib_metadata.version("DocsToKG")
+except importlib_metadata.PackageNotFoundError:  # pragma: no cover - local source tree
+    _PACKAGE_VERSION = "0.0.0"
+
+__version__ = _PACKAGE_VERSION
+
+DefaultsConfiguration = DefaultsConfig
+LoggingConfig = LoggingConfiguration
+ValidationConfiguration = ValidationConfig
+
+
+def main() -> None:
+    """CLI entry point delegating to the validation worker."""
+
+    validation_main()
+
+
+__all__ = [
+    "FetchSpec",
+    "FetchResult",
+    "PlannedFetch",
+    "DownloadResult",
+    "DownloadFailure",
+    "OntologyDownloadError",
+    "ValidationRequest",
+    "ValidationResult",
+    "ValidationTimeout",
+    "ValidatorSubprocessError",
+    "ResolverCandidate",
+    "ResolvedConfig",
+    "ConfigError",
+    "ConfigurationError",
+    "DefaultsConfig",
+    "DownloadConfiguration",
+    "ValidationConfig",
+    "LoggingConfiguration",
+    "build_resolved_config",
+    "get_env_overrides",
+    "load_raw_yaml",
+    "merge_defaults",
+    "validate_config",
+    "CACHE_DIR",
+    "CONFIG_DIR",
+    "LOG_DIR",
+    "LOCAL_ONTOLOGY_DIR",
+    "STORAGE",
+    "RDF_MIME_ALIASES",
+    "MANIFEST_SCHEMA_VERSION",
+    "MANIFEST_JSON_SCHEMA",
+    "fetch_one",
+    "fetch_all",
+    "plan_one",
+    "plan_all",
+    "_build_destination",
+    "download_stream",
+    "extract_archive_safe",
+    "validate_manifest_dict",
+    "validate_url_security",
+    "run_validators",
+    "normalize_streaming",
+    "validate_rdflib",
+    "validate_pronto",
+    "validate_owlready2",
+    "validate_robot",
+    "validate_arelle",
+    "main",
+    "parse_iso_datetime",
+    "parse_http_datetime",
+    "parse_version_timestamp",
+    "infer_version_timestamp",
+    "setup_logging",
+    "load_config",
+    "ensure_python_version",
+    "retry_with_backoff",
+    "sanitize_filename",
+    "generate_correlation_id",
+    "parse_rate_limit_to_rps",
+    "get_pystow",
+    "get_rdflib",
+    "get_pronto",
+    "get_owlready2",
+    "get_manifest_schema",
+    "mask_sensitive_data",
+    "list_plugins",
+    "about",
+    "format_table",
+    "format_plan_rows",
+    "format_results_table",
+    "format_validation_summary",
+    "cli_main",
+    "__version__",
+    "hashlib",
+]
+def _describe_plugin(obj: object) -> str:
+    module = getattr(obj, "__module__", obj.__class__.__module__)
+    name = getattr(obj, "__qualname__", obj.__class__.__name__)
+    return f"{module}.{name}"
+
+
+def list_plugins(kind: str) -> Dict[str, str]:
+    """Return a deterministic mapping of registered plugins for ``kind``.
+
+    Args:
+        kind: Plugin category (``"resolver"`` or ``"validator"``).
+
+    Returns:
+        Mapping of plugin names to import-qualified identifiers.
+    """
+
+    if kind == "resolver":
+        items = {name: _describe_plugin(resolver) for name, resolver in RESOLVERS.items()}
+    elif kind == "validator":
+        items = {name: _describe_plugin(handler) for name, handler in VALIDATORS.items()}
+    else:
+        raise ValueError(f"Unknown plugin kind: {kind}")
+    return OrderedDict(sorted(items.items()))
+
+
+def about() -> Dict[str, object]:
+    """Return metadata describing the ontology download subsystem."""
+
+    return {
+        "package_version": _PACKAGE_VERSION,
+        "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
+        "plugins": {
+            "resolver": list_plugins("resolver"),
+            "validator": list_plugins("validator"),
+        },
+    }
+
+# --- CLI utilities merged from cli.py ---
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.OntologyDownload.cli",
@@ -67,12 +286,6 @@
 #       "id": "parse-since",
 #       "name": "_parse_since",
 #       "anchor": "function-parse-since",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "format-bytes",
-#       "name": "_format_bytes",
-#       "anchor": "function-format-bytes",
 #       "kind": "function"
 #     },
 #     {
@@ -233,8 +446,6 @@ without editing configuration files. JSON output modes support automation while
 rich ASCII tables summarise resolver fallback chains and validator results.
 """
 
-from __future__ import annotations
-
 import argparse
 import importlib.util
 import json
@@ -252,47 +463,10 @@ import yaml
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
-from .ontology_download import (
-    CACHE_DIR,
-    CONFIG_DIR,
-    LOCAL_ONTOLOGY_DIR,
-    LOG_DIR,
-    MANIFEST_SCHEMA_VERSION,
-    STORAGE,
-    ConfigError,
-    ConfigurationError,
-    FetchResult,
-    FetchSpec,
-    OntologyDownloadError,
-    PlannedFetch,
-    ResolvedConfig,
-    ValidationRequest,
-    fetch_all,
-    get_manifest_schema,
-    infer_version_timestamp,
-    list_plugins,
-    load_config,
-    parse_iso_datetime,
-    parse_rate_limit_to_rps,
-    parse_version_timestamp,
-    plan_all,
-    run_validators,
-    sanitize_filename,
-    setup_logging,
-    validate_config,
-    validate_manifest_dict,
-)
-from .storage import _directory_size
+from .io import format_bytes
+from .settings import _directory_size
 
 # --- Globals ---
-
-__all__ = (
-    "format_plan_rows",
-    "format_results_table",
-    "format_table",
-    "format_validation_summary",
-    "main",
-)
 
 ONTOLOGY_DIR = LOCAL_ONTOLOGY_DIR
 
@@ -525,6 +699,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help=f"Baseline plan JSON file (default: {DEFAULT_PLAN_BASELINE})",
     )
     plan_diff.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help="Write the current plan to the baseline file after computing the diff",
+    )
+    plan_diff.add_argument(
         "--use-manifest",
         action="store_true",
         help="Compare planned metadata against the latest stored manifests",
@@ -597,6 +776,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
     doctor = subparsers.add_parser("doctor", help="Diagnose environment issues")
     doctor.add_argument("--json", action="store_true", help="Output diagnostics as JSON")
+    doctor.add_argument(
+        "--fix",
+        action="store_true",
+        help="Attempt to create required directories, rotate logs, and scaffold API key placeholders",
+    )
 
     prune = subparsers.add_parser("prune", help="Prune stored ontology versions")
     prune.add_argument(
@@ -614,6 +798,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="Preview deletions without removing files",
+    )
+    prune.add_argument(
+        "--older-than",
+        type=_parse_since_arg,
+        help="Delete versions with timestamps older than YYYY-MM-DD",
     )
     prune.add_argument(
         "--json",
@@ -768,29 +957,6 @@ def _parse_since(value: Optional[Union[str, datetime]]) -> Optional[datetime]:
     if not text:
         return None
     return _parse_since_arg(text)
-
-
-def _format_bytes(num: int) -> str:
-    """Return human-readable byte count representation.
-
-    Args:
-        num: Byte count to format.
-
-    Returns:
-        String describing the size using binary units.
-    """
-
-    step = 1024.0
-    units = ["B", "KB", "MB", "GB", "TB"]
-    value = float(num)
-    for unit in units:
-        if value < step or unit == units[-1]:
-            if unit == "B":
-                return f"{int(value)} {unit}"
-            return f"{value:.1f} {unit}"
-        value /= step
-    return f"{value:.1f} PB"
-
 
 def _apply_cli_overrides(config: ResolvedConfig, args) -> None:
     """Mutate resolved configuration based on CLI override arguments.
@@ -1159,19 +1325,24 @@ def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, 
     """Compare current plan output against a baseline plan file."""
 
     use_manifest = bool(getattr(args, "use_manifest", False))
+    update_baseline = bool(getattr(args, "update_baseline", False))
     if use_manifest:
         baseline_payload: List[dict] = []
         baseline_path = None
     else:
         baseline_path = getattr(args, "baseline", DEFAULT_PLAN_BASELINE).expanduser()
-        if not baseline_path.exists():
+        if baseline_path.exists():
+            try:
+                baseline_payload = json.loads(baseline_path.read_text()) or []
+            except json.JSONDecodeError as exc:
+                raise ConfigError(f"Baseline plan file {baseline_path} is not valid JSON") from exc
+            if not isinstance(baseline_payload, list):
+                raise ConfigError("Baseline plan must be a JSON array of plan entries")
+        elif update_baseline:
+            baseline_payload = []
+            baseline_path.parent.mkdir(parents=True, exist_ok=True)
+        else:
             raise ConfigError(f"Baseline plan file not found: {baseline_path}")
-        try:
-            baseline_payload = json.loads(baseline_path.read_text()) or []
-        except json.JSONDecodeError as exc:
-            raise ConfigError(f"Baseline plan file {baseline_path} is not valid JSON") from exc
-        if not isinstance(baseline_payload, list):
-            raise ConfigError("Baseline plan must be a JSON array of plan entries")
 
     since = _parse_since(getattr(args, "since", None))
     config, specs = _resolve_specs_from_args(args, base_config, allow_empty=True)
@@ -1200,6 +1371,11 @@ def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, 
 
     diff = _compute_plan_diff(baseline_payload, current_payload)
     diff["baseline"] = "manifests" if use_manifest else str(baseline_path)
+    if update_baseline and not use_manifest and baseline_path is not None:
+        baseline_path.write_text(json.dumps(current_payload, indent=2))
+        diff["baseline_updated"] = True
+    else:
+        diff["baseline_updated"] = False
     return diff
 
 
@@ -1215,11 +1391,15 @@ def _handle_plugins(args) -> Dict[str, Dict[str, str]]:
 
 
 def _handle_prune(args, logger) -> Dict[str, object]:
-    """Delete surplus ontology versions based on ``--keep`` parameter."""
+    """Delete surplus ontology versions based on ``--keep`` and age filters."""
 
     keep = args.keep
     if keep <= 0:
         raise ConfigError("--keep must be a positive integer")
+
+    threshold = getattr(args, "older_than", None)
+    if threshold is not None and threshold.tzinfo is None:
+        threshold = threshold.replace(tzinfo=timezone.utc)
 
     target_ids = args.ids or STORAGE.available_ontologies()
     target_ids = sorted(set(target_ids))
@@ -1236,56 +1416,88 @@ def _handle_prune(args, logger) -> Dict[str, object]:
             key=lambda item: item.get("timestamp") or datetime.min.replace(tzinfo=timezone.utc),
             reverse=True,
         )
-        if len(metadata) <= keep:
+        if not metadata:
             continue
-        retained = metadata[:keep]
-        to_remove = metadata[keep:]
+
+        removal_set = {entry["version"] for entry in metadata[keep:]}
+        if threshold is not None:
+            for entry in metadata:
+                timestamp = entry.get("timestamp")
+                if isinstance(timestamp, datetime) and timestamp < threshold:
+                    removal_set.add(entry["version"])
+
+        required = min(keep, len(metadata))
+        retained_versions: List[str] = []
+        for entry in metadata:
+            version = entry["version"]
+            if version in removal_set:
+                continue
+            retained_versions.append(version)
+            if len(retained_versions) == required:
+                break
+        if len(retained_versions) < required:
+            for entry in metadata:
+                version = entry["version"]
+                if version in retained_versions:
+                    continue
+                retained_versions.append(version)
+                removal_set.discard(version)
+                if len(retained_versions) == required:
+                    break
+
+        to_remove = [entry for entry in metadata if entry["version"] in removal_set]
+        if not to_remove:
+            if args.dry_run and threshold is not None:
+                messages.append(f"[DRY-RUN] {ontology_id}: no versions matched prune criteria")
+            continue
+
+        retained_entries = [entry for entry in metadata if entry["version"] in retained_versions]
+
         reclaimed = 0
         deleted_versions: List[str] = []
-        for item in to_remove:
-            deleted_versions.append(item["version"])
-            if args.dry_run:
-                reclaimed += int(item.get("size") or 0)
-            else:
-                reclaimed_bytes = STORAGE.delete_version(ontology_id, item["version"])
+        if args.dry_run:
+            for entry in to_remove:
+                reclaimed += int(entry.get("size") or 0)
+                deleted_versions.append(entry["version"])
+            total_deleted += len(to_remove)
+        else:
+            for entry in to_remove:
+                version = entry["version"]
+                reclaimed_bytes = STORAGE.delete_version(ontology_id, version)
                 reclaimed += reclaimed_bytes
                 total_deleted += 1
+                deleted_versions.append(version)
                 if logger is not None:
                     logger.info(
                         "pruned ontology version",
                         extra={
                             "ontology_id": ontology_id,
-                            "version": item["version"],
+                            "version": version,
                             "freed_bytes": reclaimed_bytes,
                         },
                     )
-    if not args.dry_run and retained:
-        STORAGE.set_latest_version(ontology_id, retained[0]["version"])
+            if retained_entries:
+                STORAGE.set_latest_version(ontology_id, retained_entries[0]["version"])
+
         total_reclaimed += reclaimed
-        if args.dry_run:
-            total_deleted += len(to_remove)
-        retained_versions = [entry["version"] for entry in retained]
-        keep_summary = ", ".join(retained_versions) if retained_versions else "none"
+        keep_summary = ", ".join(entry["version"] for entry in retained_entries) or "none"
         summary.append(
             {
                 "id": ontology_id,
                 "deleted": deleted_versions,
-                "retained": [entry["version"] for entry in retained],
+                "retained": [entry["version"] for entry in retained_entries],
                 "reclaimed_bytes": reclaimed,
+                "threshold": threshold.isoformat() if threshold else None,
             }
         )
         if args.dry_run:
-            if to_remove:
-                messages.append(
-                    f"[DRY-RUN] {ontology_id}: keep {keep_summary}; would delete {len(to_remove)} version(s) freeing {_format_bytes(reclaimed)}"
-                )
-            for item in to_remove:
-                messages.append(
-                    f"[DRY-RUN] {ontology_id} version {item['version']} would free {_format_bytes(int(item.get('size') or 0))}"
-                )
-        elif deleted_versions:
+            age_note = f" older than {threshold.date()}" if threshold else ""
             messages.append(
-                f"Deleted {len(deleted_versions)} versions for {ontology_id} (freed {_format_bytes(reclaimed)}; kept {keep_summary})"
+                f"[DRY-RUN] {ontology_id}: keep {keep_summary}; would delete {len(deleted_versions)} version(s){age_note} freeing {format_bytes(reclaimed)}"
+            )
+        else:
+            messages.append(
+                f"Deleted {len(deleted_versions)} versions for {ontology_id} (freed {format_bytes(reclaimed)}; kept {keep_summary})"
             )
 
     return {
@@ -1472,6 +1684,46 @@ def _doctor_report() -> Dict[str, object]:
         "storage": storage_backend,
     }
     return report
+
+
+def _apply_doctor_fixes(report: Dict[str, object]) -> List[str]:
+    """Attempt to remediate common doctor issues and return action notes."""
+
+    actions: List[str] = []
+
+    for info in report.get("directories", {}).values():
+        path = Path(info.get("path", ""))
+        if not path:
+            continue
+        if not path.exists():
+            path.mkdir(parents=True, exist_ok=True)
+            actions.append(f"Created directory {path}")
+
+    if LOG_DIR.exists():
+        for log_file in LOG_DIR.glob("*.log"):
+            target = log_file.parent / f"{log_file.name}.1"
+            try:
+                if target.exists():
+                    target.unlink()
+                log_file.rename(target)
+                actions.append(f"Rotated log {log_file.name} -> {target.name}")
+            except OSError as exc:
+                actions.append(f"Failed to rotate {log_file.name}: {exc}")
+
+    placeholders = {
+        CONFIG_DIR / "bioportal_api_key.txt": "Add your BioPortal API key here\n",
+        CONFIG_DIR / "ols_api_token.txt": "Add your OLS API token here\n",
+    }
+    for path, content in placeholders.items():
+        try:
+            if not path.exists() or not path.read_text().strip():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content)
+                actions.append(f"Ensured placeholder {path.name}")
+        except OSError as exc:
+            actions.append(f"Failed to update {path}: {exc}")
+
+    return actions
 
 
 def _print_doctor_report(report: Dict[str, object]) -> None:
@@ -1699,7 +1951,7 @@ def _handle_config_validate(path: Path) -> dict:
 # --- Module Entry Points ---
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def cli_main(argv: Optional[Sequence[str]] = None) -> int:
     """Entry point for the ontology downloader CLI.
 
     Args:
@@ -1790,6 +2042,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     print("\n".join(lines))
                 else:
                     print("No plan differences detected")
+                if diff.get("baseline_updated"):
+                    print(f"Updated baseline at {diff['baseline']}")
         elif args.command == "plugins":
             inventory = _handle_plugins(args)
             if args.json:
@@ -1815,7 +2069,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 total = summary.get("total_reclaimed_bytes", 0)
                 deleted = summary.get("total_deleted", 0)
                 label = "Dry-run" if summary.get("dry_run") else "Pruned"
-                print(f"{label}: reclaimed {_format_bytes(total)} across {deleted} versions")
+                print(f"{label}: reclaimed {format_bytes(total)} across {deleted} versions")
         elif args.command == "show":
             _handle_show(args)
         elif args.command == "validate":
@@ -1839,11 +2093,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 )
         elif args.command == "doctor":
             report = _doctor_report()
+            fixes: List[str] = []
+            if getattr(args, "fix", False):
+                fixes = _apply_doctor_fixes(report)
+                report = _doctor_report()
+                if fixes:
+                    report["fixes"] = fixes
             if args.json:
                 json.dump(report, sys.stdout, indent=2)
                 sys.stdout.write("\n")
             else:
                 _print_doctor_report(report)
+                if fixes:
+                    print("\nApplied fixes:")
+                    for action in fixes:
+                        print(f"  - {action}")
         else:  # pragma: no cover - argparse should prevent unknown commands
             parser.error(f"Unsupported command: {args.command}")
         return 0
@@ -1859,4 +2123,4 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 if __name__ == "__main__":  # pragma: no cover
-    sys.exit(main())
+    sys.exit(cli_main())

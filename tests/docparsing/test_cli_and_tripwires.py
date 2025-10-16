@@ -134,10 +134,10 @@ def _make_rec(
 
 
 COMMANDS = [
-    (Path("src/DocsToKG/DocParsing/DoclingHybridChunkerPipelineWithMin.py"), ["--help"]),
-    (Path("src/DocsToKG/DocParsing/pipelines.py"), ["--pdf", "--help"]),
-    (Path("src/DocsToKG/DocParsing/pipelines.py"), ["--html", "--help"]),
-    (Path("src/DocsToKG/DocParsing/EmbeddingV2.py"), ["--help"]),
+    (Path("src/DocsToKG/DocParsing/chunking.py"), ["--help"]),
+    (Path("src/DocsToKG/DocParsing/doctags.py"), ["--pdf", "--help"]),
+    (Path("src/DocsToKG/DocParsing/doctags.py"), ["--html", "--help"]),
+    (Path("src/DocsToKG/DocParsing/embedding.py"), ["--help"]),
 ]
 
 GOLDEN_DIR = Path("tests/data/docparsing/golden")
@@ -151,10 +151,8 @@ GOLDEN_VECTORS = GOLDEN_DIR / "sample.vectors.jsonl"
 def _reload_cli_modules():
     """Reload CLI modules so newly installed stubs are honoured."""
 
-    chunk_module = importlib.import_module(
-        "DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin"
-    )
-    embed_module = importlib.import_module("DocsToKG.DocParsing.EmbeddingV2")
+    chunk_module = importlib.import_module("DocsToKG.DocParsing.chunking")
+    embed_module = importlib.import_module("DocsToKG.DocParsing.embedding")
     cli_module = importlib.import_module("DocsToKG.DocParsing.cli")
     importlib.reload(chunk_module)
     importlib.reload(embed_module)

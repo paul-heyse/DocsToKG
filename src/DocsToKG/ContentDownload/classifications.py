@@ -12,6 +12,7 @@ class Classification(Enum):
     PDF = "pdf"
     HTML = "html"
     MISS = "miss"
+    UNKNOWN = "unknown"
     HTTP_ERROR = "http_error"
     CACHED = "cached"
     SKIPPED = "skipped"
@@ -25,10 +26,10 @@ class Classification(Enum):
         if isinstance(value, cls):
             return value
         if value is None:
-            return cls.MISS
+            return cls.UNKNOWN
         text = str(value).strip().lower()
         if not text:
-            return cls.MISS
+            return cls.UNKNOWN
 
         legacy_map = {
             "pdf_unknown": cls.PDF,
@@ -42,9 +43,54 @@ class Classification(Enum):
         for member in cls:
             if member.value == text:
                 return member
-        return cls.MISS
-
-
+        return cls.UNKNOWN
 PDF_LIKE = frozenset({Classification.PDF, Classification.CACHED})
 
-__all__ = ("Classification", "PDF_LIKE")
+
+class ReasonCode(Enum):
+    """Machine-readable reason taxonomy for download outcomes."""
+
+    UNKNOWN = "unknown"
+    PDF_SNIFF_UNKNOWN = "pdf_sniff_unknown"
+    PDF_TOO_SMALL = "pdf_too_small"
+    HTML_TAIL_DETECTED = "html_tail_detected"
+    PDF_EOF_MISSING = "pdf_eof_missing"
+    ROBOTS_DISALLOWED = "robots_disallowed"
+    UNEXPECTED_304 = "unexpected_304"
+    RESUME_COMPLETE = "resume_complete"
+    ALREADY_DOWNLOADED = "already_downloaded"
+    CONDITIONAL_CACHE_INVALID = "conditional_cache_invalid"
+    CONDITIONAL_NOT_MODIFIED = "conditional_not_modified"
+    MAX_BYTES_HEADER = "max_bytes_header"
+    MAX_BYTES_STREAM = "max_bytes_stream"
+    HEAD_PRECHECK_FAILED = "head_precheck_failed"
+    HTTP_STATUS = "http_status"
+    REQUEST_EXCEPTION = "request_exception"
+    RESOLVER_MISSING = "resolver_missing"
+    RESOLVER_DISABLED = "resolver_disabled"
+    RESOLVER_NOT_APPLICABLE = "resolver_not_applicable"
+    DUPLICATE_URL = "duplicate_url"
+    DUPLICATE_URL_GLOBAL = "duplicate_url_global"
+    LIST_ONLY = "list_only"
+    MAX_ATTEMPTS_REACHED = "max_attempts_reached"
+    RESOLVER_BREAKER_OPEN = "resolver_breaker_open"
+    DOMAIN_BREAKER_OPEN = "domain_breaker_open"
+
+    @classmethod
+    def from_wire(cls, value: Union[str, "ReasonCode", None]) -> "ReasonCode":
+        """Return the matching enum member or ``UNKNOWN``."""
+
+        if isinstance(value, cls):
+            return value
+        if value is None:
+            return cls.UNKNOWN
+        text = str(value).strip().lower()
+        if not text:
+            return cls.UNKNOWN
+        for member in cls:
+            if member.value == text:
+                return member
+        return cls.UNKNOWN
+
+
+__all__ = ("Classification", "PDF_LIKE", "ReasonCode")

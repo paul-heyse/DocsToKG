@@ -30,7 +30,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload.classifications import Classification
+from DocsToKG.ContentDownload.classifications import Classification, ReasonCode
 from DocsToKG.ContentDownload.classifier import classify_payload
 from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
@@ -41,7 +41,7 @@ def test_classify_payload_octet_stream_requires_sniff():
     payload = b"binary without signature"
     assert (
         classify_payload(payload, "application/octet-stream", "https://example.org/file.pdf")
-        is None
+        is Classification.UNKNOWN
     )
 
 
@@ -81,7 +81,7 @@ def test_build_download_outcome_respects_head_flag(tmp_path):
 
     outcome = downloader._build_download_outcome(  # type: ignore[attr-defined]
         artifact=artifact,
-        classification="pdf",
+        classification=Classification.PDF,
         dest_path=pdf_path,
         response=response,
         elapsed_ms=12.3,
@@ -119,4 +119,4 @@ def test_build_download_outcome_respects_head_flag(tmp_path):
 
     assert outcome_small.classification is Classification.MISS
     assert outcome_small.path is None
-    assert outcome_small.error == "pdf-too-small"
+    assert outcome_small.reason is ReasonCode.PDF_TOO_SMALL
