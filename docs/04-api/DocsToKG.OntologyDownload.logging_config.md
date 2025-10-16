@@ -1,8 +1,9 @@
 # 1. Module: logging_config
 
-This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.logging_config``.
-
-Structured logging utilities for the ontology downloader.
+Structured logging utilities formerly exposed via
+``DocsToKG.OntologyDownload.logging_config`` are now available from
+``DocsToKG.OntologyDownload.ontology_download`` and re-exported through the
+package facade.
 
 The refactored downloader emits JSON logs with correlation identifiers so
 concurrent planning, streaming normalization, and resolver fallback attempts

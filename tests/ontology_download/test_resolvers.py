@@ -11,10 +11,9 @@ import requests
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload.config import ConfigError, DefaultsConfig, ResolvedConfig
-from DocsToKG.OntologyDownload.core import FetchSpec
-
-from DocsToKG.OntologyDownload import core, resolvers
+from DocsToKG.OntologyDownload import ConfigError, DefaultsConfig, FetchSpec, ResolvedConfig
+from DocsToKG.OntologyDownload import ontology_download as core
+from DocsToKG.OntologyDownload import resolvers
 
 
 @pytest.fixture()
@@ -545,3 +544,42 @@ def test_resolver_fallback_chain_on_failure(monkeypatch, resolved_config):
     assert planned.resolver == "lov"
     assert [candidate.resolver for candidate in planned.candidates] == ["lov"]
     assert planned.plan.url == "https://fallback.example.org/hp.owl"
+
+
+def test_resolver_plugin_loader_registers_and_warns(monkeypatch, caplog):
+    base = resolvers.RESOLVERS.copy()
+    monkeypatch.setattr(resolvers, "RESOLVERS", base.copy())
+
+    class DummyResolver:
+        NAME = "plugin"
+
+        def plan(self, spec, config, logger):  # pragma: no cover - unused in test
+            raise NotImplementedError
+
+    class DummyEntry:
+        def __init__(self, name: str, target, fail: bool = False):
+            self.name = name
+            self._target = target
+            self._fail = fail
+
+        def load(self):
+            if self._fail:
+                raise RuntimeError("boom")
+            return self._target
+
+    entries = [
+        DummyEntry("plugin", DummyResolver),
+        DummyEntry("broken", None, fail=True),
+    ]
+
+    stub = SimpleNamespace(
+        select=lambda *, group=None: entries if group == "docstokg.ontofetch.resolver" else []
+    )
+    monkeypatch.setattr(resolvers.metadata, "entry_points", lambda: stub)
+
+    caplog.set_level(logging.INFO)
+    resolvers._load_resolver_plugins(logging.getLogger("test"))
+
+    assert "plugin" in resolvers.RESOLVERS
+    assert isinstance(resolvers.RESOLVERS["plugin"], DummyResolver)
+    assert any(record.message == "resolver plugin failed" for record in caplog.records)

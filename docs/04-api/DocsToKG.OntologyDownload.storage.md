@@ -1,8 +1,8 @@
 # 1. Module: storage
 
-This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.storage``.
-
-Storage backends for ontology artifacts.
+The storage helpers formerly published as ``DocsToKG.OntologyDownload.storage`` now
+reside in ``DocsToKG.OntologyDownload.ontology_download`` and are re-exported via the
+public ``DocsToKG.OntologyDownload`` facade.
 
 The refactored ontology downloader expects durable, versioned storage that can
 support dry-run planning, streaming normalization, and version pruning. This

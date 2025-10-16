@@ -1,8 +1,7 @@
 # 1. Module: core
 
-This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.core``.
-
-Ontology download orchestration for DocsToKG.
+The orchestrator previously exported as ``DocsToKG.OntologyDownload.core`` is folded
+into ``DocsToKG.OntologyDownload.ontology_download``.
 
 This module plans resolver candidates, enforces license allowlists, performs
 fallback-aware downloads, orchestrates streaming normalization, and writes

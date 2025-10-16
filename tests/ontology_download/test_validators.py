@@ -12,7 +12,7 @@ Key Scenarios:
 
 Dependencies:
 - pytest: Fixtures and monkeypatching
-- DocsToKG.OntologyDownload.validators: Validation entry points under test
+- DocsToKG.OntologyDownload.ontology_download: Validation entry points under test
 
 Usage:
     pytest tests/ontology_download/test_validators.py
@@ -20,8 +20,11 @@ Usage:
 
 import hashlib
 import json
+import logging
 import shutil
 import sys
+import threading
+import time
 import zipfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -31,16 +34,19 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload.config import DefaultsConfig, ResolvedConfig
-from DocsToKG.OntologyDownload.validators import (
-    ValidationRequest,
+from DocsToKG.OntologyDownload import DefaultsConfig, ResolvedConfig, ValidationRequest
+from DocsToKG.OntologyDownload import ontology_download as download
+from DocsToKG.OntologyDownload.ontology_download import (
     ValidatorSubprocessError,
     normalize_streaming,
+    ValidationResult,
+    run_validators,
     validate_arelle,
     validate_owlready2,
     validate_pronto,
     validate_rdflib,
     validate_robot,
+    _sort_triple_file,
 )
 
 
@@ -179,6 +185,110 @@ def test_normalize_streaming_edge_cases(tmp_path, config):
         assert result.details.get("streaming_nt_sha256") == digest_stream
 
 
+def test_run_validators_respects_concurrency(monkeypatch, tmp_path, config):
+    config = config.model_copy(deep=True)
+    config.defaults.validation.max_concurrent_validators = 2
+
+    barrier = threading.Barrier(config.defaults.validation.max_concurrent_validators)
+    state = {"active": 0, "max_active": 0}
+    lock = threading.Lock()
+
+    def _make_validator(name: str):
+        def _validator(request: ValidationRequest, logger):
+            path = request.validation_dir / f"{request.name}_parse.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with lock:
+                state["active"] += 1
+                state["max_active"] = max(state["max_active"], state["active"])
+            try:
+                barrier.wait(timeout=1)
+            except threading.BrokenBarrierError:
+                pass
+            time.sleep(0.02)
+            payload = {"ok": True, "validator": request.name}
+            path.write_text(json.dumps(payload))
+            with lock:
+                state["active"] -= 1
+            return ValidationResult(ok=True, details=payload, output_files=[str(path)])
+
+        return _validator
+
+    validators = {
+        "one": _make_validator("one"),
+        "two": _make_validator("two"),
+        "three": _make_validator("three"),
+    }
+    monkeypatch.setattr(download, "VALIDATORS", validators)
+
+    requests = []
+    for name in validators:
+        file_path = tmp_path / f"{name}.ttl"
+        file_path.write_text("@prefix ex: <http://example.org/> .")
+        requests.append(
+            ValidationRequest(
+                name,
+                file_path,
+                tmp_path / f"norm-{name}",
+                tmp_path / f"val-{name}",
+                config,
+            )
+        )
+
+    results = run_validators(requests, _noop_logger())
+    assert set(results) == set(validators)
+    assert state["max_active"] >= 2
+    for name in validators:
+        artifact = tmp_path / f"val-{name}" / f"{name}_parse.json"
+        assert artifact.exists()
+
+
+def test_sort_triple_file_falls_back_without_sort(monkeypatch, tmp_path):
+    unsorted = tmp_path / "triples.unsorted"
+    unsorted.write_text("c\nA\nb\n", encoding="utf-8")
+    destination = tmp_path / "triples.sorted"
+
+    monkeypatch.setattr(shutil, "which", lambda _: None)
+
+    _sort_triple_file(unsorted, destination)
+    assert destination.read_text(encoding="utf-8") == "A\nb\nc\n"
+
+
+def test_validator_plugin_loader_registers_and_warns(monkeypatch, caplog):
+    base = download.VALIDATORS.copy()
+    monkeypatch.setattr(download, "VALIDATORS", base.copy())
+
+    def _plugin(request, logger):  # pragma: no cover - handler not executed here
+        return ValidationResult(ok=True, details={"ok": True}, output_files=[])
+
+    class DummyEntry:
+        def __init__(self, name: str, target, fail: bool = False):
+            self.name = name
+            self._target = target
+            self._fail = fail
+
+        def load(self):
+            if self._fail:
+                raise RuntimeError("boom")
+            return self._target
+
+    entries = [
+        DummyEntry("plugin_validator", _plugin),
+        DummyEntry("broken_validator", None, fail=True),
+    ]
+
+    stub = SimpleNamespace(
+        select=lambda *, group=None: entries if group == "docstokg.ontofetch.validator" else []
+    )
+    monkeypatch.setattr(download.metadata, "entry_points", lambda: stub)
+
+    caplog.set_level(logging.INFO)
+    download._load_validator_plugins(logging.getLogger("test"))
+
+    assert "plugin_validator" in download.VALIDATORS
+    assert download.VALIDATORS["plugin_validator"] is _plugin
+    assert any(record.message == "validator plugin failed" for record in caplog.records)
+
+
 def test_validate_pronto_success(monkeypatch, obo_file, tmp_path, config):
     pytest.importorskip("pronto")
     pytest.importorskip("ols_client")
@@ -189,6 +299,24 @@ def test_validate_pronto_success(monkeypatch, obo_file, tmp_path, config):
         pytest.skip(f"Pronto validator unavailable: {result.details.get('error')}")
     payload = json.loads((request.validation_dir / "pronto_parse.json").read_text())
     assert payload["ok"]
+
+
+def test_validate_pronto_handles_exception(monkeypatch, obo_file, tmp_path, config):
+    request = ValidationRequest("pronto", obo_file, tmp_path / "norm", tmp_path / "val", config)
+
+    def _boom(*_args, **_kwargs):  # pragma: no cover - deterministic failure path
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(
+        "DocsToKG.OntologyDownload.ontology_download._run_validator_subprocess",
+        _boom,
+    )
+
+    result = validate_pronto(request, _noop_logger())
+    assert not result.ok
+    payload = json.loads((request.validation_dir / "pronto_parse.json").read_text())
+    assert payload["ok"] is False
+    assert payload["error"] == "boom"
 
 
 def test_validate_owlready2_success(monkeypatch, owl_file, tmp_path, config):
@@ -235,7 +363,7 @@ def test_validate_owlready2_memory_error(monkeypatch, owl_file, tmp_path, config
         raise ValidatorSubprocessError("memory exceeded")
 
     monkeypatch.setattr(
-        "DocsToKG.OntologyDownload.validators._run_validator_subprocess",
+        "DocsToKG.OntologyDownload.ontology_download._run_validator_subprocess",
         _raise,
     )
     result = validate_owlready2(request, _noop_logger())
