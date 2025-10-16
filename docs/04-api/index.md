@@ -95,7 +95,7 @@ The API returns at most `page_size` results per call. When additional results ar
 ```
 
 Cursor chains are stable across requests unless the underlying index changes significantly.
-Use `DocsToKG.HybridSearch.operations.verify_pagination` during integration tests to ensure
+Use `DocsToKG.HybridSearch.service.verify_pagination` during integration tests to ensure
 continuity.
 
 ## 4. Diagnostics

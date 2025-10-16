@@ -2,161 +2,26 @@
 
 This reference documents the DocsToKG module ``DocsToKG.HybridSearch.retrieval``.
 
-Hybrid search execution across sparse and dense channels.
+> **Deprecated:** ``DocsToKG.HybridSearch.retrieval`` is now a thin shim that re-exports
+> the public interface from ``DocsToKG.HybridSearch.service``. Import
+> :class:`HybridSearchService`, :class:`HybridSearchAPI`, and supporting helpers from the
+> service module directly. The shim emits a :class:`DeprecationWarning` on import.
 
-This module provides the core hybrid search service for DocsToKG, orchestrating
-multiple retrieval methods (BM25, SPLADE, dense vectors) and fusing their results
-for optimal document retrieval performance.
+## 1. Re-exported symbols
 
-The service supports configurable search strategies, real-time observability,
-and comprehensive result ranking through advanced fusion techniques.
+| Symbol | New home |
+| ------ | -------- |
+| ``HybridSearchService`` | ``DocsToKG.HybridSearch.service`` |
+| ``HybridSearchAPI`` | ``DocsToKG.HybridSearch.service`` |
+| ``RequestValidationError`` | ``DocsToKG.HybridSearch.service`` |
+| ``ChannelResults`` | ``DocsToKG.HybridSearch.service`` |
+| ``PaginationCheckResult`` | ``DocsToKG.HybridSearch.service`` |
+| ``verify_pagination`` | ``DocsToKG.HybridSearch.service`` |
+| ``build_stats_snapshot`` | ``DocsToKG.HybridSearch.service`` |
+| ``should_rebuild_index`` | ``DocsToKG.HybridSearch.service`` |
 
-## 1. Functions
-
-### `search(self, request)`
-
-Execute a hybrid search request across all retrieval channels.
-
-Args:
-request: Validated hybrid search request describing query parameters.
-
-Returns:
-HybridSearchResponse containing fused results and cursor metadata.
-
-Raises:
-RequestValidationError: If the request fails validation checks.
-
-### `_execute_bm25(self, request, filters, config, query_features, timings)`
-
-Run the BM25 retrieval channel and record latency metrics.
-
-Args:
-request: Hybrid search request providing query parameters.
-filters: Metadata filters applied to BM25 results.
-config: Active hybrid search configuration.
-query_features: Precomputed query features for retrieval.
-timings: Mutable dictionary used to collect latency metrics.
-
-Returns:
-ChannelResults containing BM25 candidates and score mapping.
-
-### `_execute_splade(self, request, filters, config, query_features, timings)`
-
-Execute SPLADE retrieval and return channel-specific fusion candidates.
-
-Args:
-request: Hybrid search request providing query parameters.
-filters: Metadata filters applied to SPLADE results.
-config: Active hybrid search configuration.
-query_features: Precomputed query features for retrieval.
-timings: Mutable dictionary used to collect latency metrics.
-
-Returns:
-ChannelResults containing SPLADE candidates and score mapping.
-
-### `_execute_dense(self, request, filters, config, query_features, timings)`
-
-Query the FAISS index for dense candidates and filter by metadata.
-
-Args:
-request: Hybrid search request providing query parameters.
-filters: Metadata filters applied to dense results.
-config: Active hybrid search configuration.
-query_features: Precomputed query features for retrieval.
-timings: Mutable dictionary used to collect latency metrics.
-
-Returns:
-ChannelResults containing dense candidates and score mapping.
-
-### `_filter_dense_hits(self, hits, filters)`
-
-Apply metadata filters to dense results and gather payloads for survivors.
-
-Args:
-hits: Sequence of FAISS search results to filter.
-filters: Metadata filters applied to candidate payloads.
-
-Returns:
-Tuple containing filtered hits and a mapping of payloads by vector ID.
-
-### `_dedupe_candidates(self, candidates, fused_scores)`
-
-Remove duplicate vector IDs, keeping the highest-scoring candidate per ID.
-
-Args:
-candidates: Candidate list produced across retrieval channels.
-fused_scores: Mapping of vector IDs to fused scores.
-
-Returns:
-List of candidates sorted by fused score with duplicates removed.
-
-### `_validate_request(self, request)`
-
-Validate basic request fields before executing the search pipeline.
-
-Args:
-request: Hybrid search request to validate.
-
-Returns:
-None
-
-## 2. Classes
-
-### `RequestValidationError`
-
-Raised when the caller submits an invalid search request.
-
-This exception is raised when a hybrid search request contains invalid
-parameters, malformed data, or violates system constraints.
-
-Attributes:
-message: Description of the validation error
-field: Optional field name that caused the error
-
-Examples:
->>> try:
-...     service.search(invalid_request)
-... except RequestValidationError as e:
-...     print(f"Invalid request: {e.message}")
-
-### `ChannelResults`
-
-Results from a single retrieval channel (BM25, SPLADE, or dense).
-
-This class encapsulates the candidates and scoring information returned
-by a specific retrieval method, preparing them for fusion with results
-from other channels.
-
-Attributes:
-candidates: List of fusion candidates from this channel
-scores: Performance metrics for this channel's execution
-
-Examples:
->>> bm25_results = ChannelResults(
-...     candidates=[candidate1, candidate2],
-...     scores={"recall": 0.85, "latency": 45}
-... )
-
-### `HybridSearchService`
-
-Execute BM25, SPLADE, and dense retrieval with fusion.
-
-This service orchestrates hybrid search operations by:
-1. Executing parallel retrieval across multiple channels
-2. Fusing results using configurable strategies
-3. Applying diversification and ranking optimizations
-4. Providing comprehensive observability and metrics
-
-The service is designed for high-performance document retrieval
-combining traditional lexical search with modern semantic methods.
-
-Attributes:
-_config_manager: Configuration management for search parameters
-_feature_generator: Feature extraction for query processing
-_faiss: Dense vector search using FAISS
-_opensearch: Lexical search using OpenSearch
-_registry: Document and chunk registry management
-_observability: Performance monitoring and metrics collection
+The service implementation remains unchanged—only the import location has moved. Update
+integrations to import from ``DocsToKG.HybridSearch.service`` to avoid future breakage.
 
 Examples:
 >>> service = HybridSearchService(
