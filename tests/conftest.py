@@ -15,9 +15,13 @@ Usage:
 
 from __future__ import annotations
 
+import importlib.util
 import sys
+import types
 import warnings
+from importlib.machinery import ModuleSpec
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -44,6 +48,78 @@ if VENV_ROOT.exists():
         site_path = str(site_packages)
         if site_packages.exists() and site_path not in sys.path:
             sys.path.insert(0, site_path)
+
+
+def _install_pyalex_stub() -> None:
+    """Install a lightweight ``pyalex`` stub when the real dependency is absent."""
+
+    if importlib.util.find_spec("pyalex") is not None:
+        return
+
+    stub = types.ModuleType("pyalex")
+    stub.__file__ = "<pyalex-stub>"
+    stub.__package__ = "pyalex"
+    stub.__spec__ = ModuleSpec("pyalex", loader=None)  # type: ignore[arg-type]
+
+    stub._works_results = []  # type: ignore[attr-defined]
+    stub._topics_results = []  # type: ignore[attr-defined]
+
+    class _QueryBase:
+        """Minimal query object supporting chaining semantics used by the CLI."""
+
+        def __init__(self, results=None):
+            self._results = list(results) if results is not None else []
+
+        def filter(self, **_filters):  # noqa: D401
+            return self
+
+        def search(self, _query):  # noqa: D401
+            return self
+
+        def select(self, _fields):  # noqa: D401
+            return self
+
+        def sort(self, **_fields):  # noqa: D401
+            return self
+
+        def paginate(self, per_page=25, n_max=None):  # noqa: D401
+            data = list(self._results)
+
+            if not data:
+                return iter(())
+
+            def _iterator():
+                step = per_page or len(data)
+                for start in range(0, len(data), step):
+                    yield data[start : start + step]
+
+            return _iterator()
+
+    class Works(_QueryBase):
+        def __init__(self, results=None):
+            base = stub._works_results if results is None else results  # type: ignore[attr-defined]
+            super().__init__(base)
+
+    class Topics:
+        def __init__(self, results=None):
+            self._results = list(
+                stub._topics_results if results is None else results  # type: ignore[attr-defined]
+            )
+
+        def search(self, _query):  # noqa: D401
+            return self
+
+        def get(self):  # noqa: D401
+            return list(self._results)
+
+    stub.Works = Works  # type: ignore[attr-defined]
+    stub.Topics = Topics  # type: ignore[attr-defined]
+    stub.config = SimpleNamespace(email=None)  # type: ignore[attr-defined]
+
+    sys.modules.setdefault("pyalex", stub)
+
+
+_install_pyalex_stub()
 
 
 warnings.filterwarnings(

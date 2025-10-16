@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Dict
@@ -122,7 +124,7 @@ def test_main_writes_manifest_and_sets_mailto(download_modules, monkeypatch, tmp
             self.metrics = metrics
 
         def run(self, session, artifact, context=None):
-            self.logger.log(
+            self.logger.log_attempt(
                 resolvers.AttemptRecord(
                     work_id=artifact.work_id,
                     resolver_name="openalex",
@@ -185,6 +187,327 @@ def test_main_writes_manifest_and_sets_mailto(download_modules, monkeypatch, tmp
     assert manifest["classification"] == "pdf"
     assert downloader.oa_config.email == "team@example.org"
     assert calls == ["machine learning"]
+
+    index_path = manifest_path.with_suffix(".index.json")
+    index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+    assert manifest["work_id"] in index_payload
+    assert index_payload[manifest["work_id"]]["classification"] == "pdf"
+    assert index_payload[manifest["work_id"]]["pdf_path"].endswith("out.pdf")
+
+
+def test_main_with_csv_writes_last_attempt_csv(download_modules, monkeypatch, tmp_path):
+    downloader = download_modules.downloader
+    resolvers = download_modules.resolvers
+
+    out_dir = tmp_path / "out"
+    manifest_path = out_dir / "manifest.jsonl"
+    csv_path = tmp_path / "attempts.csv"
+    out_dir.mkdir()
+
+    work = {
+        "id": "https://openalex.org/WCSV",
+        "title": "CSV Work",
+        "publication_year": 2021,
+        "ids": {"doi": "10.1000/csv"},
+        "open_access": {"oa_url": None},
+        "best_oa_location": {"pdf_url": "https://oa.example/direct.pdf"},
+        "primary_location": {},
+        "locations": [],
+    }
+
+    monkeypatch.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter([work]))
+    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
+
+    outcome = resolvers.DownloadOutcome(
+        classification="pdf",
+        path=str(out_dir / "pdfs" / "out.pdf"),
+        http_status=200,
+        content_type="application/pdf",
+        elapsed_ms=5.0,
+        error=None,
+    )
+    (out_dir / "pdfs").mkdir(parents=True, exist_ok=True)
+    (out_dir / "pdfs" / "out.pdf").write_bytes(b"%PDF-1.4\n%%EOF")
+
+    class StubPipeline:
+        def __init__(self, *_, logger=None, metrics=None, **kwargs):
+            self.logger = logger
+            self.metrics = metrics
+
+        def run(self, session, artifact, context=None):
+            self.logger.log_attempt(
+                resolvers.AttemptRecord(
+                    work_id=artifact.work_id,
+                    resolver_name="openalex",
+                    resolver_order=1,
+                    url="https://oa.example/direct.pdf",
+                    status=outcome.classification,
+                    http_status=outcome.http_status,
+                    content_type=outcome.content_type,
+                    elapsed_ms=outcome.elapsed_ms,
+                    reason=outcome.error,
+                    sha256=outcome.sha256,
+                    content_length=outcome.content_length,
+                    dry_run=False,
+                )
+            )
+            self.metrics.record_attempt("openalex", outcome)
+            return resolvers.PipelineResult(
+                success=True,
+                resolver_name="openalex",
+                url="https://oa.example/direct.pdf",
+                outcome=outcome,
+                html_paths=[],
+                failed_urls=[],
+            )
+
+    monkeypatch.setattr(downloader, "ResolverPipeline", StubPipeline)
+
+    argv = [
+        "download_pyalex_pdfs.py",
+        "--topic",
+        "csv testing",
+        "--year-start",
+        "2021",
+        "--year-end",
+        "2021",
+        "--out",
+        str(out_dir),
+        "--manifest",
+        str(manifest_path),
+        "--log-format",
+        "csv",
+        "--log-csv",
+        str(csv_path),
+    ]
+    monkeypatch.setattr("sys.argv", argv)
+
+    downloader.main()
+
+    last_csv = manifest_path.with_name("manifest.last.csv")
+    with last_csv.open("r", encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert rows == [
+        {
+            "work_id": "WCSV",
+            "title": "CSV Work",
+            "publication_year": "2021",
+            "resolver": "openalex",
+            "url": "https://oa.example/direct.pdf",
+            "classification": "pdf",
+            "path": str(out_dir / "pdfs" / "out.pdf"),
+            "sha256": "",
+            "content_length": "",
+            "etag": "",
+            "last_modified": "",
+        }
+    ]
+
+
+def test_main_with_staging_creates_timestamped_directories(
+    download_modules, monkeypatch, tmp_path
+):
+    downloader = download_modules.downloader
+    resolvers = download_modules.resolvers
+
+    base_out = tmp_path / "runs"
+    manifest_override = tmp_path / "should_not_be_used.jsonl"
+    work = {
+        "id": "https://openalex.org/WSTAGING",
+        "title": "Staging Work",
+        "publication_year": 2022,
+        "ids": {"doi": "10.1000/staging"},
+        "open_access": {"oa_url": None},
+        "best_oa_location": {"pdf_url": "https://oa.example/staging.pdf"},
+        "primary_location": {},
+        "locations": [],
+    }
+
+    fixed_timestamp = datetime(2024, 5, 6, 7, 8, tzinfo=downloader.UTC)
+
+    class _FixedDateTime:
+        @classmethod
+        def now(cls, tz=None):
+            return fixed_timestamp
+
+    monkeypatch.setattr(downloader, "datetime", _FixedDateTime)
+    monkeypatch.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter([work]))
+    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
+
+    run_dir = base_out / fixed_timestamp.strftime("%Y%m%d_%H%M")
+    pdf_path = run_dir / "PDF" / "out.pdf"
+
+    outcome = resolvers.DownloadOutcome(
+        classification="pdf",
+        path=str(pdf_path),
+        http_status=200,
+        content_type="application/pdf",
+        elapsed_ms=7.0,
+        error=None,
+    )
+
+    class StubPipeline:
+        def __init__(self, *_, logger=None, metrics=None, **kwargs):
+            self.logger = logger
+            self.metrics = metrics
+
+        def run(self, session, artifact, context=None):
+            pdf_path.parent.mkdir(parents=True, exist_ok=True)
+            pdf_path.write_bytes(b"%PDF-1.4\n%%EOF")
+            self.logger.log_attempt(
+                resolvers.AttemptRecord(
+                    work_id=artifact.work_id,
+                    resolver_name="openalex",
+                    resolver_order=1,
+                    url="https://oa.example/staging.pdf",
+                    status=outcome.classification,
+                    http_status=outcome.http_status,
+                    content_type=outcome.content_type,
+                    elapsed_ms=outcome.elapsed_ms,
+                    reason=outcome.error,
+                    sha256=outcome.sha256,
+                    content_length=outcome.content_length,
+                    dry_run=False,
+                )
+            )
+            self.metrics.record_attempt("openalex", outcome)
+            return resolvers.PipelineResult(
+                success=True,
+                resolver_name="openalex",
+                url="https://oa.example/staging.pdf",
+                outcome=outcome,
+                html_paths=[],
+                failed_urls=[],
+            )
+
+    monkeypatch.setattr(downloader, "ResolverPipeline", StubPipeline)
+
+    argv = [
+        "download_pyalex_pdfs.py",
+        "--topic-id",
+        "T123",
+        "--year-start",
+        "2022",
+        "--year-end",
+        "2022",
+        "--out",
+        str(base_out),
+        "--manifest",
+        str(manifest_override),
+        "--staging",
+    ]
+    monkeypatch.setattr("sys.argv", argv)
+
+    downloader.main()
+
+    assert run_dir.is_dir()
+    assert (run_dir / "PDF").is_dir()
+    assert (run_dir / "HTML").is_dir()
+
+    manifest_path = run_dir / "manifest.jsonl"
+    assert manifest_path.exists()
+    assert not manifest_override.exists()
+
+    index_path = manifest_path.with_suffix(".index.json")
+    assert index_path.exists()
+    payload = json.loads(index_path.read_text(encoding="utf-8"))
+    assert payload["WSTAGING"]["pdf_path"].endswith("out.pdf")
+
+
+def test_main_dry_run_skips_writing_files(download_modules, monkeypatch, tmp_path):
+    downloader = download_modules.downloader
+    resolvers = download_modules.resolvers
+
+    out_dir = tmp_path / "out"
+    manifest_path = out_dir / "manifest.jsonl"
+    out_dir.mkdir()
+
+    works = [
+        {
+            "id": f"https://openalex.org/WDry{i}",
+            "title": f"Dry Run Work {i}",
+            "publication_year": 2023,
+            "ids": {"doi": f"10.1000/dry{i}"},
+            "open_access": {"oa_url": None},
+            "best_oa_location": {"pdf_url": f"https://oa.example/dry{i}.pdf"},
+            "primary_location": {},
+            "locations": [],
+        }
+        for i in range(3)
+    ]
+
+    monkeypatch.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter(works))
+    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
+
+    outcome = resolvers.DownloadOutcome(
+        classification="pdf",
+        path=None,
+        http_status=200,
+        content_type="application/pdf",
+        elapsed_ms=3.0,
+        error=None,
+    )
+
+    class StubPipeline:
+        def __init__(self, *_, logger=None, metrics=None, **kwargs):
+            self.logger = logger
+            self.metrics = metrics
+
+        def run(self, session, artifact, context=None):
+            assert context and context.get("dry_run") is True
+            self.logger.log_attempt(
+                resolvers.AttemptRecord(
+                    work_id=artifact.work_id,
+                    resolver_name="stub",
+                    resolver_order=1,
+                    url=f"https://oa.example/{artifact.work_id}.pdf",
+                    status=outcome.classification,
+                    http_status=outcome.http_status,
+                    content_type=outcome.content_type,
+                    elapsed_ms=outcome.elapsed_ms,
+                    dry_run=True,
+                )
+            )
+            self.metrics.record_attempt("stub", outcome)
+            return resolvers.PipelineResult(
+                success=True,
+                resolver_name="stub",
+                url=f"https://oa.example/{artifact.work_id}.pdf",
+                outcome=outcome,
+                html_paths=[],
+                failed_urls=[],
+            )
+
+    monkeypatch.setattr(downloader, "ResolverPipeline", StubPipeline)
+
+    argv = [
+        "download_pyalex_pdfs.py",
+        "--topic",
+        "dry run",
+        "--year-start",
+        "2023",
+        "--year-end",
+        "2023",
+        "--out",
+        str(out_dir),
+        "--manifest",
+        str(manifest_path),
+        "--dry-run",
+    ]
+    monkeypatch.setattr("sys.argv", argv)
+
+    downloader.main()
+
+    assert not any(out_dir.glob("*.pdf"))
+    entries = [json.loads(line) for line in manifest_path.read_text(encoding="utf-8").splitlines()]
+    manifest_rows = [entry for entry in entries if entry.get("record_type") == "manifest"]
+    assert len(manifest_rows) == 3
+    assert all(row["dry_run"] is True for row in manifest_rows)
+
 
 
 def test_main_requires_topic_or_topic_id(download_modules, monkeypatch):
@@ -345,7 +668,7 @@ def test_process_one_work_logs_manifest_in_dry_run(download_modules, tmp_path):
 
     session = requests.Session()
     logger_path = tmp_path / "attempts.jsonl"
-    logger = downloader.JsonlLogger(logger_path)
+    logger = downloader.JsonlSink(logger_path)
     metrics = resolvers.ResolverMetrics()
 
     class _StubPipeline:
@@ -403,7 +726,7 @@ def test_resume_skips_completed_work(download_modules, tmp_path):
     html_dir = tmp_path / "html"
     session = requests.Session()
     logger_path = tmp_path / "attempts.jsonl"
-    logger = downloader.JsonlLogger(logger_path)
+    logger = downloader.JsonlSink(logger_path)
     metrics = resolvers.ResolverMetrics()
 
     work = {

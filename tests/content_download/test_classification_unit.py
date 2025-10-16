@@ -1,0 +1,88 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from types import SimpleNamespace
+
+from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
+from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
+
+
+def test_classify_payload_octet_stream_requires_sniff():
+    payload = b"binary without signature"
+    assert downloader.classify_payload(payload, "application/octet-stream", "https://example.org/file.pdf") is None
+
+
+def test_classify_payload_octet_stream_pdf_signature():
+    payload = b"%PDF-1.5"
+    assert (
+        downloader.classify_payload(payload, "application/octet-stream", "https://example.org/file.pdf")
+        == "pdf"
+    )
+
+
+def test_build_download_outcome_respects_head_flag(tmp_path):
+    pdf_dir = tmp_path / "pdf"
+    html_dir = tmp_path / "html"
+    pdf_dir.mkdir()
+    html_dir.mkdir()
+    artifact = WorkArtifact(
+        work_id="W-test",
+        title="Test",
+        publication_year=2024,
+        doi="10.1000/test",
+        pmid=None,
+        pmcid=None,
+        arxiv_id=None,
+        landing_urls=[],
+        pdf_urls=[],
+        open_access_url=None,
+        source_display_names=[],
+        base_stem="test",
+        pdf_dir=pdf_dir,
+        html_dir=html_dir,
+    )
+
+    pdf_path = pdf_dir / "small.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\n0 1 obj\nendobj\nstartxref\n0\n%%EOF")
+    response = SimpleNamespace(status_code=200, headers={"Content-Type": "application/pdf"})
+
+    outcome = downloader._build_download_outcome(  # type: ignore[attr-defined]
+        artifact=artifact,
+        classification="pdf",
+        dest_path=pdf_path,
+        response=response,
+        elapsed_ms=12.3,
+        flagged_unknown=False,
+        sha256="abc",
+        content_length=pdf_path.stat().st_size,
+        etag='"etag"',
+        last_modified="Wed, 01 May 2024 00:00:00 GMT",
+        extracted_text_path=None,
+        tail_bytes=b"%%EOF",
+        dry_run=False,
+        head_precheck_passed=True,
+    )
+
+    assert outcome.classification == "pdf"
+    assert outcome.path == str(pdf_path)
+
+    pdf_path.write_bytes(b"short")
+    outcome_small = downloader._build_download_outcome(  # type: ignore[attr-defined]
+        artifact=artifact,
+        classification="pdf",
+        dest_path=pdf_path,
+        response=response,
+        elapsed_ms=1.0,
+        flagged_unknown=False,
+        sha256="def",
+        content_length=pdf_path.stat().st_size,
+        etag='"etag"',
+        last_modified="Wed, 01 May 2024 00:00:00 GMT",
+        extracted_text_path=None,
+        tail_bytes=b"short",
+        dry_run=False,
+        head_precheck_passed=False,
+    )
+
+    assert outcome_small.classification == "pdf_corrupt"

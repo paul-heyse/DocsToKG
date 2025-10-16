@@ -53,24 +53,6 @@ path: Path to the candidate PDF file.
 Returns:
 ``True`` if the file ends with ``%%EOF``; ``False`` otherwise.
 
-### `_head_precheck_candidate(session, url, timeout)`
-
-Evaluate whether ``url`` is likely to return a PDF payload.
-
-The helper performs a single HEAD request with a tight timeout budget
-to avoid fetching large payloads unnecessarily. Tests rely on this
-behaviour to ensure dry-run execution does not trigger streaming
-downloads.
-
-Args:
-session: HTTP session used for the outbound HEAD request.
-url: Candidate download URL that should be validated.
-timeout: Per-request timeout budget, in seconds.
-
-Returns:
-``True`` when the HEAD response suggests the URL returns a PDF;
-``False`` when the response clearly indicates HTML or a missing file.
-
 ### `slugify(text, keep)`
 
 Create a filesystem-friendly slug for a work title.
@@ -661,42 +643,69 @@ Examples:
 ...     dry_run=False,
 ... )
 
-### `JsonlLogger`
+### `AttemptSink`
 
-Structured logger that emits attempt, manifest, and summary JSONL records.
+Protocol describing the logging interface consumed by the resolver pipeline.
+
+Implementations provide ``log_attempt()``, ``log_manifest()``, ``log_summary()``,
+and ``close()`` methods. The CLI composes multiple sinks (JSONL, CSV, indices)
+through a shared interface, enabling deterministic cleanup via
+``contextlib.ExitStack``.
+
+### `JsonlSink`
+
+Structured sink that emits attempt, manifest, and summary JSONL records.
 
 Attributes:
 _path: Destination JSONL log path.
 _file: Underlying file handle used for writes.
 
 Examples:
->>> logger = JsonlLogger(Path("logs/attempts.jsonl"))
->>> logger.log_summary({"processed": 10})
->>> logger.close()
+>>> sink = JsonlSink(Path("logs/attempts.jsonl"))
+>>> sink.log_summary({"processed": 10})
+>>> sink.close()
 
-The logger serialises records outside a thread lock and performs atomic
+The sink serialises records outside a thread lock and performs atomic
 writes under the lock, ensuring well-formed output even when multiple
 threads share the instance. It also implements the context manager protocol
 for deterministic resource cleanup.
 
-### `CsvAttemptLoggerAdapter`
+### `CsvSink`
 
-Adapter that mirrors attempt records to CSV for backward compatibility.
+Sink that mirrors attempt records to CSV without wrapping the JSONL sink.
 
 Attributes:
-_logger: Underlying :class:`JsonlLogger` instance.
+_path: Destination CSV output path.
 _file: CSV file handle used for writing.
-_writer: ``csv.DictWriter`` writing to :attr:`_file`.
+_writer: ``csv.DictWriter`` used for row emission.
 
 Examples:
->>> adapter = CsvAttemptLoggerAdapter(JsonlLogger(Path("attempts.jsonl")), Path("attempts.csv"))
->>> adapter.log_attempt(AttemptRecord(work_id="W1", resolver_name="unpaywall", resolver_order=1,
-...                                   url="https://example", status="pdf", http_status=200,
-...                                   content_type="application/pdf", elapsed_ms=120.0))
->>> adapter.close()
+>>> sink = CsvSink(Path("attempts.csv"))
+>>> sink.log_attempt(AttemptRecord(work_id="W1", resolver_name="unpaywall", resolver_order=1,
+...                                url="https://example", status="pdf", http_status=200,
+...                                content_type="application/pdf", elapsed_ms=120.0))
+>>> sink.close()
 
 CSV writes are protected by a lock to ensure rows remain well formed when
-multiple worker threads log through the same adapter instance.
+multiple worker threads share the instance.
+
+### `MultiSink`
+
+Composite sink that forwards logging calls to multiple sinks while keeping
+timestamps synchronised. Used when both JSONL and CSV (or other sinks) are
+enabled.
+
+### `ManifestIndexSink`
+
+Sink that accumulates manifest entries and writes a ``manifest.index.json``
+sidecar containing the most recent classification, PDF path, and checksum per
+work identifier.
+
+### `LastAttemptCsvSink`
+
+Sink that records only the final manifest entry per work and emits a
+``manifest.last.csv`` file on close. Intended to speed up manual review of the
+latest attempt status for each work identifier.
 
 ### `WorkArtifact`
 
