@@ -208,11 +208,14 @@ def test_iter_doctags(tmp_path: Path) -> None:
 def test_iter_chunks(tmp_path: Path) -> None:
     chunks_dir = _common.data_chunks()
     good = chunks_dir / "doc.chunks.jsonl"
+    nested = chunks_dir / "teamA" / "doc.chunks.jsonl"
     other = chunks_dir / "doc.jsonl"
     good.write_text("{}\n", encoding="utf-8")
+    nested.parent.mkdir(parents=True, exist_ok=True)
+    nested.write_text("{}\n", encoding="utf-8")
     other.write_text("{}\n", encoding="utf-8")
     results = list(_common.iter_chunks(chunks_dir))
-    assert results == [good.resolve()]
+    assert results == sorted({good.resolve(), nested.resolve()})
 
 
 def test_jsonl_load_and_save(tmp_path: Path) -> None:
@@ -442,6 +445,23 @@ def test_compute_relative_doc_id_handles_subdirectories(tmp_path: Path) -> None:
     nested.write_text("{}", encoding="utf-8")
 
     assert compute_relative_doc_id(nested, root) == "teamA/report.doctags"
+
+
+def test_derive_doc_id_and_output_path(tmp_path: Path) -> None:
+    from DocsToKG.DocParsing import EmbeddingV2 as embedding
+
+    chunks_root = tmp_path / "chunks"
+    chunk_file = chunks_root / "teamA" / "report.chunks.jsonl"
+    chunk_file.parent.mkdir(parents=True, exist_ok=True)
+    chunk_file.write_text("{}\n", encoding="utf-8")
+    vectors_root = tmp_path / "vectors"
+
+    doc_id, out_path = embedding._derive_doc_id_and_output_path(
+        chunk_file, chunks_root, vectors_root
+    )
+
+    assert doc_id == "teamA/report.doctags"
+    assert out_path == vectors_root / "teamA" / "report.vectors.jsonl"
 
 
 def test_chunk_row_fields_unique() -> None:
