@@ -18,7 +18,6 @@ import tempfile
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
 from dataclasses import dataclass
-from importlib import metadata
 from itertools import islice
 from pathlib import Path
 from typing import Any, BinaryIO, Callable, Dict, Iterable, Iterator, List, MutableMapping, Optional
@@ -29,6 +28,7 @@ from .config import ResolvedConfig
 from .io_safe import sanitize_filename
 from .net import extract_archive_safe
 from .optdeps import get_owlready2, get_pronto, get_rdflib
+from .plugins import ensure_validator_plugins
 
 rdflib = get_rdflib()
 pronto = get_pronto()
@@ -993,37 +993,7 @@ VALIDATORS = {
 }
 
 
-def _load_validator_plugins(logger: Optional[logging.Logger] = None) -> None:
-    """Discover validator plugins registered via entry points."""
-
-    logger = logger or logging.getLogger(__name__)
-    try:
-        entry_points = metadata.entry_points()
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.warning(
-            "validator plugin discovery failed",
-            extra={"stage": "init", "error": str(exc)},
-        )
-        return
-
-    for entry in entry_points.select(group="docstokg.ontofetch.validator"):
-        try:
-            handler = entry.load()
-            if not callable(handler):
-                raise TypeError("validator plugin must be callable")
-            VALIDATORS[entry.name] = handler
-            logger.info(
-                "validator plugin registered",
-                extra={"stage": "init", "validator": entry.name},
-            )
-        except Exception as exc:  # pragma: no cover - plugin faults
-            logger.warning(
-                "validator plugin failed",
-                extra={"stage": "init", "validator": entry.name, "error": str(exc)},
-            )
-
-
-_load_validator_plugins()
+ensure_validator_plugins(VALIDATORS)
 
 
 def _run_validator_task(

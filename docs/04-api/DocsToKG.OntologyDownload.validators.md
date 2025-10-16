@@ -17,7 +17,9 @@ rdflib, Pronto, Owlready2, ROBOT, and Arelle.
 ### Plugin registration example
 
 To add bespoke validation steps, publish an entry point under
-``docstokg.ontofetch.validator``. A minimal plugin might look like:
+``docstokg.ontofetch.validator``. The discovery helper in
+``DocsToKG.OntologyDownload.plugins`` surfaces the registration at import time.
+A minimal plugin might look like:
 
 ```python
 import json

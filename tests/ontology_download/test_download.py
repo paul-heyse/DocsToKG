@@ -337,16 +337,19 @@ import requests
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import (
+import DocsToKG.OntologyDownload.net as download
+import DocsToKG.OntologyDownload.pipeline as pipeline_mod
+from DocsToKG.OntologyDownload.config import (
     ConfigError,
     ConfigurationError,
     DefaultsConfig,
     DownloadConfiguration,
-    FetchSpec,
     ResolvedConfig,
 )
-from DocsToKG.OntologyDownload import ontology_download as download
+from DocsToKG.OntologyDownload.io_safe import sanitize_filename
+from DocsToKG.OntologyDownload.pipeline import FetchSpec
 from DocsToKG.OntologyDownload.resolvers import FetchPlan
+from DocsToKG.OntologyDownload.storage import CACHE_DIR
 
 
 @dataclass
@@ -830,7 +833,7 @@ def test_extract_zip_rejects_traversal(tmp_path):
     archive = tmp_path / "bad.zip"
     with download.zipfile.ZipFile(archive, "w") as zf:
         zf.writestr("../evil.txt", "data")
-    with pytest.raises(download.ConfigError):
+    with pytest.raises(ConfigError):
         download.extract_zip_safe(archive, tmp_path / "out")
 
 
@@ -838,7 +841,7 @@ def test_extract_zip_rejects_absolute(tmp_path):
     archive = tmp_path / "bad_abs.zip"
     with download.zipfile.ZipFile(archive, "w") as zf:
         zf.writestr("/absolute/path.txt", "data")
-    with pytest.raises(download.ConfigError):
+    with pytest.raises(ConfigError):
         download.extract_zip_safe(archive, tmp_path / "out")
 
 
@@ -847,7 +850,7 @@ def test_extract_zip_detects_compression_bomb(tmp_path):
     with download.zipfile.ZipFile(archive, "w", compression=download.zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("large.txt", b"0" * (11 * 1024 * 1024))
 
-    with pytest.raises(download.ConfigError) as exc_info:
+    with pytest.raises(ConfigError) as exc_info:
         download.extract_zip_safe(archive, tmp_path / "zip_out")
 
     assert "compression ratio" in str(exc_info.value)
@@ -861,7 +864,7 @@ def test_extract_zip_rejects_symlink(tmp_path):
         info.external_attr = ((stat.S_IFLNK | 0o777) << 16)
         zf.writestr(info, "target")
 
-    with pytest.raises(download.ConfigError):
+    with pytest.raises(ConfigError):
         download.extract_zip_safe(archive, tmp_path / "out")
 # --- Helper Functions ---
 
@@ -893,7 +896,7 @@ def test_extract_tar_rejects_traversal(tmp_path):
     info.size = len(payload)
     _make_tarfile(archive, [(info, payload)])
 
-    with pytest.raises(download.ConfigError):
+    with pytest.raises(ConfigError):
         download.extract_tar_safe(archive, tmp_path / "out")
 
 
@@ -904,7 +907,7 @@ def test_extract_tar_rejects_absolute(tmp_path):
     info.size = len(data)
     _make_tarfile(archive, [(info, data)])
 
-    with pytest.raises(download.ConfigError):
+    with pytest.raises(ConfigError):
         download.extract_tar_safe(archive, tmp_path / "out")
 
 
@@ -916,7 +919,7 @@ def test_extract_tar_rejects_symlink(tmp_path):
     info.size = 0
     _make_tarfile(archive, [(info, None)])
 
-    with pytest.raises(download.ConfigError):
+    with pytest.raises(ConfigError):
         download.extract_tar_safe(archive, tmp_path / "out")
 
 
@@ -927,7 +930,7 @@ def test_extract_tar_detects_compression_bomb(tmp_path):
     info.size = len(payload)
     _make_tarfile(archive, [(info, payload)])
 
-    with pytest.raises(download.ConfigError) as exc_info:
+    with pytest.raises(ConfigError) as exc_info:
         download.extract_tar_safe(archive, tmp_path / "out")
 
     assert "compression ratio" in str(exc_info.value)
@@ -1079,7 +1082,7 @@ def test_ensure_license_allowed_normalizes_spdx() -> None:
         service="obo",
     )
 
-    download._ensure_license_allowed(plan, config, spec)
+    pipeline_mod._ensure_license_allowed(plan, config, spec)
 
     disallowed_plan = FetchPlan(
         url="https://example.org/hp.owl",
@@ -1092,24 +1095,24 @@ def test_ensure_license_allowed_normalizes_spdx() -> None:
     )
 
     with pytest.raises(ConfigurationError):
-        download._ensure_license_allowed(disallowed_plan, config, spec)
+        pipeline_mod._ensure_license_allowed(disallowed_plan, config, spec)
 
 
 def test_sanitize_filename_removes_traversal():
-    sanitized = download.sanitize_filename("../evil.owl")
+    sanitized = sanitize_filename("../evil.owl")
     assert ".." not in sanitized
     assert sanitized.endswith("evil.owl")
 
 
 def test_migrate_manifest_sets_default_version():
     payload = {}
-    download._migrate_manifest_inplace(payload)
+    pipeline_mod._migrate_manifest_inplace(payload)
     assert payload["schema_version"] == "1.0"
 
 
 def test_migrate_manifest_upgrades_old_schema():
     payload = {"schema_version": "0.9"}
-    download._migrate_manifest_inplace(payload)
+    pipeline_mod._migrate_manifest_inplace(payload)
     assert payload["schema_version"] == "1.0"
     assert payload["resolver_attempts"] == []
 
@@ -1117,7 +1120,7 @@ def test_migrate_manifest_upgrades_old_schema():
 def test_migrate_manifest_warns_unknown_version(caplog):
     caplog.set_level(logging.WARNING)
     payload = {"schema_version": "2.0"}
-    download._migrate_manifest_inplace(payload)
+    pipeline_mod._migrate_manifest_inplace(payload)
     assert any("unknown manifest schema version" in record.message for record in caplog.records)
 
 
@@ -1133,7 +1136,7 @@ def test_read_manifest_applies_migration(tmp_path, monkeypatch):
 
     monkeypatch.setattr(download, "validate_manifest_dict", _validate)
 
-    payload = download._read_manifest(manifest_path)
+    payload = pipeline_mod._read_manifest(manifest_path)
     assert payload["schema_version"] == "1.0"
     assert payload["resolver_attempts"] == []
     assert observed == {"schema_version": "1.0", "resolver_attempts": []}
@@ -1162,7 +1165,7 @@ def test_version_lock_serializes_concurrent_writers(tmp_path):
 
     def _worker(name: str):
         barrier.wait()
-        with download._version_lock("hp", "2024-01-01"):
+        with pipeline_mod._version_lock("hp", "2024-01-01"):
             with lock:
                 state["active"] += 1
                 state["max_active"] = max(state["max_active"], state["active"])
@@ -1179,7 +1182,7 @@ def test_version_lock_serializes_concurrent_writers(tmp_path):
 
     assert state["max_active"] == 1
     assert len(completed) == 2
-    lock_path = download.CACHE_DIR / "locks" / "hp__2024-01-01.lock"
+    lock_path = CACHE_DIR / "locks" / "hp__2024-01-01.lock"
     assert lock_path.exists()
     assert lock_path.stat().st_size > 0
 

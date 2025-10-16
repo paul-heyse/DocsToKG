@@ -400,8 +400,18 @@ def _validate_schema(raw: Mapping[str, object], config: Optional[ResolvedConfig]
 
 
 def load_raw_yaml(config_path: Path) -> Mapping[str, object]:
-    with config_path.open("r", encoding="utf-8") as handle:
-        data = yaml.safe_load(handle)
+    if not config_path.exists():
+        print(f"Configuration file not found: {config_path}", file=sys.stderr)
+        raise SystemExit(2)
+
+    try:
+        with config_path.open("r", encoding="utf-8") as handle:
+            data = yaml.safe_load(handle)
+    except yaml.YAMLError as exc:  # pragma: no cover - exercised via tests
+        raise ConfigError(
+            f"Configuration file '{config_path}' contains invalid YAML"
+        ) from exc
+
     if not isinstance(data, Mapping):
         raise ConfigError("Configuration file must contain a mapping at the root")
     return data
