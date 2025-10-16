@@ -82,6 +82,37 @@ def test_csv_adapter_emits_wall_time_column(tmp_path: Path) -> None:
     assert rows[0]["resolver_wall_time_ms"] == "987.6"
 
 
+def test_csv_adapter_close_closes_file(tmp_path: Path) -> None:
+    jsonl_path = tmp_path / "attempts.jsonl"
+    csv_path = tmp_path / "attempts.csv"
+    adapter = CsvAttemptLoggerAdapter(JsonlLogger(jsonl_path), csv_path)
+
+    adapter.log_attempt(
+        AttemptRecord(
+            work_id="W-close",
+            resolver_name="unpaywall",
+            resolver_order=1,
+            url="https://example.org/close",
+            status="pdf",
+            http_status=200,
+            content_type="application/pdf",
+            elapsed_ms=12.0,
+            metadata={},
+            sha256="abc123",
+            content_length=256,
+            dry_run=False,
+            resolver_wall_time_ms=10.5,
+        )
+    )
+
+    adapter.close()
+    assert adapter._file.closed  # type: ignore[attr-defined]
+
+    # ``close`` should be idempotent.
+    adapter.close()
+    assert adapter._file.closed  # type: ignore[attr-defined]
+
+
 def test_jsonl_logger_writes_valid_records(tmp_path: Path) -> None:
     log_path = tmp_path / "attempts.jsonl"
     logger = JsonlLogger(log_path)
