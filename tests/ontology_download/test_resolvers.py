@@ -176,13 +176,8 @@ import requests
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import (
-    ConfigError,
-    DefaultsConfig,
-    FetchSpec,
-    ResolvedConfig,
-    resolvers,
-)
+from DocsToKG.OntologyDownload import ConfigError, DefaultsConfig, FetchSpec, ResolvedConfig, resolvers
+from DocsToKG.OntologyDownload import plugins as plugins_mod
 from DocsToKG.OntologyDownload import ontology_download as core
 
 
@@ -437,7 +432,7 @@ def test_lov_resolver_contract(load_cassette, monkeypatch, resolved_config):
 def test_skos_resolver_requires_url(resolved_config):
     resolver = resolvers.SKOSResolver()
     spec = FetchSpec(id="eurovoc", resolver="skos", extras={}, target_formats=["ttl"])
-    with pytest.raises(resolvers.ConfigError):
+    with pytest.raises(ConfigError):
         resolver.plan(spec, resolved_config, logging.getLogger(__name__))
 
 
@@ -472,7 +467,7 @@ def test_bioportal_resolver_auth_error(load_cassette, monkeypatch, resolved_conf
         get_latest_submission=lambda acronym: None,
     )
     spec = FetchSpec(id="ncit", resolver="bioportal", extras={}, target_formats=["owl"])
-    with pytest.raises(resolvers.ConfigError) as exc_info:
+    with pytest.raises(ConfigError) as exc_info:
         resolver.plan(spec, resolved_config, logging.getLogger(__name__))
     assert "bioportal" in str(exc_info.value).lower()
     assert "status 401" in str(exc_info.value).lower()
@@ -643,7 +638,7 @@ def test_lov_resolver_requires_uri(resolved_config):
         session=SimpleNamespace(headers={}, get=lambda *args, **kwargs: None)
     )
     spec = FetchSpec(id="voaf", resolver="lov", extras={}, target_formats=["ttl"])
-    with pytest.raises(resolvers.ConfigError):
+    with pytest.raises(ConfigError):
         resolver.plan(spec, resolved_config, logging.getLogger(__name__))
 
 
@@ -661,7 +656,7 @@ def test_ontobee_resolver_prefers_format(resolved_config):
 def test_ontobee_resolver_validates_identifier(resolved_config):
     resolver = resolvers.OntobeeResolver()
     spec = FetchSpec(id="invalid-id", resolver="ontobee", extras={}, target_formats=["owl"])
-    with pytest.raises(resolvers.ConfigError):
+    with pytest.raises(ConfigError):
         resolver.plan(spec, resolved_config, logging.getLogger(__name__))
 
 
@@ -748,10 +743,14 @@ def test_resolver_plugin_loader_registers_and_warns(monkeypatch, caplog):
     stub = SimpleNamespace(
         select=lambda *, group=None: entries if group == "docstokg.ontofetch.resolver" else []
     )
-    monkeypatch.setattr(resolvers.metadata, "entry_points", lambda: stub)
+    monkeypatch.setattr(plugins_mod.metadata, "entry_points", lambda: stub)
+    monkeypatch.setattr(plugins_mod, "_RESOLVER_PLUGINS_LOADED", False, raising=False)
 
     caplog.set_level(logging.INFO)
-    resolvers._load_resolver_plugins(logging.getLogger("test"))
+    plugins_mod.load_resolver_plugins(
+        resolvers.RESOLVERS,
+        logger=logging.getLogger("test"),
+    )
 
     assert "plugin" in resolvers.RESOLVERS
     assert isinstance(resolvers.RESOLVERS["plugin"], DummyResolver)
@@ -765,10 +764,14 @@ def test_resolver_plugin_guard_is_idempotent(monkeypatch):
         calls["count"] += 1
         return SimpleNamespace(select=lambda *, group=None: [])
 
-    monkeypatch.setattr(resolvers.metadata, "entry_points", fake_entry_points)
-    monkeypatch.setattr(resolvers, "_PLUGINS_LOADED", False, raising=False)
+    monkeypatch.setattr(plugins_mod.metadata, "entry_points", fake_entry_points)
+    monkeypatch.setattr(plugins_mod, "_RESOLVER_PLUGINS_LOADED", False, raising=False)
 
-    resolvers._ensure_plugins_loaded(logging.getLogger("test"))
-    resolvers._ensure_plugins_loaded(logging.getLogger("test"))
+    plugins_mod.ensure_resolver_plugins(
+        resolvers.RESOLVERS, logger=logging.getLogger("test")
+    )
+    plugins_mod.ensure_resolver_plugins(
+        resolvers.RESOLVERS, logger=logging.getLogger("test")
+    )
 
     assert calls["count"] == 1

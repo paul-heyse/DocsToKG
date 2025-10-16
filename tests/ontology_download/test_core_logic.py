@@ -109,10 +109,10 @@ from DocsToKG.OntologyDownload import (
     DownloadResult,
     ResolvedConfig,
     ValidationResult,
-    resolvers,
 )
 from DocsToKG.OntologyDownload import ontology_download as core
-from DocsToKG.OntologyDownload import storage as storage_mod
+from DocsToKG.OntologyDownload import resolvers, storage as storage_mod
+from DocsToKG.OntologyDownload.pipeline import ResolverError
 from DocsToKG.OntologyDownload.resolvers import FetchPlan
 
 
@@ -134,6 +134,7 @@ def test_select_validators_for_rdf_includes_defaults():
         pipeline_mod.DEFAULT_VALIDATOR_NAMES
     )
 
+@pytest.fixture(autouse=True)
 def stub_requests_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
     """Avoid real HTTP calls when planning augments metadata."""
 
@@ -657,7 +658,7 @@ def test_plan_one_respects_disabled_fallback(monkeypatch: pytest.MonkeyPatch) ->
     config = ResolvedConfig(defaults=defaults, specs=[])
     spec = core.FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"])
 
-    with pytest.raises(core.ResolverError):
+    with pytest.raises(ResolverError):
         core.plan_one(spec, config=config)
 
 

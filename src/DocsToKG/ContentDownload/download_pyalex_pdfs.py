@@ -222,6 +222,11 @@ from DocsToKG.ContentDownload.classifier import (
     _infer_suffix,
     classify_payload,
 )
+from DocsToKG.ContentDownload.config import (
+    apply_config_overrides,
+    load_resolver_config,
+    read_resolver_config,
+)
 from DocsToKG.ContentDownload.network import (
     CachedResult,
     ConditionalRequestHelper,
@@ -233,11 +238,13 @@ from DocsToKG.ContentDownload.network import (
 from DocsToKG.ContentDownload.telemetry import (
     MANIFEST_SCHEMA_VERSION,
     AttemptSink,
+    build_manifest_entry,
     CsvSink,
     JsonlSink,
     LastAttemptCsvSink,
     ManifestEntry,
     ManifestIndexSink,
+    load_previous_manifest,
     MultiSink,
 )
 from DocsToKG.ContentDownload.utils import (
@@ -302,15 +309,6 @@ LOGGER = logging.getLogger("DocsToKG.ContentDownload")
 
 # --- Pipeline Helpers ---
 
-
-def _utc_timestamp() -> str:
-    """Return the current time as an ISO 8601 UTC timestamp.
-
-    Returns:
-        Timestamp string formatted with a trailing ``'Z'`` suffix.
-    """
-
-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _has_pdf_eof(path: Path, *, window_bytes: int = 2048) -> bool:
@@ -577,133 +575,6 @@ def _make_session(
         pool_maxsize=pool_maxsize,
     )
 
-
-# --- Logging Sinks ---
-
-# --- Manifest Utilities ---
-
-
-def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
-    """Load manifest JSONL entries indexed by work identifier.
-
-    Args:
-        path: Path to a previous manifest JSONL log, or None.
-
-    Returns:
-        Tuple containing:
-            - Mapping of work_id -> url -> manifest payloads
-            - Set of work IDs already completed
-
-    Raises:
-        json.JSONDecodeError: If the manifest contains invalid JSON.
-        ValueError: If entries omit required fields or use deprecated schemas.
-    """
-
-    per_work: Dict[str, Dict[str, Any]] = {}
-    completed: Set[str] = set()
-    if not path or not path.exists():
-        return per_work, completed
-
-    with path.open("r", encoding="utf-8") as handle:
-        for raw in handle:
-            line = raw.strip()
-            if not line:
-                continue
-            data = json.loads(line)
-            record_type = data.get("record_type")
-            if record_type is None:
-                raise ValueError(
-                    "Legacy manifest entries without record_type are no longer supported."
-                )
-            if record_type != "manifest":
-                continue
-            schema_version_raw = data.get("schema_version")
-            if schema_version_raw is None:
-                raise ValueError("Manifest entries must include a schema_version field.")
-            try:
-                schema_version = int(schema_version_raw)
-            except (TypeError, ValueError) as exc:
-                raise ValueError(
-                    f"Manifest entry schema_version must be an integer, got {schema_version_raw!r}"
-                ) from exc
-            if schema_version > MANIFEST_SCHEMA_VERSION:
-                raise ValueError(
-                    f"Manifest schema_version {schema_version} is newer than supported "
-                    f"{MANIFEST_SCHEMA_VERSION}. Upgrade the DocsToKG downloader."
-                )
-            data["schema_version"] = schema_version
-            work_id = data.get("work_id")
-            url = data.get("url")
-            if not work_id or not url:
-                raise ValueError("Manifest entries must include work_id and url fields.")
-            content_length = data.get("content_length")
-            if isinstance(content_length, str):
-                try:
-                    data["content_length"] = int(content_length)
-                except ValueError:
-                    data["content_length"] = None
-            per_work.setdefault(work_id, {})[url] = data
-            raw_classification = data.get("classification")
-            classification_text = (raw_classification or "").strip()
-            if not classification_text:
-                raise ValueError("Manifest entries must declare a classification.")
-            classification_code = Classification.from_wire(classification_text)
-            data["classification"] = classification_code.value
-            if classification_code in PDF_LIKE:
-                completed.add(work_id)
-
-    return per_work, completed
-
-
-# --- Download Pipeline ---
-
-
-def build_manifest_entry(
-    artifact: WorkArtifact,
-    resolver: Optional[str],
-    url: Optional[str],
-    outcome: Optional[DownloadOutcome],
-    html_paths: List[str],
-    *,
-    dry_run: bool,
-    reason: Optional[str] = None,
-) -> ManifestEntry:
-    """Create a manifest entry summarizing a download attempt.
-
-    Args:
-        artifact: Work artifact providing metadata.
-        resolver: Resolver name responsible for the download.
-        url: URL that was attempted.
-        outcome: Download outcome describing classification and metadata.
-        html_paths: Any HTML paths captured during the attempt.
-        dry_run: Whether this was a dry-run execution.
-        reason: Optional reason string for failures.
-
-    Returns:
-        ManifestEntry populated with download metadata.
-    """
-    timestamp = _utc_timestamp()
-    classification = outcome.classification.value if outcome else Classification.MISS.value
-    return ManifestEntry(
-        schema_version=MANIFEST_SCHEMA_VERSION,
-        timestamp=timestamp,
-        work_id=artifact.work_id,
-        title=artifact.title,
-        publication_year=artifact.publication_year,
-        resolver=resolver,
-        url=url,
-        path=outcome.path if outcome else None,
-        classification=classification,
-        content_type=outcome.content_type if outcome else None,
-        reason=reason or (outcome.error if outcome else None),
-        html_paths=html_paths,
-        sha256=outcome.sha256 if outcome else None,
-        content_length=outcome.content_length if outcome else None,
-        etag=outcome.etag if outcome else None,
-        last_modified=outcome.last_modified if outcome else None,
-        extracted_text_path=outcome.extracted_text_path if outcome else None,
-        dry_run=dry_run,
-    )
 
 
 def _collect_location_urls(work: Dict[str, Any]) -> Dict[str, List[str]]:
@@ -1285,196 +1156,6 @@ def download_candidate(
             last_modified=None,
             extracted_text_path=None,
         )
-
-
-def read_resolver_config(path: Path) -> Dict[str, Any]:
-    """Read resolver configuration from JSON or YAML files.
-
-    Args:
-        path: Path to the configuration file.
-
-    Returns:
-        Parsed configuration mapping.
-
-    Raises:
-        RuntimeError: If YAML parsing is requested but PyYAML is unavailable.
-    """
-    text = path.read_text(encoding="utf-8")
-    ext = path.suffix.lower()
-    if ext in {".yaml", ".yml"}:
-        try:
-            import yaml  # type: ignore
-        except ImportError as exc:  # pragma: no cover - missing dependency
-            raise RuntimeError(
-                "Install PyYAML to load YAML resolver configs, or provide JSON."
-            ) from exc
-        return yaml.safe_load(text) or {}
-    if ext in {".json", ".jsn"}:
-        return json.loads(text)
-
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        try:
-            import yaml  # type: ignore
-        except ImportError as exc:  # pragma: no cover - missing dependency
-            raise RuntimeError(
-                "Unable to parse resolver config. Install PyYAML or supply JSON."
-            ) from exc
-        return yaml.safe_load(text) or {}
-
-
-def _seed_resolver_toggle_defaults(config: ResolverConfig, resolver_names: Sequence[str]) -> None:
-    """Ensure resolver toggles include defaults for every known resolver."""
-
-    for name in resolver_names:
-        default_enabled = resolvers.DEFAULT_RESOLVER_TOGGLES.get(name, True)
-        config.resolver_toggles.setdefault(name, default_enabled)
-
-
-def apply_config_overrides(
-    config: ResolverConfig,
-    data: Dict[str, Any],
-    resolver_names: Sequence[str],
-) -> None:
-    """Apply overrides from configuration data onto a ResolverConfig.
-
-    Args:
-        config: Resolver configuration object to mutate.
-        data: Mapping loaded from a configuration file.
-        resolver_names: Known resolver names. Defaults are applied after overrides.
-
-    Returns:
-        None
-    """
-    for field_name in (
-        "resolver_order",
-        "resolver_toggles",
-        "max_attempts_per_work",
-        "timeout",
-        "sleep_jitter",
-        "polite_headers",
-        "unpaywall_email",
-        "core_api_key",
-        "semantic_scholar_api_key",
-        "doaj_api_key",
-        "resolver_timeouts",
-        "resolver_min_interval_s",
-        "mailto",
-        "resolver_head_precheck",
-    ):
-        if field_name in data and data[field_name] is not None:
-            setattr(config, field_name, data[field_name])
-
-    if "resolver_rate_limits" in data:
-        raise ValueError(
-            "resolver_rate_limits is no longer supported. "
-            "Rename entries to resolver_min_interval_s."
-        )
-
-    # Resolver toggle defaults are applied once after all overrides via
-    # ``_seed_resolver_toggle_defaults`` to ensure a single source of truth.
-
-
-def load_resolver_config(
-    args: argparse.Namespace,
-    resolver_names: Sequence[str],
-    resolver_order_override: Optional[List[str]] = None,
-) -> ResolverConfig:
-    """Construct resolver configuration combining CLI, config files, and env vars.
-
-    Args:
-        args: Parsed CLI arguments.
-        resolver_names: Sequence of resolver names supported by the pipeline.
-        resolver_order_override: Optional override list for resolver order.
-
-    Returns:
-        Populated ResolverConfig instance.
-
-    Raises:
-        FileNotFoundError: If the resolver configuration file does not exist.
-        RuntimeError: If YAML parsing is requested but PyYAML is unavailable.
-    """
-    config = ResolverConfig()
-    if args.resolver_config:
-        config_data = read_resolver_config(Path(args.resolver_config))
-        apply_config_overrides(config, config_data, resolver_names)
-
-    # Environment fallbacks
-    config.unpaywall_email = (
-        args.unpaywall_email
-        or config.unpaywall_email
-        or os.getenv("UNPAYWALL_EMAIL")
-        or args.mailto
-    )
-    config.core_api_key = args.core_api_key or config.core_api_key or os.getenv("CORE_API_KEY")
-    config.semantic_scholar_api_key = (
-        args.semantic_scholar_api_key or config.semantic_scholar_api_key or os.getenv("S2_API_KEY")
-    )
-    config.doaj_api_key = args.doaj_api_key or config.doaj_api_key or os.getenv("DOAJ_API_KEY")
-    config.mailto = args.mailto or config.mailto
-
-    if getattr(args, "max_resolver_attempts", None):
-        config.max_attempts_per_work = args.max_resolver_attempts
-    if getattr(args, "resolver_timeout", None):
-        config.timeout = args.resolver_timeout
-    if hasattr(args, "concurrent_resolvers") and args.concurrent_resolvers is not None:
-        config.max_concurrent_resolvers = args.concurrent_resolvers
-
-    if resolver_order_override:
-        ordered = []
-        for name in resolver_order_override:
-            if name not in ordered:
-                ordered.append(name)
-        for name in resolver_names:
-            if name not in ordered:
-                ordered.append(name)
-        config.resolver_order = ordered
-
-    for disabled in getattr(args, "disable_resolver", []) or []:
-        config.resolver_toggles[disabled] = False
-
-    for enabled in getattr(args, "enable_resolver", []) or []:
-        config.resolver_toggles[enabled] = True
-
-    _seed_resolver_toggle_defaults(config, resolver_names)
-
-    if hasattr(args, "global_url_dedup") and args.global_url_dedup is not None:
-        config.enable_global_url_dedup = args.global_url_dedup
-
-    if getattr(args, "domain_min_interval", None):
-        domain_limits = dict(config.domain_min_interval_s)
-        for domain, interval in args.domain_min_interval:
-            domain_limits[domain] = interval
-        config.domain_min_interval_s = domain_limits
-
-    # Polite headers include mailto when available
-    headers = dict(config.polite_headers)
-    existing_mailto = headers.get("mailto")
-    mailto_value = config.mailto or existing_mailto
-    base_agent = headers.get("User-Agent") or "DocsToKGDownloader/1.0"
-    if mailto_value:
-        config.mailto = config.mailto or mailto_value
-        headers["mailto"] = mailto_value
-        user_agent = f"DocsToKGDownloader/1.0 (+{mailto_value}; mailto:{mailto_value})"
-    else:
-        headers.pop("mailto", None)
-        user_agent = base_agent
-    headers["User-Agent"] = user_agent
-    accept_override = getattr(args, "accept", None)
-    if accept_override:
-        headers["Accept"] = accept_override
-    elif not headers.get("Accept"):
-        headers["Accept"] = "application/pdf, text/html;q=0.9, */*;q=0.8"
-    config.polite_headers = headers
-
-    if hasattr(args, "head_precheck") and args.head_precheck is not None:
-        config.enable_head_precheck = args.head_precheck
-
-    # Apply resolver rate defaults (Unpaywall recommends 1 request per second)
-    config.resolver_min_interval_s.setdefault("unpaywall", 1.0)
-
-    return config
 
 
 def iterate_openalex(

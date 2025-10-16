@@ -216,7 +216,7 @@ from DocsToKG.OntologyDownload.config import (
     load_raw_yaml,
     validate_config,
 )
-from DocsToKG.OntologyDownload.pipeline import merge_defaults
+from DocsToKG.OntologyDownload.pipeline import ResolverError, merge_defaults
 
 # --- Test Cases ---
 
@@ -531,7 +531,7 @@ def test_fetch_one_unknown_resolver() -> None:
     """Unknown resolver should raise ResolverError."""
 
     spec = core.FetchSpec(id="example", resolver="missing", extras={}, target_formats=["owl"])
-    with pytest.raises(core.ResolverError):
+    with pytest.raises(ResolverError):
         core.fetch_one(
             spec, config=ResolvedConfig.from_defaults(), force=True, logger=_noop_logger()
         )

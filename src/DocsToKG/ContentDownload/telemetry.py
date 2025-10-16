@@ -24,12 +24,14 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Protocol, Set, Tuple
 
 if TYPE_CHECKING:  # pragma: no cover
-    from DocsToKG.ContentDownload.resolvers import AttemptRecord
+    from DocsToKG.ContentDownload.resolvers import AttemptRecord, DownloadOutcome
+    from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
 from DocsToKG.ContentDownload.classifications import PDF_LIKE, Classification
+from DocsToKG.ContentDownload.utils import normalize_url
 
 MANIFEST_SCHEMA_VERSION = 2
 
@@ -558,6 +560,127 @@ class LastAttemptCsvSink:
         self.close()
 
 
+def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
+    """Load JSONL manifest entries indexed by work ID and normalised URL."""
+
+    per_work: Dict[str, Dict[str, Any]] = {}
+    completed: Set[str] = set()
+    if not path or not path.exists():
+        return per_work, completed
+
+    with path.open("r", encoding="utf-8") as handle:
+        for raw in handle:
+            line = raw.strip()
+            if not line:
+                continue
+            data = json.loads(line)
+            record_type = data.get("record_type")
+            if record_type is None:
+                raise ValueError("Legacy manifest entries without record_type are no longer supported.")
+            if record_type != "manifest":
+                continue
+
+            schema_version_raw = data.get("schema_version")
+            if schema_version_raw is None:
+                raise ValueError("Manifest entries must include a schema_version field.")
+            try:
+                schema_version = int(schema_version_raw)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"Manifest entry schema_version must be an integer, got {schema_version_raw!r}"
+                ) from exc
+            if schema_version > MANIFEST_SCHEMA_VERSION:
+                raise ValueError(
+                    f"Manifest schema_version {schema_version} is newer than supported "
+                    f"{MANIFEST_SCHEMA_VERSION}. Upgrade the DocsToKG downloader."
+                )
+            data["schema_version"] = schema_version
+
+            work_id = data.get("work_id")
+            url = data.get("url")
+            if not work_id or not url:
+                raise ValueError("Manifest entries must include work_id and url fields.")
+
+            content_length = data.get("content_length")
+            if isinstance(content_length, str):
+                try:
+                    data["content_length"] = int(content_length)
+                except ValueError:
+                    data["content_length"] = None
+
+            key = normalize_url(url)
+            per_work.setdefault(work_id, {})[key] = data
+
+            raw_classification = data.get("classification")
+            classification_text = (raw_classification or "").strip()
+            if not classification_text:
+                raise ValueError("Manifest entries must declare a classification.")
+
+            classification_code = Classification.from_wire(classification_text)
+            data["classification"] = classification_code.value
+            if classification_code in PDF_LIKE:
+                completed.add(work_id)
+
+    return per_work, completed
+
+
+def build_manifest_entry(
+    artifact: "WorkArtifact",
+    resolver: Optional[str],
+    url: Optional[str],
+    outcome: Optional["DownloadOutcome"],
+    html_paths: List[str],
+    *,
+    dry_run: bool,
+    reason: Optional[str] = None,
+) -> ManifestEntry:
+    """Create a manifest entry summarising a download attempt."""
+
+    timestamp = _utc_timestamp()
+    if outcome:
+        classification = outcome.classification.value
+        path = outcome.path
+        content_type = outcome.content_type
+        error = outcome.error
+        sha256 = outcome.sha256
+        content_length = outcome.content_length
+        etag = outcome.etag
+        last_modified = outcome.last_modified
+        extracted_text_path = outcome.extracted_text_path
+    else:
+        classification = Classification.MISS.value
+        path = None
+        content_type = None
+        error = None
+        sha256 = None
+        content_length = None
+        etag = None
+        last_modified = None
+        extracted_text_path = None
+
+    resolved_reason = reason or error
+    return ManifestEntry(
+        schema_version=MANIFEST_SCHEMA_VERSION,
+        timestamp=timestamp,
+        work_id=getattr(artifact, "work_id"),
+        title=getattr(artifact, "title"),
+        publication_year=getattr(artifact, "publication_year"),
+        resolver=resolver,
+        url=url,
+        path=path,
+        classification=classification,
+        content_type=content_type,
+        reason=resolved_reason,
+        html_paths=list(html_paths),
+        sha256=sha256,
+        content_length=content_length,
+        etag=etag,
+        last_modified=last_modified,
+        extracted_text_path=extracted_text_path,
+        dry_run=dry_run,
+    )
+
+
 __all__ = [
     "AttemptSink",
     "ManifestEntry",
@@ -567,4 +690,6 @@ __all__ = [
     "MultiSink",
     "ManifestIndexSink",
     "LastAttemptCsvSink",
+    "build_manifest_entry",
+    "load_previous_manifest",
 ]

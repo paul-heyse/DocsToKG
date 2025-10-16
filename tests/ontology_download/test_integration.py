@@ -211,7 +211,7 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
             core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"]),
             core.FetchSpec(id="bfo", resolver="ols", extras={}, target_formats=["owl"]),
         ],
-        config=ResolvedConfig(defaults=DefaultsConfig(), specs=[]),
+        config=ResolvedConfig(defaults=DefaultsConfig(prefer_source=["obo", "ols"]), specs=[]),
         force=True,
     )
     assert len(results) == 2

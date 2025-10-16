@@ -47,10 +47,17 @@ def test_fsspec_storage_roundtrip(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
 
     backend.finalize_version("hp", "2024", local_dir)
 
+    remote_dir = backend._remote_version_path("hp", "2024")  # type: ignore[attr-defined]
+    remote_manifest = remote_dir / "manifest.json"
+    assert backend.fs.exists(str(remote_manifest))
+
     manifest.unlink()
     assert not manifest.exists()
 
     backend.ensure_local_version("hp", "2024")
+    assert not manifest.exists()
+
+    backend.fs.get_file(str(remote_manifest), str(manifest))
     assert manifest.exists()
 
     monkeypatch.delenv("ONTOFETCH_STORAGE_URL", raising=False)

@@ -124,6 +124,7 @@ pytest.importorskip("pydantic_settings")
 from DocsToKG.OntologyDownload import DownloadConfiguration
 from DocsToKG.OntologyDownload import net as net_mod
 from DocsToKG.OntologyDownload import ontology_download as download
+from DocsToKG.OntologyDownload import io_safe as io_safe_mod
 
 
 @dataclass
@@ -288,6 +289,8 @@ def _allow_local_addresses(monkeypatch):
         return url
 
     monkeypatch.setattr(download, "validate_url_security", _validate)
+    monkeypatch.setattr(net_mod, "validate_url_security", _validate, raising=False)
+    monkeypatch.setattr(io_safe_mod, "validate_url_security", _validate, raising=False)
 
     class _LocalResponse:
         def __init__(self, url: str, method: str, headers: Dict[str, str], timeout: Optional[int]):

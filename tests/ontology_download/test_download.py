@@ -326,6 +326,7 @@ import json
 import logging
 import stat
 import tarfile
+import zipfile
 import threading
 import time
 from dataclasses import dataclass
@@ -339,6 +340,7 @@ pytest.importorskip("pydantic_settings")
 
 import DocsToKG.OntologyDownload.net as download
 import DocsToKG.OntologyDownload.pipeline as pipeline_mod
+from DocsToKG.OntologyDownload import io_safe as io_safe_mod
 from DocsToKG.OntologyDownload.config import ConfigError, DefaultsConfig, DownloadConfiguration, ResolvedConfig
 from DocsToKG.OntologyDownload.errors import DownloadFailure, OntologyDownloadError, PolicyError
 from DocsToKG.OntologyDownload.io_safe import sanitize_filename
@@ -823,50 +825,50 @@ def test_validate_media_type_disabled(tmp_path, caplog):
 def test_extract_zip_safe(tmp_path):
     archive = tmp_path / "archive.zip"
     safe_dir = tmp_path / "safe"
-    with download.zipfile.ZipFile(archive, "w") as zf:
+    with zipfile.ZipFile(archive, "w") as zf:
         zf.writestr("folder/file.txt", "data")
-    extracted = download.extract_zip_safe(archive, safe_dir)
+    extracted = io_safe_mod.extract_zip_safe(archive, safe_dir)
     assert (safe_dir / "folder" / "file.txt").read_text() == "data"
     assert extracted
 
 
 def test_extract_zip_rejects_traversal(tmp_path):
     archive = tmp_path / "bad.zip"
-    with download.zipfile.ZipFile(archive, "w") as zf:
+    with zipfile.ZipFile(archive, "w") as zf:
         zf.writestr("../evil.txt", "data")
     with pytest.raises(ConfigError):
-        download.extract_zip_safe(archive, tmp_path / "out")
+        io_safe_mod.extract_zip_safe(archive, tmp_path / "out")
 
 
 def test_extract_zip_rejects_absolute(tmp_path):
     archive = tmp_path / "bad_abs.zip"
-    with download.zipfile.ZipFile(archive, "w") as zf:
+    with zipfile.ZipFile(archive, "w") as zf:
         zf.writestr("/absolute/path.txt", "data")
     with pytest.raises(ConfigError):
-        download.extract_zip_safe(archive, tmp_path / "out")
+        io_safe_mod.extract_zip_safe(archive, tmp_path / "out")
 
 
 def test_extract_zip_detects_compression_bomb(tmp_path):
     archive = tmp_path / "bomb.zip"
-    with download.zipfile.ZipFile(archive, "w", compression=download.zipfile.ZIP_DEFLATED) as zf:
+    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("large.txt", b"0" * (11 * 1024 * 1024))
 
     with pytest.raises(ConfigError) as exc_info:
-        download.extract_zip_safe(archive, tmp_path / "zip_out")
+        io_safe_mod.extract_zip_safe(archive, tmp_path / "zip_out")
 
     assert "compression ratio" in str(exc_info.value)
 
 
 def test_extract_zip_rejects_symlink(tmp_path):
     archive = tmp_path / "bad_symlink.zip"
-    with download.zipfile.ZipFile(archive, "w") as zf:
-        info = download.zipfile.ZipInfo("link")
+    with zipfile.ZipFile(archive, "w") as zf:
+        info = zipfile.ZipInfo("link")
         info.create_system = 3  # POSIX
         info.external_attr = (stat.S_IFLNK | 0o777) << 16
         zf.writestr(info, "target")
 
     with pytest.raises(ConfigError):
-        download.extract_zip_safe(archive, tmp_path / "out")
+        io_safe_mod.extract_zip_safe(archive, tmp_path / "out")
 
 
 # --- Helper Functions ---
@@ -886,7 +888,7 @@ def test_extract_tar_safe(tmp_path):
     info.size = len(data)
     _make_tarfile(archive, [(info, data)])
 
-    extracted = download.extract_tar_safe(archive, tmp_path / "tar_out")
+    extracted = io_safe_mod.extract_tar_safe(archive, tmp_path / "tar_out")
 
     assert (tmp_path / "tar_out" / "folder" / "file.txt").read_bytes() == data
     assert extracted
@@ -900,7 +902,7 @@ def test_extract_tar_rejects_traversal(tmp_path):
     _make_tarfile(archive, [(info, payload)])
 
     with pytest.raises(ConfigError):
-        download.extract_tar_safe(archive, tmp_path / "out")
+        io_safe_mod.extract_tar_safe(archive, tmp_path / "out")
 
 
 def test_extract_tar_rejects_absolute(tmp_path):
@@ -911,7 +913,7 @@ def test_extract_tar_rejects_absolute(tmp_path):
     _make_tarfile(archive, [(info, data)])
 
     with pytest.raises(ConfigError):
-        download.extract_tar_safe(archive, tmp_path / "out")
+        io_safe_mod.extract_tar_safe(archive, tmp_path / "out")
 
 
 def test_extract_tar_rejects_symlink(tmp_path):
@@ -923,7 +925,7 @@ def test_extract_tar_rejects_symlink(tmp_path):
     _make_tarfile(archive, [(info, None)])
 
     with pytest.raises(ConfigError):
-        download.extract_tar_safe(archive, tmp_path / "out")
+        io_safe_mod.extract_tar_safe(archive, tmp_path / "out")
 
 
 def test_extract_tar_detects_compression_bomb(tmp_path):
@@ -934,7 +936,7 @@ def test_extract_tar_detects_compression_bomb(tmp_path):
     _make_tarfile(archive, [(info, payload)])
 
     with pytest.raises(ConfigError) as exc_info:
-        download.extract_tar_safe(archive, tmp_path / "out")
+        io_safe_mod.extract_tar_safe(archive, tmp_path / "out")
 
     assert "compression ratio" in str(exc_info.value)
 
@@ -1005,7 +1007,7 @@ def test_validate_url_security_rejects_private_ip():
 
 def test_validate_url_security_upgrades_http(monkeypatch):
     monkeypatch.setattr(
-        download.socket,
+        io_safe_mod.socket,
         "getaddrinfo",
         lambda host, *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 0))],
     )
@@ -1020,7 +1022,7 @@ def test_validate_url_security_respects_allowlist(monkeypatch):
         looked_up["host"] = host
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
-    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(io_safe_mod.socket, "getaddrinfo", fake_getaddrinfo)
     config = DownloadConfiguration(allowed_hosts=["example.org", "purl.obolibrary.org"])
 
     secure_url = download.validate_url_security("https://purl.obolibrary.org/ontology.owl", config)
@@ -1043,7 +1045,7 @@ def test_validate_url_security_normalizes_idn(monkeypatch):
         looked_up["host"] = host
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
-    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(io_safe_mod.socket, "getaddrinfo", fake_getaddrinfo)
 
     config = DownloadConfiguration()
     secure_url = download.validate_url_security("https://münchen.example.org/ontology.owl", config)
@@ -1061,7 +1063,7 @@ def test_validate_url_security_respects_wildcard_allowlist(monkeypatch):
     def fake_getaddrinfo(host, *_args, **_kwargs):
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
-    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(io_safe_mod.socket, "getaddrinfo", fake_getaddrinfo)
     config = DownloadConfiguration(allowed_hosts=["*.example.org"])
 
     secure_url = download.validate_url_security("https://sub.example.org/ontology.owl", config)

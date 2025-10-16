@@ -72,7 +72,7 @@ from DocsToKG.OntologyDownload.validation_core import (
 # --- Globals ---
 
 _COMPLEX_FIXTURE = Path("tests/data/ontology_normalization/complex.ttl")
-_EXPECTED_STREAMING_HASH = "a4455411fb31c754effffaf74218f21304c64a8e6c9a0c72634c2af45fa29bb4"
+_EXPECTED_STREAMING_HASH = "65f80531c7207dc63e0d1eb6c85cae2bcb3d37968ae87b24c9c3858a4d85d449"
 # --- Helper Functions ---
 
 

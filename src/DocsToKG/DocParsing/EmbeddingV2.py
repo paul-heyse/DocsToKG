@@ -220,12 +220,15 @@ import hashlib
 import json
 import math
 import os
+import queue
 import re
 import statistics
 import time
 import tracemalloc
+import threading
 import unicodedata
 import uuid
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from collections import Counter
 from pathlib import Path
 from types import SimpleNamespace
@@ -251,14 +254,14 @@ from DocsToKG.DocParsing._common import (
     get_logger,
     init_hf_env,
     iter_chunks,
+    jsonl_append_iter,
     jsonl_load,
     load_manifest_index,
+    log_event,
     manifest_append,
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
-    resolve_hf_home,
-    resolve_model_root,
     should_skip_output,
 )
 from DocsToKG.DocParsing.pipelines import (
@@ -297,6 +300,7 @@ __all__ = (
     "process_chunk_file_vectors",
     "process_pass_a",
     "qwen_embed",
+    "QwenEmbeddingQueue",
     "splade_encode",
     "tokens",
     "write_vectors",
@@ -821,6 +825,7 @@ class SPLADEValidator:
         self.nnz_counts: List[int] = []
         self.warn_threshold_pct = float(warn_threshold_pct)
         self.top_n = max(1, int(top_n))
+        self._lock = threading.Lock()
 
     def validate(self, uuid: str, tokens: Sequence[str], weights: Sequence[float]) -> None:
         """Record sparsity information for a single chunk.
@@ -837,11 +842,12 @@ class SPLADEValidator:
             None
         """
 
-        self.total_chunks += 1
         nnz = sum(1 for weight in weights if weight > 0)
-        self.nnz_counts.append(nnz)
-        if nnz == 0:
-            self.zero_nnz_chunks.append(uuid)
+        with self._lock:
+            self.total_chunks += 1
+            self.nnz_counts.append(nnz)
+            if nnz == 0:
+                self.zero_nnz_chunks.append(uuid)
 
     def report(self, logger) -> None:
         """Emit warnings if sparsity metrics exceed thresholds.
@@ -853,10 +859,15 @@ class SPLADEValidator:
             None
         """
 
-        if not self.total_chunks:
+        with self._lock:
+            total = self.total_chunks
+            zero_chunks = list(self.zero_nnz_chunks)
+            threshold = getattr(self, "warn_threshold_pct", SPLADE_SPARSITY_WARN_THRESHOLD_PCT)
+            top_n = self.top_n
+
+        if not total:
             return
-        pct = 100 * len(self.zero_nnz_chunks) / self.total_chunks
-        threshold = getattr(self, "warn_threshold_pct", SPLADE_SPARSITY_WARN_THRESHOLD_PCT)
+        pct = 100 * len(zero_chunks) / total
         try:
             threshold = float(threshold)
         except (TypeError, ValueError):
@@ -866,21 +877,21 @@ class SPLADEValidator:
                 "SPLADE sparsity warning (threshold %.1f%%): %s / %s (%.1f%%) chunks have zero non-zero elements.",
                 threshold,
                 len(self.zero_nnz_chunks),
-                self.total_chunks,
+                total,
                 pct,
             )
             logger.warning(
                 "Affected UUIDs (first %s of %s): %s",
-                self.top_n,
-                len(self.zero_nnz_chunks),
-                self.zero_nnz_chunks[: self.top_n],
+                top_n,
+                len(zero_chunks),
+                zero_chunks[:top_n],
             )
 
 
 # --- Qwen3 Embeddings ---
 
 
-def qwen_embed(
+def _qwen_embed_direct(
     cfg: QwenCfg, texts: List[str], batch_size: Optional[int] = None
 ) -> List[List[float]]:
     """Produce dense embeddings using a local Qwen3 model served by vLLM.
@@ -917,6 +928,63 @@ def qwen_embed(
         for r in res:
             out.append([float(x) for x in r.outputs.embedding])
     return out
+
+
+def qwen_embed(
+    cfg: QwenCfg, texts: List[str], batch_size: Optional[int] = None
+) -> List[List[float]]:
+    """Public wrapper around the direct Qwen embedding implementation."""
+
+    return _qwen_embed_direct(cfg, texts, batch_size=batch_size)
+
+
+class QwenEmbeddingQueue:
+    """Serialize Qwen embedding requests across worker threads."""
+
+    def __init__(self, cfg: QwenCfg, *, maxsize: int = 8):
+        self._cfg = cfg
+        self._queue: "queue.Queue[tuple[List[str], int, Future[List[List[float]]]] | None]" = queue.Queue(
+            maxsize=max(1, maxsize)
+        )
+        self._closed = False
+        self._thread = threading.Thread(target=self._worker, name="QwenEmbeddingQueue", daemon=True)
+        self._thread.start()
+
+    def _worker(self) -> None:
+        while True:
+            item = self._queue.get()
+            if item is None:
+                self._queue.task_done()
+                break
+            texts, batch_size, future = item
+            try:
+                result = _qwen_embed_direct(self._cfg, texts, batch_size=batch_size)
+            except Exception as exc:  # pragma: no cover - propagates to caller
+                future.set_exception(exc)
+            else:
+                future.set_result(result)
+            finally:
+                self._queue.task_done()
+
+    def embed(self, texts: Sequence[str], batch_size: int) -> List[List[float]]:
+        """Queue an embedding request and block until the result is ready."""
+
+        if self._closed:
+            raise RuntimeError("QwenEmbeddingQueue has been shut down")
+        future: Future[List[List[float]]] = Future()
+        self._queue.put((list(texts), int(batch_size), future))
+        return future.result()
+
+    def shutdown(self, wait: bool = True) -> None:
+        """Flush pending requests and terminate the worker thread."""
+
+        if self._closed:
+            return
+        self._closed = True
+        self._queue.put(None)
+        if wait:
+            self._queue.join()
+            self._thread.join()
 
 
 def process_pass_a(files: Sequence[Path], logger) -> BM25Stats:
@@ -969,8 +1037,7 @@ def process_pass_a(files: Sequence[Path], logger) -> BM25Stats:
                     )
 
                 # Ensure UUID
-                if not row.get("uuid"):
-                    row["uuid"] = str(uuid.uuid4())
+                if ensure_uuid([row]):
                     updated = True
 
                 accumulator.add_document(str(row.get("text", "")))
@@ -1102,7 +1169,11 @@ def process_chunk_file_vectors(
                 splade_results.extend(zip(tokens_batch, weights_batch))
 
             # Qwen embedding for this batch
-            qwen_results = qwen_embed(args.qwen_cfg, texts, batch_size=args.batch_size_qwen)
+            qwen_queue = getattr(args, "qwen_queue", None)
+            if qwen_queue is not None:
+                qwen_results = qwen_queue.embed(texts, int(args.batch_size_qwen))
+            else:
+                qwen_results = qwen_embed(args.qwen_cfg, texts, batch_size=args.batch_size_qwen)
 
             # Write vectors for this batch immediately
             count, nnz, norms = write_vectors(
@@ -1116,6 +1187,7 @@ def process_chunk_file_vectors(
                 rows=rows,
                 validator=validator,
                 logger=logger,
+                output_path=resolved_out_path,
             )
 
             total_count += count
@@ -1136,7 +1208,7 @@ def process_chunk_file_vectors(
 
 
 def write_vectors(
-    path_or_handle,
+    destination,
     uuids: Sequence[str],
     texts: Sequence[str],
     splade_results: Sequence[Tuple[Sequence[str], Sequence[float]]],
@@ -1147,6 +1219,7 @@ def write_vectors(
     rows: Sequence[dict],
     validator: SPLADEValidator,
     logger,
+    output_path: Optional[Path] = None,
 ) -> Tuple[int, List[int], List[float]]:
     """Write validated vector rows to disk with schema enforcement.
 
@@ -1178,18 +1251,11 @@ def write_vectors(
     splade_nnz: List[int] = []
     qwen_norms: List[float] = []
 
-    # Handle both file handle and path inputs
-    if hasattr(path_or_handle, "write"):
-        # It's a file handle
-        handle = path_or_handle
-        close_handle = False
-    else:
-        # It's a path, create directory and atomic write context
-        path_or_handle.parent.mkdir(parents=True, exist_ok=True)
-        atomic_context = atomic_write(path_or_handle)
-        handle = atomic_context.__enter__()
-        close_handle = True
-
+    dest_is_handle = hasattr(destination, "write")
+    if not dest_is_handle and isinstance(destination, Path):
+        destination.parent.mkdir(parents=True, exist_ok=True)
+    output_ref = output_path or (destination if isinstance(destination, Path) else None)
+    payloads: List[dict] = []
     for uuid_value, text, splade_pair, qwen_vector, row in zip(
         uuids, texts, splade_results, qwen_results, rows
     ):
@@ -1212,7 +1278,7 @@ def write_vectors(
                 schema_version=VECTOR_SCHEMA_VERSION,
                 input_path=row.get("source_path", "unknown"),
                 input_hash=row.get("input_hash", ""),
-                output_path=path_or_handle if isinstance(path_or_handle, Path) else None,
+                output_path=output_ref,
                 error=message,
             )
             raise ValueError(message)
@@ -1229,7 +1295,7 @@ def write_vectors(
                 schema_version=VECTOR_SCHEMA_VERSION,
                 input_path=row.get("source_path", "unknown"),
                 input_hash=row.get("input_hash", ""),
-                output_path=path_or_handle if isinstance(path_or_handle, Path) else None,
+                output_path=output_ref,
                 error=message,
             )
             raise ValueError(message)
@@ -1286,12 +1352,9 @@ def write_vectors(
             )
             raise
 
-        payload = vector_row.model_dump(by_alias=True)
-        handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        payloads.append(vector_row.model_dump(by_alias=True))
 
-    # Clean up atomic write context if we created it
-    if close_handle:
-        atomic_context.__exit__(None, None, None)
+    jsonl_append_iter(destination, payloads, atomic=not dest_is_handle)
 
     return len(uuids), splade_nnz, qwen_norms
 
@@ -1414,7 +1477,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--splade-zero-pct-warn-threshold",
+        "--splade-sparsity-warn-pct",
         dest="sparsity_warn_threshold_pct",
         type=float,
         default=SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
@@ -1424,7 +1487,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--splade-sparsity-warn-pct",
+        "--splade-zero-pct-warn-threshold",
         dest="sparsity_warn_threshold_pct",
         type=float,
         help=argparse.SUPPRESS,
@@ -1436,6 +1499,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Dimension of the dense embedding head (model dependent).",
     )
     parser.add_argument("--tp", type=int, default=1)
+    parser.add_argument(
+        "--sparsity-report-top-n",
+        type=int,
+        default=10,
+        help="Number of UUIDs to surface when SPLADE sparsity exceeds the warning threshold.",
+    )
+    parser.add_argument(
+        "--files-parallel",
+        type=int,
+        default=1,
+        help="Process up to N chunk files concurrently (default: 1).",
+    )
     add_resume_force_options(
         parser,
         resume_help="Skip chunk files whose vector outputs already exist with matching hash",

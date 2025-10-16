@@ -448,7 +448,7 @@ def test_token_bucket_limits_same_service(http_server, tmp_path: Path) -> None:
     server, base_url = http_server
     server.state["max_concurrent"] = 0
     server.state["active_requests"] = 0
-    download._TOKEN_BUCKETS.clear()
+    net_mod._TOKEN_BUCKETS.clear()
     config = _make_http_config(per_host_rate_limit="1/second")
     urls = [f"{base_url}/delay?ms=100" for _ in range(3)]
     destinations = [tmp_path / f"same-{idx}.bin" for idx in range(3)]
@@ -471,7 +471,7 @@ def test_token_bucket_allows_parallel_services(http_server, tmp_path: Path) -> N
     server, base_url = http_server
     server.state["max_concurrent"] = 0
     server.state["active_requests"] = 0
-    download._TOKEN_BUCKETS.clear()
+    net_mod._TOKEN_BUCKETS.clear()
     config = _make_http_config(per_host_rate_limit="1/second")
     urls = [f"{base_url}/delay?ms=100" for _ in range(3)]
     destinations = [tmp_path / f"diff-{idx}.bin" for idx in range(3)]

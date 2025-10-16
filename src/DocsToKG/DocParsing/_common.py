@@ -130,6 +130,18 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "ensure-str-list",
+#       "name": "_ensure_str_list",
+#       "anchor": "function-ensure-str-list",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-structural-marker-config",
+#       "name": "load_structural_marker_config",
+#       "anchor": "function-load-structural-marker-config",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "stringify-path",
 #       "name": "_stringify_path",
 #       "anchor": "function-stringify-path",
@@ -157,6 +169,12 @@
 #       "id": "get-logger",
 #       "name": "get_logger",
 #       "anchor": "function-get-logger",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "log-event",
+#       "name": "log_event",
+#       "anchor": "function-log-event",
 #       "kind": "function"
 #     },
 #     {
@@ -193,6 +211,12 @@
 #       "id": "jsonl-save",
 #       "name": "jsonl_save",
 #       "anchor": "function-jsonl-save",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "jsonl-append-iter",
+#       "name": "jsonl_append_iter",
+#       "anchor": "function-jsonl-append-iter",
 #       "kind": "function"
 #     },
 #     {
@@ -293,6 +317,7 @@ import logging
 import os
 import socket
 import time
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -331,7 +356,9 @@ __all__ = [
     "iter_chunks",
     "jsonl_load",
     "jsonl_save",
+    "jsonl_append_iter",
     "get_logger",
+    "log_event",
     "Batcher",
     "manifest_append",
     "manifest_log_failure",
@@ -353,11 +380,21 @@ __all__ = [
     "ChunkWorkerConfig",
     "ChunkTask",
     "ChunkResult",
+    "DEFAULT_HEADING_MARKERS",
+    "DEFAULT_CAPTION_MARKERS",
+    "load_structural_marker_config",
 ]
 
 # --- Data Containers ---
 
 UUID_NAMESPACE = uuid.UUID("00000000-0000-0000-0000-000000000000")
+DEFAULT_HEADING_MARKERS: Tuple[str, ...] = ("#",)
+DEFAULT_CAPTION_MARKERS: Tuple[str, ...] = (
+    "Table caption:",
+    "Figure caption:",
+    "Picture description:",
+    "<!-- image -->",
+)
 
 
 @dataclass(slots=True)
@@ -742,6 +779,54 @@ def should_skip_output(
     return stored_hash == input_hash
 
 
+def _ensure_str_list(value: object, label: str) -> List[str]:
+    """Normalise configuration entries into string lists."""
+
+    if value is None:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"Expected a list of strings for '{label}'")
+    return [item for item in value if item]
+
+
+def load_structural_marker_config(path: Path) -> Tuple[List[str], List[str]]:
+    """Load user-provided heading and caption markers from JSON or YAML."""
+
+    raw = path.read_text(encoding="utf-8")
+    suffix = path.suffix.lower()
+    data: object
+    if suffix in {".yaml", ".yml"}:
+        try:
+            import yaml
+        except ImportError as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError("Loading YAML markers requires the 'PyYAML' package") from exc
+        data = yaml.safe_load(raw) or {}
+    else:
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            try:
+                import yaml
+            except ImportError as exc:  # pragma: no cover - optional dependency
+                raise ValueError(
+                    f"Unable to parse structural marker file {path}: invalid JSON and PyYAML missing."
+                ) from exc
+            data = yaml.safe_load(raw) or {}
+
+    if isinstance(data, list):
+        headings = _ensure_str_list(data, "headings")
+        captions: List[str] = []
+    elif isinstance(data, dict):
+        headings = _ensure_str_list(data.get("headings"), "headings")
+        captions = _ensure_str_list(data.get("captions"), "captions")
+    else:
+        raise ValueError(f"Unsupported structural marker format in {path!s}")
+
+    return headings, captions
+
+
 def _stringify_path(value: Path | str | None) -> str | None:
     """Return a string representation for path-like values used in manifests."""
 
@@ -938,6 +1023,15 @@ def get_logger(name: str, level: str = "INFO") -> logging.Logger:
         logger.setLevel(getattr(logging, level.upper(), logging.INFO))
         logger.propagate = False
     return logger
+
+
+def log_event(logger: logging.Logger, level: str, message: str, **fields: object) -> None:
+    """Emit a structured log record using the ``extra_fields`` convention."""
+
+    emitter = getattr(logger, level, None)
+    if not callable(emitter):
+        raise AttributeError(f"Logger has no level '{level}'")
+    emitter(message, extra={"extra_fields": fields})
 
 
 def find_free_port(start: int = 8000, span: int = 32) -> int:
@@ -1162,6 +1256,46 @@ def jsonl_save(
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+def jsonl_append_iter(
+    target: Path | TextIO,
+    rows: Iterable[Mapping],
+    *,
+    atomic: bool = True,
+) -> int:
+    """Append JSON-serialisable rows to a JSONL file.
+
+    Args:
+        target: Destination path or writable handle for the JSONL file.
+        rows: Iterable of JSON-serialisable mappings.
+        atomic: When True, writes occur via :func:`atomic_write` (ignored when
+            ``target`` is already an open handle).
+
+    Returns:
+        The number of rows written.
+    """
+
+    if hasattr(target, "write"):
+        handle = target  # type: ignore[assignment]
+        close_handle = False
+    else:
+        if atomic:
+            context = atomic_write(target)  # type: ignore[arg-type]
+        else:
+            context = contextlib.nullcontext(target.open("a", encoding="utf-8"))  # type: ignore[arg-type]
+        handle = context.__enter__()
+        close_handle = True
+
+    count = 0
+    try:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")  # type: ignore[arg-type]
+            count += 1
+    finally:
+        if close_handle:
+            context.__exit__(None, None, None)
+    return count
+
+
 # --- Collection Utilities ---
 
 
@@ -1320,12 +1454,16 @@ def compute_content_hash(path: Path, algorithm: str = "sha1") -> str:
 
     selected_algorithm = resolve_hash_algorithm(algorithm)
     hasher = hashlib.new(selected_algorithm)
-    with path.open("rb") as handle:
-        while True:
-            chunk = handle.read(65536)
-            if not chunk:
-                break
-            hasher.update(chunk)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(65536), b""):
+                hasher.update(chunk)
+        return hasher.hexdigest()
+
+    normalised = unicodedata.normalize("NFKC", text)
+    hasher.update(normalised.encode("utf-8"))
     return hasher.hexdigest()
 
 

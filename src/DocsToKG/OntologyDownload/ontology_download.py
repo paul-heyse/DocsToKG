@@ -61,6 +61,7 @@ from .pipeline import (
     validate_manifest_dict,
 )
 from .storage import CACHE_DIR, CONFIG_DIR, LOCAL_ONTOLOGY_DIR, LOG_DIR, STORAGE
+from .resolvers import RESOLVERS
 from .validation_core import (
     VALIDATORS,
     ValidationRequest,
