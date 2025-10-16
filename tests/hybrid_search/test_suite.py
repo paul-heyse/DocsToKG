@@ -26,6 +26,7 @@ from DocsToKG.HybridSearch import (
     HybridSearchService,
     HybridSearchValidator,
     Observability,
+    OpenSearchIndexTemplate,
     OpenSearchSchemaManager,
 )
 from DocsToKG.HybridSearch.config import DenseIndexConfig, FusionConfig
@@ -33,6 +34,8 @@ from DocsToKG.HybridSearch.features import tokenize
 from DocsToKG.HybridSearch.ingest import IngestError
 from DocsToKG.HybridSearch.ranking import ResultShaper
 from DocsToKG.HybridSearch.service import (
+    ChannelResults,
+    RequestValidationError,
     build_stats_snapshot,
     should_rebuild_index,
     verify_pagination,
@@ -47,6 +50,9 @@ from DocsToKG.HybridSearch.validation import infer_embedding_dim, load_dataset
 from DocsToKG.HybridSearch.vectorstore import (
     FaissIndexManager,
     cosine_against_corpus_gpu,
+    max_inner_product,
+    normalize_rows,
+    pairwise_inner_products,
     restore_state,
     serialize_state,
 )
@@ -113,7 +119,7 @@ def stack(
         feature_generator = FeatureGenerator()
         faiss_index = FaissIndexManager(dim=feature_generator.embedding_dim, config=config.dense)
         assert (
-            faiss_index._dim == feature_generator.embedding_dim
+            faiss_index.dim == feature_generator.embedding_dim
         ), "Faiss index dimensionality must match feature generator"
         opensearch = OpenSearchSimulator()
         registry = ChunkRegistry()
@@ -1141,3 +1147,71 @@ def test_operations_shim_emits_warning_and_reexports() -> None:
     assert module.serialize_state is serialize_state
     assert module.restore_state is restore_state
     assert module.verify_pagination is verify_pagination
+
+
+def test_results_shim_emits_warning_and_reexports() -> None:
+    module_name = "DocsToKG.HybridSearch.results"
+    sys.modules.pop(module_name, None)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DeprecationWarning)
+        module = importlib.import_module(module_name)
+
+    assert any(
+        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning
+        for w in caught
+    ), "Importing the shim should emit a deprecation warning"
+    assert module.ResultShaper is ResultShaper
+
+
+def test_similarity_shim_emits_warning_and_reexports() -> None:
+    module_name = "DocsToKG.HybridSearch.similarity"
+    sys.modules.pop(module_name, None)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DeprecationWarning)
+        module = importlib.import_module(module_name)
+
+    assert any(
+        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning
+        for w in caught
+    ), "Importing the shim should emit a deprecation warning"
+    assert module.normalize_rows is normalize_rows
+    assert module.cosine_against_corpus_gpu is cosine_against_corpus_gpu
+    assert module.pairwise_inner_products is pairwise_inner_products
+    assert module.max_inner_product is max_inner_product
+
+
+def test_retrieval_shim_emits_warning_and_reexports() -> None:
+    module_name = "DocsToKG.HybridSearch.retrieval"
+    sys.modules.pop(module_name, None)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DeprecationWarning)
+        module = importlib.import_module(module_name)
+
+    assert any(
+        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning
+        for w in caught
+    ), "Importing the shim should emit a deprecation warning"
+    assert module.HybridSearchService is HybridSearchService
+    assert module.HybridSearchAPI is HybridSearchAPI
+    assert module.RequestValidationError is RequestValidationError
+    assert module.ChannelResults is ChannelResults
+    assert module.verify_pagination is verify_pagination
+
+
+def test_schema_shim_emits_warning_and_reexports() -> None:
+    module_name = "DocsToKG.HybridSearch.schema"
+    sys.modules.pop(module_name, None)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DeprecationWarning)
+        module = importlib.import_module(module_name)
+
+    assert any(
+        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning
+        for w in caught
+    ), "Importing the shim should emit a deprecation warning"
+    assert module.OpenSearchSchemaManager is OpenSearchSchemaManager
+    assert module.OpenSearchIndexTemplate is OpenSearchIndexTemplate

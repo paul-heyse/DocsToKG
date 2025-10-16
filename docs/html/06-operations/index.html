@@ -221,8 +221,16 @@ python<span class="w"> </span>src/DocsToKG/DocParsing/EmbeddingV2.py<span class=
 <li><p>Warm caches by issuing representative queries after startup.</p></li>
 </ul>
 </section>
+<section id="module-consolidation-checklist">
+<h2>5. Module Consolidation Checklist<a class="headerlink" href="#module-consolidation-checklist" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Review <code class="docutils literal notranslate"><span class="pre">docs/hybrid_search_module_migration.md</span></code> and update any automation that still imports from deprecated shims (<code class="docutils literal notranslate"><span class="pre">results</span></code>, <code class="docutils literal notranslate"><span class="pre">similarity</span></code>, <code class="docutils literal notranslate"><span class="pre">retrieval</span></code>, <code class="docutils literal notranslate"><span class="pre">schema</span></code>, <code class="docutils literal notranslate"><span class="pre">operations</span></code>, <code class="docutils literal notranslate"><span class="pre">tools</span></code>).</p></li>
+<li><p>Ensure CI workflows call <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.HybridSearch.validation</span></code> instead of legacy scripts.</p></li>
+<li><p>Watch for <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> in logs and resolve them before upgrading to DocsToKG v0.6.0.</p></li>
+</ul>
+</section>
 <section id="scheduling-automation">
-<h2>5. Scheduling &amp; Automation<a class="headerlink" href="#scheduling-automation" title="Link to this heading"></a></h2>
+<h2>6. Scheduling &amp; Automation<a class="headerlink" href="#scheduling-automation" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><strong>Cron / Airflow</strong>: Schedule ingestion, embedding, and ontology jobs at off-peak hours.</p></li>
 <li><p><strong>CI/CD</strong>: Automate documentation validation, link checks, and unit tests before deployments.</p></li>
@@ -230,7 +238,7 @@ python<span class="w"> </span>src/DocsToKG/DocParsing/EmbeddingV2.py<span class=
 </ul>
 </section>
 <section id="backups-recovery">
-<h2>6. Backups &amp; Recovery<a class="headerlink" href="#backups-recovery" title="Link to this heading"></a></h2>
+<h2>7. Backups &amp; Recovery<a class="headerlink" href="#backups-recovery" title="Link to this heading"></a></h2>
 <ol class="arabic simple">
 <li><p>Serialize FAISS and registry state (<code class="docutils literal notranslate"><span class="pre">serialize_state</span></code>) before schema changes.</p></li>
 <li><p>Store snapshots and ontology manifests in durable object storage with ≥30-day retention.</p></li>
@@ -239,7 +247,7 @@ python<span class="w"> </span>src/DocsToKG/DocParsing/EmbeddingV2.py<span class=
 </ol>
 </section>
 <section id="incident-response">
-<h2>7. Incident Response<a class="headerlink" href="#incident-response" title="Link to this heading"></a></h2>
+<h2>8. Incident Response<a class="headerlink" href="#incident-response" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p>Consult <code class="docutils literal notranslate"><span class="pre">docs/hybrid_search_runbook.md</span></code> for failover plans and validation routines.</p></li>
 <li><p>Escalate blocking issues through the channels defined in <code class="docutils literal notranslate"><span class="pre">CONTRIBUTING.md</span></code>.</p></li>

@@ -1,4 +1,4 @@
-"""Hybrid search service and synchronous HTTP-style API."""
+"""Hybrid search orchestration, pagination guards, and synchronous HTTP-style API."""
 
 from __future__ import annotations
 

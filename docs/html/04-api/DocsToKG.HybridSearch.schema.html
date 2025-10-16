@@ -76,90 +76,31 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="module-schema">
+    <section id="module-schema">
 <h1>1. Module: schema<a class="headerlink" href="#module-schema" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.schema</span></code>.</p>
-<p>OpenSearch schema management for hybrid chunk documents.</p>
-<section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="asdict-self">
-<h3><code class="docutils literal notranslate"><span class="pre">asdict(self)</span></code><a class="headerlink" href="#asdict-self" title="Link to this heading"></a></h3>
-<p>Convert the template to a serializable dictionary payload.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Dictionary representation suitable for persistence or logging.</p>
-</section>
-<section id="bootstrap-template-self-namespace-chunking">
-<h3><code class="docutils literal notranslate"><span class="pre">bootstrap_template(self,</span> <span class="pre">namespace,</span> <span class="pre">chunking)</span></code><a class="headerlink" href="#bootstrap-template-self-namespace-chunking" title="Link to this heading"></a></h3>
-<p>Create and register an index template for a namespace.</p>
-<p>Args:
-namespace: Namespace identifier the template should serve.
-chunking: Optional chunking configuration override.</p>
-<p>Returns:
-Newly created <code class="docutils literal notranslate"><span class="pre">OpenSearchIndexTemplate</span></code> instance.</p>
-</section>
-<section id="get-template-self-namespace">
-<h3><code class="docutils literal notranslate"><span class="pre">get_template(self,</span> <span class="pre">namespace)</span></code><a class="headerlink" href="#get-template-self-namespace" title="Link to this heading"></a></h3>
-<p>Retrieve a registered template for the given namespace.</p>
-<p>Args:
-namespace: Namespace identifier to look up.</p>
-<p>Returns:
-Matching <code class="docutils literal notranslate"><span class="pre">OpenSearchIndexTemplate</span></code>, or None if not registered.</p>
-</section>
-<section id="list-templates-self">
-<h3><code class="docutils literal notranslate"><span class="pre">list_templates(self)</span></code><a class="headerlink" href="#list-templates-self" title="Link to this heading"></a></h3>
-<p>Return a copy of all registered templates by namespace.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Mapping from namespace to <code class="docutils literal notranslate"><span class="pre">OpenSearchIndexTemplate</span></code>.</p>
+<p><strong>Deprecated:</strong> <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.schema</span></code> is a compatibility shim that forwards to <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.storage</span></code>. Import schema helpers from the storage module to avoid future breakage. The shim emits a <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> when loaded.</p>
+<section id="re-exported-symbols">
+<h2>1. Re-exported symbols<a class="headerlink" href="#re-exported-symbols" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Symbol</p></th>
+<th class="head"><p>New home</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">OpenSearchIndexTemplate</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.storage</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">OpenSearchSchemaManager</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.storage</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>The schema API is unchanged; only the import location moved.</p>
 </section>
 </section>
-<section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
-<section id="opensearchindextemplate">
-<h3><code class="docutils literal notranslate"><span class="pre">OpenSearchIndexTemplate</span></code><a class="headerlink" href="#opensearchindextemplate" title="Link to this heading"></a></h3>
-<p>Representation of an OpenSearch index template body.</p>
-<p>Attributes:
-name: Template name stored in OpenSearch.
-namespace: Namespace served by the template.
-body: Raw OpenSearch template body.
-chunking: Chunking configuration used to parameterize the template.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>template = OpenSearchIndexTemplate(
-…     name=”hybrid-chunks-research”,
-…     namespace=”research”,
-…     body={“settings”: {}},
-…     chunking=ChunkingConfig(),
-… )
-template.namespace
-‘research’</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-<section id="opensearchschemamanager">
-<h3><code class="docutils literal notranslate"><span class="pre">OpenSearchSchemaManager</span></code><a class="headerlink" href="#opensearchschemamanager" title="Link to this heading"></a></h3>
-<p>Bootstrap and track index templates per namespace.</p>
-<p>Attributes:
-_templates: Mapping of namespace identifiers to index templates.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>manager = OpenSearchSchemaManager()
-manager.bootstrap_template(“research”)
-OpenSearchIndexTemplate(name=’hybrid-chunks-research’, namespace=’research’, …)</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-</section>
-</section>
+
 
 
            </div>

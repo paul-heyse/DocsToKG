@@ -20,3 +20,7 @@ jobs:
         run: |
           python -V
           pytest -q
+      - name: HybridSearch validation CLI smoke test
+        shell: bash -l {0}
+        run: |
+          python -m DocsToKG.HybridSearch.validation --help

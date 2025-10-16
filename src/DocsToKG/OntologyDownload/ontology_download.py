@@ -688,9 +688,6 @@ class ResolvedConfig(BaseModel):
     }
 
 
-ResolvedConfig.model_rebuild()
-
-
 class EnvironmentOverrides(BaseSettings):
     """Environment variable overrides for ontology downloader defaults.
 
@@ -4786,6 +4783,9 @@ class FetchResult:
     sha256: str
     manifest_path: Path
     artifacts: Sequence[str]
+
+
+ResolvedConfig.model_rebuild()
 
 
 @dataclass(slots=True)

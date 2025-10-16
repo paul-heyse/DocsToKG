@@ -69,7 +69,7 @@
   - [x] 2.2.4 Ensure per-validator JSON artifacts are still written to `validation_dir`
   - [x] 2.2.5 Ensure logging still occurs for each validator with appropriate `extra` fields
   - [x] 2.2.6 Add unit tests verifying validators run concurrently up to the configured limit
-  - [ ] 2.2.7 Add integration test verifying that validator results remain identical between sequential and concurrent execution
+  - [x] 2.2.7 Add integration test verifying that validator results remain identical between sequential and concurrent execution
 
 - [x] 2.3 **Add inter-process version locking**
   - [x] 2.3.1 Import `os` and create a `@contextmanager` function `_version_lock(ontology_id: str, version: str) -> Iterator[None]`
@@ -94,7 +94,7 @@
     - Never materialize the full triple list in Python memory
   - [x] 3.1.4 Preserve the existing signature: `normalize_streaming(source, output_path=None, *, graph=None, chunk_bytes=1<<20) -> str`
   - [x] 3.1.5 Add unit tests with various graph sizes verifying deterministic output and correct SHA-256
-  - [ ] 3.1.6 Add performance test demonstrating reduced memory footprint for large graphs
+  - [x] 3.1.6 Add performance test demonstrating reduced memory footprint for large graphs
 
 - [x] 3.2 **Add streaming threshold configuration**
   - [x] 3.2.1 Verify `streaming_normalization_threshold_mb` field already exists in `ValidationConfig` (default 200)
@@ -112,7 +112,7 @@
   - [x] 4.1.5 Register successfully loaded resolvers in the `RESOLVERS` dict using their `NAME` attribute or entry point name
   - [x] 4.1.6 Call `_load_resolver_plugins()` at module initialization (after `RESOLVERS` dict is defined)
   - [x] 4.1.7 Add unit test verifying plugin loading with a mock entry point
-  - [ ] 4.1.8 Add documentation example showing how to register a custom resolver via entry points
+  - [x] 4.1.8 Add documentation example showing how to register a custom resolver via entry points
 
 - [x] 4.2 **Add validator plugin infrastructure**
   - [x] 4.2.1 Import `metadata` from `importlib` in `ontology_download.py`
@@ -121,7 +121,7 @@
   - [x] 4.2.4 For each entry point, load the callable and register in `VALIDATORS` dict, catching exceptions
   - [x] 4.2.5 Call `_load_validator_plugins()` at module initialization (after `VALIDATORS` dict is defined)
   - [x] 4.2.6 Add unit test verifying plugin loading with a mock entry point
-  - [ ] 4.2.7 Add documentation example showing how to register a custom validator via entry points
+  - [x] 4.2.7 Add documentation example showing how to register a custom validator via entry points
 
 - [x] 4.3 **Add manifest schema migration shim**
   - [x] 4.3.1 Create function `_migrate_manifest_inplace(payload: dict) -> None` in `ontology_download.py`
@@ -130,7 +130,7 @@
   - [x] 4.3.4 Add extensible structure for future migrations with clear version progression
   - [x] 4.3.5 Call `_migrate_manifest_inplace(payload)` in `_read_manifest` after JSON parsing but before validation
   - [x] 4.3.6 Add unit tests verifying migration from mock old schema versions
-  - [ ] 4.3.7 Document the migration pattern for future schema evolution
+  - [x] 4.3.7 Document the migration pattern for future schema evolution
 
 ## 5. Testing & Documentation
 
@@ -154,18 +154,18 @@
   - [x] 5.3.3 Add test verifying deterministic SHA-256 output across multiple runs
   - [x] 5.3.4 Add test verifying blank node canonicalization consistency
 
-- [ ] 5.4 **Update CLI integration tests**
+- [x] 5.4 **Update CLI integration tests**
   - [x] 5.4.1 Add test for `ontofetch plan` command with metadata enrichment
   - [x] 5.4.2 Add test for `ontofetch plan-diff` command with baseline comparison
   - [x] 5.4.3 Add test for `ontofetch prune --keep N` verifying latest symlink update
-  - [ ] 5.4.4 Add test for `ontofetch doctor` command verifying all diagnostics
+  - [x] 5.4.4 Add test for `ontofetch doctor` command verifying all diagnostics
 
-- [ ] 5.5 **Update documentation**
-  - [ ] 5.5.1 Update API reference with new configuration fields
-  - [ ] 5.5.2 Add migration guide for legacy import paths in MIGRATION.md
-  - [ ] 5.5.3 Update CHANGELOG.md with all breaking changes and new features
-  - [ ] 5.5.4 Add example for registering custom resolvers and validators via plugins
-  - [ ] 5.5.5 Update operator runbook with new configuration options (max_concurrent_validators, streaming_normalization_threshold_mb)
+- [x] 5.5 **Update documentation**
+  - [x] 5.5.1 Update API reference with new configuration fields
+  - [x] 5.5.2 Add migration guide for legacy import paths in MIGRATION.md
+  - [x] 5.5.3 Update CHANGELOG.md with all breaking changes and new features
+  - [x] 5.5.4 Add example for registering custom resolvers and validators via plugins
+  - [x] 5.5.5 Update operator runbook with new configuration options (max_concurrent_validators, streaming_normalization_threshold_mb)
 
 ## 6. Final Verification
 

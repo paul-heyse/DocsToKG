@@ -97,6 +97,10 @@ python -m DocsToKG.OntologyDownload.cli pull \
 
 - Validate downloads with `python -m DocsToKG.OntologyDownload.cli validate <id>`.
 - Maintain configuration under version control and rotate API credentials securely.
+- Tune validation throughput with `defaults.validation.max_concurrent_validators`
+  (1-8) and switch large ontologies to streaming normalization by lowering
+  `defaults.validation.streaming_normalization_threshold_mb` when disk pressure
+  is a concern.
 
 ## 4. Operating the Hybrid Search API
 
@@ -121,20 +125,30 @@ def hybrid_search(payload: dict):
 - Reload configuration dynamically using `HybridSearchConfigManager.reload`.
 - Warm caches by issuing representative queries after startup.
 
-## 5. Scheduling & Automation
+## 5. Module Consolidation Checklist
+
+- Review `docs/hybrid_search_module_migration.md` and update any automation that still
+  imports from deprecated shims (`results`, `similarity`, `retrieval`, `schema`, `operations`,
+  or `tools`).
+- Ensure CI workflows call `python -m DocsToKG.HybridSearch.validation` instead of legacy
+  scripts.
+- Watch for `DeprecationWarning` in logs and resolve them before upgrading to DocsToKG
+  v0.6.0.
+
+## 6. Scheduling & Automation
 
 - **Cron / Airflow**: Schedule ingestion, embedding, and ontology jobs at off-peak hours.
 - **CI/CD**: Automate documentation validation, link checks, and unit tests before deployments.
 - **Maintenance Reminders**: Follow cadence outlined in `docs/DOCUMENTATION_MAINTENANCE_SCHEDULE.md`.
 
-## 6. Backups & Recovery
+## 7. Backups & Recovery
 
 1. Serialize FAISS and registry state (`serialize_state`) before schema changes.
 2. Store snapshots and ontology manifests in durable object storage with ≥30-day retention.
 3. Test restores quarterly using the runbook in `docs/hybrid_search_runbook.md`.
 4. Document restore outcomes in an operational log for auditability.
 
-## 7. Incident Response
+## 8. Incident Response
 
 - Consult `docs/hybrid_search_runbook.md` for failover plans and validation routines.
 - Escalate blocking issues through the channels defined in `CONTRIBUTING.md`.
