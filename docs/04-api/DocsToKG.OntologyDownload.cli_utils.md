@@ -1,8 +1,7 @@
 # 1. Module: cli_utils
 
-This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.cli_utils``.
-
-Formatting helpers supporting the ontology downloader CLI.
+The CLI utilities formerly published under ``DocsToKG.OntologyDownload.cli_utils`` are
+now part of the main ``DocsToKG.OntologyDownload.cli`` module.
 
 The CLI surfaces tabular summaries for resolver planning, download batches,
 and validator health. These helpers convert rich planner and downloader

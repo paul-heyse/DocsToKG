@@ -97,6 +97,10 @@ python -m DocsToKG.OntologyDownload.cli pull \
 
 - Validate downloads with `python -m DocsToKG.OntologyDownload.cli validate <id>`.
 - Maintain configuration under version control and rotate API credentials securely.
+- Tune validation throughput with `defaults.validation.max_concurrent_validators`
+  (1-8) and switch large ontologies to streaming normalization by lowering
+  `defaults.validation.streaming_normalization_threshold_mb` when disk pressure
+  is a concern.
 
 ## 4. Operating the Hybrid Search API
 

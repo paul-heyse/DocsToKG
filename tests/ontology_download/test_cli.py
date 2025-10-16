@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
 
+from types import SimpleNamespace
+
 import pytest
 
 pytest.importorskip("pydantic")
@@ -266,7 +268,6 @@ def test_cli_prune_dry_run_json(monkeypatch, stub_logger, capsys):
     ]
 
     monkeypatch.setattr(cli, "_collect_version_metadata", lambda oid: list(metadata))
-    monkeypatch.setattr(cli, "_update_latest_symlink", lambda *_, **__: None)
     monkeypatch.setattr(
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
@@ -275,6 +276,7 @@ def test_cli_prune_dry_run_json(monkeypatch, stub_logger, capsys):
     monkeypatch.setattr(cli.STORAGE, "available_ontologies", lambda: ["hp"])
     monkeypatch.setattr(cli.STORAGE, "available_versions", lambda oid: ["2023", "2024"])
     monkeypatch.setattr(cli.STORAGE, "delete_version", lambda *_, **__: 0)
+    monkeypatch.setattr(cli.STORAGE, "set_latest_version", lambda *_, **__: None)
 
     exit_code = cli.main(["prune", "--keep", "1", "--dry-run", "--json"])
     assert exit_code == 0
@@ -282,3 +284,173 @@ def test_cli_prune_dry_run_json(monkeypatch, stub_logger, capsys):
     assert payload["dry_run"] is True
     assert payload["total_deleted"] == 1
     assert payload["total_reclaimed_bytes"] == 1024
+
+
+def test_cli_prune_updates_latest_marker(monkeypatch, stub_logger):
+    metadata = [
+        {
+            "version": "2024",
+            "path": Path("/tmp/hp/2024"),
+            "size": 2048,
+            "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
+        },
+        {
+            "version": "2023",
+            "path": Path("/tmp/hp/2023"),
+            "size": 1024,
+            "timestamp": datetime(2023, 1, 1, tzinfo=timezone.utc),
+        },
+    ]
+
+    monkeypatch.setattr(cli, "_collect_version_metadata", lambda oid: list(metadata))
+    monkeypatch.setattr(
+        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+    )
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+
+    monkeypatch.setattr(cli.STORAGE, "available_ontologies", lambda: ["hp"])
+    monkeypatch.setattr(cli.STORAGE, "available_versions", lambda oid: ["2023", "2024"])
+
+    monkeypatch.setattr(cli.STORAGE, "delete_version", lambda *_: 0)
+
+    latest_calls: list[tuple[str, Path]] = []
+
+    def _record_latest(ontology_id: str, path: Path) -> None:
+        latest_calls.append((ontology_id, path))
+
+    monkeypatch.setattr(cli.STORAGE, "set_latest_version", _record_latest)
+
+    exit_code = cli.main(["prune", "--keep", "1"])
+    assert exit_code == 0
+    assert latest_calls == [("hp", Path("/tmp/hp/2024"))]
+
+
+def test_cli_plan_serializes_enriched_metadata(monkeypatch, stub_logger, capsys):
+    plan = _planned_fetch("hp")
+    plan.metadata = {
+        "last_modified": "Tue, 01 Aug 2023 00:00:00 GMT",
+        "content_length": 4096,
+        "etag": "\"abc123\"",
+    }
+    monkeypatch.setattr(cli, "plan_all", lambda specs, *, config=None, since=None: [plan])
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    monkeypatch.setattr(
+        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+    )
+
+    exit_code = cli.main(["plan", "hp", "--json"])
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload[0]["last_modified"] == "Tue, 01 Aug 2023 00:00:00 GMT"
+    assert payload[0]["content_length"] == 4096
+    assert payload[0]["etag"] == "\"abc123\""
+
+
+def test_cli_doctor_reports_diagnostics(monkeypatch, stub_logger, tmp_path, capsys):
+    config_dir = tmp_path / "configs"
+    cache_dir = tmp_path / "cache"
+    log_dir = tmp_path / "logs"
+    ontology_dir = tmp_path / "ontologies"
+    for path in (config_dir, cache_dir, log_dir, ontology_dir):
+        path.mkdir()
+
+    monkeypatch.setattr(cli, "CONFIG_DIR", config_dir)
+    monkeypatch.setattr(cli, "CACHE_DIR", cache_dir)
+    monkeypatch.setattr(cli, "LOG_DIR", log_dir)
+    monkeypatch.setattr(cli, "LOCAL_ONTOLOGY_DIR", ontology_dir)
+    monkeypatch.setattr(cli, "ONTOLOGY_DIR", ontology_dir)
+
+    manifest_dir = ontology_dir / "hp" / "2024-01-01"
+    manifest_dir.mkdir(parents=True)
+    manifest_payload = {
+        "schema_version": "1.0",
+        "id": "hp",
+        "resolver": "obo",
+        "url": "https://example.org/hp.owl",
+        "filename": "hp.owl",
+        "version": "2024-01-01",
+        "license": "CC-BY",
+        "status": "fresh",
+        "sha256": "abc",
+        "downloaded_at": "2024-01-01T00:00:00Z",
+        "target_formats": ["owl"],
+        "validation": {},
+        "artifacts": [],
+        "resolver_attempts": [],
+    }
+    (manifest_dir / "manifest.json").write_text(json.dumps(manifest_payload))
+
+    config_yaml = config_dir / "sources.yaml"
+    config_yaml.write_text(
+        "defaults:\n  http:\n    rate_limits:\n      ols: '10/minute'\n      invalid: bogus\n"
+    )
+
+    default_config = _default_config()
+    default_config.defaults.http.rate_limits = {"ols": "10/minute"}
+
+    monkeypatch.setattr(
+        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: default_config)
+    )
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    monkeypatch.setattr(cli, "validate_manifest_dict", lambda payload, source=None: None)
+    monkeypatch.setattr(cli, "get_manifest_schema", lambda: {"type": "object"})
+    monkeypatch.setattr(cli.Draft202012Validator, "check_schema", lambda schema: None)
+
+    original_find_spec = cli.importlib.util.find_spec
+
+    def _fake_find_spec(name: str):
+        if name in {"rdflib", "pronto", "owlready2"}:
+            return object()
+        if name == "arelle":
+            return None
+        return original_find_spec(name)
+
+    monkeypatch.setattr(cli.importlib.util, "find_spec", _fake_find_spec)
+
+    monkeypatch.setattr(
+        cli.shutil,
+        "disk_usage",
+        lambda path: SimpleNamespace(total=10_000_000_000, used=4_000_000_000, free=6_000_000_000),
+    )
+    monkeypatch.setattr(cli.shutil, "which", lambda name: "/usr/bin/robot" if name == "robot" else None)
+    monkeypatch.setattr(
+        cli.subprocess,
+        "run",
+        lambda *_, **__: SimpleNamespace(stdout="ROBOT version 1.9", stderr="", returncode=0),
+    )
+
+    class _Response:
+        def __init__(self, status: int, ok: bool, reason: str = "OK") -> None:
+            self.status_code = status
+            self.ok = ok
+            self.reason = reason
+
+    def _fake_head(url: str, **_kwargs):
+        if "ols4" in url:
+            return _Response(200, True)
+        if "bioontology" in url:
+            return _Response(405, False, "Method Not Allowed")
+        raise cli.requests.RequestException("timeout")
+
+    def _fake_get(url: str, **_kwargs):
+        return _Response(200, True)
+
+    monkeypatch.setattr(cli.requests, "head", _fake_head, raising=False)
+    monkeypatch.setattr(cli.requests, "get", _fake_get, raising=False)
+
+    exit_code = cli.main(["doctor", "--json"])
+    assert exit_code == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["directories"]["configs"]["exists"] is True
+    assert payload["disk"]["free_gb"] == 6.0
+    assert payload["dependencies"]["rdflib"] is True
+    assert payload["dependencies"]["arelle"] is False
+    assert payload["robot"]["available"] is True
+    assert payload["robot"]["version"] == "1.9"
+    assert payload["network"]["ols"]["ok"] is True
+    assert payload["network"]["bioportal"]["status"] == 200
+    assert payload["network"]["bioregistry"]["ok"] is False
+    assert payload["rate_limits"]["configured"]["ols"]["value"] == "10/minute"
+    assert "invalid" in payload["rate_limits"]["invalid"]
+    assert payload["manifest_schema"]["sample"]["valid"] is True

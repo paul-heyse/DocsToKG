@@ -615,7 +615,8 @@ def main(args: argparse.Namespace | None = None) -> int:
     for path in files:
         rel_id = compute_relative_doc_id(path, in_dir)
         name = path.stem
-        out_path = out_dir / f"{name}.chunks.jsonl"
+        relative_target = Path(rel_id)
+        out_path = (out_dir / relative_target).with_suffix(".chunks.jsonl")
         input_hash = compute_content_hash(path)
         manifest_entry = chunk_manifest_index.get(rel_id)
         parse_engine = parse_engine_lookup.get(rel_id, "docling-html")
@@ -651,6 +652,8 @@ def main(args: argparse.Namespace | None = None) -> int:
         try:
             doctags_text = read_utf8(path)
             doc = build_doc(doc_name=name, doctags_text=doctags_text)
+
+            out_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Stage 1: Docling chunking
             chunks = list(chunker.chunk(dl_doc=doc))

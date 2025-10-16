@@ -1,8 +1,8 @@
 # 1. Module: config
 
-This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.config``.
-
-Ontology downloader configuration utilities.
+Configuration utilities previously exposed from ``DocsToKG.OntologyDownload.config``
+reside in ``DocsToKG.OntologyDownload.ontology_download`` and are re-exported via the
+package facade.
 
 This module defines the Pydantic models and helpers that drive manifest schema
 validation, concurrency defaults, rate limit enforcement, and the CLI override
@@ -289,10 +289,11 @@ Examples:
 Validation limits governing parser execution.
 
 Attributes:
-parser_timeout_sec: Maximum runtime allowed for ontology parsing.
-max_memory_mb: Memory ceiling allocated to validation routines.
-skip_reasoning_if_size_mb: Threshold above which reasoning is skipped.
-streaming_normalization_threshold_mb: File size threshold for streaming normalization.
+    parser_timeout_sec: Maximum runtime allowed for ontology parsing.
+    max_memory_mb: Memory ceiling allocated to validation routines.
+    skip_reasoning_if_size_mb: Threshold above which reasoning is skipped.
+    streaming_normalization_threshold_mb: File size threshold for streaming normalization.
+    max_concurrent_validators: Bounded thread pool size for validator execution (1-8).
 
 Examples:
 >>> ValidationConfig(parser_timeout_sec=120).parser_timeout_sec

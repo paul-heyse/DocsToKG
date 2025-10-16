@@ -51,6 +51,7 @@ from DocsToKG.DocParsing._common import (
     data_chunks,
     data_vectors,
     detect_data_root,
+    expand_path,
     get_logger,
     iter_chunks,
     jsonl_load,
@@ -58,6 +59,8 @@ from DocsToKG.DocParsing._common import (
     load_manifest_index,
     manifest_append,
     resolve_hash_algorithm,
+    resolve_hf_home,
+    resolve_model_root,
 )
 from DocsToKG.DocParsing.pipelines import (
     add_data_root_option,
@@ -114,50 +117,6 @@ def _qwen_cache_key(cfg: QwenCfg) -> Tuple[str, str, int, float, str | None]:
 
 # ---- Cache / model path resolution ----
 
-
-def _expand_path(path: str | Path) -> Path:
-    """Return ``path`` expanded to an absolute :class:`Path`.
-
-    Args:
-        path: Candidate filesystem path supplied as string or :class:`Path`.
-
-    Returns:
-        Absolute path with user home and environment variables resolved.
-    """
-
-    return Path(path).expanduser().resolve()
-
-
-def _resolve_hf_home() -> Path:
-    """Determine the HuggingFace cache directory respecting ``HF_HOME``.
-
-    Args:
-        None
-
-    Returns:
-        Absolute path to the HuggingFace cache directory.
-    """
-
-    env = os.getenv("HF_HOME")
-    if env:
-        return _expand_path(env)
-    return Path.home().expanduser() / ".cache" / "huggingface"
-
-
-def _resolve_model_root(hf_home: Path) -> Path:
-    """Resolve DocsToKG model root with ``DOCSTOKG_MODEL_ROOT`` override.
-
-    Args:
-        hf_home: Base HuggingFace cache directory.
-
-    Returns:
-        Absolute path representing the DocsToKG model root.
-    """
-
-    env = os.getenv("DOCSTOKG_MODEL_ROOT")
-    return _expand_path(env) if env else hf_home
-
-
 def _resolve_qwen_dir(model_root: Path) -> Path:
     """Resolve Qwen model directory with ``DOCSTOKG_QWEN_DIR`` override.
 
@@ -169,7 +128,7 @@ def _resolve_qwen_dir(model_root: Path) -> Path:
     """
 
     env = os.getenv("DOCSTOKG_QWEN_DIR")
-    return _expand_path(env) if env else model_root / "Qwen" / "Qwen3-Embedding-4B"
+    return expand_path(env) if env else model_root / "Qwen" / "Qwen3-Embedding-4B"
 
 
 def _resolve_splade_dir(model_root: Path) -> Path:
@@ -183,13 +142,45 @@ def _resolve_splade_dir(model_root: Path) -> Path:
     """
 
     env = os.getenv("DOCSTOKG_SPLADE_DIR")
-    return _expand_path(env) if env else model_root / "naver" / "splade-v3"
+    return expand_path(env) if env else model_root / "naver" / "splade-v3"
 
 
-HF_HOME = _resolve_hf_home()
-MODEL_ROOT = _resolve_model_root(HF_HOME)
-QWEN_DIR = _expand_path(_resolve_qwen_dir(MODEL_ROOT))
-SPLADE_DIR = _expand_path(_resolve_splade_dir(MODEL_ROOT))
+HF_HOME = resolve_hf_home()
+MODEL_ROOT = resolve_model_root(HF_HOME)
+QWEN_DIR = expand_path(_resolve_qwen_dir(MODEL_ROOT))
+SPLADE_DIR = expand_path(_resolve_splade_dir(MODEL_ROOT))
+
+
+def _derive_doc_id_and_output_path(
+    chunk_file: Path, chunks_root: Path, vectors_root: Path
+) -> tuple[str, Path]:
+    """Return manifest doc_id and vector output path for a chunk artifact."""
+
+    relative = chunk_file.relative_to(chunks_root)
+    base = relative
+    if base.suffix == ".jsonl":
+        base = base.with_suffix("")
+    if base.suffix == ".chunks":
+        base = base.with_suffix("")
+    doc_id = base.with_suffix(".doctags").as_posix()
+    vector_relative = base.with_suffix(".vectors.jsonl")
+    return doc_id, vectors_root / vector_relative
+
+
+def _derive_doc_id_and_output_path(
+    chunk_file: Path, chunks_root: Path, vectors_root: Path
+) -> tuple[str, Path]:
+    """Return manifest doc_id and vector output path for a chunk artifact."""
+
+    relative = chunk_file.relative_to(chunks_root)
+    base = relative
+    if base.suffix == ".jsonl":
+        base = base.with_suffix("")
+    if base.suffix == ".chunks":
+        base = base.with_suffix("")
+    doc_id = base.with_suffix(".doctags").as_posix()
+    vector_relative = base.with_suffix(".vectors.jsonl")
+    return doc_id, vectors_root / vector_relative
 
 
 def _expand_optional(path: Optional[Path]) -> Optional[Path]:
@@ -807,6 +798,7 @@ def process_pass_a(files: Sequence[Path], logger) -> BM25Stats:
 
 def process_chunk_file_vectors(
     chunk_file: Path,
+    out_path: Path,
     stats: BM25Stats,
     args: argparse.Namespace,
     validator: SPLADEValidator,
@@ -850,7 +842,6 @@ def process_chunk_file_vectors(
         splade_results.extend(zip(tokens_batch, weights_batch))
     qwen_results = qwen_embed(args.qwen_cfg, texts, batch_size=args.batch_size_qwen)
 
-    out_path = args.out_dir / f"{chunk_file.stem.replace('.chunks', '')}.vectors.jsonl"
     count, nnz, norms = write_vectors(
         out_path,
         uuids,
@@ -868,8 +859,8 @@ def process_chunk_file_vectors(
         "Embeddings written",
         extra={
             "extra_fields": {
-                "chunk_file": str(chunk_file.name),
-                "vectors_file": out_path.name,
+                "chunk_file": str(chunk_file),
+                "vectors_file": str(out_path),
                 "rows": count,
             }
         },
@@ -1139,10 +1130,10 @@ def main(args: argparse.Namespace | None = None) -> int:
         args = parser.parse_args(args)
     offline_mode = bool(getattr(args, "offline", False))
 
-    hf_home = _resolve_hf_home()
-    model_root = _resolve_model_root(hf_home)
-    default_splade_dir = _expand_path(_resolve_splade_dir(model_root))
-    default_qwen_dir = _expand_path(_resolve_qwen_dir(model_root))
+    hf_home = resolve_hf_home()
+    model_root = resolve_model_root(hf_home)
+    default_splade_dir = expand_path(_resolve_splade_dir(model_root))
+    default_qwen_dir = expand_path(_resolve_qwen_dir(model_root))
     cli_splade = _expand_optional(getattr(args, "splade_model_dir", None))
     cli_qwen = _expand_optional(getattr(args, "qwen_model_dir", None))
     splade_model_dir = cli_splade or default_splade_dir
@@ -1289,10 +1280,14 @@ def main(args: argparse.Namespace | None = None) -> int:
     file_entries = []
     skipped_files = 0
     for chunk_file in files:
-        doc_id = chunk_file.relative_to(chunks_dir).as_posix()
-        out_path = args.out_dir / f"{chunk_file.stem.replace('.chunks', '')}.vectors.jsonl"
+        doc_id, out_path = _derive_doc_id_and_output_path(
+            chunk_file, chunks_dir, args.out_dir
+        )
         input_hash = compute_content_hash(chunk_file)
         entry = manifest_index.get(doc_id)
+        if entry is None:
+            legacy_key = chunk_file.relative_to(chunks_dir).as_posix()
+            entry = manifest_index.get(legacy_key)
         if (
             args.resume
             and not args.force
@@ -1300,7 +1295,15 @@ def main(args: argparse.Namespace | None = None) -> int:
             and entry
             and entry.get("input_hash") == input_hash
         ):
-            logger.info("Skipping %s: output exists and input unchanged", doc_id)
+            logger.info(
+                "Skipping chunk file: output exists and input unchanged",
+                extra={
+                    "extra_fields": {
+                        "doc_id": doc_id,
+                        "output_path": str(out_path),
+                    }
+                },
+            )
             manifest_append(
                 stage=MANIFEST_STAGE,
                 doc_id=doc_id,
@@ -1322,7 +1325,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         start = time.perf_counter()
         try:
             count, nnz, norms = process_chunk_file_vectors(
-                chunk_file, stats, args, validator, logger
+                chunk_file, out_path, stats, args, validator, logger
             )
         except Exception as exc:
             duration = time.perf_counter() - start
