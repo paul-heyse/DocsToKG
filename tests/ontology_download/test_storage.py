@@ -25,7 +25,7 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import storage
+from DocsToKG.OntologyDownload import settings as storage
 
 
 @pytest.mark.skipif(importlib.util.find_spec("fsspec") is None, reason="fsspec not installed")

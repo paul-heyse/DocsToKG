@@ -241,13 +241,13 @@ import os
 import queue
 import re
 import statistics
+import threading
 import time
 import tracemalloc
-import threading
 import unicodedata
 import uuid
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from collections import Counter
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Dict, Iterator, List, Optional, Sequence, Tuple
@@ -964,8 +964,8 @@ class QwenEmbeddingQueue:
         """Initialise a bounded request queue and background worker."""
 
         self._cfg = cfg
-        self._queue: "queue.Queue[tuple[List[str], int, Future[List[List[float]]]] | None]" = queue.Queue(
-            maxsize=max(1, maxsize)
+        self._queue: "queue.Queue[tuple[List[str], int, Future[List[List[float]]]] | None]" = (
+            queue.Queue(maxsize=max(1, maxsize))
         )
         self._closed = False
         self._thread = threading.Thread(target=self._worker, name="QwenEmbeddingQueue", daemon=True)
@@ -1875,7 +1875,9 @@ def main(args: argparse.Namespace | None = None) -> int:
         else:
             args.qwen_queue = None
 
-        def _process_entry(entry: Tuple[Path, Path, str, str]) -> Tuple[int, List[int], List[float], float]:
+        def _process_entry(
+            entry: Tuple[Path, Path, str, str],
+        ) -> Tuple[int, List[int], List[float], float]:
             """Encode vectors for a chunk file and report per-file metrics."""
 
             chunk_path, vectors_path, input_hash, doc_id = entry
@@ -1894,9 +1896,10 @@ def main(args: argparse.Namespace | None = None) -> int:
         if not file_entries:
             pass
         elif files_parallel > 1:
-            with ThreadPoolExecutor(max_workers=files_parallel) as executor, tqdm(
-                total=len(file_entries), desc="Pass B: Encoding vectors", unit="file"
-            ) as bar:
+            with (
+                ThreadPoolExecutor(max_workers=files_parallel) as executor,
+                tqdm(total=len(file_entries), desc="Pass B: Encoding vectors", unit="file") as bar,
+            ):
                 future_map = {
                     executor.submit(_process_entry, entry): entry for entry in file_entries
                 }

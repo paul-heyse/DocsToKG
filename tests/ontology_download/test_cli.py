@@ -119,9 +119,9 @@ from DocsToKG.OntologyDownload import (
     PlannedFetch,
     ResolvedConfig,
     ResolverCandidate,
-    cli,
 )
-from DocsToKG.OntologyDownload.resolvers import FetchPlan
+from DocsToKG.OntologyDownload import api as cli
+from DocsToKG.OntologyDownload.planning import FetchPlan
 
 
 @pytest.fixture()
@@ -186,7 +186,7 @@ def test_cli_pull_json_output(monkeypatch, stub_logger, tmp_path, capsys):
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
 
-    exit_code = cli.main(["pull", "hp", "--json"])
+    exit_code = cli.cli_main(["pull", "hp", "--json"])
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload[0]["id"] == "hp"
@@ -208,7 +208,7 @@ def test_cli_pull_table_output(monkeypatch, stub_logger, tmp_path, capsys):
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
 
-    exit_code = cli.main(["pull", "hp"])
+    exit_code = cli.cli_main(["pull", "hp"])
     assert exit_code == 0
     output = capsys.readouterr().out.splitlines()
     assert output[0].startswith("id")
@@ -226,7 +226,7 @@ def test_cli_pull_dry_run(monkeypatch, stub_logger, capsys):
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
 
-    exit_code = cli.main(["pull", "hp", "--dry-run"])
+    exit_code = cli.cli_main(["pull", "hp", "--dry-run"])
     assert exit_code == 0
     output = capsys.readouterr().out
     assert "hp" in output
@@ -248,7 +248,7 @@ def test_cli_pull_concurrency_and_hosts(monkeypatch, stub_logger):
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
 
-    exit_code = cli.main(
+    exit_code = cli.cli_main(
         [
             "pull",
             "hp",
@@ -271,7 +271,7 @@ def test_cli_plan_json_output(monkeypatch, stub_logger, capsys):
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
 
-    exit_code = cli.main(["plan", "hp", "--json"])
+    exit_code = cli.cli_main(["plan", "hp", "--json"])
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload[0]["id"] == "hp"
@@ -292,7 +292,7 @@ def test_cli_plan_since_passed_to_plan_all(monkeypatch, stub_logger):
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
 
-    exit_code = cli.main(["plan", "hp", "--since", "2024-05-01"])
+    exit_code = cli.cli_main(["plan", "hp", "--since", "2024-05-01"])
     assert exit_code == 0
     assert isinstance(captured_since, datetime)
     assert captured_since.tzinfo is timezone.utc
@@ -312,7 +312,7 @@ def test_cli_plan_concurrency_override(monkeypatch, stub_logger):
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
 
-    exit_code = cli.main(["plan", "hp", "--concurrent-plans", "5"])
+    exit_code = cli.cli_main(["plan", "hp", "--concurrent-plans", "5"])
     assert exit_code == 0
     assert captured["plans"] == 5
 
@@ -341,7 +341,7 @@ def test_cli_plan_diff_outputs(monkeypatch, stub_logger, tmp_path, capsys):
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
 
-    exit_code = cli.main(["plan-diff", "hp", "--baseline", str(baseline_path), "--json"])
+    exit_code = cli.cli_main(["plan-diff", "hp", "--baseline", str(baseline_path), "--json"])
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["added"] == []
@@ -349,7 +349,7 @@ def test_cli_plan_diff_outputs(monkeypatch, stub_logger, tmp_path, capsys):
     assert payload["modified"][0]["id"] == "hp"
 
     capsys.readouterr()  # clear
-    exit_code = cli.main(["plan-diff", "hp", "--baseline", str(baseline_path)])
+    exit_code = cli.cli_main(["plan-diff", "hp", "--baseline", str(baseline_path)])
     assert exit_code == 0
     output = capsys.readouterr().out
     assert "+ hp" in output or "~ hp" in output
@@ -365,7 +365,7 @@ def test_cli_plan_diff_updates_baseline(monkeypatch, stub_logger, tmp_path, caps
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
 
-    exit_code = cli.main(
+    exit_code = cli.cli_main(
         ["plan-diff", "hp", "--baseline", str(baseline_path), "--update-baseline"]
     )
     assert exit_code == 0
@@ -403,7 +403,7 @@ def test_cli_prune_dry_run_json(monkeypatch, stub_logger, capsys):
     monkeypatch.setattr(cli.STORAGE, "delete_version", lambda *_, **__: 0)
     monkeypatch.setattr(cli.STORAGE, "set_latest_version", lambda *_, **__: None)
 
-    exit_code = cli.main(["prune", "--keep", "1", "--dry-run", "--json"])
+    exit_code = cli.cli_main(["prune", "--keep", "1", "--dry-run", "--json"])
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["dry_run"] is True
@@ -442,7 +442,7 @@ def test_cli_prune_older_than(monkeypatch, stub_logger, capsys):
     monkeypatch.setattr(cli.STORAGE, "delete_version", lambda *_, **__: 0)
     monkeypatch.setattr(cli.STORAGE, "set_latest_version", lambda *_, **__: None)
 
-    exit_code = cli.main(
+    exit_code = cli.cli_main(
         ["prune", "--keep", "1", "--older-than", "2023-06-01", "--dry-run", "--json"]
     )
     assert exit_code == 0
@@ -485,7 +485,7 @@ def test_cli_prune_updates_latest_marker(monkeypatch, stub_logger):
 
     monkeypatch.setattr(cli.STORAGE, "set_latest_version", _record_latest)
 
-    exit_code = cli.main(["prune", "--keep", "1"])
+    exit_code = cli.cli_main(["prune", "--keep", "1"])
     assert exit_code == 0
     assert latest_calls == [("hp", "2024")]
 
@@ -503,7 +503,7 @@ def test_cli_plan_serializes_enriched_metadata(monkeypatch, stub_logger, capsys)
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
 
-    exit_code = cli.main(["plan", "hp", "--json"])
+    exit_code = cli.cli_main(["plan", "hp", "--json"])
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload[0]["last_modified"] == "Tue, 01 Aug 2023 00:00:00 GMT"
@@ -605,7 +605,7 @@ def test_cli_doctor_reports_diagnostics(monkeypatch, stub_logger, tmp_path, caps
     monkeypatch.setattr(cli.requests, "head", _fake_head, raising=False)
     monkeypatch.setattr(cli.requests, "get", _fake_get, raising=False)
 
-    exit_code = cli.main(["doctor", "--json"])
+    exit_code = cli.cli_main(["doctor", "--json"])
     assert exit_code == 0
 
     payload = json.loads(capsys.readouterr().out)
@@ -644,15 +644,21 @@ def test_cli_doctor_fix_applies_actions(monkeypatch, stub_logger, tmp_path, caps
         lambda path: SimpleNamespace(total=10_000_000_000, used=4_000_000_000, free=6_000_000_000),
     )
     monkeypatch.setattr(cli.shutil, "which", lambda name: None)
-    monkeypatch.setattr(cli.requests, "head", lambda *_, **__: SimpleNamespace(status_code=200, ok=True, reason="OK"))
-    monkeypatch.setattr(cli.requests, "get", lambda *_, **__: SimpleNamespace(status_code=200, ok=True, reason="OK"))
+    monkeypatch.setattr(
+        cli.requests,
+        "head",
+        lambda *_, **__: SimpleNamespace(status_code=200, ok=True, reason="OK"),
+    )
+    monkeypatch.setattr(
+        cli.requests, "get", lambda *_, **__: SimpleNamespace(status_code=200, ok=True, reason="OK")
+    )
     monkeypatch.setattr(cli.importlib.util, "find_spec", lambda name: object())
     monkeypatch.setattr(cli, "validate_manifest_dict", lambda payload, source=None: None)
     monkeypatch.setattr(cli, "get_manifest_schema", lambda: {"type": "object"})
     monkeypatch.setattr(cli.Draft202012Validator, "check_schema", lambda schema: None)
     monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
 
-    exit_code = cli.main(["doctor", "--fix"])
+    exit_code = cli.cli_main(["doctor", "--fix"])
     assert exit_code == 0
     output = capsys.readouterr().out
     assert "Applied fixes" in output
@@ -673,7 +679,7 @@ def test_cli_plugins_json(monkeypatch, capsys):
     monkeypatch.setattr(
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
-    exit_code = cli.main(["plugins", "--kind", "all", "--json"])
+    exit_code = cli.cli_main(["plugins", "--kind", "all", "--json"])
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["resolver"]["demo"] == "resolver.Demo"

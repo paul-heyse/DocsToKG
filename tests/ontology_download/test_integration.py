@@ -80,11 +80,12 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-import DocsToKG.OntologyDownload.pipeline as pipeline_mod
-from DocsToKG.OntologyDownload import DefaultsConfig, ResolvedConfig, resolvers
-from DocsToKG.OntologyDownload import ontology_download as core
-from DocsToKG.OntologyDownload import io_safe as io_safe_mod
-from DocsToKG.OntologyDownload import storage as storage_mod
+import DocsToKG.OntologyDownload.planning as pipeline_mod
+from DocsToKG.OntologyDownload import api as core
+from DocsToKG.OntologyDownload import io as io_mod
+from DocsToKG.OntologyDownload import settings as settings_mod
+from DocsToKG.OntologyDownload.planning import RESOLVERS, FetchPlan
+from DocsToKG.OntologyDownload.settings import DefaultsConfig, ResolvedConfig
 
 
 @pytest.fixture()
@@ -102,7 +103,7 @@ def patched_dirs(monkeypatch, tmp_path):
         "LOCAL_ONTOLOGY_DIR": ontologies,
     }
     for attr, value in overrides.items():
-        monkeypatch.setattr(storage_mod, attr, value, raising=False)
+        monkeypatch.setattr(settings_mod, attr, value, raising=False)
         monkeypatch.setattr(pipeline_mod, attr, value, raising=False)
         monkeypatch.setattr(core, attr, value, raising=False)
     monkeypatch.setattr(core, "ONTOLOGY_DIR", ontologies, raising=False)
@@ -122,7 +123,7 @@ def patched_dirs(monkeypatch, tmp_path):
             pass
 
     stub_storage = _StubStorage()
-    monkeypatch.setattr(storage_mod, "STORAGE", stub_storage, raising=False)
+    monkeypatch.setattr(settings_mod, "STORAGE", stub_storage, raising=False)
     monkeypatch.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
     monkeypatch.setattr(core, "STORAGE", stub_storage, raising=False)
     return ontologies
@@ -134,7 +135,7 @@ class _StubResolver:
         self.version = version
 
     def plan(self, spec, config, logger):
-        return resolvers.FetchPlan(
+        return FetchPlan(
             url=f"https://example.org/{spec.id}.owl",
             headers={},
             filename_hint=self.fixture.name,
@@ -189,8 +190,8 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
     pato_fixture = fixture_dir / "mini.ttl"
     bfo_fixture = fixture_dir / "mini.obo"
 
-    monkeypatch.setitem(resolvers.RESOLVERS, "obo", _StubResolver(pato_fixture, "2024-01-01"))
-    monkeypatch.setitem(resolvers.RESOLVERS, "ols", _StubResolver(bfo_fixture, "2024-02-01"))
+    monkeypatch.setitem(RESOLVERS, "obo", _StubResolver(pato_fixture, "2024-01-01"))
+    monkeypatch.setitem(RESOLVERS, "ols", _StubResolver(bfo_fixture, "2024-02-01"))
 
     def _download_with_fixture(**kwargs):
         headers = dict(kwargs["headers"])
@@ -202,7 +203,7 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
         destination = kwargs["destination"]
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(headers["__fixture__"], destination)
-        sha256 = io_safe_mod.sha256_file(destination)
+        sha256 = io_mod.sha256_file(destination)
         content_length = destination.stat().st_size
         return core.DownloadResult(
             path=destination,
@@ -214,9 +215,7 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
             content_length=content_length,
         )
 
-    monkeypatch.setattr(
-        pipeline_mod, "download_stream", _download_with_fixture, raising=False
-    )
+    monkeypatch.setattr(pipeline_mod, "download_stream", _download_with_fixture, raising=False)
     monkeypatch.setattr(core, "download_stream", _download_with_fixture, raising=False)
 
     results = core.fetch_all(
@@ -236,7 +235,7 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
         assert manifest["id"] == result.spec.id
         assert manifest["validation"]
         local_file = result.local_path
-        assert manifest["sha256"] == io_safe_mod.sha256_file(local_file)
+        assert manifest["sha256"] == io_mod.sha256_file(local_file)
         assert manifest["normalized_sha256"]
         assert len(manifest["fingerprint"]) == 64
         assert manifest["content_type"] == "application/rdf+xml"
@@ -268,7 +267,7 @@ def test_force_download_bypasses_manifest(monkeypatch, patched_dirs, stubbed_val
     monkeypatch.setattr(pipeline_mod, "download_stream", _download, raising=False)
     monkeypatch.setattr(core, "download_stream", _download, raising=False)
     spec = core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"])
-    monkeypatch.setitem(resolvers.RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
+    monkeypatch.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
     manifest_path = patched_dirs / "pato" / "2024-01-01" / "manifest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps({"sha256": "old"}))
@@ -278,7 +277,7 @@ def test_force_download_bypasses_manifest(monkeypatch, patched_dirs, stubbed_val
 
 def test_multi_version_storage(monkeypatch, patched_dirs, stubbed_validators):
     fixture = Path("tests/data/ontology_fixtures/mini.ttl")
-    monkeypatch.setitem(resolvers.RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
+    monkeypatch.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
 
     def _download(**kwargs):
         kwargs["destination"].write_bytes(fixture.read_bytes())
@@ -298,10 +297,11 @@ def test_multi_version_storage(monkeypatch, patched_dirs, stubbed_validators):
     spec = core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"])
     config = ResolvedConfig(defaults=DefaultsConfig(), specs=[])
     core.fetch_one(spec, config=config, force=True)
-    monkeypatch.setitem(resolvers.RESOLVERS, "obo", _StubResolver(fixture, "2024-02-01"))
+    monkeypatch.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-02-01"))
     core.fetch_one(spec, config=config, force=True)
     versions = sorted((patched_dirs / "pato").iterdir())
-    assert {v.name for v in versions} == {"2024-01-01", "2024-02-01"}
+    dir_names = {v.name for v in versions if v.is_dir()}
+    assert dir_names == {"2024-01-01", "2024-02-01"}
 
 
 def test_fetch_all_logs_progress(monkeypatch, patched_dirs, stubbed_validators, caplog):
@@ -322,7 +322,7 @@ def test_fetch_all_logs_progress(monkeypatch, patched_dirs, stubbed_validators, 
 
     monkeypatch.setattr(pipeline_mod, "download_stream", _download, raising=False)
     monkeypatch.setattr(core, "download_stream", _download, raising=False)
-    monkeypatch.setitem(resolvers.RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
+    monkeypatch.setitem(RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
     config = ResolvedConfig(defaults=DefaultsConfig(), specs=[])
     caplog.set_level(logging.INFO)
     core.fetch_all(

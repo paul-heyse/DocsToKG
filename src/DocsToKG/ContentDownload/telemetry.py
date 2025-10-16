@@ -28,8 +28,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Protocol, Set, Tuple
 
 if TYPE_CHECKING:  # pragma: no cover
-    from DocsToKG.ContentDownload.resolvers import AttemptRecord, DownloadOutcome
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
+    from DocsToKG.ContentDownload.resolvers import AttemptRecord, DownloadOutcome
 
 from DocsToKG.ContentDownload.classifications import PDF_LIKE, Classification, ReasonCode
 from DocsToKG.ContentDownload.utils import normalize_url
@@ -216,7 +216,9 @@ class JsonlSink:
             timestamp: Optional ISO-8601 timestamp overriding the current time.
         """
         ts = timestamp or _utc_timestamp()
-        status_text = record.status.value if isinstance(record.status, Classification) else str(record.status)
+        status_text = (
+            record.status.value if isinstance(record.status, Classification) else str(record.status)
+        )
         self._write(
             {
                 "record_type": "attempt",
@@ -338,7 +340,11 @@ class CsvSink:
             "resolver_name": record.resolver_name,
             "resolver_order": record.resolver_order,
             "url": record.url,
-            "status": record.status.value if isinstance(record.status, Classification) else str(record.status),
+            "status": (
+                record.status.value
+                if isinstance(record.status, Classification)
+                else str(record.status)
+            ),
             "http_status": record.http_status,
             "content_type": record.content_type,
             "elapsed_ms": record.elapsed_ms,
@@ -683,14 +689,10 @@ class SqliteSink:
             )
             """
         )
-        attempt_columns = {
-            row[1] for row in self._conn.execute("PRAGMA table_info(attempts)")
-        }
+        attempt_columns = {row[1] for row in self._conn.execute("PRAGMA table_info(attempts)")}
         if "reason_detail" not in attempt_columns:
             self._conn.execute("ALTER TABLE attempts ADD COLUMN reason_detail TEXT")
-        manifest_columns = {
-            row[1] for row in self._conn.execute("PRAGMA table_info(manifests)")
-        }
+        manifest_columns = {row[1] for row in self._conn.execute("PRAGMA table_info(manifests)")}
         if "reason_detail" not in manifest_columns:
             self._conn.execute("ALTER TABLE manifests ADD COLUMN reason_detail TEXT")
         self._conn.execute(
@@ -716,9 +718,7 @@ class SqliteSink:
             None
         """
         ts = timestamp or _utc_timestamp()
-        metadata_json = (
-            json.dumps(record.metadata, sort_keys=True) if record.metadata else None
-        )
+        metadata_json = json.dumps(record.metadata, sort_keys=True) if record.metadata else None
         with self._lock:
             self._conn.execute(
                 """
@@ -747,7 +747,11 @@ class SqliteSink:
                     record.resolver_name,
                     record.resolver_order,
                     record.url,
-                    record.status.value if isinstance(record.status, Classification) else str(record.status),
+                    (
+                        record.status.value
+                        if isinstance(record.status, Classification)
+                        else str(record.status)
+                    ),
                     record.http_status,
                     record.content_type,
                     record.elapsed_ms,
@@ -874,7 +878,9 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
             data = json.loads(line)
             record_type = data.get("record_type")
             if record_type is None:
-                raise ValueError("Legacy manifest entries without record_type are no longer supported.")
+                raise ValueError(
+                    "Legacy manifest entries without record_type are no longer supported."
+                )
             if record_type != "manifest":
                 continue
 
@@ -887,10 +893,19 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
                 raise ValueError(
                     f"Manifest entry schema_version must be an integer, got {schema_version_raw!r}"
                 ) from exc
-            if schema_version > MANIFEST_SCHEMA_VERSION:
+            if schema_version != MANIFEST_SCHEMA_VERSION:
+                qualifier = (
+                    "newer"
+                    if schema_version > MANIFEST_SCHEMA_VERSION
+                    else "older" if schema_version < MANIFEST_SCHEMA_VERSION else "unknown"
+                )
                 raise ValueError(
-                    f"Manifest schema_version {schema_version} is newer than supported "
-                    f"{MANIFEST_SCHEMA_VERSION}. Upgrade the DocsToKG downloader."
+                    "Unsupported manifest schema_version {observed} ({qualifier}); expected version {expected}. "
+                    "Regenerate the manifest using a compatible DocsToKG downloader release.".format(
+                        observed=schema_version,
+                        qualifier=qualifier,
+                        expected=MANIFEST_SCHEMA_VERSION,
+                    )
                 )
             data["schema_version"] = schema_version
 
@@ -994,7 +1009,6 @@ def build_manifest_entry(
         classification = Classification.MISS.value
         path = None
         content_type = None
-        error = None
         sha256 = None
         content_length = None
         etag = None
@@ -1008,7 +1022,9 @@ def build_manifest_entry(
         resolved_reason_code = ReasonCode.from_wire(reason)
     elif outcome:
         resolved_reason_code = (
-            outcome_reason if isinstance(outcome_reason, ReasonCode) else ReasonCode.from_wire(outcome_reason)
+            outcome_reason
+            if isinstance(outcome_reason, ReasonCode)
+            else ReasonCode.from_wire(outcome_reason)
         )
     else:
         resolved_reason_code = None

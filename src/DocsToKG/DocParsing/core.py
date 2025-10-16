@@ -272,6 +272,126 @@
 #       "name": "set_spawn_or_warn",
 #       "anchor": "function-set-spawn-or-warn",
 #       "kind": "function"
+#     },
+#     {
+#       "id": "run-chunk",
+#       "name": "_run_chunk",
+#       "anchor": "function-run-chunk",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-embed",
+#       "name": "_run_embed",
+#       "anchor": "function-run-embed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-doctags-parser",
+#       "name": "_build_doctags_parser",
+#       "anchor": "function-build-doctags-parser",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "scan-pdf-html",
+#       "name": "_scan_pdf_html",
+#       "anchor": "function-scan-pdf-html",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "directory-contains-suffixes",
+#       "name": "_directory_contains_suffixes",
+#       "anchor": "function-directory-contains-suffixes",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "detect-mode",
+#       "name": "_detect_mode",
+#       "anchor": "function-detect-mode",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge-args",
+#       "name": "_merge_args",
+#       "anchor": "function-merge-args",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-doctags",
+#       "name": "_run_doctags",
+#       "anchor": "function-run-doctags",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "preview-list",
+#       "name": "_preview_list",
+#       "anchor": "function-preview-list",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plan-doctags",
+#       "name": "_plan_doctags",
+#       "anchor": "function-plan-doctags",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plan-chunk",
+#       "name": "_plan_chunk",
+#       "anchor": "function-plan-chunk",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plan-embed",
+#       "name": "_plan_embed",
+#       "anchor": "function-plan-embed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "display-plan",
+#       "name": "_display_plan",
+#       "anchor": "function-display-plan",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-all",
+#       "name": "_run_all",
+#       "anchor": "function-run-all",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "command",
+#       "name": "_Command",
+#       "anchor": "class-command",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run-all-public",
+#       "name": "run_all",
+#       "anchor": "function-run-all-public",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "chunk",
+#       "name": "chunk",
+#       "anchor": "function-chunk",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "embed",
+#       "name": "embed",
+#       "anchor": "function-embed",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "doctags",
+#       "name": "doctags",
+#       "anchor": "function-doctags",
+#       "kind": "function"
 #     }
 #   ]
 # }
@@ -323,7 +443,26 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, TextIO, Tuple, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    TextIO,
+    Tuple,
+    TypeVar,
+)
+
+from DocsToKG.DocParsing.formats.markers import (
+    DEFAULT_CAPTION_MARKERS,
+    DEFAULT_HEADING_MARKERS,
+    load_structural_marker_config,
+)
 
 T = TypeVar("T")
 
@@ -373,6 +512,11 @@ __all__ = [
     "DEFAULT_HEADING_MARKERS",
     "DEFAULT_CAPTION_MARKERS",
     "DEFAULT_SERIALIZER_PROVIDER",
+    "DEFAULT_TOKENIZER",
+    "looks_like_filesystem_path",
+    "resolve_pdf_model_path",
+    "prepare_data_root",
+    "resolve_pipeline_path",
     "load_structural_marker_config",
     "CommandHandler",
     "CLI_DESCRIPTION",
@@ -386,14 +530,9 @@ __all__ = [
 # --- Data Containers ---
 
 UUID_NAMESPACE = uuid.UUID("00000000-0000-0000-0000-000000000000")
-DEFAULT_HEADING_MARKERS: Tuple[str, ...] = ("#",)
-DEFAULT_CAPTION_MARKERS: Tuple[str, ...] = (
-    "Figure caption:",
-    "Table:",
-    "Picture description:",
-    "<!-- image -->",
-)
 DEFAULT_SERIALIZER_PROVIDER = "DocsToKG.DocParsing.formats:RichSerializerProvider"
+DEFAULT_TOKENIZER = "Qwen/Qwen3-Embedding-4B"
+PDF_MODEL_SUBDIR = Path("granite-docling-258M")
 
 
 @dataclass(slots=True)
@@ -520,6 +659,38 @@ def resolve_model_root(hf_home: Optional[Path] = None) -> Path:
         return expand_path(env)
     base = hf_home if hf_home is not None else resolve_hf_home()
     return expand_path(base)
+
+
+def looks_like_filesystem_path(candidate: str) -> bool:
+    """Return ``True`` when ``candidate`` appears to reference a local path."""
+
+    expanded = Path(candidate).expanduser()
+    drive, _ = os.path.splitdrive(candidate)
+    if drive:
+        return True
+    if expanded.is_absolute() or expanded.exists():
+        return True
+    prefixes = ["~", "."]
+    if os.sep not in prefixes:
+        prefixes.append(os.sep)
+    alt = os.altsep
+    if alt and alt not in prefixes:
+        prefixes.append(alt)
+    return any(candidate.startswith(prefix) for prefix in prefixes)
+
+
+def resolve_pdf_model_path(cli_value: str | None = None) -> str:
+    """Determine PDF model path using CLI and environment precedence."""
+
+    if cli_value:
+        if looks_like_filesystem_path(cli_value):
+            return str(expand_path(cli_value))
+        return cli_value
+    env_model = os.getenv("DOCLING_PDF_MODEL")
+    if env_model:
+        return str(expand_path(env_model))
+    model_root = resolve_model_root()
+    return str(expand_path(model_root / PDF_MODEL_SUBDIR))
 
 
 def init_hf_env(
@@ -685,6 +856,33 @@ def data_manifests(root: Optional[Path] = None) -> Path:
     return _ensure_dir(detect_data_root(root) / "Manifests")
 
 
+def prepare_data_root(data_root_arg: Optional[Path], default_root: Path) -> Path:
+    """Resolve and prepare the DocsToKG data root for a pipeline invocation."""
+
+    resolved = detect_data_root(data_root_arg) if data_root_arg is not None else default_root
+    if data_root_arg is not None:
+        os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved)
+    data_manifests(resolved)
+    return resolved
+
+
+def resolve_pipeline_path(
+    *,
+    cli_value: Optional[Path],
+    default_path: Path,
+    resolved_data_root: Path,
+    data_root_overridden: bool,
+    resolver: Callable[[Path], Path],
+) -> Path:
+    """Derive a pipeline directory path respecting data-root overrides."""
+
+    if data_root_overridden and (cli_value is None or cli_value == default_path):
+        return resolver(resolved_data_root)
+    if cli_value is None:
+        return default_path
+    return cli_value
+
+
 def data_pdfs(root: Optional[Path] = None) -> Path:
     """Return the PDFs directory and ensure it exists.
 
@@ -777,54 +975,6 @@ def should_skip_output(
         return False
     stored_hash = manifest_entry.get("input_hash") if isinstance(manifest_entry, Mapping) else None
     return stored_hash == input_hash
-
-
-def _ensure_str_list(value: object, label: str) -> List[str]:
-    """Normalise configuration entries into string lists."""
-
-    if value is None:
-        return []
-    if isinstance(value, str):
-        value = [value]
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-        raise ValueError(f"Expected a list of strings for '{label}'")
-    return [item for item in value if item]
-
-
-def load_structural_marker_config(path: Path) -> Tuple[List[str], List[str]]:
-    """Load user-provided heading and caption markers from JSON or YAML."""
-
-    raw = path.read_text(encoding="utf-8")
-    suffix = path.suffix.lower()
-    data: object
-    if suffix in {".yaml", ".yml"}:
-        try:
-            import yaml
-        except ImportError as exc:  # pragma: no cover - optional dependency
-            raise RuntimeError("Loading YAML markers requires the 'PyYAML' package") from exc
-        data = yaml.safe_load(raw) or {}
-    else:
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError:
-            try:
-                import yaml
-            except ImportError as exc:  # pragma: no cover - optional dependency
-                raise ValueError(
-                    f"Unable to parse structural marker file {path}: invalid JSON and PyYAML missing."
-                ) from exc
-            data = yaml.safe_load(raw) or {}
-
-    if isinstance(data, list):
-        headings = _ensure_str_list(data, "headings")
-        captions: List[str] = []
-    elif isinstance(data, dict):
-        headings = _ensure_str_list(data.get("headings"), "headings")
-        captions = _ensure_str_list(data.get("captions"), "captions")
-    else:
-        raise ValueError(f"Unsupported structural marker format in {path!s}")
-
-    return headings, captions
 
 
 def _stringify_path(value: Path | str | None) -> str | None:
@@ -2074,7 +2224,9 @@ def _plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
         validate: List[str] = []
         missing: List[str] = []
         for chunk_path in iter_chunks(chunks_dir):
-            doc_id, vector_path = derive_doc_id_and_vectors_path(chunk_path, chunks_dir, vectors_dir)
+            doc_id, vector_path = derive_doc_id_and_vectors_path(
+                chunk_path, chunks_dir, vectors_dir
+            )
             if vector_path.exists():
                 validate.append(doc_id)
             else:
@@ -2091,9 +2243,7 @@ def _plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
 
     files = list(iter_chunks(chunks_dir))
     manifest_index = (
-        load_manifest_index(embedding_module.MANIFEST_STAGE, resolved_root)
-        if args.resume
-        else {}
+        load_manifest_index(embedding_module.MANIFEST_STAGE, resolved_root) if args.resume else {}
     )
     planned: List[str] = []
     skipped: List[str] = []

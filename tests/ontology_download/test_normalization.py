@@ -63,8 +63,8 @@ pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 pytest.importorskip("rdflib")
 
-from DocsToKG.OntologyDownload.config import DefaultsConfig, ResolvedConfig
-from DocsToKG.OntologyDownload.validation_core import (
+from DocsToKG.OntologyDownload.settings import DefaultsConfig, ResolvedConfig
+from DocsToKG.OntologyDownload.validation import (
     ValidationRequest,
     normalize_streaming,
     validate_rdflib,
@@ -182,9 +182,7 @@ def test_streaming_flushes_chunks(monkeypatch, tmp_path: Path) -> None:
             return real_sha256(*args, **kwargs)
         return tracker
 
-    monkeypatch.setattr(
-        "DocsToKG.OntologyDownload.validation_core.hashlib.sha256", fake_sha256
-    )
+    monkeypatch.setattr("DocsToKG.OntologyDownload.validation.hashlib.sha256", fake_sha256)
 
     destination = tmp_path / "chunked.ttl"
     digest = normalize_streaming(_COMPLEX_FIXTURE, output_path=destination, chunk_bytes=64)

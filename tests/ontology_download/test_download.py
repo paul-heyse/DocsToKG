@@ -326,9 +326,9 @@ import json
 import logging
 import stat
 import tarfile
-import zipfile
 import threading
 import time
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -338,16 +338,20 @@ import requests
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-import DocsToKG.OntologyDownload.net as download
-import DocsToKG.OntologyDownload.pipeline as pipeline_mod
-from DocsToKG.OntologyDownload import io_safe as io_safe_mod
-from DocsToKG.OntologyDownload import ratelimit
-from DocsToKG.OntologyDownload.config import ConfigError, DefaultsConfig, DownloadConfiguration, ResolvedConfig
-from DocsToKG.OntologyDownload.errors import DownloadFailure, OntologyDownloadError, PolicyError
-from DocsToKG.OntologyDownload.io_safe import sanitize_filename
-from DocsToKG.OntologyDownload.pipeline import ConfigurationError, FetchSpec
-from DocsToKG.OntologyDownload.resolvers import FetchPlan
-from DocsToKG.OntologyDownload.storage import CACHE_DIR
+import DocsToKG.OntologyDownload.io as download
+import DocsToKG.OntologyDownload.planning as pipeline_mod
+from DocsToKG.OntologyDownload.io import sanitize_filename
+from DocsToKG.OntologyDownload.planning import ConfigurationError, FetchPlan, FetchSpec
+from DocsToKG.OntologyDownload.settings import (
+    CACHE_DIR,
+    ConfigError,
+    DefaultsConfig,
+    DownloadConfiguration,
+    DownloadFailure,
+    OntologyDownloadError,
+    PolicyError,
+    ResolvedConfig,
+)
 
 
 @dataclass
@@ -428,9 +432,9 @@ def make_session(monkeypatch, responses, head_responses=None):
 def clear_token_buckets():
     """Reset token bucket cache between tests to avoid leakage."""
 
-    ratelimit.reset()
+    download.reset()
     yield
-    ratelimit.reset()
+    download.reset()
 
 
 # --- Test Cases ---
@@ -628,7 +632,7 @@ def test_download_stream_rate_limiting(monkeypatch, tmp_path):
         def consume(self):
             consumed.append(True)
 
-    monkeypatch.setattr(ratelimit, "get_bucket", lambda **_kwargs: StubBucket())
+    monkeypatch.setattr(download, "get_bucket", lambda **_kwargs: StubBucket())
     destination = tmp_path / "file.owl"
     download.download_stream(
         url="https://example.org/file.owl",
@@ -673,47 +677,39 @@ def test_download_stream_sets_known_hash(monkeypatch, tmp_path):
 
 def test_get_bucket_service_specific_rate():
     config = DownloadConfiguration(rate_limits={"ols": "2/second"})
-    ratelimit.reset()
+    download.reset()
 
-    bucket = ratelimit.get_bucket(http_config=config, service="ols", host="ols.example.org")
+    bucket = download.get_bucket(http_config=config, service="ols", host="ols.example.org")
 
     assert bucket.rate == pytest.approx(2.0)
-    assert (
-        ratelimit.get_bucket(http_config=config, service="ols", host="ols.example.org")
-        is bucket
-    )
+    assert download.get_bucket(http_config=config, service="ols", host="ols.example.org") is bucket
 
 
 def test_get_bucket_without_service_uses_host_key():
     config = DownloadConfiguration(per_host_rate_limit="4/second")
-    ratelimit.reset()
+    download.reset()
 
-    bucket = ratelimit.get_bucket(http_config=config, service=None, host="example.org")
+    bucket = download.get_bucket(http_config=config, service=None, host="example.org")
 
-    assert (
-        ratelimit.get_bucket(http_config=config, service=None, host="example.org")
-        is bucket
-    )
+    assert download.get_bucket(http_config=config, service=None, host="example.org") is bucket
     assert bucket.rate == pytest.approx(config.rate_limit_per_second())
 
 
 def test_get_bucket_falls_back_to_host_limit():
     config = DownloadConfiguration(per_host_rate_limit="6/second")
-    ratelimit.reset()
+    download.reset()
 
-    bucket = ratelimit.get_bucket(http_config=config, service="unknown", host="obo.org")
+    bucket = download.get_bucket(http_config=config, service="unknown", host="obo.org")
 
     assert bucket.rate == pytest.approx(config.rate_limit_per_second())
 
 
 def test_get_bucket_independent_keys_for_services():
     config = DownloadConfiguration(rate_limits={"ols": "2/second", "bioportal": "1/second"})
-    ratelimit.reset()
+    download.reset()
 
-    ols_bucket = ratelimit.get_bucket(
-        http_config=config, service="ols", host="api.example.org"
-    )
-    bioportal_bucket = ratelimit.get_bucket(
+    ols_bucket = download.get_bucket(http_config=config, service="ols", host="api.example.org")
+    bioportal_bucket = download.get_bucket(
         http_config=config, service="bioportal", host="api.example.org"
     )
 
@@ -870,7 +866,7 @@ def test_extract_zip_safe(tmp_path):
     safe_dir = tmp_path / "safe"
     with zipfile.ZipFile(archive, "w") as zf:
         zf.writestr("folder/file.txt", "data")
-    extracted = io_safe_mod.extract_zip_safe(archive, safe_dir)
+    extracted = download.extract_zip_safe(archive, safe_dir)
     assert (safe_dir / "folder" / "file.txt").read_text() == "data"
     assert extracted
 
@@ -880,7 +876,7 @@ def test_extract_zip_rejects_traversal(tmp_path):
     with zipfile.ZipFile(archive, "w") as zf:
         zf.writestr("../evil.txt", "data")
     with pytest.raises(ConfigError):
-        io_safe_mod.extract_zip_safe(archive, tmp_path / "out")
+        download.extract_zip_safe(archive, tmp_path / "out")
 
 
 def test_extract_zip_rejects_absolute(tmp_path):
@@ -888,7 +884,7 @@ def test_extract_zip_rejects_absolute(tmp_path):
     with zipfile.ZipFile(archive, "w") as zf:
         zf.writestr("/absolute/path.txt", "data")
     with pytest.raises(ConfigError):
-        io_safe_mod.extract_zip_safe(archive, tmp_path / "out")
+        download.extract_zip_safe(archive, tmp_path / "out")
 
 
 def test_extract_zip_detects_compression_bomb(tmp_path):
@@ -897,7 +893,7 @@ def test_extract_zip_detects_compression_bomb(tmp_path):
         zf.writestr("large.txt", b"0" * (11 * 1024 * 1024))
 
     with pytest.raises(ConfigError) as exc_info:
-        io_safe_mod.extract_zip_safe(archive, tmp_path / "zip_out")
+        download.extract_zip_safe(archive, tmp_path / "zip_out")
 
     assert "compression ratio" in str(exc_info.value)
 
@@ -911,7 +907,7 @@ def test_extract_zip_rejects_symlink(tmp_path):
         zf.writestr(info, "target")
 
     with pytest.raises(ConfigError):
-        io_safe_mod.extract_zip_safe(archive, tmp_path / "out")
+        download.extract_zip_safe(archive, tmp_path / "out")
 
 
 # --- Helper Functions ---
@@ -931,7 +927,7 @@ def test_extract_tar_safe(tmp_path):
     info.size = len(data)
     _make_tarfile(archive, [(info, data)])
 
-    extracted = io_safe_mod.extract_tar_safe(archive, tmp_path / "tar_out")
+    extracted = download.extract_tar_safe(archive, tmp_path / "tar_out")
 
     assert (tmp_path / "tar_out" / "folder" / "file.txt").read_bytes() == data
     assert extracted
@@ -945,7 +941,7 @@ def test_extract_tar_rejects_traversal(tmp_path):
     _make_tarfile(archive, [(info, payload)])
 
     with pytest.raises(ConfigError):
-        io_safe_mod.extract_tar_safe(archive, tmp_path / "out")
+        download.extract_tar_safe(archive, tmp_path / "out")
 
 
 def test_extract_tar_rejects_absolute(tmp_path):
@@ -956,7 +952,7 @@ def test_extract_tar_rejects_absolute(tmp_path):
     _make_tarfile(archive, [(info, data)])
 
     with pytest.raises(ConfigError):
-        io_safe_mod.extract_tar_safe(archive, tmp_path / "out")
+        download.extract_tar_safe(archive, tmp_path / "out")
 
 
 def test_extract_tar_rejects_symlink(tmp_path):
@@ -968,7 +964,7 @@ def test_extract_tar_rejects_symlink(tmp_path):
     _make_tarfile(archive, [(info, None)])
 
     with pytest.raises(ConfigError):
-        io_safe_mod.extract_tar_safe(archive, tmp_path / "out")
+        download.extract_tar_safe(archive, tmp_path / "out")
 
 
 def test_extract_tar_detects_compression_bomb(tmp_path):
@@ -979,7 +975,7 @@ def test_extract_tar_detects_compression_bomb(tmp_path):
     _make_tarfile(archive, [(info, payload)])
 
     with pytest.raises(ConfigError) as exc_info:
-        io_safe_mod.extract_tar_safe(archive, tmp_path / "out")
+        download.extract_tar_safe(archive, tmp_path / "out")
 
     assert "compression ratio" in str(exc_info.value)
 
@@ -1049,9 +1045,9 @@ def test_validate_url_security_rejects_private_ip():
 
 
 def test_validate_url_security_upgrades_http(monkeypatch):
-    io_safe_mod._DNS_CACHE.clear()
+    download._DNS_CACHE.clear()
     monkeypatch.setattr(
-        io_safe_mod.socket,
+        download.socket,
         "getaddrinfo",
         lambda host, *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 0))],
     )
@@ -1060,14 +1056,14 @@ def test_validate_url_security_upgrades_http(monkeypatch):
 
 
 def test_validate_url_security_respects_allowlist(monkeypatch):
-    io_safe_mod._DNS_CACHE.clear()
+    download._DNS_CACHE.clear()
     looked_up = {}
 
     def fake_getaddrinfo(host, *_args, **_kwargs):
         looked_up["host"] = host
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
-    monkeypatch.setattr(io_safe_mod.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
     config = DownloadConfiguration(allowed_hosts=["example.org", "purl.obolibrary.org"])
 
     secure_url = download.validate_url_security("https://purl.obolibrary.org/ontology.owl", config)
@@ -1084,14 +1080,14 @@ def test_validate_url_security_blocks_disallowed_host():
 
 
 def test_validate_url_security_normalizes_idn(monkeypatch):
-    io_safe_mod._DNS_CACHE.clear()
+    download._DNS_CACHE.clear()
     looked_up = {}
 
     def fake_getaddrinfo(host, *_args, **_kwargs):
         looked_up["host"] = host
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
-    monkeypatch.setattr(io_safe_mod.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
 
     config = DownloadConfiguration()
     secure_url = download.validate_url_security("https://münchen.example.org/ontology.owl", config)
@@ -1106,11 +1102,12 @@ def test_validate_url_security_rejects_mixed_script_idn():
 
 
 def test_validate_url_security_respects_wildcard_allowlist(monkeypatch):
-    io_safe_mod._DNS_CACHE.clear()
+    download._DNS_CACHE.clear()
+
     def fake_getaddrinfo(host, *_args, **_kwargs):
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
-    monkeypatch.setattr(io_safe_mod.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
     config = DownloadConfiguration(allowed_hosts=["*.example.org"])
 
     secure_url = download.validate_url_security("https://sub.example.org/ontology.owl", config)
@@ -1129,10 +1126,10 @@ def test_validate_url_security_enforces_default_ports() -> None:
 
 
 def test_validate_url_security_allows_configured_port(monkeypatch):
-    io_safe_mod._DNS_CACHE.clear()
+    download._DNS_CACHE.clear()
 
     monkeypatch.setattr(
-        io_safe_mod.socket,
+        download.socket,
         "getaddrinfo",
         lambda host, *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 0))],
     )
@@ -1144,10 +1141,10 @@ def test_validate_url_security_allows_configured_port(monkeypatch):
 
 
 def test_validate_url_security_allows_host_specific_port(monkeypatch):
-    io_safe_mod._DNS_CACHE.clear()
+    download._DNS_CACHE.clear()
 
     monkeypatch.setattr(
-        io_safe_mod.socket,
+        download.socket,
         "getaddrinfo",
         lambda host, *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 0))],
     )
@@ -1159,14 +1156,14 @@ def test_validate_url_security_allows_host_specific_port(monkeypatch):
 
 
 def test_validate_url_security_dns_lookup_cached(monkeypatch):
-    io_safe_mod._DNS_CACHE.clear()
+    download._DNS_CACHE.clear()
     calls = {"count": 0}
 
     def fake_getaddrinfo(host, *_args, **_kwargs):
         calls["count"] += 1
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
-    monkeypatch.setattr(io_safe_mod.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(download.socket, "getaddrinfo", fake_getaddrinfo)
 
     config = DownloadConfiguration()
     url = "https://example.org/ontology.owl"
@@ -1245,7 +1242,7 @@ def test_read_manifest_applies_migration(tmp_path, monkeypatch):
         observed["schema_version"] = payload.get("schema_version")
         observed["resolver_attempts"] = payload.get("resolver_attempts")
 
-    monkeypatch.setattr(download, "validate_manifest_dict", _validate)
+    monkeypatch.setattr(pipeline_mod, "validate_manifest_dict", _validate)
 
     payload = pipeline_mod._read_manifest(manifest_path)
     assert payload["schema_version"] == "1.0"

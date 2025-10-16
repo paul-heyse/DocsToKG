@@ -56,6 +56,18 @@
 #       "name": "ConditionalRequestHelper",
 #       "anchor": "class-conditionalrequesthelper",
 #       "kind": "class"
+#     },
+#     {
+#       "id": "circuitbreaker",
+#       "name": "CircuitBreaker",
+#       "anchor": "class-circuitbreaker",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "tokenbucket",
+#       "name": "TokenBucket",
+#       "anchor": "class-tokenbucket",
+#       "kind": "class"
 #     }
 #   ]
 # }

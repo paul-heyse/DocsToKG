@@ -227,7 +227,7 @@ if "pooch" not in sys.modules:
     _stub_pooch.retrieve = _retrieve  # type: ignore[attr-defined]
     sys.modules["pooch"] = _stub_pooch
 
-from DocsToKG.OntologyDownload import ontology_download as core  # noqa: E402  (after stubs)
+from DocsToKG.OntologyDownload import api as core  # noqa: E402  (after stubs)
 
 # --- Globals ---
 

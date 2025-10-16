@@ -77,6 +77,7 @@ class DownloadFailure(OntologyDownloadError):
         self.status_code = status_code
         self.retryable = retryable
 
+
 PYTHON_MIN_VERSION = (3, 9)
 
 
@@ -510,7 +511,7 @@ def build_resolved_config(raw_config: Mapping[str, object]) -> ResolvedConfig:
     if not isinstance(ontologies, list):
         raise UserConfigError("'ontologies' must be a list")
 
-    from .pipeline import merge_defaults  # imported lazily to avoid circular dependency
+    from .planning import merge_defaults  # imported lazily to avoid circular dependency
 
     fetch_specs: List["FetchSpec"] = []
     for index, entry in enumerate(ontologies, start=1):
@@ -584,6 +585,7 @@ def validate_config(config_path: Path) -> ResolvedConfig:
     config = build_resolved_config(raw)
     _validate_schema(raw, config)
     return config
+
 
 # --- Optional dependency helpers merged from optdeps.py ---
 
@@ -882,6 +884,7 @@ def get_owlready2() -> Any:
         _owlready2 = _create_owlready_stub()
         sys.modules.setdefault("owlready2", _owlready2)
     return _owlready2
+
 
 # --- Storage backends merged from storage.py ---
 

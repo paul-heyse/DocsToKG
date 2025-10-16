@@ -117,9 +117,9 @@ pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
 from DocsToKG.OntologyDownload import DownloadConfiguration, FetchResult, FetchSpec
-from DocsToKG.OntologyDownload import ontology_download as download
-from DocsToKG.OntologyDownload import net as net_mod
-from DocsToKG.OntologyDownload.cli import _results_to_dict, format_results_table
+from DocsToKG.OntologyDownload import api as download
+from DocsToKG.OntologyDownload import io as io_mod
+from DocsToKG.OntologyDownload.api import _results_to_dict, format_results_table
 
 
 class _TestHTTPServer(ThreadingHTTPServer):
@@ -327,8 +327,12 @@ def _make_http_config(**overrides) -> DownloadConfiguration:
 
 @pytest.fixture(autouse=True)
 def _allow_localhost(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(download, "validate_url_security", lambda url, http_config=None: url, raising=False)
-    monkeypatch.setattr(net_mod, "validate_url_security", lambda url, http_config=None: url, raising=False)
+    monkeypatch.setattr(
+        download, "validate_url_security", lambda url, http_config=None: url, raising=False
+    )
+    monkeypatch.setattr(
+        io_mod, "validate_url_security", lambda url, http_config=None: url, raising=False
+    )
 
 
 def _download(
@@ -448,7 +452,7 @@ def test_token_bucket_limits_same_service(http_server, tmp_path: Path) -> None:
     server, base_url = http_server
     server.state["max_concurrent"] = 0
     server.state["active_requests"] = 0
-    net_mod._TOKEN_BUCKETS.clear()
+    io_mod.reset()
     config = _make_http_config(per_host_rate_limit="1/second")
     urls = [f"{base_url}/delay?ms=100" for _ in range(3)]
     destinations = [tmp_path / f"same-{idx}.bin" for idx in range(3)]
@@ -471,7 +475,7 @@ def test_token_bucket_allows_parallel_services(http_server, tmp_path: Path) -> N
     server, base_url = http_server
     server.state["max_concurrent"] = 0
     server.state["active_requests"] = 0
-    net_mod._TOKEN_BUCKETS.clear()
+    io_mod.reset()
     config = _make_http_config(per_host_rate_limit="1/second")
     urls = [f"{base_url}/delay?ms=100" for _ in range(3)]
     destinations = [tmp_path / f"diff-{idx}.bin" for idx in range(3)]

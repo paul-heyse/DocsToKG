@@ -96,33 +96,30 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
-import requests
-
 import pytest
+import requests
 
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-import DocsToKG.OntologyDownload.pipeline as pipeline_mod
-from DocsToKG.OntologyDownload import (
+import DocsToKG.OntologyDownload.planning as pipeline_mod
+from DocsToKG.OntologyDownload import api as core
+from DocsToKG.OntologyDownload import settings as settings_mod
+from DocsToKG.OntologyDownload.io import DownloadResult
+from DocsToKG.OntologyDownload.planning import RESOLVERS, FetchPlan, ResolverError
+from DocsToKG.OntologyDownload.settings import (
     ConfigError,
     DefaultsConfig,
-    DownloadFailure,
-    DownloadResult,
     DownloadConfiguration,
+    DownloadFailure,
     ResolvedConfig,
-    ValidationResult,
 )
-from DocsToKG.OntologyDownload import ontology_download as core
-from DocsToKG.OntologyDownload import resolvers, storage as storage_mod
-from DocsToKG.OntologyDownload import io_safe as io_safe_mod
-from DocsToKG.OntologyDownload.pipeline import ResolverError
-from DocsToKG.OntologyDownload.resolvers import FetchPlan
+from DocsToKG.OntologyDownload.validation import ValidationResult
+
+storage_mod = settings_mod
 
 
 @pytest.fixture(autouse=True)
-
-
 def test_select_validators_for_zip_only_arelle():
     assert pipeline_mod._select_validators("application/zip") == ["arelle"]
 
@@ -137,6 +134,7 @@ def test_select_validators_for_rdf_includes_defaults():
     assert pipeline_mod._select_validators("application/rdf+xml") == list(
         pipeline_mod.DEFAULT_VALIDATOR_NAMES
     )
+
 
 @pytest.fixture(autouse=True)
 def stub_requests_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -198,7 +196,7 @@ def _run_fetch(
         def plan(self, spec, config, logger):
             return plan
 
-    monkeypatch.setitem(resolvers.RESOLVERS, "obo", Resolver())
+    monkeypatch.setitem(RESOLVERS, "obo", Resolver())
 
     defaults = DefaultsConfig(prefer_source=["obo"])
     config = ResolvedConfig(defaults=defaults, specs=[])
@@ -314,7 +312,7 @@ def test_plan_all_rejects_disallowed_host(monkeypatch: pytest.MonkeyPatch) -> No
                 service="obo",
             )
 
-    monkeypatch.setitem(resolvers.RESOLVERS, "blocked", _Resolver())
+    monkeypatch.setitem(RESOLVERS, "blocked", _Resolver())
 
     spec = core.FetchSpec(id="hp", resolver="blocked", extras={}, target_formats=("owl",))
 
@@ -632,8 +630,8 @@ def test_plan_one_uses_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
         def plan(self, spec, config, logger):
             return _make_plan()
 
-    monkeypatch.setitem(resolvers.RESOLVERS, "obo", FailingResolver())
-    monkeypatch.setitem(resolvers.RESOLVERS, "lov", SuccessfulResolver())
+    monkeypatch.setitem(RESOLVERS, "obo", FailingResolver())
+    monkeypatch.setitem(RESOLVERS, "lov", SuccessfulResolver())
 
     defaults = DefaultsConfig(prefer_source=["obo", "lov"])
     config = ResolvedConfig(defaults=defaults, specs=[])
@@ -653,7 +651,7 @@ def test_plan_one_respects_disabled_fallback(monkeypatch: pytest.MonkeyPatch) ->
         def plan(self, spec, config, logger):
             raise ConfigError("boom")
 
-    monkeypatch.setitem(resolvers.RESOLVERS, "obo", FailingResolver())
+    monkeypatch.setitem(RESOLVERS, "obo", FailingResolver())
 
     defaults = DefaultsConfig(
         prefer_source=["obo", "lov"],
@@ -696,8 +694,8 @@ def test_fetch_one_download_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: 
         def plan(self, spec, config, logger):
             return fallback_plan
 
-    monkeypatch.setitem(resolvers.RESOLVERS, "obo", PrimaryResolver())
-    monkeypatch.setitem(resolvers.RESOLVERS, "lov", SecondaryResolver())
+    monkeypatch.setitem(RESOLVERS, "obo", PrimaryResolver())
+    monkeypatch.setitem(RESOLVERS, "lov", SecondaryResolver())
 
     defaults = DefaultsConfig(prefer_source=["lov"])
     config = ResolvedConfig(defaults=defaults, specs=[])
@@ -814,7 +812,7 @@ def test_fetch_records_expected_checksum_and_index(
         def plan(self, spec, config, logger):
             return checksum_plan
 
-    monkeypatch.setitem(resolvers.RESOLVERS, "obo", ChecksumResolver())
+    monkeypatch.setitem(RESOLVERS, "obo", ChecksumResolver())
 
     defaults = DefaultsConfig(prefer_source=["obo"])
     config = ResolvedConfig(defaults=defaults, specs=[])
@@ -903,7 +901,9 @@ def test_resolve_expected_checksum_fetches_url(monkeypatch: pytest.MonkeyPatch) 
     spec = core.FetchSpec(
         id="hp",
         resolver="obo",
-        extras={"checksum_url": {"url": "https://example.org/checksums.txt", "algorithm": "sha256"}},
+        extras={
+            "checksum_url": {"url": "https://example.org/checksums.txt", "algorithm": "sha256"}
+        },
         target_formats=["owl"],
     )
     plan = FetchPlan(

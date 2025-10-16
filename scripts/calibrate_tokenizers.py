@@ -31,7 +31,7 @@ from typing import List
 
 from transformers import AutoTokenizer
 
-from DocsToKG.DocParsing._common import get_logger, iter_doctags
+from DocsToKG.DocParsing.core import get_logger, iter_doctags
 
 # --- Private Helpers ---
 

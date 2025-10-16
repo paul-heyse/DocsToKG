@@ -29,8 +29,13 @@ import pooch
 import psutil
 import requests
 
-from .settings import ConfigError, DownloadConfiguration, DownloadFailure, OntologyDownloadError, PolicyError
-
+from .settings import (
+    ConfigError,
+    DownloadConfiguration,
+    DownloadFailure,
+    OntologyDownloadError,
+    PolicyError,
+)
 
 _DNS_CACHE: Dict[str, Tuple[float, List[Tuple]]] = {}
 _DNS_CACHE_TTL = 120.0
@@ -446,6 +451,7 @@ def extract_archive_safe(
         return extract_tar_safe(archive_path, destination, logger=logger)
     raise ConfigError(f"Unsupported archive format: {archive_path}")
 
+
 # --- Rate limiter utilities merged from ratelimit.py ---
 
 try:  # pragma: no cover - POSIX only
@@ -640,7 +646,9 @@ class RateLimiterRegistry:
                     )
                 else:
                     bucket = TokenBucket(rate_per_sec=rate, capacity=capacity)
-                entry = _BucketEntry(bucket=bucket, rate=rate, capacity=capacity, shared_path=shared_path)
+                entry = _BucketEntry(
+                    bucket=bucket, rate=rate, capacity=capacity, shared_path=shared_path
+                )
                 self._buckets[key] = entry
             return entry.bucket
 
@@ -669,6 +677,7 @@ class RateLimiterRegistry:
 
 
 REGISTRY = RateLimiterRegistry()
+
 
 def get_bucket(
     *,
@@ -703,10 +712,8 @@ def reset() -> None:
 
     REGISTRY.reset()
 
-import logging
-import random
-import shutil
-import time
+
+
 T = TypeVar("T")
 
 
@@ -1526,6 +1533,7 @@ def __getattr__(name: str):
 
         return _validate_manifest_dict
     raise AttributeError(name)
+
 
 # --- Lightweight helpers merged from utils.py ---
 

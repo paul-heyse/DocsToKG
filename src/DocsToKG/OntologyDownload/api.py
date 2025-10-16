@@ -1,11 +1,275 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.api",
+#   "purpose": "Command-line interface and helpers for ontology downloads",
+#   "sections": [
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "describe-plugin",
+#       "name": "_describe_plugin",
+#       "anchor": "function-describe-plugin",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "list-plugins",
+#       "name": "list_plugins",
+#       "anchor": "function-list-plugins",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "about",
+#       "name": "about",
+#       "anchor": "function-about",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-table",
+#       "name": "format_table",
+#       "anchor": "function-format-table",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-plan-rows",
+#       "name": "format_plan_rows",
+#       "anchor": "function-format-plan-rows",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-results-table",
+#       "name": "format_results_table",
+#       "anchor": "function-format-results-table",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-validation-summary",
+#       "name": "format_validation_summary",
+#       "anchor": "function-format-validation-summary",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-parser",
+#       "name": "_build_parser",
+#       "anchor": "function-build-parser",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-target-formats",
+#       "name": "_parse_target_formats",
+#       "anchor": "function-parse-target-formats",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-positive-int",
+#       "name": "_parse_positive_int",
+#       "anchor": "function-parse-positive-int",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-allowed-hosts",
+#       "name": "_parse_allowed_hosts",
+#       "anchor": "function-parse-allowed-hosts",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize-plan-args",
+#       "name": "_normalize_plan_args",
+#       "anchor": "function-normalize-plan-args",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-since-arg",
+#       "name": "_parse_since_arg",
+#       "anchor": "function-parse-since-arg",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-since",
+#       "name": "_parse_since",
+#       "anchor": "function-parse-since",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-cli-overrides",
+#       "name": "_apply_cli_overrides",
+#       "anchor": "function-apply-cli-overrides",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "results-to-dict",
+#       "name": "_results_to_dict",
+#       "anchor": "function-results-to-dict",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute-plan-diff",
+#       "name": "_compute_plan_diff",
+#       "anchor": "function-compute-plan-diff",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format-plan-diff",
+#       "name": "_format_plan_diff",
+#       "anchor": "function-format-plan-diff",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plan-to-dict",
+#       "name": "_plan_to_dict",
+#       "anchor": "function-plan-to-dict",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-version-metadata",
+#       "name": "_resolve_version_metadata",
+#       "anchor": "function-resolve-version-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-manifest-path",
+#       "name": "_ensure_manifest_path",
+#       "anchor": "function-ensure-manifest-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-manifest",
+#       "name": "_load_manifest",
+#       "anchor": "function-load-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "collect-version-metadata",
+#       "name": "_collect_version_metadata",
+#       "anchor": "function-collect-version-metadata",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-latest-manifest",
+#       "name": "_load_latest_manifest",
+#       "anchor": "function-load-latest-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve-specs-from-args",
+#       "name": "_resolve_specs_from_args",
+#       "anchor": "function-resolve-specs-from-args",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-pull",
+#       "name": "_handle_pull",
+#       "anchor": "function-handle-pull",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-plan",
+#       "name": "_handle_plan",
+#       "anchor": "function-handle-plan",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-plan-diff",
+#       "name": "_handle_plan_diff",
+#       "anchor": "function-handle-plan-diff",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-plugins",
+#       "name": "_handle_plugins",
+#       "anchor": "function-handle-plugins",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-prune",
+#       "name": "_handle_prune",
+#       "anchor": "function-handle-prune",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "doctor-report",
+#       "name": "_doctor_report",
+#       "anchor": "function-doctor-report",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply-doctor-fixes",
+#       "name": "_apply_doctor_fixes",
+#       "anchor": "function-apply-doctor-fixes",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "print-doctor-report",
+#       "name": "_print_doctor_report",
+#       "anchor": "function-print-doctor-report",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-show",
+#       "name": "_handle_show",
+#       "anchor": "function-handle-show",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "selected-validators",
+#       "name": "_selected_validators",
+#       "anchor": "function-selected-validators",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-validate",
+#       "name": "_handle_validate",
+#       "anchor": "function-handle-validate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-init",
+#       "name": "_handle_init",
+#       "anchor": "function-handle-init",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "handle-config-validate",
+#       "name": "_handle_config_validate",
+#       "anchor": "function-handle-config-validate",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cli-main",
+#       "name": "cli_main",
+#       "anchor": "function-cli-main",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Public facade aggregating ontology downloader modules."""
 
 from __future__ import annotations
 
+import argparse
 import hashlib as _hashlib
+import importlib.util
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
 from collections import OrderedDict
+from datetime import datetime, timezone
 from importlib import metadata as importlib_metadata
-from typing import Dict
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+
+import requests
+import yaml
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError
 
 from .io import (
     RDF_MIME_ALIASES,
@@ -13,6 +277,7 @@ from .io import (
     DownloadResult,
     download_stream,
     extract_archive_safe,
+    format_bytes,
     generate_correlation_id,
     mask_sensitive_data,
     retry_with_backoff,
@@ -22,13 +287,13 @@ from .io import (
 from .planning import (
     MANIFEST_JSON_SCHEMA,
     MANIFEST_SCHEMA_VERSION,
+    RESOLVERS,
     ConfigurationError,
     FetchResult,
     FetchSpec,
     OntologyDownloadError,
     PlannedFetch,
     ResolverCandidate,
-    RESOLVERS,
     _build_destination,
     fetch_all,
     fetch_one,
@@ -55,6 +320,7 @@ from .settings import (
     LoggingConfiguration,
     ResolvedConfig,
     ValidationConfig,
+    _directory_size,
     build_resolved_config,
     ensure_python_version,
     get_env_overrides,
@@ -73,7 +339,6 @@ from .validation import (
     ValidationResult,
     ValidationTimeout,
     ValidatorSubprocessError,
-    main as validation_main,
     normalize_streaming,
     run_validators,
     validate_arelle,
@@ -81,6 +346,9 @@ from .validation import (
     validate_pronto,
     validate_rdflib,
     validate_robot,
+)
+from .validation import (
+    main as validation_main,
 )
 
 hashlib = _hashlib
@@ -179,6 +447,8 @@ __all__ = [
     "__version__",
     "hashlib",
 ]
+
+
 def _describe_plugin(obj: object) -> str:
     module = getattr(obj, "__module__", obj.__class__.__module__)
     name = getattr(obj, "__qualname__", obj.__class__.__name__)
@@ -215,6 +485,7 @@ def about() -> Dict[str, object]:
             "validator": list_plugins("validator"),
         },
     }
+
 
 # --- CLI utilities merged from cli.py ---
 # === NAVMAP v1 ===
@@ -446,25 +717,6 @@ without editing configuration files. JSON output modes support automation while
 rich ASCII tables summarise resolver fallback chains and validator results.
 """
 
-import argparse
-import importlib.util
-import json
-import os
-import re
-import shutil
-import subprocess
-import sys
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
-
-import requests
-import yaml
-from jsonschema import Draft202012Validator
-from jsonschema.exceptions import SchemaError
-
-from .io import format_bytes
-from .settings import _directory_size
 
 # --- Globals ---
 
@@ -958,6 +1210,7 @@ def _parse_since(value: Optional[Union[str, datetime]]) -> Optional[datetime]:
         return None
     return _parse_since_arg(text)
 
+
 def _apply_cli_overrides(config: ResolvedConfig, args) -> None:
     """Mutate resolved configuration based on CLI override arguments.
 
@@ -1106,6 +1359,7 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
     if metadata.get("etag"):
         payload["etag"] = metadata["etag"]
     return payload
+
 
 def _resolve_version_metadata(
     ontology_id: str, version: str

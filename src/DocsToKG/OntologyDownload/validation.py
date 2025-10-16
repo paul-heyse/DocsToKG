@@ -19,11 +19,23 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
+from importlib import metadata
 from itertools import islice
 from pathlib import Path
-from typing import Any, BinaryIO, Callable, Dict, Iterable, Iterator, List, MutableMapping, Optional, Protocol, Tuple, Union
-
-from importlib import metadata
+from typing import (
+    Any,
+    BinaryIO,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    MutableMapping,
+    Optional,
+    Protocol,
+    Tuple,
+    Union,
+)
 
 from .io import log_memory_usage
 from .settings import ResolvedConfig, get_owlready2, get_pronto, get_rdflib

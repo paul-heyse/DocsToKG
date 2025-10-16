@@ -410,8 +410,8 @@ class _DummyTqdm:
         pass
 
 
-from DocsToKG.DocParsing import _common, schemas  # noqa: E402
-from DocsToKG.DocParsing.schemas import (  # noqa: E402
+from DocsToKG.DocParsing import core, formats  # noqa: E402
+from DocsToKG.DocParsing.formats import (  # noqa: E402
     CHUNK_SCHEMA_VERSION,
     VECTOR_SCHEMA_VERSION,
     validate_chunk_row,
@@ -435,7 +435,7 @@ def _reset_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 def test_detect_data_root_env(tmp_path: Path) -> None:
     data = tmp_path / "Data"
     data.mkdir(exist_ok=True)
-    root = _common.detect_data_root()
+    root = core.detect_data_root()
     assert root == data.resolve()
 
 
@@ -446,7 +446,7 @@ def test_detect_data_root_scan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     project.mkdir(parents=True)
     (target / "DocTagsFiles").mkdir(parents=True)
     monkeypatch.chdir(project)
-    resolved = _common.detect_data_root()
+    resolved = core.detect_data_root()
     assert resolved == target.resolve()
 
 
@@ -454,18 +454,18 @@ def test_detect_data_root_fallback(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     monkeypatch.delenv("DOCSTOKG_DATA_ROOT", raising=False)
     start = tmp_path / "no_data_here"
     start.mkdir()
-    resolved = _common.detect_data_root(start)
+    resolved = core.detect_data_root(start)
     assert resolved == (start / "Data").resolve()
 
 
 def test_data_directories_created(tmp_path: Path) -> None:
     expected = {
-        _common.data_doctags(): "DocTagsFiles",
-        _common.data_chunks(): "ChunkedDocTagFiles",
-        _common.data_vectors(): "Embeddings",
-        _common.data_manifests(): "Manifests",
-        _common.data_pdfs(): "PDFs",
-        _common.data_html(): "HTML",
+        core.data_doctags(): "DocTagsFiles",
+        core.data_chunks(): "ChunkedDocTagFiles",
+        core.data_vectors(): "Embeddings",
+        core.data_manifests(): "Manifests",
+        core.data_pdfs(): "PDFs",
+        core.data_html(): "HTML",
     }
     for path, folder in expected.items():
         assert folder in str(path)
@@ -473,13 +473,13 @@ def test_data_directories_created(tmp_path: Path) -> None:
 
 
 def test_get_logger_idempotent() -> None:
-    logger1 = _common.get_logger("docparse-test")
-    logger2 = _common.get_logger("docparse-test")
+    logger1 = core.get_logger("docparse-test")
+    logger2 = core.get_logger("docparse-test")
     assert logger1 is logger2
 
 
 def test_find_free_port_basic() -> None:
-    port = _common.find_free_port(start=9000, span=4)
+    port = core.find_free_port(start=9000, span=4)
     assert isinstance(port, int)
 
 
@@ -489,7 +489,7 @@ def test_find_free_port_fallback() -> None:
     sock.listen()
     busy_port = sock.getsockname()[1]
     try:
-        result = _common.find_free_port(start=busy_port, span=1)
+        result = core.find_free_port(start=busy_port, span=1)
         assert result != busy_port
     finally:
         sock.close()
@@ -497,7 +497,7 @@ def test_find_free_port_fallback() -> None:
 
 def test_atomic_write_success(tmp_path: Path) -> None:
     target = tmp_path / "file.json"
-    with _common.atomic_write(target) as handle:
+    with core.atomic_write(target) as handle:
         handle.write("data")
     assert target.read_text(encoding="utf-8") == "data"
 
@@ -505,7 +505,7 @@ def test_atomic_write_success(tmp_path: Path) -> None:
 def test_atomic_write_failure(tmp_path: Path) -> None:
     target = tmp_path / "file.json"
     with pytest.raises(RuntimeError):
-        with _common.atomic_write(target) as handle:
+        with core.atomic_write(target) as handle:
             handle.write("data")
             raise RuntimeError("boom")
     assert not target.exists()
@@ -513,17 +513,17 @@ def test_atomic_write_failure(tmp_path: Path) -> None:
 
 
 def test_iter_doctags(tmp_path: Path) -> None:
-    doctags_dir = _common.data_doctags()
+    doctags_dir = core.data_doctags()
     target = Path(doctags_dir)
     files = [target / "a.doctags", target / "b.doctag"]
     for file in files:
         file.write_text("content", encoding="utf-8")
-    results = list(_common.iter_doctags(target))
+    results = list(core.iter_doctags(target))
     assert results == sorted(file.resolve() for file in files)
 
 
 def test_iter_chunks(tmp_path: Path) -> None:
-    chunks_dir = _common.data_chunks()
+    chunks_dir = core.data_chunks()
     good = chunks_dir / "doc.chunks.jsonl"
     nested = chunks_dir / "teamA" / "doc.chunks.jsonl"
     other = chunks_dir / "doc.jsonl"
@@ -531,21 +531,21 @@ def test_iter_chunks(tmp_path: Path) -> None:
     nested.parent.mkdir(parents=True, exist_ok=True)
     nested.write_text("{}\n", encoding="utf-8")
     other.write_text("{}\n", encoding="utf-8")
-    results = list(_common.iter_chunks(chunks_dir))
+    results = list(core.iter_chunks(chunks_dir))
     assert results == sorted({good.resolve(), nested.resolve()})
 
 
 def test_jsonl_load_and_save(tmp_path: Path) -> None:
     target = tmp_path / "example.jsonl"
-    _common.jsonl_save(target, [{"a": 1}, {"b": 2}])
-    rows = _common.jsonl_load(target)
+    core.jsonl_save(target, [{"a": 1}, {"b": 2}])
+    rows = core.jsonl_load(target)
     assert rows == [{"a": 1}, {"b": 2}]
 
 
 def test_jsonl_load_skip_invalid(tmp_path: Path) -> None:
     target = tmp_path / "bad.jsonl"
     target.write_text("{\ninvalid\n", encoding="utf-8")
-    rows = _common.jsonl_load(target, skip_invalid=True, max_errors=1)
+    rows = core.jsonl_load(target, skip_invalid=True, max_errors=1)
     assert rows == []
 
 
@@ -556,18 +556,18 @@ def test_jsonl_save_validation_error(tmp_path: Path) -> None:
         raise ValueError("bad row")
 
     with pytest.raises(ValueError, match="Validation failed"):
-        _common.jsonl_save(target, [{"a": 1}], validate=validate)
+        core.jsonl_save(target, [{"a": 1}], validate=validate)
     assert not target.exists()
 
 
 def test_batcher() -> None:
-    assert list(_common.Batcher([1, 2, 3, 4, 5], 2)) == [[1, 2], [3, 4], [5]]
-    assert list(_common.Batcher([], 3)) == []
+    assert list(core.Batcher([1, 2, 3, 4, 5], 2)) == [[1, 2], [3, 4], [5]]
+    assert list(core.Batcher([], 3)) == []
 
 
 def test_manifest_append(tmp_path: Path) -> None:
-    manifest = _common.data_manifests() / "docparse.chunks.manifest.jsonl"
-    _common.manifest_append("chunks", "doc-1", "success", duration_s=1.23)
+    manifest = core.data_manifests() / "docparse.chunks.manifest.jsonl"
+    core.manifest_append("chunks", "doc-1", "success", duration_s=1.23)
     content = manifest.read_text(encoding="utf-8").strip()
     record = json.loads(content)
     assert record["stage"] == "chunks"
@@ -603,84 +603,84 @@ def make_vector_row(**overrides):
 
 
 def test_chunk_row_valid() -> None:
-    parsed = schemas.validate_chunk_row(make_chunk_row())
+    parsed = formats.validate_chunk_row(make_chunk_row())
     assert parsed.doc_id == "doc"
-    assert parsed.schema_version == schemas.CHUNK_SCHEMA_VERSION
+    assert parsed.schema_version == formats.CHUNK_SCHEMA_VERSION
 
 
 def test_chunk_row_missing_field() -> None:
     with pytest.raises(ValueError):
-        schemas.validate_chunk_row({"doc_id": "doc"})
+        formats.validate_chunk_row({"doc_id": "doc"})
 
 
 def test_chunk_row_invalid_num_tokens() -> None:
     with pytest.raises(ValueError):
-        schemas.validate_chunk_row(make_chunk_row(num_tokens=0))
+        formats.validate_chunk_row(make_chunk_row(num_tokens=0))
     with pytest.raises(ValueError):
-        schemas.validate_chunk_row(make_chunk_row(num_tokens=200_000))
+        formats.validate_chunk_row(make_chunk_row(num_tokens=200_000))
 
 
 def test_chunk_row_invalid_page_numbers() -> None:
     with pytest.raises(ValueError):
-        schemas.validate_chunk_row(make_chunk_row(page_nos=[0, 1]))
+        formats.validate_chunk_row(make_chunk_row(page_nos=[0, 1]))
 
 
 def test_provenance_invalid_engine() -> None:
     with pytest.raises(ValueError):
-        schemas.ProvenanceMetadata(parse_engine="bad", docling_version="1")
+        formats.ProvenanceMetadata(parse_engine="bad", docling_version="1")
 
 
 def test_vector_row_valid() -> None:
-    parsed = schemas.validate_vector_row(make_vector_row())
+    parsed = formats.validate_vector_row(make_vector_row())
     assert parsed.UUID == "uuid"
-    assert parsed.schema_version == schemas.VECTOR_SCHEMA_VERSION
+    assert parsed.schema_version == formats.VECTOR_SCHEMA_VERSION
 
 
 def test_vector_row_mismatched_terms() -> None:
     data = make_vector_row(BM25={"terms": ["a"], "weights": [1.0, 2.0], "avgdl": 1.0, "N": 1})
     with pytest.raises(ValueError):
-        schemas.validate_vector_row(data)
+        formats.validate_vector_row(data)
 
 
 def test_vector_row_negative_weights() -> None:
     data = make_vector_row(SPLADEv3={"tokens": ["a"], "weights": [-0.1]})
     with pytest.raises(ValueError):
-        schemas.validate_vector_row(data)
+        formats.validate_vector_row(data)
 
 
 def test_dense_vector_dimension_mismatch() -> None:
     data = make_vector_row(Qwen3_4B={"model_id": "model", "vector": [0.1], "dimension": 2})
     with pytest.raises(ValueError):
-        schemas.validate_vector_row(data)
+        formats.validate_vector_row(data)
 
 
 def test_get_docling_version(monkeypatch: pytest.MonkeyPatch) -> None:
     module = SimpleNamespace(__version__="1.2.3")
     monkeypatch.setitem(sys.modules, "docling", module)
-    assert schemas.get_docling_version() == "1.2.3"
+    assert formats.get_docling_version() == "1.2.3"
     monkeypatch.delitem(sys.modules, "docling", raising=False)
-    assert schemas.get_docling_version() == "unknown"
+    assert formats.get_docling_version() == "unknown"
 
 
 def test_validate_schema_version() -> None:
     assert (
-        schemas.validate_schema_version("docparse/1.1.0", schemas.COMPATIBLE_CHUNK_VERSIONS)
+        formats.validate_schema_version("docparse/1.1.0", formats.COMPATIBLE_CHUNK_VERSIONS)
         == "docparse/1.1.0"
     )
     with pytest.raises(ValueError):
-        schemas.validate_schema_version("other", schemas.COMPATIBLE_CHUNK_VERSIONS)
+        formats.validate_schema_version("other", formats.COMPATIBLE_CHUNK_VERSIONS)
     with pytest.raises(ValueError):
-        schemas.validate_schema_version(None, schemas.COMPATIBLE_CHUNK_VERSIONS)
+        formats.validate_schema_version(None, formats.COMPATIBLE_CHUNK_VERSIONS)
 
 
 def test_chunk_row_invalid_schema_version() -> None:
     with pytest.raises(ValueError):
-        schemas.validate_chunk_row(make_chunk_row(schema_version="docparse/0.9.0"))
+        formats.validate_chunk_row(make_chunk_row(schema_version="docparse/0.9.0"))
 
 
 def test_vector_row_invalid_schema_version() -> None:
     with pytest.raises(ValueError):
-        schemas.validate_vector_row(make_vector_row(schema_version="embeddings/0.9.0"))
+        formats.validate_vector_row(make_vector_row(schema_version="embeddings/0.9.0"))
 
 
 # --- Golden fixture validation ---
@@ -742,24 +742,22 @@ def test_set_spawn_or_warn_warns_on_incompatible_method(
             pass
 
     dummy = DummyLogger()
-    _common.set_spawn_or_warn(dummy)
+    core.set_spawn_or_warn(dummy)
     assert dummy.warnings
     assert "spawn" in dummy.warnings[0]
 
 
 def test_compute_relative_doc_id_handles_subdirectories(tmp_path: Path) -> None:
-    from DocsToKG.DocParsing import _common
-
     root = tmp_path / "docs"
     nested = root / "teamA" / "report.doctags"
     nested.parent.mkdir(parents=True, exist_ok=True)
     nested.write_text("{}", encoding="utf-8")
 
-    assert _common.compute_relative_doc_id(nested, root) == "teamA/report.doctags"
+    assert core.compute_relative_doc_id(nested, root) == "teamA/report.doctags"
 
 
 def test_derive_doc_id_and_vectors_path(tmp_path: Path) -> None:
-    from DocsToKG.DocParsing._common import derive_doc_id_and_vectors_path
+    from DocsToKG.DocParsing.core import derive_doc_id_and_vectors_path
 
     chunks_root = tmp_path / "chunks"
     chunk_file = chunks_root / "teamA" / "report.chunks.jsonl"
@@ -774,7 +772,7 @@ def test_derive_doc_id_and_vectors_path(tmp_path: Path) -> None:
 
 
 def test_chunk_row_fields_unique() -> None:
-    fields = schemas.ChunkRow.model_fields
+    fields = formats.ChunkRow.model_fields
     for name in ("has_image_captions", "has_image_classification", "num_images"):
         assert name in fields
 
@@ -815,7 +813,7 @@ def test_detect_mode_raises_when_both_present(tmp_path: Path) -> None:
 
 
 def test_ensure_uuid_deterministic_generation() -> None:
-    from DocsToKG.DocParsing import EmbeddingV2 as embedding
+    from DocsToKG.DocParsing import embedding as embedding
 
     rows = [
         {
@@ -843,7 +841,7 @@ def test_ensure_uuid_deterministic_generation() -> None:
 
 
 def test_qwen_embed_caches_llm(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    from DocsToKG.DocParsing import EmbeddingV2 as embedding
+    from DocsToKG.DocParsing import embedding as embedding
 
     class DummyOutput:
         def __init__(self) -> None:

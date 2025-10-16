@@ -35,7 +35,9 @@ def read_resolver_config(path: Path) -> Dict[str, Any]:
         try:
             import yaml  # type: ignore
         except ImportError as exc:  # pragma: no cover - optional dependency
-            raise RuntimeError("Install PyYAML to load YAML resolver configs, or provide JSON.") from exc
+            raise RuntimeError(
+                "Install PyYAML to load YAML resolver configs, or provide JSON."
+            ) from exc
         return yaml.safe_load(text) or {}
 
     if ext in {".json", ".jsn"}:

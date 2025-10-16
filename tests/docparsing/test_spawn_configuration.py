@@ -156,7 +156,7 @@ def test_multiprocessing_import_safety():
     # This test ensures the function can be imported and called
     # without causing multiprocessing-related import issues
     try:
-        from DocsToKG.DocParsing._common import set_spawn_or_warn
+        from DocsToKG.DocParsing.core import set_spawn_or_warn
 
         set_spawn_or_warn()
         assert True  # If we get here, no exception was raised

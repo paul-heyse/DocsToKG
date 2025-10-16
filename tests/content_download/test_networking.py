@@ -2249,7 +2249,7 @@ def test_successful_pdf_download_populates_metadata(tmp_path, monkeypatch):
     assert outcome.content_length == stored.stat().st_size
     assert outcome.etag == '"etag-123"'
     assert outcome.last_modified == "Mon, 01 Jan 2024 00:00:00 GMT"
-    assert outcome.reason is None
+    assert outcome.reason is ReasonCode.CONDITIONAL_NOT_MODIFIED
     assert outcome.extracted_text_path is None
     rehashed = hashlib.sha256(stored.read_bytes()).hexdigest()
     assert rehashed == expected_sha
@@ -2291,12 +2291,12 @@ def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
     )
 
     assert outcome.classification is Classification.CACHED
-    assert outcome.path == cached_path
-    assert outcome.sha256 == "cached-sha"
-    assert outcome.content_length == 1024
+    assert outcome.path == str(cached_file)
+    assert outcome.sha256 == cached_sha
+    assert outcome.content_length == len(cached_bytes)
     assert outcome.etag == '"etag-cached"'
     assert outcome.last_modified == "Tue, 02 Jan 2024 00:00:00 GMT"
-    assert outcome.reason is None
+    assert outcome.reason is ReasonCode.CONDITIONAL_NOT_MODIFIED
 
 
 # --- test_download_outcomes.py ---

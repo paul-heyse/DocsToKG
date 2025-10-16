@@ -46,7 +46,7 @@ from unittest.mock import patch
 
 import pytest
 
-from DocsToKG.DocParsing.pipelines import (
+from DocsToKG.DocParsing.doctags import (
     resolve_hf_home,
     resolve_model_root,
     resolve_pdf_model_path,

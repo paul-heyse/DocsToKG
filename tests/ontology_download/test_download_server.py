@@ -122,9 +122,8 @@ pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
 from DocsToKG.OntologyDownload import DownloadConfiguration
-from DocsToKG.OntologyDownload import net as net_mod
-from DocsToKG.OntologyDownload import ontology_download as download
-from DocsToKG.OntologyDownload import io_safe as io_safe_mod
+from DocsToKG.OntologyDownload import api as download
+from DocsToKG.OntologyDownload import io as io_mod
 
 
 @dataclass
@@ -274,9 +273,9 @@ def http_server():
 
 
 def _reset_token_buckets():
-    net_mod._TOKEN_BUCKETS.clear()
+    io_mod.reset()
     yield
-    net_mod._TOKEN_BUCKETS.clear()
+    io_mod.reset()
 
 
 @pytest.fixture(autouse=True)
@@ -289,8 +288,7 @@ def _allow_local_addresses(monkeypatch):
         return url
 
     monkeypatch.setattr(download, "validate_url_security", _validate)
-    monkeypatch.setattr(net_mod, "validate_url_security", _validate, raising=False)
-    monkeypatch.setattr(io_safe_mod, "validate_url_security", _validate, raising=False)
+    monkeypatch.setattr(io_mod, "validate_url_security", _validate, raising=False)
 
     class _LocalResponse:
         def __init__(self, url: str, method: str, headers: Dict[str, str], timeout: Optional[int]):
@@ -348,7 +346,7 @@ def _allow_local_addresses(monkeypatch):
                 merged = {**self.headers, **(headers or {})}
                 return _LocalResponse(url, "GET", merged, timeout)
 
-        monkeypatch.setattr(net_mod.requests, "Session", _LocalSession, raising=False)
+        monkeypatch.setattr(download.requests, "Session", _LocalSession, raising=False)
 
 
 def _download_to_tmp(
@@ -445,7 +443,7 @@ def test_cache_hit_uses_304(http_server, tmp_path):
     manifest = {
         "etag": state.cache_etag,
         "last_modified": "Mon, 01 Jan 2024 00:00:00 GMT",
-        "sha256": io_safe_mod.sha256_file(destination),
+        "sha256": io_mod.sha256_file(destination),
     }
     destination.write_bytes(b"cached")
     _, cached = _download_to_tmp(f"{base_url}/cache", tmp_path, previous_manifest=manifest)
@@ -477,7 +475,7 @@ def test_etag_flip_updates_etag(http_server, tmp_path):
     first_dest, first_result = _download_to_tmp(f"{base_url}/etag-flip", tmp_path)
     manifest = {
         "etag": first_result.etag,
-        "sha256": io_safe_mod.sha256_file(first_dest),
+        "sha256": io_mod.sha256_file(first_dest),
     }
     second_dest, second_result = _download_to_tmp(
         f"{base_url}/etag-flip", tmp_path, previous_manifest=manifest
@@ -513,7 +511,8 @@ def test_token_bucket_limits_concurrency(monkeypatch, http_server, tmp_path):
     def _get_bucket(host, http_config, service=None):  # noqa: ARG001
         return bucket
 
-    monkeypatch.setattr(net_mod, "_get_bucket", _get_bucket, raising=False)
+    monkeypatch.setattr(download, "get_bucket", _get_bucket, raising=False)
+    monkeypatch.setattr(io_mod, "get_bucket", _get_bucket, raising=False)
 
     def _run(idx: int) -> Path:
         path = tmp_path / f"concurrent-{idx}.owl"
@@ -550,7 +549,8 @@ def test_concurrent_hosts_do_not_block(monkeypatch, http_server, tmp_path):
     def _bucket_for_host(host, http_config, service=None):  # noqa: ARG001
         return _PassthroughBucket(host)
 
-    monkeypatch.setattr(net_mod, "_get_bucket", _bucket_for_host, raising=False)
+    monkeypatch.setattr(download, "get_bucket", _bucket_for_host, raising=False)
+    monkeypatch.setattr(io_mod, "get_bucket", _bucket_for_host, raising=False)
 
     def _run(url: str, output: Path) -> None:
         download.download_stream(

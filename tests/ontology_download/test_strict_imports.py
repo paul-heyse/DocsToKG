@@ -23,11 +23,11 @@ def _run_strict_import(module: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_optdeps_strict_import_allowed() -> None:
-    result = _run_strict_import("DocsToKG.OntologyDownload.optdeps")
+def test_settings_strict_import_allowed() -> None:
+    result = _run_strict_import("DocsToKG.OntologyDownload.settings")
     assert result.returncode == 0, result.stderr or result.stdout
 
 
-def test_storage_strict_import_allowed() -> None:
-    result = _run_strict_import("DocsToKG.OntologyDownload.storage")
+def test_io_strict_import_allowed() -> None:
+    result = _run_strict_import("DocsToKG.OntologyDownload.io")
     assert result.returncode == 0, result.stderr or result.stdout

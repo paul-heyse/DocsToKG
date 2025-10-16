@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pytest
 
-from DocsToKG.DocParsing.pipelines import PdfTask
+from DocsToKG.DocParsing.doctags import PdfTask
 
 # --- Test Cases ---
 

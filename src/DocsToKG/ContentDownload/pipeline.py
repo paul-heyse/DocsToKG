@@ -614,7 +614,9 @@ class ResolverConfig:
                         )
                     payload["breaker_threshold"] = threshold
                 if "breaker_cooldown" in spec or "cooldown_seconds" in spec:
-                    cooldown = float(spec.get("breaker_cooldown", spec.get("cooldown_seconds", 60.0)))
+                    cooldown = float(
+                        spec.get("breaker_cooldown", spec.get("cooldown_seconds", 60.0))
+                    )
                     if cooldown < 0:
                         raise ValueError(
                             (
@@ -3283,7 +3285,6 @@ class ResolverPipeline:
             breaker = self._get_existing_host_breaker(host_key)
             if breaker:
                 breaker.record_success()
-
 
     def _jitter_sleep(self) -> None:
         """Introduce a small delay to avoid stampeding downstream services.

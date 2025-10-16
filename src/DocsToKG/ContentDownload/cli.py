@@ -145,12 +145,12 @@ from __future__ import annotations
 import argparse
 import contextlib
 import hashlib
-import shutil
 import json
 import logging
 import os
-import time
+import shutil
 import threading
+import time
 from collections import defaultdict
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass, field
@@ -164,16 +164,15 @@ from typing import (
     Iterable,
     List,
     Optional,
-    Sequence,
     Set,
     Tuple,
 )
+from urllib.parse import urlparse, urlsplit
+from urllib.robotparser import RobotFileParser
 
 import requests
 from pyalex import Topics, Works
 from pyalex import config as oa_config
-from urllib.parse import urlparse, urlsplit
-from urllib.robotparser import RobotFileParser
 
 from DocsToKG.ContentDownload import resolvers
 from DocsToKG.ContentDownload.classifications import PDF_LIKE, Classification, ReasonCode
@@ -200,17 +199,17 @@ from DocsToKG.ContentDownload.network import (
 from DocsToKG.ContentDownload.telemetry import (
     MANIFEST_SCHEMA_VERSION,
     AttemptSink,
-    build_manifest_entry,
     CsvSink,
     JsonlSink,
     LastAttemptCsvSink,
     ManifestEntry,
     ManifestIndexSink,
-    load_previous_manifest,
-    load_manifest_url_index,
     MultiSink,
-    SummarySink,
     SqliteSink,
+    SummarySink,
+    build_manifest_entry,
+    load_manifest_url_index,
+    load_previous_manifest,
 )
 from DocsToKG.ContentDownload.utils import (
     dedupe,
@@ -274,7 +273,6 @@ LOGGER = logging.getLogger("DocsToKG.ContentDownload")
 
 
 # --- Pipeline Helpers ---
-
 
 
 # --- Public Functions ---
@@ -541,19 +539,19 @@ def _parse_budget(value: str) -> Tuple[str, int]:
         multiplier = 1024
         amount_text = amount_text[:-2]
     elif amount_text.endswith("mb"):
-        multiplier = 1024 ** 2
+        multiplier = 1024**2
         amount_text = amount_text[:-2]
     elif amount_text.endswith("gb"):
-        multiplier = 1024 ** 3
+        multiplier = 1024**3
         amount_text = amount_text[:-2]
     elif amount_text.endswith("k"):
         multiplier = 1000
         amount_text = amount_text[:-1]
     elif amount_text.endswith("m"):
-        multiplier = 1000 ** 2
+        multiplier = 1000**2
         amount_text = amount_text[:-1]
     elif amount_text.endswith("g"):
-        multiplier = 1000 ** 3
+        multiplier = 1000**3
         amount_text = amount_text[:-1]
     try:
         amount = int(amount_text)
@@ -588,9 +586,6 @@ def _apply_content_addressed_storage(dest_path: Path, sha256: str) -> Path:
                 dest_path.unlink()
         shutil.copy2(hashed_path, dest_path)
     return hashed_path
-
-
-
 
 
 def _collect_location_urls(work: Dict[str, Any]) -> Dict[str, List[str]]:
@@ -1161,7 +1156,12 @@ def download_candidate(
             if part_path:
                 with contextlib.suppress(FileNotFoundError):
                     part_path.unlink()
-            if dest_path and context.get("content_addressed") and sha256 and detected is Classification.PDF:
+            if (
+                dest_path
+                and context.get("content_addressed")
+                and sha256
+                and detected is Classification.PDF
+            ):
                 dest_path = _apply_content_addressed_storage(dest_path, sha256)
             tail_snapshot: Optional[bytes] = bytes(tail_buffer) if tail_buffer else None
 
@@ -1301,7 +1301,13 @@ def process_one_work(
     """
     artifact = create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir)
 
-    result = {"work_id": artifact.work_id, "saved": False, "html_only": False, "skipped": False, "downloaded_bytes": 0}
+    result = {
+        "work_id": artifact.work_id,
+        "saved": False,
+        "html_only": False,
+        "skipped": False,
+        "downloaded_bytes": 0,
+    }
 
     raw_previous = previous_lookup.get(artifact.work_id, {})
     previous_map: Dict[str, Dict[str, Any]] = {}
@@ -1507,7 +1513,7 @@ def process_one_work(
         outcome=outcome,
         html_paths=html_paths_total,
         dry_run=dry_run,
-        reason=reason,
+        reason=reason_code,
     )
     logger.log_manifest(entry)
     return result

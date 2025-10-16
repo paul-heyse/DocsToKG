@@ -92,7 +92,7 @@ pytest.importorskip("transformers")
 
 pytestmark = pytest.mark.filterwarnings("ignore:.*SwigPy.*__module__ attribute:DeprecationWarning")
 
-from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (  # noqa: E402
+from DocsToKG.DocParsing.chunking import (  # noqa: E402
     Rec,
     coalesce_small_runs,
 )

@@ -283,13 +283,16 @@ from DocsToKG.DocParsing.core import (
     find_free_port,
     get_logger,
     load_manifest_index,
-    manifest_append,
+    log_event,
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
-    log_event,
+    prepare_data_root,
+    resolve_pdf_model_path,
     resolve_hf_home,
     resolve_model_root,
+    resolve_pipeline_path,
+    PDF_MODEL_SUBDIR,
     set_spawn_or_warn,
     should_skip_output,
 )
@@ -372,48 +375,6 @@ def _http_session() -> requests.Session:
     return _REQUEST_SESSION
 
 
-# --- Model Path Utilities ---
-
-
-def _looks_like_filesystem_path(candidate: str) -> bool:
-    """Return ``True`` when ``candidate`` appears to reference a local path."""
-
-    expanded = Path(candidate).expanduser()
-    drive, _ = os.path.splitdrive(candidate)
-    if drive:
-        return True
-    if expanded.is_absolute() or expanded.exists():
-        return True
-    prefixes = ["~", "."]
-    if os.sep not in prefixes:
-        prefixes.append(os.sep)
-    alt = os.altsep
-    if alt and alt not in prefixes:
-        prefixes.append(alt)
-    return any(candidate.startswith(prefix) for prefix in prefixes)
-
-
-def resolve_pdf_model_path(cli_value: str | None = None) -> str:
-    """Determine PDF model path using CLI and environment precedence.
-
-    Args:
-        cli_value: Optional CLI supplied path or model identifier.
-
-    Returns:
-        str: Absolute filesystem path or HuggingFace model identifier to use.
-    """
-
-    if cli_value:
-        if _looks_like_filesystem_path(cli_value):
-            return str(expand_path(cli_value))
-        return cli_value
-    env_model = os.getenv("DOCLING_PDF_MODEL")
-    if env_model:
-        return str(expand_path(env_model))
-    model_root = resolve_model_root()
-    return str(expand_path(model_root / PDF_MODEL_SUBDIR))
-
-
 # --- CLI Helpers ---
 
 
@@ -472,76 +433,6 @@ def add_resume_force_options(
 
     parser.add_argument("--resume", action="store_true", help=resume_help)
     parser.add_argument("--force", action="store_true", help=force_help)
-
-
-def prepare_data_root(
-    data_root_arg: Optional[Path],
-    default_root: Path,
-) -> Path:
-    """Resolve and apply DocsToKG data-root settings for CLI pipelines.
-
-    Args:
-        data_root_arg (Path | None): CLI-supplied data-root override.
-        default_root (Path): Default DocsToKG data directory.
-
-    Returns:
-        Path: Resolved data root that downstream stages should use.
-
-    Side Effects:
-        - When ``data_root_arg`` is provided, ``DOCSTOKG_DATA_ROOT`` is updated.
-        - Ensures the manifests directory exists for downstream writes.
-
-    Examples:
-        >>> root = prepare_data_root(None, Path("/tmp/data"))
-        >>> root.as_posix().endswith("/tmp/data")
-        True
-    """
-
-    resolved = detect_data_root(data_root_arg) if data_root_arg is not None else default_root
-    if data_root_arg is not None:
-        os.environ["DOCSTOKG_DATA_ROOT"] = str(resolved)
-    data_manifests(resolved)
-    return resolved
-
-
-def resolve_pipeline_path(
-    *,
-    cli_value: Optional[Path],
-    default_path: Path,
-    resolved_data_root: Path,
-    data_root_overridden: bool,
-    resolver: Callable[[Path], Path],
-) -> Path:
-    """Derive a pipeline directory path respecting data-root overrides.
-
-    Args:
-        cli_value (Path | None): Path provided via CLI argument (may be ``None``).
-        default_path (Path): Default path baked into the pipeline module.
-        resolved_data_root (Path): Effective data root for the current invocation.
-        data_root_overridden (bool): ``True`` when the CLI supplied ``--data-root``.
-        resolver (Callable[[Path], Path]): Callable that derives the directory when
-            a new data root is supplied (for example :func:`data_doctags`).
-
-    Returns:
-        Path: Directory path the pipeline should operate on. Callers may resolve the
-        path to an absolute location if required.
-
-    Examples:
-        >>> resolve_pipeline_path(
-        ...     cli_value=None,
-        ...     default_path=Path("/tmp/data/DocTagsFiles"),
-        ...     resolved_data_root=Path("/tmp/data"),
-        ...     data_root_overridden=False,
-        ...     resolver=lambda root: root / "DocTagsFiles",
-        ... ).as_posix()
-        '/tmp/data/DocTagsFiles'
-    """
-
-    if data_root_overridden and (cli_value is None or cli_value == default_path):
-        return resolver(resolved_data_root)
-    if cli_value is None:
-        return default_path
-    return cli_value
 
 
 # --- vLLM Lifecycle ---
@@ -1077,7 +968,9 @@ def wait_for_vllm(port: int, proc: sp.Popen, timeout_s: int = WAIT_TIMEOUT_S) ->
                     leftover = proc.stdout.read() or ""
                     combined_tail = tail_lines[-50:]
                     tail_text = "\n".join(combined_tail) if combined_tail else leftover[-800:]
-                    log_event(_LOGGER, "error", "vLLM exited while waiting", port=port, tail=tail_text)
+                    log_event(
+                        _LOGGER, "error", "vLLM exited while waiting", port=port, tail=tail_text
+                    )
                 finally:
                     message = (
                         f"vLLM exited early with code {proc.returncode}. "

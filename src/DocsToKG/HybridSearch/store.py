@@ -70,6 +70,18 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "chunkregistry",
+#       "name": "ChunkRegistry",
+#       "anchor": "class-chunkregistry",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "matches-filters",
+#       "name": "matches_filters",
+#       "anchor": "function-matches-filters",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "getattr",
 #       "name": "__getattr__",
 #       "anchor": "function-getattr",
@@ -95,15 +107,15 @@ import warnings
 from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import RLock
-from typing import TYPE_CHECKING, Callable, Dict, Iterator, List, Mapping, Optional, Sequence
+from typing import Callable, Dict, Iterator, List, Mapping, Optional, Sequence
 
 import numpy as np
 
 from .config import DenseIndexConfig
+from .devtools.opensearch_simulator import OpenSearchSimulator
 from .interfaces import DenseVectorStore
 from .pipeline import Observability
 from .types import ChunkPayload, vector_uuid_to_faiss_int
-from .devtools.opensearch_simulator import OpenSearchSimulator
 
 # --- Globals ---
 
@@ -111,7 +123,6 @@ logger = logging.getLogger(__name__)
 
 __all__ = (
     "FaissVectorStore",
-    "FaissIndexManager",
     "ManagedFaissAdapter",
     "AdapterStats",
     "FaissSearchResult",
@@ -454,7 +465,9 @@ class FaissVectorStore(DenseVectorStore):
                             train_target = faiss.downcast_index(base)
                         except Exception:
                             train_target = base
-                    if hasattr(train_target, "is_trained") and not getattr(train_target, "is_trained"):
+                    if hasattr(train_target, "is_trained") and not getattr(
+                        train_target, "is_trained"
+                    ):
                         nlist = int(getattr(self._config, "nlist", 1024))
                         factor = max(1, int(getattr(self._config, "ivf_train_factor", 8)))
                         ntrain = min(matrix.shape[0], nlist * factor)
@@ -590,7 +603,9 @@ class FaissVectorStore(DenseVectorStore):
         faiss.normalize_L2(matrix)
         batch = matrix.shape[0]
         try:
-            with self._observability.trace("faiss_search_batch", batch=str(batch), top_k=str(top_k)):
+            with self._observability.trace(
+                "faiss_search_batch", batch=str(batch), top_k=str(top_k)
+            ):
                 self._observability.metrics.increment("faiss_search_queries", amount=float(batch))
                 distances, indices = self._search_matrix(matrix, top_k)
             results = self._resolve_search_results(distances, indices)
@@ -748,9 +763,7 @@ class FaissVectorStore(DenseVectorStore):
             "ntotal": stats.ntotal,
         }
         log_fn = (
-            self._observability.logger.info
-            if level == "info"
-            else self._observability.logger.debug
+            self._observability.logger.info if level == "info" else self._observability.logger.debug
         )
         log_fn("faiss-gpu-state", extra={"event": payload})
 
@@ -1693,9 +1706,7 @@ def restore_state(
     if not isinstance(meta, Mapping):
         if not allow_legacy:
             raise ValueError("FAISS snapshot payload missing 'meta'")
-        logger.warning(
-            "restore_state: legacy payload without 'meta'; defaults will be applied"
-        )
+        logger.warning("restore_state: legacy payload without 'meta'; defaults will be applied")
         faiss_index.restore(base64.b64decode(encoded.encode("ascii")), meta=None)
         return
     faiss_index.restore(base64.b64decode(encoded.encode("ascii")), meta=dict(meta))

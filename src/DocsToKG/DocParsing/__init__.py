@@ -88,7 +88,15 @@ def _populate_cli_module(module: types.ModuleType) -> None:
     module.doctags = _core.doctags
     module._Command = _core._Command
     module.COMMANDS = _core.COMMANDS
-    module.__all__ = ["CommandHandler", "CLI_DESCRIPTION", "main", "run_all", "chunk", "embed", "doctags"]
+    module.__all__ = [
+        "CommandHandler",
+        "CLI_DESCRIPTION",
+        "main",
+        "run_all",
+        "chunk",
+        "embed",
+        "doctags",
+    ]
 
 
 def _populate_pdf_pipeline_module(module: types.ModuleType) -> None:
@@ -115,11 +123,13 @@ def _populate_pdf_pipeline_module(module: types.ModuleType) -> None:
     module.list_pdfs = backend.list_pdfs
 
     def parse_args(argv: object | None = None):
+        """Legacy CLI argument parser for backwards-compatible imports."""
         return backend.pdf_parse_args(argv)
 
     parse_args.__module__ = module.__name__
 
     def main(args: object | None = None) -> int:
+        """Legacy entry point delegating to :mod:`DocsToKG.DocParsing.doctags`."""
         if isinstance(args, argparse.Namespace):
             namespace = args
         else:
@@ -132,7 +142,9 @@ def _populate_pdf_pipeline_module(module: types.ModuleType) -> None:
             namespace.vlm_stop = []
         overrides = {
             "pdf_convert_one": module.__dict__.get("convert_one", backend.pdf_convert_one),
-            "ProcessPoolExecutor": module.__dict__.get("ProcessPoolExecutor", backend.ProcessPoolExecutor),
+            "ProcessPoolExecutor": module.__dict__.get(
+                "ProcessPoolExecutor", backend.ProcessPoolExecutor
+            ),
             "as_completed": module.__dict__.get("as_completed", backend.as_completed),
             "tqdm": module.__dict__.get("tqdm", backend.tqdm),
         }
@@ -175,37 +187,53 @@ def _populate_pdf_pipeline_module(module: types.ModuleType) -> None:
 
 _SHIM_BUILDERS: dict[str, Callable[[types.ModuleType], None]] = {
     "_common": lambda module: _populate_forwarding_module(module, _core, doc_hint="_common → core"),
-    "schemas": lambda module: _populate_forwarding_module(module, _formats, doc_hint="schemas → formats"),
-    "serializers": lambda module: _populate_forwarding_module(module, _formats, doc_hint="serializers → formats"),
+    "schemas": lambda module: _populate_forwarding_module(
+        module, _formats, doc_hint="schemas → formats"
+    ),
+    "serializers": lambda module: _populate_forwarding_module(
+        module, _formats, doc_hint="serializers → formats"
+    ),
     "DoclingHybridChunkerPipelineWithMin": lambda module: _populate_forwarding_module(
         module, _chunking, doc_hint="DoclingHybridChunkerPipelineWithMin → chunking"
     ),
     "EmbeddingV2": lambda module: _populate_forwarding_module(
         module, _embedding, doc_hint="EmbeddingV2 → embedding"
     ),
-    "pipelines": lambda module: _populate_forwarding_module(module, _doctags, doc_hint="pipelines → doctags"),
+    "pipelines": lambda module: _populate_forwarding_module(
+        module, _doctags, doc_hint="pipelines → doctags"
+    ),
     "cli": _populate_cli_module,
     "pdf_pipeline": _populate_pdf_pipeline_module,
 }
 
 
 class _DocParsingShimLoader(Loader):
+    """Loader that populates deprecated DocParsing modules on demand."""
+
     def __init__(self, fullname: str, builder: Callable[[types.ModuleType], None]) -> None:
+        """Store the module ``fullname`` and shim ``builder`` callback."""
         self._fullname = fullname
         self._builder = builder
 
     def create_module(self, spec: ModuleSpec) -> types.ModuleType:
+        """Create a new module instance that will be populated by the shim."""
         module = types.ModuleType(spec.name)
         module.__loader__ = self
         module.__package__ = spec.parent
         return module
 
-    def exec_module(self, module: types.ModuleType) -> None:  # pragma: no cover - exercised via import tests
+    def exec_module(
+        self, module: types.ModuleType
+    ) -> None:  # pragma: no cover - exercised via import tests
+        """Execute the shim builder to populate ``module``."""
         self._builder(module)
 
 
 class _DocParsingShimFinder(MetaPathFinder):
+    """Meta-path finder that serves the compatibility shims defined above."""
+
     def find_spec(self, fullname: str, path, target=None):
+        """Return a module spec when ``fullname`` matches a supported shim."""
         if not fullname.startswith(__name__ + "."):
             return None
         suffix = fullname.split(".", maxsplit=2)[-1]

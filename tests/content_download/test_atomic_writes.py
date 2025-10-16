@@ -342,13 +342,8 @@ _stub_module(
     attrs={"AutoTokenizer": SimpleNamespace(from_pretrained=lambda *_, **__: object())},
 )
 _stub_module("tqdm", attrs={"tqdm": lambda iterable=None, **_: iterable})
-_stub_module(
-    "DocsToKG.DocParsing.serializers",
-    attrs={"RichSerializerProvider": lambda: SimpleNamespace()},
-)
-
-import DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin as chunker  # noqa: E402
-import DocsToKG.DocParsing.EmbeddingV2 as embeddings  # noqa: E402
+import DocsToKG.DocParsing.chunking as chunker  # noqa: E402
+import DocsToKG.DocParsing.embedding as embeddings  # noqa: E402
 
 if not hasattr(chunker, "manifest_append"):
     chunker.manifest_append = lambda *args, **kwargs: None
@@ -357,7 +352,7 @@ if not hasattr(chunker, "manifest_load"):
 if not hasattr(chunker, "RichSerializerProvider"):
     chunker.RichSerializerProvider = lambda: SimpleNamespace()
 from DocsToKG.ContentDownload.classifications import Classification  # noqa: E402
-from DocsToKG.DocParsing._common import jsonl_load  # noqa: E402
+from DocsToKG.DocParsing.core import jsonl_load  # noqa: E402
 
 
 class DummyTokenizer:
@@ -396,7 +391,10 @@ def configure_chunker_stubs(
     )
     monkeypatch.setattr(chunker, "HuggingFaceTokenizer", DummyTokenizer)
     import DocsToKG.DocParsing.chunking as chunking_module
-    monkeypatch.setattr(chunking_module, "AutoTokenizer", SimpleNamespace(from_pretrained=lambda *_, **__: object()))
+
+    monkeypatch.setattr(
+        chunking_module, "AutoTokenizer", SimpleNamespace(from_pretrained=lambda *_, **__: object())
+    )
     monkeypatch.setattr(chunking_module, "HuggingFaceTokenizer", DummyTokenizer)
     monkeypatch.setattr(chunking_module, "HybridChunker", DummyHybridChunker)
 
@@ -422,15 +420,31 @@ def configure_chunker_stubs(
     monkeypatch.setattr(chunker, "get_docling_version", lambda: "docling-stub")
 
     chunker_manifest_log.clear()
-    original_manifest = chunker.manifest_append
 
-    def record_manifest(stage, doc_id, status, **metadata):
-        entry = {"stage": stage, "doc_id": doc_id, "status": status}
-        entry.update(metadata)
-        chunker_manifest_log.append(entry)
-        original_manifest(stage, doc_id, status, **metadata)
+    def _record(status: str, original):
+        def wrapper(*, stage, doc_id, **metadata):
+            entry = {"stage": stage, "doc_id": doc_id, "status": status}
+            entry.update(metadata)
+            chunker_manifest_log.append(entry)
+            return original(stage=stage, doc_id=doc_id, **metadata)
 
-    monkeypatch.setattr(chunker, "manifest_append", record_manifest)
+        return wrapper
+
+    monkeypatch.setattr(
+        chunker,
+        "manifest_log_failure",
+        _record("failure", chunker.manifest_log_failure),
+    )
+    monkeypatch.setattr(
+        chunker,
+        "manifest_log_success",
+        _record("success", chunker.manifest_log_success),
+    )
+    monkeypatch.setattr(
+        chunker,
+        "manifest_log_skip",
+        _record("skip", chunker.manifest_log_skip),
+    )
 
     stub_chunker = DummyHybridChunker(tokenizer=None, merge_peers=True, serializer_provider=None)
     stub_chunker.prime(texts_map)
@@ -448,7 +462,7 @@ def configure_chunker_stubs(
     if image_metadata_fn is None:
 
         def _default_image_metadata(*_, **__):
-            return False, False, 0
+            return False, False, 0, None
 
         image_metadata_fn = _default_image_metadata
     monkeypatch.setattr(chunker, "summarize_image_metadata", image_metadata_fn)
@@ -593,15 +607,31 @@ def configure_embeddings_stubs(monkeypatch):
     monkeypatch.setattr(embeddings, "VectorRow", DummyVectorRow)
 
     embeddings_manifest_log.clear()
-    original_embeddings_manifest = embeddings.manifest_append
 
-    def record_embeddings_manifest(stage, doc_id, status, **metadata):
-        entry = {"stage": stage, "doc_id": doc_id, "status": status}
-        entry.update(metadata)
-        embeddings_manifest_log.append(entry)
-        original_embeddings_manifest(stage, doc_id, status, **metadata)
+    def _record(status: str, original):
+        def wrapper(*, stage, doc_id, **metadata):
+            entry = {"stage": stage, "doc_id": doc_id, "status": status}
+            entry.update(metadata)
+            embeddings_manifest_log.append(entry)
+            return original(stage=stage, doc_id=doc_id, **metadata)
 
-    monkeypatch.setattr(embeddings, "manifest_append", record_embeddings_manifest)
+        return wrapper
+
+    monkeypatch.setattr(
+        embeddings,
+        "manifest_log_failure",
+        _record("failure", embeddings.manifest_log_failure),
+    )
+    monkeypatch.setattr(
+        embeddings,
+        "manifest_log_success",
+        _record("success", embeddings.manifest_log_success),
+    )
+    monkeypatch.setattr(
+        embeddings,
+        "manifest_log_skip",
+        _record("skip", embeddings.manifest_log_skip),
+    )
 
     def fake_splade(cfg, texts, batch_size=None):
         tokens = [[f"tok-{idx}"] for idx, _ in enumerate(texts)]
@@ -695,8 +725,8 @@ def test_chunker_promotes_image_metadata(tmp_path, monkeypatch):
     def image_meta(chunk, text):
         _, idx = chunk
         if idx == 0:
-            return True, False, 1
-        return False, True, 3
+            return True, False, 1, 0.9
+        return False, True, 3, 0.1
 
     configure_chunker_stubs(
         monkeypatch, {"sample": ["alpha", "beta"]}, image_metadata_fn=image_meta

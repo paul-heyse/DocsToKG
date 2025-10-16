@@ -176,9 +176,11 @@ import requests
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import ConfigError, DefaultsConfig, FetchSpec, ResolvedConfig, resolvers
-from DocsToKG.OntologyDownload import plugins as plugins_mod
-from DocsToKG.OntologyDownload import ontology_download as core
+from DocsToKG.OntologyDownload import ConfigError, DefaultsConfig, FetchSpec, ResolvedConfig
+from DocsToKG.OntologyDownload import api as core
+from DocsToKG.OntologyDownload import io as io_mod
+from DocsToKG.OntologyDownload import planning as resolvers
+from DocsToKG.OntologyDownload import validation as plugins_mod
 
 
 @pytest.fixture()
@@ -510,7 +512,15 @@ def test_resolver_uses_service_rate_limit(monkeypatch, resolved_config):
         def consume(self, tokens: float = 1.0) -> None:
             calls["count"] += 1
 
-    monkeypatch.setattr(resolvers, "_get_service_bucket", lambda service, config: DummyBucket())
+    bucket = DummyBucket()
+
+    def _capture_bucket(*args, **kwargs):
+        calls.setdefault("requests", 0)
+        calls["requests"] += 1
+        return bucket
+
+    monkeypatch.setattr(io_mod, "get_bucket", _capture_bucket, raising=False)
+    monkeypatch.setattr(resolvers, "get_bucket", _capture_bucket, raising=False)
     monkeypatch.setattr(resolvers, "retry_with_backoff", lambda func, **kwargs: func())
 
     record = {"download": "https://example.org/efo.owl"}
@@ -523,6 +533,7 @@ def test_resolver_uses_service_rate_limit(monkeypatch, resolved_config):
     plan = resolver.plan(spec, resolved_config, logging.getLogger(__name__))
 
     assert plan.service == "ols"
+    assert calls["requests"] >= 1
     assert calls["count"] >= 1
 
 
@@ -556,11 +567,14 @@ def test_lov_resolver_respects_timeout_and_rate_limit(monkeypatch, resolved_conf
         def consume(self, tokens: float = 1.0) -> None:
             captured["consumes"] += 1
 
-    def _fake_get_bucket(service, config):
-        captured["service"] = service
-        return StubBucket()
+    bucket = StubBucket()
 
-    monkeypatch.setattr(resolvers, "_get_service_bucket", _fake_get_bucket)
+    def _fake_get_bucket(*, http_config, service=None, host=None):  # noqa: ARG001
+        captured["service"] = service
+        return bucket
+
+    monkeypatch.setattr(io_mod, "get_bucket", _fake_get_bucket, raising=False)
+    monkeypatch.setattr(resolvers, "get_bucket", _fake_get_bucket, raising=False)
     monkeypatch.setattr(resolvers, "retry_with_backoff", lambda func, **kwargs: func())
 
     resolver = resolvers.LOVResolver(session=StubSession())
@@ -767,11 +781,7 @@ def test_resolver_plugin_guard_is_idempotent(monkeypatch):
     monkeypatch.setattr(plugins_mod.metadata, "entry_points", fake_entry_points)
     monkeypatch.setattr(plugins_mod, "_RESOLVER_PLUGINS_LOADED", False, raising=False)
 
-    plugins_mod.ensure_resolver_plugins(
-        resolvers.RESOLVERS, logger=logging.getLogger("test")
-    )
-    plugins_mod.ensure_resolver_plugins(
-        resolvers.RESOLVERS, logger=logging.getLogger("test")
-    )
+    plugins_mod.ensure_resolver_plugins(resolvers.RESOLVERS, logger=logging.getLogger("test"))
+    plugins_mod.ensure_resolver_plugins(resolvers.RESOLVERS, logger=logging.getLogger("test"))
 
     assert calls["count"] == 1

@@ -76,6 +76,7 @@ EXPECTED_PUBLIC_API = (
     "mask_sensitive_data",
     "list_plugins",
     "about",
+    "cli_main",
     "__version__",
     "PUBLIC_API_MANIFEST",
 )

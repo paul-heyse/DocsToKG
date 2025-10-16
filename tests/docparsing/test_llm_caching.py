@@ -39,14 +39,14 @@ from unittest.mock import Mock
 
 import pytest
 
-from DocsToKG.DocParsing.EmbeddingV2 import _QWEN_LLM_CACHE, _qwen_cache_key
+from DocsToKG.DocParsing.embedding import _QWEN_LLM_CACHE, _qwen_cache_key
 
 # --- Test Cases ---
 
 
 def test_qwen_cache_key_generation():
     """Test that cache keys are generated correctly for different configurations."""
-    from DocsToKG.DocParsing.EmbeddingV2 import QwenCfg
+    from DocsToKG.DocParsing.embedding import QwenCfg
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir)
@@ -106,7 +106,7 @@ def test_qwen_cache_initialization():
 
 def test_qwen_cache_functionality():
     """Test that Qwen cache key generation and storage works correctly."""
-    from DocsToKG.DocParsing.EmbeddingV2 import QwenCfg
+    from DocsToKG.DocParsing.embedding import QwenCfg
 
     # Clear cache before test
     _QWEN_LLM_CACHE.clear()
@@ -153,7 +153,7 @@ def test_qwen_cache_functionality():
 
 def test_qwen_cache_key_uniqueness():
     """Test that different configurations generate unique cache keys."""
-    from DocsToKG.DocParsing.EmbeddingV2 import QwenCfg
+    from DocsToKG.DocParsing.embedding import QwenCfg
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir)

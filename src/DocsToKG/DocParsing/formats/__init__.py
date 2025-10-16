@@ -68,6 +68,18 @@
 #       "name": "validate_schema_version",
 #       "anchor": "function-validate-schema-version",
 #       "kind": "function"
+#     },
+#     {
+#       "id": "captionplusannotationpictureserializer",
+#       "name": "CaptionPlusAnnotationPictureSerializer",
+#       "anchor": "class-captionplusannotationpictureserializer",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "richserializerprovider",
+#       "name": "RichSerializerProvider",
+#       "anchor": "class-richserializerprovider",
+#       "kind": "class"
 #     }
 #   ]
 # }

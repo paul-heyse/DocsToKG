@@ -184,7 +184,7 @@ def _import_pdf_module(monkeypatch):
             return None
 
     monkeypatch.setitem(sys.modules, "tqdm", mock.MagicMock(tqdm=_TqdmStub()))
-    module = importlib.import_module("DocsToKG.DocParsing.pipelines")
+    module = importlib.import_module("DocsToKG.DocParsing.doctags")
     return importlib.reload(module)
 
 

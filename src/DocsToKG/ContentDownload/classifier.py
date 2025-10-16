@@ -9,9 +9,7 @@ from urllib.parse import unquote, urlsplit
 from DocsToKG.ContentDownload.classifications import Classification
 
 
-def classify_payload(
-    head_bytes: bytes, content_type: Optional[str], url: str
-) -> Classification:
+def classify_payload(head_bytes: bytes, content_type: Optional[str], url: str) -> Classification:
     """Classify a payload as ``Classification.PDF``/``Classification.HTML`` or ``UNKNOWN``."""
 
     ctype = (content_type or "").lower()

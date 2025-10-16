@@ -83,7 +83,7 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import optdeps
+from DocsToKG.OntologyDownload import settings as optdeps
 
 
 @pytest.fixture(autouse=True)

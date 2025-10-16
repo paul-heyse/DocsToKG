@@ -47,26 +47,31 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
 
 from .io import (
-    DownloadFailure,
     RDF_MIME_ALIASES,
     RDF_MIME_FORMAT_LABELS,
+    DownloadFailure,
     download_stream,
     extract_archive_safe,
     generate_correlation_id,
+    get_bucket,
     mask_sensitive_data,
+    retry_with_backoff,
     sanitize_filename,
     validate_url_security,
 )
 from .settings import (
-    ConfigError,
-    DefaultsConfig,
-    ResolvedConfig,
-    _coerce_sequence,
-    ensure_python_version,
     CACHE_DIR,
     LOCAL_ONTOLOGY_DIR,
     LOG_DIR,
     STORAGE,
+    ConfigError,
+    DefaultsConfig,
+    DownloadConfiguration,
+    ResolvedConfig,
+    UserConfigError,
+    _coerce_sequence,
+    ensure_python_version,
+    get_pystow,
 )
 from .validation import (
     ValidationRequest,
@@ -179,7 +184,9 @@ def _normalize_checksum(algorithm: str, value: str, *, context: str) -> Tuple[st
     return normalized_algorithm, checksum
 
 
-def _checksum_from_extras(extras: Mapping[str, object], *, context: str) -> Tuple[Optional[str], Optional[str]]:
+def _checksum_from_extras(
+    extras: Mapping[str, object], *, context: str
+) -> Tuple[Optional[str], Optional[str]]:
     payload = extras.get("checksum") if isinstance(extras, Mapping) else None
     if payload is None:
         return None, None
@@ -196,7 +203,9 @@ def _checksum_from_extras(extras: Mapping[str, object], *, context: str) -> Tupl
     raise ConfigError(f"{context}: checksum must be provided as a string or mapping")
 
 
-def _checksum_url_from_extras(extras: Mapping[str, object], *, context: str) -> Tuple[Optional[str], Optional[str]]:
+def _checksum_url_from_extras(
+    extras: Mapping[str, object], *, context: str
+) -> Tuple[Optional[str], Optional[str]]:
     payload = extras.get("checksum_url") if isinstance(extras, Mapping) else None
     if payload is None:
         return None, None
@@ -213,7 +222,9 @@ def _checksum_url_from_extras(extras: Mapping[str, object], *, context: str) -> 
         algorithm = None
         if algorithm_value is not None:
             if not isinstance(algorithm_value, str):
-                raise ConfigError(f"{context}: checksum_url algorithm must be a string when provided")
+                raise ConfigError(
+                    f"{context}: checksum_url algorithm must be a string when provided"
+                )
             algorithm = _normalize_algorithm(algorithm_value, context=context)
         return url_value.strip(), algorithm
     raise ConfigError(f"{context}: checksum_url must be provided as a string or mapping")
@@ -264,11 +275,19 @@ def _resolve_expected_checksum(
     plan_checksum: Optional[Tuple[str, str]] = None
     if plan.checksum:
         algorithm = plan.checksum_algorithm or "sha256"
-        plan_checksum = _normalize_checksum(algorithm, plan.checksum, context=f"{context} resolver checksum")
+        plan_checksum = _normalize_checksum(
+            algorithm, plan.checksum, context=f"{context} resolver checksum"
+        )
 
     spec_checksum = _checksum_from_extras(spec.extras, context=context)
-    if spec_checksum[1] is not None and plan_checksum is not None and spec_checksum[1] != plan_checksum[1]:
-        raise ConfigError(f"{context}: conflicting checksum values between resolver and specification extras")
+    if (
+        spec_checksum[1] is not None
+        and plan_checksum is not None
+        and spec_checksum[1] != plan_checksum[1]
+    ):
+        raise ConfigError(
+            f"{context}: conflicting checksum values between resolver and specification extras"
+        )
 
     algorithm: Optional[str] = None
     value: Optional[str] = None
@@ -287,7 +306,9 @@ def _resolve_expected_checksum(
 
     if value is None and checksum_url_source:
         raw_url, url_algorithm = checksum_url_source
-        normalized_algorithm = _normalize_algorithm(url_algorithm or algorithm or "sha256", context=context)
+        normalized_algorithm = _normalize_algorithm(
+            url_algorithm or algorithm or "sha256", context=context
+        )
         value = _fetch_checksum_from_url(
             url=raw_url,
             algorithm=normalized_algorithm,
@@ -306,6 +327,7 @@ def _resolve_expected_checksum(
         extra={"stage": "download", "checksum": checksum_string, "ontology_id": spec.id},
     )
     return checksum_string
+
 
 Draft202012Validator.check_schema(MANIFEST_JSON_SCHEMA)
 _MANIFEST_VALIDATOR = Draft202012Validator(MANIFEST_JSON_SCHEMA)
@@ -2197,6 +2219,7 @@ def _version_lock(ontology_id: str, version: str) -> Iterator[None]:
                 handle.seek(0)
                 msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
 
+
 try:  # pragma: no cover - optional dependency guidance
     from bioregistry import get_obo_download, get_owl_download, get_rdf_download
 except ModuleNotFoundError:  # pragma: no cover - provide actionable error for runtime use
@@ -2216,14 +2239,6 @@ try:  # pragma: no cover - optional dependency guidance
     from ontoportal_client import BioPortalClient
 except ModuleNotFoundError:  # pragma: no cover - provide actionable error later
     BioPortalClient = None  # type: ignore[assignment]
-
-from .settings import DownloadConfiguration, ResolvedConfig
-from .settings import ResolverError, UserConfigError
-from .io import retry_with_backoff, validate_url_security
-from .io import get_bucket
-from .settings import get_pystow
-
-# --- Globals ---
 
 OlsClient = _OlsClient
 pystow = get_pystow()
@@ -2332,7 +2347,9 @@ def _parse_checksum_url_extra(value: object, *, context: str) -> Tuple[str, Opti
         algorithm = None
         if algorithm_value is not None:
             if not isinstance(algorithm_value, str):
-                raise UserConfigError(f"{context} checksum_url algorithm must be a string when provided")
+                raise UserConfigError(
+                    f"{context} checksum_url algorithm must be a string when provided"
+                )
             candidate = algorithm_value.strip().lower()
             if candidate not in _SUPPORTED_CHECKSUM_ALGORITHMS:
                 raise UserConfigError(
@@ -2451,11 +2468,15 @@ class BaseResolver:
                 },
             )
 
-        bucket = get_bucket(
-            http_config=config.defaults.http,
-            service=service,
-            host=None,
-        ) if service else None
+        bucket = (
+            get_bucket(
+                http_config=config.defaults.http,
+                service=service,
+                host=None,
+            )
+            if service
+            else None
+        )
 
         def _invoke():
             if bucket is not None:
@@ -3116,7 +3137,11 @@ class DirectResolver(BaseResolver):
             checksum_url, checksum_url_algorithm = _parse_checksum_url_extra(
                 extras["checksum_url"], context="direct resolver extras.checksum_url"
             )
-            if checksum_url_algorithm and checksum_algorithm and checksum_algorithm != checksum_url_algorithm:
+            if (
+                checksum_url_algorithm
+                and checksum_algorithm
+                and checksum_algorithm != checksum_url_algorithm
+            ):
                 raise UserConfigError(
                     "direct resolver checksum algorithm mismatch between checksum and checksum_url"
                 )

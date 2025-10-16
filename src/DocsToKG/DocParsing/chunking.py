@@ -174,12 +174,12 @@ __all__ = (
 )
 
 from DocsToKG.DocParsing.core import (
-    ChunkResult,
-    ChunkTask,
-    ChunkWorkerConfig,
     DEFAULT_CAPTION_MARKERS,
     DEFAULT_HEADING_MARKERS,
     DEFAULT_SERIALIZER_PROVIDER,
+    ChunkResult,
+    ChunkTask,
+    ChunkWorkerConfig,
     acquire_lock,
     atomic_write,
     compute_content_hash,
@@ -189,8 +189,8 @@ from DocsToKG.DocParsing.core import (
     detect_data_root,
     get_logger,
     iter_doctags,
-    load_structural_marker_config,
     load_manifest_index,
+    load_structural_marker_config,
     log_event,
     manifest_log_failure,
     manifest_log_skip,

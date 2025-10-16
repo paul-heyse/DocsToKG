@@ -302,21 +302,22 @@ from DocsToKG.HybridSearch.pipeline import IngestError
 from DocsToKG.HybridSearch.service import (
     ResultShaper,
     build_stats_snapshot,
+    infer_embedding_dim,
+    load_dataset,
     should_rebuild_index,
     verify_pagination,
 )
-from DocsToKG.HybridSearch.store import ChunkRegistry
-from DocsToKG.HybridSearch.types import (
-    ChunkFeatures,
-    ChunkPayload,
-    vector_uuid_to_faiss_int,
-)
-from DocsToKG.HybridSearch.service import infer_embedding_dim, load_dataset
 from DocsToKG.HybridSearch.store import (
+    ChunkRegistry,
     FaissVectorStore,
     cosine_against_corpus_gpu,
     restore_state,
     serialize_state,
+)
+from DocsToKG.HybridSearch.types import (
+    ChunkFeatures,
+    ChunkPayload,
+    vector_uuid_to_faiss_int,
 )
 
 faiss = pytest.importorskip("faiss")
@@ -1477,7 +1478,7 @@ def test_operations_module_is_removed() -> None:
     module_name = "DocsToKG.HybridSearch.operations"
     sys.modules.pop(module_name, None)
 
-    with pytest.deprecated_call():
+    with pytest.raises(ModuleNotFoundError):
         importlib.import_module(module_name)
 
 

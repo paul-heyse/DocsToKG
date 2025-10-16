@@ -200,10 +200,10 @@ pytest.importorskip("pydantic_settings")
 
 from pydantic import BaseModel, ValidationError
 
-from DocsToKG.OntologyDownload import ontology_download as core
-from DocsToKG.OntologyDownload import pipeline as pipeline_mod
-from DocsToKG.OntologyDownload import resolvers
-from DocsToKG.OntologyDownload.config import (
+from DocsToKG.OntologyDownload import api as core
+from DocsToKG.OntologyDownload import planning as pipeline_mod
+from DocsToKG.OntologyDownload.planning import RESOLVERS, FetchPlan, ResolverError, merge_defaults
+from DocsToKG.OntologyDownload.settings import (
     ConfigError,
     DefaultsConfig,
     DownloadConfiguration,
@@ -216,7 +216,6 @@ from DocsToKG.OntologyDownload.config import (
     load_raw_yaml,
     validate_config,
 )
-from DocsToKG.OntologyDownload.pipeline import ResolverError, merge_defaults
 
 # --- Test Cases ---
 
@@ -528,7 +527,7 @@ def test_fetch_one_rejects_disallowed_license(monkeypatch: pytest.MonkeyPatch) -
 
     class StubResolver:
         def plan(self, spec, config, logger):
-            return resolvers.FetchPlan(
+            return FetchPlan(
                 url="https://example.org/onto.owl",
                 headers={},
                 filename_hint="onto.owl",
@@ -538,7 +537,7 @@ def test_fetch_one_rejects_disallowed_license(monkeypatch: pytest.MonkeyPatch) -
                 service=spec.resolver,
             )
 
-    monkeypatch.setitem(resolvers.RESOLVERS, "stub", StubResolver())
+    monkeypatch.setitem(RESOLVERS, "stub", StubResolver())
     config = ResolvedConfig(defaults=DefaultsConfig(accept_licenses=["CC0-1.0"]), specs=[])
     spec = core.FetchSpec(id="example", resolver="stub", extras={}, target_formats=["owl"])
 
@@ -563,7 +562,7 @@ def test_fetch_one_download_error(monkeypatch: pytest.MonkeyPatch) -> None:
 
     class StubResolver:
         def plan(self, spec, config, logger):
-            return resolvers.FetchPlan(
+            return FetchPlan(
                 url="https://example.org/hp.owl",
                 headers={},
                 filename_hint="hp.owl",
@@ -573,7 +572,7 @@ def test_fetch_one_download_error(monkeypatch: pytest.MonkeyPatch) -> None:
                 service=spec.resolver,
             )
 
-    monkeypatch.setitem(resolvers.RESOLVERS, "obo", StubResolver())
+    monkeypatch.setitem(RESOLVERS, "obo", StubResolver())
     monkeypatch.setattr(
         pipeline_mod,
         "download_stream",

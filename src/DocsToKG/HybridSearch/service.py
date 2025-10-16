@@ -22,6 +22,24 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "reciprocalrankfusion",
+#       "name": "ReciprocalRankFusion",
+#       "anchor": "class-reciprocalrankfusion",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resultshaper",
+#       "name": "ResultShaper",
+#       "anchor": "class-resultshaper",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "apply-mmr-diversification",
+#       "name": "apply_mmr_diversification",
+#       "anchor": "function-apply-mmr-diversification",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "hybridsearchservice",
 #       "name": "HybridSearchService",
 #       "anchor": "class-hybridsearchservice",
@@ -56,6 +74,24 @@
 #       "name": "should_rebuild_index",
 #       "anchor": "function-should-rebuild-index",
 #       "kind": "function"
+#     },
+#     {
+#       "id": "hybridsearchvalidator",
+#       "name": "HybridSearchValidator",
+#       "anchor": "class-hybridsearchvalidator",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "load-dataset",
+#       "name": "load_dataset",
+#       "anchor": "function-load-dataset",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "infer-embedding-dim",
+#       "name": "infer_embedding_dim",
+#       "anchor": "function-infer-embedding-dim",
+#       "kind": "function"
 #     }
 #   ]
 # }
@@ -64,35 +100,37 @@
 """Hybrid search orchestration, pagination guards, and synchronous HTTP-style API."""
 
 from __future__ import annotations
-import argparse
+
 import json
 import math
-import os
 import random
-import shutil
 import statistics
-import subprocess
-import sys
 import time
-# --- Strategy Helpers ---
 
+# --- Strategy Helpers ---
 from collections import OrderedDict, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from http import HTTPStatus
+from pathlib import Path
 from threading import RLock
 from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
-from pathlib import Path
-
 import numpy as np
+
 try:  # pragma: no cover - optional dependency during doc builds
     import faiss  # type: ignore
 except ImportError:  # pragma: no cover
     faiss = None  # type: ignore
 
-from .config import FusionConfig, HybridSearchConfig, HybridSearchConfigManager
+from .config import (
+    DenseIndexConfig,
+    FusionConfig,
+    HybridSearchConfig,
+    HybridSearchConfigManager,
+    RetrievalConfig,
+)
 from .interfaces import DenseVectorStore, LexicalIndex
 from .pipeline import ChunkIngestionPipeline, FeatureGenerator, Observability, tokenize
 from .router import FaissRouter
@@ -100,9 +138,7 @@ from .store import (
     AdapterStats,
     ChunkRegistry,
     FaissSearchResult,
-    FaissVectorStore,
     OpenSearchSimulator,
-    cosine_against_corpus_gpu,
     cosine_batch,
     cosine_topk_blockwise,
     matches_filters,
@@ -114,8 +150,8 @@ from .store import (
 from .types import (
     ChunkFeatures,
     ChunkPayload,
-    FusionCandidate,
     DocumentInput,
+    FusionCandidate,
     HybridSearchDiagnostics,
     HybridSearchRequest,
     HybridSearchResponse,
@@ -164,6 +200,8 @@ class RequestValidationError(ValueError):
 class DenseSearchStrategy:
     """Stateful helper encapsulating dense search heuristics."""
 
+    _MAX_K = 2048
+
     def __init__(
         self,
         *,
@@ -176,6 +214,7 @@ class DenseSearchStrategy:
         self._cache_limit = int(cache_limit)
         self._cache: "OrderedDict[Tuple[object, ...], int]" = OrderedDict()
         self._lock = RLock()
+        self._signature_pass: Dict[Tuple[object, ...], float] = {}
 
     def plan(
         self,
@@ -202,23 +241,33 @@ class DenseSearchStrategy:
             overfetch = max(1.0, float(getattr(retrieval_cfg, "dense_overfetch_factor", 1.5)))
             basis = max(1, int(page_size))
             base = math.ceil(basis * oversample * overfetch)
-            adaptive = math.ceil(
-                basis / max(1e-3, self._pass_rate) * oversample * overfetch
+            adaptive = math.ceil(basis / max(1e-3, self._pass_rate) * oversample * overfetch)
+            target = max(
+                int(getattr(retrieval_cfg, "dense_top_k", basis)), base, adaptive, int(min_k)
             )
-            target = max(int(getattr(retrieval_cfg, "dense_top_k", basis)), base, adaptive, int(min_k))
             cached = self._cache.get(signature)
             if cached is not None:
-                target = max(target, int(cached))
+                if min_k == 0:
+                    target = max(int(cached), int(min_k))
+                else:
+                    target = max(target, int(cached))
                 self._cache.move_to_end(signature)
-            return (min(target, 10_000), oversample, overfetch)
+            return (min(target, self._MAX_K), oversample, overfetch)
 
-    def observe_pass_rate(self, observed: float) -> float:
+    def observe_pass_rate(self, signature: Tuple[object, ...], observed: float) -> float:
         """Blend ``observed`` into the running EMA and return the updated value."""
 
         with self._lock:
             bounded = max(0.0, min(1.0, float(observed)))
-            self._pass_rate = max(1e-3, min(1.0, self._alpha * bounded + (1.0 - self._alpha) * self._pass_rate))
-            return self._pass_rate
+            local_prev = self._signature_pass.get(signature, self._pass_rate)
+            local_rate = max(
+                1e-3, min(1.0, self._alpha * bounded + (1.0 - self._alpha) * local_prev)
+            )
+            self._signature_pass[signature] = local_rate
+            self._pass_rate = max(
+                1e-3, min(1.0, self._alpha * bounded + (1.0 - self._alpha) * self._pass_rate)
+            )
+            return local_rate
 
     def remember(self, signature: Tuple[object, ...], k: int) -> None:
         """Cache ``k`` for ``signature`` to seed future requests."""
@@ -228,6 +277,18 @@ class DenseSearchStrategy:
             self._cache.move_to_end(signature)
             if len(self._cache) > self._cache_limit:
                 self._cache.popitem(last=False)
+
+    def has_cache(self, signature: Tuple[object, ...]) -> bool:
+        """Return ``True`` when ``signature`` has a cached ``k`` value."""
+
+        with self._lock:
+            return signature in self._cache
+
+    def current_pass_rate(self) -> float:
+        """Expose the current blended pass rate."""
+
+        with self._lock:
+            return self._pass_rate
 
 
 @dataclass(slots=True)
@@ -255,6 +316,14 @@ class ReciprocalRankFusion:
         self._weights = dict(channel_weights or {})
 
     def fuse(self, candidates: Sequence[FusionCandidate]) -> Dict[str, float]:
+        """Combine channel rankings into fused scores keyed by vector id.
+
+        Args:
+            candidates: Ranked fusion candidates from individual retrieval channels.
+
+        Returns:
+            Mapping from vector identifiers to fused RRF scores.
+        """
         scores: Dict[str, float] = defaultdict(float)
         for candidate in candidates:
             weight = float(self._weights.get(candidate.source, 1.0))
@@ -288,6 +357,18 @@ class ResultShaper:
         *,
         precomputed_embeddings: Optional[np.ndarray] = None,
     ) -> List[HybridSearchResult]:
+        """Shape ranked chunks into API responses with highlights and diagnostics.
+
+        Args:
+            ordered_chunks: Chunks ordered by fused score.
+            fused_scores: Combined score per vector identifier.
+            request: Incoming hybrid search request.
+            channel_scores: Per-channel score maps for diagnostics emission.
+            precomputed_embeddings: Optional dense embeddings aligned with chunks.
+
+        Returns:
+            List of `HybridSearchResult` instances ready for serialization.
+        """
         if not ordered_chunks:
             return []
 
@@ -394,6 +475,20 @@ def apply_mmr_diversification(
     device: int = 0,
     resources: Optional["faiss.StandardGpuResources"] = None,
 ) -> List[FusionCandidate]:
+    """Diversify fused candidates using Maximum Marginal Relevance.
+
+    Args:
+        fused_candidates: Ranked candidates in fused order.
+        fused_scores: Combined scores keyed by vector identifier.
+        lambda_param: Trade-off between relevance and diversity (0.0-1.0).
+        top_k: Maximum number of diversified candidates to retain.
+        embeddings: Optional dense embedding matrix aligned with ``fused_candidates``.
+        device: GPU device id when leveraging FAISS GPU routines.
+        resources: Optional FAISS GPU resources handle reused across calls.
+
+    Returns:
+        List of diversified `FusionCandidate` objects.
+    """
     if not 0.0 <= lambda_param <= 1.0:
         raise ValueError("lambda_param must be within [0, 1]")
     if not fused_candidates:
@@ -610,7 +705,8 @@ class HybridSearchService:
                     dtype=np.float32,
                 )
                 embedding_index = {
-                    candidate.chunk.vector_id: idx for idx, candidate in enumerate(unique_candidates)
+                    candidate.chunk.vector_id: idx
+                    for idx, candidate in enumerate(unique_candidates)
                 }
             else:
                 unique_embeddings = None
@@ -661,7 +757,10 @@ class HybridSearchService:
                     try:
                         diversified_embeddings = np.ascontiguousarray(
                             unique_embeddings[
-                                [embedding_index[candidate.chunk.vector_id] for candidate in diversified]
+                                [
+                                    embedding_index[candidate.chunk.vector_id]
+                                    for candidate in diversified
+                                ]
                             ],
                             dtype=np.float32,
                         )
@@ -688,7 +787,11 @@ class HybridSearchService:
                 self._opensearch,
                 config.fusion,
                 device=(dense_stats.device if dense_stats is not None else dense_store.device),
-                resources=(dense_stats.resources if dense_stats is not None else getattr(dense_store, "gpu_resources", None)),
+                resources=(
+                    dense_stats.resources
+                    if dense_stats is not None
+                    else getattr(dense_store, "gpu_resources", None)
+                ),
             )
             shaped = shaper.shape(
                 ordered_chunks,
@@ -875,6 +978,7 @@ class HybridSearchService:
         retrieval_cfg = config.retrieval
         signature = self._dense_request_signature(request, filters)
         strategy = self._dense_strategy
+        cached_signature = strategy.has_cache(signature)
         initial_k, oversample, overfetch = strategy.plan(
             signature,
             page_size=page_size,
@@ -907,22 +1011,36 @@ class HybridSearchService:
         hits = run_dense_search(effective_k)
         filtered, payloads = self._filter_dense_hits(hits, filters)
         observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
-        blended_pass = strategy.observe_pass_rate(observed)
+        blended_pass = (
+            strategy.observe_pass_rate(signature, observed)
+            if not cached_signature
+            else strategy.current_pass_rate()
+        )
 
-        if len(filtered) < page_size and effective_k < 10_000:
-            retry_k, _, _ = strategy.plan(
-                signature,
-                page_size=page_size,
-                retrieval_cfg=retrieval_cfg,
-                dense_cfg=config.dense,
-                min_k=effective_k + 1,
-            )
-            if retry_k > effective_k:
-                effective_k = retry_k
-                hits = run_dense_search(effective_k)
-                filtered, payloads = self._filter_dense_hits(hits, filters)
-                observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
-                blended_pass = strategy.observe_pass_rate(observed)
+        while True:
+            if len(filtered) >= page_size or effective_k >= 10_000:
+                next_k = strategy.plan(
+                    signature,
+                    page_size=page_size,
+                    retrieval_cfg=retrieval_cfg,
+                    dense_cfg=config.dense,
+                    min_k=effective_k,
+                )[0]
+            else:
+                next_k, _, _ = strategy.plan(
+                    signature,
+                    page_size=page_size,
+                    retrieval_cfg=retrieval_cfg,
+                    dense_cfg=config.dense,
+                    min_k=effective_k + 1,
+                )
+            if next_k <= effective_k:
+                break
+            effective_k = next_k
+            hits = run_dense_search(effective_k)
+            filtered, payloads = self._filter_dense_hits(hits, filters)
+            observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
+            blended_pass = strategy.observe_pass_rate(signature, observed)
 
         strategy.remember(signature, effective_k)
         self._observability.metrics.set_gauge(
@@ -939,7 +1057,9 @@ class HybridSearchService:
             self._observability.metrics.set_gauge(
                 "search_channel_latency_p95_ms", p95_dense, channel="dense"
             )
-        self._observability.metrics.set_gauge("dense_effective_k", float(effective_k), channel="dense")
+        self._observability.metrics.set_gauge(
+            "dense_effective_k", float(effective_k), channel="dense"
+        )
         self._observability.metrics.increment("search_channel_requests", channel="dense")
         self._observability.metrics.observe(
             "search_channel_candidates", len(filtered), channel="dense"
@@ -1245,6 +1365,7 @@ def should_rebuild_index(
         return False
     return deleted_since_snapshot / total >= threshold
 
+
 # --- Validation Utilities ---
 
 DEFAULT_SCALE_THRESHOLDS: Dict[str, float] = {
@@ -1266,6 +1387,7 @@ BASIC_SPARSE_RELEVANCE_THRESHOLD = 0.90
 
 
 # --- Public Classes ---
+
 
 class HybridSearchValidator:
     """Execute validation sweeps and persist reports.
@@ -1909,10 +2031,14 @@ class HybridSearchValidator:
         except AttributeError:
             adapter_stats = None
         resources = (
-            adapter_stats.resources if adapter_stats is not None else getattr(self._ingestion.faiss_index, "gpu_resources", None)
+            adapter_stats.resources
+            if adapter_stats is not None
+            else getattr(self._ingestion.faiss_index, "gpu_resources", None)
         )
         device = (
-            adapter_stats.device if adapter_stats is not None else self._ingestion.faiss_index.device
+            adapter_stats.device
+            if adapter_stats is not None
+            else self._ingestion.faiss_index.device
         )
         if resources is None:
             vector_matrix = normalize_rows(vector_matrix)
@@ -2659,6 +2785,7 @@ class HybridSearchValidator:
 
 # --- Public Functions ---
 
+
 def load_dataset(path: Path) -> List[Mapping[str, object]]:
     """Load a JSONL dataset describing documents and queries.
 
@@ -2680,6 +2807,7 @@ def load_dataset(path: Path) -> List[Mapping[str, object]]:
             continue
         dataset.append(json.loads(line))
     return dataset
+
 
 def infer_embedding_dim(dataset: Sequence[Mapping[str, object]]) -> int:
     """Infer dense embedding dimensionality from dataset vector artifacts.

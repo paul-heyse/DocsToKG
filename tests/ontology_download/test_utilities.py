@@ -60,14 +60,13 @@ from pathlib import Path
 
 import pytest
 
-from DocsToKG.OntologyDownload.config import parse_rate_limit_to_rps
-from DocsToKG.OntologyDownload.pipeline import (
+from DocsToKG.OntologyDownload.planning import (
     infer_version_timestamp,
     parse_http_datetime,
     parse_iso_datetime,
     parse_version_timestamp,
 )
-from DocsToKG.OntologyDownload.storage import _directory_size
+from DocsToKG.OntologyDownload.settings import _directory_size, parse_rate_limit_to_rps
 
 
 @pytest.mark.parametrize(

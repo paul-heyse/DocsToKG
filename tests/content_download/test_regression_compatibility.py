@@ -155,6 +155,28 @@ def test_load_previous_manifest_requires_schema_version(tmp_path: Path) -> None:
         downloader.load_previous_manifest(manifest_path)
 
 
+def test_load_previous_manifest_rejects_mismatched_schema_version(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "old_schema.jsonl"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "record_type": "manifest",
+                "timestamp": "2024-05-01T00:00:00Z",
+                "schema_version": 1,
+                "work_id": "WLEGACYSCHEMA",
+                "url": "https://example.org/legacy-schema.pdf",
+                "classification": "pdf",
+                "path": "/tmp/legacy-schema.pdf",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Unsupported manifest schema_version"):
+        downloader.load_previous_manifest(manifest_path)
+
+
 def test_load_resolver_config_rejects_legacy_rate_limits(tmp_path: Path):
     config_payload: Dict[str, object] = {
         "resolver_rate_limits": {"example.org": 0.75},

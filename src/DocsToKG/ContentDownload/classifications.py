@@ -44,6 +44,8 @@ class Classification(Enum):
             if member.value == text:
                 return member
         return cls.UNKNOWN
+
+
 PDF_LIKE = frozenset({Classification.PDF, Classification.CACHED})
 
 
