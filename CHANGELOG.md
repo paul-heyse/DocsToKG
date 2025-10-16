@@ -5,6 +5,9 @@ All notable changes to DocsToKG are documented in this file.
 ## [Unreleased]
 
 ### Breaking Changes
+- Removed the legacy ``DocsToKG.ContentDownload.resolvers.time`` / ``requests``
+  exports and the cached ``_fetch_*`` helper functions; import ``time``,
+  ``requests``, and call the shared network helpers directly when upgrading.
 - Removed the legacy ``DocsToKG.OntologyDownload.(core|config|download|storage|validators|utils|...)`` module aliases in favour of the public ``DocsToKG.OntologyDownload`` facade and direct ``.ontology_download`` / ``.cli`` imports. Update imports before upgrading.
 - Planner metadata enrichment now enforces download host allowlists during planning; configurations that previously logged warnings will now raise ``ConfigError`` when a resolver returns a disallowed host.
 
