@@ -131,7 +131,7 @@ def test_csv_adapter_close_closes_file(tmp_path: Path) -> None:
     assert adapter._file.closed  # type: ignore[attr-defined]
 
 
-def test_jsonl_logger_writes_valid_records(tmp_path: Path) -> None:
+def test_jsonl_sink_writes_valid_records(tmp_path: Path) -> None:
     log_path = tmp_path / "attempts.jsonl"
     logger = JsonlSink(log_path)
 

@@ -291,7 +291,7 @@ def test_main_with_csv_writes_last_attempt_csv(download_modules, monkeypatch, tm
 
     assert rows == [
         {
-            "work_id": "https://openalex.org/WCSV",
+            "work_id": "WCSV",
             "title": "CSV Work",
             "publication_year": "2021",
             "resolver": "openalex",
@@ -414,7 +414,101 @@ def test_main_with_staging_creates_timestamped_directories(
     index_path = manifest_path.with_suffix(".index.json")
     assert index_path.exists()
     payload = json.loads(index_path.read_text(encoding="utf-8"))
-    assert payload[work["id"]]["pdf_path"].endswith("out.pdf")
+    assert payload["WSTAGING"]["pdf_path"].endswith("out.pdf")
+
+
+def test_main_dry_run_skips_writing_files(download_modules, monkeypatch, tmp_path):
+    downloader = download_modules.downloader
+    resolvers = download_modules.resolvers
+
+    out_dir = tmp_path / "out"
+    manifest_path = out_dir / "manifest.jsonl"
+    out_dir.mkdir()
+
+    works = [
+        {
+            "id": f"https://openalex.org/WDry{i}",
+            "title": f"Dry Run Work {i}",
+            "publication_year": 2023,
+            "ids": {"doi": f"10.1000/dry{i}"},
+            "open_access": {"oa_url": None},
+            "best_oa_location": {"pdf_url": f"https://oa.example/dry{i}.pdf"},
+            "primary_location": {},
+            "locations": [],
+        }
+        for i in range(3)
+    ]
+
+    monkeypatch.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter(works))
+    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
+
+    outcome = resolvers.DownloadOutcome(
+        classification="pdf",
+        path=None,
+        http_status=200,
+        content_type="application/pdf",
+        elapsed_ms=3.0,
+        error=None,
+    )
+
+    class StubPipeline:
+        def __init__(self, *_, logger=None, metrics=None, **kwargs):
+            self.logger = logger
+            self.metrics = metrics
+
+        def run(self, session, artifact, context=None):
+            assert context and context.get("dry_run") is True
+            self.logger.log_attempt(
+                resolvers.AttemptRecord(
+                    work_id=artifact.work_id,
+                    resolver_name="stub",
+                    resolver_order=1,
+                    url=f"https://oa.example/{artifact.work_id}.pdf",
+                    status=outcome.classification,
+                    http_status=outcome.http_status,
+                    content_type=outcome.content_type,
+                    elapsed_ms=outcome.elapsed_ms,
+                    dry_run=True,
+                )
+            )
+            self.metrics.record_attempt("stub", outcome)
+            return resolvers.PipelineResult(
+                success=True,
+                resolver_name="stub",
+                url=f"https://oa.example/{artifact.work_id}.pdf",
+                outcome=outcome,
+                html_paths=[],
+                failed_urls=[],
+            )
+
+    monkeypatch.setattr(downloader, "ResolverPipeline", StubPipeline)
+
+    argv = [
+        "download_pyalex_pdfs.py",
+        "--topic",
+        "dry run",
+        "--year-start",
+        "2023",
+        "--year-end",
+        "2023",
+        "--out",
+        str(out_dir),
+        "--manifest",
+        str(manifest_path),
+        "--dry-run",
+    ]
+    monkeypatch.setattr("sys.argv", argv)
+
+    downloader.main()
+
+    assert not any(out_dir.glob("*.pdf"))
+    entries = [json.loads(line) for line in manifest_path.read_text(encoding="utf-8").splitlines()]
+    manifest_rows = [entry for entry in entries if entry.get("record_type") == "manifest"]
+    assert len(manifest_rows) == 3
+    assert all(row["dry_run"] is True for row in manifest_rows)
+
+
 
 def test_main_requires_topic_or_topic_id(download_modules, monkeypatch):
     downloader = download_modules.downloader

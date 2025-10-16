@@ -17,7 +17,7 @@
 - [x] 1.2.2 Ensure close() checks `self._file.closed` before closing to enable idempotency
 - [x] 1.2.3 Update `__exit__()` to safely handle already-closed file
 - [x] 1.2.4 Add unit test verifying file descriptor closure after explicit `close()` call
-- [ ] 1.2.5 Add integration test confirming clean process exit on all platforms including Windows
+- [x] 1.2.5 Add integration test confirming clean process exit on all platforms including Windows
 
 ### 1.3 Remove Duplicate Session Factory
 
@@ -244,18 +244,18 @@
 
 ### 7.1 Unit Tests
 
-- [ ] 7.1.1 Add test for consolidated context management lifecycle
-- [ ] 7.1.2 Add test for CSV close() idempotency
-- [ ] 7.1.3 Add tests for unified head_precheck with various status codes
+- [x] 7.1.1 Add test for consolidated context management lifecycle
+- [x] 7.1.2 Add test for CSV close() idempotency
+- [x] 7.1.3 Add tests for unified head_precheck with various status codes
 - [x] 7.1.4 Add test for ApiResolverBase error handling paths
 - [x] 7.1.5 Add tests for HTML scraping helper functions
-- [ ] 7.1.6 Add test for conditional request pre-validation
-- [ ] 7.1.7 Add test for PDF classification with octet-stream
-- [ ] 7.1.8 Add test for corruption detection with head_precheck_passed flag
+- [x] 7.1.6 Add test for conditional request pre-validation
+- [x] 7.1.7 Add test for PDF classification with octet-stream
+- [x] 7.1.8 Add test for corruption detection with head_precheck_passed flag
 
 ### 7.2 Integration Tests
 
-- [ ] 7.2.1 Run dry-run with 3-5 works ensuring single manifest written
+- [x] 7.2.1 Run dry-run with 3-5 works ensuring single manifest written
 - [ ] 7.2.2 Run with --log-format csv confirming both JSONL and CSV produced
 - [ ] 7.2.3 Run with --staging confirming timestamped directory created
 - [ ] 7.2.4 Run with --resume-from using manifest with partial metadata
