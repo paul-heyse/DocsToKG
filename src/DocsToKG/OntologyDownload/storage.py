@@ -224,6 +224,8 @@ class FsspecStorageBackend(LocalStorageBackend):
         return sorted(local | remote)
 
     def finalize_version(self, ontology_id: str, version: str, local_dir: Path) -> None:
+        """Mirror processed artefacts to remote storage after local completion."""
+
         remote_dir = self._remote_version_path(ontology_id, version)
         for path in local_dir.rglob("*"):
             if not path.is_file():
@@ -234,6 +236,8 @@ class FsspecStorageBackend(LocalStorageBackend):
             self.fs.put_file(str(path), str(remote_path))
 
     def delete_version(self, ontology_id: str, version: str) -> int:
+        """Remove local and remote artefacts for ``ontology_id``/``version``."""
+
         reclaimed = super().delete_version(ontology_id, version)
         remote_dir = self._remote_version_path(ontology_id, version)
         if not self.fs.exists(str(remote_dir)):

@@ -82,6 +82,8 @@ class _StubGraph:
         self.namespace_manager = _StubNamespaceManager()
 
     def parse(self, source: str, format: Optional[str] = None, **_kwargs: object) -> "_StubGraph":
+        """Parse a Turtle-like text file into an in-memory triple list."""
+
         text = Path(source).read_text()
         self._last_text = text
         triples: List[tuple[str, str, str]] = []
@@ -114,6 +116,8 @@ class _StubGraph:
         return self
 
     def serialize(self, destination: Optional[Any] = None, format: Optional[str] = None, **_kwargs: object):
+        """Serialise parsed triples to the supplied destination."""
+
         if destination is None:
             return self._last_text
         if isinstance(destination, (str, Path)):
@@ -123,6 +127,8 @@ class _StubGraph:
         return destination
 
     def add(self, triple: Iterable[Any]) -> None:
+        """Append a triple to the stub graph, mirroring rdflib behaviour."""
+
         items = list(triple)
         if len(items) != 3:
             raise ValueError("rdflib.Graph.add expects a triple")
@@ -130,9 +136,13 @@ class _StubGraph:
         self._triples.append((subject, predicate, obj))
 
     def bind(self, prefix: str, namespace: str) -> None:
+        """Register a namespace binding within the stub graph."""
+
         self.namespace_manager.bind(prefix, namespace)
 
     def namespaces(self) -> Iterable[tuple[str, str]]:
+        """Yield namespace bindings previously registered via :meth:`bind`."""
+
         return self.namespace_manager.namespaces()
 
     def __len__(self) -> int:
@@ -200,9 +210,13 @@ def _create_pronto_stub() -> ModuleType:
             self.path = _path
 
         def terms(self) -> Iterable[str]:
+            """Return a deterministic collection of ontology term identifiers."""
+
             return ["TERM:0000001", "TERM:0000002"]
 
         def dump(self, destination: str, format: str = "obojson") -> None:
+            """Write minimal ontology contents to ``destination`` for tests."""
+
             Path(destination).write_text('{"graphs": []}')
 
     return _create_stub_module("pronto", {"Ontology": _StubOntology})
@@ -216,12 +230,18 @@ def _create_owlready_stub() -> ModuleType:
             self.iri = iri
 
         def load(self) -> "_StubOntology":
+            """Provide fluent API parity with owlready2 ontologies."""
+
             return self
 
         def classes(self) -> List[str]:
+            """Return example ontology classes for tests and fallbacks."""
+
             return ["Class1", "Class2", "Class3"]
 
     def get_ontology(iri: str) -> _StubOntology:
+        """Return a stub ontology instance for the provided IRI."""
+
         return _StubOntology(iri)
 
     return _create_stub_module("owlready2", {"get_ontology": get_ontology})

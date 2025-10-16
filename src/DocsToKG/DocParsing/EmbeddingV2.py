@@ -1204,7 +1204,7 @@ def write_vectors(
                 stage="embeddings",
                 doc_id=doc_id,
                 duration_s=0.0,
-                schema_version="embeddings/1.0.0",
+                schema_version=VECTOR_SCHEMA_VERSION,
                 input_path=row.get("source_path", "unknown"),
                 input_hash=row.get("input_hash", ""),
                 output_path=path_or_handle if isinstance(path_or_handle, Path) else None,
@@ -1221,7 +1221,7 @@ def write_vectors(
                 stage="embeddings",
                 doc_id=doc_id,
                 duration_s=0.0,
-                schema_version="embeddings/1.0.0",
+                schema_version=VECTOR_SCHEMA_VERSION,
                 input_path=row.get("source_path", "unknown"),
                 input_hash=row.get("input_hash", ""),
                 output_path=path_or_handle if isinstance(path_or_handle, Path) else None,
@@ -1277,7 +1277,7 @@ def write_vectors(
                 doc_id=doc_id,
                 status="failure",
                 error=str(exc),
-                schema_version="embeddings/1.0.0",
+                schema_version=VECTOR_SCHEMA_VERSION,
             )
             raise
 
@@ -1413,7 +1413,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--splade-sparsity-warn-pct",
+        "--splade-zero-pct-warn-threshold",
         dest="sparsity_warn_threshold_pct",
         type=float,
         default=SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
@@ -1423,7 +1423,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--splade-zero-pct-warn-threshold",
+        "--splade-sparsity-warn-pct",
         dest="sparsity_warn_threshold_pct",
         type=float,
         help=argparse.SUPPRESS,
@@ -1715,7 +1715,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 input_path=chunk_file,
                 input_hash=input_hash,
                 output_path=out_path,
-                schema_version="embeddings/1.0.0",
+                schema_version=VECTOR_SCHEMA_VERSION,
             )
             skipped_files += 1
             continue
@@ -1736,7 +1736,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                     stage=MANIFEST_STAGE,
                     doc_id=doc_id,
                     duration_s=round(duration, 3),
-                    schema_version="embeddings/1.0.0",
+                    schema_version=VECTOR_SCHEMA_VERSION,
                     input_path=chunk_file,
                     input_hash=input_hash,
                     output_path=out_path,
@@ -1752,7 +1752,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 stage=MANIFEST_STAGE,
                 doc_id=doc_id,
                 duration_s=round(duration, 3),
-                schema_version="embeddings/1.0.0",
+                schema_version=VECTOR_SCHEMA_VERSION,
                 input_path=chunk_file,
                 input_hash=input_hash,
                 output_path=out_path,
@@ -1804,7 +1804,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         status="success",
         duration_s=round(time.perf_counter() - overall_start, 3),
         warnings=validator.zero_nnz_chunks[: validator.top_n] if validator.zero_nnz_chunks else [],
-        schema_version="embeddings/1.0.0",
+        schema_version=VECTOR_SCHEMA_VERSION,
         total_vectors=total_vectors,
         splade_avg_nnz=avg_nnz,
         splade_median_nnz=median_nnz,

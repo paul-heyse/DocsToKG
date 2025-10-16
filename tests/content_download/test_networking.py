@@ -1046,8 +1046,9 @@ if HAS_REQUESTS and HAS_PYALEX:
             dry_run=False,
             head_precheck_passed=False,
         )
-        assert outcome.classification is Classification.PDF_CORRUPT
+        assert outcome.classification is Classification.MISS
         assert outcome.path is None
+        assert outcome.error == "pdf-too-small"
 
     def test_manifest_entry_preserves_conditional_headers() -> None:
         outcome = DownloadOutcome(
@@ -2356,8 +2357,9 @@ def test_small_pdf_detected_as_corrupt(tmp_path, monkeypatch):
         context={"skip_head_precheck": True},
     )
 
-    assert outcome.classification is Classification.PDF_CORRUPT
+    assert outcome.classification is Classification.MISS
     assert outcome.path is None
+    assert outcome.error == "pdf-too-small"
     assert not any(artifact.pdf_dir.glob("*.pdf"))
 
 
@@ -2380,8 +2382,9 @@ def test_html_tail_in_pdf_marks_corruption(tmp_path, monkeypatch):
     session = requests.Session()
     outcome = downloader.download_candidate(session, artifact, url, None, timeout=10.0)
 
-    assert outcome.classification is Classification.PDF_CORRUPT
+    assert outcome.classification is Classification.MISS
     assert outcome.path is None
+    assert outcome.error == "html-tail-detected"
     assert not any(artifact.pdf_dir.glob("*.pdf"))
 
 

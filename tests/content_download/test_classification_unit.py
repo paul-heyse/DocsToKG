@@ -116,4 +116,6 @@ def test_build_download_outcome_respects_head_flag(tmp_path):
         head_precheck_passed=False,
     )
 
-    assert outcome_small.classification is Classification.PDF_CORRUPT
+    assert outcome_small.classification is Classification.MISS
+    assert outcome_small.path is None
+    assert outcome_small.error == "pdf-too-small"
