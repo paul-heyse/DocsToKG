@@ -545,6 +545,24 @@ def test_pdf_model_path_resolution_precedence(monkeypatch: pytest.MonkeyPatch, t
     assert pipelines.resolve_pdf_model_path(None) == str(expected)
 
 
+def test_pdf_model_path_cli_normalization(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from DocsToKG.DocParsing import pipelines
+
+    monkeypatch.delenv("DOCLING_PDF_MODEL", raising=False)
+    monkeypatch.delenv("DOCSTOKG_MODEL_ROOT", raising=False)
+    monkeypatch.delenv("HF_HOME", raising=False)
+
+    local_dir = tmp_path / "models" / "granite"
+    local_dir.mkdir(parents=True)
+    assert pipelines.resolve_pdf_model_path(str(local_dir)) == str(local_dir.resolve())
+
+    tilde_path = str(Path("~") / "granite-model")
+    assert pipelines.resolve_pdf_model_path(tilde_path) == str(Path(tilde_path).expanduser().resolve())
+
+    repo_id = "ibm-granite/granite-docling-258M"
+    assert pipelines.resolve_pdf_model_path(repo_id) == repo_id
+
+
 def test_pdf_pipeline_mirrors_output_paths(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -74,6 +74,22 @@ _LOGGER = get_logger(__name__)
 PDF_MODEL_SUBDIR = Path("granite-docling-258M")
 
 
+def _looks_like_filesystem_path(candidate: str) -> bool:
+    """Return ``True`` when ``candidate`` appears to reference a local path."""
+
+    expanded = Path(candidate).expanduser()
+    drive, _ = os.path.splitdrive(candidate)
+    if drive:
+        return True
+    if expanded.is_absolute() or expanded.exists():
+        return True
+    prefixes = ["~", "."]
+    if os.sep not in prefixes:
+        prefixes.append(os.sep)
+    alt = os.altsep
+    if alt and alt not in prefixes:
+        prefixes.append(alt)
+    return any(candidate.startswith(prefix) for prefix in prefixes)
 def _expand_path(path: str | Path) -> Path:
     """Expand a filesystem path to an absolute :class:`Path`."""
 
@@ -102,6 +118,14 @@ def resolve_pdf_model_path(cli_value: str | None = None) -> str:
     """Determine PDF model path using CLI and environment precedence."""
 
     if cli_value:
+        if _looks_like_filesystem_path(cli_value):
+            return str(expand_path(cli_value))
+        return cli_value
+    env_model = os.getenv("DOCLING_PDF_MODEL")
+    if env_model:
+        return str(expand_path(env_model))
+    model_root = resolve_model_root()
+    return str(expand_path(model_root / PDF_MODEL_SUBDIR))
         return cli_value
     env_model = os.getenv("DOCLING_PDF_MODEL")
     if env_model:
