@@ -149,7 +149,7 @@ python<span class="w"> </span>src/DocsToKG/DocParsing/EmbeddingV2.py<span class=
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.ingest</span><span class="w"> </span><span class="kn">import</span> <span class="n">ChunkIngestionPipeline</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">DocumentInput</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.observability</span><span class="w"> </span><span class="kn">import</span> <span class="n">Observability</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.operations</span><span class="w"> </span><span class="kn">import</span> <span class="n">serialize_state</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.vectorstore</span><span class="w"> </span><span class="kn">import</span> <span class="n">serialize_state</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.HybridSearch.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">ChunkRegistry</span><span class="p">,</span> <span class="n">OpenSearchSimulator</span>
 
 <span class="n">config_manager</span> <span class="o">=</span> <span class="n">HybridSearchConfigManager</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config/hybrid_config.json&quot;</span><span class="p">))</span>

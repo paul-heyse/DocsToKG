@@ -33,15 +33,15 @@
 
 ## 4. Distribute operations.py functions
 
-- [ ] 4.1 Move `verify_pagination` function to `service.py` under a "Service-level operations" section
-- [ ] 4.2 Move `build_stats_snapshot` function to `service.py` ensuring it maintains access to FAISS, OpenSearch, and registry parameters
-- [ ] 4.3 Move `should_rebuild_index` function to `service.py` preserving its heuristic logic for delete thresholds
-- [ ] 4.4 Move `serialize_state` function to `vectorstore.py` as a public module-level function accepting `FaissIndexManager` and `ChunkRegistry`
-- [ ] 4.5 Move `restore_state` function to `vectorstore.py` ensuring exception handling for missing or corrupt payloads
-- [ ] 4.6 Update imports in `validation.py` from `from .operations import serialize_state, restore_state` to `from .vectorstore import serialize_state, restore_state`
-- [ ] 4.7 Update imports in tests and service code for pagination/stats operations to reference `service` module
-- [ ] 4.8 Update `__init__.py` to export service-level ops from `.service` and state ops from `.vectorstore`
-- [ ] 4.9 Convert `operations.py` to deprecation shim with conditional re-exports routing to appropriate modules
+- [x] 4.1 Move `verify_pagination` function to `service.py` under a "Service-level operations" section
+- [x] 4.2 Move `build_stats_snapshot` function to `service.py` ensuring it maintains access to FAISS, OpenSearch, and registry parameters
+- [x] 4.3 Move `should_rebuild_index` function to `service.py` preserving its heuristic logic for delete thresholds
+- [x] 4.4 Move `serialize_state` function to `vectorstore.py` as a public module-level function accepting `FaissIndexManager` and `ChunkRegistry`
+- [x] 4.5 Move `restore_state` function to `vectorstore.py` ensuring exception handling for missing or corrupt payloads
+- [x] 4.6 Update imports in `validation.py` from `from .operations import serialize_state, restore_state` to `from .vectorstore import serialize_state, restore_state`
+- [x] 4.7 Update imports in tests and service code for pagination/stats operations to reference `service` module
+- [x] 4.8 Update `__init__.py` to export service-level ops from `.service` and state ops from `.vectorstore`
+- [x] 4.9 Convert `operations.py` to deprecation shim with conditional re-exports routing to appropriate modules
 - [ ] 4.10 Run operational tests (`tests/hybrid_search/test_operations*.py` or equivalent validation harness) to confirm no regressions
 
 ## 5. Merge schema.py with storage.py
@@ -65,22 +65,22 @@
 
 ## 7. Retire Tools directory and consolidate CLI entry points
 
-- [ ] 7.1 Review functionality in `HybridSearch/tools/run_hybrid_tests.py` and identify which validation scenarios it covers
-- [ ] 7.2 Ensure `validation.py:main()` CLI accepts equivalent arguments to provide same functionality as `run_hybrid_tests.py`
-- [ ] 7.3 Review `HybridSearch/tools/run_real_vector_ci.py` and migrate its CI-specific logic into `validation.py` as optional modes or separate subcommands
-- [ ] 7.4 Update `pyproject.toml` or setup configuration to expose console script entry point for validation module if not already present
+- [x] 7.1 Review functionality in `HybridSearch/tools/run_hybrid_tests.py` and identify which validation scenarios it covers
+- [x] 7.2 Ensure `validation.py:main()` CLI accepts equivalent arguments to provide same functionality as `run_hybrid_tests.py`
+- [x] 7.3 Review `HybridSearch/tools/run_real_vector_ci.py` and migrate its CI-specific logic into `validation.py` as optional modes or separate subcommands
+- [x] 7.4 Update `pyproject.toml` or setup configuration to expose console script entry point for validation module if not already present
 - [ ] 7.5 Update CI workflow files (`.github/workflows/*.yml` or equivalent) to invoke `python -m DocsToKG.HybridSearch.validation` with appropriate arguments
-- [ ] 7.6 Delete `HybridSearch/tools/__init__.py` after verifying no external references exist
-- [ ] 7.7 Delete `HybridSearch/tools/run_hybrid_tests.py` after confirming equivalent functionality exists in `validation.py`
-- [ ] 7.8 Delete `HybridSearch/tools/run_real_vector_ci.py` after migration completion
-- [ ] 7.9 Remove `tools/` directory entirely once all files are deleted
+- [x] 7.6 Delete `HybridSearch/tools/__init__.py` after verifying no external references exist
+- [x] 7.7 Delete `HybridSearch/tools/run_hybrid_tests.py` after confirming equivalent functionality exists in `validation.py`
+- [x] 7.8 Delete `HybridSearch/tools/run_real_vector_ci.py` after migration completion
+- [x] 7.9 Remove `tools/` directory entirely once all files are deleted
 - [ ] 7.10 Run CI pipeline locally or in test environment to confirm validation entry points function correctly
 
 ## 8. Update public interface and maintain backward compatibility
 
 - [ ] 8.1 Audit `__init__.py` to ensure all previously exported symbols remain available at their original import paths
 - [ ] 8.2 Add explicit re-exports in `__init__.py` for deprecated modules using `sys.modules` aliasing pattern: `sys.modules[__name__ + ".similarity"] = sys.modules[__name__ + ".vectorstore"]`
-- [ ] 8.3 Verify deprecation warnings are emitted when users import from deprecated module paths
+- [x] 8.3 Verify deprecation warnings are emitted when users import from deprecated module paths
 - [ ] 8.4 Document the deprecation timeline in `CHANGELOG.md` with specific guidance on migration paths
 - [ ] 8.5 Update module-level docstrings in consolidated modules to reflect their expanded responsibilities
 - [ ] 8.6 Ensure `__all__` exports in each module accurately reflect public API surface
@@ -88,16 +88,16 @@
 ## 9. Update test suite for new module structure
 
 - [ ] 9.1 Create mapping of all test files in `tests/hybrid_search/` to modules they test
-- [ ] 9.2 Update import statements in test files to use new module paths (preferring new paths over deprecated shims)
+- [x] 9.2 Update import statements in test files to use new module paths (preferring new paths over deprecated shims)
 - [ ] 9.3 Verify no tests rely on internal implementation details exposed only through now-consolidated modules
-- [ ] 9.4 Add tests specifically validating deprecation warnings are emitted when using old import paths
+- [x] 9.4 Add tests specifically validating deprecation warnings are emitted when using old import paths
 - [ ] 9.5 Run full test suite with coverage analysis to ensure no coverage gaps introduced by consolidation
 - [ ] 9.6 Update test utilities or fixtures that may have hardcoded module paths
 
 ## 10. Update documentation and examples
 
 - [ ] 10.1 Search documentation files (`docs/hybrid_search*.md`) for import examples using deprecated module paths
-- [ ] 10.2 Update all code examples to demonstrate imports from consolidated modules
+- [x] 10.2 Update all code examples to demonstrate imports from consolidated modules
 - [ ] 10.3 Add migration guide section to relevant documentation explaining the consolidation and providing import path translations
 - [ ] 10.4 Update architecture diagrams or module dependency graphs to reflect nine-module structure
 - [ ] 10.5 Ensure API reference documentation (if auto-generated) correctly resolves to new module locations

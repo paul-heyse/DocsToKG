@@ -88,7 +88,7 @@ retrieval subsystems.</p>
 <h2>3. Calibration Sweeps<a class="headerlink" href="#calibration-sweeps" title="Link to this heading"></a></h2>
 <ol class="arabic simple">
 <li><p>Launch the validation harness:
-<code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.HybridSearch.tools.run_real_vector_ci</span> <span class="pre">--pytest-args</span> <span class="pre">&quot;-q</span> <span class="pre">--real-vectors&quot;</span></code>
+<code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.HybridSearch.validation</span> <span class="pre">--run-real-ci</span> <span class="pre">--pytest-args</span> <span class="pre">&quot;-q</span> <span class="pre">--real-vectors&quot;</span></code>
 or invoke <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.HybridSearch.validation</span> <span class="pre">--dataset</span> <span class="pre">tests/data/hybrid_dataset.jsonl</span></code> for ad-hoc checks.</p></li>
 <li><p>Review <code class="docutils literal notranslate"><span class="pre">calibration.json</span></code> in the generated report directory. Confirm that self-hit accuracy is ≥0.95 for oversample ≥2.</p></li>
 <li><p>If accuracy drops below threshold:</p>

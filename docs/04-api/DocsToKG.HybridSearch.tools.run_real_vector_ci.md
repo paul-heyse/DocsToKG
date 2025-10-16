@@ -1,27 +1,6 @@
 # 1. Module: run_real_vector_ci
 
-This reference documents the DocsToKG module ``DocsToKG.HybridSearch.tools.run_real_vector_ci``.
-
-CI helper to execute real-vector regression tests and collect validation artifacts.
-
-## 1. Functions
-
-### `clean_directory(path)`
-
-Remove and recreate a directory to ensure a clean workspace.
-
-Args:
-path: Directory path to reset.
-
-Returns:
-None
-
-### `main(argv)`
-
-Entry point for executing real-vector CI regression suites.
-
-Args:
-argv: Optional list of command-line arguments.
-
-Returns:
-Process exit code indicating success (`0`) or failure.
+The ``DocsToKG.HybridSearch.tools.run_real_vector_ci`` module has been retired.
+Use ``python -m DocsToKG.HybridSearch.validation --run-real-ci`` to execute the
+real-vector regression suite and produce CI artifacts. The ``validation`` module
+also accepts ``--run-tests`` to mirror the old ``run_hybrid_tests.py`` entry point.

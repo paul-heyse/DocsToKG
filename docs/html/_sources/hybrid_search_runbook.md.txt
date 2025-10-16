@@ -7,7 +7,7 @@ retrieval subsystems.
 
 ## 3. Calibration Sweeps
 1. Launch the validation harness:
-   `python -m DocsToKG.HybridSearch.tools.run_real_vector_ci --pytest-args "-q --real-vectors"`
+   `python -m DocsToKG.HybridSearch.validation --run-real-ci --pytest-args "-q --real-vectors"`
    or invoke `python -m DocsToKG.HybridSearch.validation --dataset
    tests/data/hybrid_dataset.jsonl` for ad-hoc checks.
 2. Review `calibration.json` in the generated report directory. Confirm that self-hit accuracy is ≥0.95 for oversample ≥2.
