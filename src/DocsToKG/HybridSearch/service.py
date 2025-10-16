@@ -101,6 +101,9 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+import hashlib
 import json
 import math
 import random
@@ -139,7 +142,6 @@ from .store import (
     ChunkRegistry,
     FaissSearchResult,
     OpenSearchSimulator,
-    cosine_batch,
     cosine_topk_blockwise,
     matches_filters,
     normalize_rows,
@@ -539,10 +541,22 @@ def apply_mmr_diversification(
         if not remaining.size:
             break
 
-        query_vec = embeddings[best_idx]
-        pool = embeddings[remaining]
+        query_vec = np.ascontiguousarray(embeddings[best_idx], dtype=np.float32)
+        pool = np.ascontiguousarray(embeddings[remaining], dtype=np.float32)
         if resources is not None:
-            sims = cosine_batch(query_vec, pool, device=device, resources=resources)[0]
+            if pool.size == 0:
+                sims = np.empty(0, dtype=np.float32)
+            else:
+                scores_block, indices_block = cosine_topk_blockwise(
+                    query_vec,
+                    pool,
+                    k=pool.shape[0],
+                    device=device,
+                    resources=resources,
+                )
+                sims = np.full(pool.shape[0], -np.inf, dtype=np.float32)
+                order = indices_block[0]
+                sims[order] = scores_block[0]
         else:
             sims = _cosine_cpu(query_vec, pool)
         max_sim[remaining] = np.maximum(max_sim[remaining], sims)
@@ -642,6 +656,7 @@ class HybridSearchService:
         filters = dict(request.filters)
         if request.namespace:
             filters["namespace"] = request.namespace
+        cursor_fingerprint = self._cursor_fingerprint(request, filters)
 
         with self._observability.trace("hybrid_search", namespace=request.namespace or "*"):
             timings: Dict[str, float] = {}
@@ -690,11 +705,23 @@ class HybridSearchService:
                 embedding_cache[vector_id] = embedding
                 return embedding
 
-            channel_weights = getattr(config.fusion, "channel_weights", None)
-            fusion = ReciprocalRankFusion(
-                k0=config.fusion.k0,
-                channel_weights=dict(channel_weights) if channel_weights is not None else None,
+            raw_weights = getattr(config.fusion, "channel_weights", None)
+            adaptive_weights = dict(raw_weights) if raw_weights is not None else {}
+            lexical_ids = {candidate.chunk.vector_id for candidate in bm25.candidates}
+            lexical_ids.update(candidate.chunk.vector_id for candidate in splade.candidates)
+            lexical_rate = min(1.0, len(lexical_ids) / max(1, request.page_size))
+            dense_weight = adaptive_weights.get("dense", 1.0)
+            if lexical_rate >= 0.8:
+                dense_weight = max(0.5, dense_weight * 0.7)
+            elif lexical_rate <= 0.3:
+                dense_weight = min(2.0, dense_weight * 1.25)
+            adaptive_weights["dense"] = dense_weight
+            self._observability.metrics.observe(
+                "hybrid_lexical_hit_rate",
+                lexical_rate,
+                namespace=request.namespace or "*",
             )
+            fusion = ReciprocalRankFusion(k0=config.fusion.k0, channel_weights=adaptive_weights)
             combined_candidates = bm25.candidates + splade.candidates + dense.candidates
             fused_scores = fusion.fuse(combined_candidates)
             unique_candidates = self._dedupe_candidates(combined_candidates, fused_scores)
@@ -729,11 +756,7 @@ class HybridSearchService:
                     unique_embeddings[:pool_size] if unique_embeddings is not None else None
                 )
                 device_id = dense_stats.device if dense_stats is not None else dense_store.device
-                resources = (
-                    dense_stats.resources
-                    if dense_stats is not None
-                    else getattr(dense_store, "gpu_resources", None)
-                )
+                resources = dense_stats.resources if dense_stats is not None else None
                 selected = apply_mmr_diversification(
                     pool,
                     fused_scores,
@@ -787,11 +810,7 @@ class HybridSearchService:
                 self._opensearch,
                 config.fusion,
                 device=(dense_stats.device if dense_stats is not None else dense_store.device),
-                resources=(
-                    dense_stats.resources
-                    if dense_stats is not None
-                    else getattr(dense_store, "gpu_resources", None)
-                ),
+                resources=dense_stats.resources if dense_stats is not None else None,
             )
             shaped = shaper.shape(
                 ordered_chunks,
@@ -807,8 +826,12 @@ class HybridSearchService:
             self._observability.metrics.observe(
                 "hybrid_search_timings_total_ms", timings["total_ms"]
             )
-            paged_results = self._slice_from_cursor(shaped, request.cursor)
-            next_cursor = self._build_cursor(paged_results, request.page_size)
+            paged_results = self._slice_from_cursor(
+                shaped, request.cursor, request.page_size, cursor_fingerprint
+            )
+            next_cursor = self._build_cursor(
+                paged_results, request.page_size, cursor_fingerprint
+            )
             page_results = paged_results[: request.page_size]
             self._observability.logger.info(
                 "hybrid-search",
@@ -840,46 +863,146 @@ class HybridSearchService:
         return self._faiss_router.get(namespace)
 
     def _slice_from_cursor(
-        self, results: Sequence[HybridSearchResult], cursor: Optional[str]
+        self,
+        results: Sequence[HybridSearchResult],
+        cursor: Optional[str],
+        page_size: int,
+        fingerprint: str,
     ) -> List[HybridSearchResult]:
         if not cursor:
             return list(results)
         try:
+            if cursor.startswith("v3|"):
+                _, encoded = cursor.split("|", 1)
+                padding = "=" * (-len(encoded) % 4)
+                raw = base64.urlsafe_b64decode((encoded + padding).encode("ascii"))
+                payload = json.loads(raw.decode("utf-8"))
+                page_hint = int(payload.get("p"))
+                if page_hint != page_size:
+                    raise RequestValidationError("Cursor page size mismatch")
+                if payload.get("f") != fingerprint:
+                    raise RequestValidationError("Cursor fingerprint mismatch")
+                anchor = payload.get("a") or {}
+                vector_id = anchor.get("id") or anchor.get("vector_id")
+                score = anchor.get("score")
+                rank = anchor.get("rank")
+                if vector_id is None or score is None:
+                    raise RequestValidationError("Cursor anchor missing data")
+                return self._slice_after_anchor(
+                    results,
+                    str(vector_id),
+                    float(score),
+                    int(rank) if rank is not None else None,
+                )
             if cursor.startswith("v2|"):
                 _version, score_str, vector_id = cursor.split("|", 2)
-                target_score = float(score_str)
-                sliced: List[HybridSearchResult] = []
-                skipping = True
-                for result in results:
-                    if skipping:
-                        if (
-                            result.vector_id == vector_id
-                            and abs(result.score - target_score) < 1e-6
-                        ):
-                            skipping = False
-                        continue
-                    sliced.append(result)
-                return sliced if not skipping else list(results)
+                return self._slice_after_anchor(results, vector_id, float(score_str), None)
             vector_id, rank_str = cursor.rsplit(":", 1)
-            target_rank = int(rank_str)
-        except (ValueError, TypeError):
+            return self._slice_after_anchor(results, vector_id, None, int(rank_str))
+        except RequestValidationError:
+            raise
+        except (ValueError, TypeError, json.JSONDecodeError, binascii.Error):
             return list(results)
 
+    def _build_cursor(
+        self,
+        results: Sequence[HybridSearchResult],
+        page_size: int,
+        fingerprint: str,
+    ) -> Optional[str]:
+        if len(results) <= page_size:
+            return None
+        last = results[page_size - 1]
+        anchor = {
+            "id": last.vector_id,
+            "score": float(last.score),
+            "rank": int(getattr(last, "fused_rank", page_size)),
+        }
+        payload = {
+            "p": int(page_size),
+            "f": fingerprint,
+            "a": anchor,
+        }
+        blob = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        encoded = base64.urlsafe_b64encode(blob).decode("ascii").rstrip("=")
+        return f"v3|{encoded}"
+
+    def _slice_after_anchor(
+        self,
+        results: Sequence[HybridSearchResult],
+        vector_id: str,
+        score: Optional[float],
+        rank: Optional[int],
+    ) -> List[HybridSearchResult]:
         sliced: List[HybridSearchResult] = []
         skipping = True
         for result in results:
             if skipping:
-                if result.vector_id == vector_id and result.fused_rank == target_rank:
+                if result.vector_id != vector_id:
+                    continue
+                score_match = (
+                    True
+                    if score is None or math.isnan(score)
+                    else abs(result.score - score) < 1e-6
+                )
+                rank_match = True if rank is None else result.fused_rank == rank
+                if score_match and rank_match:
                     skipping = False
                 continue
             sliced.append(result)
         return sliced if not skipping else list(results)
 
-    def _build_cursor(self, results: Sequence[HybridSearchResult], page_size: int) -> Optional[str]:
-        if len(results) <= page_size:
-            return None
-        last = results[page_size - 1]
-        return f"v2|{last.score:.6f}|{last.vector_id}"
+    def run_compaction_cycle(self) -> Dict[str, Dict[str, object]]:
+        """Trigger FAISS maintenance (rebuild/compact) and emit diagnostics."""
+
+        start = time.perf_counter()
+        before = self._faiss_router.stats()
+        actions = self._faiss_router.run_maintenance()
+        after = self._faiss_router.stats()
+        elapsed_ms = (time.perf_counter() - start) * 1000
+
+        def _dirty(snapshot: Mapping[str, Mapping[str, object]], namespace: str) -> float:
+            bucket = snapshot.get(namespace, {})
+            if not isinstance(bucket, Mapping):
+                return 0.0
+            raw = bucket.get("dirty_deletes", 0.0)
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                return 0.0
+
+        summary: Dict[str, Dict[str, object]] = {}
+        for namespace, action in actions.items():
+            before_dirty = _dirty(before, namespace)
+            after_dirty = _dirty(after, namespace)
+            rebuilt = bool(action.get("rebuilt"))
+            trained = bool(action.get("trained"))
+            summary[namespace] = {
+                "rebuilt": rebuilt,
+                "trained": trained,
+                "dirty_deletes_before": before_dirty,
+                "dirty_deletes_after": after_dirty,
+            }
+            self._observability.metrics.observe(
+                "faiss_dirty_deletes", after_dirty, namespace=namespace
+            )
+            if rebuilt:
+                self._observability.metrics.increment(
+                    "faiss_compactions_rebuilt", namespace=namespace
+                )
+
+        self._observability.metrics.increment("faiss_compactions_attempted")
+        self._observability.metrics.observe("faiss_compaction_ms", elapsed_ms)
+        self._observability.logger.info(
+            "hybrid-search-compaction",
+            extra={
+                "event": {
+                    "elapsed_ms": round(elapsed_ms, 3),
+                    "namespaces": summary,
+                }
+            },
+        )
+        return {"namespaces": summary, "elapsed_ms": elapsed_ms}
 
     def _execute_bm25(
         self,
@@ -992,6 +1115,9 @@ class HybridSearchService:
         except AttributeError:
             adapter_stats = None
 
+        score_floor = float(getattr(config.retrieval, "dense_score_floor", 0.0))
+        use_score_floor = score_floor > 0.0
+
         def run_dense_search(current_k: int) -> list[FaissSearchResult]:
             """Query FAISS for dense document candidates at the requested depth.
 
@@ -1001,11 +1127,30 @@ class HybridSearchService:
             Returns:
                 Dense similarity matches ordered by score for the current document search.
             """
-            batch_hits_local = store.search_batch(queries, current_k)
-            self._observability.metrics.observe(
-                "faiss_search_batch_size", float(len(batch_hits_local)), channel="dense"
-            )
-            return batch_hits_local[0] if batch_hits_local else []
+            hits_local: List[FaissSearchResult] = []
+            used_range = False
+            if use_score_floor:
+                try:
+                    limit = current_k if current_k > 0 else None
+                    range_hits = store.range_search(queries[0], score_floor, limit=limit)
+                    hits_local = list(range_hits)
+                    used_range = True
+                except Exception:
+                    hits_local = []
+                    used_range = False
+            if not used_range:
+                batch_hits_local = store.search_batch(queries, current_k)
+                self._observability.metrics.observe(
+                    "faiss_search_batch_size", float(len(batch_hits_local)), channel="dense"
+                )
+                hits_local = batch_hits_local[0] if batch_hits_local else []
+            if use_score_floor:
+                hits_local = [hit for hit in hits_local if hit.score >= score_floor]
+            if used_range:
+                self._observability.metrics.observe(
+                    "faiss_range_hits", float(len(hits_local)), channel="dense"
+                )
+            return hits_local
 
         effective_k = initial_k
         hits = run_dense_search(effective_k)
@@ -1130,6 +1275,20 @@ class HybridSearchService:
         if isinstance(value, (str, int, float, bool)) or value is None:
             return value
         return str(value)
+
+    def _cursor_fingerprint(
+        self,
+        request: HybridSearchRequest,
+        filters: Mapping[str, object],
+    ) -> str:
+        payload = {
+            "q": request.query.strip(),
+            "ns": request.namespace or "",
+            "filters": self._normalize_signature_value(filters),
+            "div": bool(getattr(request, "diversification", False)),
+        }
+        raw = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        return hashlib.blake2s(raw, digest_size=12).hexdigest()
 
     def _dedupe_candidates(
         self,
@@ -2030,11 +2189,7 @@ class HybridSearchValidator:
             adapter_stats = self._ingestion.faiss_index.adapter_stats  # type: ignore[attr-defined]
         except AttributeError:
             adapter_stats = None
-        resources = (
-            adapter_stats.resources
-            if adapter_stats is not None
-            else getattr(self._ingestion.faiss_index, "gpu_resources", None)
-        )
+        resources = adapter_stats.resources if adapter_stats is not None else None
         device = (
             adapter_stats.device
             if adapter_stats is not None

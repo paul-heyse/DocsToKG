@@ -271,9 +271,9 @@ import yaml
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
+from .errors import ConfigurationError, DownloadFailure, OntologyDownloadError
 from .io import (
     RDF_MIME_ALIASES,
-    DownloadFailure,
     DownloadResult,
     download_stream,
     extract_archive_safe,
@@ -288,10 +288,8 @@ from .planning import (
     MANIFEST_JSON_SCHEMA,
     MANIFEST_SCHEMA_VERSION,
     RESOLVERS,
-    ConfigurationError,
     FetchResult,
     FetchSpec,
-    OntologyDownloadError,
     PlannedFetch,
     ResolverCandidate,
     _build_destination,
@@ -305,9 +303,9 @@ from .planning import (
     parse_version_timestamp,
     plan_all,
     plan_one,
-    setup_logging,
     validate_manifest_dict,
 )
+from .logging_utils import setup_logging
 from .settings import (
     CACHE_DIR,
     CONFIG_DIR,

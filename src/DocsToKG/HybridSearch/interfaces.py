@@ -158,10 +158,6 @@ class DenseVectorStore(Protocol):
         """Immutable configuration backing the dense store."""
 
     @property
-    def gpu_resources(self) -> object | None:
-        """Return GPU resources when available, otherwise ``None``."""
-
-    @property
     def adapter_stats(self) -> "AdapterStats":
         """Return runtime adapter statistics (device, nprobe, replication state)."""
 

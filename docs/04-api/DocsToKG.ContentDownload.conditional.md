@@ -1,10 +1,10 @@
 # 1. Module: conditional
 
 The legacy module ``DocsToKG.ContentDownload.conditional`` has been merged into
-``DocsToKG.ContentDownload.network``. Conditional request helpers and metadata
+``DocsToKG.ContentDownload.networking``. Conditional request helpers and metadata
 classes are available from the unified module. Import examples::
 
-    from DocsToKG.ContentDownload.network import ConditionalRequestHelper
+    from DocsToKG.ContentDownload.networking import ConditionalRequestHelper
 
-Refer to :doc:`DocsToKG.ContentDownload.network <DocsToKG.ContentDownload.network>`
+Refer to :doc:`DocsToKG.ContentDownload.networking <DocsToKG.ContentDownload.networking>`
 for detailed documentation.

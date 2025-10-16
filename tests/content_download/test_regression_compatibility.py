@@ -43,8 +43,8 @@ from typing import Dict, List
 
 import pytest
 
-from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload import resolvers
+from DocsToKG.ContentDownload import cli as downloader
+from DocsToKG.ContentDownload import pipeline as resolvers
 
 # --- Test Cases ---
 

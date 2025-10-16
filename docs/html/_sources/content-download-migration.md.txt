@@ -6,11 +6,11 @@ change set.
 
 ## 1. Removed Compatibility Shims
 
-- `DocsToKG.ContentDownload.resolvers.time` and
-  `DocsToKG.ContentDownload.resolvers.requests` were deleted. Import these
+- `DocsToKG.ContentDownload.pipeline.time` and
+  `DocsToKG.ContentDownload.pipeline.requests` were deleted. Import these
   modules directly from the standard library / requests package.
-- `DocsToKG.ContentDownload.resolvers.request_with_retries` proxy was removed.
-  Use `from DocsToKG.ContentDownload.network import request_with_retries`.
+- `DocsToKG.ContentDownload.pipeline.request_with_retries` proxy was removed.
+  Use `from DocsToKG.ContentDownload.networking import request_with_retries`.
 - Deprecated module aliases (`DocsToKG.ContentDownload.results`, `.similarity`,
   `.retrieval`, `.operations`, `.schema`) are no longer available; import the
   consolidated modules (`ranking`, `vectorstore`, `service`, `storage`)

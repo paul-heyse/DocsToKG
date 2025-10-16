@@ -24,7 +24,7 @@ respecting Unpaywall and Crossref rate limits.
 At the CLI level the downloader exposes matching controls:
 
 ```bash
-python -m DocsToKG.ContentDownload.download_pyalex_pdfs \
+python -m DocsToKG.ContentDownload.cli \
     --concurrent-resolvers 3 \
     --head-precheck \
     --accept "application/pdf,text/html;q=0.9"
@@ -61,7 +61,7 @@ enable_global_url_dedup: true
 or ad-hoc via the CLI:
 
 ```bash
-python -m DocsToKG.ContentDownload.download_pyalex_pdfs \
+python -m DocsToKG.ContentDownload.cli \
     --topic "knowledge graphs" \
     --year-start 2020 --year-end 2023 \
     --global-url-dedup
@@ -86,7 +86,7 @@ CLI runs can supply the same information with repeated
 ``--domain-min-interval`` flags. Domains are matched case-insensitively:
 
 ```bash
-python -m DocsToKG.ContentDownload.download_pyalex_pdfs \
+python -m DocsToKG.ContentDownload.cli \
     --domain-min-interval example.org=0.5 \
     --domain-min-interval publisher.edu=1.5
 ```
@@ -118,7 +118,7 @@ artifacts. The downloader exposes a `--staging` flag that creates a timestamped
 run directory containing all artifacts for that invocation:
 
 ```bash
-python -m DocsToKG.ContentDownload.download_pyalex_pdfs \
+python -m DocsToKG.ContentDownload.cli \
     --topic "graph embeddings" \
     --year-start 2022 --year-end 2024 \
     --out ./runs \
@@ -147,7 +147,7 @@ and writes an attempts CSV mirror. Run `tools/manifest_to_csv.py` to produce a
 rapid auditing:
 
 ```bash
-python -m DocsToKG.ContentDownload.download_pyalex_pdfs \
+python -m DocsToKG.ContentDownload.cli \
     --topic "graph embeddings" \
     --year-start 2022 --year-end 2024 \
     --out ./runs \

@@ -1,6 +1,6 @@
 # 1. Module: download_pyalex_pdfs
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.download_pyalex_pdfs``.
+This reference documents the DocsToKG module ``DocsToKG.ContentDownload.cli``.
 
 ## 1. Overview
 
@@ -32,7 +32,7 @@ Dependencies:
   conditional caching, and shared utilities.
 
 Usage:
-    python -m DocsToKG.ContentDownload.download_pyalex_pdfs \
+    python -m DocsToKG.ContentDownload.cli \
         --topic "knowledge graphs" --year-start 2020 --year-end 2023 \
         --out ./pdfs --resolver-config download_config.yaml
 

@@ -1,6 +1,6 @@
 # 1. Module: headers
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.headers``.
+This reference documents the DocsToKG module ``DocsToKG.ContentDownload.pipeline.headers``.
 
 Resolver header utilities shared across provider implementations.
 

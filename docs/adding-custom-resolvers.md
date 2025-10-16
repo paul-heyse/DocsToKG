@@ -10,7 +10,7 @@ Create a new module (for example,
 `src/DocsToKG/ContentDownload/resolver_my_provider.py`) or extend
 `src/DocsToKG/ContentDownload/resolvers.py`. Implement the public surface
 expected by `ResolverConfig` using the shared types exposed from the
-`DocsToKG.ContentDownload.resolvers` module:
+`DocsToKG.ContentDownload.pipeline` module:
 
 ```python
 from __future__ import annotations
@@ -19,7 +19,7 @@ from typing import Iterable
 
 import requests
 
-from DocsToKG.ContentDownload.resolvers import (
+from DocsToKG.ContentDownload.pipeline import (
     RegisteredResolver,
     ResolverConfig,
     ResolverResult,
@@ -77,7 +77,7 @@ class MyResolver(RegisteredResolver):
 Key requirements:
 
 - Subclass `RegisteredResolver` and implement `name`, `is_enabled`, and
-  `iter_urls` as defined in `DocsToKG.ContentDownload.resolvers.Resolver`.
+  `iter_urls` as defined in `DocsToKG.ContentDownload.pipeline.Resolver`.
 - Surface errors by yielding `ResolverResult` events instead of raising
   exceptions.
 - Use `request_with_retries` for outbound HTTP to benefit from retry policies
@@ -88,7 +88,7 @@ For JSON APIs the recommended base class is `ApiResolverBase`, which wraps
 it to reduce boilerplate:
 
 ```python
-from DocsToKG.ContentDownload.resolvers import ApiResolverBase, ResolverResult
+from DocsToKG.ContentDownload.pipeline import ApiResolverBase, ResolverResult
 
 
 class MyApiResolver(ApiResolverBase):
@@ -124,7 +124,7 @@ the resolver in the default ordering, add it to `default_resolvers()` inside
 `src/DocsToKG/ContentDownload/resolvers.py`:
 
 ```python
-from DocsToKG.ContentDownload import resolvers
+from DocsToKG.ContentDownload import pipeline
 
 
 def default_resolvers() -> List[Resolver]:

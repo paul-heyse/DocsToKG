@@ -73,7 +73,7 @@ import pytest
 
 pytest.importorskip("pytest_benchmark")
 
-from DocsToKG.ContentDownload.resolvers import (
+from DocsToKG.ContentDownload.pipeline import (
     DownloadOutcome,
     ResolverConfig,
     ResolverMetrics,
@@ -177,7 +177,7 @@ def test_head_precheck_overhead_vs_savings() -> None:
 
 
 def test_retry_backoff_timing(monkeypatch: pytest.MonkeyPatch) -> None:
-    from DocsToKG.ContentDownload.network import request_with_retries
+    from DocsToKG.ContentDownload.networking import request_with_retries
 
     sleeps: List[float] = []
 
@@ -185,7 +185,7 @@ def test_retry_backoff_timing(monkeypatch: pytest.MonkeyPatch) -> None:
         sleeps.append(value)
 
     monkeypatch.setattr(time, "sleep", fake_sleep)
-    monkeypatch.setattr("DocsToKG.ContentDownload.network.random.random", lambda: 0.0)
+    monkeypatch.setattr("DocsToKG.ContentDownload.networking.random.random", lambda: 0.0)
 
     class FakeResponse:
         def __init__(self, status_code: int):

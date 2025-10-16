@@ -1928,17 +1928,6 @@ class ManagedFaissAdapter(DenseVectorStore):
         return self._inner.adapter_stats
 
     @property
-    def gpu_resources(self):
-        """Return GPU resources backing the managed index."""
-
-        warnings.warn(
-            "ManagedFaissAdapter.gpu_resources is deprecated; use adapter_stats.resources instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self._inner.adapter_stats.resources
-
-    @property
     def ntotal(self) -> int:
         """Return the number of vectors stored in the managed index."""
 

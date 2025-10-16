@@ -1,6 +1,6 @@
 # 1. Module: __init__
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.__init__``.
+This reference documents the DocsToKG module ``DocsToKG.ContentDownload.pipeline.__init__``.
 
 Resolver Package Facade
 
@@ -16,7 +16,7 @@ Key Features:
 - Backward-compatible aliases for deprecated imports (``time`` and ``requests``).
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers import ResolverPipeline, default_resolvers
+    from DocsToKG.ContentDownload.pipeline import ResolverPipeline, default_resolvers
 
     pipeline = ResolverPipeline(
         resolvers=default_resolvers(),

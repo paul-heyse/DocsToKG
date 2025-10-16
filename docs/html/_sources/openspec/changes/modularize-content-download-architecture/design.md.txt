@@ -157,7 +157,7 @@ resolvers/
 - Testing: Can import and test individual resolvers without pipeline overhead
 - Extensibility: New resolvers are standalone files following clear template
 - Maintainability: ~120 lines per file vs single 2000-line file reduces cognitive load
-- Backward compatibility: Existing imports like `from DocsToKG.ContentDownload.resolvers import ResolverPipeline` continue working via `__init__.py` re-exports
+- Backward compatibility: Existing imports like `from DocsToKG.ContentDownload.pipeline import ResolverPipeline` continue working via `__init__.py` re-exports
 
 **Migration Path:**
 

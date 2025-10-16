@@ -62,7 +62,7 @@ from typing import Any, Dict, List
 
 import pytest
 
-from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
+from DocsToKG.ContentDownload import cli as downloader
 
 
 class _RecordingSink:

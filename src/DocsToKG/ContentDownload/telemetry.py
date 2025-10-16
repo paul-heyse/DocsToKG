@@ -28,11 +28,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Protocol, Set, Tuple
 
 if TYPE_CHECKING:  # pragma: no cover
-    from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
-    from DocsToKG.ContentDownload.resolvers import AttemptRecord, DownloadOutcome
+    from DocsToKG.ContentDownload.cli import WorkArtifact
+    from DocsToKG.ContentDownload.pipeline import AttemptRecord, DownloadOutcome
 
-from DocsToKG.ContentDownload.classifications import PDF_LIKE, Classification, ReasonCode
-from DocsToKG.ContentDownload.utils import normalize_url
+from DocsToKG.ContentDownload.core import PDF_LIKE, Classification, ReasonCode
+from DocsToKG.ContentDownload.core import normalize_url
 
 MANIFEST_SCHEMA_VERSION = 2
 

@@ -148,9 +148,9 @@ from typing import Any, Dict, List
 
 import pytest
 
-from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload import resolvers
-from DocsToKG.ContentDownload.classifications import Classification
+from DocsToKG.ContentDownload import cli as downloader
+from DocsToKG.ContentDownload import pipeline as resolvers
+from DocsToKG.ContentDownload.core import Classification
 from DocsToKG.ContentDownload.telemetry import MANIFEST_SCHEMA_VERSION
 from tools.manifest_to_index import convert_manifest_to_index
 

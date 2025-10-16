@@ -126,7 +126,7 @@ Usage:
         --data-root /datasets/Data --min-tokens 256 --max-tokens 512
 
 Tokenizer Alignment:
-    The default tokenizer (``Qwen/Qwen3-Embedding-4B``) aligns with the dense
+    The default tokenizer (``DEFAULT_TOKENIZER`` from :mod:`DocsToKG.DocParsing.core`) aligns with the dense
     embedder used by the embeddings pipeline. When experimenting with other
     tokenizers (for example, legacy BERT models), run the calibration utility
     beforehand to understand token count deltas::
@@ -174,9 +174,8 @@ __all__ = (
 )
 
 from DocsToKG.DocParsing.core import (
-    DEFAULT_CAPTION_MARKERS,
-    DEFAULT_HEADING_MARKERS,
     DEFAULT_SERIALIZER_PROVIDER,
+    DEFAULT_TOKENIZER,
     ChunkResult,
     ChunkTask,
     ChunkWorkerConfig,
@@ -190,19 +189,18 @@ from DocsToKG.DocParsing.core import (
     get_logger,
     iter_doctags,
     load_manifest_index,
-    load_structural_marker_config,
     log_event,
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
+    prepare_data_root,
+    resolve_pipeline_path,
     set_spawn_or_warn,
     should_skip_output,
 )
 from DocsToKG.DocParsing.doctags import (
     add_data_root_option,
     add_resume_force_options,
-    prepare_data_root,
-    resolve_pipeline_path,
 )
 from DocsToKG.DocParsing.formats import (
     CHUNK_SCHEMA_VERSION,
@@ -211,20 +209,14 @@ from DocsToKG.DocParsing.formats import (
     get_docling_version,
     validate_chunk_row,
 )
+from DocsToKG.DocParsing.formats.markers import (
+    DEFAULT_CAPTION_MARKERS,
+    DEFAULT_HEADING_MARKERS,
+    dedupe_preserve_order,
+    load_structural_marker_config,
+)
 
 SOFT_BARRIER_MARGIN = 64
-
-
-def _dedupe_preserve_order(markers: Sequence[str]) -> Tuple[str, ...]:
-    """Return a tuple with duplicates removed while preserving original order."""
-
-    seen: set[str] = set()
-    ordered: List[str] = []
-    for marker in markers:
-        if marker not in seen:
-            seen.add(marker)
-            ordered.append(marker)
-    return tuple(ordered)
 
 
 def _resolve_serializer_provider(spec: str):
@@ -905,10 +897,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-tokens", type=int, default=256)
     parser.add_argument("--max-tokens", type=int, default=512)
     parser.add_argument(
+        "--log-level",
+        type=lambda value: str(value).upper(),
+        default="INFO",
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        help="Logging verbosity for console output (default: %(default)s).",
+    )
+    parser.add_argument(
         "--tokenizer-model",
         type=str,
-        default="Qwen/Qwen3-Embedding-4B",
-        help="HuggingFace tokenizer model (default aligns with dense embedder)",
+        default=DEFAULT_TOKENIZER,
+        help=f"HuggingFace tokenizer model (default aligns with dense embedder: {DEFAULT_TOKENIZER}).",
     )
     parser.add_argument(
         "--soft-barrier-margin",
@@ -987,9 +986,18 @@ def main(args: argparse.Namespace | None = None) -> int:
         int: Exit code where ``0`` indicates success.
     """
 
-    logger = get_logger(__name__)
+    parser = build_parser()
+    if args is None:
+        namespace = parser.parse_args()
+    elif isinstance(args, argparse.Namespace):
+        namespace = args
+    else:
+        namespace = parser.parse_args(args)
+
+    log_level = getattr(namespace, "log_level", "INFO")
+    logger = get_logger(__name__, level=str(log_level))
     set_spawn_or_warn(logger)
-    args = args if args is not None else build_parser().parse_args()
+    args = namespace
 
     if args.min_tokens < 0 or args.max_tokens < 0:
         log_event(
@@ -1101,9 +1109,9 @@ def main(args: argparse.Namespace | None = None) -> int:
         custom_heading_markers = extra_headings
         custom_caption_markers = extra_captions
         if extra_headings:
-            heading_markers = _dedupe_preserve_order((*heading_markers, *tuple(extra_headings)))
+            heading_markers = dedupe_preserve_order((*heading_markers, *tuple(extra_headings)))
         if extra_captions:
-            caption_markers = _dedupe_preserve_order((*caption_markers, *tuple(extra_captions)))
+            caption_markers = dedupe_preserve_order((*caption_markers, *tuple(extra_captions)))
         args.structural_markers = markers_path
 
     logger.info(
@@ -1172,7 +1180,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         logger.warning(
             "BERT tokenizer may not align with Qwen embedder. Consider running "
             "scripts/calibrate_tokenizers.py or using --tokenizer-model "
-            "Qwen/Qwen3-Embedding-4B.",
+            f"{DEFAULT_TOKENIZER}.",
             extra={"extra_fields": {"tokenizer_model": tokenizer_model}},
         )
 

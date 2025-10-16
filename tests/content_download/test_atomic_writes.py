@@ -142,7 +142,7 @@ else:  # pragma: no branch - simple fallback
 DOWNLOAD_TESTS_SKIP_REASON = "requests and pyalex required for content download atomic write tests"
 
 if DOWNLOAD_DEPS_AVAILABLE:
-    from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact, download_candidate
+    from DocsToKG.ContentDownload.cli import WorkArtifact, download_candidate
 
     class _DummyHeadResponse:
         status_code = 200
@@ -351,7 +351,7 @@ if not hasattr(chunker, "manifest_load"):
     chunker.manifest_load = lambda *args, **kwargs: []
 if not hasattr(chunker, "RichSerializerProvider"):
     chunker.RichSerializerProvider = lambda: SimpleNamespace()
-from DocsToKG.ContentDownload.classifications import Classification  # noqa: E402
+from DocsToKG.ContentDownload.core import Classification  # noqa: E402
 from DocsToKG.DocParsing.core import jsonl_load  # noqa: E402
 
 

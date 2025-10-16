@@ -1,6 +1,6 @@
 # 1. Module: core
 
-This reference describes the ``CoreResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.resolvers.providers``.
+This reference describes the ``CoreResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.pipeline.providers``.
 
 CORE Resolver Provider
 
@@ -14,7 +14,7 @@ Key Features:
 - Deduplicated URL emission to prevent redundant downloads.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.providers import CoreResolver
+    from DocsToKG.ContentDownload.pipeline.providers import CoreResolver
 
     resolver = CoreResolver()
     results = list(resolver.iter_urls(session, config, artifact))

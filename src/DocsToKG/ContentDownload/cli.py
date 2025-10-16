@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.ContentDownload.download_pyalex_pdfs",
+#   "module": "DocsToKG.ContentDownload.cli",
 #   "purpose": "OpenAlex PDF download CLI and supporting utilities",
 #   "sections": [
 #     {
@@ -135,7 +135,7 @@ Dependencies:
   conditional caching, and shared utilities.
 
 Usage:
-    python -m DocsToKG.ContentDownload.download_pyalex_pdfs \\
+    python -m DocsToKG.ContentDownload.cli \\
         --topic \"knowledge graphs\" --year-start 2020 --year-end 2023 \\
         --out ./pdfs --resolver-config download_config.yaml
 """
@@ -174,21 +174,28 @@ import requests
 from pyalex import Topics, Works
 from pyalex import config as oa_config
 
-from DocsToKG.ContentDownload import resolvers
-from DocsToKG.ContentDownload.classifications import PDF_LIKE, Classification, ReasonCode
-from DocsToKG.ContentDownload.classifier import (
+import DocsToKG.ContentDownload.pipeline as resolvers
+
+from DocsToKG.ContentDownload.core import PDF_LIKE, Classification, ReasonCode
+from DocsToKG.ContentDownload.core import (
     _infer_suffix,
     classify_payload,
     has_pdf_eof,
     tail_contains_html,
     update_tail_buffer,
 )
-from DocsToKG.ContentDownload.config import (
+from DocsToKG.ContentDownload.pipeline import (
+    AttemptRecord,
+    DownloadOutcome,
+    ResolverConfig,
+    ResolverMetrics,
+    ResolverPipeline,
     apply_config_overrides,
+    default_resolvers,
     load_resolver_config,
     read_resolver_config,
 )
-from DocsToKG.ContentDownload.network import (
+from DocsToKG.ContentDownload.networking import (
     CachedResult,
     ConditionalRequestHelper,
     ModifiedResult,
@@ -211,26 +218,19 @@ from DocsToKG.ContentDownload.telemetry import (
     load_manifest_url_index,
     load_previous_manifest,
 )
-from DocsToKG.ContentDownload.utils import (
+from DocsToKG.ContentDownload.core import (
     dedupe,
     normalize_doi,
     normalize_pmcid,
     normalize_url,
     slugify,
 )
-from DocsToKG.ContentDownload.utils import (
+from DocsToKG.ContentDownload.core import (
     normalize_arxiv as _normalize_arxiv,
 )
-from DocsToKG.ContentDownload.utils import (
+from DocsToKG.ContentDownload.core import (
     normalize_pmid as _normalize_pmid,
 )
-
-ResolverPipeline = resolvers.ResolverPipeline
-ResolverConfig = resolvers.ResolverConfig
-ResolverMetrics = resolvers.ResolverMetrics
-DownloadOutcome = resolvers.DownloadOutcome
-AttemptRecord = resolvers.AttemptRecord
-default_resolvers = resolvers.default_resolvers
 
 # --- Globals ---
 

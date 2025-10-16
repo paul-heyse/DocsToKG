@@ -48,7 +48,7 @@ from __future__ import annotations
 from typing import Dict
 from unittest.mock import Mock
 
-from DocsToKG.ContentDownload.network import (
+from DocsToKG.ContentDownload.networking import (
     CircuitBreaker,
     ConditionalRequestHelper,
     TokenBucket,
@@ -87,7 +87,7 @@ def _session_for_response(response: _DummyResponse, *, method: str = "HEAD") -> 
 def test_head_precheck_accepts_pdf_content(monkeypatch):
     response = _DummyResponse(200, {"Content-Type": "application/pdf"})
     session, helper = _session_for_response(response)
-    monkeypatch.setattr("DocsToKG.ContentDownload.network.request_with_retries", helper)
+    monkeypatch.setattr("DocsToKG.ContentDownload.networking.request_with_retries", helper)
 
     assert head_precheck(session, "https://example.org/file.pdf", timeout=10.0)
     assert response.closed
@@ -96,7 +96,7 @@ def test_head_precheck_accepts_pdf_content(monkeypatch):
 def test_head_precheck_rejects_html_payload(monkeypatch):
     response = _DummyResponse(200, {"Content-Type": "text/html"})
     session, helper = _session_for_response(response)
-    monkeypatch.setattr("DocsToKG.ContentDownload.network.request_with_retries", helper)
+    monkeypatch.setattr("DocsToKG.ContentDownload.networking.request_with_retries", helper)
 
     assert not head_precheck(session, "https://example.org/page", timeout=2.0)
 
@@ -129,7 +129,7 @@ def test_head_precheck_degrades_to_get(monkeypatch):
         return _Stream()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.request_with_retries", _request_with_retries
+        "DocsToKG.ContentDownload.networking.request_with_retries", _request_with_retries
     )
 
     session = Mock()
@@ -172,7 +172,7 @@ def test_circuit_breaker_open_and_cooldown(monkeypatch):
     def fake_monotonic():
         return current[0]
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.network.time.monotonic", fake_monotonic)
+    monkeypatch.setattr("DocsToKG.ContentDownload.networking.time.monotonic", fake_monotonic)
     breaker = CircuitBreaker(failure_threshold=2, cooldown_seconds=5.0)
     assert breaker.allow()
     breaker.record_failure()

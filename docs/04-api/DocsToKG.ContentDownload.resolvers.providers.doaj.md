@@ -1,6 +1,6 @@
 # 1. Module: doaj
 
-This reference describes the ``DoajResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.resolvers.providers``.
+This reference describes the ``DoajResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.pipeline.providers``.
 
 DOAJ Resolver Provider
 
@@ -13,7 +13,7 @@ Key Features:
 - Integration with the shared retry helper for polite request handling.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.providers import DoajResolver
+    from DocsToKG.ContentDownload.pipeline.providers import DoajResolver
 
     resolver = DoajResolver()
     urls = list(resolver.iter_urls(session, config, artifact))

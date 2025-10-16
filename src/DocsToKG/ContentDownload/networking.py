@@ -1,6 +1,6 @@
 # === NAVMAP v1 ===
 # {
-#   "module": "DocsToKG.ContentDownload.network",
+#   "module": "DocsToKG.ContentDownload.networking",
 #   "purpose": "HTTP session, retry, and conditional request helpers",
 #   "sections": [
 #     {
@@ -93,7 +93,7 @@ Key Features:
 
 Usage:
 
-    from DocsToKG.ContentDownload.network import (
+    from DocsToKG.ContentDownload.networking import (
         ConditionalRequestHelper,
         create_session,
         request_with_retries,
@@ -144,7 +144,7 @@ __all__ = (
     "request_with_retries",
 )
 
-LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
+LOGGER = logging.getLogger("DocsToKG.ContentDownload.networking")
 
 
 # --- Public Functions ---

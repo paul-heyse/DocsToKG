@@ -1,6 +1,6 @@
 # 1. Module: hal
 
-This reference describes the ``HalResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.resolvers.providers``.
+This reference describes the ``HalResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.pipeline.providers``.
 
 HAL Resolver Provider
 
@@ -13,7 +13,7 @@ Key Features:
 - Error handling and logging for HTTP and JSON parsing issues.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.providers import HalResolver
+    from DocsToKG.ContentDownload.pipeline.providers import HalResolver
 
     resolver = HalResolver()
     urls = list(resolver.iter_urls(session, config, artifact))

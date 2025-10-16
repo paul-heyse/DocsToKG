@@ -19,6 +19,7 @@ import unicodedata
 import uuid
 import zipfile
 from dataclasses import dataclass
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path, PurePosixPath
@@ -29,13 +30,8 @@ import pooch
 import psutil
 import requests
 
-from .settings import (
-    ConfigError,
-    DownloadConfiguration,
-    DownloadFailure,
-    OntologyDownloadError,
-    PolicyError,
-)
+from .errors import ConfigError, DownloadFailure, OntologyDownloadError, PolicyError
+from .settings import DownloadConfiguration
 
 _DNS_CACHE: Dict[str, Tuple[float, List[Tuple]]] = {}
 _DNS_CACHE_TTL = 120.0
@@ -572,6 +568,59 @@ class SharedTokenBucket(TokenBucket):
             time.sleep(max(needed / self.rate, 0.0))
 
 
+class SessionPool:
+    """Lightweight pool that reuses requests sessions per (service, host)."""
+
+    def __init__(self, max_per_key: int = 2) -> None:
+        self._lock = threading.Lock()
+        self._pool: Dict[Tuple[str, str], List[requests.Session]] = {}
+        self._max_per_key = max_per_key
+
+    def _normalize(self, service: Optional[str], host: Optional[str]) -> Tuple[str, str]:
+        service_key = (service or "_").lower()
+        host_key = (host or "default").lower()
+        return service_key, host_key
+
+    @contextmanager
+    def lease(
+        self,
+        *,
+        service: Optional[str],
+        host: Optional[str],
+    ) -> Tuple[requests.Session]:
+        """Yield a session associated with ``service``/``host`` and return it to the pool."""
+
+        key = self._normalize(service, host)
+        with self._lock:
+            stack = self._pool.get(key)
+            if stack:
+                session = stack.pop()
+                if not stack:
+                    self._pool.pop(key, None)
+            else:
+                session = requests.Session()
+        try:
+            yield session
+        finally:
+            with self._lock:
+                stack = self._pool.setdefault(key, [])
+                if len(stack) < self._max_per_key:
+                    stack.append(session)
+                else:
+                    session.close()
+                    if not stack:
+                        self._pool.pop(key, None)
+
+    def clear(self) -> None:
+        """Close and forget all pooled sessions (testing helper)."""
+
+        with self._lock:
+            for stack in self._pool.values():
+                for session in stack:
+                    session.close()
+            self._pool.clear()
+
+
 def _shared_bucket_path(http_config: DownloadConfiguration, key: str) -> Optional[Path]:
     """Return the filesystem path for the shared token bucket state."""
 
@@ -677,6 +726,7 @@ class RateLimiterRegistry:
 
 
 REGISTRY = RateLimiterRegistry()
+SESSION_POOL = SessionPool()
 
 
 def get_bucket(
@@ -711,6 +761,7 @@ def reset() -> None:
     """Clear all buckets (testing hook)."""
 
     REGISTRY.reset()
+    SESSION_POOL.clear()
 
 
 

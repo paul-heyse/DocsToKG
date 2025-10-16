@@ -132,8 +132,8 @@ from pathlib import Path
 
 import pytest
 
-from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload.resolvers import FigshareResolver, ResolverConfig, ZenodoResolver
+from DocsToKG.ContentDownload import cli as downloader
+from DocsToKG.ContentDownload.pipeline import FigshareResolver, ResolverConfig, ZenodoResolver
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 

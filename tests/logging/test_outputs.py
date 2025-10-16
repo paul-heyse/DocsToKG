@@ -83,7 +83,7 @@ import pytest
 pytest.importorskip("requests")
 pytest.importorskip("pyalex")
 
-from DocsToKG.ContentDownload.resolvers import AttemptRecord  # noqa: E402
+from DocsToKG.ContentDownload.pipeline import AttemptRecord  # noqa: E402
 from DocsToKG.ContentDownload.telemetry import (  # noqa: E402
     MANIFEST_SCHEMA_VERSION,
     CsvSink,

@@ -1,6 +1,6 @@
 # 1. Module: resolvers
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers``.
+This reference documents the DocsToKG module ``DocsToKG.ContentDownload.pipeline``.
 
 ## 1. Overview
 
@@ -21,10 +21,10 @@ Key Features:
 Dependencies:
 - requests: Outbound HTTP traffic and session management.
 - BeautifulSoup: Optional HTML parsing for resolver implementations.
-- DocsToKG.ContentDownload.network: Shared retry and session helpers.
+- DocsToKG.ContentDownload.networking: Shared retry and session helpers.
 
 Usage:
-    from DocsToKG.ContentDownload import resolvers
+    from DocsToKG.ContentDownload import pipeline
 
     config = resolvers.ResolverConfig()
     active_resolvers = resolvers.default_resolvers()

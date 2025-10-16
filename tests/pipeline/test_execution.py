@@ -239,11 +239,11 @@ from typing import Iterable, List, Optional
 import pytest
 import requests
 
-from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload import resolvers
-from DocsToKG.ContentDownload.classifications import Classification
-from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
-from DocsToKG.ContentDownload.resolvers import (
+from DocsToKG.ContentDownload import cli as downloader
+from DocsToKG.ContentDownload import pipeline as resolvers
+from DocsToKG.ContentDownload.core import Classification
+from DocsToKG.ContentDownload.cli import WorkArtifact
+from DocsToKG.ContentDownload.pipeline import (
     AttemptRecord,
     DownloadOutcome,
     OpenAlexResolver,
@@ -636,7 +636,7 @@ def _download_stub(session, artifact, url, referer, timeout, context=None):
 
 
 def test_concurrent_pipeline_reduces_wall_time(monkeypatch):
-    monkeypatch.setattr("DocsToKG.ContentDownload.resolvers.random.random", lambda: 0.0)
+    monkeypatch.setattr("DocsToKG.ContentDownload.pipeline.random.random", lambda: 0.0)
     resolver_count = 4
     delay = 0.1
     resolvers = [_SlowResolver(f"slow-{idx}", delay) for idx in range(resolver_count)]
@@ -908,8 +908,8 @@ def test_pipeline_rate_limit_enforced(monkeypatch, tmp_path):
     def fake_sleep(duration):
         sleeps.append(duration)
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.resolvers._time.monotonic", fake_monotonic)
-    monkeypatch.setattr("DocsToKG.ContentDownload.resolvers._time.sleep", fake_sleep)
+    monkeypatch.setattr("DocsToKG.ContentDownload.pipeline._time.monotonic", fake_monotonic)
+    monkeypatch.setattr("DocsToKG.ContentDownload.pipeline._time.sleep", fake_sleep)
 
     def downloader_fn(session, art, url, referer, timeout):
         return build_outcome("pdf", path=str(art.pdf_dir / "out.pdf"))
@@ -995,8 +995,8 @@ def test_openalex_respects_rate_limit(monkeypatch, tmp_path):
     def fake_sleep(duration):
         sleeps.append(duration)
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.resolvers._time.monotonic", fake_monotonic)
-    monkeypatch.setattr("DocsToKG.ContentDownload.resolvers._time.sleep", fake_sleep)
+    monkeypatch.setattr("DocsToKG.ContentDownload.pipeline._time.monotonic", fake_monotonic)
+    monkeypatch.setattr("DocsToKG.ContentDownload.pipeline._time.sleep", fake_sleep)
 
     def downloader_fn(session, art, url, referer, timeout):
         return build_outcome("pdf", path=str(art.pdf_dir / "result.pdf"))
@@ -1177,7 +1177,7 @@ def test_real_network_download(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     metrics = ResolverMetrics()
     logger = MemoryLogger([])
 
-    from DocsToKG.ContentDownload.download_pyalex_pdfs import _make_session, download_candidate
+    from DocsToKG.ContentDownload.cli import _make_session, download_candidate
 
     session = _make_session({"User-Agent": "DocsToKG-Test/1.0"})
     try:

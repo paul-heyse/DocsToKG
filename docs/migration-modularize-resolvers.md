@@ -1,7 +1,7 @@
 # 1. Migration Guide: Unified Content Download Resolvers
 
 The resolver subsystem has been recomposed into a single module,
-`DocsToKG.ContentDownload.resolvers`. This guide explains how to migrate code
+`DocsToKG.ContentDownload.pipeline`. This guide explains how to migrate code
 that previously relied on the intermediate submodules (`.types`, `.pipeline`,
 `.providers`, `.headers`, `.cache`).
 
@@ -9,10 +9,10 @@ that previously relied on the intermediate submodules (`.types`, `.pipeline`,
 
 | Replace | With |
 | --- | --- |
-| `from DocsToKG.ContentDownload.resolvers.types import …` | `from DocsToKG.ContentDownload.resolvers import …` |
-| `from DocsToKG.ContentDownload.resolvers.pipeline import …` | `from DocsToKG.ContentDownload.resolvers import …` |
-| `from DocsToKG.ContentDownload.resolvers.providers import …` | `from DocsToKG.ContentDownload.resolvers import …` |
-| `from DocsToKG.ContentDownload.resolvers.headers import headers_cache_key` | `from DocsToKG.ContentDownload.resolvers import headers_cache_key` |
+| `from DocsToKG.ContentDownload.pipeline.types import …` | `from DocsToKG.ContentDownload.pipeline import …` |
+| `from DocsToKG.ContentDownload.pipeline.pipeline import …` | `from DocsToKG.ContentDownload.pipeline import …` |
+| `from DocsToKG.ContentDownload.pipeline.providers import …` | `from DocsToKG.ContentDownload.pipeline import …` |
+| `from DocsToKG.ContentDownload.pipeline.headers import headers_cache_key` | `from DocsToKG.ContentDownload.pipeline import headers_cache_key` |
 
 All resolver-related dataclasses (`ResolverResult`, `AttemptRecord`, etc.),
 pipeline helpers, and provider implementations are now re-exported directly
@@ -23,7 +23,7 @@ from the top-level module.
 
 ## 2. Registering Custom Resolvers
 
-Subclass `DocsToKG.ContentDownload.resolvers.RegisteredResolver` and make sure
+Subclass `DocsToKG.ContentDownload.pipeline.RegisteredResolver` and make sure
 the subclass is imported during start-up so it registers with the resolver
 registry. To take part in the default order, append instances to
 `default_resolvers()` inside `resolvers.py` or extend the returned list within

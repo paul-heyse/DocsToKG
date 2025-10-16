@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import gzip
 import hashlib
 import json
 import logging
 import os
 import re
-import sys
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -40,29 +38,32 @@ except ImportError:  # pragma: no cover - non-windows
     msvcrt = None  # type: ignore[assignment]
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from logging.handlers import RotatingFileHandler
-
 import requests
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
 
+from .errors import (
+    ConfigurationError,
+    DownloadFailure,
+    OntologyDownloadError,
+    ResolverError,
+    ValidationError,
+)
 from .io import (
     RDF_MIME_ALIASES,
     RDF_MIME_FORMAT_LABELS,
-    DownloadFailure,
     download_stream,
     extract_archive_safe,
     generate_correlation_id,
     get_bucket,
-    mask_sensitive_data,
     retry_with_backoff,
     sanitize_filename,
     validate_url_security,
 )
+from .logging_utils import setup_logging
 from .settings import (
     CACHE_DIR,
     LOCAL_ONTOLOGY_DIR,
-    LOG_DIR,
     STORAGE,
     ConfigError,
     DefaultsConfig,
@@ -333,101 +334,6 @@ Draft202012Validator.check_schema(MANIFEST_JSON_SCHEMA)
 _MANIFEST_VALIDATOR = Draft202012Validator(MANIFEST_JSON_SCHEMA)
 
 
-class JSONFormatter(logging.Formatter):
-    """Formatter emitting JSON structured logs."""
-
-    def format(self, record: logging.LogRecord) -> str:
-        """Render ``record`` as a JSON string with DocsToKG-specific fields."""
-
-        now = datetime.now(timezone.utc)
-        payload = {
-            "timestamp": now.isoformat().replace("+00:00", "Z"),
-            "level": record.levelname,
-            "message": record.getMessage(),
-            "correlation_id": getattr(record, "correlation_id", None),
-            "ontology_id": getattr(record, "ontology_id", None),
-            "stage": getattr(record, "stage", None),
-        }
-        if hasattr(record, "extra_fields") and isinstance(record.extra_fields, dict):
-            payload.update(record.extra_fields)
-        if record.exc_info:
-            payload["exc_info"] = self.formatException(record.exc_info)
-        return json.dumps(mask_sensitive_data(payload))
-
-
-def _compress_old_log(path: Path) -> None:
-    compressed_path = path.with_suffix(path.suffix + ".gz")
-    with path.open("rb") as source, gzip.open(compressed_path, "wb") as target:
-        target.write(source.read())
-    path.unlink(missing_ok=True)
-
-
-def _cleanup_logs(log_dir: Path, retention_days: int) -> None:
-    now = datetime.now(timezone.utc)
-    retention_delta = timedelta(days=retention_days)
-    for file in log_dir.glob("*.jsonl"):
-        mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
-        if now - mtime > retention_delta:
-            _compress_old_log(file)
-    for file in log_dir.glob("*.jsonl.gz"):
-        mtime = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
-        if now - mtime > retention_delta:
-            file.unlink(missing_ok=True)
-
-
-def setup_logging(
-    *,
-    level: str = "INFO",
-    retention_days: int = 30,
-    max_log_size_mb: int = 100,
-    log_dir: Optional[Path] = None,
-) -> logging.Logger:
-    """Configure ontology downloader logging with rotation and JSON sidecars.
-
-    Args:
-        level: Logging level name applied to the root ontology logger.
-        retention_days: Number of days to retain historical log files.
-        max_log_size_mb: Threshold triggering log rotation for JSONL outputs.
-        log_dir: Optional directory override for persisted logs.
-
-    Returns:
-        Configured logger instance ready for use by the pipeline.
-    """
-    resolved_dir = log_dir or Path(os.environ.get("ONTOFETCH_LOG_DIR", ""))
-    if not resolved_dir:
-        resolved_dir = LOG_DIR
-    resolved_dir.mkdir(parents=True, exist_ok=True)
-    _cleanup_logs(resolved_dir, retention_days)
-
-    logger = logging.getLogger("DocsToKG.OntologyDownload")
-    logger.setLevel(getattr(logging, level.upper(), logging.INFO))
-
-    for handler in list(logger.handlers):
-        if getattr(handler, "_ontofetch_managed", False):
-            logger.removeHandler(handler)
-            handler.close()
-
-    console_formatter = logging.Formatter("%(levelname)s: %(message)s")
-    stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setFormatter(console_formatter)
-    stream_handler._ontofetch_managed = True  # type: ignore[attr-defined]
-    logger.addHandler(stream_handler)
-
-    today = datetime.now(timezone.utc).strftime("%Y%m%d")
-    file_name = sanitize_filename(f"ontofetch-{today}.jsonl")
-    file_handler = RotatingFileHandler(
-        resolved_dir / file_name,
-        maxBytes=int(max_log_size_mb * 1024 * 1024),
-        backupCount=5,
-    )
-    file_handler.setFormatter(JSONFormatter())
-    file_handler._ontofetch_managed = True  # type: ignore[attr-defined]
-    logger.addHandler(file_handler)
-
-    logger.propagate = True
-    return logger
-
-
 def get_manifest_schema() -> Dict[str, Any]:
     """Return a deep copy of the manifest JSON Schema definition.
 
@@ -464,62 +370,6 @@ def validate_manifest_dict(payload: Mapping[str, Any], *, source: Optional[Path]
             message = f"{location}: {message}"
         context = f" for {source}" if source else ""
         raise ConfigurationError(f"Manifest validation failed{context}: {message}") from exc
-
-
-class OntologyDownloadError(RuntimeError):
-    """Base exception for ontology download failures.
-
-    Args:
-        message: Description of the failure encountered.
-
-    Examples:
-        >>> raise OntologyDownloadError("unexpected error")
-        Traceback (most recent call last):
-        ...
-        OntologyDownloadError: unexpected error
-    """
-
-
-class ResolverError(OntologyDownloadError):
-    """Raised when resolver planning fails.
-
-    Args:
-        message: Description of the resolver failure.
-
-    Examples:
-        >>> raise ResolverError("resolver unavailable")
-        Traceback (most recent call last):
-        ...
-        ResolverError: resolver unavailable
-    """
-
-
-class ValidationError(OntologyDownloadError):
-    """Raised when validation encounters unrecoverable issues.
-
-    Args:
-        message: Human-readable description of the validation failure.
-
-    Examples:
-        >>> raise ValidationError("robot validator crashed")
-        Traceback (most recent call last):
-        ...
-        ValidationError: robot validator crashed
-    """
-
-
-class ConfigurationError(OntologyDownloadError):
-    """Raised when configuration or manifest validation fails.
-
-    Args:
-        message: Details about the configuration inconsistency.
-
-    Examples:
-        >>> raise ConfigurationError("manifest missing sha256")
-        Traceback (most recent call last):
-        ...
-        ConfigurationError: manifest missing sha256
-    """
 
 
 @dataclass(slots=True)

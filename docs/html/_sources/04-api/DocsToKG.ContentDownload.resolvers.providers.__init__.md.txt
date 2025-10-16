@@ -1,6 +1,6 @@
 # 1. Module: __init__
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.providers.__init__``.
+This reference documents the DocsToKG module ``DocsToKG.ContentDownload.pipeline.providers.__init__``.
 
 Resolver Providers
 

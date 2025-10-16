@@ -1,6 +1,6 @@
 # 1. Module: zenodo
 
-This reference describes the ``ZenodoResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.resolvers.providers``.
+This reference describes the ``ZenodoResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.pipeline.providers``.
 
 Zenodo Resolver Provider
 
@@ -13,7 +13,7 @@ Key Features:
 - Deduplication-free iteration over PDF file entries.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.providers import ZenodoResolver
+    from DocsToKG.ContentDownload.pipeline.providers import ZenodoResolver
 
     resolver = ZenodoResolver()
     results = list(resolver.iter_urls(session, config, artifact))

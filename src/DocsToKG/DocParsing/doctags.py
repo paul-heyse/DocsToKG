@@ -264,7 +264,7 @@ from collections import deque
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Deque, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Deque, Iterable, List, Optional, Tuple
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -279,7 +279,6 @@ from DocsToKG.DocParsing.core import (
     data_manifests,
     data_pdfs,
     detect_data_root,
-    expand_path,
     find_free_port,
     get_logger,
     load_manifest_index,
@@ -330,13 +329,25 @@ __all__ = (
     "validate_served_models",
 )
 
-PDF_MODEL_SUBDIR = Path("granite-docling-258M")
-
 # Default data directories resolved relative to the workspace.
 DEFAULT_DATA_ROOT = detect_data_root()
 DEFAULT_INPUT = data_pdfs(DEFAULT_DATA_ROOT)
 DEFAULT_OUTPUT = data_doctags(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "doctags-pdf"
+
+
+def ensure_docling_dependencies() -> None:
+    """Validate that required Docling packages are installed."""
+
+    try:
+        import docling_core  # noqa: F401  # pragma: no cover - import validation only
+        from docling.document_converter import DocumentConverter  # noqa: F401
+    except ImportError as exc:  # pragma: no cover - exercised when dependencies missing
+        raise ImportError(
+            "DocTags conversion requires the 'docling' and 'docling-core' packages. "
+            "Install them with `pip install docling docling-core`."
+        ) from exc
+
 
 # Execution defaults for the vLLM-backed conversion pipeline.
 PREFERRED_PORT = 8000
@@ -576,6 +587,13 @@ def pdf_build_parser() -> argparse.ArgumentParser:
         description="Convert PDF corpora to DocTags with an optional vLLM backend",
     )
     parser.add_argument(
+        "--log-level",
+        type=lambda value: str(value).upper(),
+        default="INFO",
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        help="Logging verbosity for console output (default: %(default)s).",
+    )
+    parser.add_argument(
         "--data-root",
         type=Path,
         default=None,
@@ -636,6 +654,12 @@ def pdf_build_parser() -> argparse.ArgumentParser:
         action="append",
         default=["</doctag>", "<|end_of_text|>"],
         help="Stop tokens for the VLM (repeatable)",
+    )
+    parser.add_argument(
+        "--vllm-wait-timeout",
+        type=int,
+        default=WAIT_TIMEOUT_S,
+        help="Seconds to wait for vLLM server readiness (default: %(default)s).",
     )
     add_resume_force_options(
         parser,
@@ -1045,6 +1069,8 @@ def ensure_vllm(
     model_path: str,
     served_model_names: Tuple[str, ...],
     gpu_memory_utilization: float,
+    *,
+    wait_timeout_s: int = WAIT_TIMEOUT_S,
 ) -> Tuple[int, Optional[sp.Popen], bool]:
     """Ensure a vLLM server is available, launching one when necessary.
 
@@ -1066,7 +1092,7 @@ def ensure_vllm(
     # 1) If preferred is free, start there
     if port_is_free(preferred):
         proc = start_vllm(preferred, model_path, served_model_names, gpu_memory_utilization)
-        names = wait_for_vllm(preferred, proc)
+        names = wait_for_vllm(preferred, proc, timeout_s=wait_timeout_s)
         validate_served_models(names, served_model_names)
         return preferred, proc, True
 
@@ -1097,7 +1123,7 @@ def ensure_vllm(
         },
     )
     proc = start_vllm(alt, model_path, served_model_names, gpu_memory_utilization)
-    names = wait_for_vllm(alt, proc)
+    names = wait_for_vllm(alt, proc, timeout_s=wait_timeout_s)
     validate_served_models(names, served_model_names)
     return alt, proc, True
 
@@ -1285,7 +1311,15 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         ValueError: If required configuration (such as auto-detected mode) is invalid.
     """
 
-    logger = get_logger(__name__)
+    if args is None:
+        namespace = pdf_parse_args()
+    elif isinstance(args, argparse.Namespace):
+        namespace = args
+    else:
+        namespace = pdf_parse_args(args)
+
+    log_level = getattr(namespace, "log_level", "INFO")
+    logger = get_logger(__name__, level=str(log_level))
     set_spawn_or_warn(logger)
     import multiprocessing as mp
 
@@ -1299,10 +1333,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         },
     )
 
-    if isinstance(args, argparse.Namespace):
-        args = args
-    else:
-        args = pdf_parse_args() if args is None else pdf_parse_args(args)
+    args = namespace
 
     if not hasattr(args, "served_model_names"):
         args.served_model_names = None
@@ -1320,6 +1351,8 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         args.input = DEFAULT_INPUT
     if not hasattr(args, "output"):
         args.output = DEFAULT_OUTPUT
+
+    ensure_docling_dependencies()
 
     served_model_names = _normalize_served_model_names(args.served_model_names)
     inference_model = served_model_names[0]
@@ -1381,14 +1414,17 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
         model_path,
         served_model_names,
         gpu_memory_utilization,
+        wait_timeout_s=int(getattr(args, "vllm_wait_timeout", WAIT_TIMEOUT_S)),
     )
     metrics_healthy, metrics_status = probe_metrics(port)
-    manifest_append(
+    manifest_log_success(
         stage=MANIFEST_STAGE,
         doc_id="__service__",
-        status="success",
         duration_s=round(time.perf_counter() - preflight_start, 3),
         schema_version="docparse/1.1.0",
+        input_path=model_path,
+        input_hash="",
+        output_path=output_dir,
         served_models=list(served_model_names),
         vllm_version=vllm_version,
         port=port,
@@ -1602,6 +1638,13 @@ def html_build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         description="Convert HTML corpora to DocTags using Docling",
+    )
+    parser.add_argument(
+        "--log-level",
+        type=lambda value: str(value).upper(),
+        default="INFO",
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        help="Logging verbosity for console output (default: %(default)s).",
     )
     parser.add_argument(
         "--data-root",
@@ -1876,6 +1919,8 @@ def html_main(args: argparse.Namespace | None = None) -> int:
         args.force = False
     if not hasattr(args, "data_root"):
         args.data_root = None
+
+    ensure_docling_dependencies()
 
     data_root_override = args.data_root
     resolved_root = (

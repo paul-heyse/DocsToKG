@@ -276,17 +276,17 @@ from DocsToKG.DocParsing.core import (
     jsonl_load,
     load_manifest_index,
     log_event,
-    manifest_append,
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
+    prepare_data_root,
+    DEFAULT_TOKENIZER,
+    resolve_pipeline_path,
     should_skip_output,
 )
 from DocsToKG.DocParsing.doctags import (
     add_data_root_option,
     add_resume_force_options,
-    prepare_data_root,
-    resolve_pipeline_path,
 )
 from DocsToKG.DocParsing.formats import (
     COMPATIBLE_CHUNK_VERSIONS,
@@ -1353,7 +1353,7 @@ def write_vectors(
                 ),
                 SPLADEv3=SPLADEVector(tokens=tokens_list, weights=weight_list),
                 Qwen3_4B=DenseVector(
-                    model_id="Qwen/Qwen3-Embedding-4B",
+                    model_id=DEFAULT_TOKENIZER,
                     vector=[float(x) for x in qwen_vector],
                     dimension=int(args.qwen_dim),
                 ),
@@ -1377,12 +1377,15 @@ def write_vectors(
                     }
                 },
             )
-            manifest_append(
+            manifest_log_failure(
                 stage="embeddings",
                 doc_id=doc_id,
-                status="failure",
-                error=str(exc),
+                duration_s=0.0,
                 schema_version=VECTOR_SCHEMA_VERSION,
+                input_path=row.get("source_path", "unknown"),
+                input_hash=row.get("input_hash", ""),
+                output_path=output_ref,
+                error=str(exc),
             )
             raise
 
@@ -1469,6 +1472,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser()
     add_data_root_option(parser)
+    parser.add_argument(
+        "--log-level",
+        type=lambda value: str(value).upper(),
+        default="INFO",
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        help="Logging verbosity for console output (default: %(default)s).",
+    )
     parser.add_argument("--chunks-dir", type=Path, default=DEFAULT_CHUNKS_DIR)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_VECTORS_DIR)
     parser.add_argument("--bm25-k1", type=float, default=1.5)
@@ -1506,8 +1516,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Override Qwen model directory (CLI > $DOCSTOKG_QWEN_DIR > "
-            f"{QWEN_DIR})."
-            "model root/Qwen/Qwen3-Embedding-4B)."
+            f"{QWEN_DIR}). Defaults to model root/{DEFAULT_TOKENIZER}."
         ),
     )
     parser.add_argument(
@@ -1600,20 +1609,22 @@ def main(args: argparse.Namespace | None = None) -> int:
         ValueError: If invalid runtime parameters (such as batch sizes) are supplied.
     """
 
-    logger = get_logger(__name__)
-
     parser = build_parser()
     if args is None:
-        args = parser.parse_args()
+        namespace = parser.parse_args()
     elif isinstance(args, argparse.Namespace):
-        pass
+        namespace = args
     elif isinstance(args, SimpleNamespace) or hasattr(args, "__dict__"):
         defaults = parser.parse_args([])
         for key, value in vars(args).items():
             setattr(defaults, key, value)
-        args = defaults
+        namespace = defaults
     else:
-        args = parser.parse_args(args)
+        namespace = parser.parse_args(args)
+
+    log_level = getattr(namespace, "log_level", "INFO")
+    logger = get_logger(__name__, level=str(log_level))
+    args = namespace
     offline_mode = bool(getattr(args, "offline", False))
 
     global HF_HOME, MODEL_ROOT, QWEN_DIR, SPLADE_DIR
@@ -2034,13 +2045,15 @@ def main(args: argparse.Namespace | None = None) -> int:
     )
     logger.info("Peak memory: %.2f GB", peak / 1024**3)
 
-    manifest_append(
+    manifest_log_success(
         stage=MANIFEST_STAGE,
         doc_id="__corpus__",
-        status="success",
         duration_s=round(time.perf_counter() - overall_start, 3),
-        warnings=validator.zero_nnz_chunks[: validator.top_n] if validator.zero_nnz_chunks else [],
         schema_version=VECTOR_SCHEMA_VERSION,
+        input_path="__corpus__",
+        input_hash="",
+        output_path=out_dir,
+        warnings=validator.zero_nnz_chunks[: validator.top_n] if validator.zero_nnz_chunks else [],
         total_vectors=total_vectors,
         splade_avg_nnz=avg_nnz,
         splade_median_nnz=median_nnz,

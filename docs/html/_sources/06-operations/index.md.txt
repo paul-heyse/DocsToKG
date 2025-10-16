@@ -14,7 +14,7 @@ This guide covers day-two operations for DocsToKG, including ingestion jobs, sea
 ### 3.1 Content Acquisition
 
 ```bash
-python -m DocsToKG.ContentDownload.download_pyalex_pdfs \
+python -m DocsToKG.ContentDownload.cli \
   --topic "knowledge graphs" \
   --year-start 2022 --year-end 2024 \
   --out Data/PyalexRaw \

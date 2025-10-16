@@ -81,19 +81,19 @@ The Content Download module SHALL organize resolver implementations into discret
 
 #### Scenario: Backward-compatible imports after refactoring
 
-- **WHEN** existing code imports `from DocsToKG.ContentDownload.resolvers import ResolverPipeline`
+- **WHEN** existing code imports `from DocsToKG.ContentDownload.pipeline import ResolverPipeline`
 - **THEN** the import succeeds without modification
 - **AND** the imported class maintains identical API behavior
 
 #### Scenario: Direct submodule imports
 
-- **WHEN** new code imports `from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline`
+- **WHEN** new code imports `from DocsToKG.ContentDownload.pipeline.pipeline import ResolverPipeline`
 - **THEN** the import succeeds and provides identical functionality
 - **AND** reduces coupling to internal module structure
 
 #### Scenario: Individual resolver testing
 
-- **WHEN** tests import a single resolver: `from DocsToKG.ContentDownload.resolvers.providers.unpaywall import UnpaywallResolver`
+- **WHEN** tests import a single resolver: `from DocsToKG.ContentDownload.pipeline.providers.unpaywall import UnpaywallResolver`
 - **THEN** the resolver can be instantiated and tested in isolation
 - **AND** no pipeline or other resolver dependencies are loaded
 

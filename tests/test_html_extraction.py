@@ -33,7 +33,7 @@ Key Scenarios:
 Dependencies:
 - pytest: Test orchestration
 - requests/responses: HTTP simulation for resolver candidates
-- DocsToKG.ContentDownload.download_pyalex_pdfs: Download helpers under test
+- DocsToKG.ContentDownload.cli: Download helpers under test
 
 Usage:
     pytest tests/test_html_extraction.py
@@ -48,8 +48,8 @@ import pytest
 
 pytest.importorskip("pyalex")
 
-from DocsToKG.ContentDownload.classifications import Classification
-from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact, download_candidate
+from DocsToKG.ContentDownload.core import Classification
+from DocsToKG.ContentDownload.cli import WorkArtifact, download_candidate
 
 # --- Globals ---
 

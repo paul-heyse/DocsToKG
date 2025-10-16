@@ -595,10 +595,10 @@ from unittest.mock import Mock, call, patch
 import pytest
 import requests
 
-from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload.classifications import Classification, ReasonCode
-from DocsToKG.ContentDownload.classifier import classify_payload
-from DocsToKG.ContentDownload.download_pyalex_pdfs import (
+from DocsToKG.ContentDownload import cli as downloader
+from DocsToKG.ContentDownload.core import Classification, ReasonCode
+from DocsToKG.ContentDownload.core import classify_payload
+from DocsToKG.ContentDownload.cli import (
     DEFAULT_MIN_PDF_BYTES,
     DEFAULT_SNIFF_BYTES,
     DEFAULT_TAIL_CHECK_BYTES,
@@ -607,7 +607,7 @@ from DocsToKG.ContentDownload.download_pyalex_pdfs import (
     download_candidate,
     process_one_work,
 )
-from DocsToKG.ContentDownload.network import (
+from DocsToKG.ContentDownload.networking import (
     CachedResult,
     ConditionalRequestHelper,
     ModifiedResult,
@@ -616,7 +616,7 @@ from DocsToKG.ContentDownload.network import (
     parse_retry_after_header,
     request_with_retries,
 )
-from DocsToKG.ContentDownload.resolvers import (
+from DocsToKG.ContentDownload.pipeline import (
     DownloadOutcome,
     OpenAlexResolver,
     ResolverConfig,
@@ -626,7 +626,7 @@ from DocsToKG.ContentDownload.resolvers import (
     WaybackResolver,
 )
 from DocsToKG.ContentDownload.telemetry import JsonlSink, SqliteSink, load_manifest_url_index
-from DocsToKG.ContentDownload.utils import (
+from DocsToKG.ContentDownload.core import (
     dedupe,
     normalize_doi,
     normalize_pmcid,
@@ -657,13 +657,13 @@ given = hypothesis.given
 # --- test_conditional_requests.py ---
 
 if HAS_REQUESTS and HAS_PYALEX:
-    from DocsToKG.ContentDownload.download_pyalex_pdfs import (
+    from DocsToKG.ContentDownload.cli import (
         ManifestEntry,
         WorkArtifact,
         build_manifest_entry,
         download_candidate,
     )
-    from DocsToKG.ContentDownload.resolvers import DownloadOutcome
+    from DocsToKG.ContentDownload.pipeline import DownloadOutcome
 
     class _DummyResponse:
         def __init__(self, status_code: int, headers: Dict[str, str]) -> None:
@@ -914,7 +914,7 @@ if HAS_REQUESTS and HAS_PYALEX:
             "dry_run": False,
         }
 
-        with caplog.at_level("WARNING", logger="DocsToKG.ContentDownload.network"):
+        with caplog.at_level("WARNING", logger="DocsToKG.ContentDownload.networking"):
             outcome = download_candidate(
                 _Session(),
                 artifact,
@@ -1296,7 +1296,7 @@ def test_interpret_response_cached_property(path: str, sha: str, size: int) -> N
     )
     response = _make_helper_response(304)
 
-    with patch("DocsToKG.ContentDownload.network.Path.exists", return_value=True):
+    with patch("DocsToKG.ContentDownload.networking.Path.exists", return_value=True):
         result = helper.interpret_response(response)  # type: ignore[arg-type]
 
     assert isinstance(result, CachedResult)
@@ -1547,7 +1547,7 @@ def test_head_precheck_allows_pdf(monkeypatch):
     head_response.close = Mock()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.request_with_retries",
+        "DocsToKG.ContentDownload.networking.request_with_retries",
         lambda *args, **kwargs: head_response,
     )
 
@@ -1560,7 +1560,7 @@ def test_head_precheck_rejects_html(monkeypatch):
     head_response.close = Mock()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.request_with_retries",
+        "DocsToKG.ContentDownload.networking.request_with_retries",
         lambda *args, **kwargs: head_response,
     )
 
@@ -1598,7 +1598,7 @@ def test_head_precheck_degrades_to_get_pdf(monkeypatch, status):
         return responses.pop(0)
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.request_with_retries",
+        "DocsToKG.ContentDownload.networking.request_with_retries",
         fake_request,
     )
 
@@ -1635,7 +1635,7 @@ def test_head_precheck_degrades_to_get_html(monkeypatch, status):
         return responses.pop(0)
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.request_with_retries",
+        "DocsToKG.ContentDownload.networking.request_with_retries",
         fake_request,
     )
 
@@ -1648,7 +1648,7 @@ def test_head_precheck_degrades_to_get_html(monkeypatch, status):
 )
 def test_head_precheck_returns_true_on_exception(monkeypatch, exc):
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.request_with_retries",
+        "DocsToKG.ContentDownload.networking.request_with_retries",
         Mock(side_effect=exc),
     )
 
@@ -1657,7 +1657,7 @@ def test_head_precheck_returns_true_on_exception(monkeypatch, exc):
 
 def test_conditional_request_build_headers_requires_complete_metadata(caplog) -> None:
     helper = ConditionalRequestHelper(prior_etag="abc", prior_last_modified=None)
-    with caplog.at_level("WARNING", logger="DocsToKG.ContentDownload.network"):
+    with caplog.at_level("WARNING", logger="DocsToKG.ContentDownload.networking"):
         headers = helper.build_headers()
     assert headers == {}
     assert "resume-metadata-incomplete" in caplog.text
@@ -1688,14 +1688,14 @@ def test_retry_determinism_matches_request_with_retries(monkeypatch, http_server
     handler.statuses = [429, 429, 200]
     url = f"http://127.0.0.1:{server.server_address[1]}/rate-limited.pdf"
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.network.random.random", lambda: 0.0)
+    monkeypatch.setattr("DocsToKG.ContentDownload.networking.random.random", lambda: 0.0)
 
     sleep_durations: list[float] = []
 
     def _capture_sleep(delay: float) -> None:
         sleep_durations.append(delay)
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.network.time.sleep", _capture_sleep)
+    monkeypatch.setattr("DocsToKG.ContentDownload.networking.time.sleep", _capture_sleep)
 
     _, session, _, outcome = _download(url, tmp_path)
     try:
@@ -1758,8 +1758,8 @@ def test_successful_request_no_retries():
 # --- test_http_retry.py ---
 
 
-@patch("DocsToKG.ContentDownload.network.random.random", return_value=0.0)
-@patch("DocsToKG.ContentDownload.network.time.sleep")
+@patch("DocsToKG.ContentDownload.networking.random.random", return_value=0.0)
+@patch("DocsToKG.ContentDownload.networking.time.sleep")
 def test_transient_503_with_exponential_backoff(mock_sleep: Mock, _: Mock) -> None:
     """Verify exponential backoff timing for transient 503 errors."""
 
@@ -1818,8 +1818,8 @@ def test_parse_retry_after_header_invalid_date() -> None:
 # --- test_http_retry.py ---
 
 
-@patch("DocsToKG.ContentDownload.network.random.random", return_value=0.0)
-@patch("DocsToKG.ContentDownload.network.time.sleep")
+@patch("DocsToKG.ContentDownload.networking.random.random", return_value=0.0)
+@patch("DocsToKG.ContentDownload.networking.time.sleep")
 def test_retry_after_header_overrides_backoff(mock_sleep: Mock, _: Mock) -> None:
     session = Mock(spec=requests.Session)
     retry_headers = {"Retry-After": "10"}
@@ -1842,7 +1842,7 @@ def test_retry_after_header_overrides_backoff(mock_sleep: Mock, _: Mock) -> None
 # --- test_http_retry.py ---
 
 
-@patch("DocsToKG.ContentDownload.network.time.sleep")
+@patch("DocsToKG.ContentDownload.networking.time.sleep")
 def test_request_exception_raises_after_retries(mock_sleep: Mock) -> None:
     session = Mock(spec=requests.Session)
     error = requests.RequestException("boom")
@@ -1858,7 +1858,7 @@ def test_request_exception_raises_after_retries(mock_sleep: Mock) -> None:
 # --- test_http_retry.py ---
 
 
-@patch("DocsToKG.ContentDownload.network.time.sleep")
+@patch("DocsToKG.ContentDownload.networking.time.sleep")
 def test_timeout_retry_handling(mock_sleep: Mock) -> None:
     session = Mock(spec=requests.Session)
     session.request.side_effect = [requests.Timeout("slow"), _mock_response(200)]
@@ -1872,7 +1872,7 @@ def test_timeout_retry_handling(mock_sleep: Mock) -> None:
 # --- test_http_retry.py ---
 
 
-@patch("DocsToKG.ContentDownload.network.time.sleep")
+@patch("DocsToKG.ContentDownload.networking.time.sleep")
 def test_connection_error_retry_handling(mock_sleep: Mock) -> None:
     session = Mock(spec=requests.Session)
     session.request.side_effect = [requests.ConnectionError("down"), _mock_response(200)]
@@ -1886,7 +1886,7 @@ def test_connection_error_retry_handling(mock_sleep: Mock) -> None:
 # --- test_http_retry.py ---
 
 
-@patch("DocsToKG.ContentDownload.network.time.sleep")
+@patch("DocsToKG.ContentDownload.networking.time.sleep")
 def test_timeout_raises_after_exhaustion(mock_sleep: Mock) -> None:
     """Ensure timeout retries raise after exhausting the retry budget."""
 
@@ -1903,7 +1903,7 @@ def test_timeout_raises_after_exhaustion(mock_sleep: Mock) -> None:
 # --- test_http_retry.py ---
 
 
-@patch("DocsToKG.ContentDownload.network.time.sleep")
+@patch("DocsToKG.ContentDownload.networking.time.sleep")
 def test_connection_error_raises_after_exhaustion(mock_sleep: Mock) -> None:
     """Ensure connection errors propagate when retries are exhausted."""
 
@@ -2032,7 +2032,7 @@ def test_request_with_retries_errors_when_no_callable_available() -> None:
 # --- test_http_retry.py ---
 
 
-@patch("DocsToKG.ContentDownload.network.time.sleep")
+@patch("DocsToKG.ContentDownload.networking.time.sleep")
 def test_retry_after_header_prefers_longer_delay(mock_sleep: Mock) -> None:
     """Verify Retry-After header longer than backoff takes precedence."""
 
@@ -2065,8 +2065,8 @@ def test_retry_after_header_prefers_longer_delay(mock_sleep: Mock) -> None:
 # --- test_http_retry.py ---
 
 
-@patch("DocsToKG.ContentDownload.network.time.sleep")
-@patch("DocsToKG.ContentDownload.network.parse_retry_after_header")
+@patch("DocsToKG.ContentDownload.networking.time.sleep")
+@patch("DocsToKG.ContentDownload.networking.parse_retry_after_header")
 def test_respect_retry_after_false_skips_header(mock_parse: Mock, mock_sleep: Mock) -> None:
     """Ensure disabling respect_retry_after bypasses header parsing."""
 
@@ -2109,7 +2109,7 @@ def test_parse_retry_after_header_handles_parse_errors(monkeypatch) -> None:
     response.headers = {"Retry-After": "Mon, 01 Jan 2024 00:00:00 GMT"}
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.parsedate_to_datetime",
+        "DocsToKG.ContentDownload.networking.parsedate_to_datetime",
         Mock(side_effect=TypeError("boom")),
     )
 
@@ -2124,7 +2124,7 @@ def test_parse_retry_after_header_returns_none_when_parser_returns_none(monkeypa
     response.headers = {"Retry-After": "Mon, 01 Jan 2024 00:00:00 GMT"}
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.network.parsedate_to_datetime",
+        "DocsToKG.ContentDownload.networking.parsedate_to_datetime",
         Mock(return_value=None),
     )
 

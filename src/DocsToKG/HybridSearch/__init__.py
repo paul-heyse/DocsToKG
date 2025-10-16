@@ -35,7 +35,8 @@ Dependencies:
 - redis: Caching and session management
 
 Usage:
-    from docstokg.hybrid_search import HybridSearchService, HybridSearchConfig
+    from DocsToKG.HybridSearch import HybridSearchService
+    from DocsToKG.HybridSearch.config import HybridSearchConfig
 
     # Configure search service
     config = HybridSearchConfig()
@@ -52,88 +53,27 @@ import sys
 # --- Globals ---
 
 __all__ = (
-    "ChunkIngestionPipeline",
-    "ChunkPayload",
-    "DocumentInput",
-    "FaissVectorStore",
-    "FaissIndexManager",
-    "ManagedFaissAdapter",
     "AdapterStats",
-    "OpenSearchSimulator",
+    "ChunkPayload",
     "FaissRouter",
+    "FaissVectorStore",
     "HybridSearchAPI",
-    "HybridSearchConfig",
-    "HybridSearchConfigManager",
     "HybridSearchRequest",
     "HybridSearchResponse",
     "HybridSearchResult",
     "HybridSearchService",
     "HybridSearchValidator",
-    "LexicalIndex",
+    "ManagedFaissAdapter",
     "Observability",
-    "PaginationCheckResult",
-    "ReciprocalRankFusion",
-    "ResultShaper",
-    "apply_mmr_diversification",
-    "build_stats_snapshot",
     "restore_state",
     "serialize_state",
-    "should_rebuild_index",
-    "verify_pagination",
-    "load_dataset",
-    "infer_embedding_dim",
-    "vector_uuid_to_faiss_int",
 )
 
 
 # --- Re-exports ---
 
-from .config import HybridSearchConfig, HybridSearchConfigManager
-from .interfaces import LexicalIndex
-from .pipeline import ChunkIngestionPipeline, Observability
+from .pipeline import Observability
 from .router import FaissRouter
-from .service import (
-    HybridSearchAPI,
-    HybridSearchService,
-    HybridSearchValidator,
-    PaginationCheckResult,
-    ReciprocalRankFusion,
-    ResultShaper,
-    apply_mmr_diversification,
-    build_stats_snapshot,
-    infer_embedding_dim,
-    load_dataset,
-    should_rebuild_index,
-    verify_pagination,
-)
-from .store import (
-    AdapterStats,
-    FaissIndexManager,
-    FaissVectorStore,
-    ManagedFaissAdapter,
-    OpenSearchSimulator,
-    restore_state,
-    serialize_state,
-)
-from .types import (
-    ChunkPayload,
-    DocumentInput,
-    HybridSearchRequest,
-    HybridSearchResponse,
-    HybridSearchResult,
-    vector_uuid_to_faiss_int,
-)
-
-# --- Package Setup ---
-
-_package = sys.modules[__name__]
-sys.modules.setdefault(__name__ + ".ids", sys.modules[__name__ + ".types"])
-sys.modules.setdefault(__name__ + ".similarity_gpu", sys.modules[__name__ + ".store"])
-sys.modules.setdefault(__name__ + ".vectorstore", sys.modules[__name__ + ".store"])
-sys.modules.setdefault(__name__ + ".storage", sys.modules[__name__ + ".store"])
-sys.modules.setdefault(__name__ + ".operations", sys.modules[__name__ + ".store"])
-sys.modules.setdefault(__name__ + ".ingest", sys.modules[__name__ + ".pipeline"])
-sys.modules.setdefault(__name__ + ".observability", sys.modules[__name__ + ".pipeline"])
-sys.modules.setdefault(__name__ + ".features", sys.modules[__name__ + ".pipeline"])
-sys.modules.setdefault(__name__ + ".ranking", sys.modules[__name__ + ".service"])
-sys.modules.setdefault(__name__ + ".validation", sys.modules[__name__ + ".service"])
+from .service import HybridSearchAPI, HybridSearchService, HybridSearchValidator
+from .store import AdapterStats, FaissVectorStore, ManagedFaissAdapter, restore_state, serialize_state
+from .types import ChunkPayload, HybridSearchRequest, HybridSearchResponse, HybridSearchResult

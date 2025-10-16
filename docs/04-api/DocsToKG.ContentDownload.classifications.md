@@ -1,6 +1,6 @@
 # 1. Module: classifications
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.classifications``.
+This reference documents the DocsToKG module ``DocsToKG.ContentDownload.core``.
 
 ## 1. Overview
 

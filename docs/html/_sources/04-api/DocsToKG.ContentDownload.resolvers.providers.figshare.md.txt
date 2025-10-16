@@ -1,6 +1,6 @@
 # 1. Module: figshare
 
-This reference describes the ``FigshareResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.resolvers.providers``.
+This reference describes the ``FigshareResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.pipeline.providers``.
 
 Figshare Resolver Provider
 
@@ -13,7 +13,7 @@ Key Features:
 - Extensive logging for malformed payloads and API errors.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.providers import FigshareResolver
+    from DocsToKG.ContentDownload.pipeline.providers import FigshareResolver
 
     resolver = FigshareResolver()
     results = list(resolver.iter_urls(session, config, artifact))

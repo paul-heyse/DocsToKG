@@ -1,6 +1,6 @@
 # 1. Module: classifier
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.classifier``.
+This reference documents the DocsToKG module ``DocsToKG.ContentDownload.core``.
 
 ## 1. Overview
 

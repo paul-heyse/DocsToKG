@@ -1,6 +1,6 @@
 # 1. Module: network
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.network``.
+This reference documents the DocsToKG module ``DocsToKG.ContentDownload.networking``.
 
 ## 1. Overview
 
@@ -23,7 +23,7 @@ Key Features:
 
 Usage:
 
-    from DocsToKG.ContentDownload.network import (
+    from DocsToKG.ContentDownload.networking import (
         ConditionalRequestHelper,
         create_session,
         request_with_retries,

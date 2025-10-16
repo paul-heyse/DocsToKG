@@ -1,6 +1,6 @@
 # 1. Module: utils
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.utils``.
+This reference documents the DocsToKG module ``DocsToKG.ContentDownload.core``.
 
 ## 1. Overview
 

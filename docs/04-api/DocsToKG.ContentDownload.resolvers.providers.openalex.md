@@ -1,6 +1,6 @@
 # 1. Module: openalex
 
-This reference describes the ``OpenAlexResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.resolvers.providers``.
+This reference describes the ``OpenAlexResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.pipeline.providers``.
 
 OpenAlex Resolver Provider
 
@@ -13,7 +13,7 @@ Key Features:
 - Compatibility shim that ignores unused parameters required by the resolver protocol.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.providers import OpenAlexResolver
+    from DocsToKG.ContentDownload.pipeline.providers import OpenAlexResolver
 
     resolver = OpenAlexResolver()
     results = list(resolver.iter_urls(session, config, artifact))

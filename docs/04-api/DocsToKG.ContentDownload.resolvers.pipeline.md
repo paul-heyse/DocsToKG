@@ -1,6 +1,6 @@
 # 1. Module: pipeline
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.pipeline``.
+This reference documents the DocsToKG module ``DocsToKG.ContentDownload.pipeline.pipeline``.
 
 Resolver Pipeline Execution Engine
 
@@ -15,7 +15,7 @@ Key Features:
 - State tracking for seen URLs, global deduplication, HTML fallbacks, and failure metrics.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline
+    from DocsToKG.ContentDownload.pipeline.pipeline import ResolverPipeline
 
     pipeline = ResolverPipeline(
         resolvers=[],
@@ -29,7 +29,7 @@ Usage:
 
 ### `request_with_retries(session, method, url)`
 
-Proxy to :func:`DocsToKG.ContentDownload.network.request_with_retries`.
+Proxy to :func:`DocsToKG.ContentDownload.networking.request_with_retries`.
 
 The indirection keeps this module compatible with unit tests that monkeypatch
 either the pipeline-level attribute or the underlying HTTP helper while also

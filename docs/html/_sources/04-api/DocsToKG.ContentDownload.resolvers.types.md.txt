@@ -1,6 +1,6 @@
 # 1. Module: types
 
-This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers.types``.
+This reference documents the DocsToKG module ``DocsToKG.ContentDownload.pipeline.types``.
 
 Resolver Type Declarations
 
@@ -16,7 +16,7 @@ Key Features:
 - Lightweight metrics collector for resolver attempt statistics.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.types import Resolver, ResolverConfig
+    from DocsToKG.ContentDownload.pipeline.types import Resolver, ResolverConfig
 
     class ExampleResolver:
         name = "example"

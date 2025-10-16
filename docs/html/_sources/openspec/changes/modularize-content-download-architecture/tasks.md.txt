@@ -452,7 +452,7 @@
   - Add module docstring: "Resolver pipeline orchestration and execution logic."
 
 - [x] 3.4 Update `resolvers/pipeline.py` imports for new structure
-  - Change `from DocsToKG.ContentDownload.utils import ...` to relative import if needed
+  - Change `from DocsToKG.ContentDownload.core import ...` to relative import if needed
   - Ensure all type references point to `types` module
 
 - [x] 3.5 Create `src/DocsToKG/ContentDownload/resolvers/providers/__init__.py` with registry
@@ -477,7 +477,7 @@
   - Copy `_fetch_unpaywall_data` helper and LRU cache (lines ~85-101)
   - Copy `_headers_cache_key` helper (lines ~81-82)
   - Import necessary types from `..types`: `Resolver`, `ResolverConfig`, `ResolverResult`
-  - Import utilities: `normalize_doi`, `dedupe` from `DocsToKG.ContentDownload.utils`
+  - Import utilities: `normalize_doi`, `dedupe` from `DocsToKG.ContentDownload.core`
   - Import `requests`, `lru_cache`, `quote`, `Iterable`, `Dict`, `List`, `Tuple`, `Any`
   - Add module docstring: "Unpaywall API resolver for open access PDFs."
 
@@ -621,8 +621,8 @@
   ```
 
 - [ ] 4.16 Verify all existing imports still work
-  - Run: `python -c "from DocsToKG.ContentDownload.resolvers import ResolverPipeline, default_resolvers, ResolverConfig"`
-  - Run: `python -c "from DocsToKG.ContentDownload.resolvers import AttemptRecord, DownloadOutcome"`
+  - Run: `python -c "from DocsToKG.ContentDownload.pipeline import ResolverPipeline, default_resolvers, ResolverConfig"`
+  - Run: `python -c "from DocsToKG.ContentDownload.pipeline import AttemptRecord, DownloadOutcome"`
   - Verify no ImportError exceptions
 
 ## 5. OpenAlex Virtual Resolver
@@ -634,7 +634,7 @@
   from typing import Iterable
   import requests
   from ..types import Resolver, ResolverConfig, ResolverResult
-  from DocsToKG.ContentDownload.utils import dedupe
+  from DocsToKG.ContentDownload.core import dedupe
 
   class OpenAlexResolver:
       """Resolver for PDF URLs directly provided by OpenAlex metadata."""
@@ -877,7 +877,7 @@
   import requests
   from urllib.parse import quote
   from ..types import Resolver, ResolverConfig, ResolverResult
-  from DocsToKG.ContentDownload.utils import normalize_doi
+  from DocsToKG.ContentDownload.core import normalize_doi
   from DocsToKG.ContentDownload.http import request_with_retries
 
   class ZenodoResolver:
@@ -1053,7 +1053,7 @@
   from typing import Iterable
   import requests
   from ..types import Resolver, ResolverConfig, ResolverResult
-  from DocsToKG.ContentDownload.utils import normalize_doi
+  from DocsToKG.ContentDownload.core import normalize_doi
   from DocsToKG.ContentDownload.http import request_with_retries
 
   class FigshareResolver:
@@ -1324,8 +1324,8 @@
 ## 14. Migration and Compatibility
 
 - [ ] 14.1 Create migration guide in `docs/migration-modularize-resolvers.md`
-  - Document old import paths: `from DocsToKG.ContentDownload.resolvers import ResolverPipeline`
-  - Document new import paths (recommended): `from DocsToKG.ContentDownload.resolvers.pipeline import ResolverPipeline`
+  - Document old import paths: `from DocsToKG.ContentDownload.pipeline import ResolverPipeline`
+  - Document new import paths (recommended): `from DocsToKG.ContentDownload.pipeline.pipeline import ResolverPipeline`
   - Note that old paths continue working via re-exports
   - List new configuration options and defaults
 

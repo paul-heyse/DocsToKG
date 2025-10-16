@@ -1,6 +1,6 @@
 # 1. Module: wayback
 
-This reference describes the ``WaybackResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.resolvers.providers``.
+This reference describes the ``WaybackResolver`` class provided by the consolidated module ``DocsToKG.ContentDownload.pipeline.providers``.
 
 Wayback Machine Resolver Provider
 
@@ -13,7 +13,7 @@ Key Features:
 - Graceful handling when no snapshots are available or when failures persist.
 
 Usage:
-    from DocsToKG.ContentDownload.resolvers.providers import WaybackResolver
+    from DocsToKG.ContentDownload.pipeline.providers import WaybackResolver
 
     resolver = WaybackResolver()
     results = list(resolver.iter_urls(session, config, artifact))
