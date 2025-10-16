@@ -2,13 +2,95 @@
 
 from __future__ import annotations
 
+import argparse
 import json
+import logging
 import socket
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+
+class _RequestsResponse:
+    headers = {"content-type": "application/json"}
+    text = "{}"
+    status_code = 200
+
+    def json(self):  # pragma: no cover - simple stub
+        return {"data": []}
+
+
+sys.modules.setdefault(
+    "requests", SimpleNamespace(get=lambda *args, **kwargs: _RequestsResponse())
+)
+
+sys.modules.setdefault(
+    "tqdm", SimpleNamespace(tqdm=lambda *a, **kw: _DummyTqdm(*a, **kw))
+)
+
+sys.modules.setdefault(
+    "docling_core.transforms.chunker.base",
+    SimpleNamespace(BaseChunk=object),
+)
+sys.modules.setdefault(
+    "docling_core.transforms.chunker.hybrid_chunker",
+    SimpleNamespace(HybridChunker=object),
+)
+sys.modules.setdefault(
+    "docling_core.transforms.chunker.tokenizer.huggingface",
+    SimpleNamespace(HuggingFaceTokenizer=object),
+)
+sys.modules.setdefault(
+    "docling_core.transforms.chunker.hierarchical_chunker",
+    SimpleNamespace(ChunkingDocSerializer=object, ChunkingSerializerProvider=object),
+)
+sys.modules.setdefault(
+    "docling_core.types.doc.document",
+    SimpleNamespace(
+        DoclingDocument=object,
+        DocTagsDocument=object,
+        PictureClassificationData=object,
+        PictureDescriptionData=object,
+        PictureItem=object,
+        PictureMoleculeData=object,
+    ),
+)
+sys.modules.setdefault(
+    "transformers",
+    SimpleNamespace(AutoTokenizer=SimpleNamespace(from_pretrained=lambda *a, **k: SimpleNamespace())),
+)
+sys.modules.setdefault(
+    "docling_core.transforms.serializer.base",
+    SimpleNamespace(BaseDocSerializer=object, SerializationResult=object),
+)
+sys.modules.setdefault(
+    "docling_core.transforms.serializer.common",
+    SimpleNamespace(create_ser_result=lambda *a, **k: {}),
+)
+sys.modules.setdefault(
+    "docling_core.transforms.serializer.markdown",
+    SimpleNamespace(
+        MarkdownParams=object,
+        MarkdownPictureSerializer=object,
+        MarkdownTableSerializer=object,
+    ),
+)
+
+
+class _DummyTqdm:
+    def __init__(self, *args, **kwargs) -> None:  # pragma: no cover - simple stub
+        self.total = kwargs.get("total", 0)
+
+    def __enter__(self):  # pragma: no cover - simple stub
+        return self
+
+    def __exit__(self, exc_type, exc, tb):  # pragma: no cover - simple stub
+        return False
+
+    def update(self, *_args, **_kwargs) -> None:  # pragma: no cover - simple stub
+        pass
+
 
 from DocsToKG.DocParsing import _common, schemas
 from DocsToKG.DocParsing.schemas import (
@@ -63,7 +145,7 @@ def test_data_directories_created(tmp_path: Path) -> None:
     expected = {
         _common.data_doctags(): "DocTagsFiles",
         _common.data_chunks(): "ChunkedDocTagFiles",
-        _common.data_vectors(): "Vectors",
+        _common.data_vectors(): "Embeddings",
         _common.data_manifests(): "Manifests",
         _common.data_pdfs(): "PDFs",
         _common.data_html(): "HTML",
@@ -126,11 +208,14 @@ def test_iter_doctags(tmp_path: Path) -> None:
 def test_iter_chunks(tmp_path: Path) -> None:
     chunks_dir = _common.data_chunks()
     good = chunks_dir / "doc.chunks.jsonl"
+    nested = chunks_dir / "teamA" / "doc.chunks.jsonl"
     other = chunks_dir / "doc.jsonl"
     good.write_text("{}\n", encoding="utf-8")
+    nested.parent.mkdir(parents=True, exist_ok=True)
+    nested.write_text("{}\n", encoding="utf-8")
     other.write_text("{}\n", encoding="utf-8")
     results = list(_common.iter_chunks(chunks_dir))
-    assert results == [good.resolve()]
+    assert results == sorted({good.resolve(), nested.resolve()})
 
 
 def test_jsonl_load_and_save(tmp_path: Path) -> None:
@@ -316,3 +401,300 @@ def test_vector_golden_rows_validate(relative: str) -> None:
     for row in rows:
         validated = validate_vector_row(row)
         assert validated.schema_version == VECTOR_SCHEMA_VERSION
+
+
+# ---------------------------------------------------------------------------
+# New robustness and configuration tests
+
+
+def test_set_spawn_or_warn_warns_on_incompatible_method(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    import multiprocessing as mp
+
+    def raise_runtime_error(*_args, **_kwargs):
+        raise RuntimeError("already set")
+
+    monkeypatch.setattr(mp, "set_start_method", raise_runtime_error)
+    monkeypatch.setattr(mp, "get_start_method", lambda allow_none=True: "fork")
+
+    class DummyLogger:
+        def __init__(self) -> None:
+            self.warnings: list[str] = []
+
+        def warning(self, message: str) -> None:  # pragma: no cover - simple stub
+            self.warnings.append(message)
+
+        def debug(self, *_args, **_kwargs) -> None:  # pragma: no cover - simple stub
+            pass
+
+    dummy = DummyLogger()
+    _common.set_spawn_or_warn(dummy)
+    assert dummy.warnings
+    assert "spawn" in dummy.warnings[0]
+
+
+def test_compute_relative_doc_id_handles_subdirectories(tmp_path: Path) -> None:
+    from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (
+        compute_relative_doc_id,
+    )
+
+    root = tmp_path / "docs"
+    nested = root / "teamA" / "report.doctags"
+    nested.parent.mkdir(parents=True, exist_ok=True)
+    nested.write_text("{}", encoding="utf-8")
+
+    assert compute_relative_doc_id(nested, root) == "teamA/report.doctags"
+
+
+def test_derive_doc_id_and_output_path(tmp_path: Path) -> None:
+    from DocsToKG.DocParsing import EmbeddingV2 as embedding
+
+    chunks_root = tmp_path / "chunks"
+    chunk_file = chunks_root / "teamA" / "report.chunks.jsonl"
+    chunk_file.parent.mkdir(parents=True, exist_ok=True)
+    chunk_file.write_text("{}\n", encoding="utf-8")
+    vectors_root = tmp_path / "vectors"
+
+    doc_id, out_path = embedding._derive_doc_id_and_output_path(
+        chunk_file, chunks_root, vectors_root
+    )
+
+    assert doc_id == "teamA/report.doctags"
+    assert out_path == vectors_root / "teamA" / "report.vectors.jsonl"
+
+
+def test_chunk_row_fields_unique() -> None:
+    fields = schemas.ChunkRow.model_fields
+    for name in ("has_image_captions", "has_image_classification", "num_images"):
+        assert name in fields
+
+
+def test_qwen_embed_caches_llm(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from DocsToKG.DocParsing import EmbeddingV2 as embedding
+
+    class DummyOutput:
+        def __init__(self) -> None:
+            self.outputs = SimpleNamespace(embedding=[0.1, 0.2])
+
+    class DummyLLM:
+        instances = 0
+
+        def __init__(self, *args, **kwargs) -> None:  # pragma: no cover - simple counter
+            type(self).instances += 1
+
+        def embed(self, batch, pooling_params):  # pragma: no cover - simple stub
+            return [DummyOutput() for _ in batch]
+
+    class DummyPoolingParams:
+        def __init__(self, normalize: bool = True) -> None:
+            self.normalize = normalize
+
+    monkeypatch.setattr(embedding, "LLM", DummyLLM)
+    monkeypatch.setattr(embedding, "PoolingParams", DummyPoolingParams)
+    monkeypatch.setattr(embedding, "_VLLM_IMPORT_ERROR", None)
+    monkeypatch.setattr(embedding, "_QWEN_LLM_CACHE", {})
+
+    cfg = embedding.QwenCfg(model_dir=tmp_path, batch_size=2)
+    first = embedding.qwen_embed(cfg, ["a", "b"])
+    second = embedding.qwen_embed(cfg, ["c"])
+
+    assert DummyLLM.instances == 1
+    assert len(first) == 2
+    assert len(second) == 1
+
+
+def test_pdf_model_path_resolution_precedence(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    class DummyResponse:
+        headers = {"content-type": "application/json"}
+        text = "{}"
+        status_code = 200
+
+        def json(self):  # pragma: no cover - simple stub
+            return {"data": []}
+
+    monkeypatch.setitem(
+        sys.modules,
+        "requests",
+        SimpleNamespace(get=lambda *args, **kwargs: DummyResponse()),
+    )
+
+    from DocsToKG.DocParsing import pipelines
+
+    monkeypatch.delenv("DOCLING_PDF_MODEL", raising=False)
+    monkeypatch.delenv("DOCSTOKG_MODEL_ROOT", raising=False)
+    monkeypatch.delenv("HF_HOME", raising=False)
+
+    cli_override = "explicit-model"
+    assert pipelines.resolve_pdf_model_path(cli_override) == cli_override
+
+    env_model = tmp_path / "custom"
+    monkeypatch.setenv("DOCLING_PDF_MODEL", str(env_model))
+    assert pipelines.resolve_pdf_model_path(None) == str(env_model.resolve())
+
+    monkeypatch.delenv("DOCLING_PDF_MODEL", raising=False)
+    model_root = tmp_path / "root"
+    monkeypatch.setenv("DOCSTOKG_MODEL_ROOT", str(model_root))
+    expected = (model_root / "granite-docling-258M").resolve()
+    assert pipelines.resolve_pdf_model_path(None) == str(expected)
+
+    monkeypatch.delenv("DOCSTOKG_MODEL_ROOT", raising=False)
+    hf_home = tmp_path / "hf"
+    monkeypatch.setenv("HF_HOME", str(hf_home))
+    expected = (hf_home / "granite-docling-258M").resolve()
+    assert pipelines.resolve_pdf_model_path(None) == str(expected)
+
+
+def test_pdf_pipeline_mirrors_output_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class DummyResponse:
+        headers = {"content-type": "application/json"}
+        text = "{}"
+        status_code = 200
+
+        def json(self):  # pragma: no cover - simple stub
+            return {"data": []}
+
+    monkeypatch.setitem(
+        sys.modules,
+        "requests",
+        SimpleNamespace(get=lambda *args, **kwargs: DummyResponse()),
+    )
+
+    from DocsToKG.DocParsing import pipelines
+
+    input_dir = tmp_path / "inputs"
+    (input_dir / "teamA").mkdir(parents=True)
+    (input_dir / "teamB").mkdir(parents=True)
+    for folder in ("teamA", "teamB"):
+        target = input_dir / folder / "report.pdf"
+        target.write_text("content", encoding="utf-8")
+
+    output_dir = tmp_path / "outputs"
+    model_dir = tmp_path / "model"
+    model_dir.mkdir()
+    data_root = tmp_path / "data-root"
+    data_root.mkdir()
+    monkeypatch.setenv("DOCSTOKG_DATA_ROOT", str(data_root))
+
+    monkeypatch.setattr(pipelines, "ensure_vllm", lambda *args, **kwargs: (8000, None, False))
+    monkeypatch.setattr(pipelines, "probe_metrics", lambda port: (True, 200))
+    monkeypatch.setattr(pipelines, "detect_vllm_version", lambda: "test")
+
+    class ImmediateExecutor:
+        def __init__(self, *args, **kwargs) -> None:
+            self._submitted = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def submit(self, fn, task):
+            from concurrent.futures import Future
+
+            fut = Future()
+            try:
+                fut.set_result(fn(task))
+            except Exception as exc:  # pragma: no cover - defensive
+                fut.set_exception(exc)
+            self._submitted.append(task)
+            return fut
+
+    monkeypatch.setattr(pipelines, "ProcessPoolExecutor", ImmediateExecutor)
+
+    class DummyProgress:
+        def __init__(self, *args, total=0, **_kwargs) -> None:
+            self.total = total
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def update(self, *_args, **_kwargs) -> None:  # pragma: no cover - simple stub
+            pass
+
+    monkeypatch.setattr(pipelines, "tqdm", lambda *args, **kwargs: DummyProgress(*args, **kwargs))
+
+    def immediate_as_completed(futures):
+        return list(futures)
+
+    monkeypatch.setattr(pipelines, "as_completed", immediate_as_completed)
+
+    def fake_convert(task):
+        task.output_path.parent.mkdir(parents=True, exist_ok=True)
+        task.output_path.write_text("{}", encoding="utf-8")
+        return pipelines.PdfConversionResult(
+            doc_id=task.doc_id,
+            status="success",
+            duration_s=0.1,
+            input_path=str(task.pdf_path),
+            input_hash=task.input_hash,
+            output_path=str(task.output_path),
+        )
+
+    monkeypatch.setattr(pipelines, "pdf_convert_one", fake_convert)
+
+    args = argparse.Namespace(
+        data_root=data_root,
+        input=input_dir,
+        output=output_dir,
+        workers=1,
+        resume=False,
+        force=False,
+        served_model_names=None,
+        model=str(model_dir),
+        gpu_memory_utilization=0.1,
+    )
+
+    exit_code = pipelines.pdf_main(args)
+    assert exit_code == 0
+    assert (output_dir / "teamA" / "report.doctags").exists()
+    assert (output_dir / "teamB" / "report.doctags").exists()
+
+    manifest_path = data_root / "Manifests" / "docparse.doctags-pdf.manifest.jsonl"
+    assert manifest_path.exists()
+    records = [json.loads(line) for line in manifest_path.read_text(encoding="utf-8").splitlines()]
+    doc_ids = {rec["doc_id"] for rec in records if rec.get("doc_id") != "__service__"}
+    assert doc_ids == {"teamA/report.pdf", "teamB/report.pdf"}
+
+    args.resume = True
+    call_count = {"value": 0}
+
+    def unexpected_convert(task):  # pragma: no cover - resume guard
+        call_count["value"] += 1
+        return pipelines.PdfConversionResult(
+            doc_id=task.doc_id,
+            status="unexpected",
+            duration_s=0.0,
+            input_path=str(task.pdf_path),
+            input_hash=task.input_hash,
+            output_path=str(task.output_path),
+        )
+
+    monkeypatch.setattr(pipelines, "pdf_convert_one", unexpected_convert)
+    exit_code = pipelines.pdf_main(args)
+    assert exit_code == 0
+    assert call_count["value"] == 0
+
+    records = [json.loads(line) for line in manifest_path.read_text(encoding="utf-8").splitlines()]
+    skip_entries = [rec for rec in records if rec.get("status") == "skip"]
+    assert {rec["doc_id"] for rec in skip_entries if rec["doc_id"] != "__service__"} == {
+        "teamA/report.pdf",
+        "teamB/report.pdf",
+    }
+
+
+def test_deprecated_pdf_pipeline_warning(monkeypatch: pytest.MonkeyPatch) -> None:
+    import DocsToKG.DocParsing as docparse
+
+    legacy = sys.modules["DocsToKG.DocParsing.pdf_pipeline"]
+    setattr(legacy, "_warned", False)
+
+    with pytest.warns(DeprecationWarning):
+        _ = legacy.build_parser
+

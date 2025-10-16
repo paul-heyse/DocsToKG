@@ -39,17 +39,19 @@ auditing across the toolchain.
 ### 2. Chunking & Coalescence
 
 * **Entry point**: `python -m DocsToKG.DocParsing.cli chunk`
-* **Output**: `Data/ChunkedDocTagFiles/<doc_id>.chunks.jsonl`
+* **Output**: `Data/ChunkedDocTagFiles/<relative_path>.chunks.jsonl` (mirrors the DocTags hierarchy)
 * **Highlights**:
   - The hybrid chunker honors Docling structural annotations and only merges
     across sections when soft-boundary thresholds permit.
   - Chunk rows embed `ProvenanceMetadata` (parse engine, Docling version, image
     flags) to preserve the source context of every span.
+  - Document identifiers mirror the relative path within the input directory so
+    nested hierarchies never collide on basename alone.
 
 ### 3. Embedding Generation
 
 * **Entry point**: `python -m DocsToKG.DocParsing.cli embed`
-* **Output**: `Data/Embeddings/<doc_id>.vectors.jsonl`
+* **Output**: `Data/Embeddings/<relative_path>.vectors.jsonl` (mirrors the chunk directory layout)
 * **Highlights**:
   - Streaming two-pass architecture bounds memory usage while collecting BM25
     statistics.
@@ -76,9 +78,26 @@ include:
 | Variable | Purpose |
 | --- | --- |
 | `DOCSTOKG_DATA_ROOT` | Overrides automatic data-root detection for all stages. |
+| `HF_HOME` | Preferred HuggingFace cache directory used for model discovery when stage-specific overrides are not supplied. |
+| `DOCSTOKG_MODEL_ROOT` | Base directory that houses DocParsing models when `DOCLING_PDF_MODEL` is unset. |
+| `DOCLING_PDF_MODEL` | Explicit path to the Granite Docling model used by the PDF pipeline. Overrides all other model-location environment variables. |
 | `DOCLING_CUDA_USE_FLASH_ATTENTION2` | Enables Flash Attention optimizations within Docling VLM workers. |
 | `DOCLING_ARTIFACTS_PATH` | Custom cache directory for Docling-rendered artifacts (bitmaps, intermediate assets). |
 | `DOCSTOKG_HASH_ALG` | Forces content hashing algorithm (`sha1` default, set to `sha256`, `sha512`, etc. when compliance requires). Changing this invalidates resume caches created with a different algorithm. |
+
+### PDF model resolution
+
+The PDF DocTags converter resolves its model path using the following
+precedence order:
+
+1. `--model` CLI argument
+2. `DOCLING_PDF_MODEL` environment variable
+3. `DOCSTOKG_MODEL_ROOT/granite-docling-258M`
+4. `HF_HOME/granite-docling-258M`
+5. `~/.cache/huggingface/granite-docling-258M`
+
+The resolved path is logged at startup so operators can confirm the
+expected model directory before conversion begins.
 
 ## Schema Versioning Strategy
 
@@ -162,6 +181,10 @@ When upgrading schema versions or changing tokenizer defaults, update the
 OpenSpec change proposal with explicit migration steps.  Provide before/after
 examples and recommend recalculating affected manifolds so downstream consumers
 can reason about historical data sets.
+
+* Embedding outputs now write to `Data/Embeddings/` so deployments with legacy
+  `Data/Vectors/` directories should rename them to keep manifests and resumable
+  processing aligned with the canonical layout.
 
 ## Synthetic Benchmarking & Test Utilities
 
