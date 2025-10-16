@@ -242,6 +242,51 @@ def test_run_validators_respects_concurrency(monkeypatch, tmp_path, config):
         assert artifact.exists()
 
 
+def test_run_validators_matches_sequential(monkeypatch, tmp_path, config):
+    config_seq = config.model_copy(deep=True)
+    config_seq.defaults.validation.max_concurrent_validators = 1
+
+    config_conc = config.model_copy(deep=True)
+    config_conc.defaults.validation.max_concurrent_validators = 3
+
+    def _validator(request: ValidationRequest, logger):
+        payload = {"ok": True, "validator": request.name}
+        artifact = request.validation_dir / f"{request.name}_parse.json"
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        artifact.write_text(json.dumps(payload))
+        return ValidationResult(ok=True, details=payload, output_files=[str(artifact)])
+
+    validators = {
+        "alpha": _validator,
+        "beta": _validator,
+        "gamma": _validator,
+    }
+    monkeypatch.setattr(download, "VALIDATORS", validators)
+
+    def _build_requests(prefix: str, cfg: ResolvedConfig) -> list[ValidationRequest]:
+        requests = []
+        for name in validators:
+            file_path = tmp_path / f"{prefix}-{name}.ttl"
+            file_path.write_text("@prefix ex: <http://example.org/> .")
+            requests.append(
+                ValidationRequest(
+                    name,
+                    file_path,
+                    tmp_path / f"{prefix}-{name}-normalized",
+                    tmp_path / f"{prefix}-{name}-validation",
+                    cfg,
+                )
+            )
+        return requests
+
+    seq_results = run_validators(_build_requests("seq", config_seq), _noop_logger())
+    conc_results = run_validators(_build_requests("conc", config_conc), _noop_logger())
+
+    assert set(seq_results) == set(conc_results) == set(validators)
+    for name in validators:
+        assert seq_results[name].details == conc_results[name].details
+
+
 def test_sort_triple_file_falls_back_without_sort(monkeypatch, tmp_path):
     unsorted = tmp_path / "triples.unsorted"
     unsorted.write_text("c\nA\nb\n", encoding="utf-8")

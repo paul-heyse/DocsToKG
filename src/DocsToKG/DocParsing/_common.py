@@ -483,9 +483,8 @@ def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:
             if logger is not None:
                 logger.debug("Multiprocessing start method already 'spawn'")
             return
-        message = (
-            "Multiprocessing start method is %s; CUDA workloads require 'spawn'."
-            % (current or "unset")
+        message = "Multiprocessing start method is %s; CUDA workloads require 'spawn'." % (
+            current or "unset"
         )
         if logger is not None:
             logger.warning(message)
@@ -518,9 +517,8 @@ def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:
             if logger is not None:
                 logger.debug("Multiprocessing start method already 'spawn'")
             return
-        message = (
-            "Multiprocessing start method is %s; CUDA workloads require 'spawn'."
-            % (current or "unset")
+        message = "Multiprocessing start method is %s; CUDA workloads require 'spawn'." % (
+            current or "unset"
         )
         if logger is not None:
             logger.warning(message)
@@ -903,3 +901,35 @@ def _pid_is_running(pid: int) -> bool:
     except OSError:  # pragma: no cover - defensive guard
         return False
     return True
+
+
+def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:
+    """Ensure the multiprocessing start method is set to ``spawn``.
+
+    This helper attempts to set the start method to ``spawn`` with ``force=True``.
+    If a ``RuntimeError`` occurs (meaning the method was already set), it checks
+    if the current method is ``spawn``. If not, it emits a warning about the
+    potential CUDA safety risk, logging the current method so callers understand
+    the degraded safety state.
+    """
+
+    import multiprocessing as mp
+
+    try:
+        mp.set_start_method("spawn", force=True)
+        if logger is not None:
+            logger.debug("Multiprocessing start method set to 'spawn'")
+        return
+    except RuntimeError:
+        current = mp.get_start_method(allow_none=True)
+        if current == "spawn":
+            if logger is not None:
+                logger.debug("Multiprocessing start method already 'spawn'")
+            return
+        message = "Multiprocessing start method is %s; CUDA workloads require 'spawn'." % (
+            current or "unset"
+        )
+        if logger is not None:
+            logger.warning(message)
+        else:
+            logging.getLogger(__name__).warning(message)

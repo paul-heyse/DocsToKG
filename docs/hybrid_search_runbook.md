@@ -43,3 +43,8 @@ retrieval subsystems.
   1. Drain ingestion traffic.
   2. Reconstruct FAISS from the authoritative registry list.
   3. Re-enable ingestion and confirm `ntotal` aligns with registry count.
+
+## 8. Module Consolidation Migration
+- Legacy modules (`results`, `similarity`, `retrieval`, `schema`, `operations`, `tools`) now emit
+  `DeprecationWarning`. Update automation and notebooks to import from the consolidated
+  modules documented in `docs/hybrid_search_module_migration.md` before the v0.6.0 release.

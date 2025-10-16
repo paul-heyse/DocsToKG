@@ -297,7 +297,8 @@ class JsonlSink:
 
     def _write(self, payload: Dict[str, Any]) -> None:
         payload.setdefault("timestamp", _utc_timestamp())
-        line = json.dumps(payload, sort_keys=True) + "\n"
+        line = json.dumps(payload, sort_keys=True) + "
+"
         with self._lock:
             self._file.write(line)
             self._file.flush()
@@ -2153,6 +2154,8 @@ def main() -> None:
         index_path = manifest_path.with_suffix(".index.json")
         index_sink = stack.enter_context(ManifestIndexSink(index_path))
         sinks.append(index_sink)
+        base_logger = stack.enter_context(JsonlLogger(manifest_path))
+        attempt_logger: Any = base_logger
         if csv_path:
             csv_sink = stack.enter_context(CsvSink(csv_path))
             sinks.append(csv_sink)
