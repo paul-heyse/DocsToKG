@@ -17,6 +17,11 @@ All notable changes to DocsToKG are documented in this file.
   and updated CLI flag documentation.
 - CHANGELOG entry detailing the content download robustness refactor for downstream consumers.
 
+### Changed
+- Refactored `DocsToKG.OntologyDownload` into modular submodules (`config`, `io_safe`,
+  `net`, `pipeline`, `storage`, `validation_core`, `plugins`) while keeping the
+  public facade stable for downstream consumers.
+
 ## [0.2.0] - 2025-02-15
 
 ### Breaking Changes

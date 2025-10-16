@@ -17,7 +17,7 @@ import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 try:  # pragma: no cover - dependency check
     import yaml  # type: ignore
@@ -38,6 +38,9 @@ from pydantic import BaseModel, Field, field_validator
 from pydantic import ValidationError as PydanticValidationError
 from pydantic_core import ValidationError as CoreValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+if TYPE_CHECKING:  # pragma: no cover - import cycle guard for type checkers only
+    from .pipeline import ConfigurationError as _ConfigurationError
 
 PYTHON_MIN_VERSION = (3, 9)
 
@@ -60,6 +63,34 @@ def _coerce_sequence(value: Optional[Iterable[str]]) -> List[str]:
     if isinstance(value, str):
         return [value]
     return [str(item) for item in value]
+
+
+__all__ = [
+    "ConfigError",
+    "DefaultsConfig",
+    "DownloadConfiguration",
+    "LoggingConfiguration",
+    "ResolvedConfig",
+    "ValidationConfig",
+    "build_resolved_config",
+    "ensure_python_version",
+    "get_env_overrides",
+    "load_config",
+    "load_raw_yaml",
+    "parse_rate_limit_to_rps",
+    "validate_config",
+    "ConfigurationError",
+]
+
+
+def __getattr__(name: str):
+    """Lazily expose pipeline exceptions without introducing import cycles."""
+
+    if name == "ConfigurationError":
+        from .pipeline import ConfigurationError as _ConfigurationError
+
+        return _ConfigurationError
+    raise AttributeError(name)
 
 
 _RATE_LIMIT_PATTERN = re.compile(r"^([\d.]+)/(second|sec|s|minute|min|m|hour|h)$")
@@ -400,8 +431,18 @@ def _validate_schema(raw: Mapping[str, object], config: Optional[ResolvedConfig]
 
 
 def load_raw_yaml(config_path: Path) -> Mapping[str, object]:
-    with config_path.open("r", encoding="utf-8") as handle:
-        data = yaml.safe_load(handle)
+    if not config_path.exists():
+        print(f"Configuration file not found: {config_path}", file=sys.stderr)
+        raise SystemExit(2)
+
+    try:
+        with config_path.open("r", encoding="utf-8") as handle:
+            data = yaml.safe_load(handle)
+    except yaml.YAMLError as exc:  # pragma: no cover - exercised via tests
+        raise ConfigError(
+            f"Configuration file '{config_path}' contains invalid YAML"
+        ) from exc
+
     if not isinstance(data, Mapping):
         raise ConfigError("Configuration file must contain a mapping at the root")
     return data

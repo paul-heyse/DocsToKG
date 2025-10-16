@@ -60,14 +60,14 @@ from pathlib import Path
 
 import pytest
 
-from DocsToKG.OntologyDownload.ontology_download import (
-    _directory_size,
+from DocsToKG.OntologyDownload.pipeline import (
     infer_version_timestamp,
     parse_http_datetime,
     parse_iso_datetime,
     parse_rate_limit_to_rps,
     parse_version_timestamp,
 )
+from DocsToKG.OntologyDownload.storage import _directory_size
 
 
 @pytest.mark.parametrize(

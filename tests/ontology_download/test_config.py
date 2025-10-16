@@ -200,7 +200,9 @@ pytest.importorskip("pydantic_settings")
 
 from pydantic import BaseModel, ValidationError
 
-from DocsToKG.OntologyDownload import (
+from DocsToKG.OntologyDownload import resolvers
+from DocsToKG.OntologyDownload import ontology_download as core
+from DocsToKG.OntologyDownload.config import (
     ConfigError,
     DefaultsConfig,
     DownloadConfiguration,
@@ -211,11 +213,9 @@ from DocsToKG.OntologyDownload import (
     get_env_overrides,
     load_config,
     load_raw_yaml,
-    merge_defaults,
-    resolvers,
     validate_config,
 )
-from DocsToKG.OntologyDownload import ontology_download as core
+from DocsToKG.OntologyDownload.pipeline import merge_defaults
 # --- Test Cases ---
 
 
