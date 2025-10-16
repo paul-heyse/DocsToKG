@@ -9,6 +9,20 @@ All notable changes to DocsToKG are documented in this file.
 - Planner metadata enrichment now enforces download host allowlists during planning; configurations that previously logged warnings will now raise ``ConfigError`` when a resolver returns a disallowed host.
 
 ### Added
+- Regression coverage ensuring validator results are identical between sequential
+  and concurrent execution and that streaming normalization flushes chunked
+  output for large ontologies.
+- Integration test for the ``ontofetch doctor`` command covering filesystem,
+  dependency, network, and manifest diagnostics.
+- Documentation examples showing how to register custom resolver and validator
+  plugins via ``docstokg.ontofetch`` entry points.
+
+### Changed
+- Validator configuration docs now highlight the ``max_concurrent_validators``
+  limit and the operations runbook covers tuning streaming thresholds and
+  validator concurrency for large datasets.
+- Migration guide elaborates on removing legacy module aliases and explains how
+  to apply ``_migrate_manifest_inplace`` for future schema upgrades.
 - Zenodo and Figshare resolvers integrated into the modular content download pipeline with defensive error handling and metadata-rich events.
 - Unit tests covering shared rate-limit parsing, directory size measurement, datetime normalization helpers, and validator failure handling guard the new single-source utilities.
 - Bounded intra-work concurrency controls and HEAD pre-check filtering options documented in the README and resolver guides.
@@ -47,26 +61,3 @@ All notable changes to DocsToKG are documented in this file.
 - Tests cover HEAD pre-check redirects, resolver concurrency error isolation, and configuration validation edge cases.
 - Planning metadata enrichment no longer passes bare allowlists to ``validate_url_security`` and correctly rejects URLs outside the configured host policy without raising attribute errors.
 - Property-based tests ensure conditional request headers and deduplication utilities behave correctly across arbitrary inputs.
-## Unreleased
-
-### Added
-- Migration guide for the modular resolver architecture, including new
-  configuration defaults.
-- Developer documentation for adding custom resolver providers and extending the
-  registry.
-- Property-based tests covering retry backoff, conditional request headers, and
-  dedupe behaviour to lift branch coverage.
-
-### Changed
-- Resolver namespace now emits deprecation warnings when importing legacy
-  ``time`` or ``requests`` aliases.
-- ``ResolverPipeline`` captures resolver exceptions consistently across
-  sequential and concurrent execution paths.
-- README and API docs updated to highlight Zenodo/Figshare resolvers, bounded
-  concurrency, and HEAD pre-check filtering.
-
-### Fixed
-- HTTP retry helper now validates parameters early and exposes clearer error
-  messages for invalid usage.
-- Conditional request helper rejects negative content lengths and validates
-  response shapes before processing HTTP 304 outcomes.
