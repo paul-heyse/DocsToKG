@@ -13,10 +13,17 @@ import logging
 import re
 import threading
 from dataclasses import dataclass
+from importlib import metadata
 from typing import Any, Dict, Iterable, Optional
 
 import requests
-from bioregistry import get_obo_download, get_owl_download, get_rdf_download
+
+try:  # pragma: no cover - optional dependency guidance
+    from bioregistry import get_obo_download, get_owl_download, get_rdf_download
+except ModuleNotFoundError:  # pragma: no cover - provide actionable error for runtime use
+    get_obo_download = None  # type: ignore[assignment]
+    get_owl_download = None  # type: ignore[assignment]
+    get_rdf_download = None  # type: ignore[assignment]
 
 try:  # pragma: no cover - optional dependency shim
     from ols_client import OlsClient as _OlsClient
@@ -25,7 +32,11 @@ except ImportError:
         from ols_client import Client as _OlsClient
     except ImportError:  # ols-client not installed
         _OlsClient = None  # type: ignore[assignment]
-from ontoportal_client import BioPortalClient
+
+try:  # pragma: no cover - optional dependency guidance
+    from ontoportal_client import BioPortalClient
+except ModuleNotFoundError:  # pragma: no cover - provide actionable error later
+    BioPortalClient = None  # type: ignore[assignment]
 
 from .ontology_download import (
     ConfigError,
@@ -355,6 +366,11 @@ class OBOResolver(BaseResolver):
         Raises:
             ConfigError: If no download URL can be derived.
         """
+        if get_obo_download is None or get_owl_download is None or get_rdf_download is None:
+            raise ConfigError(
+                "bioregistry is required for the OBO resolver. Install it with: pip install bioregistry"
+            )
+
         preferred_formats = list(spec.target_formats) or ["owl", "obo", "rdf"]
         for fmt in preferred_formats:
             if fmt == "owl":
@@ -511,6 +527,10 @@ class BioPortalResolver(BaseResolver):
     """
 
     def __init__(self) -> None:
+        if BioPortalClient is None:
+            raise ConfigError(
+                "ontoportal-client is required for the BioPortal resolver. Install it with: pip install ontoportal-client"
+            )
         self.client = BioPortalClient()
         config_dir = pystow.join("ontology-fetcher", "configs")
         self.api_key_path = config_dir / "bioportal_api_key.txt"
@@ -901,16 +921,66 @@ class OntobeeResolver(BaseResolver):
         return self._build_plan(url=url, media_type="application/rdf+xml", service="ontobee")
 
 
-RESOLVERS = {
+def _load_resolver_plugins(logger: Optional[logging.Logger] = None) -> None:
+    """Discover resolver plugins registered via Python entry points."""
+
+    logger = logger or logging.getLogger(__name__)
+    try:
+        entry_points = metadata.entry_points()
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning(
+            "resolver plugin discovery failed",
+            extra={"stage": "init", "error": str(exc)},
+        )
+        return
+
+    for entry in entry_points.select(group="docstokg.ontofetch.resolver"):
+        try:
+            loaded = entry.load()
+            resolver = loaded() if isinstance(loaded, type) else loaded
+            if not hasattr(resolver, "plan"):
+                raise TypeError("resolver plugin must define a plan method")
+            name = getattr(resolver, "NAME", entry.name)
+            RESOLVERS[name] = resolver
+            logger.info(
+                "resolver plugin registered",
+                extra={"stage": "init", "resolver": name},
+            )
+        except Exception as exc:  # pragma: no cover - plugin faults
+            logger.warning(
+                "resolver plugin failed",
+                extra={"stage": "init", "resolver": entry.name, "error": str(exc)},
+            )
+
+
+_LOGGER = logging.getLogger(__name__)
+
+RESOLVERS: Dict[str, BaseResolver] = {
     "obo": OBOResolver(),
     "bioregistry": OBOResolver(),
-    "ols": OLSResolver(),
-    "bioportal": BioPortalResolver(),
     "lov": LOVResolver(),
     "skos": SKOSResolver(),
     "xbrl": XBRLResolver(),
     "ontobee": OntobeeResolver(),
 }
+
+if _OlsClient is not None:
+    try:
+        RESOLVERS["ols"] = OLSResolver()
+    except Exception as exc:  # pragma: no cover - depends on local credentials
+        _LOGGER.debug("OLS resolver disabled: %s", exc)
+else:  # pragma: no cover - depends on optional dependency presence
+    _LOGGER.debug("OLS resolver disabled because ols-client is not installed")
+
+if BioPortalClient is not None:
+    try:
+        RESOLVERS["bioportal"] = BioPortalResolver()
+    except Exception as exc:  # pragma: no cover - depends on API key availability
+        _LOGGER.debug("BioPortal resolver disabled: %s", exc)
+else:  # pragma: no cover - depends on optional dependency presence
+    _LOGGER.debug("BioPortal resolver disabled because ontoportal-client is not installed")
+
+_load_resolver_plugins()
 
 
 __all__ = [

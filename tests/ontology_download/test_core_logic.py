@@ -13,11 +13,16 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import core
-from DocsToKG.OntologyDownload.config import ConfigError, DefaultsConfig, ResolvedConfig
-from DocsToKG.OntologyDownload.download import DownloadFailure, DownloadResult
+from DocsToKG.OntologyDownload import (
+    ConfigError,
+    DefaultsConfig,
+    DownloadFailure,
+    DownloadResult,
+    ResolvedConfig,
+    ValidationResult,
+)
+from DocsToKG.OntologyDownload import ontology_download as core
 from DocsToKG.OntologyDownload.resolvers import FetchPlan
-from DocsToKG.OntologyDownload.validators import ValidationResult
 
 
 @pytest.fixture(autouse=True)
@@ -131,6 +136,52 @@ def _run_fetch(
     logger.setLevel(logging.INFO)
     result = core.fetch_one(spec, config=config, force=True, logger=logger)
     return json.loads(result.manifest_path.read_text())
+
+
+def test_populate_plan_metadata_uses_http_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    defaults = DefaultsConfig()
+    defaults.http.allowed_hosts = ["example.org"]
+    config = ResolvedConfig(defaults=defaults, specs=[])
+    planned = core.PlannedFetch(
+        spec=core.FetchSpec(id="hp", resolver="obo", extras={}, target_formats=("owl",)),
+        resolver="obo",
+        plan=_make_plan(),
+        candidates=(),
+    )
+    adapter = logging.LoggerAdapter(logging.getLogger("ontology-test"), extra={})
+
+    enriched = core._populate_plan_metadata(planned, config, adapter)
+
+    assert enriched.last_modified is not None
+    assert enriched.last_modified_at is not None
+    assert enriched.metadata.get("content_length") == 256
+
+
+def test_plan_all_rejects_disallowed_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    defaults = DefaultsConfig()
+    defaults.http.allowed_hosts = ["allowed.example"]
+    config = ResolvedConfig(defaults=defaults, specs=[])
+
+    class _Resolver:
+        def plan(self, spec, config, logger):  # pragma: no cover - trivial stub
+            return FetchPlan(
+                url="https://blocked.example/hp.owl",
+                headers={},
+                filename_hint=None,
+                version="2024-01-01",
+                license="CC-BY",
+                media_type="application/rdf+xml",
+                service="obo",
+            )
+
+    monkeypatch.setitem(core.RESOLVERS, "blocked", _Resolver())
+
+    spec = core.FetchSpec(id="hp", resolver="blocked", extras={}, target_formats=("owl",))
+
+    with pytest.raises(ConfigError) as exc_info:
+        core.plan_all([spec], config=config)
+
+    assert "blocked.example" in str(exc_info.value)
 
 
 class _ImmediateFuture:

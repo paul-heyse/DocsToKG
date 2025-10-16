@@ -17,11 +17,13 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import download
-from DocsToKG.OntologyDownload.cli import _results_to_dict
-from DocsToKG.OntologyDownload.cli_utils import format_results_table
-from DocsToKG.OntologyDownload.config import DownloadConfiguration
-from DocsToKG.OntologyDownload.core import FetchResult, FetchSpec
+from DocsToKG.OntologyDownload import (
+    DownloadConfiguration,
+    FetchResult,
+    FetchSpec,
+)
+from DocsToKG.OntologyDownload import ontology_download as download
+from DocsToKG.OntologyDownload.cli import _results_to_dict, format_results_table
 
 
 class _TestHTTPServer(ThreadingHTTPServer):
