@@ -17,8 +17,7 @@ pytest.importorskip("pydantic_settings")
 
 from pydantic import BaseModel, ValidationError
 
-from DocsToKG.OntologyDownload import core, resolvers
-from DocsToKG.OntologyDownload.config import (
+from DocsToKG.OntologyDownload import (
     ConfigError,
     DefaultsConfig,
     DownloadConfiguration,
@@ -32,6 +31,8 @@ from DocsToKG.OntologyDownload.config import (
     merge_defaults,
     validate_config,
 )
+from DocsToKG.OntologyDownload import ontology_download as core
+from DocsToKG.OntologyDownload import resolvers
 
 
 def test_merge_defaults_creates_fetch_spec() -> None:
