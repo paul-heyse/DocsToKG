@@ -339,12 +339,8 @@ pytest.importorskip("pydantic_settings")
 
 import DocsToKG.OntologyDownload.net as download
 import DocsToKG.OntologyDownload.pipeline as pipeline_mod
-from DocsToKG.OntologyDownload.config import (
-    ConfigError,
-    DefaultsConfig,
-    DownloadConfiguration,
-    ResolvedConfig,
-)
+from DocsToKG.OntologyDownload.config import ConfigError, DefaultsConfig, DownloadConfiguration, ResolvedConfig
+from DocsToKG.OntologyDownload.errors import DownloadFailure, OntologyDownloadError, PolicyError
 from DocsToKG.OntologyDownload.io_safe import sanitize_filename
 from DocsToKG.OntologyDownload.pipeline import ConfigurationError, FetchSpec
 from DocsToKG.OntologyDownload.resolvers import FetchPlan
@@ -409,6 +405,10 @@ class DummySession:
         response.request_headers = headers or {}
         self.head_calls.append(response.request_headers)
         return response
+
+    def close(self):
+        """Mimic requests.Session.close."""
+        return None
 
 
 def make_session(monkeypatch, responses, head_responses=None):
@@ -733,7 +733,7 @@ def test_head_check_raises_on_oversized(monkeypatch, tmp_path):
         previous_manifest=None,
         logger=_noop_logger(),
     )
-    with pytest.raises(ConfigError) as exc_info:
+    with pytest.raises(PolicyError) as exc_info:
         downloader._preliminary_head_check("https://example.org/huge.owl", session)
 
     assert "exceeds limit" in str(exc_info.value)
@@ -942,7 +942,7 @@ def test_extract_tar_detects_compression_bomb(tmp_path):
 def test_download_stream_http_error(monkeypatch, tmp_path):
     response = DummyResponse(500, b"", {}, raise_error=True)
     make_session(monkeypatch, [response])
-    with pytest.raises(ConfigError):
+    with pytest.raises(DownloadFailure):
         download.download_stream(
             url="https://example.org/file.owl",
             destination=tmp_path / "file.owl",
@@ -965,7 +965,7 @@ def test_download_stream_no_space(monkeypatch, tmp_path):
         return original_open(self, mode, *args, **kwargs)
 
     monkeypatch.setattr(Path, "open", failing_open)
-    with pytest.raises(ConfigError):
+    with pytest.raises(OntologyDownloadError):
         download.download_stream(
             url="https://example.org/file.owl",
             destination=tmp_path / "file.owl",
@@ -1148,7 +1148,7 @@ def test_read_manifest_applies_migration(tmp_path, monkeypatch):
 def test_download_stream_rejects_large_content(monkeypatch, tmp_path):
     response = DummyResponse(200, b"data", {"Content-Length": str(10 * 1024 * 1024 * 1024)})
     make_session(monkeypatch, [response])
-    with pytest.raises(ConfigError):
+    with pytest.raises(OntologyDownloadError):
         download.download_stream(
             url="https://example.org/file.owl",
             destination=tmp_path / "file.owl",

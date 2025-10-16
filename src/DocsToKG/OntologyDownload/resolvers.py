@@ -91,6 +91,7 @@ download refactor. New resolvers can be registered through the ``RESOLVERS`` map
 from __future__ import annotations
 
 import logging
+from importlib import metadata
 import re
 import threading
 from dataclasses import dataclass

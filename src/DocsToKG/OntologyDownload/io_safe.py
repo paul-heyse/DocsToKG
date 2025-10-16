@@ -99,8 +99,7 @@ from pathlib import Path, PurePosixPath
 from typing import Dict, List, Optional
 from urllib.parse import ParseResult, urlparse, urlunparse
 
-from .config import DownloadConfiguration
-from .errors import ConfigError
+from .config import ConfigError, DownloadConfiguration
 
 __all__ = [
     "sanitize_filename",

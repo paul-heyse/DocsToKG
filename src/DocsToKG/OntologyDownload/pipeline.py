@@ -61,11 +61,7 @@ from .io_safe import (
     sanitize_filename,
     validate_url_security,
 )
-from .net import (
-    RDF_MIME_ALIASES,
-    RDF_MIME_FORMAT_LABELS,
-    download_stream,
-)
+from .net import DownloadFailure, RDF_MIME_ALIASES, RDF_MIME_FORMAT_LABELS, download_stream
 from .resolvers import RESOLVERS, FetchPlan, normalize_license_to_spdx
 from .storage import CACHE_DIR, LOCAL_ONTOLOGY_DIR, LOG_DIR, STORAGE
 from .validation_core import ValidationRequest, ValidationResult, run_validators
@@ -902,6 +898,32 @@ def _canonical_media_type(value: Optional[str]) -> Optional[str]:
     return value.split(";", 1)[0].strip().lower() or None
 
 
+DEFAULT_VALIDATOR_NAMES: Tuple[str, ...] = (
+    "rdflib",
+    "pronto",
+    "owlready2",
+    "robot",
+    "arelle",
+)
+
+_MEDIA_VALIDATOR_WHITELIST = {
+    "application/zip": {"arelle"},
+}
+
+
+def _select_validators(media_type: Optional[str]) -> List[str]:
+    """Return validator names appropriate for ``media_type``."""
+
+    canonical = _canonical_media_type(media_type)
+    if canonical and canonical in _MEDIA_VALIDATOR_WHITELIST:
+        allowed = set(_MEDIA_VALIDATOR_WHITELIST[canonical])
+    else:
+        allowed = set(DEFAULT_VALIDATOR_NAMES)
+        if canonical and canonical not in RDF_MIME_ALIASES:
+            allowed -= {"rdflib", "robot"}
+    return [name for name in DEFAULT_VALIDATOR_NAMES if name in allowed]
+
+
 def _populate_plan_metadata(
     planned: PlannedFetch,
     config: ResolvedConfig,
@@ -1295,7 +1317,7 @@ def _resolve_plan_with_fallback(
         )
         try:
             plan = resolver.plan(spec, config, adapter)
-        except ConfigError as exc:
+        except (ConfigError, DownloadFailure) as exc:
             message = str(exc)
             attempts.append(f"{resolver_name}: {message}")
             adapter.warning(
@@ -1477,56 +1499,29 @@ def fetch_one(
 
                 normalized_dir = base_dir / "normalized"
                 validation_dir = base_dir / "validation"
-                validation_requests: List[ValidationRequest] = [
+                validator_names = _select_validators(plan.media_type)
+                validation_requests = [
                     ValidationRequest(
-                        name="rdflib",
+                        name=validator,
                         file_path=destination,
                         normalized_dir=normalized_dir,
                         validation_dir=validation_dir,
                         config=active_config,
-                    ),
-                    ValidationRequest(
-                        name="pronto",
-                        file_path=destination,
-                        normalized_dir=normalized_dir,
-                        validation_dir=validation_dir,
-                        config=active_config,
-                    ),
-                    ValidationRequest(
-                        name="owlready2",
-                        file_path=destination,
-                        normalized_dir=normalized_dir,
-                        validation_dir=validation_dir,
-                        config=active_config,
-                    ),
-                    ValidationRequest(
-                        name="robot",
-                        file_path=destination,
-                        normalized_dir=normalized_dir,
-                        validation_dir=validation_dir,
-                        config=active_config,
-                    ),
-                    ValidationRequest(
-                        name="arelle",
-                        file_path=destination,
-                        normalized_dir=normalized_dir,
-                        validation_dir=validation_dir,
-                        config=active_config,
-                    ),
+                    )
+                    for validator in validator_names
                 ]
 
-                media_type = (plan.media_type or "").strip().lower()
-                if media_type and media_type not in RDF_MIME_ALIASES:
-                    validation_requests = [
-                        request
-                        for request in validation_requests
-                        if request.name not in {"rdflib", "robot"}
-                    ]
+                canonical_media = _canonical_media_type(plan.media_type)
+                if (
+                    canonical_media
+                    and canonical_media not in RDF_MIME_ALIASES
+                    and {"rdflib", "robot"} - set(validator_names)
+                ):
                     adapter.info(
                         "skipping rdf validators",
                         extra={
                             "stage": "validate",
-                            "media_type": media_type,
+                            "media_type": canonical_media,
                             "validator": "rdf",
                         },
                     )
@@ -1586,11 +1581,7 @@ def fetch_one(
                     _canonical_media_type(plan.media_type)
                 )
                 content_length = result.content_length or plan.content_length
-                label_key = (
-                    _canonical_media_type(result.content_type)
-                    or media_type
-                    or (_canonical_media_type(plan.media_type))
-                )
+                label_key = _canonical_media_type(result.content_type) or canonical_media
                 source_media_label = RDF_MIME_FORMAT_LABELS.get(label_key) if label_key else None
 
                 manifest = Manifest(
@@ -1640,7 +1631,7 @@ def fetch_one(
 
         try:
             return _execute_candidate()
-        except ConfigError as exc:
+        except (ConfigError, DownloadFailure) as exc:
             attempt_record.update({"status": "failed", "error": str(exc)})
             resolver_attempts.append(dict(attempt_record))
             adapter.warning(

@@ -122,6 +122,7 @@ pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
 from DocsToKG.OntologyDownload import DownloadConfiguration
+from DocsToKG.OntologyDownload import net as net_mod
 from DocsToKG.OntologyDownload import ontology_download as download
 
 
@@ -506,7 +507,7 @@ def test_token_bucket_limits_concurrency(monkeypatch, http_server, tmp_path):
     def _get_bucket(host, http_config, service=None):  # noqa: ARG001
         return bucket
 
-    monkeypatch.setattr(download, "_get_bucket", _get_bucket)
+    monkeypatch.setattr(net_mod, "_get_bucket", _get_bucket, raising=False)
 
     def _run(idx: int) -> Path:
         path = tmp_path / f"concurrent-{idx}.owl"
@@ -543,7 +544,7 @@ def test_concurrent_hosts_do_not_block(monkeypatch, http_server, tmp_path):
     def _bucket_for_host(host, http_config, service=None):  # noqa: ARG001
         return _PassthroughBucket(host)
 
-    monkeypatch.setattr(download, "_get_bucket", _bucket_for_host)
+    monkeypatch.setattr(net_mod, "_get_bucket", _bucket_for_host, raising=False)
 
     def _run(url: str, output: Path) -> None:
         download.download_stream(

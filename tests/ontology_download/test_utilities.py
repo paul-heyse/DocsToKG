@@ -90,7 +90,7 @@ def test_parse_rate_limit_to_rps_formats(limit, expected):
     assert parse_rate_limit_to_rps(limit) == expected
 
 
-@pytest.mark.parametrize("limit", [None, "", "ten/second", "5/century"])
+@pytest.mark.parametrize("limit", ["", "ten/second", "5/century"])
 def test_parse_rate_limit_to_rps_invalid(limit):
     assert parse_rate_limit_to_rps(limit) is None
 

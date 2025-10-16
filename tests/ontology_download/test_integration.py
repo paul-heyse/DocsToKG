@@ -190,12 +190,15 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(headers["__fixture__"], destination)
         sha256 = core.sha256_file(destination)
+        content_length = destination.stat().st_size
         return core.DownloadResult(
             path=destination,
             status="fresh",
             sha256=sha256,
             etag="etag",
             last_modified="yesterday",
+            content_type="application/rdf+xml",
+            content_length=content_length,
         )
 
     monkeypatch.setattr(
@@ -220,6 +223,9 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
         assert manifest["sha256"] == core.sha256_file(local_file)
         assert manifest["normalized_sha256"]
         assert len(manifest["fingerprint"]) == 64
+        assert manifest["content_type"] == "application/rdf+xml"
+        assert manifest["content_length"] == local_file.stat().st_size
+        assert manifest["source_media_type_label"] == "RDF/XML"
         normalized_dir = result.manifest_path.parent / "normalized"
         assert any(normalized_dir.glob("*.ttl"))
         assert any(normalized_dir.glob("*.json"))
@@ -232,12 +238,15 @@ def test_force_download_bypasses_manifest(monkeypatch, patched_dirs, stubbed_val
     def _download(**kwargs):
         captured["previous"] = kwargs.get("previous_manifest")
         kwargs["destination"].write_bytes(fixture.read_bytes())
+        content_length = kwargs["destination"].stat().st_size
         return core.DownloadResult(
             path=kwargs["destination"],
             status="fresh",
             sha256="sha",
             etag=None,
             last_modified=None,
+            content_type="application/rdf+xml",
+            content_length=content_length,
         )
 
     monkeypatch.setattr(pipeline_mod, "download_stream", _download, raising=False)
@@ -257,12 +266,15 @@ def test_multi_version_storage(monkeypatch, patched_dirs, stubbed_validators):
 
     def _download(**kwargs):
         kwargs["destination"].write_bytes(fixture.read_bytes())
+        content_length = kwargs["destination"].stat().st_size
         return core.DownloadResult(
             path=kwargs["destination"],
             status="fresh",
             sha256="sha",
             etag=None,
             last_modified=None,
+            content_type="application/rdf+xml",
+            content_length=content_length,
         )
 
     monkeypatch.setattr(pipeline_mod, "download_stream", _download, raising=False)
@@ -281,12 +293,15 @@ def test_fetch_all_logs_progress(monkeypatch, patched_dirs, stubbed_validators, 
 
     def _download(**kwargs):
         kwargs["destination"].write_bytes(fixture.read_bytes())
+        content_length = kwargs["destination"].stat().st_size
         return core.DownloadResult(
             path=kwargs["destination"],
             status="fresh",
             sha256="sha",
             etag=None,
             last_modified=None,
+            content_type="application/rdf+xml",
+            content_length=content_length,
         )
 
     monkeypatch.setattr(pipeline_mod, "download_stream", _download, raising=False)

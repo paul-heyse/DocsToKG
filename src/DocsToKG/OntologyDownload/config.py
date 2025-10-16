@@ -195,9 +195,11 @@ def __getattr__(name: str):
 _RATE_LIMIT_PATTERN = re.compile(r"^([\d.]+)/(second|sec|s|minute|min|m|hour|h)$")
 
 
-def parse_rate_limit_to_rps(limit_str: str) -> Optional[float]:
+def parse_rate_limit_to_rps(limit_str: Optional[str]) -> Optional[float]:
     """Convert a rate limit expression into requests-per-second."""
 
+    if not limit_str:
+        return None
     match = _RATE_LIMIT_PATTERN.match(limit_str)
     if not match:
         return None

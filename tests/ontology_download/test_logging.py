@@ -65,6 +65,22 @@ def test_mask_sensitive_data_masks_tokens():
     assert masked["nested"] == "value"
 
 
+def test_mask_sensitive_data_masks_nested_structures():
+    payload = {
+        "Authorization": "ZXhhbXBsZVRva2VuZXhhbXBsZVRva2VuZXhhbXBsZVRva2Vu",
+        "headers": {"Authorization": "Bearer secret-token"},
+        "items": [
+            {"token": "nested-secret"},
+            "Bearer inline",
+        ],
+    }
+    masked = mask_sensitive_data(payload)
+    assert masked["Authorization"] == "***masked***"
+    assert masked["headers"]["Authorization"] == "***masked***"
+    assert masked["items"][0]["token"] == "***masked***"
+    assert masked["items"][1] == "***masked***"
+
+
 def test_setup_logging_emits_structured_json(tmp_path):
     config = LoggingConfiguration(level="INFO", max_log_size_mb=1, retention_days=1)
     logger = setup_logging(

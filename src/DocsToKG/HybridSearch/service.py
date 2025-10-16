@@ -58,12 +58,13 @@
 """Hybrid search orchestration, pagination guards, and synchronous HTTP-style API."""
 
 from __future__ import annotations
-
 import math
 import time
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from http import HTTPStatus
+from threading import RLock
 from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Sequence
 
 import numpy as np
@@ -199,6 +200,9 @@ class HybridSearchService:
         self._faiss_router.set_resolver(self._registry.resolve_faiss_id)
         self._dense_filter_pass_ema: float = 0.75
         self._dense_filter_ema_alpha: float = 0.20
+        self._dense_k_cache: OrderedDict[tuple, int] = OrderedDict()
+        self._dense_k_cache_limit: int = 64
+        self._dense_k_cache_lock = RLock()
 
     def search(self, request: HybridSearchRequest) -> HybridSearchResponse:
         """Execute a hybrid retrieval round trip for ``request``.
@@ -482,6 +486,7 @@ class HybridSearchService:
         # Over-fetch relative to the page size (not dense_top_k) to leave headroom for filtering.
         page_size = max(1, request.page_size)
         retrieval_cfg = config.retrieval
+        signature = self._dense_request_signature(request, filters)
         oversample = float(
             getattr(retrieval_cfg, "dense_oversample", getattr(config.dense, "oversample", 1.0))
         )
@@ -493,13 +498,46 @@ class HybridSearchService:
         adaptive = math.ceil(page_size / pass_rate * oversample * overfetch)
         k = max(int(retrieval_cfg.dense_top_k), base, adaptive)
         k = min(k, 10_000)
-        self._observability.metrics.set_gauge("dense_effective_k", float(k), channel="dense")
+        cached_k = self._dense_lookup_cached_k(signature)
+        if cached_k is not None:
+            k = cached_k
         queries = np.asarray([query_features.embedding], dtype=np.float32)
-        batch_hits = store.search_batch(queries, k)
-        self._observability.metrics.observe(
-            "faiss_search_batch_size", float(len(batch_hits)), channel="dense"
+
+        def run_dense_search(current_k: int) -> list[FaissSearchResult]:
+            batch_hits_local = store.search_batch(queries, current_k)
+            self._observability.metrics.observe(
+                "faiss_search_batch_size", float(len(batch_hits_local)), channel="dense"
+            )
+            return batch_hits_local[0] if batch_hits_local else []
+
+        effective_k = k
+        hits = run_dense_search(effective_k)
+        filtered, payloads = self._filter_dense_hits(hits, filters)
+        observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
+        blended_pass = self._blend_pass_rate(observed)
+
+        if len(filtered) < page_size and effective_k < 10_000:
+            retry_k = min(
+                10_000,
+                max(
+                    int(retrieval_cfg.dense_top_k),
+                    base,
+                    math.ceil(page_size / max(1e-3, blended_pass) * oversample * overfetch),
+                ),
+            )
+            if cached_k is not None and cached_k > retry_k:
+                retry_k = cached_k
+            if retry_k > effective_k:
+                effective_k = retry_k
+                hits = run_dense_search(effective_k)
+                filtered, payloads = self._filter_dense_hits(hits, filters)
+                observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
+                blended_pass = self._blend_pass_rate(observed)
+
+        self._dense_filter_pass_ema = blended_pass
+        self._observability.metrics.set_gauge(
+            "dense_filter_pass_rate", self._dense_filter_pass_ema, channel="dense"
         )
-        hits = batch_hits[0] if batch_hits else []
         timings["dense_ms"] = (time.perf_counter() - start) * 1000
         self._observability.metrics.observe(
             "search_channel_latency_ms", timings["dense_ms"], channel="dense"
@@ -511,20 +549,12 @@ class HybridSearchService:
             self._observability.metrics.set_gauge(
                 "search_channel_latency_p95_ms", p95_dense, channel="dense"
             )
-        filtered, payloads = self._filter_dense_hits(hits, filters)
-        observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
-        ema = (
-            self._dense_filter_ema_alpha * observed
-            + (1.0 - self._dense_filter_ema_alpha) * self._dense_filter_pass_ema
-        )
-        self._dense_filter_pass_ema = max(1e-3, min(1.0, ema))
-        self._observability.metrics.set_gauge(
-            "dense_filter_pass_rate", self._dense_filter_pass_ema, channel="dense"
-        )
+        self._observability.metrics.set_gauge("dense_effective_k", float(effective_k), channel="dense")
         self._observability.metrics.increment("search_channel_requests", channel="dense")
         self._observability.metrics.observe(
             "search_channel_candidates", len(filtered), channel="dense"
         )
+        self._dense_store_cached_k(signature, effective_k)
         candidates: List[FusionCandidate] = []
         scores: Dict[str, float] = {}
         for idx, hit in enumerate(filtered):
@@ -553,6 +583,55 @@ class HybridSearchService:
             and matches_filters(chunk, filters)
         ]
         return filtered, payloads
+
+    def _dense_request_signature(
+        self,
+        request: HybridSearchRequest,
+        filters: Mapping[str, object],
+    ) -> tuple[object, ...]:
+        normalized_filters = self._normalize_signature_value(filters)
+        cursor = getattr(request, "cursor", None)
+        return (
+            request.query,
+            request.namespace,
+            normalized_filters,
+            int(request.page_size),
+            cursor,
+        )
+
+    def _dense_lookup_cached_k(self, signature: tuple[object, ...]) -> Optional[int]:
+        with self._dense_k_cache_lock:
+            cached = self._dense_k_cache.get(signature)
+            if cached is not None:
+                self._dense_k_cache.move_to_end(signature)
+            return cached
+
+    def _dense_store_cached_k(self, signature: tuple[object, ...], k: int) -> None:
+        with self._dense_k_cache_lock:
+            self._dense_k_cache[signature] = k
+            self._dense_k_cache.move_to_end(signature)
+            if len(self._dense_k_cache) > self._dense_k_cache_limit:
+                self._dense_k_cache.popitem(last=False)
+
+    def _normalize_signature_value(self, value: object) -> object:
+        if isinstance(value, Mapping):
+            return tuple(
+                (str(key), self._normalize_signature_value(val))
+                for key, val in sorted(value.items(), key=lambda item: str(item[0]))
+            )
+        if isinstance(value, (list, tuple, set)):
+            return tuple(self._normalize_signature_value(val) for val in value)
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        return str(value)
+
+    def _blend_pass_rate(self, observed: float) -> float:
+        clamped_observed = max(0.0, min(1.0, float(observed)))
+        blended = (
+            self._dense_filter_ema_alpha * clamped_observed
+            + (1.0 - self._dense_filter_ema_alpha) * self._dense_filter_pass_ema
+        )
+        return max(1e-3, min(1.0, blended))
 
     def _dedupe_candidates(
         self,

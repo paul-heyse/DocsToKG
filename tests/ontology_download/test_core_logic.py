@@ -117,6 +117,23 @@ from DocsToKG.OntologyDownload.resolvers import FetchPlan
 
 
 @pytest.fixture(autouse=True)
+
+
+def test_select_validators_for_zip_only_arelle():
+    assert pipeline_mod._select_validators("application/zip") == ["arelle"]
+
+
+def test_select_validators_for_non_rdf_skips_rdf_validators():
+    selected = pipeline_mod._select_validators("application/json")
+    assert "rdflib" not in selected
+    assert "robot" not in selected
+
+
+def test_select_validators_for_rdf_includes_defaults():
+    assert pipeline_mod._select_validators("application/rdf+xml") == list(
+        pipeline_mod.DEFAULT_VALIDATOR_NAMES
+    )
+
 def stub_requests_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
     """Avoid real HTTP calls when planning augments metadata."""
 
@@ -240,6 +257,8 @@ def _run_fetch(
             sha256=sha256,
             etag=None,
             last_modified=None,
+            content_type="application/rdf+xml",
+            content_length=len(payload),
         )
 
     monkeypatch.setattr(pipeline_mod, "download_stream", _fake_download_stream, raising=False)
@@ -266,7 +285,7 @@ def test_populate_plan_metadata_uses_http_config(monkeypatch: pytest.MonkeyPatch
     )
     adapter = logging.LoggerAdapter(logging.getLogger("ontology-test"), extra={})
 
-    enriched = core._populate_plan_metadata(planned, config, adapter)
+    enriched = pipeline_mod._populate_plan_metadata(planned, config, adapter)
 
     assert enriched.last_modified is not None
     assert enriched.last_modified_at is not None
@@ -290,7 +309,7 @@ def test_plan_all_rejects_disallowed_host(monkeypatch: pytest.MonkeyPatch) -> No
                 service="obo",
             )
 
-    monkeypatch.setitem(core.RESOLVERS, "blocked", _Resolver())
+    monkeypatch.setitem(resolvers.RESOLVERS, "blocked", _Resolver())
 
     spec = core.FetchSpec(id="hp", resolver="blocked", extras={}, target_formats=("owl",))
 
@@ -416,9 +435,12 @@ def test_plan_all_skips_failures_when_configured(monkeypatch: pytest.MonkeyPatch
             self._futures.append(future)
             return future
 
-    monkeypatch.setattr(core, "ThreadPoolExecutor", DummyExecutor)
-    monkeypatch.setattr(core, "as_completed", fake_as_completed)
-    monkeypatch.setattr(core, "plan_one", fake_plan_one)
+    monkeypatch.setattr(pipeline_mod, "ThreadPoolExecutor", DummyExecutor, raising=False)
+    monkeypatch.setattr(core, "ThreadPoolExecutor", DummyExecutor, raising=False)
+    monkeypatch.setattr(pipeline_mod, "as_completed", fake_as_completed, raising=False)
+    monkeypatch.setattr(core, "as_completed", fake_as_completed, raising=False)
+    monkeypatch.setattr(pipeline_mod, "plan_one", fake_plan_one, raising=False)
+    monkeypatch.setattr(core, "plan_one", fake_plan_one, raising=False)
 
     plans = core.plan_all(specs, config=config)
 
@@ -481,12 +503,20 @@ def test_plan_all_since_filters_outdated_plans(monkeypatch: pytest.MonkeyPatch) 
         logger.propagate = False
         return logger
 
-    monkeypatch.setattr(core, "ThreadPoolExecutor", DummyExecutor)
-    monkeypatch.setattr(core, "as_completed", fake_as_completed)
-    monkeypatch.setattr(core, "plan_one", fake_plan_one)
-    monkeypatch.setattr(core, "setup_logging", fake_setup_logging)
-    monkeypatch.setattr(core, "ensure_python_version", lambda: None)
-    monkeypatch.setattr(core, "generate_correlation_id", lambda: "fixed-correlation")
+    monkeypatch.setattr(pipeline_mod, "ThreadPoolExecutor", DummyExecutor, raising=False)
+    monkeypatch.setattr(core, "ThreadPoolExecutor", DummyExecutor, raising=False)
+    monkeypatch.setattr(pipeline_mod, "as_completed", fake_as_completed, raising=False)
+    monkeypatch.setattr(core, "as_completed", fake_as_completed, raising=False)
+    monkeypatch.setattr(pipeline_mod, "plan_one", fake_plan_one, raising=False)
+    monkeypatch.setattr(core, "plan_one", fake_plan_one, raising=False)
+    monkeypatch.setattr(pipeline_mod, "setup_logging", fake_setup_logging, raising=False)
+    monkeypatch.setattr(core, "setup_logging", fake_setup_logging, raising=False)
+    monkeypatch.setattr(pipeline_mod, "ensure_python_version", lambda: None, raising=False)
+    monkeypatch.setattr(core, "ensure_python_version", lambda: None, raising=False)
+    monkeypatch.setattr(
+        pipeline_mod, "generate_correlation_id", lambda: "fixed-correlation", raising=False
+    )
+    monkeypatch.setattr(core, "generate_correlation_id", lambda: "fixed-correlation", raising=False)
 
     cutoff = datetime(2021, 1, 1, tzinfo=timezone.utc)
     plans = core.plan_all([spec], config=config, since=cutoff)
@@ -556,13 +586,24 @@ def test_plan_all_since_fetches_missing_last_modified(monkeypatch: pytest.Monkey
         logger.propagate = False
         return logger
 
-    monkeypatch.setattr(core, "ThreadPoolExecutor", DummyExecutor)
-    monkeypatch.setattr(core, "as_completed", fake_as_completed)
-    monkeypatch.setattr(core, "plan_one", fake_plan_one)
-    monkeypatch.setattr(core, "_fetch_last_modified", fake_fetch_last_modified)
-    monkeypatch.setattr(core, "setup_logging", fake_setup_logging)
-    monkeypatch.setattr(core, "ensure_python_version", lambda: None)
-    monkeypatch.setattr(core, "generate_correlation_id", lambda: "fixed-correlation")
+    monkeypatch.setattr(pipeline_mod, "ThreadPoolExecutor", DummyExecutor, raising=False)
+    monkeypatch.setattr(core, "ThreadPoolExecutor", DummyExecutor, raising=False)
+    monkeypatch.setattr(pipeline_mod, "as_completed", fake_as_completed, raising=False)
+    monkeypatch.setattr(core, "as_completed", fake_as_completed, raising=False)
+    monkeypatch.setattr(pipeline_mod, "plan_one", fake_plan_one, raising=False)
+    monkeypatch.setattr(core, "plan_one", fake_plan_one, raising=False)
+    monkeypatch.setattr(
+        pipeline_mod, "_fetch_last_modified", fake_fetch_last_modified, raising=False
+    )
+    monkeypatch.setattr(core, "_fetch_last_modified", fake_fetch_last_modified, raising=False)
+    monkeypatch.setattr(pipeline_mod, "setup_logging", fake_setup_logging, raising=False)
+    monkeypatch.setattr(core, "setup_logging", fake_setup_logging, raising=False)
+    monkeypatch.setattr(pipeline_mod, "ensure_python_version", lambda: None, raising=False)
+    monkeypatch.setattr(core, "ensure_python_version", lambda: None, raising=False)
+    monkeypatch.setattr(
+        pipeline_mod, "generate_correlation_id", lambda: "fixed-correlation", raising=False
+    )
+    monkeypatch.setattr(core, "generate_correlation_id", lambda: "fixed-correlation", raising=False)
 
     cutoff = datetime(2024, 1, 1, tzinfo=timezone.utc)
     plans = core.plan_all([spec], config=config, since=cutoff)
@@ -586,8 +627,8 @@ def test_plan_one_uses_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
         def plan(self, spec, config, logger):
             return _make_plan()
 
-    monkeypatch.setitem(core.RESOLVERS, "obo", FailingResolver())
-    monkeypatch.setitem(core.RESOLVERS, "lov", SuccessfulResolver())
+    monkeypatch.setitem(resolvers.RESOLVERS, "obo", FailingResolver())
+    monkeypatch.setitem(resolvers.RESOLVERS, "lov", SuccessfulResolver())
 
     defaults = DefaultsConfig(prefer_source=["obo", "lov"])
     config = ResolvedConfig(defaults=defaults, specs=[])
@@ -607,7 +648,7 @@ def test_plan_one_respects_disabled_fallback(monkeypatch: pytest.MonkeyPatch) ->
         def plan(self, spec, config, logger):
             raise ConfigError("boom")
 
-    monkeypatch.setitem(core.RESOLVERS, "obo", FailingResolver())
+    monkeypatch.setitem(resolvers.RESOLVERS, "obo", FailingResolver())
 
     defaults = DefaultsConfig(
         prefer_source=["obo", "lov"],
@@ -650,8 +691,8 @@ def test_fetch_one_download_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: 
         def plan(self, spec, config, logger):
             return fallback_plan
 
-    monkeypatch.setitem(core.RESOLVERS, "obo", PrimaryResolver())
-    monkeypatch.setitem(core.RESOLVERS, "lov", SecondaryResolver())
+    monkeypatch.setitem(resolvers.RESOLVERS, "obo", PrimaryResolver())
+    monkeypatch.setitem(resolvers.RESOLVERS, "lov", SecondaryResolver())
 
     defaults = DefaultsConfig(prefer_source=["lov"])
     config = ResolvedConfig(defaults=defaults, specs=[])
@@ -659,8 +700,15 @@ def test_fetch_one_download_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: 
 
     cache_dir = tmp_path / "cache"
     ontology_dir = tmp_path / "ontologies"
-    monkeypatch.setattr(core, "CACHE_DIR", cache_dir)
-    monkeypatch.setattr(core, "ONTOLOGY_DIR", ontology_dir)
+    overrides = {
+        "CACHE_DIR": cache_dir,
+        "LOCAL_ONTOLOGY_DIR": ontology_dir,
+    }
+    for attr, value in overrides.items():
+        monkeypatch.setattr(storage_mod, attr, value, raising=False)
+        monkeypatch.setattr(pipeline_mod, attr, value, raising=False)
+        monkeypatch.setattr(core, attr, value, raising=False)
+    monkeypatch.setattr(core, "ONTOLOGY_DIR", ontology_dir, raising=False)
 
     class _StubStorage:
         def finalize_version(self, ontology_id: str, version: str, base_dir: Path) -> None:
@@ -671,7 +719,10 @@ def test_fetch_one_download_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: 
             path.mkdir(parents=True, exist_ok=True)
             return path
 
-    monkeypatch.setattr(core, "STORAGE", _StubStorage())
+    stub_storage = _StubStorage()
+    monkeypatch.setattr(storage_mod, "STORAGE", stub_storage, raising=False)
+    monkeypatch.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
+    monkeypatch.setattr(core, "STORAGE", stub_storage, raising=False)
 
     def _fake_run_validators(requests, logger):
         results = {}
@@ -684,8 +735,12 @@ def test_fetch_one_download_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: 
             results[request.name] = ValidationResult(ok=True, details=details, output_files=[])
         return results
 
-    monkeypatch.setattr(core, "run_validators", _fake_run_validators)
-    monkeypatch.setattr(core, "validate_url_security", lambda url, config=None: url)
+    monkeypatch.setattr(pipeline_mod, "run_validators", _fake_run_validators, raising=False)
+    monkeypatch.setattr(core, "run_validators", _fake_run_validators, raising=False)
+    monkeypatch.setattr(
+        pipeline_mod, "validate_url_security", lambda url, config=None: url, raising=False
+    )
+    monkeypatch.setattr(core, "validate_url_security", lambda url, config=None: url, raising=False)
 
     attempts = {"count": 0}
 
@@ -704,9 +759,12 @@ def test_fetch_one_download_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: 
             sha256=sha256,
             etag=None,
             last_modified=None,
+            content_type="application/rdf+xml",
+            content_length=len(payload),
         )
 
-    monkeypatch.setattr(core, "download_stream", _fake_download_stream)
+    monkeypatch.setattr(pipeline_mod, "download_stream", _fake_download_stream, raising=False)
+    monkeypatch.setattr(core, "download_stream", _fake_download_stream, raising=False)
 
     logger = logging.getLogger("ontology-download-test")
     logger.setLevel(logging.INFO)

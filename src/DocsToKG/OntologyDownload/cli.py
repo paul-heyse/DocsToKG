@@ -519,6 +519,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help=f"Baseline plan JSON file (default: {DEFAULT_PLAN_BASELINE})",
     )
     plan_diff.add_argument(
+        "--use-manifest",
+        action="store_true",
+        help="Compare planned metadata against the latest stored manifests",
+    )
+    plan_diff.add_argument(
         "--concurrent-plans",
         type=_parse_positive_int,
         help="Override maximum concurrent resolver planning workers",
@@ -1079,6 +1084,22 @@ def _collect_version_metadata(ontology_id: str) -> List[Dict[str, object]]:
     return metadata
 
 
+def _load_latest_manifest(ontology_id: str) -> Optional[Dict[str, object]]:
+    """Return the most recent manifest for ``ontology_id`` when available."""
+
+    for entry in _collect_version_metadata(ontology_id):
+        version_dir = entry.get("path")
+        if not isinstance(version_dir, Path):
+            continue
+        manifest_path = version_dir / "manifest.json"
+        if manifest_path.exists():
+            try:
+                return json.loads(manifest_path.read_text())
+            except json.JSONDecodeError:
+                continue
+    return None
+
+
 def _resolve_specs_from_args(
     args,
     base_config: Optional[ResolvedConfig],
@@ -1163,22 +1184,48 @@ def _handle_plan(args, base_config: Optional[ResolvedConfig]) -> List[PlannedFet
 def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, object]:
     """Compare current plan output against a baseline plan file."""
 
-    baseline_path: Path = getattr(args, "baseline", DEFAULT_PLAN_BASELINE).expanduser()
-    if not baseline_path.exists():
-        raise ConfigError(f"Baseline plan file not found: {baseline_path}")
-    try:
-        baseline_payload = json.loads(baseline_path.read_text()) or []
-    except json.JSONDecodeError as exc:
-        raise ConfigError(f"Baseline plan file {baseline_path} is not valid JSON") from exc
-    if not isinstance(baseline_payload, list):
-        raise ConfigError("Baseline plan must be a JSON array of plan entries")
+    use_manifest = bool(getattr(args, "use_manifest", False))
+    if use_manifest:
+        baseline_payload: List[dict] = []
+        baseline_path = None
+    else:
+        baseline_path = getattr(args, "baseline", DEFAULT_PLAN_BASELINE).expanduser()
+        if not baseline_path.exists():
+            raise ConfigError(f"Baseline plan file not found: {baseline_path}")
+        try:
+            baseline_payload = json.loads(baseline_path.read_text()) or []
+        except json.JSONDecodeError as exc:
+            raise ConfigError(f"Baseline plan file {baseline_path} is not valid JSON") from exc
+        if not isinstance(baseline_payload, list):
+            raise ConfigError("Baseline plan must be a JSON array of plan entries")
 
     since = _parse_since(getattr(args, "since", None))
     config, specs = _resolve_specs_from_args(args, base_config, allow_empty=True)
     plans = plan_all(specs, config=config, since=since)
     current_payload = [_plan_to_dict(plan) for plan in plans]
+
+    if use_manifest:
+        baseline_payload = []
+        for plan in plans:
+            manifest = _load_latest_manifest(plan.spec.id)
+            if not manifest:
+                continue
+            baseline_payload.append(
+                {
+                    "id": manifest.get("id") or plan.spec.id,
+                    "resolver": manifest.get("resolver"),
+                    "url": manifest.get("url"),
+                    "version": manifest.get("version"),
+                    "license": manifest.get("license"),
+                    "media_type": manifest.get("content_type"),
+                    "service": manifest.get("service"),
+                    "last_modified": manifest.get("last_modified"),
+                    "content_length": manifest.get("content_length"),
+                }
+            )
+
     diff = _compute_plan_diff(baseline_payload, current_payload)
-    diff["baseline"] = str(baseline_path)
+    diff["baseline"] = "manifests" if use_manifest else str(baseline_path)
     return diff
 
 
@@ -1769,6 +1816,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     print("\n".join(lines))
                 else:
                     print("No plan differences detected")
+        elif args.command == "plugins":
+            inventory = _handle_plugins(args)
+            if args.json:
+                json.dump(inventory, sys.stdout, indent=2)
+                sys.stdout.write("\n")
+            else:
+                for kind, plugins in inventory.items():
+                    print(f"{kind}:")
+                    if not plugins:
+                        print("  (none)")
+                        continue
+                    for name, target in plugins.items():
+                        print(f"  - {name}: {target}")
         elif args.command == "prune":
             summary = _handle_prune(args, logger)
             if args.json:

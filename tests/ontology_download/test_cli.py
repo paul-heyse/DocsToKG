@@ -560,3 +560,64 @@ def test_cli_doctor_reports_diagnostics(monkeypatch, stub_logger, tmp_path, caps
     assert payload["rate_limits"]["configured"]["ols"]["value"] == "10/minute"
     assert "invalid" in payload["rate_limits"]["invalid"]
     assert payload["manifest_schema"]["sample"]["valid"] is True
+
+
+def test_cli_plugins_json(monkeypatch, capsys):
+    monkeypatch.setattr(
+        cli,
+        "list_plugins",
+        lambda kind: {"demo": f"{kind}.Demo"},
+    )
+    monkeypatch.setattr(
+        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+    )
+    exit_code = cli.main(["plugins", "--kind", "all", "--json"])
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["resolver"]["demo"] == "resolver.Demo"
+    assert payload["validator"]["demo"] == "validator.Demo"
+
+
+def test_handle_plan_diff_uses_manifest_baseline(monkeypatch):
+    args = SimpleNamespace(
+        use_manifest=True,
+        since=None,
+        baseline=Path("ignored.json"),
+        spec=None,
+        ids=["hp"],
+        resolver=None,
+        target_formats=None,
+        concurrent_plans=None,
+        concurrent_downloads=None,
+        allowed_hosts=None,
+    )
+
+    spec = FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"])
+    monkeypatch.setattr(
+        cli,
+        "_resolve_specs_from_args",
+        lambda *_args, **_kwargs: (_default_config(), [spec]),
+    )
+    monkeypatch.setattr(
+        cli,
+        "plan_all",
+        lambda specs, config=None, since=None: [_planned_fetch("hp")],
+    )
+    monkeypatch.setattr(
+        cli,
+        "_load_latest_manifest",
+        lambda oid: {
+            "id": oid,
+            "resolver": "obo",
+            "url": "https://example.org/old.owl",
+            "version": "2023-12-31",
+            "license": "CC-BY",
+            "content_type": "application/rdf+xml",
+            "last_modified": "2023-12-31T00:00:00Z",
+            "content_length": 42,
+        },
+    )
+    diff = cli._handle_plan_diff(args, _default_config())
+    assert diff["baseline"] == "manifests"
+    assert diff["modified"], "expected modified entries when manifests differ"
+
