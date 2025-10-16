@@ -53,7 +53,7 @@ from DocsToKG.HybridSearch.vectorstore import FaissIndexManager
 from DocsToKG.HybridSearch.ingest import ChunkIngestionPipeline
 from DocsToKG.HybridSearch.types import DocumentInput
 from DocsToKG.HybridSearch.observability import Observability
-from DocsToKG.HybridSearch.operations import serialize_state
+from DocsToKG.HybridSearch.vectorstore import serialize_state
 from DocsToKG.HybridSearch.storage import ChunkRegistry, OpenSearchSimulator
 
 config_manager = HybridSearchConfigManager(Path("config/hybrid_config.json"))

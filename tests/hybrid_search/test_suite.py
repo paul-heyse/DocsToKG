@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 import os
+import sys
 import uuid
+import warnings
 from http import HTTPStatus
 from pathlib import Path
 from typing import Callable, Dict, List, Mapping, Sequence
@@ -24,16 +27,16 @@ from DocsToKG.HybridSearch import (
     HybridSearchValidator,
     Observability,
     OpenSearchSchemaManager,
-    build_stats_snapshot,
-    restore_state,
-    serialize_state,
-    should_rebuild_index,
-    verify_pagination,
 )
 from DocsToKG.HybridSearch.config import DenseIndexConfig, FusionConfig
 from DocsToKG.HybridSearch.features import tokenize
 from DocsToKG.HybridSearch.ingest import IngestError
 from DocsToKG.HybridSearch.ranking import ResultShaper
+from DocsToKG.HybridSearch.service import (
+    build_stats_snapshot,
+    should_rebuild_index,
+    verify_pagination,
+)
 from DocsToKG.HybridSearch.storage import ChunkRegistry, OpenSearchSimulator
 from DocsToKG.HybridSearch.types import (
     ChunkFeatures,
@@ -44,6 +47,8 @@ from DocsToKG.HybridSearch.validation import infer_embedding_dim, load_dataset
 from DocsToKG.HybridSearch.vectorstore import (
     FaissIndexManager,
     cosine_against_corpus_gpu,
+    restore_state,
+    serialize_state,
 )
 
 faiss = pytest.importorskip("faiss")
@@ -1119,3 +1124,20 @@ def test_gpu_similarity_uses_supplied_device(monkeypatch: pytest.MonkeyPatch) ->
 
     assert captured.get("device") == manager.device
     assert captured.get("resources") is manager.gpu_resources
+
+
+def test_operations_shim_emits_warning_and_reexports() -> None:
+    module_name = "DocsToKG.HybridSearch.operations"
+    sys.modules.pop(module_name, None)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DeprecationWarning)
+        module = importlib.import_module(module_name)
+
+    assert any(
+        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning
+        for w in caught
+    ), "Importing the shim should emit a deprecation warning"
+    assert module.serialize_state is serialize_state
+    assert module.restore_state is restore_state
+    assert module.verify_pagination is verify_pagination

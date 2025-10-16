@@ -5125,6 +5125,20 @@ def infer_version_timestamp(value: Optional[str]) -> Optional[datetime]:
         parsed = parse_version_timestamp(digits_only[:14])
         if parsed is not None:
             return parsed
+    parsed = parse_iso_datetime(value)
+    if parsed is not None:
+        return parsed
+    if not value or not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    for fmt in ("%Y-%m-%d", "%Y%m%d", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            naive = datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+        return naive.replace(tzinfo=timezone.utc)
     return None
 
 
