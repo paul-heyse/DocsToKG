@@ -190,6 +190,24 @@ def test_validate_pronto_success(monkeypatch, obo_file, tmp_path, config):
     assert payload["ok"]
 
 
+def test_validate_pronto_handles_exception(monkeypatch, obo_file, tmp_path, config):
+    request = ValidationRequest("pronto", obo_file, tmp_path / "norm", tmp_path / "val", config)
+
+    def _boom(*_args, **_kwargs):  # pragma: no cover - deterministic failure path
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(
+        "DocsToKG.OntologyDownload.ontology_download._run_validator_subprocess",
+        _boom,
+    )
+
+    result = validate_pronto(request, _noop_logger())
+    assert not result.ok
+    payload = json.loads((request.validation_dir / "pronto_parse.json").read_text())
+    assert payload["ok"] is False
+    assert payload["error"] == "boom"
+
+
 def test_validate_owlready2_success(monkeypatch, owl_file, tmp_path, config):
     pytest.importorskip("owlready2")
     pytest.importorskip("ols_client")

@@ -1,8 +1,9 @@
 # 1. Module: optdeps
 
-This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.optdeps``.
-
-Centralized optional dependency management with fallback stubs.
+The legacy module ``DocsToKG.OntologyDownload.optdeps`` has been removed. Optional
+dependency accessors are now provided directly from
+``DocsToKG.OntologyDownload.ontology_download`` and re-exported via the public
+``DocsToKG.OntologyDownload`` package.
 
 The refactored ontology downloader relies on optional tooling for streaming
 normalization, diagnostics, and validator subprocesses. These helpers expose

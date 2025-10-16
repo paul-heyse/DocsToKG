@@ -45,6 +45,7 @@ from .ontology_download import (
     fetch_all,
     get_manifest_schema,
     load_config,
+    infer_version_timestamp,
     parse_iso_datetime,
     parse_rate_limit_to_rps,
     parse_version_timestamp,
@@ -495,11 +496,10 @@ def _parse_since_arg(value: str) -> datetime:
         argparse.ArgumentTypeError: If ``value`` is not a valid date.
     """
 
-    try:
-        parsed = datetime.strptime(value, "%Y-%m-%d")
-    except ValueError as exc:  # pragma: no cover - argparse handles presentation
-        raise argparse.ArgumentTypeError("must be YYYY-MM-DD") from exc
-    return parsed.replace(tzinfo=timezone.utc)
+    parsed = parse_version_timestamp(value)
+    if parsed is None:
+        raise argparse.ArgumentTypeError("must be YYYY-MM-DD")
+    return parsed
 
 
 def _parse_since(value: Optional[Union[str, datetime]]) -> Optional[datetime]:
@@ -544,10 +544,6 @@ def _format_bytes(num: int) -> str:
             return f"{value:.1f} {unit}"
         value /= step
     return f"{value:.1f} PB"
-
-
-def _directory_size_bytes(path: Path) -> int:
-    return _directory_size(path)
 
 
 def _apply_cli_overrides(config: ResolvedConfig, args) -> None:
@@ -763,13 +759,13 @@ def _resolve_version_metadata(
         else:
             timestamp = parse_iso_datetime(manifest.get("downloaded_at"))
     if timestamp is None:
-        timestamp = _infer_version_timestamp(version)
+        timestamp = infer_version_timestamp(version)
     if timestamp is None:
         try:
             timestamp = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
         except OSError:
             timestamp = None
-    size = _directory_size_bytes(path)
+    size = _directory_size(path)
     return path, timestamp, size
 
 
@@ -846,7 +842,7 @@ def _collect_version_metadata(ontology_id: str) -> List[Dict[str, object]]:
                 timestamp = datetime.fromtimestamp(manifest_path.stat().st_mtime, tz=timezone.utc)
             elif version_dir.exists():
                 timestamp = datetime.fromtimestamp(version_dir.stat().st_mtime, tz=timezone.utc)
-        size = _directory_size_bytes(version_dir)
+        size = _directory_size(version_dir)
         metadata.append(
             {
                 "id": ontology_id,

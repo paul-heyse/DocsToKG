@@ -4197,15 +4197,8 @@ def validate_pronto(request: ValidationRequest, logger: logging.Logger) -> Valid
             output_files=output_files,
         )
     except ValidationTimeout:
-        message = f"Parser timeout after {timeout}s"
-        payload = {"ok": False, "error": message}
+        payload = {"ok": False, "error": f"Parser timeout after {timeout}s"}
     except ValidatorSubprocessError as exc:
-        payload = {"ok": False, "error": str(exc)}
-    except Exception as exc:  # pragma: no cover - defensive catch
-        payload = {"ok": False, "error": str(exc)}
-    except Exception as exc:  # pragma: no cover - defensive catch
-        payload = {"ok": False, "error": str(exc)}
-    except Exception as exc:  # pragma: no cover - defensive catch
         payload = {"ok": False, "error": str(exc)}
     except Exception as exc:  # pragma: no cover - defensive catch
         payload = {"ok": False, "error": str(exc)}
@@ -5060,6 +5053,78 @@ def parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
 def parse_version_timestamp(value: Optional[str]) -> Optional[datetime]:
     """Parse version strings or manifest timestamps into UTC datetimes."""
 
+    if not value or not isinstance(value, str):
+        return None
+
+    text = value.strip()
+    if not text:
+        return None
+
+    parsed = parse_iso_datetime(text)
+    if parsed is not None:
+        return parsed
+
+    candidates: List[str] = []
+
+    def _add_candidate(candidate: str) -> None:
+        candidate = candidate.strip()
+        if candidate and candidate not in candidates:
+            candidates.append(candidate)
+
+    _add_candidate(text)
+    _add_candidate(text.replace("_", "-"))
+    _add_candidate(text.replace("/", "-"))
+    _add_candidate(text.replace("_", ""))
+    _add_candidate(text.replace("-", ""))
+
+    patterns = (
+        "%Y-%m-%d",
+        "%Y%m%d",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y%m%dT%H%M%S",
+        "%Y-%m-%d-%H-%M-%S",
+    )
+
+    for candidate in candidates:
+        parsed = parse_iso_datetime(candidate)
+        if parsed is not None:
+            return parsed
+        for fmt in patterns:
+            try:
+                naive = datetime.strptime(candidate, fmt)
+            except ValueError:
+                continue
+            return naive.replace(tzinfo=timezone.utc)
+    return None
+
+
+def infer_version_timestamp(value: Optional[str]) -> Optional[datetime]:
+    """Infer a timestamp from resolver version identifiers."""
+
+    if not value:
+        return None
+
+    text = value.strip()
+    if not text:
+        return None
+
+    parsed = parse_version_timestamp(text)
+    if parsed is not None:
+        return parsed
+
+    # Attempt to recover from composite strings like "2024-01-01-release" by
+    # extracting contiguous digit blocks that resemble dates.
+    matches = re.findall(r"(\d{4}[\d-]{4,})", text)
+    for match in matches:
+        parsed = parse_version_timestamp(match)
+        if parsed is not None:
+            return parsed
+
+    digits_only = re.sub(r"\D", "", text)
+    if len(digits_only) >= 8:
+        parsed = parse_version_timestamp(digits_only[:14])
+        if parsed is not None:
+            return parsed
     parsed = parse_iso_datetime(value)
     if parsed is not None:
         return parsed
@@ -5124,15 +5189,16 @@ def _populate_plan_metadata(
     try:
         validate_url_security(planned.plan.url, config.defaults.http)
     except ConfigError as exc:
-        adapter.warning(
-            "metadata probe skipped",
+        adapter.error(
+            "metadata probe blocked by URL policy",
             extra={
                 "stage": "plan",
                 "ontology_id": planned.spec.id,
+                "url": planned.plan.url,
                 "error": str(exc),
             },
         )
-        return planned
+        raise
 
     timeout = getattr(config.defaults.http, "timeout_sec", 30)
     headers = dict(planned.plan.headers or {})
