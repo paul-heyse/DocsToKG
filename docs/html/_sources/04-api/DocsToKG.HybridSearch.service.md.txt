@@ -103,6 +103,26 @@ Return ``True`` when ``signature`` has a cached ``k`` value.
 
 Expose the current blended pass rate.
 
+### `persist(self)`
+
+Persist the adaptive cache to disk when a cache path is configured.
+
+### `_encode_signature(self, value)`
+
+*No documentation available.*
+
+### `_decode_signature(self, value)`
+
+*No documentation available.*
+
+### `_persist_cache(self)`
+
+*No documentation available.*
+
+### `_load_cache(self)`
+
+*No documentation available.*
+
 ### `fuse(self, candidates)`
 
 Combine channel rankings into fused scores keyed by vector id.
@@ -143,6 +163,10 @@ List of `HybridSearchResult` instances ready for serialization.
 
 *No documentation available.*
 
+### `close(self)`
+
+Release pooled resources held by the service.
+
 ### `search(self, request)`
 
 Execute a hybrid retrieval round trip for ``request``.
@@ -159,6 +183,10 @@ Raises:
 RequestValidationError: If ``request`` fails validation checks.
 
 ### `_validate_request(self, request)`
+
+*No documentation available.*
+
+### `_assert_managed_store(store)`
 
 *No documentation available.*
 
@@ -194,7 +222,7 @@ Trigger FAISS maintenance (rebuild/compact) and emit diagnostics.
 
 *No documentation available.*
 
-### `_filter_dense_hits(self, hits, filters)`
+### `_filter_dense_hits(self, hits, filters, score_floor)`
 
 *No documentation available.*
 

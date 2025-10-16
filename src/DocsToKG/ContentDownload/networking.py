@@ -16,6 +16,24 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "contentpolicyviolation",
+#       "name": "ContentPolicyViolation",
+#       "anchor": "class-contentpolicyviolation",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "normalise-content-type",
+#       "name": "_normalise_content_type",
+#       "anchor": "function-normalise-content-type",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "enforce-content-policy",
+#       "name": "_enforce_content_policy",
+#       "anchor": "function-enforce-content-policy",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "request-with-retries",
 #       "name": "request_with_retries",
 #       "anchor": "function-request-with-retries",
@@ -116,6 +134,7 @@ Raises:
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import math
 import logging
@@ -137,6 +156,7 @@ __all__ = (
     "CachedResult",
     "ConditionalRequestHelper",
     "ModifiedResult",
+    "ContentPolicyViolation",
     "CircuitBreaker",
     "TokenBucket",
     "create_session",
@@ -258,6 +278,87 @@ def parse_retry_after_header(response: requests.Response) -> Optional[float]:
         return None
 
 
+class ContentPolicyViolation(requests.RequestException):
+    """Raised when a response violates configured content policies."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        violation: str,
+        policy: Optional[Mapping[str, Any]] = None,
+        detail: Optional[str] = None,
+        content_type: Optional[str] = None,
+        content_length: Optional[int] = None,
+    ) -> None:
+        super().__init__(message)
+        self.violation = violation
+        self.policy = dict(policy) if policy else None
+        self.detail = detail
+        self.content_type = content_type
+        self.content_length = content_length
+
+
+def _normalise_content_type(value: str) -> str:
+    """Return the canonical MIME type component from a Content-Type header."""
+
+    if not value:
+        return ""
+    return value.split(";", 1)[0].strip().lower()
+
+
+def _enforce_content_policy(
+    response: requests.Response,
+    content_policy: Optional[Mapping[str, Any]],
+    *,
+    method: str,
+    url: str,
+) -> None:
+    """Raise ContentPolicyViolation when response headers violate policy."""
+
+    if not content_policy:
+        return
+    headers = getattr(response, "headers", {}) or {}
+    allowed_types = content_policy.get("allowed_types")
+    max_bytes = content_policy.get("max_bytes")
+
+    content_type_header = headers.get("Content-Type")
+    content_type = _normalise_content_type(content_type_header or "")
+    if allowed_types and content_type:
+        allowed_set = set(allowed_types)
+        if content_type not in allowed_set:
+            with contextlib.suppress(Exception):
+                response.close()
+            detail = f"content-type {content_type!r} not in allow-list"
+            raise ContentPolicyViolation(
+                f"{method} {url} blocked by content policy",
+                violation="content-type",
+                policy=content_policy,
+                detail=detail,
+                content_type=content_type,
+            )
+
+    if max_bytes:
+        raw_length = (headers.get("Content-Length") or "").strip()
+        if raw_length:
+            try:
+                content_length = int(raw_length)
+            except ValueError:
+                content_length = None
+            else:
+                if content_length > int(max_bytes):
+                    with contextlib.suppress(Exception):
+                        response.close()
+                    detail = f"content-length {content_length} > limit {int(max_bytes)}"
+                    raise ContentPolicyViolation(
+                        f"{method} {url} exceeds content policy max_bytes",
+                        violation="max-bytes",
+                        policy=content_policy,
+                        detail=detail,
+                        content_type=content_type or None,
+                        content_length=content_length,
+                    )
+
 def request_with_retries(
     session: requests.Session,
     method: str,
@@ -267,6 +368,7 @@ def request_with_retries(
     retry_statuses: Optional[Set[int]] = None,
     backoff_factor: float = 0.75,
     respect_retry_after: bool = True,
+    content_policy: Optional[Mapping[str, Any]] = None,
     **kwargs: Any,
 ) -> requests.Response:
     """Execute an HTTP request with exponential backoff and retry handling.
@@ -281,6 +383,7 @@ def request_with_retries(
             ``{429, 500, 502, 503, 504}``.
         backoff_factor: Base multiplier for exponential backoff delays in seconds. Defaults to ``0.75``.
         respect_retry_after: Whether to parse and obey ``Retry-After`` headers. Defaults to ``True``.
+        content_policy: Optional mapping describing max-bytes and allowed MIME types for the target host.
         **kwargs: Additional keyword arguments forwarded directly to :meth:`requests.Session.request`.
 
     Returns:
@@ -338,6 +441,7 @@ def request_with_retries(
                 retry_after_delay = parse_retry_after_header(response)
 
             if status_code not in retry_statuses:
+                _enforce_content_policy(response, content_policy, method=method, url=url)
                 return response
 
             if attempt >= max_retries:
@@ -348,6 +452,7 @@ def request_with_retries(
                     url,
                     attempt + 1,
                 )
+                _enforce_content_policy(response, content_policy, method=method, url=url)
                 return response
 
             base_delay = backoff_factor * (2**attempt)
@@ -366,6 +471,8 @@ def request_with_retries(
                 max_retries + 1,
                 delay,
             )
+            with contextlib.suppress(Exception):
+                response.close()
             time.sleep(delay)
 
         except requests.Timeout as exc:
@@ -438,6 +545,8 @@ def head_precheck(
     session: requests.Session,
     url: str,
     timeout: float,
+    *,
+    content_policy: Optional[Mapping[str, Any]] = None,
 ) -> bool:
     """Issue a lightweight request to determine whether ``url`` returns a PDF.
 
@@ -450,6 +559,7 @@ def head_precheck(
         session: HTTP session used for outbound requests.
         url: Candidate download URL.
         timeout: Maximum time budget in seconds for the probe.
+        content_policy: Optional domain-specific content policy to enforce.
 
     Returns:
         ``True`` when the response appears to represent a binary payload such as
@@ -466,7 +576,10 @@ def head_precheck(
             max_retries=1,
             timeout=min(timeout, 5.0),
             allow_redirects=True,
+            content_policy=content_policy,
         )
+    except ContentPolicyViolation:
+        return False
     except Exception:
         return True
 
@@ -474,7 +587,7 @@ def head_precheck(
         if response.status_code in {200, 302, 304}:
             return _looks_like_pdf(response.headers)
         if response.status_code in {405, 501}:
-            return _head_precheck_via_get(session, url, timeout)
+            return _head_precheck_via_get(session, url, timeout, content_policy=content_policy)
         return False
     finally:
         response.close()
@@ -503,6 +616,8 @@ def _head_precheck_via_get(
     session: requests.Session,
     url: str,
     timeout: float,
+    *,
+    content_policy: Optional[Mapping[str, Any]] = None,
 ) -> bool:
     """Fallback GET probe for providers that reject HEAD requests."""
 
@@ -514,6 +629,7 @@ def _head_precheck_via_get(
             stream=True,
             timeout=min(timeout, 5.0),
             allow_redirects=True,
+            content_policy=content_policy,
         ) as response:
             # Consume at most one chunk to avoid downloading the entire body.
             try:
@@ -527,6 +643,8 @@ def _head_precheck_via_get(
             if response.status_code not in {200, 302, 304}:
                 return False
             return _looks_like_pdf(response.headers)
+    except ContentPolicyViolation:
+        return False
     except Exception:
         return True
 
@@ -847,6 +965,7 @@ __all__ = [
     "CachedResult",
     "ConditionalRequestHelper",
     "ModifiedResult",
+    "ContentPolicyViolation",
     "CircuitBreaker",
     "TokenBucket",
     "head_precheck",

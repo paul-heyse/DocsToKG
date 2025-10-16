@@ -45,14 +45,21 @@
 
 from __future__ import annotations
 
+import pytest
 from typing import Dict
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
+
+hypothesis = pytest.importorskip("hypothesis")
+from hypothesis import given
+from hypothesis import strategies as st
 
 from DocsToKG.ContentDownload.networking import (
     CircuitBreaker,
     ConditionalRequestHelper,
+    ContentPolicyViolation,
     TokenBucket,
     head_precheck,
+    request_with_retries,
 )
 
 
@@ -136,6 +143,22 @@ def test_head_precheck_degrades_to_get(monkeypatch):
     assert head_precheck(session, "https://example.org/pdf", timeout=3.0)
 
 
+def test_head_precheck_blocks_disallowed_mime():
+    session = Mock()
+    response = _DummyResponse(200, {"Content-Type": "application/pdf"})
+    session.request = Mock(return_value=response)
+
+    policy = {"allowed_types": ("text/html",)}
+
+    assert not head_precheck(
+        session,
+        "https://example.org/file.pdf",
+        timeout=2.0,
+        content_policy=policy,
+    )
+    assert response.closed
+
+
 def test_conditional_request_helper_requires_complete_metadata(caplog):
     helper = ConditionalRequestHelper(
         prior_etag='"etag"',
@@ -185,3 +208,125 @@ def test_circuit_breaker_open_and_cooldown(monkeypatch):
     assert breaker.allow()
     breaker.record_success()
     assert breaker.allow()
+
+
+def test_request_with_retries_enforces_max_bytes_policy():
+    session = Mock()
+    response = _DummyResponse(200, {"Content-Length": "2048"})
+    session.request = Mock(return_value=response)
+
+    with pytest.raises(ContentPolicyViolation) as excinfo:
+        request_with_retries(
+            session,
+            "GET",
+            "https://example.org/file.pdf",
+            content_policy={"max_bytes": 1024},
+        )
+
+    assert response.closed
+    assert excinfo.value.violation == "max-bytes"
+
+
+@st.composite
+def _token_bucket_scenarios(draw):
+    rate = draw(
+        st.floats(
+            min_value=0.5,
+            max_value=5.0,
+            allow_infinity=False,
+            allow_nan=False,
+        )
+    )
+    capacity = draw(
+        st.floats(
+            min_value=0.5,
+            max_value=5.0,
+            allow_infinity=False,
+            allow_nan=False,
+        )
+    )
+    steps = draw(
+        st.lists(
+            st.tuples(
+                st.floats(
+                    min_value=0.0,
+                    max_value=3.0,
+                    allow_infinity=False,
+                    allow_nan=False,
+                ),
+                st.floats(
+                    min_value=0.1,
+                    max_value=3.0,
+                    allow_infinity=False,
+                    allow_nan=False,
+                ),
+            ),
+            min_size=1,
+            max_size=8,
+        )
+    )
+    return rate, capacity, steps
+
+
+@given(_token_bucket_scenarios())
+def test_token_bucket_waits_match_deficits(scenario):
+    rate, capacity, steps = scenario
+    bucket = TokenBucket(rate_per_second=rate, capacity=capacity, clock=lambda: 0.0)
+    manual_tokens = capacity
+    last_time = 0.0
+    for delta, tokens in steps:
+        current_time = last_time + delta
+        elapsed = max(current_time - last_time, 0.0)
+        manual_tokens = min(capacity, manual_tokens + elapsed * rate)
+        if manual_tokens >= tokens:
+            expected_wait = 0.0
+            manual_tokens -= tokens
+        else:
+            deficit = tokens - manual_tokens
+            expected_wait = deficit / rate
+            manual_tokens = 0.0
+        wait = bucket.acquire(tokens=tokens, now=current_time)
+        assert wait == pytest.approx(expected_wait, rel=1e-6, abs=1e-9)
+        last_time = current_time
+
+
+@given(
+    st.integers(min_value=1, max_value=6),
+    st.floats(
+        min_value=0.05,
+        max_value=20.0,
+        allow_infinity=False,
+        allow_nan=False,
+    ),
+    st.one_of(
+        st.none(),
+        st.floats(
+            min_value=0.0,
+            max_value=20.0,
+            allow_infinity=False,
+            allow_nan=False,
+        ),
+    ),
+)
+def test_circuit_breaker_cooldown_behaviour(failure_threshold, cooldown, retry_after):
+    current = 0.0
+    with patch("DocsToKG.ContentDownload.networking.time.monotonic", lambda: current):
+        breaker = CircuitBreaker(failure_threshold=failure_threshold, cooldown_seconds=cooldown)
+        for _ in range(failure_threshold - 1):
+            breaker.record_failure()
+            assert breaker.allow(now=current)
+        current += 1.0
+        breaker.record_failure(retry_after=retry_after)
+        cooldown_value = retry_after if retry_after is not None else cooldown
+        addition_changes = (current + cooldown_value) != current
+        should_block = cooldown_value > 0.0 and addition_changes
+        if should_block:
+            assert not breaker.allow(now=current)
+        else:
+            assert breaker.allow(now=current)
+        expected_remaining = cooldown_value if should_block else 0.0
+        assert breaker.cooldown_remaining(now=current) == pytest.approx(expected_remaining)
+        current += expected_remaining
+        assert breaker.allow(now=current)
+        breaker.record_success()
+        assert breaker.allow(now=current)

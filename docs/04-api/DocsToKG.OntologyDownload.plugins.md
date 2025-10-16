@@ -4,7 +4,7 @@ This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.plugins
 
 ## 1. Overview
 
-Plugin discovery utilities for ontology downloader extensions.
+Plugin discovery helpers for ontology downloader components.
 
 ## 2. Functions
 
@@ -20,10 +20,6 @@ Load resolver plugins exactly once per interpreter.
 
 Discover validator plugins registered via ``entry_points``.
 
-### `ensure_validator_plugins(registry)`
-
-Load validator plugins exactly once per interpreter.
-
 ### `plan(self)`
 
 Plan a fetch for the provided ontology specification.
@@ -34,10 +30,10 @@ Execute the validator.
 
 ## 3. Classes
 
-### `_ResolverLike`
+### `ResolverPlugin`
 
-Structural protocol describing resolver plugin instances.
+Protocol describing resolver plugins discovered via entry points.
 
-### `_ValidatorLike`
+### `ValidatorPlugin`
 
-Structural protocol for validator callables.
+Protocol describing validator plugins discovered via entry points.

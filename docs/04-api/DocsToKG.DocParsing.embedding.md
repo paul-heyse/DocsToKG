@@ -29,6 +29,14 @@ Dependencies:
 
 ## 2. Functions
 
+### `_shutdown_llm_instance(llm)`
+
+Best-effort shutdown for a cached Qwen LLM instance.
+
+### `close_all_qwen()`
+
+Release all cached Qwen LLM instances.
+
 ### `_qwen_cache_key(cfg)`
 
 Return cache key tuple for Qwen LLM instances.
@@ -74,21 +82,13 @@ default: Fallback path used when ``value`` is absent.
 Returns:
 Absolute path derived from ``value`` or ``default``.
 
-### `_missing_splade_dependency_message()`
-
-Return a human-readable installation hint for SPLADE extras.
-
-### `_missing_qwen_dependency_message()`
-
-Return a human-readable installation hint for Qwen/vLLM extras.
-
 ### `_ensure_splade_dependencies()`
 
-Validate that SPLADE optional dependencies are importable.
+Backward-compatible shim that delegates to core.ensure_splade_dependencies.
 
 ### `_ensure_qwen_dependencies()`
 
-Validate that Qwen/vLLM optional dependencies are importable.
+Backward-compatible shim that delegates to core.ensure_qwen_dependencies.
 
 ### `ensure_uuid(rows)`
 
@@ -244,6 +244,10 @@ directory: Directory to scan for chunk artifacts.
 Returns:
 Iterator over chunk files.
 
+### `create_vector_writer(path, fmt)`
+
+Factory returning the appropriate vector writer for ``fmt``.
+
 ### `process_chunk_file_vectors(chunk_file, out_path, stats, args, validator, logger)`
 
 Generate vectors for a single chunk file and persist them to disk.
@@ -262,12 +266,12 @@ Tuple of ``(vector_count, splade_nnz_list, qwen_norms)``.
 Raises:
 ValueError: Propagated if vector dimensions or norms fail validation.
 
-### `write_vectors(destination, uuids, texts, splade_results, qwen_results, stats, args)`
+### `write_vectors(writer, uuids, texts, splade_results, qwen_results, stats, args)`
 
 Write validated vector rows to disk with schema enforcement.
 
 Args:
-path_or_handle: Destination JSONL path or file handle for vector rows.
+writer: Vector writer responsible for persisting rows.
 uuids: Sequence of chunk UUIDs aligned with the other inputs.
 texts: Chunk text bodies.
 splade_results: SPLADE token and weight pairs per chunk.
@@ -333,6 +337,18 @@ int: Exit code where ``0`` indicates success.
 Raises:
 ValueError: If invalid runtime parameters (such as batch sizes) are supplied.
 
+### `from_env(cls, defaults)`
+
+Construct configuration from environment variables.
+
+### `from_args(cls, args, defaults)`
+
+Merge CLI arguments, configuration files, and environment variables.
+
+### `finalize(self)`
+
+Normalise paths and casing after all sources have been applied.
+
 ### `add_document(self, text)`
 
 Add document to statistics without retaining text.
@@ -390,11 +406,31 @@ Queue an embedding request and block until the result is ready.
 
 Flush pending requests and terminate the worker thread.
 
+### `write_rows(self, rows)`
+
+Persist a batch of vector rows to the underlying storage medium.
+
+### `__enter__(self)`
+
+*No documentation available.*
+
+### `__exit__(self, exc_type, exc, tb)`
+
+*No documentation available.*
+
+### `write_rows(self, rows)`
+
+Append ``rows`` to the active JSONL artifact created by ``__enter__``.
+
 ### `_process_entry(entry)`
 
 Encode vectors for a chunk file and report per-file metrics.
 
 ## 3. Classes
+
+### `EmbedCfg`
+
+Stage configuration container for the embedding pipeline.
 
 ### `BM25StatsAccumulator`
 
@@ -432,3 +468,11 @@ Serialize Qwen embedding requests across worker threads.
 ### `EmbeddingProcessingError`
 
 Wrap exceptions raised during per-file embedding with timing metadata.
+
+### `VectorWriter`
+
+Abstract base class for vector writers.
+
+### `JsonlVectorWriter`
+
+Context manager that writes vector rows to JSONL atomically.

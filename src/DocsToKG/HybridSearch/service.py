@@ -141,6 +141,7 @@ from .store import (
     AdapterStats,
     ChunkRegistry,
     FaissSearchResult,
+    ManagedFaissAdapter,
     OpenSearchSimulator,
     cosine_topk_blockwise,
     matches_filters,
@@ -210,6 +211,7 @@ class DenseSearchStrategy:
         alpha: float = 0.20,
         initial_pass_rate: float = 0.75,
         cache_limit: int = 64,
+        cache_path: Optional[Path] = None,
     ) -> None:
         self._alpha = float(alpha)
         self._pass_rate = max(1e-3, min(1.0, float(initial_pass_rate)))
@@ -217,6 +219,10 @@ class DenseSearchStrategy:
         self._cache: "OrderedDict[Tuple[object, ...], int]" = OrderedDict()
         self._lock = RLock()
         self._signature_pass: Dict[Tuple[object, ...], float] = {}
+        self._cache_path = Path(cache_path) if cache_path is not None else None
+        self._dirty = False
+        if self._cache_path is not None:
+            self._load_cache()
 
     def plan(
         self,
@@ -230,16 +236,13 @@ class DenseSearchStrategy:
         """Return the requested ``k`` and oversampling knobs for a dense search."""
 
         with self._lock:
-            oversample = max(
-                1.0,
-                float(
-                    getattr(
-                        retrieval_cfg,
-                        "dense_oversample",
-                        getattr(dense_cfg, "oversample", 1.0),
-                    )
-                ),
-            )
+            oversample = max(1.0, float(getattr(retrieval_cfg, "dense_oversample", 1.0)))
+            legacy_over = getattr(dense_cfg, "oversample", None)
+            if legacy_over is not None:
+                try:
+                    oversample = max(oversample, float(legacy_over))
+                except Exception:
+                    pass
             overfetch = max(1.0, float(getattr(retrieval_cfg, "dense_overfetch_factor", 1.5)))
             basis = max(1, int(page_size))
             base = math.ceil(basis * oversample * overfetch)
@@ -269,6 +272,7 @@ class DenseSearchStrategy:
             self._pass_rate = max(
                 1e-3, min(1.0, self._alpha * bounded + (1.0 - self._alpha) * self._pass_rate)
             )
+            self._dirty = True
             return local_rate
 
     def remember(self, signature: Tuple[object, ...], k: int) -> None:
@@ -279,6 +283,7 @@ class DenseSearchStrategy:
             self._cache.move_to_end(signature)
             if len(self._cache) > self._cache_limit:
                 self._cache.popitem(last=False)
+            self._dirty = True
 
     def has_cache(self, signature: Tuple[object, ...]) -> bool:
         """Return ``True`` when ``signature`` has a cached ``k`` value."""
@@ -291,6 +296,104 @@ class DenseSearchStrategy:
 
         with self._lock:
             return self._pass_rate
+
+    def persist(self) -> None:
+        """Persist the adaptive cache to disk when a cache path is configured."""
+
+        if self._cache_path is None:
+            return
+        with self._lock:
+            if not self._dirty:
+                return
+            try:
+                self._persist_cache()
+            finally:
+                self._dirty = False
+
+    # --- Persistence helpers ---
+
+    def _encode_signature(self, value: object) -> object:
+        if isinstance(value, tuple):
+            return {"__tuple__": [self._encode_signature(v) for v in value]}
+        if isinstance(value, list):
+            return [self._encode_signature(v) for v in value]
+        if isinstance(value, dict):
+            return {str(k): self._encode_signature(v) for k, v in value.items()}
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        return {"__str__": str(value)}
+
+    def _decode_signature(self, value: object) -> object:
+        if isinstance(value, dict):
+            if "__tuple__" in value:
+                return tuple(self._decode_signature(v) for v in value["__tuple__"])
+            if "__str__" in value:
+                return value["__str__"]
+            return {k: self._decode_signature(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [self._decode_signature(v) for v in value]
+        return value
+
+    def _persist_cache(self) -> None:
+        if self._cache_path is None:
+            return
+        payload = {
+            "cache": [
+                {"signature": self._encode_signature(signature), "k": value}
+                for signature, value in self._cache.items()
+            ],
+            "signature_pass": [
+                {"signature": self._encode_signature(signature), "rate": value}
+                for signature, value in self._signature_pass.items()
+            ],
+            "global_pass_rate": self._pass_rate,
+        }
+        try:
+            self._cache_path.parent.mkdir(parents=True, exist_ok=True)
+            self._cache_path.write_text(json.dumps(payload, indent=2, sort_keys=True))
+        except Exception:
+            pass
+
+    def _load_cache(self) -> None:
+        if self._cache_path is None:
+            return
+        try:
+            data = json.loads(self._cache_path.read_text())
+        except FileNotFoundError:
+            return
+        except Exception:
+            return
+        cache_entries = data.get("cache", [])
+        signature_pass_entries = data.get("signature_pass", [])
+        pass_rate = data.get("global_pass_rate")
+        with self._lock:
+            for entry in cache_entries:
+                try:
+                    signature = self._decode_signature(entry["signature"])
+                    if not isinstance(signature, tuple):
+                        if isinstance(signature, list):
+                            signature = tuple(signature)
+                        else:
+                            signature = (signature,)
+                    value = int(entry["k"])
+                except Exception:
+                    continue
+                self._cache[signature] = value
+            for entry in signature_pass_entries:
+                try:
+                    signature = self._decode_signature(entry["signature"])
+                    if not isinstance(signature, tuple):
+                        if isinstance(signature, list):
+                            signature = tuple(signature)
+                        else:
+                            signature = (signature,)
+                    rate = float(entry["rate"])
+                except Exception:
+                    continue
+                self._signature_pass[signature] = rate
+            if isinstance(pass_rate, (int, float)):
+                self._pass_rate = max(1e-3, min(1.0, float(pass_rate)))
+            self._dirty = False
 
 
 @dataclass(slots=True)
@@ -618,6 +721,7 @@ class HybridSearchService:
         registry: ChunkRegistry,
         observability: Optional[Observability] = None,
         faiss_router: Optional[FaissRouter] = None,
+        dense_strategy_cache_path: Optional[Path] = None,
     ) -> None:
         """Initialise the hybrid search service.
 
@@ -628,6 +732,7 @@ class HybridSearchService:
             opensearch: Lexical index providing BM25/SPLADE access.
             registry: Chunk registry used for metadata lookups.
             observability: Optional observability facade (defaults to a no-op).
+            dense_strategy_cache_path: Optional path used to persist dense planner heuristics.
 
         Returns:
             None
@@ -637,18 +742,34 @@ class HybridSearchService:
         self._opensearch = opensearch
         self._registry = registry
         self._observability = observability or Observability()
+        cache_path = (
+            Path(dense_strategy_cache_path).expanduser()
+            if dense_strategy_cache_path is not None
+            else None
+        )
+        self._assert_managed_store(faiss_index)
         if faiss_router is not None:
             self._faiss_router = faiss_router
         else:
             self._faiss_router = FaissRouter(per_namespace=False, default_store=faiss_index)
         self._faiss = self._faiss_router.default_store
+        self._assert_managed_store(self._faiss)
         self._faiss_router.set_resolver(self._registry.resolve_faiss_id)
-        self._dense_strategy = DenseSearchStrategy()
+        self._dense_strategy = DenseSearchStrategy(cache_path=cache_path)
         self._executor = ThreadPoolExecutor(max_workers=3)
+        self._closed = False
+        atexit.register(self.close)
 
     def close(self) -> None:
         """Release pooled resources held by the service."""
 
+        if getattr(self, "_closed", False):
+            return
+        self._closed = True
+        try:
+            self._dense_strategy.persist()
+        except Exception:
+            self._observability.logger.exception("dense-strategy-persist-failed")
         self._executor.shutdown(wait=False)
 
 
@@ -682,9 +803,21 @@ class HybridSearchService:
 
             dense_store = self._dense_store(request.namespace)
             try:
-                dense_stats = dense_store.adapter_stats  # type: ignore[attr-defined]
+                adapter_stats = dense_store.adapter_stats  # type: ignore[attr-defined]
             except AttributeError:
-                dense_stats = None
+                adapter_stats = None
+            store_resources = getattr(dense_store, "get_gpu_resources", lambda: None)()
+            resources_hint = (
+                adapter_stats.resources if adapter_stats is not None else store_resources
+            )
+            device_hint = (
+                adapter_stats.device if adapter_stats is not None else getattr(dense_store, "device", 0)
+            )
+            fp16_hint = (
+                bool(adapter_stats.fp16_enabled)
+                if adapter_stats is not None
+                else bool(getattr(getattr(dense_store, "config", object()), "flat_use_fp16", False))
+            )
 
             f_bm25 = self._executor.submit(
                 self._execute_bm25, request, filters, config, query_features, timings
@@ -770,9 +903,9 @@ class HybridSearchService:
                 pool_embeddings = (
                     unique_embeddings[:pool_size] if unique_embeddings is not None else None
                 )
-                device_id = dense_stats.device if dense_stats is not None else dense_store.device
-                resources = dense_stats.resources if dense_stats is not None else None
-                fp16_enabled = bool(dense_stats.fp16_enabled) if dense_stats is not None else False
+                device_id = device_hint
+                resources = resources_hint
+                fp16_enabled = fp16_hint
                 selected = apply_mmr_diversification(
                     pool,
                     fused_scores,
@@ -791,6 +924,14 @@ class HybridSearchService:
                 diversified = [*selected, *pool_remaining, *tail]
             else:
                 diversified = unique_candidates
+
+            diversified = sorted(
+                diversified,
+                key=lambda cand: (
+                    -fused_scores.get(cand.chunk.vector_id, 0.0),
+                    cand.chunk.vector_id,
+                ),
+            )
 
             if diversified:
                 if unique_embeddings is not None and embedding_index:
@@ -826,10 +967,10 @@ class HybridSearchService:
             shaper = ResultShaper(
                 self._opensearch,
                 config.fusion,
-                device=(dense_stats.device if dense_stats is not None else dense_store.device),
-                resources=dense_stats.resources if dense_stats is not None else None,
+                device=device_hint,
+                resources=resources_hint,
                 channel_weights=adaptive_weights,
-                fp16_enabled=bool(dense_stats.fp16_enabled) if dense_stats is not None else False,
+                fp16_enabled=fp16_hint,
             )
             shaped = shaper.shape(
                 ordered_chunks,
@@ -889,8 +1030,20 @@ class HybridSearchService:
         if request.page_size > 1000:
             raise RequestValidationError("page_size exceeds maximum")
 
+    @staticmethod
+    def _assert_managed_store(store: DenseVectorStore) -> None:
+        unsafe_attrs = ("index", "_index", "gpu_resources")
+        if isinstance(store, ManagedFaissAdapter):
+            return
+        if any(hasattr(store, attr) for attr in unsafe_attrs):
+            raise TypeError("HybridSearchService requires a managed dense vector store")
+        if not hasattr(store, "get_gpu_resources"):
+            raise TypeError("Dense vector store must expose get_gpu_resources()")
+
     def _dense_store(self, namespace: Optional[str]) -> DenseVectorStore:
-        return self._faiss_router.get(namespace)
+        store = self._faiss_router.get(namespace)
+        self._assert_managed_store(store)
+        return store
 
     def _slice_from_cursor(
         self,
@@ -986,10 +1139,13 @@ class HybridSearchService:
         """Trigger FAISS maintenance (rebuild/compact) and emit diagnostics."""
 
         start = time.perf_counter()
-        before = self._faiss_router.stats()
+        before_snapshot = self._faiss_router.stats()
         actions = self._faiss_router.run_maintenance()
-        after = self._faiss_router.stats()
+        after_snapshot = self._faiss_router.stats()
         elapsed_ms = (time.perf_counter() - start) * 1000
+
+        before = before_snapshot.get("namespaces", {})
+        after = after_snapshot.get("namespaces", {})
 
         def _dirty(snapshot: Mapping[str, Mapping[str, object]], namespace: str) -> float:
             bucket = snapshot.get(namespace, {})
@@ -1032,7 +1188,7 @@ class HybridSearchService:
                 }
             },
         )
-        return {"namespaces": summary, "elapsed_ms": elapsed_ms}
+        return {"namespaces": summary, "elapsed_ms": elapsed_ms, "aggregate": after_snapshot.get("aggregate", {})}
 
     def _execute_bm25(
         self,
@@ -1144,9 +1300,80 @@ class HybridSearchService:
             adapter_stats = store.adapter_stats  # type: ignore[attr-defined]
         except AttributeError:
             adapter_stats = None
+        store_resources = getattr(store, "get_gpu_resources", lambda: None)()
+        resources_hint = (
+            adapter_stats.resources if adapter_stats is not None else store_resources
+        )
+        device_hint = (
+            adapter_stats.device if adapter_stats is not None else getattr(store, "device", 0)
+        )
+        fp16_hint = (
+            bool(adapter_stats.fp16_enabled)
+            if adapter_stats is not None
+            else bool(getattr(getattr(store, "config", object()), "flat_use_fp16", False))
+        )
 
         score_floor = float(getattr(config.retrieval, "dense_score_floor", 0.0))
         use_score_floor = score_floor > 0.0
+        use_range = bool(getattr(request, "recall_first", False) and use_score_floor)
+        if use_range:
+            hits = list(store.range_search(queries[0], score_floor, limit=None))
+            self._observability.metrics.observe(
+                "faiss_search_batch_size", 1.0, channel="dense"
+            )
+            filtered, payloads = self._filter_dense_hits(hits, filters, score_floor)
+            observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
+            blended_pass = strategy.observe_pass_rate(signature, observed)
+            strategy.remember(signature, max(len(filtered), len(hits)))
+            filtered.sort(key=lambda hit: (-hit.score, hit.vector_id))
+            effective_k = len(hits)
+            self._observability.metrics.set_gauge(
+                "dense_pass_through_rate",
+                float(observed),
+                namespace=request.namespace or "*",
+            )
+            self._observability.metrics.set_gauge(
+                "dense_filter_pass_rate", blended_pass, channel="dense"
+            )
+            timings["dense_ms"] = (time.perf_counter() - start) * 1000
+            self._observability.metrics.observe(
+                "search_channel_latency_ms", timings["dense_ms"], channel="dense"
+            )
+            p95_dense = self._observability.metrics.percentile(
+                "search_channel_latency_ms", 0.95, channel="dense"
+            )
+            if p95_dense is not None:
+                self._observability.metrics.set_gauge(
+                    "search_channel_latency_p95_ms", p95_dense, channel="dense"
+                )
+            self._observability.metrics.set_gauge(
+                "dense_effective_k", float(effective_k), channel="dense"
+            )
+            self._observability.metrics.increment("search_channel_requests", channel="dense")
+            self._observability.metrics.observe(
+                "search_channel_candidates", len(filtered), channel="dense"
+            )
+            if adapter_stats is not None:
+                self._observability.metrics.set_gauge(
+                    "nprobe_in_effect", float(adapter_stats.nprobe), channel="dense"
+                )
+            candidates: List[FusionCandidate] = []
+            scores: Dict[str, float] = {}
+            embedding_rows: List[np.ndarray] = []
+            for idx, hit in enumerate(filtered):
+                chunk = payloads.get(hit.vector_id)
+                if chunk is None:
+                    continue
+                candidates.append(
+                    FusionCandidate(source="dense", score=hit.score, chunk=chunk, rank=idx + 1)
+                )
+                scores[hit.vector_id] = hit.score
+                embedding_rows.append(chunk.features.embedding.astype(np.float32, copy=False))
+            if embedding_rows:
+                embedding_matrix = np.ascontiguousarray(np.stack(embedding_rows), dtype=np.float32)
+            else:
+                embedding_matrix = None
+            return ChannelResults(candidates=candidates, scores=scores, embeddings=embedding_matrix)
 
         def run_dense_search(current_k: int) -> list[FaissSearchResult]:
             """Query FAISS for dense document candidates at the requested depth.
@@ -1169,7 +1396,7 @@ class HybridSearchService:
 
         effective_k = initial_k
         hits = run_dense_search(effective_k)
-        filtered, payloads = self._filter_dense_hits(hits, filters)
+        filtered, payloads = self._filter_dense_hits(hits, filters, score_floor)
         observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
         self._observability.metrics.set_gauge(
             "dense_pass_through_rate",
@@ -1203,10 +1430,11 @@ class HybridSearchService:
                 break
             effective_k = next_k
             hits = run_dense_search(effective_k)
-            filtered, payloads = self._filter_dense_hits(hits, filters)
+            filtered, payloads = self._filter_dense_hits(hits, filters, score_floor)
             observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
             blended_pass = strategy.observe_pass_rate(signature, observed)
 
+        filtered.sort(key=lambda hit: (-hit.score, hit.vector_id))
         strategy.remember(signature, effective_k)
         self._observability.metrics.set_gauge(
             "dense_filter_pass_rate", blended_pass, channel="dense"
@@ -1256,6 +1484,7 @@ class HybridSearchService:
         self,
         hits: Sequence[FaissSearchResult],
         filters: Mapping[str, object],
+        score_floor: float,
     ) -> tuple[List[FaissSearchResult], Dict[str, ChunkPayload]]:
         if not hits:
             return [], {}
@@ -1266,6 +1495,7 @@ class HybridSearchService:
             for hit in hits
             if (chunk := payloads.get(hit.vector_id)) is not None
             and matches_filters(chunk, filters)
+            and float(hit.score) >= float(score_floor)
         ]
         return filtered, payloads
 
@@ -1420,6 +1650,7 @@ class HybridSearchAPI:
         cursor = payload.get("cursor")
         diversification = bool(payload.get("diversification", False))
         diagnostics = bool(payload.get("diagnostics", True))
+        recall_first = bool(payload.get("recall_first", False))
         return HybridSearchRequest(
             query=query,
             namespace=str(namespace) if namespace is not None else None,
@@ -1428,6 +1659,7 @@ class HybridSearchAPI:
             cursor=str(cursor) if cursor is not None else None,
             diversification=diversification,
             diagnostics=diagnostics,
+            recall_first=recall_first,
         )
 
     def _normalize_filters(self, payload: Mapping[str, Any]) -> MutableMapping[str, Any]:

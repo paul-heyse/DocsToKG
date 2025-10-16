@@ -35,6 +35,70 @@ third-party dependencies beyond the standard library.
 
 ## 2. Functions
 
+### `dedupe_preserve_order(markers)`
+
+Return ``markers`` without duplicates while preserving input order.
+
+### `_ensure_str_sequence(value, label)`
+
+Normalise structural marker entries into string lists.
+
+### `_load_yaml_markers(raw)`
+
+*No documentation available.*
+
+### `_load_toml_markers(raw)`
+
+*No documentation available.*
+
+### `load_structural_marker_profile(path)`
+
+Load heading/caption marker overrides from JSON, YAML, or TOML files.
+
+### `load_structural_marker_config(path)`
+
+Backward compatible alias for :func:`load_structural_marker_profile`.
+
+### `build_subcommand(parser, options)`
+
+Attach CLI options described by ``options`` to ``parser``.
+
+### `_coerce_path(value, base_dir)`
+
+Convert ``value`` into an absolute :class:`Path`.
+
+### `_coerce_optional_path(value, base_dir)`
+
+Convert optional path-like values.
+
+### `_coerce_bool(value, _base_dir)`
+
+Convert truthy strings or numbers to boolean.
+
+### `_coerce_int(value, _base_dir)`
+
+Convert ``value`` to ``int``.
+
+### `_coerce_float(value, _base_dir)`
+
+Convert ``value`` to ``float``.
+
+### `_coerce_str(value, _base_dir)`
+
+Return ``value`` coerced to string.
+
+### `_coerce_str_tuple(value, _base_dir)`
+
+Return ``value`` as a tuple of strings.
+
+### `_manifest_value(value)`
+
+Convert values to manifest-friendly representations.
+
+### `load_config_mapping(path)`
+
+Load a configuration mapping from JSON, YAML, or TOML.
+
 ### `expand_path(path)`
 
 Return ``path`` expanded to an absolute :class:`Path`.
@@ -83,6 +147,22 @@ model_root: Optional DocsToKG model root override.
 
 Returns:
 Tuple of ``(hf_home, model_root)`` paths after normalisation.
+
+### `ensure_model_environment(hf_home, model_root)`
+
+Initialise and cache the HuggingFace/model-root environment settings.
+
+### `_ensure_optional_dependency(module_name, message)`
+
+Import ``module_name`` or raise with ``message``.
+
+### `ensure_splade_dependencies(import_error)`
+
+Validate that SPLADE optional dependencies are importable.
+
+### `ensure_qwen_dependencies(import_error)`
+
+Validate that Qwen/vLLM optional dependencies are importable.
 
 ### `detect_data_root(start)`
 
@@ -224,6 +304,14 @@ Examples:
 >>> isinstance(data_html(), Path)
 True
 
+### `derive_doc_id_and_doctags_path(source_pdf, pdfs_root, doctags_root)`
+
+Return manifest doc identifier and DocTags output path for ``source_pdf``.
+
+### `derive_doc_id_and_chunks_path(doctags_file, doctags_root, chunks_root)`
+
+Return manifest doc identifier and chunk output path for ``doctags_file``.
+
 ### `derive_doc_id_and_vectors_path(chunk_file, chunks_root, vectors_root)`
 
 Return manifest doc identifier and vectors output path for ``chunk_file``.
@@ -345,6 +433,11 @@ True
 ### `atomic_write(path)`
 
 Write to a temporary file and atomically replace the destination.
+
+Pattern: open a sibling ``*.tmp`` file, write the payload, flush and
+``fsync`` the descriptor, then ``rename`` it over the original path. This
+guarantees that readers never observe a partially written file even if the
+process crashes mid-write.
 
 Args:
 path: Target path to write.
@@ -657,6 +750,38 @@ Public wrapper for the ``embed`` subcommand.
 
 Public wrapper for the ``doctags`` subcommand.
 
+### `apply_env(self)`
+
+Overlay configuration from environment variables.
+
+### `update_from_file(self, cfg_path)`
+
+Overlay configuration from ``cfg_path``.
+
+### `apply_args(self, args)`
+
+Overlay configuration from an argparse namespace.
+
+### `from_env(cls)`
+
+Instantiate a configuration populated solely from environment variables.
+
+### `finalize(self)`
+
+Hook allowing subclasses to normalise derived fields.
+
+### `to_manifest(self)`
+
+Return a manifest-friendly snapshot of the configuration.
+
+### `_coerce_field(self, name, value, base_dir)`
+
+*No documentation available.*
+
+### `is_overridden(self, field_name)`
+
+Return ``True`` when ``field_name`` was explicitly overridden.
+
 ### `__iter__(self)`
 
 Yield successive lists containing up to ``batch_size`` elements.
@@ -678,6 +803,14 @@ Returns:
 JSON-formatted string containing canonical log fields and optional extras.
 
 ## 3. Classes
+
+### `CLIOption`
+
+Declarative CLI argument specification used by ``build_subcommand``.
+
+### `StageConfigBase`
+
+Base dataclass for stage configuration objects.
 
 ### `BM25Stats`
 

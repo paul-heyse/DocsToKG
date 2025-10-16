@@ -106,6 +106,14 @@ python -m DocsToKG.DocParsing.embedding –resume</p>
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="shutdown-llm-instance-llm">
+<h3><code class="docutils literal notranslate"><span class="pre">_shutdown_llm_instance(llm)</span></code><a class="headerlink" href="#shutdown-llm-instance-llm" title="Link to this heading"></a></h3>
+<p>Best-effort shutdown for a cached Qwen LLM instance.</p>
+</section>
+<section id="close-all-qwen">
+<h3><code class="docutils literal notranslate"><span class="pre">close_all_qwen()</span></code><a class="headerlink" href="#close-all-qwen" title="Link to this heading"></a></h3>
+<p>Release all cached Qwen LLM instances.</p>
+</section>
 <section id="qwen-cache-key-cfg">
 <h3><code class="docutils literal notranslate"><span class="pre">_qwen_cache_key(cfg)</span></code><a class="headerlink" href="#qwen-cache-key-cfg" title="Link to this heading"></a></h3>
 <p>Return cache key tuple for Qwen LLM instances.</p>
@@ -143,21 +151,13 @@ default: Fallback path used when <code class="docutils literal notranslate"><spa
 <p>Returns:
 Absolute path derived from <code class="docutils literal notranslate"><span class="pre">value</span></code> or <code class="docutils literal notranslate"><span class="pre">default</span></code>.</p>
 </section>
-<section id="missing-splade-dependency-message">
-<h3><code class="docutils literal notranslate"><span class="pre">_missing_splade_dependency_message()</span></code><a class="headerlink" href="#missing-splade-dependency-message" title="Link to this heading"></a></h3>
-<p>Return a human-readable installation hint for SPLADE extras.</p>
-</section>
-<section id="missing-qwen-dependency-message">
-<h3><code class="docutils literal notranslate"><span class="pre">_missing_qwen_dependency_message()</span></code><a class="headerlink" href="#missing-qwen-dependency-message" title="Link to this heading"></a></h3>
-<p>Return a human-readable installation hint for Qwen/vLLM extras.</p>
-</section>
 <section id="ensure-splade-dependencies">
 <h3><code class="docutils literal notranslate"><span class="pre">_ensure_splade_dependencies()</span></code><a class="headerlink" href="#ensure-splade-dependencies" title="Link to this heading"></a></h3>
-<p>Validate that SPLADE optional dependencies are importable.</p>
+<p>Backward-compatible shim that delegates to core.ensure_splade_dependencies.</p>
 </section>
 <section id="ensure-qwen-dependencies">
 <h3><code class="docutils literal notranslate"><span class="pre">_ensure_qwen_dependencies()</span></code><a class="headerlink" href="#ensure-qwen-dependencies" title="Link to this heading"></a></h3>
-<p>Validate that Qwen/vLLM optional dependencies are importable.</p>
+<p>Backward-compatible shim that delegates to core.ensure_qwen_dependencies.</p>
 </section>
 <section id="ensure-uuid-rows">
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_uuid(rows)</span></code><a class="headerlink" href="#ensure-uuid-rows" title="Link to this heading"></a></h3>
@@ -286,6 +286,10 @@ directory: Directory to scan for chunk artifacts.</p>
 <p>Returns:
 Iterator over chunk files.</p>
 </section>
+<section id="create-vector-writer-path-fmt">
+<h3><code class="docutils literal notranslate"><span class="pre">create_vector_writer(path,</span> <span class="pre">fmt)</span></code><a class="headerlink" href="#create-vector-writer-path-fmt" title="Link to this heading"></a></h3>
+<p>Factory returning the appropriate vector writer for <code class="docutils literal notranslate"><span class="pre">fmt</span></code>.</p>
+</section>
 <section id="process-chunk-file-vectors-chunk-file-out-path-stats-args-validator-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">process_chunk_file_vectors(chunk_file,</span> <span class="pre">out_path,</span> <span class="pre">stats,</span> <span class="pre">args,</span> <span class="pre">validator,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#process-chunk-file-vectors-chunk-file-out-path-stats-args-validator-logger" title="Link to this heading"></a></h3>
 <p>Generate vectors for a single chunk file and persist them to disk.</p>
@@ -301,11 +305,11 @@ Tuple of <code class="docutils literal notranslate"><span class="pre">(vector_co
 <p>Raises:
 ValueError: Propagated if vector dimensions or norms fail validation.</p>
 </section>
-<section id="write-vectors-destination-uuids-texts-splade-results-qwen-results-stats-args">
-<h3><code class="docutils literal notranslate"><span class="pre">write_vectors(destination,</span> <span class="pre">uuids,</span> <span class="pre">texts,</span> <span class="pre">splade_results,</span> <span class="pre">qwen_results,</span> <span class="pre">stats,</span> <span class="pre">args)</span></code><a class="headerlink" href="#write-vectors-destination-uuids-texts-splade-results-qwen-results-stats-args" title="Link to this heading"></a></h3>
+<section id="write-vectors-writer-uuids-texts-splade-results-qwen-results-stats-args">
+<h3><code class="docutils literal notranslate"><span class="pre">write_vectors(writer,</span> <span class="pre">uuids,</span> <span class="pre">texts,</span> <span class="pre">splade_results,</span> <span class="pre">qwen_results,</span> <span class="pre">stats,</span> <span class="pre">args)</span></code><a class="headerlink" href="#write-vectors-writer-uuids-texts-splade-results-qwen-results-stats-args" title="Link to this heading"></a></h3>
 <p>Write validated vector rows to disk with schema enforcement.</p>
 <p>Args:
-path_or_handle: Destination JSONL path or file handle for vector rows.
+writer: Vector writer responsible for persisting rows.
 uuids: Sequence of chunk UUIDs aligned with the other inputs.
 texts: Chunk text bodies.
 splade_results: SPLADE token and weight pairs per chunk.
@@ -359,6 +363,18 @@ int: Exit code where <code class="docutils literal notranslate"><span class="pre
 <p>Raises:
 ValueError: If invalid runtime parameters (such as batch sizes) are supplied.</p>
 </section>
+<section id="from-env-cls-defaults">
+<h3><code class="docutils literal notranslate"><span class="pre">from_env(cls,</span> <span class="pre">defaults)</span></code><a class="headerlink" href="#from-env-cls-defaults" title="Link to this heading"></a></h3>
+<p>Construct configuration from environment variables.</p>
+</section>
+<section id="from-args-cls-args-defaults">
+<h3><code class="docutils literal notranslate"><span class="pre">from_args(cls,</span> <span class="pre">args,</span> <span class="pre">defaults)</span></code><a class="headerlink" href="#from-args-cls-args-defaults" title="Link to this heading"></a></h3>
+<p>Merge CLI arguments, configuration files, and environment variables.</p>
+</section>
+<section id="finalize-self">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize(self)</span></code><a class="headerlink" href="#finalize-self" title="Link to this heading"></a></h3>
+<p>Normalise paths and casing after all sources have been applied.</p>
+</section>
 <section id="add-document-self-text">
 <h3><code class="docutils literal notranslate"><span class="pre">add_document(self,</span> <span class="pre">text)</span></code><a class="headerlink" href="#add-document-self-text" title="Link to this heading"></a></h3>
 <p>Add document to statistics without retaining text.</p>
@@ -367,8 +383,8 @@ text: Document contents used to update running statistics.</p>
 <p>Returns:
 None</p>
 </section>
-<section id="finalize-self">
-<h3><code class="docutils literal notranslate"><span class="pre">finalize(self)</span></code><a class="headerlink" href="#finalize-self" title="Link to this heading"></a></h3>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize(self)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
 <p>Compute final statistics.</p>
 <p>Args:
 None: The accumulator finalises its internal counters without parameters.</p>
@@ -407,6 +423,22 @@ None</p>
 <h3><code class="docutils literal notranslate"><span class="pre">shutdown(self,</span> <span class="pre">wait)</span></code><a class="headerlink" href="#shutdown-self-wait" title="Link to this heading"></a></h3>
 <p>Flush pending requests and terminate the worker thread.</p>
 </section>
+<section id="write-rows-self-rows">
+<h3><code class="docutils literal notranslate"><span class="pre">write_rows(self,</span> <span class="pre">rows)</span></code><a class="headerlink" href="#write-rows-self-rows" title="Link to this heading"></a></h3>
+<p>Persist a batch of vector rows to the underlying storage medium.</p>
+</section>
+<section id="enter-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#enter-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="exit-self-exc-type-exc-tb">
+<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#exit-self-exc-type-exc-tb" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id2">
+<h3><code class="docutils literal notranslate"><span class="pre">write_rows(self,</span> <span class="pre">rows)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<p>Append <code class="docutils literal notranslate"><span class="pre">rows</span></code> to the active JSONL artifact created by <code class="docutils literal notranslate"><span class="pre">__enter__</span></code>.</p>
+</section>
 <section id="process-entry-entry">
 <h3><code class="docutils literal notranslate"><span class="pre">_process_entry(entry)</span></code><a class="headerlink" href="#process-entry-entry" title="Link to this heading"></a></h3>
 <p>Encode vectors for a chunk file and report per-file metrics.</p>
@@ -414,6 +446,10 @@ None</p>
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="embedcfg">
+<h3><code class="docutils literal notranslate"><span class="pre">EmbedCfg</span></code><a class="headerlink" href="#embedcfg" title="Link to this heading"></a></h3>
+<p>Stage configuration container for the embedding pipeline.</p>
+</section>
 <section id="bm25statsaccumulator">
 <h3><code class="docutils literal notranslate"><span class="pre">BM25StatsAccumulator</span></code><a class="headerlink" href="#bm25statsaccumulator" title="Link to this heading"></a></h3>
 <p>Streaming accumulator for BM25 corpus statistics.</p>
@@ -458,6 +494,14 @@ validator.total_chunks
 <section id="embeddingprocessingerror">
 <h3><code class="docutils literal notranslate"><span class="pre">EmbeddingProcessingError</span></code><a class="headerlink" href="#embeddingprocessingerror" title="Link to this heading"></a></h3>
 <p>Wrap exceptions raised during per-file embedding with timing metadata.</p>
+</section>
+<section id="vectorwriter">
+<h3><code class="docutils literal notranslate"><span class="pre">VectorWriter</span></code><a class="headerlink" href="#vectorwriter" title="Link to this heading"></a></h3>
+<p>Abstract base class for vector writers.</p>
+</section>
+<section id="jsonlvectorwriter">
+<h3><code class="docutils literal notranslate"><span class="pre">JsonlVectorWriter</span></code><a class="headerlink" href="#jsonlvectorwriter" title="Link to this heading"></a></h3>
+<p>Context manager that writes vector rows to JSONL atomically.</p>
 </section>
 </section>
 </section>

@@ -81,7 +81,12 @@
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.features</span></code>.</p>
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>Deprecated feature helpers retained for backward compatibility.</p>
+<p>Compatibility layer for the retired <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.features</span></code> module.</p>
+<p>This shim is gated behind the <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_HYBRID_FEATURES_SHIM</span></code> environment
+variable. By default the module raises an ImportError instructing callers to
+switch to <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.devtools.features</span></code>. Setting the environment
+variable to a truthy value temporarily re-enables the shim (and emits a
+DeprecationWarning) so teams can smoke-test outstanding imports.</p>
 </section>
 </section>
 

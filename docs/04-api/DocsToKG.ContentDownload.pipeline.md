@@ -35,6 +35,14 @@ Usage:
 
 ## 2. Functions
 
+### `_normalise_domain_bytes_budget(data)`
+
+Normalize domain byte budgets to lower-case host keys and integer byte limits.
+
+### `_normalise_domain_content_rules(data)`
+
+Normalize domain content policies to lower-case host keys and canonical values.
+
 ### `read_resolver_config(path)`
 
 Read resolver configuration from JSON or YAML files.
@@ -140,6 +148,10 @@ resolver_name: Name of the resolver requesting a timeout.
 
 Returns:
 float: Timeout value in seconds.
+
+### `get_content_policy(self, host)`
+
+Return the normalized content policy for ``host`` when configured.
 
 ### `is_enabled(self, resolver_name)`
 
@@ -686,7 +698,33 @@ None
 
 Enforce per-domain throttling when configured.
 
+Args:
+url: Candidate URL whose host may be throttled.
+
+Returns:
+Total seconds slept enforcing the domain policies.
+
 ### `_ensure_host_bucket(self, host)`
+
+*No documentation available.*
+
+### `_resolve_budget_host_key(self, host)`
+
+*No documentation available.*
+
+### `_domain_budget_remaining(self, host_key)`
+
+*No documentation available.*
+
+### `_estimate_outcome_bytes(self, outcome)`
+
+*No documentation available.*
+
+### `_record_domain_bytes(self, host_key, outcome)`
+
+*No documentation available.*
+
+### `_acquire_host_slot(self, host)`
 
 *No documentation available.*
 
@@ -726,7 +764,7 @@ resolver_name: Name of the resolver under consideration.
 Returns:
 Boolean indicating whether the resolver should issue a HEAD request.
 
-### `_head_precheck_url(self, session, url, timeout)`
+### `_head_precheck_url(self, session, url, timeout, content_policy)`
 
 Delegate to the shared network-layer preflight helper.
 
@@ -823,6 +861,10 @@ PipelineResult when resolution succeeds, otherwise ``None``.
 
 *No documentation available.*
 
+### `_release()`
+
+*No documentation available.*
+
 ### `submit_next(executor, start_index)`
 
 Queue additional resolvers until reaching concurrency limits.
@@ -874,8 +916,11 @@ resolver_head_precheck: Per-resolver overrides for HEAD filtering behaviour.
 host_accept_overrides: Mapping of hostname to Accept header override.
 mailto: Contact email appended to polite headers and user agent string.
 max_concurrent_resolvers: Upper bound on concurrent resolver threads per work.
+max_concurrent_per_host: Upper bound on simultaneous downloads per hostname.
 enable_global_url_dedup: Enable global URL deduplication across works when True.
 domain_token_buckets: Mapping of hostname to token bucket parameters.
+domain_bytes_budget: Mapping of hostname to maximum bytes permitted this run.
+domain_content_rules: Mapping of hostname to MIME allow-lists and max-bytes caps.
 resolver_circuit_breakers: Mapping of resolver name to breaker thresholds/cooldowns.
 
 Notes:
@@ -883,7 +928,8 @@ Notes:
 to filter obvious HTML responses. ``resolver_head_precheck`` allows
 per-resolver overrides when specific providers reject HEAD _requests.
 ``max_concurrent_resolvers`` bounds the number of resolver threads used
-per work while still respecting configured rate limits.
+per work while still respecting configured rate limits. ``max_concurrent_per_host``
+limits simultaneous downloads hitting the same hostname across workers.
 
 Examples:
 >>> config = ResolverConfig()
@@ -895,6 +941,7 @@ Examples:
 Structured log record describing a resolver attempt.
 
 Attributes:
+run_id: Identifier shared across a downloader run.
 work_id: Identifier of the work being processed.
 resolver_name: Name of the resolver that produced the record.
 resolver_order: Ordinal position of the resolver in the pipeline.
@@ -910,6 +957,7 @@ metadata: Arbitrary metadata supplied by the resolver.
 sha256: SHA-256 digest of downloaded content, when available.
 content_length: Size of the downloaded content in bytes.
 dry_run: Flag indicating whether the attempt occurred in dry-run mode.
+retry_after: Optional cooldown seconds suggested by the upstream service.
 
 Examples:
 >>> AttemptRecord(
@@ -940,6 +988,7 @@ content_length: Size of the downloaded content in bytes.
 etag: HTTP ETag header value when provided.
 last_modified: HTTP Last-Modified timestamp.
 extracted_text_path: Optional path to extracted text artefacts.
+retry_after: Optional cooldown value derived from HTTP ``Retry-After`` headers.
 
 Examples:
 >>> DownloadOutcome(classification="pdf", path="pdfs/sample.pdf", http_status=200,

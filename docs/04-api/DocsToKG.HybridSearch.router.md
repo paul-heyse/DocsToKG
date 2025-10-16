@@ -22,7 +22,11 @@ Return the store serving ``namespace`` (creating one if necessary).
 
 ### `stats(self)`
 
-Return stats for all managed stores.
+Return stats for all managed stores (namespaced and aggregate).
+
+### `_aggregate_stats(namespaced)`
+
+*No documentation available.*
 
 ### `serialize_all(self)`
 

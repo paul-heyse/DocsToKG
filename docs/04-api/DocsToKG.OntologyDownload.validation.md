@@ -8,6 +8,18 @@ Validation and normalization utilities for ontology downloads.
 
 ## 2. Functions
 
+### `load_resolver_plugins(registry)`
+
+Proxy to :mod:`plugins` resolver discovery preserving legacy globals.
+
+### `ensure_resolver_plugins(registry)`
+
+Load resolver plugins exactly once per interpreter.
+
+### `load_validator_plugins(registry)`
+
+Proxy to :mod:`plugins` validator discovery preserving legacy globals.
+
 ### `_write_validation_json(path, payload)`
 
 Persist structured validation metadata to disk as JSON.
@@ -89,18 +101,6 @@ return_header_hash: When True, also return the hash of Turtle prefix directives.
 Returns:
 SHA-256 hex digest of the canonical Turtle content, and optionally the hash
 of the serialized prefix header when ``return_header_hash`` is True.
-
-### `load_resolver_plugins(registry)`
-
-Discover resolver plugins registered via ``entry_points``.
-
-### `ensure_resolver_plugins(registry)`
-
-Load resolver plugins exactly once per interpreter.
-
-### `load_validator_plugins(registry)`
-
-Discover validator plugins registered via ``entry_points``.
 
 ### `ensure_validator_plugins(registry)`
 
@@ -270,14 +270,6 @@ Dictionary with boolean status, detail payload, and output paths.
 
 *No documentation available.*
 
-### `plan(self)`
-
-Plan a fetch for the provided ontology specification.
-
-### `__call__(self)`
-
-Execute the validator.
-
 ### `_parse()`
 
 Parse the ontology with rdflib to populate the graph object.
@@ -350,14 +342,6 @@ Examples:
 Traceback (most recent call last):
 ...
 ValidationTimeout: rdflib exceeded 60s
-
-### `_ResolverLike`
-
-Structural protocol describing resolver plugin instances.
-
-### `_ValidatorLike`
-
-Structural protocol for validator callables.
 
 ### `ValidatorSubprocessError`
 

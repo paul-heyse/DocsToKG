@@ -167,6 +167,26 @@ Inferred embedding dimensionality, defaulting to 2560 when unknown.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">current_pass_rate(self)</span></code><a class="headerlink" href="#current-pass-rate-self" title="Link to this heading"></a></h3>
 <p>Expose the current blended pass rate.</p>
 </section>
+<section id="persist-self">
+<h3><code class="docutils literal notranslate"><span class="pre">persist(self)</span></code><a class="headerlink" href="#persist-self" title="Link to this heading"></a></h3>
+<p>Persist the adaptive cache to disk when a cache path is configured.</p>
+</section>
+<section id="encode-signature-self-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_encode_signature(self,</span> <span class="pre">value)</span></code><a class="headerlink" href="#encode-signature-self-value" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="decode-signature-self-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_decode_signature(self,</span> <span class="pre">value)</span></code><a class="headerlink" href="#decode-signature-self-value" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="persist-cache-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_persist_cache(self)</span></code><a class="headerlink" href="#persist-cache-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="load-cache-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_load_cache(self)</span></code><a class="headerlink" href="#load-cache-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="fuse-self-candidates">
 <h3><code class="docutils literal notranslate"><span class="pre">fuse(self,</span> <span class="pre">candidates)</span></code><a class="headerlink" href="#fuse-self-candidates" title="Link to this heading"></a></h3>
 <p>Combine channel rankings into fused scores keyed by vector id.</p>
@@ -203,6 +223,10 @@ List of <code class="docutils literal notranslate"><span class="pre">HybridSearc
 <h3><code class="docutils literal notranslate"><span class="pre">_cosine_cpu(query,</span> <span class="pre">pool)</span></code><a class="headerlink" href="#cosine-cpu-query-pool" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
+<section id="close-self">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#close-self" title="Link to this heading"></a></h3>
+<p>Release pooled resources held by the service.</p>
+</section>
 <section id="search-self-request">
 <h3><code class="docutils literal notranslate"><span class="pre">search(self,</span> <span class="pre">request)</span></code><a class="headerlink" href="#search-self-request" title="Link to this heading"></a></h3>
 <p>Execute a hybrid retrieval round trip for <code class="docutils literal notranslate"><span class="pre">request</span></code>.</p>
@@ -217,6 +241,10 @@ RequestValidationError: If <code class="docutils literal notranslate"><span clas
 </section>
 <section id="validate-request-self-request">
 <h3><code class="docutils literal notranslate"><span class="pre">_validate_request(self,</span> <span class="pre">request)</span></code><a class="headerlink" href="#validate-request-self-request" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="assert-managed-store-store">
+<h3><code class="docutils literal notranslate"><span class="pre">_assert_managed_store(store)</span></code><a class="headerlink" href="#assert-managed-store-store" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 <section id="dense-store-self-namespace">
@@ -251,8 +279,8 @@ RequestValidationError: If <code class="docutils literal notranslate"><span clas
 <h3><code class="docutils literal notranslate"><span class="pre">_execute_dense(self,</span> <span class="pre">request,</span> <span class="pre">filters,</span> <span class="pre">config,</span> <span class="pre">query_features,</span> <span class="pre">timings,</span> <span class="pre">store)</span></code><a class="headerlink" href="#execute-dense-self-request-filters-config-query-features-timings-store" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
-<section id="filter-dense-hits-self-hits-filters">
-<h3><code class="docutils literal notranslate"><span class="pre">_filter_dense_hits(self,</span> <span class="pre">hits,</span> <span class="pre">filters)</span></code><a class="headerlink" href="#filter-dense-hits-self-hits-filters" title="Link to this heading"></a></h3>
+<section id="filter-dense-hits-self-hits-filters-score-floor">
+<h3><code class="docutils literal notranslate"><span class="pre">_filter_dense_hits(self,</span> <span class="pre">hits,</span> <span class="pre">filters,</span> <span class="pre">score_floor)</span></code><a class="headerlink" href="#filter-dense-hits-self-hits-filters-score-floor" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 <section id="dense-request-signature-self-request-filters">

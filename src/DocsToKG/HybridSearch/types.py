@@ -368,6 +368,7 @@ class HybridSearchRequest:
         cursor: Optional pagination cursor for continuation
         diversification: Whether to apply MMR diversification
         diagnostics: Whether to include per-method scoring information
+        recall_first: When True, prefer range-search style recall for dense results
 
     Examples:
         >>> request = HybridSearchRequest(
@@ -385,6 +386,7 @@ class HybridSearchRequest:
     cursor: Optional[str] = None
     diversification: bool = False
     diagnostics: bool = True
+    recall_first: bool = False
 
 
 @dataclass(slots=True)

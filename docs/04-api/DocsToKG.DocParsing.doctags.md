@@ -389,7 +389,51 @@ args: Optional pre-parsed CLI namespace to override command-line inputs.
 Returns:
 Process exit code, where ``0`` denotes success.
 
+### `_should_install_docling_test_stubs()`
+
+Return ``True`` when docling stubs should be installed for tests.
+
+### `_ensure_stub_module(name)`
+
+Register a lightweight stub module in :mod:`sys.modules` if missing.
+
+### `_install_docling_test_stubs()`
+
+Install minimal docling/docling-core shims for unit tests.
+
+### `from_env(cls)`
+
+Build a configuration exclusively from environment variables.
+
+### `from_args(cls, args)`
+
+Create a configuration by merging env vars, optional config files, and CLI arguments.
+
+### `finalize(self)`
+
+Normalise derived fields after configuration sources are applied.
+
+### `convert(self)`
+
+Raise to indicate conversions are not executed in stub mode.
+
+### `__repr__(self)`
+
+*No documentation available.*
+
+### `__hash__(self)`
+
+*No documentation available.*
+
+### `__eq__(self, other)`
+
+*No documentation available.*
+
 ## 3. Classes
+
+### `DoctagsCfg`
+
+Structured configuration for DocTags conversion stages.
 
 ### `PdfTask`
 
@@ -471,3 +515,51 @@ error: Optional error detail for failures.
 Examples:
 >>> HtmlConversionResult("doc", "success", 1.0, "in.html", "hash", "out.doctags")
 HtmlConversionResult(doc_id='doc', status='success', duration_s=1.0, input_path='in.html', input_hash='hash', output_path='out.doctags', error=None)
+
+### `DocumentConverter`
+
+Stubbed ``docling`` converter preserving the real API surface.
+
+### `PdfFormatOption`
+
+Stub container matching ``docling`` PDF format options.
+
+### `DoclingParseV4DocumentBackend`
+
+Placeholder backend used when ``docling`` is unavailable.
+
+### `AcceleratorDevice`
+
+Minimal enum-like device sentinel for accelerator selection.
+
+### `AcceleratorOptions`
+
+Stub options matching the constructor signature of the real class.
+
+### `_EnumValue`
+
+*No documentation available.*
+
+### `ConversionStatus`
+
+Enum-like result state mirrors for Docling conversion outcomes.
+
+### `InputFormat`
+
+Enum-like input format sentinel used in Docling pipelines.
+
+### `VlmPipelineOptions`
+
+Catch-all structure mimicking the real VLM pipeline options.
+
+### `ApiVlmOptions`
+
+Stub capturing API VLM options forwarded by planners.
+
+### `ResponseFormat`
+
+Response format sentinel mirroring Docling's enumeration.
+
+### `VlmPipeline`
+
+Placeholder VLM pipeline used during tests.

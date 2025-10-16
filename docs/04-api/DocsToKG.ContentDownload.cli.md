@@ -55,6 +55,14 @@ OSError: If the directory cannot be created because of permissions.
 
 *No documentation available.*
 
+### `_validate_cached_artifact(result)`
+
+Return ``True`` when cached artefact metadata matches on-disk state.
+
+### `_parse_size(value)`
+
+Parse human-friendly size strings (e.g., ``10MB``) into bytes.
+
 ### `_parse_domain_interval(value)`
 
 Parse ``DOMAIN=SECONDS`` CLI arguments for domain throttling.
@@ -67,6 +75,14 @@ Tuple containing the normalized domain name and interval seconds.
 
 Raises:
 argparse.ArgumentTypeError: If the argument is malformed or negative.
+
+### `_parse_domain_bytes_budget(value)`
+
+Parse ``DOMAIN=BYTES`` CLI arguments for domain byte budgets.
+
+### `_parse_domain_token_bucket(value)`
+
+Parse ``DOMAIN=RPS[:capacity=X]`` specifications into bucket configs.
 
 ### `_parse_budget(value)`
 
@@ -179,17 +195,7 @@ html_dir: Directory where HTML artefacts are written.
 pipeline: Resolver pipeline orchestrating downstream resolvers.
 logger: Structured attempt logger capturing manifest records.
 metrics: Resolver metrics collector.
-dry_run: When True, simulate downloads without writing files.
-list_only: When True, record candidate URLs without fetching content.
-extract_html_text: Whether to extract plaintext from HTML artefacts.
-previous_lookup: Mapping of work_id/URL to prior manifest entries.
-resume_completed: Set of work IDs already processed in resume mode.
-max_bytes: Optional size limit per download in bytes.
-sniff_bytes: Number of leading bytes to buffer for payload inference.
-min_pdf_bytes: Minimum PDF size accepted when HEAD prechecks fail.
-tail_check_bytes: Tail window size used to detect embedded HTML payloads.
-robots_checker: Cache enforcing robots.txt policies when enabled.
-content_addressed: Whether to store PDFs under content-addressed paths.
+options: :class:`DownloadOptions` describing download behaviour for the work.
 
 Returns:
 Dictionary summarizing the outcome (saved/html_only/skipped flags).
@@ -213,10 +219,6 @@ None
 
 Returns:
 None
-
-### `__post_init__(self)`
-
-*No documentation available.*
 
 ### `is_allowed(self, session, url, timeout)`
 
@@ -251,6 +253,10 @@ Update aggregate counters based on a single work result.
 
 *No documentation available.*
 
+### `_stream_chunks()`
+
+*No documentation available.*
+
 ### `_submit(work_item)`
 
 Submit a work item to the executor for asynchronous processing.
@@ -261,13 +267,17 @@ Process a single work item within a worker-managed session.
 
 ## 3. Classes
 
-### `WorkArtifact`
+### `DownloadOptions`
 
-Normalized artifact describing an OpenAlex work to process.
+Stable collection of per-run download settings applied to each work item.
 
 ### `DownloadState`
 
 State machine for streaming downloads.
+
+### `_MaxBytesExceeded`
+
+Internal signal raised when the stream exceeds the configured byte budget.
 
 ### `RobotsCache`
 

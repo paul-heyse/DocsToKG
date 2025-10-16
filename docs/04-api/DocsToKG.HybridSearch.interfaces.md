@@ -115,10 +115,6 @@ Return runtime adapter statistics (device, nprobe, replication state).
 
 Insert dense vectors.
 
-### `add_batch(self, vectors, vector_ids)`
-
-Insert vectors in batches; defaults mirror FAISS GPU-friendly chunking.
-
 ### `remove(self, vector_ids)`
 
 Delete dense vectors referenced by ``vector_ids``.

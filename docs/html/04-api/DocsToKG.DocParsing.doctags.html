@@ -423,9 +423,53 @@ args: Optional pre-parsed CLI namespace to override command-line inputs.</p>
 <p>Returns:
 Process exit code, where <code class="docutils literal notranslate"><span class="pre">0</span></code> denotes success.</p>
 </section>
+<section id="should-install-docling-test-stubs">
+<h3><code class="docutils literal notranslate"><span class="pre">_should_install_docling_test_stubs()</span></code><a class="headerlink" href="#should-install-docling-test-stubs" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when docling stubs should be installed for tests.</p>
+</section>
+<section id="ensure-stub-module-name">
+<h3><code class="docutils literal notranslate"><span class="pre">_ensure_stub_module(name)</span></code><a class="headerlink" href="#ensure-stub-module-name" title="Link to this heading"></a></h3>
+<p>Register a lightweight stub module in :mod:<code class="docutils literal notranslate"><span class="pre">sys.modules</span></code> if missing.</p>
+</section>
+<section id="install-docling-test-stubs">
+<h3><code class="docutils literal notranslate"><span class="pre">_install_docling_test_stubs()</span></code><a class="headerlink" href="#install-docling-test-stubs" title="Link to this heading"></a></h3>
+<p>Install minimal docling/docling-core shims for unit tests.</p>
+</section>
+<section id="from-env-cls">
+<h3><code class="docutils literal notranslate"><span class="pre">from_env(cls)</span></code><a class="headerlink" href="#from-env-cls" title="Link to this heading"></a></h3>
+<p>Build a configuration exclusively from environment variables.</p>
+</section>
+<section id="from-args-cls-args">
+<h3><code class="docutils literal notranslate"><span class="pre">from_args(cls,</span> <span class="pre">args)</span></code><a class="headerlink" href="#from-args-cls-args" title="Link to this heading"></a></h3>
+<p>Create a configuration by merging env vars, optional config files, and CLI arguments.</p>
+</section>
+<section id="finalize-self">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize(self)</span></code><a class="headerlink" href="#finalize-self" title="Link to this heading"></a></h3>
+<p>Normalise derived fields after configuration sources are applied.</p>
+</section>
+<section id="convert-self">
+<h3><code class="docutils literal notranslate"><span class="pre">convert(self)</span></code><a class="headerlink" href="#convert-self" title="Link to this heading"></a></h3>
+<p>Raise to indicate conversions are not executed in stub mode.</p>
+</section>
+<section id="repr-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__repr__(self)</span></code><a class="headerlink" href="#repr-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="hash-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__hash__(self)</span></code><a class="headerlink" href="#hash-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="eq-self-other">
+<h3><code class="docutils literal notranslate"><span class="pre">__eq__(self,</span> <span class="pre">other)</span></code><a class="headerlink" href="#eq-self-other" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="doctagscfg">
+<h3><code class="docutils literal notranslate"><span class="pre">DoctagsCfg</span></code><a class="headerlink" href="#doctagscfg" title="Link to this heading"></a></h3>
+<p>Structured configuration for DocTags conversion stages.</p>
+</section>
 <section id="pdftask">
 <h3><code class="docutils literal notranslate"><span class="pre">PdfTask</span></code><a class="headerlink" href="#pdftask" title="Link to this heading"></a></h3>
 <p>Work item representing a single PDF conversion request.</p>
@@ -522,6 +566,54 @@ HtmlConversionResult(doc_id=’doc’, status=’success’, duration_s=1.0, inp
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>
+</section>
+<section id="documentconverter">
+<h3><code class="docutils literal notranslate"><span class="pre">DocumentConverter</span></code><a class="headerlink" href="#documentconverter" title="Link to this heading"></a></h3>
+<p>Stubbed <code class="docutils literal notranslate"><span class="pre">docling</span></code> converter preserving the real API surface.</p>
+</section>
+<section id="pdfformatoption">
+<h3><code class="docutils literal notranslate"><span class="pre">PdfFormatOption</span></code><a class="headerlink" href="#pdfformatoption" title="Link to this heading"></a></h3>
+<p>Stub container matching <code class="docutils literal notranslate"><span class="pre">docling</span></code> PDF format options.</p>
+</section>
+<section id="doclingparsev4documentbackend">
+<h3><code class="docutils literal notranslate"><span class="pre">DoclingParseV4DocumentBackend</span></code><a class="headerlink" href="#doclingparsev4documentbackend" title="Link to this heading"></a></h3>
+<p>Placeholder backend used when <code class="docutils literal notranslate"><span class="pre">docling</span></code> is unavailable.</p>
+</section>
+<section id="acceleratordevice">
+<h3><code class="docutils literal notranslate"><span class="pre">AcceleratorDevice</span></code><a class="headerlink" href="#acceleratordevice" title="Link to this heading"></a></h3>
+<p>Minimal enum-like device sentinel for accelerator selection.</p>
+</section>
+<section id="acceleratoroptions">
+<h3><code class="docutils literal notranslate"><span class="pre">AcceleratorOptions</span></code><a class="headerlink" href="#acceleratoroptions" title="Link to this heading"></a></h3>
+<p>Stub options matching the constructor signature of the real class.</p>
+</section>
+<section id="enumvalue">
+<h3><code class="docutils literal notranslate"><span class="pre">_EnumValue</span></code><a class="headerlink" href="#enumvalue" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="conversionstatus">
+<h3><code class="docutils literal notranslate"><span class="pre">ConversionStatus</span></code><a class="headerlink" href="#conversionstatus" title="Link to this heading"></a></h3>
+<p>Enum-like result state mirrors for Docling conversion outcomes.</p>
+</section>
+<section id="inputformat">
+<h3><code class="docutils literal notranslate"><span class="pre">InputFormat</span></code><a class="headerlink" href="#inputformat" title="Link to this heading"></a></h3>
+<p>Enum-like input format sentinel used in Docling pipelines.</p>
+</section>
+<section id="vlmpipelineoptions">
+<h3><code class="docutils literal notranslate"><span class="pre">VlmPipelineOptions</span></code><a class="headerlink" href="#vlmpipelineoptions" title="Link to this heading"></a></h3>
+<p>Catch-all structure mimicking the real VLM pipeline options.</p>
+</section>
+<section id="apivlmoptions">
+<h3><code class="docutils literal notranslate"><span class="pre">ApiVlmOptions</span></code><a class="headerlink" href="#apivlmoptions" title="Link to this heading"></a></h3>
+<p>Stub capturing API VLM options forwarded by planners.</p>
+</section>
+<section id="responseformat">
+<h3><code class="docutils literal notranslate"><span class="pre">ResponseFormat</span></code><a class="headerlink" href="#responseformat" title="Link to this heading"></a></h3>
+<p>Response format sentinel mirroring Docling’s enumeration.</p>
+</section>
+<section id="vlmpipeline">
+<h3><code class="docutils literal notranslate"><span class="pre">VlmPipeline</span></code><a class="headerlink" href="#vlmpipeline" title="Link to this heading"></a></h3>
+<p>Placeholder VLM pipeline used during tests.</p>
 </section>
 </section>
 </section>

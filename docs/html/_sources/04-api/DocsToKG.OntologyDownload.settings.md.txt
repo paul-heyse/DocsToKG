@@ -241,6 +241,10 @@ Delete stored data for *ontology_id*/*version*, returning bytes reclaimed.
 
 Record the latest processed version for *ontology_id*.
 
+### `mirror_cas_artifact(self, algorithm, digest, source)`
+
+Mirror ``source`` into a content-addressable cache and return its path.
+
 ### `_version_dir(self, ontology_id, version)`
 
 *No documentation available.*
@@ -277,6 +281,10 @@ Remove stored data for ``ontology_id``/``version`` and return bytes reclaimed.
 
 Update symbolic links/markers to highlight the latest processed version.
 
+### `mirror_cas_artifact(self, algorithm, digest, source)`
+
+Copy ``source`` into the content-addressable cache.
+
 ### `_remote_version_path(self, ontology_id, version)`
 
 Return the remote storage path for ``ontology_id``/``version``.
@@ -296,6 +304,10 @@ Mirror processed artefacts to remote storage after local completion.
 ### `delete_version(self, ontology_id, version)`
 
 Remove local and remote artefacts for ``ontology_id``/``version``.
+
+### `mirror_cas_artifact(self, algorithm, digest, source)`
+
+Mirror CAS artefact locally and to remote storage.
 
 ### `terms(self)`
 

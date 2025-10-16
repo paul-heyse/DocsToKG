@@ -397,6 +397,7 @@ class FaissVectorStore(DenseVectorStore):
         self._dirty_deletes = 0
         self._needs_rebuild = False
         self._supports_remove_ids: Optional[bool] = None
+        self._last_nprobe_update = 0.0
         self._set_nprobe()
         self._search_coalescer = _SearchCoalescer(self)
         self._cpu_replica: Optional[bytes] = None
@@ -451,6 +452,11 @@ class FaissVectorStore(DenseVectorStore):
         Returns:
             faiss.StandardGpuResources | None: GPU resource manager when initialised.
         """
+        return self._gpu_resources
+
+    def get_gpu_resources(self) -> Optional["faiss.StandardGpuResources"]:
+        """Compatibility helper returning active GPU resources."""
+
         return self._gpu_resources
 
     @property
@@ -737,6 +743,70 @@ class FaissVectorStore(DenseVectorStore):
         finally:
             self._release_pinned_buffers()
 
+    def range_search(
+        self,
+        query: np.ndarray,
+        min_score: float,
+        *,
+        limit: Optional[int] = None,
+    ) -> List[FaissSearchResult]:
+        """Return all vectors scoring above ``min_score`` for ``query``."""
+
+        vector = self._ensure_dim(query)
+        matrix = np.ascontiguousarray(vector.reshape(1, -1), dtype=np.float32)
+        matrix = self._as_pinned(matrix)
+        faiss.normalize_L2(matrix)
+        threshold = float(min_score)
+        results: List[FaissSearchResult] = []
+        try:
+            with self._observability.trace(
+                "faiss_range_search",
+                threshold=f"{threshold:.6f}",
+                limit="*" if limit is None else str(int(limit)),
+            ):
+                self._observability.metrics.increment("faiss_range_queries", amount=1.0)
+                pairs: List[tuple[float, int]]
+                try:
+                    with self._lock:
+                        self._flush_pending_deletes(force=False)
+                        self._set_nprobe()
+                        if not hasattr(self._index, "range_search"):
+                            raise AttributeError("range_search unsupported by index")
+                        lims, distances, labels = self._index.range_search(matrix, threshold)
+                except Exception:
+                    fallback_k = limit or max(32, min(self.ntotal, 2048))
+                    distances, indices = self._search_matrix(matrix, int(fallback_k))
+                    pairs = [
+                        (float(score), int(internal_id))
+                        for score, internal_id in zip(distances[0], indices[0])
+                        if internal_id != -1 and float(score) >= threshold
+                    ]
+                else:
+                    start = int(lims[0])
+                    end = int(lims[1])
+                    pairs = [
+                        (float(distances[i]), int(labels[i]))
+                        for i in range(start, end)
+                        if labels[i] != -1 and float(distances[i]) >= threshold
+                    ]
+                scored: List[tuple[float, str]] = []
+                for score, internal_id in pairs:
+                    vector_id = self._resolve_vector_id(int(internal_id))
+                    if vector_id is None:
+                        continue
+                    scored.append((score, vector_id))
+                scored.sort(key=lambda item: (-item[0], item[1]))
+                if limit is not None:
+                    scored = scored[: int(limit)]
+                for score, vector_id in scored:
+                    results.append(FaissSearchResult(vector_id=vector_id, score=float(score)))
+                self._observability.metrics.observe(
+                    "faiss_range_results", float(len(results))
+                )
+            return results
+        finally:
+            self._release_pinned_buffers()
+
     def _search_matrix(self, matrix: np.ndarray, top_k: int) -> tuple[np.ndarray, np.ndarray]:
         with self._lock:
             self._flush_pending_deletes(force=False)
@@ -1004,6 +1074,14 @@ class FaissVectorStore(DenseVectorStore):
         current = int(getattr(self._config, "nprobe", target))
         if target == current:
             return target
+        now = time.time()
+        if self._last_nprobe_update and now - self._last_nprobe_update < 60.0:
+            self._observability.metrics.increment("faiss_nprobe_rate_limited", amount=1.0)
+            self._observability.logger.debug(
+                "faiss-nprobe-rate-limit",
+                extra={"event": {"previous": current, "requested": target}},
+            )
+            return current
         logger.info(
             "faiss-nprobe-update",
             extra={
@@ -1014,6 +1092,7 @@ class FaissVectorStore(DenseVectorStore):
         with self._observability.trace("faiss_set_nprobe", nprobe=str(target)):
             with self._lock:
                 self._set_nprobe()
+                self._last_nprobe_update = now
         self._observability.metrics.set_gauge("faiss_nprobe", float(target))
         self._emit_gpu_state("set_nprobe")
         return target
@@ -1994,6 +2073,17 @@ class ManagedFaissAdapter(DenseVectorStore):
         """
         self._inner.set_id_resolver(resolver)
 
+    def range_search(
+        self,
+        query: np.ndarray,
+        min_score: float,
+        *,
+        limit: Optional[int] = None,
+    ) -> List[FaissSearchResult]:
+        """Delegate range search to the managed store."""
+
+        return list(self._inner.range_search(query, min_score, limit=limit))
+
     def needs_training(self) -> bool:
         """Return ``True`` when the underlying index requires training."""
 
@@ -2031,3 +2121,14 @@ class ManagedFaissAdapter(DenseVectorStore):
         """Expose diagnostic statistics from the managed store."""
 
         return self._inner.stats()
+
+    def get_gpu_resources(self) -> Optional["faiss.StandardGpuResources"]:
+        """Return GPU resources backing the managed index (if available)."""
+
+        getter = getattr(self._inner, "get_gpu_resources", None)
+        if callable(getter):
+            return getter()
+        adapter_stats = getattr(self._inner, "adapter_stats", None)
+        if adapter_stats is None:
+            return None
+        return adapter_stats.resources

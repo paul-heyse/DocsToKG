@@ -47,6 +47,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "embedcfg",
+#       "name": "EmbedCfg",
+#       "anchor": "class-embedcfg",
+#       "kind": "class"
+#     },
+#     {
 #       "id": "ensure-splade-dependencies",
 #       "name": "_ensure_splade_dependencies",
 #       "anchor": "function-ensure-splade-dependencies",
@@ -269,7 +275,8 @@ from collections import Counter
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Dict, Iterator, List, Optional, Sequence, Tuple
+from dataclasses import dataclass, fields
+from typing import Any, Callable, ClassVar, Dict, Iterator, List, Optional, Sequence, Tuple
 
 # Third-party imports
 from tqdm import tqdm
@@ -278,6 +285,7 @@ from DocsToKG.DocParsing.core import (
     UUID_NAMESPACE,
     Batcher,
     BM25Stats,
+    StageConfigBase,
     QwenCfg,
     SpladeCfg,
     CLIOption,
@@ -329,6 +337,7 @@ __all__ = (
     "QwenCfg",
     "SPLADEValidator",
     "SpladeCfg",
+    "EmbedCfg",
     "bm25_vector",
     "build_parser",
     "ensure_chunk_schema",
@@ -492,6 +501,10 @@ SPLADE_SPARSITY_WARN_THRESHOLD_PCT = 1.0
 
 EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     CLIOption(
+        ("--config",),
+        {"type": Path, "default": None, "help": "Path to stage config file (JSON/YAML/TOML)."},
+    ),
+    CLIOption(
         ("--log-level",),
         {
             "type": lambda value: str(value).upper(),
@@ -612,6 +625,159 @@ EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     ),
 )
 
+
+@dataclass
+class EmbedCfg(StageConfigBase):
+    """Stage configuration container for the embedding pipeline."""
+
+    log_level: str = "INFO"
+    data_root: Optional[Path] = None
+    chunks_dir: Path = DEFAULT_CHUNKS_DIR
+    out_dir: Path = DEFAULT_VECTORS_DIR
+    vector_format: str = "jsonl"
+    bm25_k1: float = 1.5
+    bm25_b: float = 0.75
+    batch_size_splade: int = 32
+    batch_size_qwen: int = 64
+    splade_max_active_dims: Optional[int] = None
+    splade_model_dir: Optional[Path] = None
+    splade_attn: str = "auto"
+    qwen_dtype: str = "bfloat16"
+    qwen_quant: Optional[str] = None
+    qwen_model_dir: Optional[Path] = None
+    qwen_dim: int = 2560
+    tp: int = 1
+    sparsity_warn_threshold_pct: float = SPLADE_SPARSITY_WARN_THRESHOLD_PCT
+    sparsity_report_top_n: int = 10
+    files_parallel: int = 1
+    validate_only: bool = False
+    offline: bool = False
+    resume: bool = False
+    force: bool = False
+    no_cache: bool = False
+    shard_count: int = 1
+    shard_index: int = 0
+
+    ENV_VARS: ClassVar[Dict[str, str]] = {
+        "log_level": "DOCSTOKG_EMBED_LOG_LEVEL",
+        "data_root": "DOCSTOKG_EMBED_DATA_ROOT",
+        "chunks_dir": "DOCSTOKG_EMBED_CHUNKS_DIR",
+        "out_dir": "DOCSTOKG_EMBED_OUT_DIR",
+        "vector_format": "DOCSTOKG_EMBED_VECTOR_FORMAT",
+        "bm25_k1": "DOCSTOKG_EMBED_BM25_K1",
+        "bm25_b": "DOCSTOKG_EMBED_BM25_B",
+        "batch_size_splade": "DOCSTOKG_EMBED_BATCH_SIZE_SPLADE",
+        "batch_size_qwen": "DOCSTOKG_EMBED_BATCH_SIZE_QWEN",
+        "splade_max_active_dims": "DOCSTOKG_EMBED_SPLADE_MAX_ACTIVE_DIMS",
+        "splade_model_dir": "DOCSTOKG_SPLADE_DIR",
+        "splade_attn": "DOCSTOKG_EMBED_SPLADE_ATTN",
+        "qwen_dtype": "DOCSTOKG_EMBED_QWEN_DTYPE",
+        "qwen_quant": "DOCSTOKG_EMBED_QWEN_QUANT",
+        "qwen_model_dir": "DOCSTOKG_QWEN_DIR",
+        "qwen_dim": "DOCSTOKG_EMBED_QWEN_DIM",
+        "tp": "DOCSTOKG_EMBED_TP",
+        "sparsity_warn_threshold_pct": "DOCSTOKG_EMBED_SPARSITY_WARN_PCT",
+        "sparsity_report_top_n": "DOCSTOKG_EMBED_SPARSITY_REPORT_TOP_N",
+        "files_parallel": "DOCSTOKG_EMBED_FILES_PARALLEL",
+        "validate_only": "DOCSTOKG_EMBED_VALIDATE_ONLY",
+        "offline": "DOCSTOKG_EMBED_OFFLINE",
+        "resume": "DOCSTOKG_EMBED_RESUME",
+        "force": "DOCSTOKG_EMBED_FORCE",
+        "no_cache": "DOCSTOKG_EMBED_NO_CACHE",
+        "shard_count": "DOCSTOKG_EMBED_SHARD_COUNT",
+        "shard_index": "DOCSTOKG_EMBED_SHARD_INDEX",
+        "config": "DOCSTOKG_EMBED_CONFIG",
+    }
+
+    FIELD_PARSERS: ClassVar[Dict[str, Callable[[Any, Optional[Path]], Any]]] = {
+        "config": StageConfigBase._coerce_optional_path,
+        "log_level": StageConfigBase._coerce_str,
+        "data_root": StageConfigBase._coerce_optional_path,
+        "chunks_dir": StageConfigBase._coerce_path,
+        "out_dir": StageConfigBase._coerce_path,
+        "vector_format": StageConfigBase._coerce_str,
+        "bm25_k1": StageConfigBase._coerce_float,
+        "bm25_b": StageConfigBase._coerce_float,
+        "batch_size_splade": StageConfigBase._coerce_int,
+        "batch_size_qwen": StageConfigBase._coerce_int,
+        "splade_max_active_dims": lambda value, base_dir: (
+            None if value in (None, "", []) else StageConfigBase._coerce_int(value, base_dir)
+        ),
+        "splade_model_dir": StageConfigBase._coerce_optional_path,
+        "splade_attn": StageConfigBase._coerce_str,
+        "qwen_dtype": StageConfigBase._coerce_str,
+        "qwen_quant": StageConfigBase._coerce_str,
+        "qwen_model_dir": StageConfigBase._coerce_optional_path,
+        "qwen_dim": StageConfigBase._coerce_int,
+        "tp": StageConfigBase._coerce_int,
+        "sparsity_warn_threshold_pct": StageConfigBase._coerce_float,
+        "sparsity_report_top_n": StageConfigBase._coerce_int,
+        "files_parallel": StageConfigBase._coerce_int,
+        "validate_only": StageConfigBase._coerce_bool,
+        "offline": StageConfigBase._coerce_bool,
+        "resume": StageConfigBase._coerce_bool,
+        "force": StageConfigBase._coerce_bool,
+        "no_cache": StageConfigBase._coerce_bool,
+        "shard_count": StageConfigBase._coerce_int,
+        "shard_index": StageConfigBase._coerce_int,
+    }
+
+    @classmethod
+    def from_env(cls, defaults: Optional[Dict[str, Any]] = None) -> "EmbedCfg":
+        """Construct configuration from environment variables."""
+
+        cfg = cls(**(defaults or {}))
+        cfg.apply_env()
+        if cfg.data_root is None:
+            fallback_root = os.getenv("DOCSTOKG_DATA_ROOT")
+            if fallback_root:
+                cfg.data_root = StageConfigBase._coerce_optional_path(fallback_root, None)
+        cfg.finalize()
+        return cfg
+
+    @classmethod
+    def from_args(
+        cls,
+        args: argparse.Namespace,
+        defaults: Optional[Dict[str, Any]] = None,
+    ) -> "EmbedCfg":
+        """Merge CLI arguments, configuration files, and environment variables."""
+
+        cfg = cls.from_env(defaults=defaults)
+        config_path = getattr(args, "config", None)
+        if config_path:
+            cfg.update_from_file(Path(config_path))
+        cfg.apply_args(args)
+        cfg.finalize()
+        return cfg
+
+    def finalize(self) -> None:
+        """Normalise paths and casing after all sources have been applied."""
+
+        if self.data_root is not None:
+            self.data_root = StageConfigBase._coerce_optional_path(self.data_root, None)
+        self.chunks_dir = StageConfigBase._coerce_path(self.chunks_dir, None)
+        self.out_dir = StageConfigBase._coerce_path(self.out_dir, None)
+        if self.splade_model_dir is not None:
+            self.splade_model_dir = StageConfigBase._coerce_optional_path(
+                self.splade_model_dir, None
+            )
+        if self.qwen_model_dir is not None:
+            self.qwen_model_dir = StageConfigBase._coerce_optional_path(
+                self.qwen_model_dir, None
+            )
+        if self.config is not None:
+            self.config = StageConfigBase._coerce_optional_path(self.config, None)
+        self.log_level = str(self.log_level).upper()
+        self.vector_format = str(self.vector_format or "jsonl").lower()
+        self.splade_attn = str(self.splade_attn or "auto").lower()
+        if self.splade_max_active_dims in (None, "", []):
+            self.splade_max_active_dims = None
+        self.validate_only = bool(self.validate_only)
+        self.offline = bool(self.offline)
+        self.resume = bool(self.resume)
+        self.force = bool(self.force)
+        self.no_cache = bool(self.no_cache)
 
 def _ensure_splade_dependencies() -> None:
     """Backward-compatible shim that delegates to core.ensure_splade_dependencies."""
@@ -1731,14 +1897,19 @@ def main(args: argparse.Namespace | None = None) -> int:
     else:
         namespace = parser.parse_args(args)
 
-    log_level = getattr(namespace, "log_level", "INFO")
+    cfg = EmbedCfg.from_args(namespace)
+    config_snapshot = cfg.to_manifest()
+    for field_def in fields(EmbedCfg):
+        setattr(namespace, field_def.name, getattr(cfg, field_def.name))
+
+    log_level = cfg.log_level
     logger = get_logger(__name__, level=str(log_level))
     args = namespace
-    offline_mode = bool(getattr(args, "offline", False))
+    offline_mode = bool(cfg.offline)
 
     try:
-        shard_count = int(getattr(args, "shard_count", 1))
-        shard_index = int(getattr(args, "shard_index", 0))
+        shard_count = int(cfg.shard_count)
+        shard_index = int(cfg.shard_index)
     except (TypeError, ValueError) as exc:
         raise ValueError("--shard-count and --shard-index must be integers") from exc
     if shard_count < 1:
@@ -1748,7 +1919,7 @@ def main(args: argparse.Namespace | None = None) -> int:
     args.shard_count = shard_count
     args.shard_index = shard_index
 
-    vector_format = str(getattr(args, "vector_format", "jsonl")).lower()
+    vector_format = str(cfg.vector_format or "jsonl").lower()
     if vector_format not in {"jsonl", "parquet"}:
         raise ValueError("--format must be one of: jsonl, parquet")
     if vector_format != "jsonl":
@@ -1759,6 +1930,7 @@ def main(args: argparse.Namespace | None = None) -> int:
             vector_format=vector_format,
         )
         raise NotImplementedError("Parquet vector output is not yet implemented; use --format jsonl.")
+    cfg.vector_format = vector_format
     args.vector_format = vector_format
 
     global HF_HOME, MODEL_ROOT, QWEN_DIR, SPLADE_DIR
@@ -1774,7 +1946,7 @@ def main(args: argparse.Namespace | None = None) -> int:
     splade_model_dir = cli_splade or default_splade_dir
     qwen_model_dir = cli_qwen or default_qwen_dir
 
-    validate_only = bool(getattr(args, "validate_only", False))
+    validate_only = bool(cfg.validate_only)
 
     if offline_mode and not validate_only:
         os.environ["TRANSFORMERS_OFFLINE"] = "1"
@@ -1790,6 +1962,7 @@ def main(args: argparse.Namespace | None = None) -> int:
             detail = "; ".join(missing_paths)
             raise FileNotFoundError("Offline mode requires local model directories. " + detail)
 
+    cfg.offline = offline_mode
     args.offline = offline_mode
     args.splade_model_dir = splade_model_dir
     args.qwen_model_dir = qwen_model_dir
@@ -1825,7 +1998,7 @@ def main(args: argparse.Namespace | None = None) -> int:
             logger.error("Embedding dependencies unavailable: %s", exc)
             raise
 
-    data_root_override = args.data_root
+    data_root_override = cfg.data_root
     data_root_overridden = data_root_override is not None
     resolved_root = prepare_data_root(data_root_override, DEFAULT_DATA_ROOT)
 
@@ -1844,6 +2017,31 @@ def main(args: argparse.Namespace | None = None) -> int:
         data_root_overridden=data_root_overridden,
         resolver=data_vectors,
     ).resolve()
+
+    config_snapshot.update(
+        {
+            "data_root": str(resolved_root),
+            "chunks_dir": str(chunks_dir),
+            "out_dir": str(out_dir),
+            "splade_model_dir": str(splade_model_dir),
+            "qwen_model_dir": str(qwen_model_dir),
+            "offline": bool(offline_mode),
+            "vector_format": vector_format,
+            "shard_count": shard_count,
+            "shard_index": shard_index,
+            "files_parallel_requested": requested_parallel,
+            "bm25_k1": float(cfg.bm25_k1),
+            "bm25_b": float(cfg.bm25_b),
+            "batch_size_splade": int(cfg.batch_size_splade),
+            "batch_size_qwen": int(cfg.batch_size_qwen),
+            "sparsity_warn_threshold_pct": float(cfg.sparsity_warn_threshold_pct),
+            "sparsity_report_top_n": int(cfg.sparsity_report_top_n),
+            "resume": bool(cfg.resume),
+            "force": bool(cfg.force),
+            "validate_only": bool(validate_only),
+            "no_cache": bool(cfg.no_cache),
+        }
+    )
 
     if validate_only:
         missing_reasons = []
@@ -1865,6 +2063,17 @@ def main(args: argparse.Namespace | None = None) -> int:
     else:
         out_dir.mkdir(parents=True, exist_ok=True)
 
+    manifest_log_success(
+        stage=MANIFEST_STAGE,
+        doc_id="__config__",
+        duration_s=0.0,
+        schema_version=VECTOR_SCHEMA_VERSION,
+        input_path=chunks_dir,
+        input_hash="",
+        output_path=out_dir,
+        config=config_snapshot,
+    )
+
     if validate_only:
         files_checked, rows_validated = _validate_vectors_for_chunks(chunks_dir, out_dir, logger)
         logger.info(
@@ -1882,29 +2091,25 @@ def main(args: argparse.Namespace | None = None) -> int:
 
     args.out_dir = out_dir
 
-    requested_parallel = max(1, int(getattr(args, "files_parallel", 1)))
+    requested_parallel = max(1, int(cfg.files_parallel or 1))
 
     logger.info(
         "Embedding configuration",
         extra={
-            "extra_fields": {
-                "data_root": str(resolved_root),
-                "chunks_dir": str(chunks_dir),
-                "embeddings_dir": str(out_dir),
-                "splade_model_dir": str(splade_model_dir),
-                "qwen_model_dir": str(qwen_model_dir),
-                "offline": offline_mode,
-                "requested_files_parallel": requested_parallel,
-                "shard_count": args.shard_count,
-                "shard_index": args.shard_index,
-                "vector_format": args.vector_format,
-                "qwen_cache_enabled": not bool(getattr(args, "no_cache", False)),
-                "sparsity_warn_threshold_pct": getattr(
-                    args,
-                    "sparsity_warn_threshold_pct",
-                    SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
-                ),
-                "sparsity_report_top_n": int(getattr(args, "sparsity_report_top_n", 10)),
+        "extra_fields": {
+            "data_root": str(resolved_root),
+            "chunks_dir": str(chunks_dir),
+            "embeddings_dir": str(out_dir),
+            "splade_model_dir": str(splade_model_dir),
+            "qwen_model_dir": str(qwen_model_dir),
+            "offline": offline_mode,
+            "requested_files_parallel": requested_parallel,
+            "shard_count": shard_count,
+            "shard_index": shard_index,
+            "vector_format": vector_format,
+            "qwen_cache_enabled": not bool(cfg.no_cache),
+            "sparsity_warn_threshold_pct": float(cfg.sparsity_warn_threshold_pct),
+            "sparsity_report_top_n": int(cfg.sparsity_report_top_n),
             }
         },
     )
@@ -1973,9 +2178,9 @@ def main(args: argparse.Namespace | None = None) -> int:
             "Incompatible chunk schema detected; review chunk files before proceeding: " + summary
         )
 
-    if args.force:
+    if cfg.force:
         logger.info("Force mode: reprocessing all chunk files")
-    elif args.resume:
+    elif cfg.resume:
         logger.info("Resume mode enabled: unchanged chunk files will be skipped")
 
     attn_impl = None if args.splade_attn == "auto" else args.splade_attn
@@ -1994,7 +2199,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         batch_size=int(args.batch_size_qwen),
         quantization=args.qwen_quant,
         dim=int(args.qwen_dim),
-        cache_enabled=not bool(getattr(args, "no_cache", False)),
+        cache_enabled=not bool(cfg.no_cache),
     )
 
     stats = process_pass_a(files, logger)
@@ -2003,12 +2208,8 @@ def main(args: argparse.Namespace | None = None) -> int:
         return 0
 
     validator = SPLADEValidator(
-        warn_threshold_pct=getattr(
-            args,
-            "sparsity_warn_threshold_pct",
-            SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
-        ),
-        top_n=max(1, int(getattr(args, "sparsity_report_top_n", 10))),
+        warn_threshold_pct=float(cfg.sparsity_warn_threshold_pct),
+        top_n=max(1, int(cfg.sparsity_report_top_n)),
     )
     tracemalloc.start()
     pass_b_start = time.perf_counter()
@@ -2016,14 +2217,14 @@ def main(args: argparse.Namespace | None = None) -> int:
     splade_nnz_all: List[int] = []
     qwen_norms_all: List[float] = []
 
-    manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_root) if args.resume else {}
+    manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_root) if cfg.resume else {}
     file_entries: List[Tuple[Path, Path, str, str]] = []
     skipped_files = 0
     for chunk_file in files:
         doc_id, out_path = derive_doc_id_and_vectors_path(chunk_file, chunks_dir, args.out_dir)
         input_hash = compute_content_hash(chunk_file)
         entry = manifest_index.get(doc_id)
-        if should_skip_output(out_path, entry, input_hash, args.resume, args.force):
+        if should_skip_output(out_path, entry, input_hash, cfg.resume, cfg.force):
             log_event(
                 logger,
                 "info",
@@ -2045,6 +2246,8 @@ def main(args: argparse.Namespace | None = None) -> int:
 
     files_parallel = min(requested_parallel, max(1, len(file_entries)))
     args.files_parallel = files_parallel
+    cfg.files_parallel = files_parallel
+    config_snapshot["files_parallel_effective"] = files_parallel
 
     if files_parallel > 1:
         log_event(logger, "info", "File-level parallelism enabled", files_parallel=files_parallel)
@@ -2236,11 +2439,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "skipped_files": skipped_files,
                 "files_parallel": files_parallel,
                 "splade_attn_backend_used": backend_used,
-                "sparsity_warn_threshold_pct": getattr(
-                    args,
-                    "sparsity_warn_threshold_pct",
-                    SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
-                ),
+                "sparsity_warn_threshold_pct": float(cfg.sparsity_warn_threshold_pct),
             }
         },
     )
@@ -2265,11 +2464,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         skipped_files=skipped_files,
         files_parallel=files_parallel,
         splade_attn_backend_used=backend_used,
-        sparsity_warn_threshold_pct=getattr(
-            args,
-            "sparsity_warn_threshold_pct",
-            SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
-        ),
+        sparsity_warn_threshold_pct=float(cfg.sparsity_warn_threshold_pct),
     )
 
     logger.info(

@@ -228,6 +228,26 @@ plan: Planned fetch data produced by :func:<code class="docutils literal notrans
 Mapping containing resolver metadata and planned download details suitable
 for serialization.</p>
 </section>
+<section id="write-json-atomic-path-payload">
+<h3><code class="docutils literal notranslate"><span class="pre">_write_json_atomic(path,</span> <span class="pre">payload)</span></code><a class="headerlink" href="#write-json-atomic-path-payload" title="Link to this heading"></a></h3>
+<p>Atomically persist <code class="docutils literal notranslate"><span class="pre">payload</span></code> as JSON to <code class="docutils literal notranslate"><span class="pre">path</span></code>.</p>
+</section>
+<section id="write-lockfile-plans-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_write_lockfile(plans,</span> <span class="pre">path)</span></code><a class="headerlink" href="#write-lockfile-plans-path" title="Link to this heading"></a></h3>
+<p>Write lockfile capturing planned resolver outputs.</p>
+</section>
+<section id="load-lockfile-payload-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_load_lockfile_payload(path)</span></code><a class="headerlink" href="#load-lockfile-payload-path" title="Link to this heading"></a></h3>
+<p>Return the parsed lockfile payload.</p>
+</section>
+<section id="spec-from-lock-entry-entry-defaults">
+<h3><code class="docutils literal notranslate"><span class="pre">_spec_from_lock_entry(entry,</span> <span class="pre">defaults)</span></code><a class="headerlink" href="#spec-from-lock-entry-entry-defaults" title="Link to this heading"></a></h3>
+<p>Convert a lockfile entry back into a fetch specification.</p>
+</section>
+<section id="specs-from-lock-payload-payload">
+<h3><code class="docutils literal notranslate"><span class="pre">_specs_from_lock_payload(payload)</span></code><a class="headerlink" href="#specs-from-lock-payload-payload" title="Link to this heading"></a></h3>
+<p>Build fetch specifications from lockfile payload.</p>
+</section>
 <section id="resolve-version-metadata-ontology-id-version">
 <h3><code class="docutils literal notranslate"><span class="pre">_resolve_version_metadata(ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#resolve-version-metadata-ontology-id-version" title="Link to this heading"></a></h3>
 <p>Return path, timestamp, and size metadata for a stored version.</p>

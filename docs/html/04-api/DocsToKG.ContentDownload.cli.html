@@ -129,6 +129,14 @@ OSError: If the directory cannot be created because of permissions.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_build_download_outcome()</span></code><a class="headerlink" href="#build-download-outcome" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
+<section id="validate-cached-artifact-result">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_cached_artifact(result)</span></code><a class="headerlink" href="#validate-cached-artifact-result" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when cached artefact metadata matches on-disk state.</p>
+</section>
+<section id="parse-size-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_parse_size(value)</span></code><a class="headerlink" href="#parse-size-value" title="Link to this heading"></a></h3>
+<p>Parse human-friendly size strings (e.g., <code class="docutils literal notranslate"><span class="pre">10MB</span></code>) into bytes.</p>
+</section>
 <section id="parse-domain-interval-value">
 <h3><code class="docutils literal notranslate"><span class="pre">_parse_domain_interval(value)</span></code><a class="headerlink" href="#parse-domain-interval-value" title="Link to this heading"></a></h3>
 <p>Parse <code class="docutils literal notranslate"><span class="pre">DOMAIN=SECONDS</span></code> CLI arguments for domain throttling.</p>
@@ -138,6 +146,14 @@ value: Argument provided via <code class="docutils literal notranslate"><span cl
 Tuple containing the normalized domain name and interval seconds.</p>
 <p>Raises:
 argparse.ArgumentTypeError: If the argument is malformed or negative.</p>
+</section>
+<section id="parse-domain-bytes-budget-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_parse_domain_bytes_budget(value)</span></code><a class="headerlink" href="#parse-domain-bytes-budget-value" title="Link to this heading"></a></h3>
+<p>Parse <code class="docutils literal notranslate"><span class="pre">DOMAIN=BYTES</span></code> CLI arguments for domain byte budgets.</p>
+</section>
+<section id="parse-domain-token-bucket-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_parse_domain_token_bucket(value)</span></code><a class="headerlink" href="#parse-domain-token-bucket-value" title="Link to this heading"></a></h3>
+<p>Parse <code class="docutils literal notranslate"><span class="pre">DOMAIN=RPS[:capacity=X]</span></code> specifications into bucket configs.</p>
 </section>
 <section id="parse-budget-value">
 <h3><code class="docutils literal notranslate"><span class="pre">_parse_budget(value)</span></code><a class="headerlink" href="#parse-budget-value" title="Link to this heading"></a></h3>
@@ -233,17 +249,7 @@ html_dir: Directory where HTML artefacts are written.
 pipeline: Resolver pipeline orchestrating downstream resolvers.
 logger: Structured attempt logger capturing manifest records.
 metrics: Resolver metrics collector.
-dry_run: When True, simulate downloads without writing files.
-list_only: When True, record candidate URLs without fetching content.
-extract_html_text: Whether to extract plaintext from HTML artefacts.
-previous_lookup: Mapping of work_id/URL to prior manifest entries.
-resume_completed: Set of work IDs already processed in resume mode.
-max_bytes: Optional size limit per download in bytes.
-sniff_bytes: Number of leading bytes to buffer for payload inference.
-min_pdf_bytes: Minimum PDF size accepted when HEAD prechecks fail.
-tail_check_bytes: Tail window size used to detect embedded HTML payloads.
-robots_checker: Cache enforcing robots.txt policies when enabled.
-content_addressed: Whether to store PDFs under content-addressed paths.</p>
+options: :class:<code class="docutils literal notranslate"><span class="pre">DownloadOptions</span></code> describing download behaviour for the work.</p>
 <p>Returns:
 Dictionary summarizing the outcome (saved/html_only/skipped flags).</p>
 <p>Raises:
@@ -262,10 +268,6 @@ modular content download specification. It is exposed both as the module’s
 None</p>
 <p>Returns:
 None</p>
-</section>
-<section id="post-init-self">
-<h3><code class="docutils literal notranslate"><span class="pre">__post_init__(self)</span></code><a class="headerlink" href="#post-init-self" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
 </section>
 <section id="is-allowed-self-session-url-timeout">
 <h3><code class="docutils literal notranslate"><span class="pre">is_allowed(self,</span> <span class="pre">session,</span> <span class="pre">url,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#is-allowed-self-session-url-timeout" title="Link to this heading"></a></h3>
@@ -298,6 +300,10 @@ thread-local.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_should_stop()</span></code><a class="headerlink" href="#should-stop" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
+<section id="stream-chunks">
+<h3><code class="docutils literal notranslate"><span class="pre">_stream_chunks()</span></code><a class="headerlink" href="#stream-chunks" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="submit-work-item">
 <h3><code class="docutils literal notranslate"><span class="pre">_submit(work_item)</span></code><a class="headerlink" href="#submit-work-item" title="Link to this heading"></a></h3>
 <p>Submit a work item to the executor for asynchronous processing.</p>
@@ -309,13 +315,17 @@ thread-local.</p>
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
-<section id="workartifact">
-<h3><code class="docutils literal notranslate"><span class="pre">WorkArtifact</span></code><a class="headerlink" href="#workartifact" title="Link to this heading"></a></h3>
-<p>Normalized artifact describing an OpenAlex work to process.</p>
+<section id="downloadoptions">
+<h3><code class="docutils literal notranslate"><span class="pre">DownloadOptions</span></code><a class="headerlink" href="#downloadoptions" title="Link to this heading"></a></h3>
+<p>Stable collection of per-run download settings applied to each work item.</p>
 </section>
 <section id="downloadstate">
 <h3><code class="docutils literal notranslate"><span class="pre">DownloadState</span></code><a class="headerlink" href="#downloadstate" title="Link to this heading"></a></h3>
 <p>State machine for streaming downloads.</p>
+</section>
+<section id="maxbytesexceeded">
+<h3><code class="docutils literal notranslate"><span class="pre">_MaxBytesExceeded</span></code><a class="headerlink" href="#maxbytesexceeded" title="Link to this heading"></a></h3>
+<p>Internal signal raised when the stream exceeds the configured byte budget.</p>
 </section>
 <section id="robotscache">
 <h3><code class="docutils literal notranslate"><span class="pre">RobotsCache</span></code><a class="headerlink" href="#robotscache" title="Link to this heading"></a></h3>

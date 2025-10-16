@@ -82,7 +82,7 @@ None
 
 ### `summarize_image_metadata(chunk, text)`
 
-Infer image annotation flags, counts, and confidences from chunk metadata and text.
+Infer image annotation flags, counts, confidences, and structured metadata.
 
 ### `_chunk_worker_initializer(cfg)`
 
@@ -188,9 +188,25 @@ testing or orchestration.
 Returns:
 int: Exit code where ``0`` indicates success.
 
+### `from_env(cls, defaults)`
+
+Instantiate configuration derived solely from environment variables.
+
+### `from_args(cls, args, defaults)`
+
+Create a configuration by layering env vars, config files, and CLI args.
+
+### `finalize(self)`
+
+Normalise paths, casing, and defaults after all inputs are merged.
+
 ### `_maybe_add_conf(value)`
 
 Collect numeric confidence scores from metadata sources.
+
+### `_normalise_meta(payload, doc_item)`
+
+*No documentation available.*
 
 ### `is_small(idx)`
 
@@ -210,6 +226,10 @@ Args:
 result: Structured outcome emitted by the chunking worker.
 
 ## 3. Classes
+
+### `ChunkerCfg`
+
+Configuration values for the chunking stage.
 
 ### `Rec`
 

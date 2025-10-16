@@ -839,7 +839,22 @@ def _coerce_str_tuple(value: object, _base_dir: Optional[Path] = None) -> Tuple[
     if value is None:
         return ()
     if isinstance(value, (list, tuple, set)):
-        return tuple(str(item) for item in value)
+        flattened: List[str] = []
+        for item in value:
+            if item is None:
+                continue
+            if isinstance(item, (list, tuple, set)):
+                for sub_item in item:
+                    if sub_item is None:
+                        continue
+                    text = str(sub_item).strip()
+                    if text:
+                        flattened.append(text)
+            else:
+                text = str(item).strip()
+                if text:
+                    flattened.append(text)
+        return tuple(flattened)
     text = str(value).strip()
     if not text:
         return ()
@@ -895,7 +910,13 @@ class StageConfigBase:
     """Base dataclass for stage configuration objects."""
 
     config: Optional[Path] = None
-    overrides: Set[str] = field(default_factory=set, init=False, repr=False)
+    overrides: Set[str] = field(
+        default_factory=set,
+        init=False,
+        repr=False,
+        compare=False,
+        metadata={"manifest": False},
+    )
 
     ENV_VARS: ClassVar[Dict[str, str]] = {}
     FIELD_PARSERS: ClassVar[Dict[str, Callable[[Any, Optional[Path]], Any]]] = {}
@@ -964,6 +985,8 @@ class StageConfigBase:
 
         payload: Dict[str, Any] = {}
         for field_def in fields(self):
+            if not field_def.metadata.get("manifest", True):
+                continue
             payload[field_def.name] = _manifest_value(getattr(self, field_def.name))
         return payload
 
@@ -977,6 +1000,14 @@ class StageConfigBase:
         """Return ``True`` when ``field_name`` was explicitly overridden."""
 
         return field_name in self.overrides
+
+    _coerce_path = staticmethod(_coerce_path)
+    _coerce_optional_path = staticmethod(_coerce_optional_path)
+    _coerce_bool = staticmethod(_coerce_bool)
+    _coerce_int = staticmethod(_coerce_int)
+    _coerce_float = staticmethod(_coerce_float)
+    _coerce_str = staticmethod(_coerce_str)
+    _coerce_str_tuple = staticmethod(_coerce_str_tuple)
 
 
 # --- Globals ---

@@ -314,6 +314,10 @@ Dictionary containing the supplied configuration data.
 
 Collect numeric confidence scores when they can be coerced to float.
 
+### `_maybe_float(value)`
+
+*No documentation available.*
+
 ### `model_dump(self)`
 
 Mirror :meth:`pydantic.BaseModel.model_dump` error semantics.

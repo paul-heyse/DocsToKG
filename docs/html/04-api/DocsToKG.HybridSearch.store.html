@@ -195,6 +195,30 @@ ValueError: If the payload is missing the FAISS byte stream.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">__getattr__(name)</span></code><a class="headerlink" href="#getattr-name" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
+<section id="set-result-self-result">
+<h3><code class="docutils literal notranslate"><span class="pre">set_result(self,</span> <span class="pre">result)</span></code><a class="headerlink" href="#set-result-self-result" title="Link to this heading"></a></h3>
+<p>Fulfil the pending search with <code class="docutils literal notranslate"><span class="pre">result</span></code> and release any waiters.</p>
+</section>
+<section id="set-exception-self-exc">
+<h3><code class="docutils literal notranslate"><span class="pre">set_exception(self,</span> <span class="pre">exc)</span></code><a class="headerlink" href="#set-exception-self-exc" title="Link to this heading"></a></h3>
+<p>Attach <code class="docutils literal notranslate"><span class="pre">exc</span></code> to the pending search and release any waiters.</p>
+</section>
+<section id="wait-self">
+<h3><code class="docutils literal notranslate"><span class="pre">wait(self)</span></code><a class="headerlink" href="#wait-self" title="Link to this heading"></a></h3>
+<p>Block until a result or exception is produced for this search.</p>
+</section>
+<section id="submit-self-vector-top-k">
+<h3><code class="docutils literal notranslate"><span class="pre">submit(self,</span> <span class="pre">vector,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#submit-self-vector-top-k" title="Link to this heading"></a></h3>
+<p>Coalesce a singleton search request and return its results.</p>
+</section>
+<section id="drain-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_drain(self)</span></code><a class="headerlink" href="#drain-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="execute-self-batch">
+<h3><code class="docutils literal notranslate"><span class="pre">_execute(self,</span> <span class="pre">batch)</span></code><a class="headerlink" href="#execute-self-batch" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="create-cls-dim-config">
 <h3><code class="docutils literal notranslate"><span class="pre">create(cls,</span> <span class="pre">dim,</span> <span class="pre">config)</span></code><a class="headerlink" href="#create-cls-dim-config" title="Link to this heading"></a></h3>
 <p>Factory helper matching the managed FAISS interface contracts.</p>
@@ -230,6 +254,10 @@ int: Dimensionality of embeddings managed by the index.</p>
 None</p>
 <p>Returns:
 faiss.StandardGpuResources | None: GPU resource manager when initialised.</p>
+</section>
+<section id="get-gpu-resources-self">
+<h3><code class="docutils literal notranslate"><span class="pre">get_gpu_resources(self)</span></code><a class="headerlink" href="#get-gpu-resources-self" title="Link to this heading"></a></h3>
+<p>Compatibility helper returning active GPU resources.</p>
 </section>
 <section id="device-self">
 <h3><code class="docutils literal notranslate"><span class="pre">device(self)</span></code><a class="headerlink" href="#device-self" title="Link to this heading"></a></h3>
@@ -298,10 +326,6 @@ force_flush: Force immediate rebuild when tombstones accumulate.</p>
 <p>Returns:
 Number of ids scheduled for removal.</p>
 </section>
-<section id="add-batch-self-vectors-vector-ids">
-<h3><code class="docutils literal notranslate"><span class="pre">add_batch(self,</span> <span class="pre">vectors,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#add-batch-self-vectors-vector-ids" title="Link to this heading"></a></h3>
-<p>Add vectors in batches to minimise host→device churn.</p>
-</section>
 <section id="current-index-ids-self">
 <h3><code class="docutils literal notranslate"><span class="pre">_current_index_ids(self)</span></code><a class="headerlink" href="#current-index-ids-self" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
@@ -322,6 +346,10 @@ Number of ids scheduled for removal.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">search_batch(self,</span> <span class="pre">queries,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#search-batch-self-queries-top-k" title="Link to this heading"></a></h3>
 <p>Alias for <code class="docutils literal notranslate"><span class="pre">search_many</span></code> to support explicit batch workloads.</p>
 </section>
+<section id="search-batch-impl-self-matrix-top-k">
+<h3><code class="docutils literal notranslate"><span class="pre">_search_batch_impl(self,</span> <span class="pre">matrix,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#search-batch-impl-self-matrix-top-k" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="range-search-self-query-min-score">
 <h3><code class="docutils literal notranslate"><span class="pre">range_search(self,</span> <span class="pre">query,</span> <span class="pre">min_score)</span></code><a class="headerlink" href="#range-search-self-query-min-score" title="Link to this heading"></a></h3>
 <p>Return all vectors scoring above <code class="docutils literal notranslate"><span class="pre">min_score</span></code> for <code class="docutils literal notranslate"><span class="pre">query</span></code>.</p>
@@ -337,6 +365,14 @@ Number of ids scheduled for removal.</p>
 <section id="release-pinned-buffers-self">
 <h3><code class="docutils literal notranslate"><span class="pre">_release_pinned_buffers(self)</span></code><a class="headerlink" href="#release-pinned-buffers-self" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
+</section>
+<section id="refresh-cpu-replica-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_refresh_cpu_replica(self)</span></code><a class="headerlink" href="#refresh-cpu-replica-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="promote-cpu-replica-self">
+<h3><code class="docutils literal notranslate"><span class="pre">promote_cpu_replica(self)</span></code><a class="headerlink" href="#promote-cpu-replica-self" title="Link to this heading"></a></h3>
+<p>Promote the cached CPU replica back onto the GPU index.</p>
 </section>
 <section id="current-nprobe-value-self">
 <h3><code class="docutils literal notranslate"><span class="pre">_current_nprobe_value(self)</span></code><a class="headerlink" href="#current-nprobe-value-self" title="Link to this heading"></a></h3>
@@ -577,58 +613,54 @@ vectors: Embedding vectors to index.
 vector_ids: Identifiers associated with <code class="docutils literal notranslate"><span class="pre">vectors</span></code>.</p>
 </section>
 <section id="id6">
-<h3><code class="docutils literal notranslate"><span class="pre">add_batch(self,</span> <span class="pre">vectors,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
-<p>Insert vectors using batching heuristics from the inner store.</p>
-<p>Args:
-vectors: Embedding vectors to index.
-vector_ids: Identifiers associated with <code class="docutils literal notranslate"><span class="pre">vectors</span></code>.
-batch_size: Chunk size forwarded to the underlying store.</p>
-</section>
-<section id="id7">
-<h3><code class="docutils literal notranslate"><span class="pre">range_search(self,</span> <span class="pre">query,</span> <span class="pre">min_score)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
-<p>Delegate range search to the managed store.</p>
-</section>
-<section id="id8">
-<h3><code class="docutils literal notranslate"><span class="pre">set_nprobe(self,</span> <span class="pre">nprobe)</span></code><a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
+<h3><code class="docutils literal notranslate"><span class="pre">set_nprobe(self,</span> <span class="pre">nprobe)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
 <p>Tune <code class="docutils literal notranslate"><span class="pre">nprobe</span></code> while clamping to the managed safe range.</p>
 </section>
-<section id="id9">
-<h3><code class="docutils literal notranslate"><span class="pre">remove(self,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#id9" title="Link to this heading"></a></h3>
+<section id="id7">
+<h3><code class="docutils literal notranslate"><span class="pre">remove(self,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
 <p>Remove vectors corresponding to <code class="docutils literal notranslate"><span class="pre">vector_ids</span></code> from the index.</p>
 </section>
-<section id="id10">
-<h3><code class="docutils literal notranslate"><span class="pre">set_id_resolver(self,</span> <span class="pre">resolver)</span></code><a class="headerlink" href="#id10" title="Link to this heading"></a></h3>
+<section id="id8">
+<h3><code class="docutils literal notranslate"><span class="pre">set_id_resolver(self,</span> <span class="pre">resolver)</span></code><a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
 <p>Configure identifier resolver on the inner store.</p>
 <p>Args:
 resolver: Callable mapping FAISS ids to external identifiers.</p>
 </section>
-<section id="id11">
-<h3><code class="docutils literal notranslate"><span class="pre">needs_training(self)</span></code><a class="headerlink" href="#id11" title="Link to this heading"></a></h3>
+<section id="id9">
+<h3><code class="docutils literal notranslate"><span class="pre">range_search(self,</span> <span class="pre">query,</span> <span class="pre">min_score)</span></code><a class="headerlink" href="#id9" title="Link to this heading"></a></h3>
+<p>Delegate range search to the managed store.</p>
+</section>
+<section id="id10">
+<h3><code class="docutils literal notranslate"><span class="pre">needs_training(self)</span></code><a class="headerlink" href="#id10" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when the underlying index requires training.</p>
 </section>
-<section id="id12">
-<h3><code class="docutils literal notranslate"><span class="pre">train(self,</span> <span class="pre">vectors)</span></code><a class="headerlink" href="#id12" title="Link to this heading"></a></h3>
+<section id="id11">
+<h3><code class="docutils literal notranslate"><span class="pre">train(self,</span> <span class="pre">vectors)</span></code><a class="headerlink" href="#id11" title="Link to this heading"></a></h3>
 <p>Train the managed index using <code class="docutils literal notranslate"><span class="pre">vectors</span></code>.</p>
 </section>
-<section id="id13">
-<h3><code class="docutils literal notranslate"><span class="pre">device(self)</span></code><a class="headerlink" href="#id13" title="Link to this heading"></a></h3>
+<section id="id12">
+<h3><code class="docutils literal notranslate"><span class="pre">device(self)</span></code><a class="headerlink" href="#id12" title="Link to this heading"></a></h3>
 <p>Return the CUDA device identifier for the managed index.</p>
 </section>
-<section id="id14">
-<h3><code class="docutils literal notranslate"><span class="pre">adapter_stats(self)</span></code><a class="headerlink" href="#id14" title="Link to this heading"></a></h3>
+<section id="id13">
+<h3><code class="docutils literal notranslate"><span class="pre">adapter_stats(self)</span></code><a class="headerlink" href="#id13" title="Link to this heading"></a></h3>
 <p>Return a read-only snapshot of adapter state.</p>
 </section>
-<section id="id15">
-<h3><code class="docutils literal notranslate"><span class="pre">ntotal(self)</span></code><a class="headerlink" href="#id15" title="Link to this heading"></a></h3>
+<section id="id14">
+<h3><code class="docutils literal notranslate"><span class="pre">ntotal(self)</span></code><a class="headerlink" href="#id14" title="Link to this heading"></a></h3>
 <p>Return the number of vectors stored in the managed index.</p>
 </section>
-<section id="id16">
-<h3><code class="docutils literal notranslate"><span class="pre">rebuild_if_needed(self)</span></code><a class="headerlink" href="#id16" title="Link to this heading"></a></h3>
+<section id="id15">
+<h3><code class="docutils literal notranslate"><span class="pre">rebuild_if_needed(self)</span></code><a class="headerlink" href="#id15" title="Link to this heading"></a></h3>
 <p>Trigger inner index rebuild when required by FAISS heuristics.</p>
 </section>
-<section id="id17">
-<h3><code class="docutils literal notranslate"><span class="pre">stats(self)</span></code><a class="headerlink" href="#id17" title="Link to this heading"></a></h3>
+<section id="id16">
+<h3><code class="docutils literal notranslate"><span class="pre">stats(self)</span></code><a class="headerlink" href="#id16" title="Link to this heading"></a></h3>
 <p>Expose diagnostic statistics from the managed store.</p>
+</section>
+<section id="id17">
+<h3><code class="docutils literal notranslate"><span class="pre">get_gpu_resources(self)</span></code><a class="headerlink" href="#id17" title="Link to this heading"></a></h3>
+<p>Return GPU resources backing the managed index (if available).</p>
 </section>
 </section>
 <section id="classes">
@@ -652,6 +684,14 @@ FaissSearchResult(vector_id=’doc-123’, score=0.82)</p>
 <section id="adapterstats">
 <h3><code class="docutils literal notranslate"><span class="pre">AdapterStats</span></code><a class="headerlink" href="#adapterstats" title="Link to this heading"></a></h3>
 <p>Snapshot of runtime characteristics for a managed FAISS adapter.</p>
+</section>
+<section id="pendingsearch">
+<h3><code class="docutils literal notranslate"><span class="pre">_PendingSearch</span></code><a class="headerlink" href="#pendingsearch" title="Link to this heading"></a></h3>
+<p>Container representing a pending single-query search awaiting batching.</p>
+</section>
+<section id="searchcoalescer">
+<h3><code class="docutils literal notranslate"><span class="pre">_SearchCoalescer</span></code><a class="headerlink" href="#searchcoalescer" title="Link to this heading"></a></h3>
+<p>Batcher that groups singleton searches into short-lived micro-batches.</p>
 </section>
 <section id="faissvectorstore">
 <h3><code class="docutils literal notranslate"><span class="pre">FaissVectorStore</span></code><a class="headerlink" href="#faissvectorstore" title="Link to this heading"></a></h3>

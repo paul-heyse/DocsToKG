@@ -112,6 +112,70 @@ third-party dependencies beyond the standard library.</p>
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="dedupe-preserve-order-markers">
+<h3><code class="docutils literal notranslate"><span class="pre">dedupe_preserve_order(markers)</span></code><a class="headerlink" href="#dedupe-preserve-order-markers" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">markers</span></code> without duplicates while preserving input order.</p>
+</section>
+<section id="ensure-str-sequence-value-label">
+<h3><code class="docutils literal notranslate"><span class="pre">_ensure_str_sequence(value,</span> <span class="pre">label)</span></code><a class="headerlink" href="#ensure-str-sequence-value-label" title="Link to this heading"></a></h3>
+<p>Normalise structural marker entries into string lists.</p>
+</section>
+<section id="load-yaml-markers-raw">
+<h3><code class="docutils literal notranslate"><span class="pre">_load_yaml_markers(raw)</span></code><a class="headerlink" href="#load-yaml-markers-raw" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="load-toml-markers-raw">
+<h3><code class="docutils literal notranslate"><span class="pre">_load_toml_markers(raw)</span></code><a class="headerlink" href="#load-toml-markers-raw" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="load-structural-marker-profile-path">
+<h3><code class="docutils literal notranslate"><span class="pre">load_structural_marker_profile(path)</span></code><a class="headerlink" href="#load-structural-marker-profile-path" title="Link to this heading"></a></h3>
+<p>Load heading/caption marker overrides from JSON, YAML, or TOML files.</p>
+</section>
+<section id="load-structural-marker-config-path">
+<h3><code class="docutils literal notranslate"><span class="pre">load_structural_marker_config(path)</span></code><a class="headerlink" href="#load-structural-marker-config-path" title="Link to this heading"></a></h3>
+<p>Backward compatible alias for :func:<code class="docutils literal notranslate"><span class="pre">load_structural_marker_profile</span></code>.</p>
+</section>
+<section id="build-subcommand-parser-options">
+<h3><code class="docutils literal notranslate"><span class="pre">build_subcommand(parser,</span> <span class="pre">options)</span></code><a class="headerlink" href="#build-subcommand-parser-options" title="Link to this heading"></a></h3>
+<p>Attach CLI options described by <code class="docutils literal notranslate"><span class="pre">options</span></code> to <code class="docutils literal notranslate"><span class="pre">parser</span></code>.</p>
+</section>
+<section id="coerce-path-value-base-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">_coerce_path(value,</span> <span class="pre">base_dir)</span></code><a class="headerlink" href="#coerce-path-value-base-dir" title="Link to this heading"></a></h3>
+<p>Convert <code class="docutils literal notranslate"><span class="pre">value</span></code> into an absolute :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code>.</p>
+</section>
+<section id="coerce-optional-path-value-base-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">_coerce_optional_path(value,</span> <span class="pre">base_dir)</span></code><a class="headerlink" href="#coerce-optional-path-value-base-dir" title="Link to this heading"></a></h3>
+<p>Convert optional path-like values.</p>
+</section>
+<section id="coerce-bool-value-base-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">_coerce_bool(value,</span> <span class="pre">_base_dir)</span></code><a class="headerlink" href="#coerce-bool-value-base-dir" title="Link to this heading"></a></h3>
+<p>Convert truthy strings or numbers to boolean.</p>
+</section>
+<section id="coerce-int-value-base-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">_coerce_int(value,</span> <span class="pre">_base_dir)</span></code><a class="headerlink" href="#coerce-int-value-base-dir" title="Link to this heading"></a></h3>
+<p>Convert <code class="docutils literal notranslate"><span class="pre">value</span></code> to <code class="docutils literal notranslate"><span class="pre">int</span></code>.</p>
+</section>
+<section id="coerce-float-value-base-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">_coerce_float(value,</span> <span class="pre">_base_dir)</span></code><a class="headerlink" href="#coerce-float-value-base-dir" title="Link to this heading"></a></h3>
+<p>Convert <code class="docutils literal notranslate"><span class="pre">value</span></code> to <code class="docutils literal notranslate"><span class="pre">float</span></code>.</p>
+</section>
+<section id="coerce-str-value-base-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">_coerce_str(value,</span> <span class="pre">_base_dir)</span></code><a class="headerlink" href="#coerce-str-value-base-dir" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">value</span></code> coerced to string.</p>
+</section>
+<section id="coerce-str-tuple-value-base-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">_coerce_str_tuple(value,</span> <span class="pre">_base_dir)</span></code><a class="headerlink" href="#coerce-str-tuple-value-base-dir" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">value</span></code> as a tuple of strings.</p>
+</section>
+<section id="manifest-value-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_manifest_value(value)</span></code><a class="headerlink" href="#manifest-value-value" title="Link to this heading"></a></h3>
+<p>Convert values to manifest-friendly representations.</p>
+</section>
+<section id="load-config-mapping-path">
+<h3><code class="docutils literal notranslate"><span class="pre">load_config_mapping(path)</span></code><a class="headerlink" href="#load-config-mapping-path" title="Link to this heading"></a></h3>
+<p>Load a configuration mapping from JSON, YAML, or TOML.</p>
+</section>
 <section id="expand-path-path">
 <h3><code class="docutils literal notranslate"><span class="pre">expand_path(path)</span></code><a class="headerlink" href="#expand-path-path" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">path</span></code> expanded to an absolute :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code>.</p>
@@ -152,6 +216,22 @@ hf_home: Optional explicit HF cache directory.
 model_root: Optional DocsToKG model root override.</p>
 <p>Returns:
 Tuple of <code class="docutils literal notranslate"><span class="pre">(hf_home,</span> <span class="pre">model_root)</span></code> paths after normalisation.</p>
+</section>
+<section id="ensure-model-environment-hf-home-model-root">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_model_environment(hf_home,</span> <span class="pre">model_root)</span></code><a class="headerlink" href="#ensure-model-environment-hf-home-model-root" title="Link to this heading"></a></h3>
+<p>Initialise and cache the HuggingFace/model-root environment settings.</p>
+</section>
+<section id="ensure-optional-dependency-module-name-message">
+<h3><code class="docutils literal notranslate"><span class="pre">_ensure_optional_dependency(module_name,</span> <span class="pre">message)</span></code><a class="headerlink" href="#ensure-optional-dependency-module-name-message" title="Link to this heading"></a></h3>
+<p>Import <code class="docutils literal notranslate"><span class="pre">module_name</span></code> or raise with <code class="docutils literal notranslate"><span class="pre">message</span></code>.</p>
+</section>
+<section id="ensure-splade-dependencies-import-error">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_splade_dependencies(import_error)</span></code><a class="headerlink" href="#ensure-splade-dependencies-import-error" title="Link to this heading"></a></h3>
+<p>Validate that SPLADE optional dependencies are importable.</p>
+</section>
+<section id="ensure-qwen-dependencies-import-error">
+<h3><code class="docutils literal notranslate"><span class="pre">ensure_qwen_dependencies(import_error)</span></code><a class="headerlink" href="#ensure-qwen-dependencies-import-error" title="Link to this heading"></a></h3>
+<p>Validate that Qwen/vLLM optional dependencies are importable.</p>
 </section>
 <section id="detect-data-root-start">
 <h3><code class="docutils literal notranslate"><span class="pre">detect_data_root(start)</span></code><a class="headerlink" href="#detect-data-root-start" title="Link to this heading"></a></h3>
@@ -321,6 +401,14 @@ True</p>
 </div></blockquote>
 </div></blockquote>
 </section>
+<section id="derive-doc-id-and-doctags-path-source-pdf-pdfs-root-doctags-root">
+<h3><code class="docutils literal notranslate"><span class="pre">derive_doc_id_and_doctags_path(source_pdf,</span> <span class="pre">pdfs_root,</span> <span class="pre">doctags_root)</span></code><a class="headerlink" href="#derive-doc-id-and-doctags-path-source-pdf-pdfs-root-doctags-root" title="Link to this heading"></a></h3>
+<p>Return manifest doc identifier and DocTags output path for <code class="docutils literal notranslate"><span class="pre">source_pdf</span></code>.</p>
+</section>
+<section id="derive-doc-id-and-chunks-path-doctags-file-doctags-root-chunks-root">
+<h3><code class="docutils literal notranslate"><span class="pre">derive_doc_id_and_chunks_path(doctags_file,</span> <span class="pre">doctags_root,</span> <span class="pre">chunks_root)</span></code><a class="headerlink" href="#derive-doc-id-and-chunks-path-doctags-file-doctags-root-chunks-root" title="Link to this heading"></a></h3>
+<p>Return manifest doc identifier and chunk output path for <code class="docutils literal notranslate"><span class="pre">doctags_file</span></code>.</p>
+</section>
 <section id="derive-doc-id-and-vectors-path-chunk-file-chunks-root-vectors-root">
 <h3><code class="docutils literal notranslate"><span class="pre">derive_doc_id_and_vectors_path(chunk_file,</span> <span class="pre">chunks_root,</span> <span class="pre">vectors_root)</span></code><a class="headerlink" href="#derive-doc-id-and-vectors-path-chunk-file-chunks-root-vectors-root" title="Link to this heading"></a></h3>
 <p>Return manifest doc identifier and vectors output path for <code class="docutils literal notranslate"><span class="pre">chunk_file</span></code>.</p>
@@ -441,6 +529,10 @@ True</p>
 <section id="atomic-write-path">
 <h3><code class="docutils literal notranslate"><span class="pre">atomic_write(path)</span></code><a class="headerlink" href="#atomic-write-path" title="Link to this heading"></a></h3>
 <p>Write to a temporary file and atomically replace the destination.</p>
+<p>Pattern: open a sibling <code class="docutils literal notranslate"><span class="pre">*.tmp</span></code> file, write the payload, flush and
+<code class="docutils literal notranslate"><span class="pre">fsync</span></code> the descriptor, then <code class="docutils literal notranslate"><span class="pre">rename</span></code> it over the original path. This
+guarantees that readers never observe a partially written file even if the
+process crashes mid-write.</p>
 <p>Args:
 path: Target path to write.</p>
 <p>Returns:
@@ -762,6 +854,38 @@ the degraded safety state.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">doctags(argv)</span></code><a class="headerlink" href="#doctags-argv" title="Link to this heading"></a></h3>
 <p>Public wrapper for the <code class="docutils literal notranslate"><span class="pre">doctags</span></code> subcommand.</p>
 </section>
+<section id="apply-env-self">
+<h3><code class="docutils literal notranslate"><span class="pre">apply_env(self)</span></code><a class="headerlink" href="#apply-env-self" title="Link to this heading"></a></h3>
+<p>Overlay configuration from environment variables.</p>
+</section>
+<section id="update-from-file-self-cfg-path">
+<h3><code class="docutils literal notranslate"><span class="pre">update_from_file(self,</span> <span class="pre">cfg_path)</span></code><a class="headerlink" href="#update-from-file-self-cfg-path" title="Link to this heading"></a></h3>
+<p>Overlay configuration from <code class="docutils literal notranslate"><span class="pre">cfg_path</span></code>.</p>
+</section>
+<section id="apply-args-self-args">
+<h3><code class="docutils literal notranslate"><span class="pre">apply_args(self,</span> <span class="pre">args)</span></code><a class="headerlink" href="#apply-args-self-args" title="Link to this heading"></a></h3>
+<p>Overlay configuration from an argparse namespace.</p>
+</section>
+<section id="from-env-cls">
+<h3><code class="docutils literal notranslate"><span class="pre">from_env(cls)</span></code><a class="headerlink" href="#from-env-cls" title="Link to this heading"></a></h3>
+<p>Instantiate a configuration populated solely from environment variables.</p>
+</section>
+<section id="finalize-self">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize(self)</span></code><a class="headerlink" href="#finalize-self" title="Link to this heading"></a></h3>
+<p>Hook allowing subclasses to normalise derived fields.</p>
+</section>
+<section id="to-manifest-self">
+<h3><code class="docutils literal notranslate"><span class="pre">to_manifest(self)</span></code><a class="headerlink" href="#to-manifest-self" title="Link to this heading"></a></h3>
+<p>Return a manifest-friendly snapshot of the configuration.</p>
+</section>
+<section id="coerce-field-self-name-value-base-dir">
+<h3><code class="docutils literal notranslate"><span class="pre">_coerce_field(self,</span> <span class="pre">name,</span> <span class="pre">value,</span> <span class="pre">base_dir)</span></code><a class="headerlink" href="#coerce-field-self-name-value-base-dir" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="is-overridden-self-field-name">
+<h3><code class="docutils literal notranslate"><span class="pre">is_overridden(self,</span> <span class="pre">field_name)</span></code><a class="headerlink" href="#is-overridden-self-field-name" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when <code class="docutils literal notranslate"><span class="pre">field_name</span></code> was explicitly overridden.</p>
+</section>
 <section id="iter-self">
 <h3><code class="docutils literal notranslate"><span class="pre">__iter__(self)</span></code><a class="headerlink" href="#iter-self" title="Link to this heading"></a></h3>
 <p>Yield successive lists containing up to <code class="docutils literal notranslate"><span class="pre">batch_size</span></code> elements.</p>
@@ -781,6 +905,14 @@ JSON-formatted string containing canonical log fields and optional extras.</p>
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="clioption">
+<h3><code class="docutils literal notranslate"><span class="pre">CLIOption</span></code><a class="headerlink" href="#clioption" title="Link to this heading"></a></h3>
+<p>Declarative CLI argument specification used by <code class="docutils literal notranslate"><span class="pre">build_subcommand</span></code>.</p>
+</section>
+<section id="stageconfigbase">
+<h3><code class="docutils literal notranslate"><span class="pre">StageConfigBase</span></code><a class="headerlink" href="#stageconfigbase" title="Link to this heading"></a></h3>
+<p>Base dataclass for stage configuration objects.</p>
+</section>
 <section id="bm25stats">
 <h3><code class="docutils literal notranslate"><span class="pre">BM25Stats</span></code><a class="headerlink" href="#bm25stats" title="Link to this heading"></a></h3>
 <p>Corpus-level statistics required for BM25 weighting.</p>

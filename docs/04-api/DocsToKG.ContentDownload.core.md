@@ -14,13 +14,29 @@ simplifying imports for both the CLI and resolver pipeline.
 
 ## 2. Functions
 
+### `atomic_write(path, chunks)`
+
+Atomically write ``chunks`` to ``path`` and return the byte count.
+
+### `atomic_write_bytes(path, chunks)`
+
+Backward-compatible wrapper for :func:`atomic_write`.
+
+### `atomic_write_text(path, text)`
+
+Atomically write ``text`` to ``path`` using :func:`atomic_write`.
+
 ### `classify_payload(head_bytes, content_type, url)`
 
-Classify a payload as ``Classification.PDF``/``Classification.HTML`` or ``UNKNOWN``.
+Classify a payload as ``Classification.PDF``/``Classification.HTML`` or ``Classification.UNKNOWN``.
 
 ### `_extract_filename_from_disposition(disposition)`
 
 Return the filename component from a Content-Disposition header.
+
+### `parse_size(value)`
+
+Parse human-friendly size strings like ``10GB`` into byte counts.
 
 ### `_infer_suffix(url, content_type, disposition, classification, default_suffix)`
 
@@ -70,6 +86,10 @@ Create a filesystem-friendly slug from the provided text.
 
 Return a canonicalised version of ``url`` suitable for deduplication.
 
+### `__post_init__(self)`
+
+*No documentation available.*
+
 ### `from_wire(cls, value)`
 
 Return the enum member when ``value`` matches a known code.
@@ -79,6 +99,10 @@ Return the enum member when ``value`` matches a known code.
 Return the matching enum member or ``UNKNOWN``.
 
 ## 3. Classes
+
+### `WorkArtifact`
+
+Normalized artifact describing an OpenAlex work to process.
 
 ### `Classification`
 

@@ -140,6 +140,30 @@ Check whether ``chunk`` satisfies the provided OpenSearch-style filters.
 
 *No documentation available.*
 
+### `set_result(self, result)`
+
+Fulfil the pending search with ``result`` and release any waiters.
+
+### `set_exception(self, exc)`
+
+Attach ``exc`` to the pending search and release any waiters.
+
+### `wait(self)`
+
+Block until a result or exception is produced for this search.
+
+### `submit(self, vector, top_k)`
+
+Coalesce a singleton search request and return its results.
+
+### `_drain(self)`
+
+*No documentation available.*
+
+### `_execute(self, batch)`
+
+*No documentation available.*
+
 ### `create(cls, dim, config)`
 
 Factory helper matching the managed FAISS interface contracts.
@@ -183,6 +207,10 @@ None
 
 Returns:
 faiss.StandardGpuResources | None: GPU resource manager when initialised.
+
+### `get_gpu_resources(self)`
+
+Compatibility helper returning active GPU resources.
 
 ### `device(self)`
 
@@ -267,10 +295,6 @@ force_flush: Force immediate rebuild when tombstones accumulate.
 Returns:
 Number of ids scheduled for removal.
 
-### `add_batch(self, vectors, vector_ids)`
-
-Add vectors in batches to minimise host→device churn.
-
 ### `_current_index_ids(self)`
 
 *No documentation available.*
@@ -291,6 +315,10 @@ Search the index for multiple queries in a single FAISS call.
 
 Alias for ``search_many`` to support explicit batch workloads.
 
+### `_search_batch_impl(self, matrix, top_k)`
+
+*No documentation available.*
+
 ### `range_search(self, query, min_score)`
 
 Return all vectors scoring above ``min_score`` for ``query``.
@@ -306,6 +334,14 @@ Return a pinned-memory view of ``array`` when practical.
 ### `_release_pinned_buffers(self)`
 
 *No documentation available.*
+
+### `_refresh_cpu_replica(self)`
+
+*No documentation available.*
+
+### `promote_cpu_replica(self)`
+
+Promote the cached CPU replica back onto the GPU index.
 
 ### `_current_nprobe_value(self)`
 
@@ -572,19 +608,6 @@ Args:
 vectors: Embedding vectors to index.
 vector_ids: Identifiers associated with ``vectors``.
 
-### `add_batch(self, vectors, vector_ids)`
-
-Insert vectors using batching heuristics from the inner store.
-
-Args:
-vectors: Embedding vectors to index.
-vector_ids: Identifiers associated with ``vectors``.
-batch_size: Chunk size forwarded to the underlying store.
-
-### `range_search(self, query, min_score)`
-
-Delegate range search to the managed store.
-
 ### `set_nprobe(self, nprobe)`
 
 Tune ``nprobe`` while clamping to the managed safe range.
@@ -599,6 +622,10 @@ Configure identifier resolver on the inner store.
 
 Args:
 resolver: Callable mapping FAISS ids to external identifiers.
+
+### `range_search(self, query, min_score)`
+
+Delegate range search to the managed store.
 
 ### `needs_training(self)`
 
@@ -628,6 +655,10 @@ Trigger inner index rebuild when required by FAISS heuristics.
 
 Expose diagnostic statistics from the managed store.
 
+### `get_gpu_resources(self)`
+
+Return GPU resources backing the managed index (if available).
+
 ## 3. Classes
 
 ### `FaissSearchResult`
@@ -645,6 +676,14 @@ FaissSearchResult(vector_id='doc-123', score=0.82)
 ### `AdapterStats`
 
 Snapshot of runtime characteristics for a managed FAISS adapter.
+
+### `_PendingSearch`
+
+Container representing a pending single-query search awaiting batching.
+
+### `_SearchCoalescer`
+
+Batcher that groups singleton searches into short-lived micro-batches.
 
 ### `FaissVectorStore`
 

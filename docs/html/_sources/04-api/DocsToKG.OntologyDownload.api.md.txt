@@ -181,6 +181,26 @@ Returns:
 Mapping containing resolver metadata and planned download details suitable
 for serialization.
 
+### `_write_json_atomic(path, payload)`
+
+Atomically persist ``payload`` as JSON to ``path``.
+
+### `_write_lockfile(plans, path)`
+
+Write lockfile capturing planned resolver outputs.
+
+### `_load_lockfile_payload(path)`
+
+Return the parsed lockfile payload.
+
+### `_spec_from_lock_entry(entry, defaults)`
+
+Convert a lockfile entry back into a fetch specification.
+
+### `_specs_from_lock_payload(payload)`
+
+Build fetch specifications from lockfile payload.
+
 ### `_resolve_version_metadata(ontology_id, version)`
 
 Return path, timestamp, and size metadata for a stored version.

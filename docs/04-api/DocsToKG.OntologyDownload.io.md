@@ -40,6 +40,10 @@ Validate URLs to avoid SSRF, enforce HTTPS, normalize IDNs, and honor host allow
 
 Compute the SHA-256 digest for the provided file.
 
+### `_compute_file_hash(path, algorithm)`
+
+Compute ``algorithm`` digest for ``path``.
+
 ### `_validate_member_path(member_name)`
 
 Validate archive member paths to prevent traversal attacks.
@@ -89,6 +93,10 @@ Emit debug-level memory usage snapshots when enabled.
 *No documentation available.*
 
 ### `_is_retryable_status(status_code)`
+
+*No documentation available.*
+
+### `_extract_correlation_id(logger)`
 
 *No documentation available.*
 
@@ -241,6 +249,26 @@ Returns:
 None
 
 ### `_resolved_content_metadata()`
+
+*No documentation available.*
+
+### `_verify_expected_checksum(sha256_value)`
+
+*No documentation available.*
+
+### `_stream_once()`
+
+*No documentation available.*
+
+### `_should_retry(exc)`
+
+*No documentation available.*
+
+### `_retry_after_hint(exc)`
+
+*No documentation available.*
+
+### `_on_retry(attempt_number, exc, delay)`
 
 *No documentation available.*
 

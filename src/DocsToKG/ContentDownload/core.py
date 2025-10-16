@@ -29,6 +29,7 @@ __all__ = (
     "DEFAULT_MIN_PDF_BYTES",
     "DEFAULT_TAIL_CHECK_BYTES",
     "WorkArtifact",
+    "atomic_write",
     "atomic_write_bytes",
     "atomic_write_text",
     "classify_payload",
@@ -66,16 +67,18 @@ _SIZE_SUFFIXES = {
 }
 
 
-def atomic_write_bytes(
+def atomic_write(
     path: Path,
     chunks: Iterable[bytes],
     *,
     hasher: Optional[Any] = None,
+    temp_suffix: str = ".part",
 ) -> int:
-    """Atomically write ``chunks`` to ``path`` returning the byte count."""
+    """Atomically write ``chunks`` to ``path`` and return the byte count."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    temp_name = f".{path.name}.{uuid.uuid4().hex}.tmp"
+    suffix = temp_suffix if temp_suffix.startswith(".") else f".{temp_suffix}"
+    temp_name = f"{path.name}{suffix}.{uuid.uuid4().hex}"
     temp_path = path.with_name(temp_name)
     written = 0
     replaced = False
@@ -97,10 +100,21 @@ def atomic_write_bytes(
                 temp_path.unlink()
 
 
-def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None:
-    """Atomically write ``text`` to ``path`` using :func:`atomic_write_bytes`."""
+def atomic_write_bytes(
+    path: Path,
+    chunks: Iterable[bytes],
+    *,
+    hasher: Optional[Any] = None,
+) -> int:
+    """Backward-compatible wrapper for :func:`atomic_write`."""
 
-    atomic_write_bytes(path, [text.encode(encoding)])
+    return atomic_write(path, chunks, hasher=hasher)
+
+
+def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None:
+    """Atomically write ``text`` to ``path`` using :func:`atomic_write`."""
+
+    atomic_write(path, [text.encode(encoding)])
 
 
 @dataclass
@@ -204,6 +218,8 @@ class ReasonCode(Enum):
     RESOLVER_BREAKER_OPEN = "resolver_breaker_open"
     DOMAIN_BREAKER_OPEN = "domain_breaker_open"
     DOMAIN_BYTES_BUDGET = "domain_bytes_budget"
+    DOMAIN_MAX_BYTES = "domain_max_bytes"
+    DOMAIN_DISALLOWED_MIME = "domain_disallowed_mime"
     BUDGET_EXHAUSTED = "budget_exhausted"
 
     @classmethod

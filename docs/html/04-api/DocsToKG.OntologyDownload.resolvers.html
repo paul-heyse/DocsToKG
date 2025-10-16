@@ -81,126 +81,73 @@
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.resolvers</span></code>.</p>
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>Ontology resolver implementations.</p>
-<p>This module defines the strategies that translate planner specifications into
-actionable fetch plans. Each resolver applies polite headers, unified retry
-logic, SPDX-normalized licensing, and service-specific rate limits while
-participating in the automatic fallback chains described in the ontology
-download refactor. New resolvers can be registered through the <code class="docutils literal notranslate"><span class="pre">RESOLVERS</span></code> map.</p>
+<p>Resolver implementations for DocsToKG ontology downloads.</p>
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="normalize-license-to-spdx-value">
 <h3><code class="docutils literal notranslate"><span class="pre">normalize_license_to_spdx(value)</span></code><a class="headerlink" href="#normalize-license-to-spdx-value" title="Link to this heading"></a></h3>
 <p>Normalize common license strings to canonical SPDX identifiers.</p>
-<p>Resolver metadata frequently reports informal variants such as <code class="docutils literal notranslate"><span class="pre">CC</span> <span class="pre">BY</span> <span class="pre">4.0</span></code>;
-converting to SPDX ensures allowlist comparisons remain consistent.</p>
-<p>Args:
-value: Raw license string returned by a resolver (may be <code class="docutils literal notranslate"><span class="pre">None</span></code>).</p>
-<p>Returns:
-Canonical SPDX identifier when a mapping is known, otherwise the
-cleaned original value or <code class="docutils literal notranslate"><span class="pre">None</span></code> when the input is empty.</p>
 </section>
-<section id="get-service-bucket-service-config">
-<h3><code class="docutils literal notranslate"><span class="pre">_get_service_bucket(service,</span> <span class="pre">config)</span></code><a class="headerlink" href="#get-service-bucket-service-config" title="Link to this heading"></a></h3>
-<p>Return a token bucket for resolver API requests respecting rate limits.</p>
+<section id="parse-checksum-extra-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_parse_checksum_extra(value)</span></code><a class="headerlink" href="#parse-checksum-extra-value" title="Link to this heading"></a></h3>
+<p>Normalize checksum extras to <code class="docutils literal notranslate"><span class="pre">(algorithm,</span> <span class="pre">value)</span></code> tuples.</p>
+</section>
+<section id="parse-checksum-url-extra-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_parse_checksum_url_extra(value)</span></code><a class="headerlink" href="#parse-checksum-url-extra-value" title="Link to this heading"></a></h3>
+<p>Normalize checksum URL extras to <code class="docutils literal notranslate"><span class="pre">(url,</span> <span class="pre">algorithm)</span></code> tuples.</p>
+</section>
+<section id="plan-self-spec-config-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#plan-self-spec-config-logger" title="Link to this heading"></a></h3>
+<p>Produce a :class:<code class="docutils literal notranslate"><span class="pre">FetchPlan</span></code> describing how to retrieve <code class="docutils literal notranslate"><span class="pre">spec</span></code>.</p>
+</section>
+<section id="normalize-media-type-self-media-type">
+<h3><code class="docutils literal notranslate"><span class="pre">_normalize_media_type(self,</span> <span class="pre">media_type)</span></code><a class="headerlink" href="#normalize-media-type-self-media-type" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="preferred-media-type-self-spec">
+<h3><code class="docutils literal notranslate"><span class="pre">_preferred_media_type(self,</span> <span class="pre">spec)</span></code><a class="headerlink" href="#preferred-media-type-self-spec" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="negotiate-media-type-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_negotiate_media_type(self)</span></code><a class="headerlink" href="#negotiate-media-type-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="execute-with-retry-self-func">
 <h3><code class="docutils literal notranslate"><span class="pre">_execute_with_retry(self,</span> <span class="pre">func)</span></code><a class="headerlink" href="#execute-with-retry-self-func" title="Link to this heading"></a></h3>
 <p>Run a callable with retry semantics tailored for resolver APIs.</p>
-<p>Args:
-func: Callable performing the API request.
-config: Resolved configuration containing retry and timeout settings.
-logger: Logger adapter used to record retry attempts.
-name: Human-friendly resolver name used in log messages.</p>
-<p>Returns:
-Result returned by the supplied callable.</p>
-<p>Raises:
-ConfigError: When retry limits are exceeded or HTTP errors occur.</p>
 </section>
 <section id="extract-correlation-id-self-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">_extract_correlation_id(self,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#extract-correlation-id-self-logger" title="Link to this heading"></a></h3>
 <p>Return the correlation id from a logger adapter when available.</p>
-<p>Args:
-logger: Logger or adapter potentially carrying an <code class="docutils literal notranslate"><span class="pre">extra</span></code> dictionary.</p>
-<p>Returns:
-Correlation identifier string when present, otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
 </section>
 <section id="build-polite-headers-self-config-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">_build_polite_headers(self,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#build-polite-headers-self-config-logger" title="Link to this heading"></a></h3>
 <p>Create polite headers derived from configuration and logger context.</p>
-<p>Args:
-config: Resolved configuration providing HTTP header defaults.
-logger: Logger adapter whose correlation id is propagated to headers.</p>
-<p>Returns:
-Dictionary of polite header values ready to attach to HTTP sessions.</p>
 </section>
 <section id="apply-headers-to-session-session-headers">
 <h3><code class="docutils literal notranslate"><span class="pre">_apply_headers_to_session(session,</span> <span class="pre">headers)</span></code><a class="headerlink" href="#apply-headers-to-session-session-headers" title="Link to this heading"></a></h3>
 <p>Apply polite headers to a client session when supported.</p>
-<p>Args:
-session: HTTP client or session object whose <code class="docutils literal notranslate"><span class="pre">headers</span></code> may be updated.
-headers: Mapping of header names to polite values to merge.</p>
-<p>Returns:
-None</p>
 </section>
 <section id="build-plan-self">
 <h3><code class="docutils literal notranslate"><span class="pre">_build_plan(self)</span></code><a class="headerlink" href="#build-plan-self" title="Link to this heading"></a></h3>
 <p>Construct a <code class="docutils literal notranslate"><span class="pre">FetchPlan</span></code> from resolver components.</p>
-<p>Args:
-url: Canonical download URL for the ontology.
-headers: HTTP headers required when issuing the download.
-filename_hint: Suggested filename derived from resolver metadata.
-version: Version string reported by the resolver.
-license: License identifier reported by the resolver.
-media_type: MIME type associated with the ontology.
-service: Logical service identifier used for rate limiting.</p>
-<p>Returns:
-FetchPlan capturing resolver metadata.</p>
-</section>
-<section id="plan-self-spec-config-logger">
-<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#plan-self-spec-config-logger" title="Link to this heading"></a></h3>
-<p>Resolve download URLs using Bioregistry-provided endpoints.</p>
-<p>Args:
-spec: Fetch specification describing the ontology to download.
-config: Global configuration with retry and timeout settings.
-logger: Logger adapter used to emit planning telemetry.</p>
-<p>Returns:
-FetchPlan pointing to the preferred download URL.</p>
-<p>Raises:
-ConfigError: If no download URL can be derived.</p>
 </section>
 <section id="id1">
 <h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
-<p>Discover download locations via the OLS API.</p>
-<p>Args:
-spec: Fetch specification containing ontology identifiers and extras.
-config: Resolved configuration that provides retry policies.
-logger: Logger adapter used for planner progress messages.</p>
-<p>Returns:
-FetchPlan describing the download URL, headers, and metadata.</p>
-<p>Raises:
-ConfigError: When the API rejects credentials or yields no URLs.</p>
-</section>
-<section id="load-api-key-self">
-<h3><code class="docutils literal notranslate"><span class="pre">_load_api_key(self)</span></code><a class="headerlink" href="#load-api-key-self" title="Link to this heading"></a></h3>
-<p>Load the BioPortal API key from disk when available.</p>
-<p>Args:
-self: Resolver instance requesting the API key.</p>
-<p>Returns:
-Optional[str]: API key string stripped of whitespace, or <code class="docutils literal notranslate"><span class="pre">None</span></code> when missing.</p>
+<p>Build a :class:<code class="docutils literal notranslate"><span class="pre">FetchPlan</span></code> by resolving OBO-hosted download URLs.</p>
 </section>
 <section id="id2">
 <h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
-<p>Resolve BioPortal download URLs and authorization headers.</p>
-<p>Args:
-spec: Fetch specification with optional API extras like acronyms.
-config: Resolved configuration that governs HTTP retry behaviour.
-logger: Logger adapter for structured telemetry.</p>
-<p>Returns:
-FetchPlan containing the resolved download URL and headers.</p>
-<p>Raises:
-ConfigError: If authentication fails or no download link is available.</p>
+<p>Plan an OLS download by negotiating media type and authentication.</p>
+</section>
+<section id="load-api-key-self">
+<h3><code class="docutils literal notranslate"><span class="pre">_load_api_key(self)</span></code><a class="headerlink" href="#load-api-key-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id3">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<p>Plan a BioPortal download by combining ontology and submission metadata.</p>
 </section>
 <section id="fetch-metadata-self-uri-timeout">
 <h3><code class="docutils literal notranslate"><span class="pre">_fetch_metadata(self,</span> <span class="pre">uri,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#fetch-metadata-self-uri-timeout" title="Link to this heading"></a></h3>
@@ -210,65 +157,25 @@ ConfigError: If authentication fails or no download link is available.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_iter_dicts(payload)</span></code><a class="headerlink" href="#iter-dicts-payload" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
-<section id="id3">
-<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
-<p>Discover download metadata from the LOV API.</p>
-<p>Args:
-spec: Fetch specification providing ontology identifier and extras.
-config: Resolved configuration supplying timeout and header defaults.
-logger: Logger adapter used to emit planning telemetry.</p>
-<p>Returns:
-FetchPlan describing the resolved download URL and metadata.</p>
-<p>Raises:
-ConfigError: If required metadata is missing or the LOV API fails.</p>
-</section>
 <section id="id4">
 <h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
-<p>Return a fetch plan for explicitly provided SKOS URLs.</p>
-<p>Args:
-spec: Fetch specification containing the <code class="docutils literal notranslate"><span class="pre">extras.url</span></code> field.
-config: Resolved configuration (unused, included for API symmetry).
-logger: Logger adapter used to report resolved URL information.</p>
-<p>Returns:
-FetchPlan with the provided URL and appropriate media type.</p>
-<p>Raises:
-ConfigError: If the specification omits the required URL.</p>
+<p>Plan a LOV download by inspecting linked metadata for URLs and licenses.</p>
 </section>
 <section id="id5">
 <h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
-<p>Return a fetch plan using the direct URL provided in <code class="docutils literal notranslate"><span class="pre">spec.extras</span></code>.</p>
-<p>Args:
-spec: Fetch specification containing the upstream download details.
-config: Resolved configuration (unused, provided for interface parity).
-logger: Logger adapter used to record telemetry.</p>
-<p>Returns:
-FetchPlan referencing the explicit URL.</p>
-<p>Raises:
-ConfigError: If the specification omits the required URL or provides invalid extras.</p>
+<p>Plan a SKOS vocabulary download from explicit configuration metadata.</p>
 </section>
 <section id="id6">
 <h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
-<p>Return a fetch plan for XBRL ZIP archives provided via extras.</p>
-<p>Args:
-spec: Fetch specification containing the upstream download URL.
-config: Resolved configuration (unused, included for API compatibility).
-logger: Logger adapter for structured observability.</p>
-<p>Returns:
-FetchPlan referencing the specified ZIP archive.</p>
-<p>Raises:
-ConfigError: If the specification omits the required URL.</p>
+<p>Plan a direct download from declarative extras without discovery.</p>
 </section>
 <section id="id7">
 <h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
-<p>Return a fetch plan pointing to Ontobee-managed PURLs.</p>
-<p>Args:
-spec: Fetch specification describing the ontology identifier and preferred formats.
-config: Resolved configuration (unused beyond interface compatibility).
-logger: Logger adapter for structured telemetry.</p>
-<p>Returns:
-FetchPlan pointing to an Ontobee-hosted download URL.</p>
-<p>Raises:
-ConfigError: If the ontology identifier is invalid.</p>
+<p>Plan an XBRL taxonomy download using declarative resolver extras.</p>
+</section>
+<section id="id8">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
+<p>Plan an Ontobee download by composing the appropriate REST endpoint.</p>
 </section>
 <section id="retryable-exc">
 <h3><code class="docutils literal notranslate"><span class="pre">_retryable(exc)</span></code><a class="headerlink" href="#retryable-exc" title="Link to this heading"></a></h3>
@@ -288,177 +195,50 @@ ConfigError: If the ontology identifier is invalid.</p>
 <section id="fetchplan">
 <h3><code class="docutils literal notranslate"><span class="pre">FetchPlan</span></code><a class="headerlink" href="#fetchplan" title="Link to this heading"></a></h3>
 <p>Concrete plan output from a resolver.</p>
-<p>Attributes:
-url: Final URL from which to download the ontology document.
-headers: HTTP headers required by the upstream service.
-filename_hint: Optional filename recommended by the resolver.
-version: Version identifier derived from resolver metadata.
-license: License reported for the ontology.
-media_type: MIME type of the artifact when known.
-service: Logical service identifier used for rate limiting.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>plan = FetchPlan(
-…     url=”https://example.org/ontology.owl”,
-…     headers={“Accept”: “application/rdf+xml”},
-…     filename_hint=”ontology.owl”,
-…     version=”2024-01-01”,
-…     license=”CC-BY”,
-…     media_type=”application/rdf+xml”,
-…     service=”ols”,
-… )
-plan.service
-‘ols’</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
+</section>
+<section id="resolver">
+<h3><code class="docutils literal notranslate"><span class="pre">Resolver</span></code><a class="headerlink" href="#resolver" title="Link to this heading"></a></h3>
+<p>Protocol describing resolver planning behaviour.</p>
+</section>
+<section id="resolvercandidate">
+<h3><code class="docutils literal notranslate"><span class="pre">ResolverCandidate</span></code><a class="headerlink" href="#resolvercandidate" title="Link to this heading"></a></h3>
+<p>Resolver plan captured for download-time fallback.</p>
 </section>
 <section id="baseresolver">
 <h3><code class="docutils literal notranslate"><span class="pre">BaseResolver</span></code><a class="headerlink" href="#baseresolver" title="Link to this heading"></a></h3>
 <p>Shared helpers for resolver implementations.</p>
-<p>Provides polite header construction, retry orchestration, and metadata
-normalization utilities shared across concrete resolver classes.</p>
-<p>Attributes:
-None</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>class DemoResolver(BaseResolver):
-…     def plan(self, spec, config, logger):
-…         return self._build_plan(url=”https://example.org/demo.owl”)
-…
-demo = DemoResolver()
-isinstance(demo._build_plan(url=”https://example.org”).url, str)
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
 </section>
 <section id="oboresolver">
 <h3><code class="docutils literal notranslate"><span class="pre">OBOResolver</span></code><a class="headerlink" href="#oboresolver" title="Link to this heading"></a></h3>
 <p>Resolve ontologies hosted on the OBO Library using Bioregistry helpers.</p>
-<p>Attributes:
-None</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>resolver = OBOResolver()
-callable(getattr(resolver, “plan”))
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
 </section>
 <section id="olsresolver">
 <h3><code class="docutils literal notranslate"><span class="pre">OLSResolver</span></code><a class="headerlink" href="#olsresolver" title="Link to this heading"></a></h3>
 <p>Resolve ontologies from the Ontology Lookup Service (OLS4).</p>
-<p>Attributes:
-client: OLS client instance used to perform API calls.
-credentials_path: Path where the API token is expected.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>resolver = OLSResolver()
-resolver.credentials_path.name.endswith(“.txt”)
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
 </section>
 <section id="bioportalresolver">
 <h3><code class="docutils literal notranslate"><span class="pre">BioPortalResolver</span></code><a class="headerlink" href="#bioportalresolver" title="Link to this heading"></a></h3>
 <p>Resolve ontologies using the BioPortal (OntoPortal) API.</p>
-<p>Attributes:
-client: BioPortal client used to query ontology metadata.
-api_key_path: Path on disk containing the API key.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>resolver = BioPortalResolver()
-resolver.api_key_path.suffix
-‘.txt’</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
 </section>
 <section id="lovresolver">
 <h3><code class="docutils literal notranslate"><span class="pre">LOVResolver</span></code><a class="headerlink" href="#lovresolver" title="Link to this heading"></a></h3>
 <p>Resolve vocabularies from Linked Open Vocabularies (LOV).</p>
-<p>Queries the LOV API, normalises metadata fields, and returns Turtle
-download plans enriched with service identifiers for rate limiting.</p>
-<p>Attributes:
-API_ROOT: Base URL for the LOV API endpoints.
-session: Requests session used to execute API calls.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>resolver = LOVResolver()
-isinstance(resolver.session, requests.Session)
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
 </section>
 <section id="skosresolver">
 <h3><code class="docutils literal notranslate"><span class="pre">SKOSResolver</span></code><a class="headerlink" href="#skosresolver" title="Link to this heading"></a></h3>
-<p>Resolver for direct SKOS/RDF URLs.</p>
-<p>Attributes:
-None</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>resolver = SKOSResolver()
-callable(getattr(resolver, “plan”))
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
+<p>Resolve SKOS vocabularies specified directly via configuration.</p>
 </section>
 <section id="directresolver">
 <h3><code class="docutils literal notranslate"><span class="pre">DirectResolver</span></code><a class="headerlink" href="#directresolver" title="Link to this heading"></a></h3>
-<p>Resolver that consumes explicit URLs supplied via <code class="docutils literal notranslate"><span class="pre">spec.extras</span></code>.</p>
+<p>Resolve direct download links specified in configuration extras.</p>
 </section>
 <section id="xbrlresolver">
 <h3><code class="docutils literal notranslate"><span class="pre">XBRLResolver</span></code><a class="headerlink" href="#xbrlresolver" title="Link to this heading"></a></h3>
-<p>Resolver for XBRL taxonomy packages.</p>
-<p>Attributes:
-None</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>resolver = XBRLResolver()
-callable(getattr(resolver, “plan”))
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
+<p>Resolve XBRL taxonomy downloads from regulator endpoints.</p>
 </section>
 <section id="ontobeeresolver">
 <h3><code class="docutils literal notranslate"><span class="pre">OntobeeResolver</span></code><a class="headerlink" href="#ontobeeresolver" title="Link to this heading"></a></h3>
-<p>Resolver that constructs Ontobee-backed PURLs for OBO ontologies.</p>
-<p>Provides a lightweight fallback resolver that constructs deterministic
-PURLs for OBO prefixes when primary resolvers fail.</p>
-<p>Attributes:
-_FORMAT_MAP: Mapping of preferred formats to extensions and media types.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>resolver = OntobeeResolver()
-resolver._FORMAT_MAP[‘owl’][0]
-‘owl’</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
+<p>Resolve Ontobee-hosted ontologies via canonical PURLs.</p>
 </section>
 </section>
 </section>

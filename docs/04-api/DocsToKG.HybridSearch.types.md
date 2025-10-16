@@ -216,6 +216,7 @@ page_size: Maximum number of results to return
 cursor: Optional pagination cursor for continuation
 diversification: Whether to apply MMR diversification
 diagnostics: Whether to include per-method scoring information
+recall_first: When True, prefer range-search style recall for dense results
 
 Examples:
 >>> request = HybridSearchRequest(

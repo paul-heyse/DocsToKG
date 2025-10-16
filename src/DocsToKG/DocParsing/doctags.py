@@ -269,9 +269,9 @@ import time
 import types
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Deque, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Deque, Dict, Iterable, List, Optional, Tuple
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -419,17 +419,40 @@ class DoctagsCfg(StageConfigBase):
     }
 
     @classmethod
-    def from_sources(cls, args: argparse.Namespace, *, mode: str) -> "DoctagsCfg":
-        """Create a configuration by merging env vars, config files, and CLI arguments."""
-        cfg = cls(mode=mode)
+    @classmethod
+    def from_env(
+        cls,
+        *,
+        mode: str = "pdf",
+        defaults: Optional[Dict[str, Any]] = None,
+    ) -> "DoctagsCfg":
+        """Build a configuration exclusively from environment variables."""
+
+        base_kwargs = dict(defaults or {})
+        base_kwargs.setdefault("mode", mode)
+        cfg = cls(**base_kwargs)
         cfg.apply_env()
         if cfg.data_root is None:
             fallback_root = os.getenv("DOCSTOKG_DATA_ROOT")
             if fallback_root:
                 cfg.data_root = StageConfigBase._coerce_optional_path(fallback_root, None)
+        cfg.finalize()
+        return cfg
+
+    @classmethod
+    def from_args(
+        cls,
+        args: argparse.Namespace,
+        *,
+        mode: str = "pdf",
+        defaults: Optional[Dict[str, Any]] = None,
+    ) -> "DoctagsCfg":
+        """Create a configuration by merging env vars, optional config files, and CLI arguments."""
+
+        cfg = cls.from_env(mode=mode, defaults=defaults)
         config_path = getattr(args, "config", None)
         if config_path:
-            cfg.update_from_file(config_path)
+            cfg.update_from_file(Path(config_path))
         cfg.apply_args(args)
         cfg.finalize()
         return cfg
@@ -445,9 +468,17 @@ class DoctagsCfg(StageConfigBase):
         self.log_level = str(self.log_level).upper()
         self.mode = (self.mode or "pdf").lower()
         served = StageConfigBase._coerce_str_tuple(self.served_model_names, None)
-        self.served_model_names = served or DEFAULT_SERVED_MODEL_NAMES
-        stop = StageConfigBase._coerce_str_tuple(self.vlm_stop, None)
-        self.vlm_stop = stop or ("</doctag>", "<|end_of_text|>")
+        if served:
+            self.served_model_names = _normalize_served_model_names(served)
+        else:
+            self.served_model_names = DEFAULT_SERVED_MODEL_NAMES
+        stop_values = StageConfigBase._coerce_str_tuple(self.vlm_stop, None)
+        if stop_values:
+            self.vlm_stop = tuple(stop_values)
+        else:
+            self.vlm_stop = ("</doctag>", "<|end_of_text|>")
+
+    from_sources = from_args
 PDF_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     CLIOption(
         ("--config",),
@@ -1416,7 +1447,12 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
     else:
         namespace = pdf_parse_args(args)
 
-    log_level = getattr(namespace, "log_level", "INFO")
+    cfg = DoctagsCfg.from_args(namespace, mode="pdf")
+    config_snapshot = cfg.to_manifest()
+    for field_def in fields(DoctagsCfg):
+        setattr(namespace, field_def.name, getattr(cfg, field_def.name))
+
+    log_level = cfg.log_level
     logger = get_logger(__name__, level=str(log_level))
     set_spawn_or_warn(logger)
     import multiprocessing as mp
@@ -1433,35 +1469,18 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
 
     args = namespace
 
-    if not hasattr(args, "served_model_names"):
-        args.served_model_names = None
-    if not hasattr(args, "model"):
-        args.model = None
-    if not hasattr(args, "gpu_memory_utilization"):
-        args.gpu_memory_utilization = DEFAULT_GPU_MEMORY_UTILIZATION
-    if not hasattr(args, "workers"):
-        args.workers = DEFAULT_WORKERS
-    if not hasattr(args, "resume"):
-        args.resume = False
-    if not hasattr(args, "force"):
-        args.force = False
-    if not hasattr(args, "input"):
-        args.input = DEFAULT_INPUT
-    if not hasattr(args, "output"):
-        args.output = DEFAULT_OUTPUT
-
     ensure_docling_dependencies()
     ensure_model_environment()
 
-    served_model_names = _normalize_served_model_names(args.served_model_names)
+    served_model_names = cfg.served_model_names
     inference_model = served_model_names[0]
-    model_path = resolve_pdf_model_path(args.model)
+    model_path = resolve_pdf_model_path(cfg.model)
     args.model = model_path
-    gpu_memory_utilization = float(args.gpu_memory_utilization)
+    gpu_memory_utilization = float(cfg.gpu_memory_utilization)
 
     vllm_version = detect_vllm_version()
 
-    data_root_override = args.data_root
+    data_root_override = cfg.data_root
     resolved_root = (
         detect_data_root(data_root_override)
         if data_root_override is not None
@@ -1473,18 +1492,45 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
 
     data_manifests(resolved_root)
 
-    if args.input == DEFAULT_INPUT and data_root_override is not None:
+    if cfg.input == DEFAULT_INPUT and data_root_override is not None:
         input_dir = data_pdfs(resolved_root)
     else:
-        input_dir = (args.input or DEFAULT_INPUT).resolve()
+        input_dir = (cfg.input or DEFAULT_INPUT).resolve()
 
-    if args.output == DEFAULT_OUTPUT and data_root_override is not None:
+    if cfg.output == DEFAULT_OUTPUT and data_root_override is not None:
         output_dir = data_doctags(resolved_root)
     else:
-        output_dir = (args.output or DEFAULT_OUTPUT).resolve()
+        output_dir = (cfg.output or DEFAULT_OUTPUT).resolve()
 
     input_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    config_snapshot.update(
+        {
+            "mode": cfg.mode,
+            "data_root": str(resolved_root),
+            "input": str(input_dir),
+            "output": str(output_dir),
+            "model": str(model_path) if model_path else None,
+            "gpu_memory_utilization": gpu_memory_utilization,
+            "served_model_names": list(served_model_names),
+            "workers": int(cfg.workers),
+            "resume": bool(cfg.resume),
+            "force": bool(cfg.force),
+            "vllm_wait_timeout": int(cfg.vllm_wait_timeout),
+        }
+    )
+
+    manifest_log_success(
+        stage=MANIFEST_STAGE,
+        doc_id="__config__",
+        duration_s=0.0,
+        schema_version="docparse/1.1.0",
+        input_path=input_dir,
+        input_hash="",
+        output_path=output_dir,
+        config=config_snapshot,
+    )
 
     logger.info(
         "I/O configuration",
@@ -1498,14 +1544,14 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                 "served_models": list(served_model_names),
                 "gpu_memory_utilization": gpu_memory_utilization,
                 "vllm_version": vllm_version,
-                "vllm_wait_timeout": int(getattr(args, "vllm_wait_timeout", WAIT_TIMEOUT_S)),
+                "vllm_wait_timeout": int(cfg.vllm_wait_timeout),
             }
         },
     )
 
-    if args.force:
+    if cfg.force:
         logger.info("Force mode: reprocessing all documents")
-    elif args.resume:
+    elif cfg.resume:
         logger.info("Resume mode enabled: unchanged outputs will be skipped")
 
     preflight_start = time.perf_counter()
@@ -1551,9 +1597,11 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
             )
             return 0
 
-        manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_root) if args.resume else {}
+        manifest_index = (
+            load_manifest_index(MANIFEST_STAGE, resolved_root) if cfg.resume else {}
+        )
 
-        workers = max(1, int(args.workers))
+        workers = max(1, int(cfg.workers))
         logger.info(
             "Launching workers",
             extra={
@@ -1570,7 +1618,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
             doc_id, out_path = derive_doc_id_and_doctags_path(pdf_path, input_dir, output_dir)
             input_hash = compute_content_hash(pdf_path)
             manifest_entry = manifest_index.get(doc_id)
-            if should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force):
+            if should_skip_output(out_path, manifest_entry, input_hash, cfg.resume, cfg.force):
                 logger.info(
                     "Skipping document: output exists and input unchanged",
                     extra={
@@ -1977,7 +2025,12 @@ def html_main(args: argparse.Namespace | None = None) -> int:
     else:
         namespace = html_parse_args(args)
 
-    log_level = getattr(namespace, "log_level", "INFO")
+    cfg = DoctagsCfg.from_args(namespace, mode="html")
+    config_snapshot = cfg.to_manifest()
+    for field_def in fields(DoctagsCfg):
+        setattr(namespace, field_def.name, getattr(cfg, field_def.name))
+
+    log_level = cfg.log_level
     logger = get_logger(__name__, level=str(log_level))
     set_spawn_or_warn(logger)
 
@@ -1995,24 +2048,9 @@ def html_main(args: argparse.Namespace | None = None) -> int:
 
     args = namespace
 
-    if not hasattr(args, "input"):
-        args.input = HTML_DEFAULT_INPUT_DIR
-    if not hasattr(args, "output"):
-        args.output = HTML_DEFAULT_OUTPUT_DIR
-    if not hasattr(args, "workers"):
-        args.workers = max(1, (os.cpu_count() or 8) - 1)
-    if not hasattr(args, "overwrite"):
-        args.overwrite = False
-    if not hasattr(args, "resume"):
-        args.resume = False
-    if not hasattr(args, "force"):
-        args.force = False
-    if not hasattr(args, "data_root"):
-        args.data_root = None
-
     ensure_docling_dependencies()
 
-    data_root_override = args.data_root
+    data_root_override = cfg.data_root
     resolved_root = (
         detect_data_root(data_root_override)
         if data_root_override is not None
@@ -2024,15 +2062,15 @@ def html_main(args: argparse.Namespace | None = None) -> int:
 
     data_manifests(resolved_root)
 
-    if args.input == HTML_DEFAULT_INPUT_DIR and data_root_override is not None:
+    if cfg.input == HTML_DEFAULT_INPUT_DIR and data_root_override is not None:
         input_dir: Path = data_html(resolved_root)
     else:
-        input_dir = (args.input or HTML_DEFAULT_INPUT_DIR).resolve()
+        input_dir = (cfg.input or HTML_DEFAULT_INPUT_DIR).resolve()
 
-    if args.output == HTML_DEFAULT_OUTPUT_DIR and data_root_override is not None:
+    if cfg.output == HTML_DEFAULT_OUTPUT_DIR and data_root_override is not None:
         output_dir: Path = data_doctags(resolved_root)
     else:
-        output_dir = (args.output or HTML_DEFAULT_OUTPUT_DIR).resolve()
+        output_dir = (cfg.output or HTML_DEFAULT_OUTPUT_DIR).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info(
@@ -2042,17 +2080,41 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                 "data_root": str(resolved_root),
                 "input_dir": str(input_dir),
                 "output_dir": str(output_dir),
-                "workers": args.workers,
+                "workers": cfg.workers,
             }
         },
     )
 
-    if args.force:
+    config_snapshot.update(
+        {
+            "mode": cfg.mode,
+            "data_root": str(resolved_root),
+            "input": str(input_dir),
+            "output": str(output_dir),
+            "workers": int(cfg.workers),
+            "resume": bool(cfg.resume),
+            "force": bool(cfg.force),
+            "overwrite": bool(cfg.overwrite),
+        }
+    )
+
+    manifest_log_success(
+        stage=HTML_MANIFEST_STAGE,
+        doc_id="__config__",
+        duration_s=0.0,
+        schema_version="docparse/1.1.0",
+        input_path=input_dir,
+        input_hash="",
+        output_path=output_dir,
+        config=config_snapshot,
+    )
+
+    if cfg.force:
         logger.info(
             "Force mode: reprocessing all documents",
             extra={"extra_fields": {"mode": "force"}},
         )
-    elif args.resume:
+    elif cfg.resume:
         logger.info(
             "Resume mode enabled: unchanged outputs will be skipped",
             extra={"extra_fields": {"mode": "resume"}},
@@ -2065,7 +2127,9 @@ def html_main(args: argparse.Namespace | None = None) -> int:
         )
         return 0
 
-    manifest_index = load_manifest_index(HTML_MANIFEST_STAGE, resolved_root) if args.resume else {}
+    manifest_index = (
+        load_manifest_index(HTML_MANIFEST_STAGE, resolved_root) if cfg.resume else {}
+    )
 
     tasks: List[HtmlTask] = []
     ok = fail = skip = 0
@@ -2076,8 +2140,8 @@ def html_main(args: argparse.Namespace | None = None) -> int:
         input_hash = compute_content_hash(path)
         manifest_entry = manifest_index.get(doc_id)
         if (
-            should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force)
-            and not args.overwrite
+            should_skip_output(out_path, manifest_entry, input_hash, cfg.resume, cfg.force)
+            and not cfg.overwrite
         ):
             logger.info(
                 "Skipping HTML document",
@@ -2105,7 +2169,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                 relative_id=doc_id,
                 output_path=out_path,
                 input_hash=input_hash,
-                overwrite=args.overwrite,
+                overwrite=cfg.overwrite,
             )
         )
 
@@ -2122,7 +2186,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
         )
         return 0
 
-    with ProcessPoolExecutor(max_workers=args.workers) as ex:
+    with ProcessPoolExecutor(max_workers=cfg.workers) as ex:
         futures = [ex.submit(html_convert_one, task) for task in tasks]
         for fut in tqdm(
             as_completed(futures), total=len(futures), unit="file", desc="HTML → DocTags"

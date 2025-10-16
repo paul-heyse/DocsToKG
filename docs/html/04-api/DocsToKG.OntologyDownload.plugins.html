@@ -81,7 +81,7 @@
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.plugins</span></code>.</p>
 <section id="overview">
 <h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>Plugin discovery utilities for ontology downloader extensions.</p>
+<p>Plugin discovery helpers for ontology downloader components.</p>
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
@@ -97,10 +97,6 @@
 <h3><code class="docutils literal notranslate"><span class="pre">load_validator_plugins(registry)</span></code><a class="headerlink" href="#load-validator-plugins-registry" title="Link to this heading"></a></h3>
 <p>Discover validator plugins registered via <code class="docutils literal notranslate"><span class="pre">entry_points</span></code>.</p>
 </section>
-<section id="ensure-validator-plugins-registry">
-<h3><code class="docutils literal notranslate"><span class="pre">ensure_validator_plugins(registry)</span></code><a class="headerlink" href="#ensure-validator-plugins-registry" title="Link to this heading"></a></h3>
-<p>Load validator plugins exactly once per interpreter.</p>
-</section>
 <section id="plan-self">
 <h3><code class="docutils literal notranslate"><span class="pre">plan(self)</span></code><a class="headerlink" href="#plan-self" title="Link to this heading"></a></h3>
 <p>Plan a fetch for the provided ontology specification.</p>
@@ -112,13 +108,13 @@
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
-<section id="resolverlike">
-<h3><code class="docutils literal notranslate"><span class="pre">_ResolverLike</span></code><a class="headerlink" href="#resolverlike" title="Link to this heading"></a></h3>
-<p>Structural protocol describing resolver plugin instances.</p>
+<section id="resolverplugin">
+<h3><code class="docutils literal notranslate"><span class="pre">ResolverPlugin</span></code><a class="headerlink" href="#resolverplugin" title="Link to this heading"></a></h3>
+<p>Protocol describing resolver plugins discovered via entry points.</p>
 </section>
-<section id="validatorlike">
-<h3><code class="docutils literal notranslate"><span class="pre">_ValidatorLike</span></code><a class="headerlink" href="#validatorlike" title="Link to this heading"></a></h3>
-<p>Structural protocol for validator callables.</p>
+<section id="validatorplugin">
+<h3><code class="docutils literal notranslate"><span class="pre">ValidatorPlugin</span></code><a class="headerlink" href="#validatorplugin" title="Link to this heading"></a></h3>
+<p>Protocol describing validator plugins discovered via entry points.</p>
 </section>
 </section>
 </section>

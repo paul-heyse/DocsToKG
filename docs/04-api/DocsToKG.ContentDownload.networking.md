@@ -96,6 +96,14 @@ Examples:
 >>> isinstance(parse_retry_after_header(response), float)
 True
 
+### `_normalise_content_type(value)`
+
+Return the canonical MIME type component from a Content-Type header.
+
+### `_enforce_content_policy(response, content_policy)`
+
+Raise ContentPolicyViolation when response headers violate policy.
+
 ### `request_with_retries(session, method, url)`
 
 Execute an HTTP request with exponential backoff and retry handling.
@@ -110,6 +118,7 @@ retry_statuses: HTTP status codes that should trigger a retry. Defaults to
 ``{429, 500, 502, 503, 504}``.
 backoff_factor: Base multiplier for exponential backoff delays in seconds. Defaults to ``0.75``.
 respect_retry_after: Whether to parse and obey ``Retry-After`` headers. Defaults to ``True``.
+content_policy: Optional mapping describing max-bytes and allowed MIME types for the target host.
 **kwargs: Additional keyword arguments forwarded directly to :meth:`requests.Session.request`.
 
 Returns:
@@ -133,6 +142,7 @@ Args:
 session: HTTP session used for outbound requests.
 url: Candidate download URL.
 timeout: Maximum time budget in seconds for the probe.
+content_policy: Optional domain-specific content policy to enforce.
 
 Returns:
 ``True`` when the response appears to represent a binary payload such as
@@ -150,7 +160,7 @@ Fallback GET probe for providers that reject HEAD requests.
 
 ### `request_func()`
 
-Invoke :meth:`requests.Session.request` on the provided session.
+Invoke the appropriate request callable on the provided session.
 
 ### `build_headers(self)`
 
@@ -208,6 +218,10 @@ Consume tokens and return wait seconds required before proceeding.
 Attempt to consume tokens without blocking; return ``True`` if granted.
 
 ## 3. Classes
+
+### `ContentPolicyViolation`
+
+Raised when a response violates configured content policies.
 
 ### `CachedResult`
 

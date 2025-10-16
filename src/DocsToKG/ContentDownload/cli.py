@@ -184,6 +184,7 @@ from DocsToKG.ContentDownload.core import (
     Classification,
     ReasonCode,
     WorkArtifact,
+    atomic_write,
     atomic_write_text,
     _infer_suffix,
     classify_payload,
@@ -210,6 +211,7 @@ from DocsToKG.ContentDownload.pipeline import (
 from DocsToKG.ContentDownload.networking import (
     CachedResult,
     ConditionalRequestHelper,
+    ContentPolicyViolation,
     ModifiedResult,
     create_session,
     head_precheck,
@@ -314,6 +316,10 @@ class DownloadState(Enum):
 
     PENDING = "pending"
     WRITING = "writing"
+
+
+class _MaxBytesExceeded(RuntimeError):
+    """Internal signal raised when the stream exceeds the configured byte budget."""
 
 
 def _build_download_outcome(
@@ -951,6 +957,21 @@ def download_candidate(
         max_bytes = None
     if max_bytes is not None and max_bytes <= 0:
         max_bytes = None
+    parsed_url = urlsplit(url)
+    domain_policies: Dict[str, Dict[str, Any]] = context.get("domain_content_rules", {})
+    host_key = (parsed_url.hostname or parsed_url.netloc or "").lower()
+    content_policy: Optional[Dict[str, Any]] = None
+    if domain_policies and host_key:
+        content_policy = domain_policies.get(host_key)
+        if content_policy is None and host_key.startswith("www."):
+            content_policy = domain_policies.get(host_key[4:])
+    policy_max_bytes: Optional[int] = None
+    if content_policy:
+        raw_policy_limit = content_policy.get("max_bytes")
+        if isinstance(raw_policy_limit, int) and raw_policy_limit > 0:
+            policy_max_bytes = raw_policy_limit
+            if max_bytes is None or raw_policy_limit < max_bytes:
+                max_bytes = raw_policy_limit
     headers: Dict[str, str] = {}
     if referer:
         headers["Referer"] = referer
@@ -958,7 +979,7 @@ def download_candidate(
     accept_overrides = context.get("host_accept_overrides", {})
     accept_value: Optional[str] = None
     if isinstance(accept_overrides, dict):
-        host_for_accept = urlsplit(url).netloc.lower()
+        host_for_accept = (parsed_url.netloc or "").lower()
         if host_for_accept:
             accept_value = accept_overrides.get(host_for_accept)
             if accept_value is None and host_for_accept.startswith("www."):
@@ -991,7 +1012,7 @@ def download_candidate(
             )
     head_precheck_passed = head_precheck_passed or bool(context.get("head_precheck_passed", False))
     if not head_precheck_passed and not context.get("skip_head_precheck", False):
-        head_precheck_passed = head_precheck(session, url, timeout)
+        head_precheck_passed = head_precheck(session, url, timeout, content_policy=content_policy)
         context["head_precheck_passed"] = head_precheck_passed
     extract_html_text = bool(context.get("extract_html_text", False))
     previous_map: Dict[str, Dict[str, Any]] = context.get("previous", {})
@@ -1024,15 +1045,53 @@ def download_candidate(
                 headers.update(cond_helper.build_headers())
 
             start = time.monotonic()
-            with request_with_retries(
-                session,
-                "GET",
-                url,
-                stream=True,
-                allow_redirects=True,
-                timeout=timeout,
-                headers=headers,
-            ) as response:
+            try:
+                response_cm = request_with_retries(
+                    session,
+                    "GET",
+                    url,
+                    stream=True,
+                    allow_redirects=True,
+                    timeout=timeout,
+                    headers=headers,
+                    content_policy=content_policy,
+                )
+            except ContentPolicyViolation as exc:
+                elapsed_ms = (time.monotonic() - start) * 1000.0
+                violation = exc.violation
+                reason_code = (
+                    ReasonCode.DOMAIN_DISALLOWED_MIME
+                    if violation == "content-type"
+                    else ReasonCode.DOMAIN_MAX_BYTES
+                )
+                LOGGER.info(
+                    "domain-content-policy-blocked",
+                    extra={
+                        "extra_fields": {
+                            "url": url,
+                            "work_id": artifact.work_id,
+                            "violation": violation,
+                            "detail": exc.detail,
+                        }
+                    },
+                )
+                return DownloadOutcome(
+                    classification=Classification.SKIPPED,
+                    path=None,
+                    http_status=None,
+                    content_type=exc.content_type,
+                    elapsed_ms=elapsed_ms,
+                    reason=reason_code,
+                    reason_detail=exc.detail or violation,
+                    sha256=None,
+                    content_length=exc.content_length,
+                    etag=None,
+                    last_modified=None,
+                    extracted_text_path=None,
+                    retry_after=None,
+                )
+
+            with response_cm as response:
                 elapsed_ms = (time.monotonic() - start) * 1000.0
                 status_code = response.status_code or 0
                 if status_code >= 400:
@@ -1141,7 +1200,7 @@ def download_candidate(
                     except (TypeError, ValueError):
                         content_length_hint = None
                 if (
-                    max_bytes
+                    max_bytes is not None
                     and content_length_hint is not None
                     and content_length_hint > max_bytes
                 ):
@@ -1162,16 +1221,27 @@ def download_candidate(
                         if "html" in content_type_lower
                         else Classification.PAYLOAD_TOO_LARGE
                     )
+                    policy_triggered = (
+                        policy_max_bytes is not None and max_bytes == policy_max_bytes
+                    )
+                    reason_code = (
+                        ReasonCode.DOMAIN_MAX_BYTES
+                        if policy_triggered
+                        else ReasonCode.MAX_BYTES_HEADER
+                    )
+                    reason_detail = (
+                        f"content-length {content_length_hint} exceeds domain max_bytes {policy_max_bytes}"
+                        if policy_triggered and policy_max_bytes is not None
+                        else f"content-length {content_length_hint} exceeds max_bytes {max_bytes}"
+                    )
                     return DownloadOutcome(
                         classification=classification_limit,
                         path=None,
                         http_status=response.status_code,
                         content_type=content_type,
                         elapsed_ms=elapsed_now,
-                        reason=ReasonCode.MAX_BYTES_HEADER,
-                        reason_detail=(
-                            f"content-length {content_length_hint} exceeds max_bytes {max_bytes}"
-                        ),
+                        reason=reason_code,
+                        reason_detail=reason_detail,
                         sha256=None,
                         content_length=content_length_hint,
                         etag=modified_result.etag,
@@ -1179,125 +1249,43 @@ def download_candidate(
                         extracted_text_path=None,
                         retry_after=retry_after_hint,
                     )
-                sniff_buffer = bytearray()
-                detected: Classification = Classification.UNKNOWN
-                flagged_unknown = False
-                dest_path: Optional[Path] = None
-                part_path: Optional[Path] = None
-                handle = None
-                state = DownloadState.PENDING
                 hasher = hashlib.sha256() if not dry_run else None
                 byte_count = 0
                 tail_buffer = bytearray()
+                content_iter = response.iter_content(chunk_size=1 << 15)
+                sniff_buffer = bytearray()
+                prefetched: List[bytes] = []
+                detected: Classification = Classification.UNKNOWN
+                flagged_unknown = False
 
-                try:
-                    for chunk in response.iter_content(chunk_size=1 << 15):
-                        if not chunk:
-                            continue
-                        if state is DownloadState.PENDING:
-                            sniff_buffer.extend(chunk)
-                            candidate = classify_payload(bytes(sniff_buffer), content_type, url)
-                            if candidate is not Classification.UNKNOWN:
-                                detected = candidate
-                            if (
-                                detected is Classification.UNKNOWN
-                                and sniff_limit
-                                and len(sniff_buffer) >= sniff_limit
-                            ):
-                                detected = Classification.PDF
-                                flagged_unknown = True
-
-                            if detected is not Classification.UNKNOWN:
-                                if dry_run:
-                                    break
-                                default_suffix = (
-                                    ".html" if detected == Classification.HTML else ".pdf"
-                                )
-                                suffix = _infer_suffix(
-                                    url, content_type, disposition, detected, default_suffix
-                                )
-                                dest_dir = (
-                                    artifact.html_dir
-                                    if detected == Classification.HTML
-                                    else artifact.pdf_dir
-                                )
-                                dest_path = dest_dir / f"{artifact.base_stem}{suffix}"
-                                ensure_dir(dest_path.parent)
-                                part_path = dest_path.with_suffix(dest_path.suffix + ".part")
-                                handle = part_path.open("wb")
-                                initial_bytes = bytes(sniff_buffer)
-                                if initial_bytes:
-                                    handle.write(initial_bytes)
-                                    if hasher:
-                                        hasher.update(initial_bytes)
-                                    byte_count += len(initial_bytes)
-                                    update_tail_buffer(
-                                        tail_buffer, initial_bytes, limit=tail_window_bytes
-                                    )
-                                sniff_buffer.clear()
-                                state = DownloadState.WRITING
-                                continue
-                        elif handle is not None:
-                            handle.write(chunk)
-                            if hasher:
-                                hasher.update(chunk)
-                            byte_count += len(chunk)
-                            update_tail_buffer(tail_buffer, chunk, limit=tail_window_bytes)
-
-                            if max_bytes and byte_count > max_bytes:
-                                LOGGER.warning(
-                                    "Aborting download during stream due to max-bytes limit",
-                                    extra={
-                                        "extra_fields": {
-                                            "url": url,
-                                            "work_id": artifact.work_id,
-                                            "bytes_downloaded": byte_count,
-                                            "max_bytes": max_bytes,
-                                        }
-                                    },
-                                )
-                                if handle is not None:
-                                    handle.close()
-                                    handle = None
-                                if part_path:
-                                    with contextlib.suppress(FileNotFoundError):
-                                        part_path.unlink()
-                                classification_limit = (
-                                    Classification.HTML_TOO_LARGE
-                                    if detected is Classification.HTML
-                                    else Classification.PAYLOAD_TOO_LARGE
-                                )
-                                elapsed_limit = (time.monotonic() - start) * 1000.0
-                                return DownloadOutcome(
-                                    classification=classification_limit,
-                                    path=None,
-                                    http_status=response.status_code,
-                                    content_type=content_type,
-                                    elapsed_ms=elapsed_limit,
-                                    reason=ReasonCode.MAX_BYTES_STREAM,
-                                    reason_detail=f"download exceeded max_bytes {max_bytes}",
-                                    sha256=None,
-                                    content_length=byte_count,
-                                    etag=modified_result.etag,
-                                    last_modified=modified_result.last_modified,
-                                    extracted_text_path=None,
-                                    retry_after=retry_after_hint,
-                                )
-
-                    if detected is Classification.UNKNOWN:
-                        return DownloadOutcome(
-                            classification=Classification.MISS,
-                            path=None,
-                            http_status=response.status_code,
-                            content_type=content_type,
-                            elapsed_ms=elapsed_ms,
-                            reason=ReasonCode.UNKNOWN,
-                            reason_detail="classifier-unknown",
-                            retry_after=retry_after_hint,
-                        )
-                finally:
-                    if handle is not None:
-                        handle.close()
+                for chunk in content_iter:
+                    if not chunk:
+                        continue
+                    sniff_buffer.extend(chunk)
+                    prefetched.append(chunk)
+                    candidate = classify_payload(bytes(sniff_buffer), content_type, url)
+                    if candidate is not Classification.UNKNOWN:
+                        detected = candidate
+                    if (
+                        detected is Classification.UNKNOWN
+                        and sniff_limit
+                        and len(sniff_buffer) >= sniff_limit
+                    ):
+                        detected = Classification.PDF
+                        flagged_unknown = True
+                    if detected is not Classification.UNKNOWN:
+                        break
+                else:
+                    return DownloadOutcome(
+                        classification=Classification.MISS,
+                        path=None,
+                        http_status=response.status_code,
+                        content_type=content_type,
+                        elapsed_ms=elapsed_ms,
+                        reason=ReasonCode.UNKNOWN,
+                        reason_detail="classifier-unknown",
+                        retry_after=retry_after_hint,
+                    )
 
             if dry_run:
                 return _build_download_outcome(
@@ -1320,16 +1308,85 @@ def download_candidate(
                     retry_after=retry_after_hint,
                 )
 
+            default_suffix = ".html" if detected == Classification.HTML else ".pdf"
+            suffix = _infer_suffix(url, content_type, disposition, detected, default_suffix)
+            dest_dir = artifact.html_dir if detected == Classification.HTML else artifact.pdf_dir
+            dest_path = dest_dir / f"{artifact.base_stem}{suffix}"
+            ensure_dir(dest_path.parent)
+
+            def _stream_chunks() -> Iterable[bytes]:
+                nonlocal byte_count
+                for chunk in prefetched:
+                    if not chunk:
+                        continue
+                    byte_count += len(chunk)
+                    update_tail_buffer(tail_buffer, chunk, limit=tail_window_bytes)
+                    if max_bytes is not None and byte_count > max_bytes:
+                        raise _MaxBytesExceeded()
+                    yield chunk
+                for chunk in content_iter:
+                    if not chunk:
+                        continue
+                    byte_count += len(chunk)
+                    update_tail_buffer(tail_buffer, chunk, limit=tail_window_bytes)
+                    if max_bytes is not None and byte_count > max_bytes:
+                        raise _MaxBytesExceeded()
+                    yield chunk
+
+            try:
+                atomic_write(dest_path, _stream_chunks(), hasher=hasher)
+            except _MaxBytesExceeded:
+                LOGGER.warning(
+                    "Aborting download during stream due to max-bytes limit",
+                    extra={
+                        "extra_fields": {
+                            "url": url,
+                            "work_id": artifact.work_id,
+                            "bytes_downloaded": byte_count,
+                            "max_bytes": max_bytes,
+                        }
+                    },
+                )
+                classification_limit = (
+                    Classification.HTML_TOO_LARGE
+                    if detected is Classification.HTML
+                    else Classification.PAYLOAD_TOO_LARGE
+                )
+                elapsed_limit = (time.monotonic() - start) * 1000.0
+                policy_triggered = (
+                    policy_max_bytes is not None and max_bytes is not None and max_bytes == policy_max_bytes
+                )
+                reason_code = (
+                    ReasonCode.DOMAIN_MAX_BYTES
+                    if policy_triggered
+                    else ReasonCode.MAX_BYTES_STREAM
+                )
+                reason_detail = (
+                    f"download exceeded domain max_bytes {policy_max_bytes}"
+                    if policy_triggered and policy_max_bytes is not None
+                    else f"download exceeded max_bytes {max_bytes}"
+                )
+                return DownloadOutcome(
+                    classification=classification_limit,
+                    path=None,
+                    http_status=response.status_code,
+                    content_type=content_type,
+                    elapsed_ms=elapsed_limit,
+                    reason=reason_code,
+                    reason_detail=reason_detail,
+                    sha256=None,
+                    content_length=byte_count,
+                    etag=modified_result.etag,
+                    last_modified=modified_result.last_modified,
+                    extracted_text_path=None,
+                    retry_after=retry_after_hint,
+                )
+
             sha256: Optional[str] = None
             content_length: Optional[int] = None
-            if dest_path and hasher is not None:
+            if hasher is not None:
                 sha256 = hasher.hexdigest()
                 content_length = byte_count
-            if part_path and dest_path:
-                os.replace(part_path, dest_path)
-            if part_path:
-                with contextlib.suppress(FileNotFoundError):
-                    part_path.unlink()
             if (
                 dest_path
                 and context.get("content_addressed")
@@ -1971,11 +2028,21 @@ def main() -> None:
         help="Resume from manifest JSONL log, skipping completed works.",
     )
     parser.add_argument(
+        "--extract-text",
+        dest="extract_text",
+        choices=["html", "never"],
+        default="never",
+        help="Extract plaintext sidecars for HTML downloads ('html') or disable ('never', default).",
+    )
+    parser.add_argument(
         "--extract-html-text",
-        action="store_true",
-        help="Extract plaintext from HTML fallbacks (requires trafilatura).",
+        dest="extract_text",
+        action="store_const",
+        const="html",
+        help=argparse.SUPPRESS,
     )
     args = parser.parse_args()
+    args.extract_html_text = args.extract_text == "html"
     run_id = uuid.uuid4().hex
 
     if args.workers < 1:

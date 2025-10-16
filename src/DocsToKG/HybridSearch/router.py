@@ -58,13 +58,27 @@ class FaissRouter:
                 self._stores[key] = store
             return store
 
-    def stats(self) -> Dict[str, Mapping[str, object]]:
-        """Return stats for all managed stores."""
+    def stats(self) -> Dict[str, object]:
+        """Return stats for all managed stores (namespaced and aggregate)."""
 
         if not self._per_namespace:
-            return {DEFAULT_NAMESPACE: self._default_store.stats()}
-        with self._lock:
-            return {ns: store.stats() for ns, store in self._stores.items()}
+            snapshots = {DEFAULT_NAMESPACE: self._default_store.stats()}
+        else:
+            with self._lock:
+                snapshots = {ns: store.stats() for ns, store in self._stores.items()}
+        aggregate = self._aggregate_stats(snapshots)
+        return {"namespaces": snapshots, "aggregate": aggregate}
+
+    @staticmethod
+    def _aggregate_stats(namespaced: Mapping[str, Mapping[str, object]]) -> Dict[str, float]:
+        totals: Dict[str, float] = {}
+        for stats in namespaced.values():
+            if not isinstance(stats, Mapping):
+                continue
+            for key, value in stats.items():
+                if isinstance(value, (int, float)):
+                    totals[key] = totals.get(key, 0.0) + float(value)
+        return totals
 
     def serialize_all(self) -> Dict[str, bytes]:
         """Serialize every managed store (namespace -> payload)."""

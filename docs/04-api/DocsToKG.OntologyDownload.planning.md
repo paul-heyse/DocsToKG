@@ -34,7 +34,7 @@ Download planning and orchestration helpers for ontology fetching.
 
 ### `_resolve_expected_checksum()`
 
-Determine the expected checksum string passed to the downloader.
+Determine the expected checksum metadata for downstream enforcement.
 
 ### `get_manifest_schema()`
 
@@ -172,6 +172,14 @@ Return a timezone-aware datetime parsed from HTTP date headers.
 
 Probe the upstream plan URL for a Last-Modified header.
 
+### `_atomic_write_text(path, content)`
+
+Atomically replace ``path`` with ``content`` to avoid partial writes.
+
+### `_atomic_write_json(path, payload)`
+
+Serialize ``payload`` to JSON and atomically persist it to ``path``.
+
 ### `_write_manifest(manifest_path, manifest)`
 
 Persist a validated manifest to disk as JSON.
@@ -183,6 +191,10 @@ manifest: Manifest describing the downloaded ontology artifact.
 ### `_append_index_entry(ontology_dir, entry)`
 
 Append or update the ontology-level ``index.json`` with ``entry``.
+
+### `_mirror_to_cas_if_enabled()`
+
+Mirror ``destination`` into the content-addressable cache when enabled.
 
 ### `_build_destination(spec, plan, config)`
 
@@ -292,27 +304,13 @@ Return a filesystem-safe token for lock filenames.
 
 Acquire an inter-process lock for a specific ontology version.
 
-### `normalize_license_to_spdx(value)`
+### `to_known_hash(self)`
 
-Normalize common license strings to canonical SPDX identifiers.
+Return ``algorithm:value`` string suitable for pooch known_hash.
 
-Resolver metadata frequently reports informal variants such as ``CC BY 4.0``;
-converting to SPDX ensures allowlist comparisons remain consistent.
+### `to_mapping(self)`
 
-Args:
-value: Raw license string returned by a resolver (may be ``None``).
-
-Returns:
-Canonical SPDX identifier when a mapping is known, otherwise the
-cleaned original value or ``None`` when the input is empty.
-
-### `_parse_checksum_extra(value)`
-
-Normalize checksum extras to ``(algorithm, value)`` tuples.
-
-### `_parse_checksum_url_extra(value)`
-
-Normalize checksum URL extras to ``(url, algorithm)`` tuples.
+Return mapping representation for manifest and index serialization.
 
 ### `to_dict(self)`
 
@@ -334,18 +332,6 @@ None
 Returns:
 JSON document encoding the manifest metadata.
 
-### `plan(self, spec, config, logger)`
-
-Return a FetchPlan describing how to obtain the ontology.
-
-Args:
-spec: Ontology fetch specification under consideration.
-config: Fully resolved configuration containing defaults.
-logger: Logger adapter scoped to the current fetch request.
-
-Returns:
-Concrete plan containing download URL, headers, and metadata.
-
 ### `_add_candidate(candidate)`
 
 *No documentation available.*
@@ -354,226 +340,7 @@ Concrete plan containing download URL, headers, and metadata.
 
 *No documentation available.*
 
-### `_execute_with_retry(self, func)`
-
-Run a callable with retry semantics tailored for resolver APIs.
-
-Args:
-func: Callable performing the API request.
-config: Resolved configuration containing retry and timeout settings.
-logger: Logger adapter used to record retry attempts.
-name: Human-friendly resolver name used in log messages.
-
-Returns:
-Result returned by the supplied callable.
-
-Raises:
-ResolverError: When retry limits are exceeded or HTTP errors occur.
-UserConfigError: When upstream services reject credentials.
-
-### `_extract_correlation_id(self, logger)`
-
-Return the correlation id from a logger adapter when available.
-
-Args:
-logger: Logger or adapter potentially carrying an ``extra`` dictionary.
-
-Returns:
-Correlation identifier string when present, otherwise ``None``.
-
-### `_build_polite_headers(self, config, logger)`
-
-Create polite headers derived from configuration and logger context.
-
-Args:
-config: Resolved configuration providing HTTP header defaults.
-logger: Logger adapter whose correlation id is propagated to headers.
-
-Returns:
-Dictionary of polite header values ready to attach to HTTP sessions.
-
-### `_apply_headers_to_session(session, headers)`
-
-Apply polite headers to a client session when supported.
-
-Args:
-session: HTTP client or session object whose ``headers`` may be updated.
-headers: Mapping of header names to polite values to merge.
-
-Returns:
-None
-
-### `_build_plan(self)`
-
-Construct a ``FetchPlan`` from resolver components.
-
-Args:
-url: Canonical download URL for the ontology.
-headers: HTTP headers required when issuing the download.
-filename_hint: Suggested filename derived from resolver metadata.
-version: Version string reported by the resolver.
-license: License identifier reported by the resolver.
-media_type: MIME type associated with the ontology.
-service: Logical service identifier used for rate limiting.
-
-Returns:
-FetchPlan capturing resolver metadata with a security-validated URL.
-
-### `plan(self, spec, config, logger)`
-
-Resolve download URLs using Bioregistry-provided endpoints.
-
-Args:
-spec: Fetch specification describing the ontology to download.
-config: Global configuration with retry and timeout settings.
-logger: Logger adapter used to emit planning telemetry.
-
-Returns:
-FetchPlan pointing to the preferred download URL.
-
-Raises:
-ResolverError: If no download URL can be derived.
-UserConfigError: When required Bioregistry helpers are unavailable.
-
-### `plan(self, spec, config, logger)`
-
-Discover download locations via the OLS API.
-
-Args:
-spec: Fetch specification containing ontology identifiers and extras.
-config: Resolved configuration that provides retry policies.
-logger: Logger adapter used for planner progress messages.
-
-Returns:
-FetchPlan describing the download URL, headers, and metadata.
-
-Raises:
-UserConfigError: When the API rejects credentials.
-ResolverError: When no download URLs can be resolved.
-
-### `_load_api_key(self)`
-
-Load the BioPortal API key from disk when available.
-
-Args:
-self: Resolver instance requesting the API key.
-
-Returns:
-Optional[str]: API key string stripped of whitespace, or ``None`` when missing.
-
-### `plan(self, spec, config, logger)`
-
-Resolve BioPortal download URLs and authorization headers.
-
-Args:
-spec: Fetch specification with optional API extras like acronyms.
-config: Resolved configuration that governs HTTP retry behaviour.
-logger: Logger adapter for structured telemetry.
-
-Returns:
-FetchPlan containing the resolved download URL and headers.
-
-Raises:
-UserConfigError: If authentication fails.
-ResolverError: If no download link is available.
-
-### `_fetch_metadata(self, uri, timeout)`
-
-*No documentation available.*
-
-### `_iter_dicts(payload)`
-
-*No documentation available.*
-
-### `plan(self, spec, config, logger)`
-
-Discover download metadata from the LOV API.
-
-Args:
-spec: Fetch specification providing ontology identifier and extras.
-config: Resolved configuration supplying timeout and header defaults.
-logger: Logger adapter used to emit planning telemetry.
-
-Returns:
-FetchPlan describing the resolved download URL and metadata.
-
-Raises:
-UserConfigError: If required resolver metadata is missing.
-ResolverError: If the LOV API does not provide a download URL.
-
-### `plan(self, spec, config, logger)`
-
-Return a fetch plan for explicitly provided SKOS URLs.
-
-Args:
-spec: Fetch specification containing the `extras.url` field.
-config: Resolved configuration (unused, included for API symmetry).
-logger: Logger adapter used to report resolved URL information.
-
-Returns:
-FetchPlan with the provided URL and appropriate media type.
-
-Raises:
-UserConfigError: If the specification omits the required URL.
-
-### `plan(self, spec, config, logger)`
-
-Return a fetch plan using the direct URL provided in ``spec.extras``.
-
-Args:
-spec: Fetch specification containing the upstream download details.
-config: Resolved configuration (unused, provided for interface parity).
-logger: Logger adapter used to record telemetry.
-
-Returns:
-FetchPlan referencing the explicit URL.
-
-Raises:
-UserConfigError: If the specification omits the required URL or provides invalid extras.
-
-### `plan(self, spec, config, logger)`
-
-Return a fetch plan for XBRL ZIP archives provided via extras.
-
-Args:
-spec: Fetch specification containing the upstream download URL.
-config: Resolved configuration (unused, included for API compatibility).
-logger: Logger adapter for structured observability.
-
-Returns:
-FetchPlan referencing the specified ZIP archive.
-
-Raises:
-UserConfigError: If the specification omits the required URL.
-
-### `plan(self, spec, config, logger)`
-
-Return a fetch plan pointing to Ontobee-managed PURLs.
-
-Args:
-spec: Fetch specification describing the ontology identifier and preferred formats.
-config: Resolved configuration (unused beyond interface compatibility).
-logger: Logger adapter for structured telemetry.
-
-Returns:
-FetchPlan pointing to an Ontobee-hosted download URL.
-
-Raises:
-UserConfigError: If the ontology identifier is invalid.
-
 ### `_execute_candidate()`
-
-*No documentation available.*
-
-### `_retryable(exc)`
-
-*No documentation available.*
-
-### `_on_retry(attempt, exc, sleep_time)`
-
-*No documentation available.*
-
-### `_invoke()`
 
 *No documentation available.*
 
@@ -620,6 +387,10 @@ Examples:
 >>> result.status
 'success'
 
+### `ExpectedChecksum`
+
+Expected checksum derived from configuration or resolver metadata.
+
 ### `Manifest`
 
 Provenance information for a downloaded ontology artifact.
@@ -646,6 +417,7 @@ target_formats: Desired conversion targets for normalization.
 validation: Mapping of validator names to their results.
 artifacts: Additional file paths generated during processing.
 resolver_attempts: Ordered record of resolver attempts during download.
+expected_checksum: Optional checksum metadata enforced for the download.
 
 Examples:
 >>> manifest = Manifest(
@@ -672,55 +444,6 @@ Examples:
 ...     resolver_attempts=(),
 ... )
 >>> manifest.resolver
-'obo'
-
-### `Resolver`
-
-Protocol describing resolver planning behaviour.
-
-Attributes:
-None
-
-Examples:
->>> import logging
->>> spec = FetchSpec(id="CHEBI", resolver="dummy", extras={}, target_formats=("owl",))
->>> class DummyResolver:
-...     def plan(self, spec, config, logger):
-...         return FetchPlan(
-...             url="https://example.org/chebi.owl",
-...             headers={},
-...             filename_hint="chebi.owl",
-...             version="v1",
-...             license="CC-BY",
-...             media_type="application/rdf+xml",
-...         )
-...
->>> plan = DummyResolver().plan(spec, ResolvedConfig.from_defaults(), logging.getLogger("test"))
->>> plan.url
-'https://example.org/chebi.owl'
-
-### `ResolverCandidate`
-
-Resolver plan captured for download-time fallback.
-
-Attributes:
-resolver: Name of the resolver that produced the plan.
-plan: Concrete :class:`FetchPlan` describing how to fetch the ontology.
-
-Examples:
->>> candidate = ResolverCandidate(
-...     resolver="obo",
-...     plan=FetchPlan(
-...         url="https://example.org/hp.owl",
-...         headers={},
-...         filename_hint=None,
-...         version="2024-01-01",
-...         license="CC-BY",
-...         media_type="application/rdf+xml",
-...         service="obo",
-...     ),
-... )
->>> candidate.resolver
 'obo'
 
 ### `PlannedFetch`
@@ -761,148 +484,3 @@ Examples:
 ... )
 >>> fetch_plan.resolver
 'obo'
-
-### `FetchPlan`
-
-Concrete plan output from a resolver.
-
-Attributes:
-url: Final URL from which to download the ontology document.
-headers: HTTP headers required by the upstream service.
-filename_hint: Optional filename recommended by the resolver.
-version: Version identifier derived from resolver metadata.
-license: License reported for the ontology.
-media_type: MIME type of the artifact when known.
-service: Logical service identifier used for rate limiting.
-checksum: Optional checksum value supplied by resolver.
-checksum_algorithm: Hash algorithm associated with ``checksum``.
-checksum_url: URL where a checksum file can be retrieved when provided.
-
-Examples:
->>> plan = FetchPlan(
-...     url="https://example.org/ontology.owl",
-...     headers={"Accept": "application/rdf+xml"},
-...     filename_hint="ontology.owl",
-...     version="2024-01-01",
-...     license="CC-BY",
-...     media_type="application/rdf+xml",
-...     service="ols",
-... )
->>> plan.service
-'ols'
-
-### `BaseResolver`
-
-Shared helpers for resolver implementations.
-
-Provides polite header construction, retry orchestration, and metadata
-normalization utilities shared across concrete resolver classes.
-
-Attributes:
-None
-
-Examples:
->>> class DemoResolver(BaseResolver):
-...     def plan(self, spec, config, logger):
-...         return self._build_plan(url="https://example.org/demo.owl")
-...
->>> demo = DemoResolver()
->>> isinstance(demo._build_plan(url="https://example.org").url, str)
-True
-
-### `OBOResolver`
-
-Resolve ontologies hosted on the OBO Library using Bioregistry helpers.
-
-Attributes:
-None
-
-Examples:
->>> resolver = OBOResolver()
->>> callable(getattr(resolver, "plan"))
-True
-
-### `OLSResolver`
-
-Resolve ontologies from the Ontology Lookup Service (OLS4).
-
-Attributes:
-client: OLS client instance used to perform API calls.
-credentials_path: Path where the API token is expected.
-
-Examples:
->>> resolver = OLSResolver()
->>> resolver.credentials_path.name.endswith(".txt")
-True
-
-### `BioPortalResolver`
-
-Resolve ontologies using the BioPortal (OntoPortal) API.
-
-Attributes:
-client: BioPortal client used to query ontology metadata.
-api_key_path: Path on disk containing the API key.
-
-Examples:
->>> resolver = BioPortalResolver()
->>> resolver.api_key_path.suffix
-'.txt'
-
-### `LOVResolver`
-
-Resolve vocabularies from Linked Open Vocabularies (LOV).
-
-Queries the LOV API, normalises metadata fields, and returns Turtle
-download plans enriched with service identifiers for rate limiting.
-
-Attributes:
-API_ROOT: Base URL for the LOV API endpoints.
-session: Requests session used to execute API calls.
-
-Examples:
->>> resolver = LOVResolver()
->>> isinstance(resolver.session, requests.Session)
-True
-
-### `SKOSResolver`
-
-Resolver for direct SKOS/RDF URLs.
-
-Attributes:
-None
-
-Examples:
->>> resolver = SKOSResolver()
->>> callable(getattr(resolver, "plan"))
-True
-
-### `DirectResolver`
-
-Resolver that consumes explicit URLs supplied via ``spec.extras``.
-
-### `XBRLResolver`
-
-Resolver for XBRL taxonomy packages.
-
-Attributes:
-None
-
-Examples:
->>> resolver = XBRLResolver()
->>> callable(getattr(resolver, "plan"))
-True
-
-### `OntobeeResolver`
-
-Resolver that constructs Ontobee-backed PURLs for OBO ontologies.
-
-Provides a lightweight fallback resolver that constructs deterministic
-PURLs for OBO prefixes when primary resolvers fail.
-
-Attributes:
-_FORMAT_MAP: Mapping of preferred formats to extensions and media types.
-
-Examples:
->>> resolver = OntobeeResolver()
->>> resolver._FORMAT_MAP['owl'][0]
-'owl'

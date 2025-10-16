@@ -152,7 +152,7 @@ None</p>
 </section>
 <section id="summarize-image-metadata-chunk-text">
 <h3><code class="docutils literal notranslate"><span class="pre">summarize_image_metadata(chunk,</span> <span class="pre">text)</span></code><a class="headerlink" href="#summarize-image-metadata-chunk-text" title="Link to this heading"></a></h3>
-<p>Infer image annotation flags, counts, and confidences from chunk metadata and text.</p>
+<p>Infer image annotation flags, counts, confidences, and structured metadata.</p>
 </section>
 <section id="chunk-worker-initializer-cfg">
 <h3><code class="docutils literal notranslate"><span class="pre">_chunk_worker_initializer(cfg)</span></code><a class="headerlink" href="#chunk-worker-initializer-cfg" title="Link to this heading"></a></h3>
@@ -248,9 +248,25 @@ testing or orchestration.</p>
 <p>Returns:
 int: Exit code where <code class="docutils literal notranslate"><span class="pre">0</span></code> indicates success.</p>
 </section>
+<section id="from-env-cls-defaults">
+<h3><code class="docutils literal notranslate"><span class="pre">from_env(cls,</span> <span class="pre">defaults)</span></code><a class="headerlink" href="#from-env-cls-defaults" title="Link to this heading"></a></h3>
+<p>Instantiate configuration derived solely from environment variables.</p>
+</section>
+<section id="from-args-cls-args-defaults">
+<h3><code class="docutils literal notranslate"><span class="pre">from_args(cls,</span> <span class="pre">args,</span> <span class="pre">defaults)</span></code><a class="headerlink" href="#from-args-cls-args-defaults" title="Link to this heading"></a></h3>
+<p>Create a configuration by layering env vars, config files, and CLI args.</p>
+</section>
+<section id="finalize-self">
+<h3><code class="docutils literal notranslate"><span class="pre">finalize(self)</span></code><a class="headerlink" href="#finalize-self" title="Link to this heading"></a></h3>
+<p>Normalise paths, casing, and defaults after all inputs are merged.</p>
+</section>
 <section id="maybe-add-conf-value">
 <h3><code class="docutils literal notranslate"><span class="pre">_maybe_add_conf(value)</span></code><a class="headerlink" href="#maybe-add-conf-value" title="Link to this heading"></a></h3>
 <p>Collect numeric confidence scores from metadata sources.</p>
+</section>
+<section id="normalise-meta-payload-doc-item">
+<h3><code class="docutils literal notranslate"><span class="pre">_normalise_meta(payload,</span> <span class="pre">doc_item)</span></code><a class="headerlink" href="#normalise-meta-payload-doc-item" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="is-small-idx">
 <h3><code class="docutils literal notranslate"><span class="pre">is_small(idx)</span></code><a class="headerlink" href="#is-small-idx" title="Link to this heading"></a></h3>
@@ -269,6 +285,10 @@ result: Structured outcome emitted by the chunking worker.</p>
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="chunkercfg">
+<h3><code class="docutils literal notranslate"><span class="pre">ChunkerCfg</span></code><a class="headerlink" href="#chunkercfg" title="Link to this heading"></a></h3>
+<p>Configuration values for the chunking stage.</p>
+</section>
 <section id="rec">
 <h3><code class="docutils literal notranslate"><span class="pre">Rec</span></code><a class="headerlink" href="#rec" title="Link to this heading"></a></h3>
 <p>Intermediate record tracking chunk text and provenance.</p>

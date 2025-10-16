@@ -146,7 +146,7 @@ import json
 import os
 import time
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
@@ -355,17 +355,30 @@ class ChunkerCfg(StageConfigBase):
     }
 
     @classmethod
-    def from_sources(cls, args: argparse.Namespace) -> "ChunkerCfg":
-        """Create a configuration by layering env vars, config files, and CLI args."""
-        cfg = cls()
+    def from_env(cls, defaults: Optional[Dict[str, Any]] = None) -> "ChunkerCfg":
+        """Instantiate configuration derived solely from environment variables."""
+
+        cfg = cls(**(defaults or {}))
         cfg.apply_env()
         if cfg.data_root is None:
             fallback_root = os.getenv("DOCSTOKG_DATA_ROOT")
             if fallback_root:
                 cfg.data_root = StageConfigBase._coerce_optional_path(fallback_root, None)
+        cfg.finalize()
+        return cfg
+
+    @classmethod
+    def from_args(
+        cls,
+        args: argparse.Namespace,
+        defaults: Optional[Dict[str, Any]] = None,
+    ) -> "ChunkerCfg":
+        """Create a configuration by layering env vars, config files, and CLI args."""
+
+        cfg = cls.from_env(defaults=defaults)
         config_path = getattr(args, "config", None)
         if config_path:
-            cfg.update_from_file(config_path)
+            cfg.update_from_file(Path(config_path))
         cfg.apply_args(args)
         cfg.finalize()
         return cfg
@@ -384,6 +397,8 @@ class ChunkerCfg(StageConfigBase):
             self.config = StageConfigBase._coerce_optional_path(self.config, None)
         self.log_level = str(self.log_level).upper()
         self.serializer_provider = str(self.serializer_provider)
+
+    from_sources = from_args
 CHUNK_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     CLIOption(
         ("--config",),
@@ -536,14 +551,15 @@ def extract_refs_and_pages(chunk: BaseChunk) -> Tuple[List[str], List[int]]:
 
 def summarize_image_metadata(
     chunk: BaseChunk, text: str
-) -> Tuple[bool, bool, int, Optional[float]]:
-    """Infer image annotation flags, counts, and confidences from chunk metadata and text."""
+) -> Tuple[bool, bool, int, Optional[float], List[Dict[str, Any]]]:
+    """Infer image annotation flags, counts, confidences, and structured metadata."""
 
     has_caption = False
     has_classification = False
     num_images = 0
     confidence: Optional[float] = None
     confidence_candidates: List[float] = []
+    picture_meta: List[Dict[str, Any]] = []
 
     try:
         doc_items = getattr(chunk.meta, "doc_items", []) or []
@@ -559,6 +575,31 @@ def summarize_image_metadata(
         except (TypeError, ValueError):
             return
 
+    def _normalise_meta(payload: object, doc_item: object) -> List[Dict[str, Any]]:
+        entries: List[Dict[str, Any]] = []
+        if isinstance(payload, dict):
+            candidates = [payload]
+        elif isinstance(payload, list):
+            candidates = [item for item in payload if isinstance(item, dict)]
+        else:
+            return entries
+        doc_ref = getattr(doc_item, "self_ref", None)
+        for entry in candidates:
+            cloned: Dict[str, Any] = {}
+            for key, value in entry.items():
+                if isinstance(value, list):
+                    cloned[key] = [
+                        dict(item) if isinstance(item, dict) else item for item in value
+                    ]
+                elif isinstance(value, dict):
+                    cloned[key] = dict(value)
+                else:
+                    cloned[key] = value
+            if doc_ref and "doc_item_ref" not in cloned:
+                cloned["doc_item_ref"] = doc_ref
+            entries.append(cloned)
+        return entries
+
     for doc_item in doc_items:
         picture = getattr(doc_item, "doc_item", doc_item)
         flags = getattr(picture, "_docstokg_flags", None)
@@ -566,6 +607,9 @@ def summarize_image_metadata(
             has_caption = has_caption or bool(flags.get("has_image_captions"))
             has_classification = has_classification or bool(flags.get("has_image_classification"))
             _maybe_add_conf(flags.get("image_confidence"))
+        meta_payload = getattr(picture, "_docstokg_meta", None)
+        if meta_payload:
+            picture_meta.extend(_normalise_meta(meta_payload, doc_item))
         annotations = (
             getattr(picture, "annotations", []) or getattr(doc_item, "annotations", []) or []
         )
@@ -599,7 +643,7 @@ def summarize_image_metadata(
     if num_images == 0 and (has_caption or has_classification):
         num_images = 1
 
-    return has_caption, has_classification, num_images, confidence
+    return has_caption, has_classification, num_images, confidence, picture_meta
 
 
 # --- Public Classes ---
@@ -631,6 +675,7 @@ class Rec:
     has_image_classification: bool = False
     num_images: int = 0
     image_confidence: Optional[float] = None
+    picture_meta: List[Dict[str, Any]] = field(default_factory=list)
 
 
 _CHUNK_WORKER_CONFIG: Optional[ChunkWorkerConfig] = None
@@ -685,7 +730,7 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
             text = chunker.contextualize(ch)
             n_tok = tokenizer.count_tokens(text=text)
             refs, pages = extract_refs_and_pages(ch)
-            has_caption, has_classification, num_images, image_confidence = (
+            has_caption, has_classification, num_images, image_confidence, picture_meta = (
                 summarize_image_metadata(ch, text)
             )
             recs.append(
@@ -699,6 +744,7 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
                     has_image_classification=has_classification,
                     num_images=num_images,
                     image_confidence=image_confidence,
+                    picture_meta=picture_meta,
                 )
             )
 
@@ -716,6 +762,7 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
         with acquire_lock(task.output_path):
             with atomic_write(task.output_path) as handle:
                 for cid, r in enumerate(final_recs):
+                    meta_payload = {"items": r.picture_meta} if r.picture_meta else None
                     provenance = ProvenanceMetadata(
                         parse_engine=task.parse_engine,
                         docling_version=cfg.docling_version,
@@ -723,6 +770,7 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
                         has_image_classification=r.has_image_classification,
                         num_images=r.num_images,
                         image_confidence=r.image_confidence,
+                        picture_meta=meta_payload,
                     )
                     row = ChunkRow(
                         doc_id=task.doc_id,
@@ -807,6 +855,7 @@ def merge_rec(
         has_image_classification=a.has_image_classification or b.has_image_classification,
         num_images=a.num_images + b.num_images,
         image_confidence=combined_confidence,
+        picture_meta=list(a.picture_meta) + list(b.picture_meta),
     )
 
 
@@ -1127,6 +1176,11 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     else:
         namespace = parser.parse_args(args)
 
+    cfg = ChunkerCfg.from_args(namespace)
+    config_snapshot = cfg.to_manifest()
+    for field_def in fields(ChunkerCfg):
+        setattr(namespace, field_def.name, getattr(cfg, field_def.name))
+
     log_level = getattr(namespace, "log_level", "INFO")
     logger = get_logger(__name__, level=str(log_level))
     set_spawn_or_warn(logger)
@@ -1183,6 +1237,10 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     args.max_tokens = max_tokens
     args.soft_barrier_margin = soft_margin
     args.serializer_provider = serializer_spec
+    config_snapshot["min_tokens"] = args.min_tokens
+    config_snapshot["max_tokens"] = args.max_tokens
+    config_snapshot["soft_barrier_margin"] = args.soft_barrier_margin
+    config_snapshot["serializer_provider"] = serializer_spec
     log_event(
         logger,
         "info",
@@ -1201,6 +1259,8 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         raise ValueError("--shard-index must be between 0 and shard-count-1")
     args.shard_count = shard_count
     args.shard_index = shard_index
+    config_snapshot["shard_count"] = shard_count
+    config_snapshot["shard_index"] = shard_index
 
     data_root_override = args.data_root
     data_root_overridden = data_root_override is not None
@@ -1235,6 +1295,13 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         data_root_overridden=data_root_overridden,
         resolver=data_chunks,
     )
+    in_dir = in_dir.resolve()
+    out_dir = out_dir.resolve()
+    args.in_dir = in_dir
+    args.out_dir = out_dir
+    config_snapshot["data_root"] = str(resolved_data_root)
+    config_snapshot["in_dir"] = str(in_dir)
+    config_snapshot["out_dir"] = str(out_dir)
 
     heading_markers: Tuple[str, ...] = DEFAULT_HEADING_MARKERS
     caption_markers: Tuple[str, ...] = DEFAULT_CAPTION_MARKERS
@@ -1259,26 +1326,7 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         if extra_captions:
             caption_markers = dedupe_preserve_order((*caption_markers, *tuple(extra_captions)))
         args.structural_markers = markers_path
-
-    logger.info(
-        "Chunking configuration",
-        extra={
-            "extra_fields": {
-                "data_root": str(resolved_data_root),
-                "input_dir": str(in_dir),
-                "output_dir": str(out_dir),
-                "min_tokens": args.min_tokens,
-                "max_tokens": args.max_tokens,
-                "soft_barrier_margin": args.soft_barrier_margin,
-                "custom_heading_markers": custom_heading_markers,
-                "custom_caption_markers": custom_caption_markers,
-                "workers": int(getattr(args, "workers", 1)),
-                "serializer_provider": args.serializer_provider,
-                "shard_count": args.shard_count,
-                "shard_index": args.shard_index,
-            }
-        },
-    )
+        config_snapshot["structural_markers"] = str(markers_path)
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1377,6 +1425,30 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
             },
         )
         worker_count = 1
+
+    config_snapshot["workers"] = worker_count
+    config_snapshot["resume"] = bool(args.resume)
+    config_snapshot["force"] = bool(args.force)
+    config_snapshot["validate_only"] = bool(args.validate_only)
+    config_payload = dict(config_snapshot)
+    config_payload.update(
+        {
+            "docling_version": docling_version,
+            "custom_heading_markers": custom_heading_markers,
+            "custom_caption_markers": custom_caption_markers,
+        }
+    )
+    logger.info("Chunking configuration", extra={"extra_fields": config_payload})
+    manifest_log_success(
+        stage=MANIFEST_STAGE,
+        doc_id="__config__",
+        duration_s=0.0,
+        schema_version=CHUNK_SCHEMA_VERSION,
+        input_path=in_dir,
+        input_hash="",
+        output_path=out_dir,
+        config=config_snapshot,
+    )
 
     tasks: List[ChunkTask] = []
     for path in files:

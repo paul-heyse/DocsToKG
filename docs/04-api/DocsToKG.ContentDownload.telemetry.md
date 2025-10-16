@@ -133,6 +133,22 @@ Flush buffered data and close the underlying JSONL file handle.
 
 *No documentation available.*
 
+### `_initial_sequence(self)`
+
+*No documentation available.*
+
+### `_rotate(self)`
+
+*No documentation available.*
+
+### `_should_rotate(self, pending_bytes)`
+
+*No documentation available.*
+
+### `_write(self, payload)`
+
+*No documentation available.*
+
 ### `log_attempt(self, record)`
 
 Append an attempt record to the CSV log.
@@ -317,6 +333,22 @@ Commit outstanding changes and dispose of the SQLite connection.
 
 *No documentation available.*
 
+### `_initialise_schema(self, current_version)`
+
+*No documentation available.*
+
+### `_run_migrations(self, current_version)`
+
+*No documentation available.*
+
+### `_safe_add_column(self, table, column, declaration)`
+
+*No documentation available.*
+
+### `_migrate_summary_table(self)`
+
+*No documentation available.*
+
 ## 3. Classes
 
 ### `ManifestEntry`
@@ -343,6 +375,7 @@ etag: Server-provided entity tag when available.
 last_modified: HTTP ``Last-Modified`` header value if supplied.
 extracted_text_path: Path to extracted text artefacts when produced.
 dry_run: Flag indicating whether the artifact was processed in dry-run mode.
+run_id: Unique identifier for the downloader run that produced the entry.
 
 Examples:
 >>> entry = ManifestEntry(
@@ -389,6 +422,10 @@ True
 ### `JsonlSink`
 
 Thread-safe sink that streams attempt, manifest, and summary events to JSONL files.
+
+### `RotatingJsonlSink`
+
+JSONL sink that rotates the log file once it exceeds a configured size.
 
 ### `CsvSink`
 

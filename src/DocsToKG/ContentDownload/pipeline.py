@@ -16,6 +16,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "normalise-domain-content-rules",
+#       "name": "_normalise_domain_content_rules",
+#       "anchor": "function-normalise-domain-content-rules",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "resolverconfig",
 #       "name": "ResolverConfig",
 #       "anchor": "class-resolverconfig",
@@ -336,6 +342,7 @@ from DocsToKG.ContentDownload.core import (
     Classification,
     ReasonCode,
     dedupe,
+    parse_size,
     normalize_doi,
     normalize_pmcid,
     normalize_url,
@@ -475,6 +482,89 @@ def _normalise_domain_bytes_budget(data: Mapping[str, Any]) -> Dict[str, int]:
     return normalized
 
 
+def _normalise_domain_content_rules(data: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """Normalize domain content policies to lower-case host keys and canonical values."""
+
+    if data is None:
+        return {}
+    if not isinstance(data, Mapping):  # pragma: no cover - defensive guard
+        raise ValueError("domain_content_rules must be a mapping of host -> policy")
+
+    normalized: Dict[str, Dict[str, Any]] = {}
+    for host, raw_spec in data.items():
+        if not host:
+            continue
+        if not isinstance(raw_spec, Mapping):
+            raise ValueError(
+                ("domain_content_rules['{name}'] must be a mapping, got {value!r}").format(
+                    name=host, value=raw_spec
+                )
+            )
+        host_key = str(host).strip().lower()
+        if not host_key:
+            continue
+
+        policy: Dict[str, Any] = {}
+        if "max_bytes" in raw_spec and raw_spec["max_bytes"] is not None:
+            raw_limit = raw_spec["max_bytes"]
+            try:
+                limit_value = parse_size(raw_limit) if isinstance(raw_limit, str) else int(raw_limit)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    (
+                        "domain_content_rules['{name}'].max_bytes must be an integer or size string,"
+                        " got {value!r}"
+                    ).format(name=host, value=raw_limit)
+                ) from exc
+            if limit_value <= 0:
+                raise ValueError(
+                    (
+                        "domain_content_rules['{name}'].max_bytes must be positive, got {value}"
+                    ).format(name=host, value=limit_value)
+                )
+            policy["max_bytes"] = int(limit_value)
+
+        allowed_raw = raw_spec.get("allowed_types")
+        if allowed_raw:
+            candidates: List[str] = []
+            if isinstance(allowed_raw, str):
+                candidates.extend(allowed_raw.split(","))
+            elif isinstance(allowed_raw, (list, tuple, set)):
+                for entry in allowed_raw:
+                    if entry is None:
+                        continue
+                    candidates.extend(str(entry).split(","))
+            else:
+                raise ValueError(
+                    (
+                        "domain_content_rules['{name}'].allowed_types must be a string or sequence,"
+                        " got {value!r}"
+                    ).format(name=host, value=allowed_raw)
+                )
+            allowed: List[str] = []
+            for candidate in candidates:
+                token = candidate.strip()
+                if not token:
+                    continue
+                token_lower = token.lower()
+                if token_lower not in allowed:
+                    allowed.append(token_lower)
+            if allowed:
+                policy["allowed_types"] = tuple(allowed)
+
+        if policy:
+            normalized[host_key] = policy
+            if host_key.startswith("www."):
+                bare = host_key[4:]
+                if bare and bare not in normalized:
+                    normalized[bare] = policy
+            else:
+                prefixed = f"www.{host_key}"
+                normalized.setdefault(prefixed, policy)
+
+    return normalized
+
+
 @dataclass
 class ResolverConfig:
     """Runtime configuration options applied across resolvers.
@@ -502,6 +592,7 @@ class ResolverConfig:
         enable_global_url_dedup: Enable global URL deduplication across works when True.
         domain_token_buckets: Mapping of hostname to token bucket parameters.
         domain_bytes_budget: Mapping of hostname to maximum bytes permitted this run.
+        domain_content_rules: Mapping of hostname to MIME allow-lists and max-bytes caps.
         resolver_circuit_breakers: Mapping of resolver name to breaker thresholds/cooldowns.
 
     Notes:
@@ -543,6 +634,7 @@ class ResolverConfig:
     enable_global_url_dedup: bool = False
     domain_token_buckets: Dict[str, Dict[str, float]] = field(default_factory=dict)
     domain_bytes_budget: Dict[str, int] = field(default_factory=dict)
+    domain_content_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     resolver_circuit_breakers: Dict[str, Dict[str, float]] = field(default_factory=dict)
     # Heuristic knobs (defaults preserve current CLI behaviour)
     sniff_bytes: int = DEFAULT_SNIFF_BYTES
@@ -560,6 +652,16 @@ class ResolverConfig:
         """
 
         return self.resolver_timeouts.get(resolver_name, self.timeout)
+
+    def get_content_policy(self, host: Optional[str]) -> Optional[Dict[str, Any]]:
+        """Return the normalized content policy for ``host`` when configured."""
+
+        if not host:
+            return None
+        host_key = host.strip().lower()
+        if not host_key:
+            return None
+        return self.domain_content_rules.get(host_key)
 
     def is_enabled(self, resolver_name: str) -> bool:
         """Return ``True`` when the resolver is enabled for the current run.
@@ -635,6 +737,8 @@ class ResolverConfig:
 
         if self.domain_bytes_budget:
             self.domain_bytes_budget = _normalise_domain_bytes_budget(self.domain_bytes_budget)
+        if self.domain_content_rules:
+            self.domain_content_rules = _normalise_domain_content_rules(self.domain_content_rules)
 
         if self.max_attempts_per_work < 1:
             raise ValueError(
@@ -781,10 +885,13 @@ def apply_config_overrides(
         "resolver_circuit_breakers",
         "max_concurrent_per_host",
         "domain_bytes_budget",
+        "domain_content_rules",
     ):
         if field_name in data and data[field_name] is not None:
             if field_name == "domain_bytes_budget":
                 setattr(config, field_name, _normalise_domain_bytes_budget(data[field_name]))
+            elif field_name == "domain_content_rules":
+                setattr(config, field_name, _normalise_domain_content_rules(data[field_name]))
             else:
                 setattr(config, field_name, data[field_name])
 
@@ -3736,6 +3843,7 @@ class ResolverPipeline:
         session: _requests.Session,
         url: str,
         timeout: float,
+        content_policy: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """Delegate to the shared network-layer preflight helper.
 
@@ -3748,7 +3856,7 @@ class ResolverPipeline:
             bool: ``True`` when the URL passes preflight checks, ``False`` otherwise.
         """
 
-        return head_precheck(session, url, timeout)
+        return head_precheck(session, url, timeout, content_policy=content_policy)
 
     def run(
         self,
@@ -4175,6 +4283,8 @@ class ResolverPipeline:
             return None
 
         state.seen_urls.add(url)
+        parsed_url = urlsplit(url)
+        host_for_policy = parsed_url.hostname or parsed_url.netloc
         if context_data.get("list_only"):
             self._emit_attempt(
                 AttemptRecord(
@@ -4204,12 +4314,14 @@ class ResolverPipeline:
         download_context.setdefault("tail_check_bytes", self.config.tail_check_bytes)
         download_context.setdefault("host_accept_overrides", self.config.host_accept_overrides)
         download_context.setdefault("global_manifest_index", self._global_manifest_index)
+        download_context.setdefault("domain_content_rules", self.config.domain_content_rules)
         head_precheck_passed = False
         if self._should_attempt_head_check(resolver_name, url):
             head_precheck_passed = self._head_precheck_url(
                 session,
                 url,
                 self.config.get_timeout(resolver_name),
+                self.config.get_content_policy(host_for_policy),
             )
             if not head_precheck_passed:
                 self._emit_attempt(
@@ -4237,7 +4349,7 @@ class ResolverPipeline:
         budget_key: Optional[str] = None
         try:
             state.attempt_counter += 1
-            host_value = urlsplit(url).netloc.lower()
+            host_value = (parsed_url.netloc or "").lower()
             if host_value:
                 budget_key = self._resolve_budget_host_key(host_value)
                 if budget_key is not None:

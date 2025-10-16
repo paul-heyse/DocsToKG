@@ -90,13 +90,29 @@ simplifying imports for both the CLI and resolver pipeline.</p>
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="atomic-write-path-chunks">
+<h3><code class="docutils literal notranslate"><span class="pre">atomic_write(path,</span> <span class="pre">chunks)</span></code><a class="headerlink" href="#atomic-write-path-chunks" title="Link to this heading"></a></h3>
+<p>Atomically write <code class="docutils literal notranslate"><span class="pre">chunks</span></code> to <code class="docutils literal notranslate"><span class="pre">path</span></code> and return the byte count.</p>
+</section>
+<section id="atomic-write-bytes-path-chunks">
+<h3><code class="docutils literal notranslate"><span class="pre">atomic_write_bytes(path,</span> <span class="pre">chunks)</span></code><a class="headerlink" href="#atomic-write-bytes-path-chunks" title="Link to this heading"></a></h3>
+<p>Backward-compatible wrapper for :func:<code class="docutils literal notranslate"><span class="pre">atomic_write</span></code>.</p>
+</section>
+<section id="atomic-write-text-path-text">
+<h3><code class="docutils literal notranslate"><span class="pre">atomic_write_text(path,</span> <span class="pre">text)</span></code><a class="headerlink" href="#atomic-write-text-path-text" title="Link to this heading"></a></h3>
+<p>Atomically write <code class="docutils literal notranslate"><span class="pre">text</span></code> to <code class="docutils literal notranslate"><span class="pre">path</span></code> using :func:<code class="docutils literal notranslate"><span class="pre">atomic_write</span></code>.</p>
+</section>
 <section id="classify-payload-head-bytes-content-type-url">
 <h3><code class="docutils literal notranslate"><span class="pre">classify_payload(head_bytes,</span> <span class="pre">content_type,</span> <span class="pre">url)</span></code><a class="headerlink" href="#classify-payload-head-bytes-content-type-url" title="Link to this heading"></a></h3>
-<p>Classify a payload as <code class="docutils literal notranslate"><span class="pre">Classification.PDF</span></code>/<code class="docutils literal notranslate"><span class="pre">Classification.HTML</span></code> or <code class="docutils literal notranslate"><span class="pre">UNKNOWN</span></code>.</p>
+<p>Classify a payload as <code class="docutils literal notranslate"><span class="pre">Classification.PDF</span></code>/<code class="docutils literal notranslate"><span class="pre">Classification.HTML</span></code> or <code class="docutils literal notranslate"><span class="pre">Classification.UNKNOWN</span></code>.</p>
 </section>
 <section id="extract-filename-from-disposition-disposition">
 <h3><code class="docutils literal notranslate"><span class="pre">_extract_filename_from_disposition(disposition)</span></code><a class="headerlink" href="#extract-filename-from-disposition-disposition" title="Link to this heading"></a></h3>
 <p>Return the filename component from a Content-Disposition header.</p>
+</section>
+<section id="parse-size-value">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_size(value)</span></code><a class="headerlink" href="#parse-size-value" title="Link to this heading"></a></h3>
+<p>Parse human-friendly size strings like <code class="docutils literal notranslate"><span class="pre">10GB</span></code> into byte counts.</p>
 </section>
 <section id="infer-suffix-url-content-type-disposition-classification-default-suffix">
 <h3><code class="docutils literal notranslate"><span class="pre">_infer_suffix(url,</span> <span class="pre">content_type,</span> <span class="pre">disposition,</span> <span class="pre">classification,</span> <span class="pre">default_suffix)</span></code><a class="headerlink" href="#infer-suffix-url-content-type-disposition-classification-default-suffix" title="Link to this heading"></a></h3>
@@ -146,6 +162,10 @@ simplifying imports for both the CLI and resolver pipeline.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">normalize_url(url)</span></code><a class="headerlink" href="#normalize-url-url" title="Link to this heading"></a></h3>
 <p>Return a canonicalised version of <code class="docutils literal notranslate"><span class="pre">url</span></code> suitable for deduplication.</p>
 </section>
+<section id="post-init-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__post_init__(self)</span></code><a class="headerlink" href="#post-init-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 <section id="from-wire-cls-value">
 <h3><code class="docutils literal notranslate"><span class="pre">from_wire(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#from-wire-cls-value" title="Link to this heading"></a></h3>
 <p>Return the enum member when <code class="docutils literal notranslate"><span class="pre">value</span></code> matches a known code.</p>
@@ -157,6 +177,10 @@ simplifying imports for both the CLI and resolver pipeline.</p>
 </section>
 <section id="classes">
 <h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="workartifact">
+<h3><code class="docutils literal notranslate"><span class="pre">WorkArtifact</span></code><a class="headerlink" href="#workartifact" title="Link to this heading"></a></h3>
+<p>Normalized artifact describing an OpenAlex work to process.</p>
+</section>
 <section id="classification">
 <h3><code class="docutils literal notranslate"><span class="pre">Classification</span></code><a class="headerlink" href="#classification" title="Link to this heading"></a></h3>
 <p>Canonical classification codes for download outcomes.</p>

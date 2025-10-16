@@ -180,6 +180,15 @@ class DenseVectorStore(Protocol):
     ) -> Sequence[Sequence["FaissSearchResult"]]:
         """Optional alias for batched search."""
 
+    def range_search(
+        self,
+        query: np.ndarray,
+        min_score: float,
+        *,
+        limit: Optional[int] = None,
+    ) -> Sequence["FaissSearchResult"]:
+        """Return all vectors scoring above ``min_score`` for ``query``."""
+
     def serialize(self) -> bytes:
         """Return a serialised representation of the index."""
 
