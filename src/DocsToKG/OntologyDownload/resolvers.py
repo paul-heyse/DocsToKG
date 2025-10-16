@@ -59,13 +59,8 @@ try:  # pragma: no cover - optional dependency guidance
 except ModuleNotFoundError:  # pragma: no cover - provide actionable error later
     BioPortalClient = None  # type: ignore[assignment]
 
-from .ontology_download import (
-    ConfigError,
-    ResolvedConfig,
-    TokenBucket,
-    get_pystow,
-    retry_with_backoff,
-)
+from .net import TokenBucket, retry_with_backoff
+from .ontology_download import ConfigError, ResolvedConfig, get_pystow
 # --- Globals ---
 
 OlsClient = _OlsClient
