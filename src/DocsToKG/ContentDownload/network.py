@@ -330,6 +330,97 @@ def request_with_retries(
     )
 
 
+def _looks_like_pdf(headers: Mapping[str, str]) -> bool:
+    """Return ``True`` when response headers suggest a PDF payload."""
+
+    content_type = (headers.get("Content-Type") or "").lower()
+    content_length = (headers.get("Content-Length") or "").strip()
+
+    if "text/html" in content_type:
+        return False
+    if content_length == "0":
+        return False
+    return True
+
+
+def _head_precheck_via_get(
+    session: requests.Session,
+    url: str,
+    timeout: float,
+) -> bool:
+    """Fallback GET probe for providers that reject HEAD requests."""
+
+    try:
+        with request_with_retries(
+            session,
+            "GET",
+            url,
+            stream=True,
+            timeout=min(timeout, 5.0),
+            allow_redirects=True,
+        ) as response:
+            # Consume at most one chunk to avoid downloading the entire body.
+            try:
+                next(response.iter_content(chunk_size=1024))
+            except StopIteration:
+                pass
+            except Exception:
+                # If iter_content raises, treat as inconclusive and allow download.
+                return True
+
+            if response.status_code not in {200, 302, 304}:
+                return False
+            return _looks_like_pdf(response.headers)
+    except Exception:
+        return True
+
+
+def head_precheck(
+    session: requests.Session,
+    url: str,
+    timeout: float,
+) -> bool:
+    """Issue a lightweight request to determine whether ``url`` returns a PDF.
+
+    The helper primarily relies on a HEAD request capped to a short timeout.
+    Some providers respond with ``405`` or ``501`` for HEAD requests; in those
+    cases a secondary streaming GET probe is issued that reads at most one
+    chunk to infer the payload type without downloading the entire resource.
+
+    Args:
+        session: HTTP session used for outbound requests.
+        url: Candidate download URL.
+        timeout: Maximum time budget in seconds for the probe.
+
+    Returns:
+        ``True`` when the response appears to represent a binary payload such as
+        a PDF. ``False`` when the response clearly corresponds to HTML or an
+        error status. Any network exception results in ``True`` to avoid
+        blocking legitimate downloads.
+    """
+
+    try:
+        response = request_with_retries(
+            session,
+            "HEAD",
+            url,
+            max_retries=1,
+            timeout=min(timeout, 5.0),
+            allow_redirects=True,
+        )
+    except Exception:
+        return True
+
+    try:
+        if response.status_code in {200, 302, 304}:
+            return _looks_like_pdf(response.headers)
+        if response.status_code in {405, 501}:
+            return _head_precheck_via_get(session, url, timeout)
+        return False
+    finally:
+        response.close()
+
+
 @dataclass
 class CachedResult:
     """Represents an HTTP 304 response resolved via cached metadata.
@@ -502,6 +593,7 @@ __all__ = [
     "CachedResult",
     "ConditionalRequestHelper",
     "ModifiedResult",
+    "head_precheck",
     "create_session",
     "parse_retry_after_header",
     "request_with_retries",

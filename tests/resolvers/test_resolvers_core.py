@@ -9,8 +9,8 @@ import warnings
 from argparse import Namespace
 from dataclasses import replace
 from pathlib import Path
-from types import SimpleNamespace
-from typing import Any, Dict, List, Optional
+from types import MappingProxyType, SimpleNamespace
+from typing import Any, Dict, Iterable, List, Optional
 from unittest.mock import Mock, patch
 
 import pytest
@@ -26,6 +26,7 @@ from DocsToKG.ContentDownload.download_pyalex_pdfs import (
     load_resolver_config,
 )
 from DocsToKG.ContentDownload.resolvers import (
+    ApiResolverBase,
     ArxivResolver,
     AttemptRecord,
     CoreResolver,
@@ -47,14 +48,20 @@ from DocsToKG.ContentDownload.resolvers import (
     UnpaywallResolver,
     WaybackResolver,
     ZenodoResolver,
-    _fetch_crossref_data,
     clear_resolver_caches,
+    find_pdf_via_anchor,
+    find_pdf_via_link,
+    find_pdf_via_meta,
 )
 
 try:  # pragma: no cover - optional dependency for some environments
     import requests  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover
     requests = pytest.importorskip("requests")  # type: ignore
+
+# BeautifulSoup is optional in some environments; skip helper tests when absent.
+_bs4 = pytest.importorskip("bs4")
+from bs4 import BeautifulSoup  # type: ignore  # noqa: E402
 
 # ---- test_resolver_caching.py -----------------------------
 pytest.importorskip("requests")
@@ -68,42 +75,191 @@ def clear_cache_between_tests():
     clear_resolver_caches()
 
 
+class DummyApiResolver(ApiResolverBase, register=False):
+    name = "dummy_api"
+
+    def is_enabled(self, config: ResolverConfig, artifact: Any) -> bool:  # pragma: no cover - helper
+        return True
+
+    def iter_urls(
+        self,
+        session: Any,
+        config: ResolverConfig,
+        artifact: Any,
+    ) -> Iterable[ResolverResult]:  # pragma: no cover - helper
+        return []
+
+
+def test_api_resolver_base_error_handling(monkeypatch: Any) -> None:
+    resolver = DummyApiResolver()
+    config = ResolverConfig()
+    config.polite_headers = {"User-Agent": "Tester"}
+    session = Mock(spec=requests.Session)
+    timeout_value = config.get_timeout(resolver.name)
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        Mock(side_effect=requests.Timeout("boom")),
+    )
+    data, error = resolver._request_json(
+        session,
+        "GET",
+        "https://example.org/timeout",
+        config=config,
+    )
+    assert data is None
+    assert error is not None
+    assert error.event_reason == "timeout"
+    assert error.metadata["timeout"] == timeout_value
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        Mock(side_effect=requests.ConnectionError("offline")),
+    )
+    _, error = resolver._request_json(
+        session,
+        "GET",
+        "https://example.org/connection",
+        config=config,
+    )
+    assert error is not None
+    assert error.event_reason == "connection-error"
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        Mock(side_effect=requests.RequestException("bad request")),
+    )
+    _, error = resolver._request_json(
+        session,
+        "GET",
+        "https://example.org/request",
+        config=config,
+    )
+    assert error is not None
+    assert error.event_reason == "request-error"
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        Mock(return_value=_StubResponse(status_code=502, json_data={})),
+    )
+    _, error = resolver._request_json(
+        session,
+        "GET",
+        "https://example.org/http",
+        config=config,
+    )
+    assert error is not None
+    assert error.event_reason == "http-error"
+    assert error.http_status == 502
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        Mock(
+            return_value=_StubResponse(
+                json_data=ValueError("bad json"),
+                text="not json",  # provides preview
+            )
+        ),
+    )
+    _, error = resolver._request_json(
+        session,
+        "GET",
+        "https://example.org/json",
+        config=config,
+    )
+    assert error is not None
+    assert error.event_reason == "json-error"
+    assert "content_preview" in error.metadata
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        Mock(return_value=_StubResponse(json_data={"ok": True})),
+    )
+    data, error = resolver._request_json(
+        session,
+        "GET",
+        "https://example.org/success",
+        config=config,
+    )
+    assert error is None
+    assert data == {"ok": True}
+
+
+def test_landing_page_helpers_extract_expected_urls() -> None:
+    base = "https://example.org/articles/view"
+
+    soup_meta = BeautifulSoup(
+        "<html><head><meta name='citation_pdf_url' content='../files/paper.pdf'></head></html>",
+        "html.parser",
+    )
+    assert find_pdf_via_meta(soup_meta, base) == "https://example.org/files/paper.pdf"
+
+    soup_meta_missing = BeautifulSoup("<html></html>", "html.parser")
+    assert find_pdf_via_meta(soup_meta_missing, base) is None
+
+    soup_link = BeautifulSoup(
+        """
+        <html><head>
+            <link rel='alternate' type='application/pdf' href='assets/download.pdf'>
+        </head></html>
+        """,
+        "html.parser",
+    )
+    assert find_pdf_via_link(soup_link, base) == "https://example.org/assets/download.pdf"
+
+    soup_link_missing = BeautifulSoup(
+        "<html><head><link rel='stylesheet' href='style.css'></head></html>",
+        "html.parser",
+    )
+    assert find_pdf_via_link(soup_link_missing, base) is None
+
+    soup_anchor = BeautifulSoup(
+        "<html><body><a href='pdfs/final.pdf'>Download</a></body></html>",
+        "html.parser",
+    )
+    assert find_pdf_via_anchor(soup_anchor, base) == "https://example.org/pdfs/final.pdf"
+
+    soup_anchor_text = BeautifulSoup(
+        "<html><body><a href='pdf?id=123'>View PDF</a></body></html>",
+        "html.parser",
+    )
+    assert find_pdf_via_anchor(soup_anchor_text, base) is None
+
 # ---- test_resolver_caching.py -----------------------------
-def test_resolver_caches_prevent_duplicate_requests(monkeypatch):
+def test_resolvers_use_shared_retry_helper(monkeypatch):
     calls: list[str] = []
 
-    def fake_get(url, params=None, timeout=None, headers=None):
+    def fake_request(session, method, url, **kwargs):
         calls.append(url)
-
-        class _Resp:
-            status_code = 200
-
-            def raise_for_status(self):
-                return None
-
-            def json(self):
-                if "unpaywall" in url:
-                    return {
-                        "best_oa_location": {"url_for_pdf": "https://example.org/unpaywall.pdf"}
+        if "unpaywall" in url:
+            return _StubResponse(
+                json_data={
+                    "best_oa_location": {"url_for_pdf": "https://example.org/unpaywall.pdf"}
+                }
+            )
+        if "crossref" in url:
+            return _StubResponse(
+                json_data={
+                    "message": {
+                        "link": [
+                            {
+                                "URL": "https://example.org/crossref.pdf",
+                                "content-type": "application/pdf",
+                            }
+                        ]
                     }
-                if "crossref" in url:
-                    return {
-                        "message": {
-                            "link": [
-                                {
-                                    "URL": "https://example.org/crossref.pdf",
-                                    "content-type": "application/pdf",
-                                }
-                            ]
-                        }
-                    }
-                if "semanticscholar" in url:
-                    return {"openAccessPdf": {"url": "https://example.org/s2.pdf"}}
-                raise AssertionError(f"unexpected URL {url}")
+                }
+            )
+        if "semanticscholar" in url:
+            return _StubResponse(
+                json_data={"openAccessPdf": {"url": "https://example.org/s2.pdf"}}
+            )
+        raise AssertionError(f"unexpected URL {url}")
 
-        return _Resp()
-
-    monkeypatch.setattr("requests.get", fake_get)
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        fake_request,
+    )
 
     config = ResolverConfig()
     config.unpaywall_email = "test@example.org"
@@ -113,7 +269,7 @@ def test_resolver_caches_prevent_duplicate_requests(monkeypatch):
 
     artifact = SimpleNamespace(doi="10.1234/test")
 
-    session = None
+    session = Mock()
 
     unpaywall = UnpaywallResolver()
     list(unpaywall.iter_urls(session, config, artifact))
@@ -125,11 +281,18 @@ def test_resolver_caches_prevent_duplicate_requests(monkeypatch):
     list(s2.iter_urls(session, config, artifact))
     list(s2.iter_urls(session, config, artifact))
 
-    assert len(calls) == 3
+    assert calls == [
+        "https://api.unpaywall.org/v2/10.1234/test",
+        "https://api.unpaywall.org/v2/10.1234/test",
+        "https://api.crossref.org/works/10.1234/test",
+        "https://api.crossref.org/works/10.1234/test",
+        "https://api.semanticscholar.org/graph/v1/paper/DOI:10.1234/test",
+        "https://api.semanticscholar.org/graph/v1/paper/DOI:10.1234/test",
+    ]
 
     clear_resolver_caches()
     list(unpaywall.iter_urls(session, config, artifact))
-    assert len(calls) == 4
+    assert calls[-1] == "https://api.unpaywall.org/v2/10.1234/test"
 
 
 # ---- test_resolver_config.py -----------------------------
@@ -194,6 +357,166 @@ def test_user_agent_includes_mailto(tmp_path: Path) -> None:
     )
     assert config.polite_headers.get("mailto") == "ua-tester@example.org"
     assert config.resolver_toggles["openaire"] is True
+
+
+def test_resolver_toggle_defaults_single_source(monkeypatch: pytest.MonkeyPatch) -> None:
+    overrides = {"openalex": False, "osf": True}
+    monkeypatch.setattr(resolvers, "_DEFAULT_RESOLVER_TOGGLES", overrides.copy(), raising=False)
+    monkeypatch.setattr(
+        resolvers,
+        "DEFAULT_RESOLVER_TOGGLES",
+        MappingProxyType(resolvers._DEFAULT_RESOLVER_TOGGLES),  # type: ignore[attr-defined]
+        raising=False,
+    )
+
+    args = Namespace(
+        resolver_config=None,
+        unpaywall_email=None,
+        core_api_key=None,
+        semantic_scholar_api_key=None,
+        doaj_api_key=None,
+        mailto=None,
+        max_resolver_attempts=None,
+        resolver_timeout=None,
+        disable_resolver=[],
+        enable_resolver=[],
+        resolver_order=None,
+        log_jsonl=None,
+        log_format="jsonl",
+        resume_from=None,
+    )
+
+    config = load_resolver_config(args, ["openalex", "osf"], None)
+
+    assert config.resolver_toggles["openalex"] is False
+    assert config.resolver_toggles["osf"] is True
+
+
+@pytest.mark.parametrize(
+    "resolver_cls, expected_url, extra_headers",
+    [
+        (
+            UnpaywallResolver,
+            "https://api.unpaywall.org/v2/10.1234/example",
+            {},
+        ),
+        (
+            CrossrefResolver,
+            "https://api.crossref.org/works/10.1234/example",
+            {},
+        ),
+        (
+            CoreResolver,
+            "https://api.core.ac.uk/v3/search/works",
+            {"Authorization": "Bearer core-key"},
+        ),
+        (
+            DoajResolver,
+            "https://doaj.org/api/v2/search/articles/",
+            {"X-API-KEY": "doaj-key"},
+        ),
+        (
+            SemanticScholarResolver,
+            "https://api.semanticscholar.org/graph/v1/paper/DOI:10.1234/example",
+            {"x-api-key": "s2-key"},
+        ),
+    ],
+)
+def test_resolvers_apply_polite_headers_and_timeouts(
+    monkeypatch: pytest.MonkeyPatch,
+    resolver_cls,
+    expected_url: str,
+    extra_headers: Dict[str, str],
+) -> None:
+    captured: List[Dict[str, Any]] = []
+
+    class _Response:
+        def __init__(self, data: Any) -> None:
+            self._data = data
+            self.status_code = 200
+            self.headers: Dict[str, str] = {}
+
+        def json(self) -> Any:
+            return self._data
+
+        def close(self) -> None:  # pragma: no cover - compatibility shim
+            return None
+
+    def _payload() -> Any:
+        if resolver_cls is UnpaywallResolver:
+            return {"best_oa_location": {"url_for_pdf": "https://example.org/unpaywall.pdf"}}
+        if resolver_cls is CrossrefResolver:
+            return {
+                "message": {
+                    "link": [
+                        {
+                            "URL": "https://example.org/crossref.pdf",
+                            "content-type": "application/pdf",
+                        }
+                    ]
+                }
+            }
+        if resolver_cls is CoreResolver:
+            return {
+                "results": [
+                    {
+                        "downloadUrl": "https://example.org/core.pdf",
+                        "fullTextLinks": [],
+                    }
+                ]
+            }
+        if resolver_cls is DoajResolver:
+            return {
+                "results": [
+                    {
+                        "bibjson": {
+                            "link": [
+                                {
+                                    "url": "https://example.org/doaj.pdf",
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        if resolver_cls is SemanticScholarResolver:
+            return {"openAccessPdf": {"url": "https://example.org/s2.pdf"}}
+        raise AssertionError("Unhandled resolver payload request")
+
+    def fake_request(session, method, url, **kwargs):
+        captured.append({"url": url, "kwargs": kwargs})
+        return _Response(_payload())
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        fake_request,
+    )
+
+    config = ResolverConfig()
+    config.polite_headers = {"User-Agent": "TestAgent/1.0", "mailto": "test@example.org"}
+    config.mailto = "test@example.org"
+    config.unpaywall_email = "test@example.org"
+    config.core_api_key = "core-key"
+    config.doaj_api_key = "doaj-key"
+    config.semantic_scholar_api_key = "s2-key"
+
+    resolver = resolver_cls()
+    override = 17.5
+    config.resolver_timeouts[resolver.name] = override
+
+    artifact = SimpleNamespace(doi="10.1234/example")
+
+    list(resolver.iter_urls(Mock(), config, artifact))
+
+    assert captured, "resolver did not issue a request"
+    record = captured[0]
+    assert record["url"] == expected_url
+    headers = record["kwargs"]["headers"]
+    assert headers["User-Agent"] == "TestAgent/1.0"
+    assert headers.get("mailto") == "test@example.org"
+    for key, value in extra_headers.items():
+        assert headers.get(key) == value
+    assert record["kwargs"]["timeout"] == pytest.approx(override)
 
 
 # ---- test_resolver_pipeline.py -----------------------------
@@ -409,32 +732,16 @@ def test_head_precheck_allows_redirect(monkeypatch, tmp_path):
         metrics=metrics,
     )
 
-    class _HeadResponse:
-        def __init__(self, status_code: int, headers: Dict[str, str]):
-            self.status_code = status_code
-            self.headers = headers
-
-        def close(self) -> None:
-            return None
-
-    def fake_head(session, method, url, **kwargs):
-        assert method == "HEAD"
-        assert kwargs["allow_redirects"] is True
-        return _HeadResponse(302, {"Content-Type": "application/pdf", "Content-Length": "1234"})
-
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.request_with_retries",
-        fake_head,
+        "DocsToKG.ContentDownload.resolvers.head_precheck",
+        lambda *args, **kwargs: True,
     )
 
     assert pipeline._head_precheck_url(object(), "https://example.org/file.pdf", timeout=5.0)
 
-    def fake_html(session, method, url, **kwargs):
-        return _HeadResponse(200, {"Content-Type": "text/html", "Content-Length": "128"})
-
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers.request_with_retries",
-        fake_html,
+        "DocsToKG.ContentDownload.resolvers.head_precheck",
+        lambda *args, **kwargs: False,
     )
 
     assert not pipeline._head_precheck_url(object(), "https://example.org/file.pdf", timeout=5.0)
@@ -1584,29 +1891,23 @@ def test_core_resolver_ignores_non_dict_hits(monkeypatch, tmp_path) -> None:
 
 
 # ---- test_resolver_providers_additional.py -----------------------------
-def test_crossref_resolver_cached_http_error(monkeypatch, tmp_path) -> None:
+def test_crossref_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
 
-    http_error = requests.HTTPError("boom")
-    http_error.response = Mock(status_code=429)
-
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers._fetch_crossref_data",
-        Mock(side_effect=http_error),
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        Mock(return_value=_StubResponse(status_code=429)),
     )
 
-    class _Session:  # lacks .get to force cached path
-        pass
-
-    results = list(CrossrefResolver().iter_urls(_Session(), config, artifact))
+    results = list(CrossrefResolver().iter_urls(Mock(), config, artifact))
 
     assert results[0].event_reason == "http-error"
     assert results[0].http_status == 429
 
 
 # ---- test_resolver_providers_additional.py -----------------------------
-def test_crossref_resolver_cached_success(monkeypatch, tmp_path) -> None:
+def test_crossref_resolver_success(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
 
@@ -1621,14 +1922,11 @@ def test_crossref_resolver_cached_success(monkeypatch, tmp_path) -> None:
     }
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers._fetch_crossref_data",
-        Mock(return_value=payload),
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        Mock(return_value=_StubResponse(json_data=payload)),
     )
 
-    class _Session:
-        pass
-
-    results = list(CrossrefResolver().iter_urls(_Session(), config, artifact))
+    results = list(CrossrefResolver().iter_urls(Mock(), config, artifact))
 
     urls = [result.url for result in results]
     assert "https://publisher.example/paper.pdf" in urls
@@ -1643,14 +1941,11 @@ def test_crossref_resolver_link_not_list(monkeypatch, tmp_path) -> None:
     payload = {"message": {"link": "not-a-list"}}
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers._fetch_crossref_data",
-        Mock(return_value=payload),
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
+        Mock(return_value=_StubResponse(json_data=payload)),
     )
 
-    class _Session:
-        pass
-
-    results = list(CrossrefResolver().iter_urls(_Session(), config, artifact))
+    results = list(CrossrefResolver().iter_urls(Mock(), config, artifact))
 
     assert results == []
 
@@ -1723,55 +2018,13 @@ def test_crossref_resolver_cached_request_error(monkeypatch, tmp_path) -> None:
     config = ResolverConfig()
 
     monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers._fetch_crossref_data",
+        "DocsToKG.ContentDownload.resolvers.request_with_retries",
         Mock(side_effect=requests.RequestException("boom")),
     )
 
-    class _Session:
-        pass
-
-    result = next(CrossrefResolver().iter_urls(_Session(), config, artifact))
+    result = next(CrossrefResolver().iter_urls(Mock(), config, artifact))
 
     assert result.event_reason == "request-error"
-
-
-# ---- test_resolver_providers_additional.py -----------------------------
-def test_fetch_crossref_data_http_error(monkeypatch) -> None:
-    _fetch_crossref_data.cache_clear()
-
-    class _Resp:
-        status_code = 502
-
-        def raise_for_status(self):
-            raise requests.HTTPError("boom", response=Mock(status_code=502))
-
-    monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers._requests.get",
-        lambda *args, **kwargs: _Resp(),
-    )
-
-    with pytest.raises(requests.HTTPError):
-        _fetch_crossref_data("10.1000/example", "user@example.org", 5.0, ())
-
-
-# ---- test_resolver_providers_additional.py -----------------------------
-def test_fetch_crossref_data_success(monkeypatch) -> None:
-    _fetch_crossref_data.cache_clear()
-
-    class _Resp:
-        status_code = 200
-
-        def json(self):
-            return {"message": "ok"}
-
-    monkeypatch.setattr(
-        "DocsToKG.ContentDownload.resolvers._requests.get",
-        lambda *args, **kwargs: _Resp(),
-    )
-
-    data = _fetch_crossref_data("10.1000/example", None, 5.0, ())
-
-    assert data["message"] == "ok"
 
 
 # ---- test_resolver_providers_additional.py -----------------------------
