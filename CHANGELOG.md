@@ -33,6 +33,7 @@ All notable changes to DocsToKG are documented in this file.
 - Download runs emit JSONL summary records and `.metrics.json` sidecar files capturing aggregate metrics.
 - Optional global URL deduplication and domain-level throttling controls, including
   `--global-url-dedup` and `--domain-min-interval` CLI flags for ad-hoc runs.
+- HybridSearch module migration guide (`docs/hybrid_search_module_migration.md`) documenting old-to-new import paths.
 
 ### Changed
 - Centralised HTTP retry helper now logs timeout/connection issues separately and emits warnings when retries are exhausted.
@@ -47,6 +48,9 @@ All notable changes to DocsToKG are documented in this file.
 - Resolver namespace documents the deprecation timeline for the legacy ``time`` and ``requests`` aliases ahead of their removal.
 - Resolver pipeline enforces optional domain rate limits and skips repeat URLs across works when
   global deduplication is enabled.
+- HybridSearch modules consolidated: result shaping lives in `ranking`, FAISS similarity and state
+  helpers live in `vectorstore`, service orchestration owns pagination/stats, and the CLI is exposed
+  solely via `python -m DocsToKG.HybridSearch.validation`.
 
 ### Deprecated
 - Convenience re-exports of ``time`` and ``requests`` from
@@ -56,6 +60,10 @@ All notable changes to DocsToKG are documented in this file.
 - ``DocsToKG.HybridSearch.operations`` and ``DocsToKG.HybridSearch.tools`` now emit
   deprecation warnings and direct users to the consolidated service/vectorstore
   modules and the unified ``DocsToKG.HybridSearch.validation`` CLI entry point.
+- ``DocsToKG.HybridSearch.results``, ``.similarity``, ``.retrieval``, and ``.schema``
+  exist as shims that re-export the ranking, vectorstore, service, and storage modules
+  respectively. All shims will be removed in DocsToKG v0.6.0 after one release cycle.
+  See `docs/hybrid_search_module_migration.md` for migration guidance and timelines.
 
 ### Fixed
 - Tests cover HEAD pre-check redirects, resolver concurrency error isolation, and configuration validation edge cases.

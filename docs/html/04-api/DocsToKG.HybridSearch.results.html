@@ -78,69 +78,25 @@
              
   <section id="module-results">
 <h1>1. Module: results<a class="headerlink" href="#module-results" title="Link to this heading"></a></h1>
-<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.ranking</span></code>.</p>
-<p>Result shaping utilities for hybrid search responses.</p>
-<section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="shape-self-ordered-chunks-fused-scores-request-channel-scores">
-<h3><code class="docutils literal notranslate"><span class="pre">shape(self,</span> <span class="pre">ordered_chunks,</span> <span class="pre">fused_scores,</span> <span class="pre">request,</span> <span class="pre">channel_scores)</span></code><a class="headerlink" href="#shape-self-ordered-chunks-fused-scores-request-channel-scores" title="Link to this heading"></a></h3>
-<p>Transform ordered chunks into shaped search results.</p>
-<p>Args:
-ordered_chunks: Ranked chunk payloads emitted by fusion.
-fused_scores: Final fused score per vector ID.
-request: Original hybrid search request used for context.
-channel_scores: Per-channel scoring maps keyed by vector ID.</p>
-<p>Returns:
-List of <code class="docutils literal notranslate"><span class="pre">HybridSearchResult</span></code> objects ready for response serialization.</p>
-</section>
-<section id="within-doc-limit-self-doc-id-doc-buckets">
-<h3><code class="docutils literal notranslate"><span class="pre">_within_doc_limit(self,</span> <span class="pre">doc_id,</span> <span class="pre">doc_buckets)</span></code><a class="headerlink" href="#within-doc-limit-self-doc-id-doc-buckets" title="Link to this heading"></a></h3>
-<p>Check and update per-document emission counts.</p>
-<p>Args:
-doc_id: Document identifier being considered for emission.
-doc_buckets: Mutable counter of chunks emitted per document.</p>
-<p>Returns:
-True if the document is still below the configured limit.</p>
-</section>
-<section id="is-near-duplicate-self-embeddings-current-idx-emitted-indices-pairwise">
-<h3><code class="docutils literal notranslate"><span class="pre">_is_near_duplicate(self,</span> <span class="pre">embeddings,</span> <span class="pre">current_idx,</span> <span class="pre">emitted_indices,</span> <span class="pre">pairwise)</span></code><a class="headerlink" href="#is-near-duplicate-self-embeddings-current-idx-emitted-indices-pairwise" title="Link to this heading"></a></h3>
-<p>Determine whether the current chunk is too similar to emitted ones.</p>
-<p>Args:
-embeddings: Matrix of chunk embeddings ordered to match <code class="docutils literal notranslate"><span class="pre">ordered_chunks</span></code>.
-current_idx: Index of the chunk currently under consideration.
-emitted_indices: Indices that have already been emitted in the final results.</p>
-<p>Returns:
-True when the current chunk’s embedding exceeds the cosine similarity threshold.</p>
-</section>
-<section id="build-highlights-self-chunk-query-tokens">
-<h3><code class="docutils literal notranslate"><span class="pre">_build_highlights(self,</span> <span class="pre">chunk,</span> <span class="pre">query_tokens)</span></code><a class="headerlink" href="#build-highlights-self-chunk-query-tokens" title="Link to this heading"></a></h3>
-<p>Generate highlight snippets for a chunk.</p>
-<p>Args:
-chunk: Chunk payload being rendered.
-query_tokens: Tokens derived from the user’s query.</p>
-<p>Returns:
-List of highlight strings; falls back to a snippet when necessary.</p>
-</section>
-</section>
-<section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
-<section id="resultshaper">
-<h3><code class="docutils literal notranslate"><span class="pre">ResultShaper</span></code><a class="headerlink" href="#resultshaper" title="Link to this heading"></a></h3>
-<p>Collapse duplicates, enforce quotas, and generate highlights.</p>
-<p>Attributes:
-_opensearch: OpenSearch simulator providing highlighting hooks.
-_fusion_config: Fusion configuration controlling dedupe thresholds and quotas.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>shaper = ResultShaper(OpenSearchSimulator(), FusionConfig())
-shaper._fusion_config.max_chunks_per_doc
-3</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.results</span></code>.</p>
+<p><strong>Deprecated:</strong> <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.results</span></code> is a compatibility shim retained for one
+release cycle. Import result shaping utilities from <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.ranking</span></code> instead. The shim
+re-exports <code class="docutils literal notranslate"><span class="pre">ResultShaper</span></code> and emits a <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> at import time to aid migrations.</p>
+<section id="re-exported-symbols">
+<h2>1. Re-exported symbols<a class="headerlink" href="#re-exported-symbols" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Symbol</p></th>
+<th class="head"><p>New home</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ResultShaper</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.ranking</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>No behaviour changed—only the import location. Update applications and notebooks to reference the ranking module directly.</p>
 </section>
 </section>
 
