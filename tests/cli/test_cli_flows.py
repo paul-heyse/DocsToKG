@@ -733,6 +733,9 @@ def test_cli_flag_propagation_and_metrics_export(download_modules, monkeypatch, 
         "html": {},
         "skips": {},
         "failures": {},
+        "latency_ms": {},
+        "status_counts": {},
+        "error_reasons": {},
     }
 
 
@@ -843,6 +846,7 @@ def test_process_one_work_logs_manifest_in_dry_run(download_modules, tmp_path):
         extract_html_text=False,
         previous_lookup={},
         resume_completed=set(),
+        max_bytes=None,
     )
 
     logger.close()
@@ -897,6 +901,7 @@ def test_resume_skips_completed_work(download_modules, tmp_path):
         extract_html_text=False,
         previous_lookup={},
         resume_completed={"W-RESUME"},
+        max_bytes=None,
     )
 
     logger.close()

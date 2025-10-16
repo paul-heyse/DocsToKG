@@ -16,12 +16,6 @@
 #       "kind": "class"
 #     },
 #     {
-#       "id": "basic-tokenize",
-#       "name": "_basic_tokenize",
-#       "anchor": "function-_basic-tokenize",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "apply-mmr-diversification",
 #       "name": "apply_mmr_diversification",
 #       "anchor": "function-apply-mmr-diversification",
@@ -35,13 +29,13 @@
 
 from __future__ import annotations
 
-import re
 from collections import defaultdict
 from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 
 from .config import FusionConfig
+from .features import tokenize
 from .interfaces import LexicalIndex
 from .types import (
     ChunkPayload,
@@ -62,8 +56,6 @@ __all__ = (
     "ResultShaper",
     "apply_mmr_diversification",
 )
-
-_TOKEN_PATTERN = re.compile(r"[\w']+")
 
 
 # --- Public Classes ---
@@ -193,7 +185,7 @@ class ResultShaper:
         doc_buckets: Dict[str, int] = defaultdict(int)
         emitted_indices: List[int] = []
         results: List[HybridSearchResult] = []
-        query_tokens = _basic_tokenize(request.query)
+        query_tokens = tokenize(request.query)
         for current_idx, chunk in enumerate(ordered_chunks):
             rank = current_idx + 1
             if not self._within_doc_limit(chunk.doc_id, doc_buckets):
@@ -263,24 +255,13 @@ class ResultShaper:
         highlights = self._opensearch.highlight(chunk, query_tokens)
         if highlights:
             return highlights
-        tokens = _basic_tokenize(chunk.text)
+        tokens = tokenize(chunk.text)
         matches = [token for token in tokens if token in set(query_tokens)]
         if matches:
             return [" ".join(tokens[: min(len(tokens), 40)])]
         return [chunk.text[: min(len(chunk.text), 200)]]
 
 
-def _basic_tokenize(text: str) -> List[str]:
-    """Tokenize ``text`` using a simple regex to avoid devtools dependencies.
-
-    Args:
-        text: Source string to segment into lowercase tokens.
-
-    Returns:
-        List of tokens extracted from ``text``.
-    """
-
-    return [match.group(0).lower() for match in _TOKEN_PATTERN.finditer(text)]
 
 
 # --- Public Functions ---

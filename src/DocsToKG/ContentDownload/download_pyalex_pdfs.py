@@ -753,6 +753,14 @@ def download_candidate(
     sniff_limit = max(int(context.get("sniff_bytes", 64 * 1024)), 0)
     min_pdf_bytes = max(int(context.get("min_pdf_bytes", 1024)), 0)
     tail_window_bytes = max(int(context.get("tail_check_bytes", 2048)), 0)
+    max_bytes_raw = context.get("max_bytes")
+    max_bytes: Optional[int]
+    try:
+        max_bytes = int(max_bytes_raw) if max_bytes_raw is not None else None
+    except (TypeError, ValueError):
+        max_bytes = None
+    if max_bytes is not None and max_bytes <= 0:
+        max_bytes = None
     headers: Dict[str, str] = {}
     if referer:
         headers["Referer"] = referer
@@ -830,6 +838,45 @@ def download_candidate(
 
             content_type = response.headers.get("Content-Type") or content_type_hint
             disposition = response.headers.get("Content-Disposition")
+            content_type_lower = content_type.lower() if content_type else ""
+            content_length_header = response.headers.get("Content-Length")
+            content_length_hint: Optional[int] = None
+            if content_length_header:
+                try:
+                    content_length_hint = int(content_length_header.strip())
+                except (TypeError, ValueError):
+                    content_length_hint = None
+            if max_bytes and content_length_hint is not None and content_length_hint > max_bytes:
+                LOGGER.warning(
+                    "Aborting download due to max-bytes limit",
+                    extra={
+                        "extra_fields": {
+                            "url": url,
+                            "work_id": artifact.work_id,
+                            "content_length": content_length_hint,
+                            "max_bytes": max_bytes,
+                        }
+                    },
+                )
+                elapsed_now = (time.monotonic() - start) * 1000.0
+                classification_limit = (
+                    Classification.HTML_TOO_LARGE
+                    if "html" in content_type_lower
+                    else Classification.PAYLOAD_TOO_LARGE
+                )
+                return DownloadOutcome(
+                    classification=classification_limit,
+                    path=None,
+                    http_status=response.status_code,
+                    content_type=content_type,
+                    elapsed_ms=elapsed_now,
+                    error=f"content-length {content_length_hint} exceeds max_bytes {max_bytes}",
+                    sha256=None,
+                    content_length=content_length_hint,
+                    etag=modified_result.etag,
+                    last_modified=modified_result.last_modified,
+                    extracted_text_path=None,
+                )
             sniff_buffer = bytearray()
             detected: Optional[Classification] = None
             flagged_unknown = False
@@ -886,6 +933,44 @@ def download_candidate(
                             hasher.update(chunk)
                         byte_count += len(chunk)
                         _update_tail_buffer(tail_buffer, chunk, limit=tail_window_bytes)
+
+                        if max_bytes and byte_count > max_bytes:
+                            LOGGER.warning(
+                                "Aborting download during stream due to max-bytes limit",
+                                extra={
+                                    "extra_fields": {
+                                        "url": url,
+                                        "work_id": artifact.work_id,
+                                        "bytes_downloaded": byte_count,
+                                        "max_bytes": max_bytes,
+                                    }
+                                },
+                            )
+                            if handle is not None:
+                                handle.close()
+                                handle = None
+                            if part_path:
+                                with contextlib.suppress(FileNotFoundError):
+                                    part_path.unlink()
+                            classification_limit = (
+                                Classification.HTML_TOO_LARGE
+                                if detected is Classification.HTML
+                                else Classification.PAYLOAD_TOO_LARGE
+                            )
+                            elapsed_limit = (time.monotonic() - start) * 1000.0
+                            return DownloadOutcome(
+                                classification=classification_limit,
+                                path=None,
+                                http_status=response.status_code,
+                                content_type=content_type,
+                                elapsed_ms=elapsed_limit,
+                                error=f"download exceeded max_bytes {max_bytes}",
+                                sha256=None,
+                                content_length=byte_count,
+                                etag=modified_result.etag,
+                                last_modified=modified_result.last_modified,
+                                extracted_text_path=None,
+                            )
 
                 if detected is None:
                     return DownloadOutcome(
@@ -1061,6 +1146,7 @@ def apply_config_overrides(
         "resolver_timeouts",
         "resolver_min_interval_s",
         "mailto",
+        "resolver_head_precheck",
     ):
         if field_name in data and data[field_name] is not None:
             setattr(config, field_name, data[field_name])
@@ -1213,6 +1299,7 @@ def process_one_work(
     extract_html_text: bool,
     previous_lookup: Dict[str, Dict[str, Any]],
     resume_completed: Set[str],
+    max_bytes: Optional[int],
 ) -> Dict[str, Any]:
     """Process a single OpenAlex work through the resolver pipeline.
 
@@ -1226,9 +1313,10 @@ def process_one_work(
         metrics: Resolver metrics collector.
         dry_run: When True, simulate downloads without writing files.
         list_only: When True, record candidate URLs without fetching content.
-        extract_html_text: Whether to extract plaintext from HTML artefacts.
-        previous_lookup: Mapping of work_id/URL to prior manifest entries.
-        resume_completed: Set of work IDs already processed in resume mode.
+            extract_html_text: Whether to extract plaintext from HTML artefacts.
+            previous_lookup: Mapping of work_id/URL to prior manifest entries.
+            resume_completed: Set of work IDs already processed in resume mode.
+            max_bytes: Optional size limit per download in bytes.
 
     Returns:
         Dictionary summarizing the outcome (saved/html_only/skipped flags).
@@ -1293,6 +1381,7 @@ def process_one_work(
         "extract_html_text": extract_html_text,
         "previous": previous_map,
         "list_only": list_only,
+        "max_bytes": max_bytes,
     }
 
     if artifact.work_id in resume_completed:
@@ -1469,6 +1558,12 @@ def main() -> None:
         default=0.05,
         help="Sleep seconds between works (sequential mode).",
     )
+    parser.add_argument(
+        "--max-bytes",
+        type=int,
+        default=None,
+        help="Maximum bytes to download per request before aborting (default: unlimited).",
+    )
 
     resolver_group = parser.add_argument_group("Resolver settings")
     resolver_group.add_argument(
@@ -1616,6 +1711,8 @@ def main() -> None:
         parser.error("--concurrent-resolvers must be >= 1")
     if not args.topic and not args.topic_id:
         parser.error("Provide --topic or --topic-id.")
+    if args.max_bytes is not None and args.max_bytes <= 0:
+        parser.error("--max-bytes must be a positive integer")
 
     if args.mailto:
         oa_config.email = args.mailto
@@ -1765,6 +1862,7 @@ def main() -> None:
                             extract_html_text=args.extract_html_text,
                             previous_lookup=resume_lookup,
                             resume_completed=resume_completed,
+                            max_bytes=args.max_bytes,
                         )
                         _record_result(result)
                         if args.sleep > 0:
@@ -1798,6 +1896,7 @@ def main() -> None:
                                     extract_html_text=args.extract_html_text,
                                     previous_lookup=resume_lookup,
                                     resume_completed=resume_completed,
+                                    max_bytes=args.max_bytes,
                                 )
                             finally:
                                 if hasattr(session, "close"):
@@ -1848,8 +1947,32 @@ def main() -> None:
     if args.dry_run:
         print("DRY RUN: no files written, resolver coverage only.")
     print("Resolver summary:")
-    for key, values in summary.items():
-        print(f"  {key}: {values}")
+    for key in ("attempts", "successes", "html", "skips", "failures"):
+        values = summary.get(key, {})
+        if values:
+            print(f"  {key}: {values}")
+    latency_summary = summary.get("latency_ms", {})
+    if latency_summary:
+        print("  latency_ms:")
+        for resolver_name, stats in latency_summary.items():
+            mean_ms = stats.get("mean_ms", 0.0)
+            p95_ms = stats.get("p95_ms", 0.0)
+            max_ms = stats.get("max_ms", 0.0)
+            count = stats.get("count", 0)
+            print(
+                f"    {resolver_name}: count={count} mean={mean_ms:.1f}ms p95={p95_ms:.1f}ms max={max_ms:.1f}ms"
+            )
+    status_counts = summary.get("status_counts", {})
+    if status_counts:
+        print("  status_counts:")
+        for resolver_name, counts in status_counts.items():
+            print(f"    {resolver_name}: {counts}")
+    error_reasons = summary.get("error_reasons", {})
+    if error_reasons:
+        print("  top_error_reasons:")
+        for resolver_name, items in error_reasons.items():
+            formatted = ", ".join(f"{entry['reason']} ({entry['count']})" for entry in items)
+            print(f"    {resolver_name}: {formatted}")
 
     if not summary_record:
         summary_record = {

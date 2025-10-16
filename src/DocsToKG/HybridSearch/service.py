@@ -322,28 +322,39 @@ class HybridSearchService:
     ) -> List[HybridSearchResult]:
         if not cursor:
             return list(results)
-        if cursor.startswith("v2|"):
-            try:
+        try:
+            if cursor.startswith("v2|"):
                 _version, score_str, vector_id = cursor.split("|", 2)
                 target_score = float(score_str)
-            except (ValueError, TypeError):
-                return list(results)
-            sliced: List[HybridSearchResult] = []
-            skipping = True
-            for result in results:
-                if skipping:
-                    if result.vector_id == vector_id and round(result.score, 6) == round(target_score, 6):
-                        skipping = False
-                    continue
-                sliced.append(result)
-            return list(results) if skipping else sliced
-        return list(results)
+                sliced: List[HybridSearchResult] = []
+                skipping = True
+                for result in results:
+                    if skipping:
+                        if result.vector_id == vector_id and abs(result.score - target_score) < 1e-6:
+                            skipping = False
+                        continue
+                    sliced.append(result)
+                return sliced if not skipping else list(results)
+            vector_id, rank_str = cursor.rsplit(":", 1)
+            target_rank = int(rank_str)
+        except (ValueError, TypeError):
+            return list(results)
+
+        sliced: List[HybridSearchResult] = []
+        skipping = True
+        for result in results:
+            if skipping:
+                if result.vector_id == vector_id and result.fused_rank == target_rank:
+                    skipping = False
+                continue
+            sliced.append(result)
+        return sliced if not skipping else list(results)
 
     def _build_cursor(self, results: Sequence[HybridSearchResult], page_size: int) -> Optional[str]:
         if len(results) <= page_size:
             return None
         last = results[page_size - 1]
-        return f"v2|{round(last.score, 6)}|{last.vector_id}"
+        return f"v2|{last.score:.6f}|{last.vector_id}"
 
     def _execute_bm25(
         self,

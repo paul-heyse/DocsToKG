@@ -699,7 +699,7 @@ class FaissVectorStore(DenseVectorStore):
             cloned = faiss.index_gpu_to_cpu(index)
             opts = faiss.GpuMultipleClonerOptions()
             opts.shard = False
-            opts.useFloat16 = getattr(self._config, "flat_use_fp16", False)
+            opts.useFloat16 = bool(getattr(self._config, "flat_use_fp16", False))
             multi = faiss.index_cpu_to_all_gpus(cloned, opts)
             self._replicated = True
             return multi
