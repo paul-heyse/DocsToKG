@@ -65,6 +65,7 @@ __all__ = [
     "resolve_hash_algorithm",
     "load_manifest_index",
     "acquire_lock",
+    "set_spawn_or_warn",
 ]
 
 
@@ -182,7 +183,7 @@ def data_vectors(root: Optional[Path] = None) -> Path:
         True
     """
 
-    return _ensure_dir(detect_data_root(root) / "Vectors")
+    return _ensure_dir(detect_data_root(root) / "Embeddings")
 
 
 def data_manifests(root: Optional[Path] = None) -> Path:
@@ -417,6 +418,41 @@ def iter_chunks(directory: Path) -> Iterator[Path]:
     yield from (
         path.resolve() for path in sorted(directory.glob("*.chunks.jsonl")) if path.is_file()
     )
+
+
+def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:
+    """Ensure the multiprocessing start method is set to ``spawn``.
+
+    Args:
+        logger: Optional logger used to emit diagnostic output.
+
+    The helper enforces CUDA safety guarantees by configuring the
+    ``spawn`` start method when possible. If another start method is
+    already active, the helper logs a warning describing the current
+    method so callers understand the degraded safety state.
+    """
+
+    import multiprocessing as mp
+
+    try:
+        mp.set_start_method("spawn", force=True)
+        if logger is not None:
+            logger.debug("Multiprocessing start method set to 'spawn'")
+        return
+    except RuntimeError:
+        current = mp.get_start_method(allow_none=True)
+        if current == "spawn":
+            if logger is not None:
+                logger.debug("Multiprocessing start method already 'spawn'")
+            return
+        message = (
+            "Multiprocessing start method is %s; CUDA workloads require 'spawn'."
+            % (current or "unset")
+        )
+        if logger is not None:
+            logger.warning(message)
+        else:
+            logging.getLogger(__name__).warning(message)
 
 
 def jsonl_load(path: Path, skip_invalid: bool = False, max_errors: int = 10) -> List[dict]:
