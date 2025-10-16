@@ -89,6 +89,7 @@ from tqdm import tqdm
 
 from DocsToKG.DocParsing._common import (
     Batcher,
+    acquire_lock,
     atomic_write,
     compute_content_hash,
     data_chunks,
@@ -97,6 +98,7 @@ from DocsToKG.DocParsing._common import (
     derive_doc_id_and_vectors_path,
     expand_path,
     get_logger,
+    init_hf_env,
     iter_chunks,
     jsonl_load,
     jsonl_save,
@@ -218,8 +220,7 @@ def _resolve_splade_dir(model_root: Path) -> Path:
     return expand_path(env) if env else model_root / "naver" / "splade-v3"
 
 
-HF_HOME = resolve_hf_home()
-MODEL_ROOT = resolve_model_root(HF_HOME)
+HF_HOME, MODEL_ROOT = init_hf_env()
 QWEN_DIR = expand_path(_resolve_qwen_dir(MODEL_ROOT))
 SPLADE_DIR = expand_path(_resolve_splade_dir(MODEL_ROOT))
 
@@ -259,14 +260,6 @@ DEFAULT_CHUNKS_DIR = data_chunks(DEFAULT_DATA_ROOT)
 DEFAULT_VECTORS_DIR = data_vectors(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "embeddings"
 SPLADE_SPARSITY_WARN_THRESHOLD_PCT = 1.0
-
-# Make sure every lib (Transformers / HF Hub / Sentence-Transformers) honors this cache.
-os.environ.setdefault("HF_HOME", str(HF_HOME))
-os.environ.setdefault("HF_HUB_CACHE", str(HF_HOME / "hub"))
-os.environ.setdefault("TRANSFORMERS_CACHE", str(HF_HOME / "transformers"))
-os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", str(MODEL_ROOT))
-os.environ.setdefault("DOCSTOKG_MODEL_ROOT", str(MODEL_ROOT))
-
 
 def _missing_splade_dependency_message() -> str:
     """Return a human-readable installation hint for SPLADE extras."""
@@ -752,7 +745,12 @@ class SPLADEValidator:
         if not self.total_chunks:
             return
         pct = 100 * len(self.zero_nnz_chunks) / self.total_chunks
-        if pct > self.warn_threshold_pct:
+        threshold = getattr(self, "warn_threshold_pct", SPLADE_SPARSITY_WARN_THRESHOLD_PCT)
+        try:
+            threshold = float(threshold)
+        except (TypeError, ValueError):
+            threshold = SPLADE_SPARSITY_WARN_THRESHOLD_PCT
+        if pct > threshold:
             logger.warning(
                 "SPLADE sparsity warning: %s / %s (%.1f%%) chunks have zero non-zero elements.",
                 len(self.zero_nnz_chunks),
@@ -1326,7 +1324,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--splade-zero-pct-warn-threshold",
+        "--splade-sparsity-warn-pct",
         dest="sparsity_warn_threshold_pct",
         type=float,
         default=SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
@@ -1335,7 +1333,12 @@ def build_parser() -> argparse.ArgumentParser:
             f"(default: {SPLADE_SPARSITY_WARN_THRESHOLD_PCT})."
         ),
     )
-    parser.add_argument("--qwen-dim", type=int, default=2560, help="Expected Qwen output dimension (set when using MRL).")
+    parser.add_argument(
+        "--qwen-dim",
+        type=int,
+        default=2560,
+        help="Dimension of the dense embedding head (model dependent).",
+    )
     parser.add_argument("--tp", type=int, default=1)
     add_resume_force_options(
         parser,
@@ -1411,15 +1414,11 @@ def main(args: argparse.Namespace | None = None) -> int:
     qwen_model_dir = cli_qwen or default_qwen_dir
 
     global HF_HOME, MODEL_ROOT, QWEN_DIR, SPLADE_DIR
-    HF_HOME = hf_home
-    MODEL_ROOT = model_root
-    QWEN_DIR = default_qwen_dir
-    SPLADE_DIR = default_splade_dir
-
-    os.environ["HF_HOME"] = str(hf_home)
-    os.environ["HF_HUB_CACHE"] = str(hf_home / "hub")
-    os.environ["TRANSFORMERS_CACHE"] = str(hf_home / "transformers")
-    os.environ["SENTENCE_TRANSFORMERS_HOME"] = str(model_root)
+    HF_HOME, MODEL_ROOT = init_hf_env(hf_home, model_root)
+    QWEN_DIR = expand_path(_resolve_qwen_dir(MODEL_ROOT))
+    SPLADE_DIR = expand_path(_resolve_splade_dir(MODEL_ROOT))
+    default_qwen_dir = QWEN_DIR
+    default_splade_dir = SPLADE_DIR
 
     validate_only = bool(getattr(args, "validate_only", False))
 
@@ -1614,43 +1613,44 @@ def main(args: argparse.Namespace | None = None) -> int:
     for chunk_file, out_path, input_hash, doc_id in tqdm(
         file_entries, desc="Pass B: Encoding vectors", unit="file"
     ):
-        start = time.perf_counter()
-        try:
-            count, nnz, norms = process_chunk_file_vectors(
-                chunk_file, out_path, stats, args, validator, logger
-            )
-        except Exception as exc:
+        with acquire_lock(out_path):
+            start = time.perf_counter()
+            try:
+                count, nnz, norms = process_chunk_file_vectors(
+                    chunk_file, out_path, stats, args, validator, logger
+                )
+            except Exception as exc:
+                duration = time.perf_counter() - start
+                manifest_append(
+                    stage=MANIFEST_STAGE,
+                    doc_id=doc_id,
+                    status="failure",
+                    duration_s=round(duration, 3),
+                    schema_version="embeddings/1.0.0",
+                    input_path=str(chunk_file),
+                    input_hash=input_hash,
+                    hash_alg=resolve_hash_algorithm(),
+                    output_path=str(out_path),
+                    error=str(exc),
+                )
+                raise
+
             duration = time.perf_counter() - start
+            total_vectors += count
+            splade_nnz_all.extend(nnz)
+            qwen_norms_all.extend(norms)
             manifest_append(
                 stage=MANIFEST_STAGE,
                 doc_id=doc_id,
-                status="failure",
+                status="success",
                 duration_s=round(duration, 3),
                 schema_version="embeddings/1.0.0",
                 input_path=str(chunk_file),
                 input_hash=input_hash,
                 hash_alg=resolve_hash_algorithm(),
                 output_path=str(out_path),
-                error=str(exc),
+                vector_count=count,
             )
-            raise
-
-        duration = time.perf_counter() - start
-        total_vectors += count
-        splade_nnz_all.extend(nnz)
-        qwen_norms_all.extend(norms)
-        manifest_append(
-            stage=MANIFEST_STAGE,
-            doc_id=doc_id,
-            status="success",
-            duration_s=round(duration, 3),
-            schema_version="embeddings/1.0.0",
-            input_path=str(chunk_file),
-            input_hash=input_hash,
-            hash_alg=resolve_hash_algorithm(),
-            output_path=str(out_path),
-            vector_count=count,
-        )
 
     _current, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()

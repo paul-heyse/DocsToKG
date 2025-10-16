@@ -249,6 +249,8 @@ __all__ = [
     "acquire_lock",
     "set_spawn_or_warn",
     "derive_doc_id_and_vectors_path",
+    "compute_relative_doc_id",
+    "init_hf_env",
 ]
 
 # --- Path Resolution ---
@@ -297,6 +299,38 @@ def resolve_model_root(hf_home: Optional[Path] = None) -> Path:
         return expand_path(env)
     base = hf_home if hf_home is not None else resolve_hf_home()
     return expand_path(base)
+
+
+def init_hf_env(
+    hf_home: Optional[Path] = None,
+    model_root: Optional[Path] = None,
+) -> tuple[Path, Path]:
+    """Initialise Hugging Face and transformer cache environment variables.
+
+    Args:
+        hf_home: Optional explicit HF cache directory.
+        model_root: Optional DocsToKG model root override.
+
+    Returns:
+        Tuple of ``(hf_home, model_root)`` paths after normalisation.
+    """
+
+    resolved_hf = (
+        expand_path(hf_home) if isinstance(hf_home, Path) else resolve_hf_home()
+    )
+    resolved_model_root = (
+        expand_path(model_root)
+        if isinstance(model_root, Path)
+        else resolve_model_root(resolved_hf)
+    )
+
+    os.environ["HF_HOME"] = str(resolved_hf)
+    os.environ["HF_HUB_CACHE"] = str(resolved_hf / "hub")
+    os.environ["TRANSFORMERS_CACHE"] = str(resolved_hf / "transformers")
+    os.environ["SENTENCE_TRANSFORMERS_HOME"] = str(resolved_model_root)
+    os.environ["DOCSTOKG_MODEL_ROOT"] = str(resolved_model_root)
+
+    return resolved_hf, resolved_model_root
 
 
 def detect_data_root(start: Optional[Path] = None) -> Path:
@@ -493,6 +527,20 @@ def derive_doc_id_and_vectors_path(
     doc_id = base.with_suffix(".doctags").as_posix()
     vector_relative = base.with_suffix(".vectors.jsonl")
     return doc_id, vectors_root / vector_relative
+
+
+def compute_relative_doc_id(path: Path, root: Path) -> str:
+    """Return POSIX-style relative identifier for a document path.
+
+    Args:
+        path: Absolute path to the document on disk.
+        root: Root directory that anchors relative identifiers.
+
+    Returns:
+        str: POSIX-style relative path suitable for manifest IDs.
+    """
+
+    return path.relative_to(root).as_posix()
 
 
 # --- Logging and I/O Utilities ---

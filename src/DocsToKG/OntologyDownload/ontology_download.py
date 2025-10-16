@@ -1905,9 +1905,138 @@ class LocalStorageBackend:
             local_dir: Directory containing the ready-to-serve ontology.
 
         Returns:
+            Path to the local directory for the ontology version.
+        """
+
+        _ = (ontology_id, version, local_dir)  # pragma: no cover - intentional no-op
+
+    def version_path(self, ontology_id: str, version: str) -> Path:
+        """Return the local storage directory for the requested version.
+
+        Args:
+            ontology_id: Identifier being queried.
+            version: Version string whose storage path is needed.
+
+        Returns:
+            Path pointing to the stored ontology version.
+        """
+
+        return self._version_dir(ontology_id, version)
+
+    def delete_version(self, ontology_id: str, version: str) -> int:
+        """Delete a stored ontology version returning reclaimed bytes.
+        base = self._version_dir(ontology_id, version)
+        base.mkdir(parents=True, exist_ok=True)
+        return base
+
+    def available_versions(self, ontology_id: str) -> List[str]:
+        """Return sorted versions already present for an ontology.
+
+        Args:
+            ontology_id: Identifier whose stored versions should be listed.
+
+        Returns:
+            Sorted list of version strings found under the storage root.
+        """
+
+        safe_id, _ = _safe_identifiers(ontology_id, "unused")
+        base = self.root / safe_id
+        if not base.exists():
+            return []
+        versions = [entry.name for entry in base.iterdir() if entry.is_dir()]
+        return sorted(versions)
+
+    def available_ontologies(self) -> List[str]:
+        """Return ontology identifiers discovered under ``root``.
+
+        Args:
+            ontology_id: Identifier whose stored version should be removed.
+            version: Version string targeted for deletion.
+
+        Returns:
+            Number of bytes reclaimed by removing the version directory.
+
+        Raises:
+            OSError: Propagated if filesystem deletion fails.
+        """
+
+        path = self._version_dir(ontology_id, version)
+        if not path.exists():
+            return 0
+        reclaimed = _directory_size(path)
+        shutil.rmtree(path)
+        return reclaimed
+
+    def set_latest_version(self, ontology_id: str, version: str) -> None:
+        """Update symlink and marker file indicating the latest version.
+
+        Args:
+            ontology_id: Identifier whose latest marker should be updated.
+            version: Version string to record as the latest processed build.
+            Sorted list of ontology identifiers available locally.
+        """
+
+        if not self.root.exists():
+            return []
+        return sorted([entry.name for entry in self.root.iterdir() if entry.is_dir()])
+
+    def finalize_version(self, ontology_id: str, version: str, local_dir: Path) -> None:
+        """Finalize a local version directory (no-op for purely local storage).
+
+        Args:
+            ontology_id: Identifier that finished processing.
+            version: Version string associated with the processed ontology.
+            local_dir: Directory containing the ready-to-serve ontology.
+
+        Returns:
             None.
         """
 
+        safe_id, _ = _safe_identifiers(ontology_id, "unused")
+        base = self.root / safe_id
+        base.mkdir(parents=True, exist_ok=True)
+        link = base / "latest"
+        marker = base / "latest.txt"
+        target = Path(version)
+
+        try:
+            if link.exists() or link.is_symlink():
+                link.unlink()
+            link.symlink_to(target, target_is_directory=True)
+        except OSError:
+            if marker.exists():
+                marker.unlink()
+            marker.write_text(version)
+        else:
+            if marker.exists():
+                marker.unlink()
+
+
+class FsspecStorageBackend(LocalStorageBackend):
+    """Hybrid storage backend that mirrors artifacts to an fsspec location.
+
+    Attributes:
+        fs: ``fsspec`` filesystem instance used for remote operations.
+        base_path: Root path within the remote filesystem where artefacts live.
+
+    Examples:
+        >>> backend = FsspecStorageBackend("memory://ontologies")  # doctest: +SKIP
+        >>> backend.available_ontologies()  # doctest: +SKIP
+        []
+    """
+
+    def __init__(self, url: str) -> None:
+        """Create a hybrid storage backend backed by an fsspec URL.
+
+        Args:
+            url: Remote ``fsspec`` URL (for example ``s3://bucket/prefix``).
+
+        Raises:
+            ConfigError: If :mod:`fsspec` is not installed or the URL is invalid.
+
+        Returns:
+            None
+        """
         _ = (ontology_id, version, local_dir)  # pragma: no cover - intentional no-op
 
     def version_path(self, ontology_id: str, version: str) -> Path:
@@ -2000,6 +2129,819 @@ class FsspecStorageBackend(LocalStorageBackend):
         Returns:
             None
         """
+
+        if fsspec is None:  # pragma: no cover - exercised when dependency missing
+            raise ConfigError(
+                "fsspec required for remote storage. Install it via 'pip install fsspec'."
+            )
+        fs, path = fsspec.core.url_to_fs(url)  # type: ignore[attr-defined]
+        self.fs = fs
+        self.base_path = PurePosixPath(path)
+        super().__init__(LOCAL_ONTOLOGY_DIR)
+
+    def _remote_version_path(self, ontology_id: str, version: str) -> PurePosixPath:
+        """Return the remote filesystem path for the specified ontology version.
+
+        Args:
+            ontology_id: Identifier whose remote storage path is required.
+            version: Version string associated with the ontology release.
+
+        Returns:
+            Posix-style path referencing the remote storage location.
+        """
+
+        safe_id, safe_version = _safe_identifiers(ontology_id, version)
+        return (self.base_path / safe_id / safe_version).with_suffix("")
+
+    def available_versions(self, ontology_id: str) -> List[str]:
+        """Return versions aggregated from local cache and remote storage.
+
+        Args:
+            ontology_id: Identifier whose version catalogue is required.
+
+        Returns:
+            Sorted list combining local and remote version identifiers.
+        """
+
+        local_versions = super().available_versions(ontology_id)
+        safe_id, _ = _safe_identifiers(ontology_id, "unused")
+        remote_dir = self.base_path / safe_id
+        try:
+            entries = self.fs.ls(str(remote_dir), detail=False)
+        except FileNotFoundError:
+            entries = []
+        remote_versions = [
+            PurePosixPath(entry).name for entry in entries if entry and not entry.endswith(".tmp")
+        ]
+        return sorted({*local_versions, *remote_versions})
+
+    def available_ontologies(self) -> List[str]:
+        """Return ontology identifiers available locally or remotely.
+
+        Args:
+            None.
+
+        Returns:
+            Sorted set union of local and remote ontology identifiers.
+        """
+
+        local_ids = super().available_ontologies()
+        try:
+            entries = self.fs.ls(str(self.base_path), detail=False)
+        except FileNotFoundError:
+            entries = []
+        remote_ids = [
+            PurePosixPath(entry).name for entry in entries if entry and not entry.endswith(".tmp")
+        ]
+        return sorted({*local_ids, *remote_ids})
+
+    def ensure_local_version(self, ontology_id: str, version: str) -> Path:
+        """Mirror a remote ontology version into the local cache when absent.
+
+        Args:
+            ontology_id: Identifier whose version should exist locally.
+            version: Version string to ensure within the local cache.
+
+        Returns:
+            Path to the local directory containing the requested version.
+        """
+
+        base = super().ensure_local_version(ontology_id, version)
+        manifest_path = base / "manifest.json"
+        if manifest_path.exists():
+            return base
+
+        remote_dir = self._remote_version_path(ontology_id, version)
+        if not self.fs.exists(str(remote_dir)):
+            return base
+
+        try:
+            remote_files = self.fs.find(str(remote_dir))
+        except FileNotFoundError:
+            remote_files = []
+        for remote_file in remote_files:
+            remote_path = PurePosixPath(remote_file)
+            relative = remote_path.relative_to(remote_dir)
+            local_path = base / Path(str(relative))
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            self.fs.get_file(str(remote_path), str(local_path))
+        return base
+
+    def finalize_version(self, ontology_id: str, version: str, local_dir: Path) -> None:
+        """Upload the finalized local directory to the remote store.
+
+        Args:
+            ontology_id: Identifier of the ontology that has completed processing.
+            version: Version string associated with the finalised ontology.
+            local_dir: Directory containing the validated ontology payload.
+
+        Returns:
+            None.
+        """
+
+        remote_dir = self._remote_version_path(ontology_id, version)
+        for path in local_dir.rglob("*"):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(local_dir)
+            remote_path = remote_dir / PurePosixPath(str(relative).replace("\\", "/"))
+            self.fs.makedirs(str(remote_path.parent), exist_ok=True)
+            self.fs.put_file(str(path), str(remote_path))
+
+    def delete_version(self, ontology_id: str, version: str) -> int:
+        """Delete both local and remote copies of a stored version.
+
+        Args:
+            ontology_id: Identifier whose stored version should be deleted.
+            version: Version string targeted for deletion.
+
+        Returns:
+            Total bytes reclaimed across local and remote storage.
+
+        Raises:
+            OSError: Propagated if remote deletion fails irrecoverably.
+        """
+
+        reclaimed = super().delete_version(ontology_id, version)
+        remote_dir = self._remote_version_path(ontology_id, version)
+        if not self.fs.exists(str(remote_dir)):
+            return reclaimed
+
+        try:
+            remote_files = self.fs.find(str(remote_dir))
+        except FileNotFoundError:
+            remote_files = []
+        for remote_file in remote_files:
+            try:
+                info = self.fs.info(remote_file)
+            except FileNotFoundError:
+                continue
+            size = info.get("size") if isinstance(info, dict) else None
+            if isinstance(size, (int, float)):
+                reclaimed += int(size)
+        self.fs.rm(str(remote_dir), recursive=True)
+        return reclaimed
+
+
+def get_storage_backend() -> StorageBackend:
+    """Instantiate the storage backend based on environment configuration.
+
+    Args:
+        None.
+
+    Returns:
+        Storage backend instance selected according to ``ONTOFETCH_STORAGE_URL``.
+    """
+
+    storage_url = os.getenv("ONTOFETCH_STORAGE_URL")
+    if storage_url:
+        return FsspecStorageBackend(storage_url)
+    return LocalStorageBackend(LOCAL_ONTOLOGY_DIR)
+
+
+STORAGE: StorageBackend = get_storage_backend()
+
+
+# --- Validation utilities ---
+import logging
+import re
+from dataclasses import dataclass
+
+rdflib = get_rdflib()
+pronto = get_pronto()
+owlready2 = get_owlready2()
+
+
+@dataclass(slots=True)
+class ValidationRequest:
+    """Parameters describing a single validation task.
+
+    Attributes:
+        name: Identifier of the validator to execute.
+        file_path: Path to the ontology document to inspect.
+        normalized_dir: Directory used to write normalized artifacts.
+        validation_dir: Directory for validator reports and logs.
+        config: Resolved configuration that supplies timeout thresholds.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> from DocsToKG.OntologyDownload import ResolvedConfig
+        >>> req = ValidationRequest(
+        ...     name="rdflib",
+        ...     file_path=Path("ontology.owl"),
+        ...     normalized_dir=Path("normalized"),
+        ...     validation_dir=Path("validation"),
+        ...     config=ResolvedConfig.from_defaults(),
+        ... )
+        >>> req.name
+        'rdflib'
+    """
+
+    name: str
+    file_path: Path
+    normalized_dir: Path
+    validation_dir: Path
+    config: ResolvedConfig
+
+
+@dataclass(slots=True)
+class ValidationResult:
+    """Outcome produced by a validator.
+
+    Attributes:
+        ok: Indicates whether the validator succeeded.
+        details: Arbitrary metadata describing validator output.
+        output_files: Generated files for downstream processing.
+
+    Examples:
+        >>> result = ValidationResult(ok=True, details={"triples": 10}, output_files=["ontology.ttl"])
+        >>> result.ok
+        True
+    """
+
+    ok: bool
+    details: Dict[str, object]
+    output_files: List[str]
+
+    def to_dict(self) -> Dict[str, object]:
+        """Represent the validation result as a JSON-serializable dict.
+
+        Args:
+            None.
+
+        Returns:
+            Dictionary with boolean status, detail payload, and output paths.
+        """
+        return {
+            "ok": self.ok,
+            "details": self.details,
+            "output_files": self.output_files,
+        }
+
+
+class ValidationTimeout(Exception):
+    """Raised when a validation task exceeds the configured timeout.
+
+    Args:
+        message: Optional description of the timeout condition.
+
+    Examples:
+        >>> raise ValidationTimeout("rdflib exceeded 60s")
+        Traceback (most recent call last):
+        ...
+        ValidationTimeout: rdflib exceeded 60s
+    """
+
+
+def _log_validation_memory(logger: logging.Logger, validator: str, event: str) -> None:
+    """Emit memory usage diagnostics for a validator when debug logging is enabled.
+
+    Args:
+        logger: Logger responsible for validator telemetry.
+        validator: Name of the validator emitting the event.
+        event: Lifecycle label describing when the measurement is captured.
+    """
+    is_enabled = getattr(logger, "isEnabledFor", None)
+    if callable(is_enabled):
+        enabled = is_enabled(logging.DEBUG)
+    else:  # pragma: no cover - fallback for stub loggers
+        enabled = False
+    if not enabled:
+        return
+    process = psutil.Process()
+    memory_mb = process.memory_info().rss / (1024**2)
+    logger.debug(
+        "memory usage",
+        extra={
+            "stage": "validate",
+            "validator": validator,
+            "event": event,
+            "memory_mb": round(memory_mb, 2),
+        },
+    )
+
+
+def _write_validation_json(path: Path, payload: MutableMapping[str, object]) -> None:
+    """Persist structured validation metadata to disk as JSON.
+
+    Args:
+        path: Destination path for the JSON payload.
+        payload: Mapping containing validation results.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _python_merge_sort(source: Path, destination: Path, *, chunk_size: int = 100_000) -> None:
+    """Sort an N-Triples file using a disk-backed merge strategy.
+
+    Args:
+        source: Path to the unsorted triple file.
+        destination: Output path that receives sorted triples.
+        chunk_size: Number of lines loaded into memory per chunk before flushing.
+    """
+
+    with tempfile.TemporaryDirectory(prefix="ontology-sort-") as tmp_dir:
+        chunk_paths: List[Path] = []
+        with source.open("r", encoding="utf-8") as reader:
+            while True:
+                lines = list(islice(reader, chunk_size))
+                if not lines:
+                    break
+                lines.sort()
+                chunk_path = Path(tmp_dir) / f"chunk-{len(chunk_paths)}.nt"
+                chunk_path.write_text("".join(lines), encoding="utf-8")
+                chunk_paths.append(chunk_path)
+
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if not chunk_paths:
+            destination.write_text("", encoding="utf-8")
+            return
+
+        with contextlib.ExitStack() as stack:
+            iterators: List[Iterator[str]] = []
+            for chunk_path in chunk_paths:
+                handle = stack.enter_context(chunk_path.open("r", encoding="utf-8"))
+                iterators.append(iter(handle))
+            with destination.open("w", encoding="utf-8") as writer:
+                for line in heapq.merge(*iterators):
+                    writer.write(line)
+
+
+def _term_to_string(term, namespace_manager) -> str:
+    """Render an RDF term using the provided namespace manager.
+
+    Args:
+        term: RDF term such as a URIRef, BNode, or Literal.
+        namespace_manager: Namespace manager responsible for prefix resolution.
+
+    Returns:
+        Term rendered in N3 form, falling back to :func:`str` when unavailable.
+    """
+    formatter = getattr(term, "n3", None)
+    if callable(formatter):
+        return formatter(namespace_manager)
+    return str(term)
+
+
+def _canonicalize_turtle(graph) -> str:
+    """Return canonical Turtle output with sorted prefixes and triples.
+
+    The canonical form mirrors the ontology downloader specification by sorting
+    prefixes lexicographically and emitting triples ordered by subject,
+    predicate, and object so downstream hashing yields deterministic values.
+
+    Args:
+        graph: RDF graph containing triples to canonicalize.
+
+    Returns:
+        Canonical Turtle serialization as a string.
+    """
+
+    namespace_manager = getattr(graph, "namespace_manager", None)
+    if namespace_manager is None or not hasattr(namespace_manager, "namespaces"):
+        raise AttributeError("graph lacks namespace manager support")
+
+    try:
+        namespace_items = list(namespace_manager.namespaces())
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        raise AttributeError("unable to iterate namespaces") from exc
+
+    prefix_map: Dict[str, str] = {}
+    for prefix, namespace in namespace_items:
+        key = prefix or ""
+        prefix_map[key] = str(namespace)
+
+    try:
+        triples = list(graph)
+    except Exception as exc:  # pragma: no cover - stub graphs are not iterable
+        raise AttributeError("graph is not iterable") from exc
+
+    triple_lines = [
+        f"{_term_to_string(subject, namespace_manager)} {_term_to_string(predicate, namespace_manager)} {_term_to_string(obj, namespace_manager)} ."
+        for subject, predicate, obj in sorted(
+            ((s, p, o) for s, p, o in triples),
+            key=lambda item: (
+                _term_to_string(item[0], namespace_manager),
+                _term_to_string(item[1], namespace_manager),
+                _term_to_string(item[2], namespace_manager),
+            ),
+        )
+    ]
+
+    bnode_map: Dict[str, str] = {}
+    triple_lines = [_canonicalize_blank_nodes_line(line, bnode_map) for line in triple_lines]
+
+    prefix_lines = []
+    for key in sorted(prefix_map):
+        label = f"{key}:" if key else ":"
+        prefix_lines.append(f"@prefix {label} <{prefix_map[key]}> .")
+
+    lines: List[str] = []
+    lines.extend(prefix_lines)
+    if prefix_lines and triple_lines:
+        lines.append("")
+    lines.extend(triple_lines)
+    return "\n".join(lines) + ("\n" if lines else "")
+
+
+_BNODE_PATTERN = re.compile(r"_:[A-Za-z0-9]+")
+
+
+def _canonicalize_blank_nodes_line(line: str, mapping: Dict[str, str]) -> str:
+    """Replace blank node identifiers with deterministic sequential labels.
+
+    Args:
+        line: Serialized triple line containing blank node identifiers.
+        mapping: Mutable mapping preserving deterministic blank node assignments.
+
+    Returns:
+        Triple line with normalized blank node identifiers.
+    """
+
+    def _replace(match: re.Match[str]) -> str:
+        key = match.group(0)
+        mapped = mapping.get(key)
+        if mapped is None:
+            mapped = f"_:b{len(mapping)}"
+            mapping[key] = mapped
+        return mapped
+
+    return _BNODE_PATTERN.sub(_replace, line)
+
+
+def _sort_triple_file(source: Path, destination: Path) -> None:
+    """Sort serialized triple lines using platform sort when available.
+
+    Args:
+        source: Path to the unsorted triple file.
+        destination: Output path that receives sorted triples.
+    """
+
+    sort_binary = shutil.which("sort")
+    if sort_binary:
+        try:
+            with destination.open("w", encoding="utf-8", newline="\n") as handle:
+                subprocess.run(  # noqa: PLW1510 - intentional check handling
+                    [sort_binary, source.as_posix()],
+                    check=True,
+                    stdout=handle,
+                    text=True,
+                )
+            return
+        except (subprocess.SubprocessError, OSError):
+            # Fall back to pure Python sorting when the external command fails.
+            pass
+
+    _python_merge_sort(source, destination)
+
+
+def normalize_streaming(
+    source: Path,
+    output_path: Optional[Path] = None,
+    *,
+    graph=None,
+    chunk_bytes: int = 1 << 20,
+) -> str:
+    """Normalize ontologies using streaming canonical Turtle serialization.
+
+    The streaming path serializes triples to a temporary file, leverages the
+    platform ``sort`` command (when available) to order triples lexicographically,
+    and streams the canonical Turtle output while computing a SHA-256 digest.
+    When ``output_path`` is provided the canonical form is persisted without
+    retaining the entire content in memory.
+
+    Args:
+        source: Path to the ontology document providing triples.
+        output_path: Optional destination for the normalized Turtle document.
+        graph: Optional pre-loaded RDF graph re-used instead of reparsing.
+        chunk_bytes: Threshold controlling how frequently buffered bytes are flushed.
+
+    Returns:
+        SHA-256 hex digest of the canonical Turtle content.
+    """
+
+    graph_obj = graph if graph is not None else rdflib.Graph()
+    if graph is None:
+        graph_obj.parse(source.as_posix())
+
+    namespace_manager = getattr(graph_obj, "namespace_manager", None)
+    if namespace_manager is None or not hasattr(namespace_manager, "namespaces"):
+        raise AttributeError("graph lacks namespace manager support")
+
+    try:
+        namespace_items = list(namespace_manager.namespaces())
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        raise AttributeError("unable to iterate namespaces") from exc
+
+    prefix_map: Dict[str, str] = {}
+    for prefix, namespace in namespace_items:
+        key = prefix or ""
+        prefix_map[key] = str(namespace)
+
+    prefix_lines = []
+    for key in sorted(prefix_map):
+        label = f"{key}:" if key else ":"
+        prefix_lines.append(f"@prefix {label} <{prefix_map[key]}> .\n")
+
+    chunk_limit = max(1, int(chunk_bytes))
+    buffer = bytearray()
+    sha256 = hashlib.sha256()
+
+    def _flush(writer: Optional[BinaryIO]) -> None:
+        if not buffer:
+            return
+        sha256.update(buffer)
+        if writer is not None:
+            writer.write(buffer)
+        buffer.clear()
+
+    with tempfile.TemporaryDirectory(prefix="ontology-stream-") as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        unsorted_path = tmp_path / "triples.unsorted"
+        with unsorted_path.open("w", encoding="utf-8", newline="\n") as handle:
+            for subject, predicate, obj in graph_obj:
+                line = (
+                    f"{_term_to_string(subject, namespace_manager)} "
+                    f"{_term_to_string(predicate, namespace_manager)} "
+                    f"{_term_to_string(obj, namespace_manager)} ."
+                )
+                handle.write(line + "\n")
+
+        sorted_path = tmp_path / "triples.sorted"
+        _sort_triple_file(unsorted_path, sorted_path)
+
+        with contextlib.ExitStack() as stack:
+            writer: Optional[BinaryIO] = None
+            if output_path is not None:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                writer = stack.enter_context(output_path.open("wb"))
+
+            def _emit(text: str) -> None:
+                buffer.extend(text.encode("utf-8"))
+                if len(buffer) >= chunk_limit:
+                    _flush(writer)
+
+            wrote_any = False
+            for line in prefix_lines:
+                _emit(line)
+                wrote_any = True
+
+            bnode_map: Dict[str, str] = {}
+            blank_line_pending = bool(prefix_lines)
+
+            with sorted_path.open("r", encoding="utf-8") as reader:
+                for raw_line in reader:
+                    line = raw_line.rstrip("\n")
+                    if not line:
+                        continue
+                    if blank_line_pending:
+                        _emit("\n")
+                        blank_line_pending = False
+                    canonical_line = _canonicalize_blank_nodes_line(line, bnode_map) + "\n"
+                    _emit(canonical_line)
+                    wrote_any = True
+
+            if not wrote_any and writer is not None:
+                writer.truncate(0)
+                writer.flush()
+
+            _flush(writer)
+
+    return sha256.hexdigest()
+
+
+class ValidatorSubprocessError(RuntimeError):
+    """Raised when a validator subprocess exits unsuccessfully.
+
+    Attributes:
+        message: Human-readable description of the underlying subprocess failure.
+
+    Examples:
+        >>> raise ValidatorSubprocessError("rdflib validator crashed")
+        Traceback (most recent call last):
+        ...
+        ValidatorSubprocessError: rdflib validator crashed
+    """
+
+
+def _worker_pronto(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Execute Pronto validation logic and emit JSON-friendly results."""
+
+    file_path = Path(payload["file_path"])
+    ontology = pronto.Ontology(file_path.as_posix())
+    terms = len(list(ontology.terms()))
+    result: Dict[str, Any] = {"ok": True, "terms": terms}
+
+    normalized_path = payload.get("normalized_path")
+    if normalized_path:
+        destination = Path(normalized_path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        ontology.dump(destination.as_posix(), format="obojson")
+        result["normalized_written"] = True
+
+    return result
+
+
+def _worker_owlready2(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Execute Owlready2 validation logic and emit JSON-friendly results."""
+
+    file_path = Path(payload["file_path"])
+    ontology = owlready2.get_ontology(file_path.resolve().as_uri()).load()
+    entities = len(list(ontology.classes()))
+    return {"ok": True, "entities": entities}
+
+
+_WORKER_DISPATCH = {
+    "pronto": _worker_pronto,
+    "owlready2": _worker_owlready2,
+}
+
+
+def _run_validator_subprocess(
+    name: str, payload: Dict[str, object], *, timeout: int
+) -> Dict[str, object]:
+    """Execute a validator worker module within a subprocess.
+
+    The subprocess workflow enforces parser timeouts, returns JSON payloads,
+    and helps release memory held by heavy libraries such as Pronto and
+    Owlready2 after each validation completes.
+    """
+
+    command = [sys.executable, "-m", "DocsToKG.OntologyDownload.validation", "worker", name]
+    env = os.environ.copy()
+
+    try:
+        completed = subprocess.run(
+            command,
+            input=json.dumps(payload).encode("utf-8"),
+            capture_output=True,
+            timeout=timeout,
+            check=False,
+            env=env,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ValidationTimeout(f"{name} validator exceeded {timeout}s") from exc
+    except OSError as exc:
+        raise ValidatorSubprocessError(f"Failed to launch {name} validator: {exc}") from exc
+
+    if completed.returncode != 0:
+        stderr = completed.stderr.decode("utf-8", errors="ignore").strip()
+        message = stderr or (f"{name} validator subprocess failed with code {completed.returncode}")
+        raise ValidatorSubprocessError(message)
+
+    stdout = completed.stdout.decode("utf-8", errors="ignore").strip()
+    if not stdout:
+        return {}
+    try:
+        return json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise ValidatorSubprocessError(f"{name} validator returned invalid JSON output") from exc
+
+
+def _run_with_timeout(func, timeout_sec: int) -> None:
+    """Execute a callable and raise :class:`ValidationTimeout` on deadline expiry.
+
+    Args:
+        func: Callable invoked without arguments.
+        timeout_sec: Number of seconds allowed for execution.
+
+    Returns:
+        None
+
+    Raises:
+        ValidationTimeout: When the callable exceeds the allotted runtime.
+    """
+    if platform.system() in ("Linux", "Darwin"):
+        import signal
+
+        class _Alarm(Exception):
+            """Sentinel exception raised when the alarm signal fires.
+
+            Args:
+                message: Optional description associated with the exception.
+
+            Attributes:
+                message: Optional description associated with the exception.
+
+            Examples:
+                >>> try:
+                ...     raise _Alarm()
+                ... except _Alarm:
+                ...     pass
+            """
+
+        def _handler(signum, frame):  # pragma: no cover - platform dependent
+            """Signal handler converting SIGALRM into :class:`ValidationTimeout`.
+
+            Args:
+                signum: Received signal number.
+                frame: Current stack frame (unused).
+            """
+            raise ValidationTimeout()  # pragma: no cover - bridges to outer scope
+
+        signal.signal(signal.SIGALRM, _handler)
+        signal.alarm(timeout_sec)
+        try:
+            func()
+        finally:
+            signal.alarm(0)
+    else:  # Windows
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(func)
+            try:
+                future.result(timeout=timeout_sec)
+            except FuturesTimeoutError as exc:  # pragma: no cover - platform specific
+                raise ValidationTimeout() from exc
+
+
+def _prepare_xbrl_package(
+    request: ValidationRequest, logger: logging.Logger
+) -> tuple[Path, List[str]]:
+    """Extract XBRL taxonomy ZIP archives for downstream validation.
+
+    Args:
+        request: Validation request describing the ontology package under test.
+        logger: Logger used to record extraction telemetry.
+
+    Returns:
+        Tuple containing the entrypoint path passed to Arelle and a list of artifacts.
+
+    Raises:
+        ValueError: If the archive is malformed or contains unsafe paths.
+    """
+    package_path = request.file_path
+    if package_path.suffix.lower() != ".zip":
+        return package_path, []
+    if not zipfile.is_zipfile(package_path):
+        raise ValueError("XBRL package is not a valid ZIP archive")
+
+    with zipfile.ZipFile(package_path) as archive:
+        for member in archive.infolist():
+            member_path = Path(member.filename)
+            if member_path.is_absolute() or ".." in member_path.parts:
+                raise ValueError(f"Unsafe path detected in archive: {member.filename}")
+            if member.compress_size == 0 and member.file_size > 0:
+                raise ValueError(f"Zip entry {member.filename} has invalid compression size")
+            ratio = member.file_size / max(member.compress_size, 1)
+            if ratio > 10:
+                raise ValueError(
+                    f"Zip entry {member.filename} exceeds compression ratio limit (ratio={ratio:.1f})"
+                )
+
+    temp_dir = Path(tempfile.mkdtemp(prefix="ontofetch-xbrl-"))
+    try:
+        with zipfile.ZipFile(package_path) as archive:
+            for member in archive.infolist():
+                member_path = Path(member.filename)
+                target_path = temp_dir / member_path
+                if member.is_dir():
+                    target_path.mkdir(parents=True, exist_ok=True)
+                    continue
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                with archive.open(member, "r") as source, target_path.open("wb") as destination:
+                    shutil.copyfileobj(source, destination)
+    except Exception:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        raise
+
+    final_dir = request.validation_dir / "arelle" / package_path.stem
+    if final_dir.exists():
+        shutil.rmtree(final_dir)
+    final_dir.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(temp_dir), final_dir)
+    logger.info(
+        "extracted xbrl package",
+        extra={"stage": "validate", "validator": "arelle", "destination": str(final_dir)},
+    )
+
+    entrypoint_candidates = sorted(final_dir.rglob("*.xsd")) or sorted(final_dir.rglob("*.xml"))
+    entrypoint = entrypoint_candidates[0] if entrypoint_candidates else package_path
+    artifacts = [str(path) for path in final_dir.rglob("*") if path.is_file()]
+    return entrypoint, artifacts
+
+
+def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> ValidationResult:
+    """Parse ontologies with rdflib, canonicalize Turtle output, and emit hashes.
+
+    Args:
+        request: Validation request describing the target ontology and output directories.
+        logger: Logger adapter used for structured validation events.
+
+    Returns:
+        ValidationResult capturing success state, metadata, canonical hash,
+        and generated files.
+
+    Raises:
+        ValidationTimeout: Propagated when parsing exceeds configured timeout.
+    """
+    graph = rdflib.Graph()
+    payload: Dict[str, object] = {"ok": False}
+    timeout = request.config.defaults.validation.parser_timeout_sec
+
+    def _parse() -> None:
+        """Parse the ontology with rdflib to populate the graph object."""
+        graph.parse(request.file_path.as_posix())
 
         if fsspec is None:  # pragma: no cover - exercised when dependency missing
             raise ConfigError(
