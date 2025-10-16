@@ -31,6 +31,7 @@ from types import SimpleNamespace
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
 from DocsToKG.ContentDownload.classifier import classify_payload
+from DocsToKG.ContentDownload.classifications import Classification
 from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 # --- Test Cases ---
 
@@ -47,7 +48,7 @@ def test_classify_payload_octet_stream_pdf_signature():
     payload = b"%PDF-1.5"
     assert (
         classify_payload(payload, "application/octet-stream", "https://example.org/file.pdf")
-        == "pdf"
+        is Classification.PDF
     )
 
 
@@ -94,7 +95,7 @@ def test_build_download_outcome_respects_head_flag(tmp_path):
         head_precheck_passed=True,
     )
 
-    assert outcome.classification == "pdf"
+    assert outcome.classification is Classification.PDF
     assert outcome.path == str(pdf_path)
 
     pdf_path.write_bytes(b"short")
@@ -115,4 +116,4 @@ def test_build_download_outcome_respects_head_flag(tmp_path):
         head_precheck_passed=False,
     )
 
-    assert outcome_small.classification == "pdf_corrupt"
+    assert outcome_small.classification is Classification.PDF_CORRUPT

@@ -288,16 +288,16 @@ def _build_download_outcome(
     min_pdf_bytes: int = 1024,
     tail_check_bytes: int = 2048,
 ) -> DownloadOutcome:
-    classification_text = str(classification) if classification else ""
-    normalized_text = classification_text or "empty"
-    normalized_code = Classification.from_wire(normalized_text)
-    if flagged_unknown and normalized_code is Classification.PDF:
-        normalized_code = Classification.PDF_UNKNOWN
-        normalized_text = normalized_code.value
+    if isinstance(classification, Classification):
+        classification_code = classification
+    else:
+        classification_code = Classification.from_wire(classification)
+    if flagged_unknown and classification_code is Classification.PDF:
+        classification_code = Classification.PDF_UNKNOWN
 
     path_str = str(dest_path) if dest_path else None
 
-    if normalized_code in PDF_LIKE and not dry_run and dest_path is not None:
+    if classification_code in PDF_LIKE and not dry_run and dest_path is not None:
         size_hint = content_length
         if size_hint is None:
             with contextlib.suppress(OSError):
@@ -359,7 +359,7 @@ def _build_download_outcome(
             )
 
     return DownloadOutcome(
-        classification=normalized_code or normalized_text,
+        classification=classification_code,
         path=path_str,
         http_status=response.status_code,
         content_type=response.headers.get("Content-Type"),
@@ -502,7 +502,8 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
             if not classification_text:
                 raise ValueError("Manifest entries must declare a classification.")
             classification_code = Classification.from_wire(classification_text)
-            if classification_code in PDF_LIKE or classification_code is Classification.CACHED:
+            data["classification"] = classification_code.value
+            if classification_code in PDF_LIKE:
                 completed.add(work_id)
 
     return per_work, completed
@@ -535,7 +536,7 @@ def build_manifest_entry(
         ManifestEntry populated with download metadata.
     """
     timestamp = _utc_timestamp()
-    classification = str(outcome.classification) if outcome else Classification.MISS.value
+    classification = outcome.classification.value if outcome else Classification.MISS.value
     return ManifestEntry(
         timestamp=timestamp,
         work_id=artifact.work_id,
@@ -984,7 +985,7 @@ def download_candidate(
 
                 if detected is None:
                     return DownloadOutcome(
-                        classification="empty",
+                        classification=Classification.MISS,
                         path=None,
                         http_status=response.status_code,
                         content_type=content_type,
@@ -1068,7 +1069,7 @@ def download_candidate(
     except requests.RequestException as exc:
         elapsed_ms = (time.monotonic() - start) * 1000.0
         return DownloadOutcome(
-            classification="request_error",
+            classification=Classification.REQUEST_ERROR,
             path=None,
             http_status=None,
             content_type=None,
@@ -1462,10 +1463,7 @@ def process_one_work(
         logger.log_manifest(entry)
         if pipeline_result.outcome.is_pdf:
             result["saved"] = True
-        elif (
-            Classification.from_wire(pipeline_result.outcome.classification)
-            is Classification.HTML
-        ):
+        elif pipeline_result.outcome.classification is Classification.HTML:
             result["html_only"] = True
         return result
 
@@ -1486,7 +1484,7 @@ def process_one_work(
             resolver_name="final",
             resolver_order=None,
             url=pipeline_result.url,
-            status=outcome.classification,
+            status=outcome.classification.value,
             http_status=outcome.http_status,
             content_type=outcome.content_type,
             elapsed_ms=outcome.elapsed_ms,

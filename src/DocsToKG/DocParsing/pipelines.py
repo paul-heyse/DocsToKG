@@ -100,10 +100,14 @@ from DocsToKG.DocParsing._common import (
     get_logger,
     load_manifest_index,
     manifest_append,
+    manifest_log_failure,
+    manifest_log_skip,
+    manifest_log_success,
     resolve_hash_algorithm,
     resolve_hf_home,
     resolve_model_root,
     set_spawn_or_warn,
+    should_skip_output,
 )
 
 try:  # pragma: no cover - optional dependency
@@ -1313,13 +1317,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
             out_path = (output_dir / rel_path).with_suffix(".doctags")
             input_hash = compute_content_hash(pdf_path)
             manifest_entry = manifest_index.get(doc_id)
-            if (
-                args.resume
-                and not args.force
-                and out_path.exists()
-                and manifest_entry
-                and manifest_entry.get("input_hash") == input_hash
-            ):
+            if should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force):
                 logger.info(
                     "Skipping document: output exists and input unchanged",
                     extra={
@@ -1329,16 +1327,13 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                         }
                     },
                 )
-                manifest_append(
+                manifest_log_skip(
                     stage=MANIFEST_STAGE,
                     doc_id=doc_id,
-                    status="skip",
-                    duration_s=0.0,
-                    schema_version="docparse/1.1.0",
-                    input_path=str(pdf_path),
+                    input_path=pdf_path,
                     input_hash=input_hash,
-                    hash_alg=resolve_hash_algorithm(),
-                    output_path=str(out_path),
+                    output_path=out_path,
+                    schema_version="docparse/1.1.0",
                     parse_engine="docling-vlm",
                     model_name=inference_model,
                     served_models=list(served_model_names),
@@ -1398,22 +1393,47 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                             },
                         )
 
-                    manifest_append(
-                        stage=MANIFEST_STAGE,
-                        doc_id=result.doc_id,
-                        status=result.status,
-                        duration_s=round(result.duration_s, 3),
-                        schema_version="docparse/1.1.0",
-                        input_path=result.input_path,
-                        input_hash=result.input_hash,
-                        hash_alg=resolve_hash_algorithm(),
-                        output_path=result.output_path,
-                        error=result.error,
-                        parse_engine="docling-vlm",
-                        model_name=task.inference_model,
-                        served_models=list(task.served_model_names),
-                        vllm_version=vllm_version,
-                    )
+                    duration = round(result.duration_s, 3)
+                    common_extra = {
+                        "parse_engine": "docling-vlm",
+                        "model_name": task.inference_model,
+                        "served_models": list(task.served_model_names),
+                        "vllm_version": vllm_version,
+                    }
+                    if result.status == "success":
+                        manifest_log_success(
+                            stage=MANIFEST_STAGE,
+                            doc_id=result.doc_id,
+                            duration_s=duration,
+                            schema_version="docparse/1.1.0",
+                            input_path=result.input_path,
+                            input_hash=result.input_hash,
+                            output_path=result.output_path,
+                            **common_extra,
+                        )
+                    elif result.status == "skip":
+                        manifest_log_skip(
+                            stage=MANIFEST_STAGE,
+                            doc_id=result.doc_id,
+                            input_path=result.input_path,
+                            input_hash=result.input_hash,
+                            output_path=result.output_path,
+                            schema_version="docparse/1.1.0",
+                            duration_s=duration,
+                            **common_extra,
+                        )
+                    else:
+                        manifest_log_failure(
+                            stage=MANIFEST_STAGE,
+                            doc_id=result.doc_id,
+                            duration_s=duration,
+                            schema_version="docparse/1.1.0",
+                            input_path=result.input_path,
+                            input_hash=result.input_hash,
+                            output_path=result.output_path,
+                            error=result.error or "unknown",
+                            **common_extra,
+                        )
 
                     pbar.update(1)
 
@@ -1802,14 +1822,7 @@ def html_main(args: argparse.Namespace | None = None) -> int:
         out_path = (output_dir / rel_path).with_suffix(".doctags")
         input_hash = compute_content_hash(path)
         manifest_entry = manifest_index.get(doc_id)
-        if (
-            args.resume
-            and not args.force
-            and not args.overwrite
-            and out_path.exists()
-            and manifest_entry
-            and manifest_entry.get("input_hash") == input_hash
-        ):
+        if should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force) and not args.overwrite:
             _LOGGER.info(
                 "Skipping HTML document",
                 extra={
@@ -1819,16 +1832,13 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                     }
                 },
             )
-            manifest_append(
+            manifest_log_skip(
                 stage=HTML_MANIFEST_STAGE,
                 doc_id=doc_id,
-                status="skip",
-                duration_s=0.0,
-                schema_version="docparse/1.1.0",
-                input_path=str(path),
+                input_path=path,
                 input_hash=input_hash,
-                hash_alg=resolve_hash_algorithm(),
-                output_path=str(out_path),
+                output_path=out_path,
+                schema_version="docparse/1.1.0",
                 parse_engine="docling-html",
             )
             skip += 1
@@ -1862,10 +1872,31 @@ def html_main(args: argparse.Namespace | None = None) -> int:
             as_completed(futures), total=len(futures), unit="file", desc="HTML → DocTags"
         ):
             result = fut.result()
+            duration = round(result.duration_s, 3)
             if result.status == "success":
                 ok += 1
+                manifest_log_success(
+                    stage=HTML_MANIFEST_STAGE,
+                    doc_id=result.doc_id,
+                    duration_s=duration,
+                    schema_version="docparse/1.1.0",
+                    input_path=result.input_path,
+                    input_hash=result.input_hash,
+                    output_path=result.output_path,
+                    parse_engine="docling-html",
+                )
             elif result.status == "skip":
                 skip += 1
+                manifest_log_skip(
+                    stage=HTML_MANIFEST_STAGE,
+                    doc_id=result.doc_id,
+                    input_path=result.input_path,
+                    input_hash=result.input_hash,
+                    output_path=result.output_path,
+                    schema_version="docparse/1.1.0",
+                    duration_s=duration,
+                    parse_engine="docling-html",
+                )
             else:
                 fail += 1
                 _LOGGER.error(
@@ -1877,20 +1908,17 @@ def html_main(args: argparse.Namespace | None = None) -> int:
                         }
                     },
                 )
-
-            manifest_append(
-                stage=HTML_MANIFEST_STAGE,
-                doc_id=result.doc_id,
-                status=result.status,
-                duration_s=round(result.duration_s, 3),
-                schema_version="docparse/1.1.0",
-                input_path=result.input_path,
-                input_hash=result.input_hash,
-                hash_alg=resolve_hash_algorithm(),
-                output_path=result.output_path,
-                error=result.error,
-                parse_engine="docling-html",
-            )
+                manifest_log_failure(
+                    stage=HTML_MANIFEST_STAGE,
+                    doc_id=result.doc_id,
+                    duration_s=duration,
+                    schema_version="docparse/1.1.0",
+                    input_path=result.input_path,
+                    input_hash=result.input_hash,
+                    output_path=result.output_path,
+                    error=result.error or "conversion failed",
+                    parse_engine="docling-html",
+                )
 
     _LOGGER.info(
         "HTML conversion summary",

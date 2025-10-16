@@ -596,6 +596,7 @@ import requests
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
 from DocsToKG.ContentDownload.classifier import classify_payload
+from DocsToKG.ContentDownload.classifications import Classification
 from DocsToKG.ContentDownload.download_pyalex_pdfs import (
     WorkArtifact,
     _build_download_outcome,
@@ -621,6 +622,7 @@ from DocsToKG.ContentDownload.resolvers import (
     WaybackResolver,
 )
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
+from DocsToKG.ContentDownload.telemetry import JsonlSink
 
 # --- test_conditional_requests.py ---
 
@@ -731,7 +733,7 @@ if HAS_REQUESTS and HAS_PYALEX:
             context={"previous": {"https://example.org/test.pdf": previous}},
         )
 
-        assert outcome.classification == "cached"
+        assert outcome.classification is Classification.CACHED
         assert outcome.path == previous_path
         assert outcome.sha256 == "abc"
         assert outcome.last_modified == previous["last_modified"]
@@ -785,7 +787,7 @@ if HAS_REQUESTS and HAS_PYALEX:
                 context=context,
             )
 
-        assert outcome.classification == "pdf"
+        assert outcome.classification is Classification.PDF
         assert "resume-metadata-incomplete" in caplog.text
 
     def test_download_candidate_respects_max_bytes_header(tmp_path: Path) -> None:
@@ -826,7 +828,7 @@ if HAS_REQUESTS and HAS_PYALEX:
             context={"max_bytes": 10_000, "previous": {}},
         )
 
-        assert outcome.classification == "html_too_large"
+        assert outcome.classification is Classification.HTML_TOO_LARGE
         assert outcome.path is None
         assert outcome.error and "max_bytes" in outcome.error
 
@@ -868,7 +870,7 @@ if HAS_REQUESTS and HAS_PYALEX:
             context={"max_bytes": 100, "previous": {}},
         )
 
-        assert outcome.classification == "payload_too_large"
+        assert outcome.classification is Classification.PAYLOAD_TOO_LARGE
         assert outcome.path is None
         assert outcome.error and "max_bytes" in outcome.error
         assert not any(pdf_dir.glob("*.pdf"))
@@ -895,7 +897,7 @@ if HAS_REQUESTS and HAS_PYALEX:
             dry_run=False,
             head_precheck_passed=True,
         )
-        assert outcome.classification == "pdf"
+        assert outcome.classification is Classification.PDF
         assert outcome.path == str(pdf_path)
 
     def test_build_download_outcome_rejects_small_pdf_without_head(tmp_path: Path) -> None:
@@ -920,7 +922,7 @@ if HAS_REQUESTS and HAS_PYALEX:
             dry_run=False,
             head_precheck_passed=False,
         )
-        assert outcome.classification == "pdf_corrupt"
+        assert outcome.classification is Classification.PDF_CORRUPT
         assert outcome.path is None
 
     def test_manifest_entry_preserves_conditional_headers() -> None:
@@ -1296,7 +1298,7 @@ def test_download_candidate_retries_on_transient_errors(http_server, tmp_path, s
 
     artifact, session, context, outcome = _download(url, tmp_path)
     try:
-        assert outcome.classification == "pdf"
+        assert outcome.classification is Classification.PDF
         assert outcome.path is not None
         assert handler.calls == [503, 503, 200]
         assert Path(outcome.path).exists()
@@ -1321,7 +1323,7 @@ def test_retry_after_header_respected(monkeypatch, http_server, tmp_path):
 
     artifact, session, context, outcome = _download(url, tmp_path)
     try:
-        assert outcome.classification == "pdf"
+        assert outcome.classification is Classification.PDF
         assert handler.calls == [429, 200]
         assert sleep_calls and sleep_calls[0] >= handler.retry_after
     finally:
@@ -1350,7 +1352,7 @@ def test_non_retryable_errors_do_not_retry(http_server, tmp_path):
         )
     finally:
         session.close()
-    assert outcome.classification == "http_error"
+    assert outcome.classification is Classification.HTTP_ERROR
     assert handler.calls == [404]
 
 
@@ -1366,7 +1368,7 @@ def test_download_candidate_avoids_per_request_head(http_server, tmp_path):
 
     _, session, _, outcome = _download(url, tmp_path)
     try:
-        assert outcome.classification == "pdf"
+        assert outcome.classification is Classification.PDF
         assert handler.head_calls == 0
         assert handler.calls == [200]
     finally:
@@ -1531,7 +1533,7 @@ def test_retry_determinism_matches_request_with_retries(monkeypatch, http_server
 
     _, session, _, outcome = _download(url, tmp_path)
     try:
-        assert outcome.classification == "pdf"
+        assert outcome.classification is Classification.PDF
         assert handler.calls == [429, 429, 200]
         assert handler.head_calls == 0
         # Ensure exactly max_retries + 1 attempts were issued (default helper budget)
@@ -2044,7 +2046,7 @@ def test_successful_pdf_download_populates_metadata(tmp_path, monkeypatch):
         context={"skip_head_precheck": True},
     )
 
-    assert outcome.classification == "pdf"
+    assert outcome.classification is Classification.PDF
     assert outcome.path is not None
     stored = Path(outcome.path)
     assert stored.exists()
@@ -2089,7 +2091,7 @@ def test_cached_response_preserves_prior_metadata(tmp_path, monkeypatch):
         session, artifact, url, None, timeout=10.0, context=context
     )
 
-    assert outcome.classification == "cached"
+    assert outcome.classification is Classification.CACHED
     assert outcome.path == cached_path
     assert outcome.sha256 == "cached-sha"
     assert outcome.content_length == 1024
@@ -2112,7 +2114,7 @@ def test_http_error_sets_metadata_to_none(tmp_path, monkeypatch):
     session = requests.Session()
     outcome = downloader.download_candidate(session, artifact, url, None, timeout=10.0)
 
-    assert outcome.classification == "http_error"
+    assert outcome.classification is Classification.HTTP_ERROR
     assert outcome.path is None
     assert outcome.sha256 is None
     assert outcome.content_length is None
@@ -2154,7 +2156,7 @@ def test_html_download_with_text_extraction(tmp_path, monkeypatch):
         context={"extract_html_text": True},
     )
 
-    assert outcome.classification == "html"
+    assert outcome.classification is Classification.HTML
     assert outcome.path is not None and outcome.path.endswith(".html")
     assert outcome.extracted_text_path is not None
     extracted = Path(outcome.extracted_text_path)
@@ -2195,7 +2197,7 @@ def test_dry_run_preserves_metadata_without_files(tmp_path, monkeypatch):
         context={"dry_run": True},
     )
 
-    assert outcome.classification == "pdf"
+    assert outcome.classification is Classification.PDF
     assert outcome.path is None
     assert outcome.sha256 is None
     assert outcome.content_length is None
@@ -2230,7 +2232,7 @@ def test_small_pdf_detected_as_corrupt(tmp_path, monkeypatch):
         context={"skip_head_precheck": True},
     )
 
-    assert outcome.classification == "pdf_corrupt"
+    assert outcome.classification is Classification.PDF_CORRUPT
     assert outcome.path is None
     assert not any(artifact.pdf_dir.glob("*.pdf"))
 
@@ -2254,7 +2256,7 @@ def test_html_tail_in_pdf_marks_corruption(tmp_path, monkeypatch):
     session = requests.Session()
     outcome = downloader.download_candidate(session, artifact, url, None, timeout=10.0)
 
-    assert outcome.classification == "pdf_corrupt"
+    assert outcome.classification is Classification.PDF_CORRUPT
     assert outcome.path is None
     assert not any(artifact.pdf_dir.glob("*.pdf"))
 
@@ -2316,7 +2318,7 @@ def test_rfc5987_filename_suffix(tmp_path, monkeypatch):
     session = requests.Session()
     outcome = downloader.download_candidate(session, artifact, url, None, timeout=10.0)
 
-    assert outcome.classification == "pdf"
+    assert outcome.classification is Classification.PDF
     assert outcome.path is not None
     assert outcome.path.endswith(".pdf")
 
@@ -2343,7 +2345,7 @@ def test_html_filename_suffix_from_disposition(tmp_path, monkeypatch):
     session = requests.Session()
     outcome = downloader.download_candidate(session, artifact, url, None, timeout=10.0)
 
-    assert outcome.classification == "html"
+    assert outcome.classification is Classification.HTML
     assert outcome.path is not None
     assert outcome.path.endswith(".xhtml")
 
@@ -2374,7 +2376,8 @@ def test_slugify_truncates_and_normalises():
     ],
 )
 def test_classify_payload_variants(payload, ctype, url, expected):
-    assert classify_payload(payload, ctype, url) == expected
+    expected_cls = Classification.from_wire(expected)
+    assert classify_payload(payload, ctype, url) is expected_cls
 
 
 # --- test_download_utils.py ---
@@ -2629,7 +2632,7 @@ def test_html_classification_overrides_misleading_content_type(tmp_path: Path) -
         context={"dry_run": False, "extract_html_text": False, "previous": {}},
     )
 
-    assert outcome.classification == "html"
+    assert outcome.classification is Classification.HTML
     assert outcome.path and outcome.path.endswith(".html")
 
 

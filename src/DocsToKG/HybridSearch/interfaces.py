@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Callable, List, Mapping, Optional, Protocol, S
 
 import numpy as np
 
+from .config import DenseIndexConfig
 from .types import ChunkPayload
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -152,6 +153,10 @@ class DenseVectorStore(Protocol):
         """Return the CUDA device identifier used by the index."""
 
     @property
+    def config(self) -> DenseIndexConfig:
+        """Immutable configuration backing the dense store."""
+
+    @property
     def gpu_resources(self) -> object | None:
         """Return GPU resources when available, otherwise ``None``."""
 
@@ -190,6 +195,12 @@ class DenseVectorStore(Protocol):
 
     def rebuild_if_needed(self) -> bool:
         """Perform compaction when the store indicates a rebuild is required."""
+
+    def needs_training(self) -> bool:
+        """Return ``True`` when additional training is required."""
+
+    def train(self, vectors: Sequence[np.ndarray]) -> None:
+        """Train the index with representative vectors."""
 
     def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
         """Register a resolver translating FAISS integer IDs to external IDs."""

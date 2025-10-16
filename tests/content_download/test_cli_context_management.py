@@ -195,7 +195,7 @@ def test_main_with_csv_releases_attempt_files(monkeypatch, tmp_path):
                     resolver_name="stub",
                     resolver_order=1,
                     url="https://oa.example/context.pdf",
-                    status=outcome.classification,
+                    status=outcome.classification.value,
                     http_status=outcome.http_status,
                     content_type=outcome.content_type,
                     elapsed_ms=outcome.elapsed_ms,

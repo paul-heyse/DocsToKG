@@ -453,7 +453,7 @@ class DownloadOutcome:
         ...                 content_type="application/pdf", elapsed_ms=150.0)
     """
 
-    classification: Classification | str
+    classification: Classification
     path: Optional[str] = None
     http_status: Optional[int] = None
     content_type: Optional[str] = None
@@ -476,8 +476,11 @@ class DownloadOutcome:
             bool: ``True`` if the outcome corresponds to a PDF download.
         """
 
-        classification = Classification.from_wire(self.classification)
-        return classification in PDF_LIKE
+        return self.classification in PDF_LIKE
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.classification, Classification):
+            self.classification = Classification.from_wire(self.classification)
 
 
 @dataclass
@@ -592,24 +595,20 @@ class ResolverMetrics:
             None
         """
 
-        classification = Classification.from_wire(outcome.classification)
         with self._lock:
             self.attempts[resolver_name] += 1
-            if classification is Classification.HTML:
+            if outcome.classification is Classification.HTML:
                 self.html[resolver_name] += 1
             if outcome.is_pdf:
                 self.successes[resolver_name] += 1
-            classification_key = (
-                classification.value if isinstance(classification, Classification) else str(outcome.classification)
-            )
-            if classification_key:
-                self.status_counts[resolver_name][classification_key] += 1
+            classification_key = outcome.classification.value
+            self.status_counts[resolver_name][classification_key] += 1
             if outcome.elapsed_ms is not None:
                 self.latency_ms[resolver_name].append(float(outcome.elapsed_ms))
             reason = outcome.error
-            if not reason and classification_key and classification_key not in {
-                Classification.PDF.value,
-                Classification.PDF_UNKNOWN.value,
+            if not reason and outcome.classification not in {
+                Classification.PDF,
+                Classification.PDF_UNKNOWN,
             }:
                 reason = classification_key
             if reason:
@@ -3439,7 +3438,7 @@ class ResolverPipeline:
                 resolver_name=resolver_name,
                 resolver_order=order_index,
                 url=url,
-                status=outcome.classification,
+                status=outcome.classification.value,
                 http_status=outcome.http_status,
                 content_type=outcome.content_type,
                 elapsed_ms=outcome.elapsed_ms,
@@ -3453,7 +3452,7 @@ class ResolverPipeline:
         )
         self.metrics.record_attempt(resolver_name, outcome)
 
-        classification = Classification.from_wire(outcome.classification)
+        classification = outcome.classification
         if classification is Classification.HTML and outcome.path:
             state.html_paths.append(outcome.path)
 

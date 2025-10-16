@@ -149,6 +149,9 @@ from typing import Any, Dict, List
 import pytest
 from tools.manifest_to_csv import convert_manifest_to_csv
 from tools.manifest_to_index import convert_manifest_to_index
+from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
+from DocsToKG.ContentDownload import resolvers
+from DocsToKG.ContentDownload.classifications import Classification
 # --- Globals ---
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -167,9 +170,6 @@ def download_modules():
 
     pytest.importorskip("pyalex")
     requests = pytest.importorskip("requests")
-    from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-    from DocsToKG.ContentDownload import resolvers
-
     return SimpleNamespace(downloader=downloader, resolvers=resolvers, requests=requests)
 # --- Test Cases ---
 
@@ -272,7 +272,7 @@ def test_main_writes_manifest_and_sets_mailto(download_modules, monkeypatch, tmp
                     resolver_name="openalex",
                     resolver_order=1,
                     url="https://oa.example/direct.pdf",
-                    status=outcome.classification,
+                    status=outcome.classification.value,
                     http_status=outcome.http_status,
                     content_type=outcome.content_type,
                     elapsed_ms=outcome.elapsed_ms,
@@ -385,7 +385,7 @@ def test_main_with_csv_writes_last_attempt_csv(download_modules, monkeypatch, tm
                     resolver_name="openalex",
                     resolver_order=1,
                     url="https://oa.example/direct.pdf",
-                    status=outcome.classification,
+                    status=outcome.classification.value,
                     http_status=outcome.http_status,
                     content_type=outcome.content_type,
                     elapsed_ms=outcome.elapsed_ms,
@@ -506,7 +506,7 @@ def test_main_with_staging_creates_timestamped_directories(download_modules, mon
                     resolver_name="openalex",
                     resolver_order=1,
                     url="https://oa.example/staging.pdf",
-                    status=outcome.classification,
+                    status=outcome.classification.value,
                     http_status=outcome.http_status,
                     content_type=outcome.content_type,
                     elapsed_ms=outcome.elapsed_ms,
@@ -609,7 +609,7 @@ def test_main_dry_run_skips_writing_files(download_modules, monkeypatch, tmp_pat
                     resolver_name="stub",
                     resolver_order=1,
                     url=f"https://oa.example/{artifact.work_id}.pdf",
-                    status=outcome.classification,
+                    status=outcome.classification.value,
                     http_status=outcome.http_status,
                     content_type=outcome.content_type,
                     elapsed_ms=outcome.elapsed_ms,
@@ -774,7 +774,7 @@ def test_download_candidate_dry_run_does_not_create_files(download_modules, tmp_
         )
         call_methods = [call.request.method for call in mocked.calls]
 
-    assert outcome.classification == "pdf"
+    assert outcome.classification is Classification.PDF
     assert outcome.path is None
     assert list((artifact.pdf_dir).glob("*.pdf")) == []
     assert call_methods.count("GET") == 1
@@ -983,7 +983,7 @@ def test_cli_resume_from_partial_metadata(download_modules, monkeypatch, tmp_pat
                     resolver_name="stub",
                     resolver_order=1,
                     url=previous_entry["url"],
-                    status=outcome.classification,
+                    status=outcome.classification.value,
                     http_status=outcome.http_status,
                     content_type=outcome.content_type,
                     elapsed_ms=outcome.elapsed_ms,

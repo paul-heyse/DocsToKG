@@ -70,9 +70,10 @@ from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Sequence
 
 from .config import HybridSearchConfig, HybridSearchConfigManager
 from .features import FeatureGenerator
-from .interfaces import LexicalIndex
+from .interfaces import DenseVectorStore, LexicalIndex
 from .observability import Observability
 from .ranking import ReciprocalRankFusion, ResultShaper, apply_mmr_diversification
+from .router import FaissRouter
 from .storage import ChunkRegistry, matches_filters
 from .types import (
     ChunkFeatures,
@@ -82,7 +83,6 @@ from .types import (
     HybridSearchResponse,
     HybridSearchResult,
 )
-from .interfaces import DenseVectorStore
 from .vectorstore import FaissSearchResult
 
 # --- Globals ---
@@ -138,7 +138,8 @@ class HybridSearchService:
     Attributes:
         _config_manager: Source of runtime hybrid-search configuration.
         _feature_generator: Component producing BM25/SPLADE/dense features.
-        _faiss: GPU-backed FAISS index manager for dense retrieval.
+        _faiss: Default FAISS index used for namespaces routed to the shared store.
+        _faiss_router: Namespace-aware router managing FAISS stores.
         _opensearch: Lexical index used for BM25 and SPLADE lookups.
         _registry: Chunk registry providing metadata and FAISS id lookups.
         _observability: Telemetry facade for metrics and traces.
@@ -169,6 +170,7 @@ class HybridSearchService:
         opensearch: LexicalIndex,
         registry: ChunkRegistry,
         observability: Optional[Observability] = None,
+        faiss_router: Optional[FaissRouter] = None,
     ) -> None:
         """Initialise the hybrid search service.
 
@@ -185,11 +187,15 @@ class HybridSearchService:
         """
         self._config_manager = config_manager
         self._feature_generator = feature_generator
-        self._faiss = faiss_index
         self._opensearch = opensearch
         self._registry = registry
         self._observability = observability or Observability()
-        self._faiss.set_id_resolver(self._registry.resolve_faiss_id)
+        if faiss_router is not None:
+            self._faiss_router = faiss_router
+        else:
+            self._faiss_router = FaissRouter(per_namespace=False, default_store=faiss_index)
+        self._faiss = self._faiss_router.default_store
+        self._faiss_router.set_resolver(self._registry.resolve_faiss_id)
 
     def search(self, request: HybridSearchRequest) -> HybridSearchResponse:
         """Execute a hybrid retrieval round trip for ``request``.
@@ -218,6 +224,8 @@ class HybridSearchService:
             query_features = self._feature_generator.compute_features(request.query)
             timings["feature_ms"] = (time.perf_counter() - query_start) * 1000
 
+            dense_store = self._dense_store(request.namespace)
+
             with ThreadPoolExecutor(max_workers=3) as pool:
                 f_bm25 = pool.submit(
                     self._execute_bm25, request, filters, config, query_features, timings
@@ -226,7 +234,13 @@ class HybridSearchService:
                     self._execute_splade, request, filters, config, query_features, timings
                 )
                 f_dense = pool.submit(
-                    self._execute_dense, request, filters, config, query_features, timings
+                    self._execute_dense,
+                    request,
+                    filters,
+                    config,
+                    query_features,
+                    timings,
+                    dense_store,
                 )
                 bm25 = f_bm25.result()
                 splade = f_splade.result()
@@ -253,8 +267,8 @@ class HybridSearchService:
                     fused_scores,
                     config.fusion.mmr_lambda,
                     desired,
-                    device=self._faiss.device,
-                    resources=self._faiss.gpu_resources,
+                    device=dense_store.device,
+                    resources=dense_store.gpu_resources,
                 )
                 selected_ids = {candidate.chunk.vector_id for candidate in selected}
                 pool_remaining = [candidate for candidate in pool if candidate.chunk.vector_id not in selected_ids]
@@ -272,8 +286,8 @@ class HybridSearchService:
             shaper = ResultShaper(
                 self._opensearch,
                 config.fusion,
-                device=self._faiss.device,
-                resources=self._faiss.gpu_resources,
+                device=dense_store.device,
+                resources=dense_store.gpu_resources,
             )
             shaped = shaper.shape(
                 ordered_chunks,
@@ -316,6 +330,9 @@ class HybridSearchService:
             raise RequestValidationError("page_size must be positive")
         if request.page_size > 1000:
             raise RequestValidationError("page_size exceeds maximum")
+
+    def _dense_store(self, namespace: Optional[str]) -> DenseVectorStore:
+        return self._faiss_router.get(namespace)
 
     def _slice_from_cursor(
         self, results: Sequence[HybridSearchResult], cursor: Optional[str]
@@ -446,23 +463,28 @@ class HybridSearchService:
         config: HybridSearchConfig,
         query_features: ChunkFeatures,
         timings: Dict[str, float],
+        store: DenseVectorStore,
     ) -> ChannelResults:
         start = time.perf_counter()
         # Over-fetch relative to the page size (not dense_top_k) to leave headroom for filtering.
         page_size = max(1, request.page_size)
-        overfetch = max(1.0, float(getattr(config.retrieval, "dense_overfetch_factor", 1.5)))
-        target = math.ceil(page_size * overfetch)
-        q_oversample = float(
+        overfetch = float(getattr(config.retrieval, "dense_overfetch_factor", 1.5))
+        base = math.ceil(page_size * max(1.0, overfetch))
+        dense_oversample = float(
             getattr(
                 config.retrieval,
                 "dense_oversample",
                 getattr(config.dense, "oversample", 1.0),
             )
         )
-        if q_oversample > 1.0:
-            target = max(target, math.ceil(page_size * q_oversample))
-        k = max(int(config.retrieval.dense_top_k), target)
-        batch_hits = self._faiss.search_batch(np.asarray([query_features.embedding]), k)
+        if dense_oversample > 1.0:
+            base = max(base, math.ceil(page_size * dense_oversample))
+        k = max(int(config.retrieval.dense_top_k), base)
+        queries = np.asarray([query_features.embedding], dtype=np.float32)
+        batch_hits = store.search_batch(queries, k)
+        self._observability.metrics.observe(
+            "faiss_search_batch_size", float(len(batch_hits)), channel="dense"
+        )
         hits = batch_hits[0] if batch_hits else []
         timings["dense_ms"] = (time.perf_counter() - start) * 1000
         self._observability.metrics.observe(

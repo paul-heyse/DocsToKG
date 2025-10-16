@@ -190,23 +190,19 @@ def _build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPa
         default="auto",
         help="Select conversion backend; auto infers from input directory",
     )
+    pipeline_backend.add_data_root_option(parser)
     parser.add_argument(
-        "--data-root",
-        type=Path,
-        default=None,
-        help=(
-            "Override DocsToKG Data directory. Defaults to auto-detection or "
-            "$DOCSTOKG_DATA_ROOT."
-        ),
-    )
-    parser.add_argument(
+        "--in-dir",
         "--input",
+        dest="in_dir",
         type=Path,
         default=None,
         help="Directory containing HTML or PDF sources (defaults vary by mode)",
     )
     parser.add_argument(
+        "--out-dir",
         "--output",
+        dest="out_dir",
         type=Path,
         default=None,
         help="Destination for generated .doctags files (defaults vary by mode)",
@@ -237,15 +233,10 @@ def _build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPa
         default=None,
         help="Fraction of GPU memory allocated to the vLLM server",
     )
-    parser.add_argument(
-        "--resume",
-        action="store_true",
-        help="Skip documents whose outputs already exist with matching content hash",
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Force reprocessing even when resume criteria are satisfied",
+    pipeline_backend.add_resume_force_options(
+        parser,
+        resume_help="Skip documents whose outputs already exist with matching content hash",
+        force_help="Force reprocessing even when resume criteria are satisfied",
     )
     parser.add_argument(
         "--overwrite",
@@ -363,8 +354,8 @@ def _run_doctags(argv: Sequence[str]) -> int:
     doctags_default_out = data_doctags(resolved_root)
 
     mode = args.mode
-    if args.input is not None:
-        input_dir = args.input.resolve()
+    if args.in_dir is not None:
+        input_dir = args.in_dir.resolve()
         if mode == "auto":
             mode = _detect_mode(input_dir)
     else:
@@ -379,7 +370,10 @@ def _run_doctags(argv: Sequence[str]) -> int:
                 raise ValueError("Cannot auto-detect mode: specify --mode or --input explicitly")
         input_dir = html_default_in if mode == "html" else pdf_default_in
 
-    output_dir = args.output.resolve() if args.output is not None else doctags_default_out
+    output_dir = args.out_dir.resolve() if args.out_dir is not None else doctags_default_out
+
+    args.in_dir = input_dir
+    args.out_dir = output_dir
 
     logger.info(
         "Unified DocTags conversion",
@@ -400,26 +394,25 @@ def _run_doctags(argv: Sequence[str]) -> int:
         },
     )
 
-    if mode == "html":
-        overrides = {
-            "data_root": args.data_root,
-            "input": input_dir,
-            "output": output_dir,
-            "workers": args.workers,
-            "resume": args.resume,
-            "force": args.force,
-            "overwrite": args.overwrite,
-        }
-        html_args = _merge_args(pipeline_backend.html_build_parser(), overrides)
-        return pipeline_backend.html_main(html_args)
-
-    overrides = {
+    base_overrides = {
         "data_root": args.data_root,
         "input": input_dir,
         "output": output_dir,
         "workers": args.workers,
         "resume": args.resume,
         "force": args.force,
+    }
+
+    if mode == "html":
+        html_overrides = {
+            **base_overrides,
+            "overwrite": args.overwrite,
+        }
+        html_args = _merge_args(pipeline_backend.html_build_parser(), html_overrides)
+        return pipeline_backend.html_main(html_args)
+
+    overrides = {
+        **base_overrides,
         "model": args.model,
         "served_model_names": args.served_model_names,
         "gpu_memory_utilization": args.gpu_memory_utilization,

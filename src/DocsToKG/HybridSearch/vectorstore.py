@@ -75,6 +75,7 @@ from typing import TYPE_CHECKING, Callable, List, Optional, Sequence
 import numpy as np
 
 from .config import DenseIndexConfig
+from .observability import Observability
 from .interfaces import DenseVectorStore
 from .types import vector_uuid_to_faiss_int
 
@@ -88,6 +89,7 @@ logger = logging.getLogger(__name__)
 __all__ = (
     "FaissVectorStore",
     "FaissIndexManager",
+    "ManagedFaissAdapter",
     "FaissSearchResult",
     "cosine_against_corpus_gpu",
     "cosine_batch",
@@ -161,7 +163,25 @@ class FaissVectorStore(DenseVectorStore):
         ['chunk-1']
     """
 
-    def __init__(self, dim: int, config: DenseIndexConfig) -> None:
+    @classmethod
+    def create(
+        cls,
+        dim: int,
+        config: DenseIndexConfig,
+        *,
+        observability: Optional[Observability] = None,
+    ) -> "FaissVectorStore":
+        """Factory helper matching the managed FAISS interface contracts."""
+
+        return cls(dim=dim, config=config, observability=observability)
+
+    def __init__(
+        self,
+        dim: int,
+        config: DenseIndexConfig,
+        *,
+        observability: Optional[Observability] = None,
+    ) -> None:
         """Initialise the vector store and allocate GPU resources.
 
         Args:
@@ -207,6 +227,7 @@ class FaissVectorStore(DenseVectorStore):
         self._needs_rebuild = False
         self._supports_remove_ids: Optional[bool] = None
         self._set_nprobe()
+        self._observability = observability or Observability()
 
     @property
     def ntotal(self) -> int:
@@ -299,12 +320,14 @@ class FaissVectorStore(DenseVectorStore):
             return
         if not vectors:
             raise ValueError("Training vectors required for IVF indexes")
-        matrix = np.stack([self._ensure_dim(vec) for vec in vectors]).astype(np.float32)
-        faiss.normalize_L2(matrix)
-        nlist = int(getattr(self._config, "nlist", 1024))
-        factor = max(1, int(getattr(self._config, "ivf_train_factor", 8)))
-        ntrain = min(matrix.shape[0], nlist * factor)
-        self._index.train(matrix[:ntrain])
+        with self._observability.trace("faiss_train", samples=str(len(vectors))):
+            self._observability.metrics.increment("faiss_train_calls", amount=1.0)
+            matrix = np.stack([self._ensure_dim(vec) for vec in vectors]).astype(np.float32)
+            faiss.normalize_L2(matrix)
+            nlist = int(getattr(self._config, "nlist", 1024))
+            factor = max(1, int(getattr(self._config, "ivf_train_factor", 8)))
+            ntrain = min(matrix.shape[0], nlist * factor)
+            self._index.train(matrix[:ntrain])
 
     def needs_training(self) -> bool:
         """Return ``True`` when the current FAISS index still requires training.
@@ -331,42 +354,45 @@ class FaissVectorStore(DenseVectorStore):
         Returns:
             None
         """
-        with self._lock:
-            self._flush_pending_deletes(force=False)
-            if len(vectors) != len(vector_ids):
-                raise ValueError("vectors and vector_ids must align")
-            if not vectors:
-                return
-            faiss_ids = np.array(
-                [vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64
-            )
-            if self._supports_remove_ids is None:
-                self._supports_remove_ids = self._probe_remove_support()
-            if self._supports_remove_ids:
-                self.remove_ids(faiss_ids, force_flush=True)
-            else:
-                existing_ids = self._lookup_existing_ids(faiss_ids)
-                if existing_ids.size:
-                    self.remove_ids(existing_ids, force_flush=True)
-            matrix = np.ascontiguousarray(
-                np.stack([self._ensure_dim(vec) for vec in vectors]), dtype=np.float32
-            )
-            faiss.normalize_L2(matrix)
-            base = self._index.index if hasattr(self._index, "index") else self._index
-            train_target = base
-            if hasattr(faiss, "downcast_index"):
-                try:
-                    train_target = faiss.downcast_index(base)
-                except Exception:
-                    train_target = base
-        if hasattr(train_target, "is_trained") and not getattr(train_target, "is_trained"):
-            nlist = int(getattr(self._config, "nlist", 1024))
-            factor = max(1, int(getattr(self._config, "ivf_train_factor", 8)))
-            ntrain = min(matrix.shape[0], nlist * factor)
-            train_target.train(matrix[:ntrain])
-            self._index.add_with_ids(matrix, faiss_ids)
-            self._dirty_deletes = 0
-            self._needs_rebuild = False
+        count = len(vector_ids)
+        with self._observability.trace("faiss_add", count=str(count)):
+            self._observability.metrics.increment("faiss_add_vectors", amount=float(count))
+            with self._lock:
+                self._flush_pending_deletes(force=False)
+                if len(vectors) != len(vector_ids):
+                    raise ValueError("vectors and vector_ids must align")
+                if not vectors:
+                    return
+                faiss_ids = np.array(
+                    [vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64
+                )
+                if self._supports_remove_ids is None:
+                    self._supports_remove_ids = self._probe_remove_support()
+                if self._supports_remove_ids:
+                    self.remove_ids(faiss_ids, force_flush=True)
+                else:
+                    existing_ids = self._lookup_existing_ids(faiss_ids)
+                    if existing_ids.size:
+                        self.remove_ids(existing_ids, force_flush=True)
+                matrix = np.ascontiguousarray(
+                    np.stack([self._ensure_dim(vec) for vec in vectors]), dtype=np.float32
+                )
+                faiss.normalize_L2(matrix)
+                base = self._index.index if hasattr(self._index, "index") else self._index
+                train_target = base
+                if hasattr(faiss, "downcast_index"):
+                    try:
+                        train_target = faiss.downcast_index(base)
+                    except Exception:
+                        train_target = base
+                if hasattr(train_target, "is_trained") and not getattr(train_target, "is_trained"):
+                    nlist = int(getattr(self._config, "nlist", 1024))
+                    factor = max(1, int(getattr(self._config, "ivf_train_factor", 8)))
+                    ntrain = min(matrix.shape[0], nlist * factor)
+                    train_target.train(matrix[:ntrain])
+                self._index.add_with_ids(matrix, faiss_ids)
+                self._dirty_deletes = 0
+                self._needs_rebuild = False
 
     def remove(self, vector_ids: Sequence[str]) -> None:
         """Remove vectors from the index using application-level identifiers.
@@ -379,9 +405,12 @@ class FaissVectorStore(DenseVectorStore):
         """
         if not vector_ids:
             return
+        count = len(vector_ids)
         ids = np.array([vector_uuid_to_faiss_int(vid) for vid in vector_ids], dtype=np.int64)
-        with self._lock:
-            self.remove_ids(ids, force_flush=True)
+        with self._observability.trace("faiss_remove", count=str(count)):
+            self._observability.metrics.increment("faiss_remove_vectors", amount=float(count))
+            with self._lock:
+                self.remove_ids(ids, force_flush=True)
 
     def remove_ids(self, ids: np.ndarray, *, force_flush: bool = False) -> int:
         """Remove vectors using FAISS internal ids.
@@ -420,9 +449,15 @@ class FaissVectorStore(DenseVectorStore):
             raise ValueError("vectors and vector_ids must align")
         if not vector_list:
             return
-        for start in range(0, len(vector_list), max(1, int(batch_size))):
-            end = min(len(vector_list), start + int(batch_size))
-            self.add(vector_list[start:end], ids[start:end])
+        step = max(1, int(batch_size))
+        total = len(vector_list)
+        with self._observability.trace(
+            "faiss_add_batch", total=str(total), batch_size=str(step)
+        ):
+            self._observability.metrics.increment("faiss_add_batches", amount=1.0)
+            for start in range(0, total, step):
+                end = min(total, start + step)
+                self.add(vector_list[start:end], ids[start:end])
 
     def _current_index_ids(self) -> np.ndarray:
         # Robustly extract id_map across wrappers / GPU clones.
@@ -451,63 +486,63 @@ class FaissVectorStore(DenseVectorStore):
         return current_ids[mask]
 
     def search(self, query: np.ndarray, top_k: int) -> List[FaissSearchResult]:
-        """Search the index for the ``top_k`` nearest neighbours of ``query``.
+        """Search the index for the ``top_k`` nearest neighbours of ``query``."""
 
-        Args:
-            query: Dense query vector with dimensionality ``self._dim``.
-            top_k: Maximum number of nearest neighbours to return.
-
-        Returns:
-            Ranked list of :class:`FaissSearchResult` objects.
-        """
-        with self._lock:
-            self._flush_pending_deletes(force=False)
-            query_matrix = np.ascontiguousarray(
-                self._ensure_dim(query).reshape(1, -1), dtype=np.float32
-            )
-            faiss.normalize_L2(query_matrix)
-            self._set_nprobe()
-            scores, ids = self._index.search(query_matrix, top_k)
-            results: List[FaissSearchResult] = []
-            for score, internal_id in zip(scores[0], ids[0]):
-                if internal_id == -1:
-                    continue
-                vector_id = self._resolve_vector_id(int(internal_id))
-                if vector_id is None:
-                    continue
-                results.append(FaissSearchResult(vector_id=vector_id, score=float(score)))
-            return results
+        vector = self._ensure_dim(query)
+        matrix = np.ascontiguousarray(vector.reshape(1, -1), dtype=np.float32)
+        faiss.normalize_L2(matrix)
+        with self._observability.trace("faiss_search", top_k=str(top_k)):
+            self._observability.metrics.increment("faiss_search_queries", amount=1.0)
+            distances, indices = self._search_matrix(matrix, top_k)
+        results = self._resolve_search_results(distances, indices)
+        row = results[0] if results else []
+        self._observability.metrics.observe("faiss_search_results", float(len(row)))
+        return row
 
     def search_many(self, queries: np.ndarray, top_k: int) -> List[List[FaissSearchResult]]:
         """Search the index for multiple queries in a single FAISS call."""
 
-        if queries.ndim == 1:
-            queries = queries.reshape(1, -1)
+        return self.search_batch(queries, top_k)
+
+    def search_batch(self, queries: np.ndarray, top_k: int) -> List[List[FaissSearchResult]]:
+        """Alias for ``search_many`` to support explicit batch workloads."""
+
+        matrix = np.atleast_2d(np.ascontiguousarray(queries, dtype=np.float32))
+        if matrix.shape[1] != self._dim:
+            raise ValueError(f"Query dimensionality {matrix.shape[1]} != index dim {self._dim}")
+        faiss.normalize_L2(matrix)
+        batch = matrix.shape[0]
+        with self._observability.trace("faiss_search_batch", batch=str(batch), top_k=str(top_k)):
+            self._observability.metrics.increment("faiss_search_queries", amount=float(batch))
+            distances, indices = self._search_matrix(matrix, top_k)
+        results = self._resolve_search_results(distances, indices)
+        self._observability.metrics.observe(
+            "faiss_search_results",
+            float(sum(len(row) for row in results)),
+        )
+        return results
+
+    def _search_matrix(self, matrix: np.ndarray, top_k: int) -> tuple[np.ndarray, np.ndarray]:
         with self._lock:
             self._flush_pending_deletes(force=False)
-            matrix = np.ascontiguousarray(queries, dtype=np.float32)
-            if matrix.shape[1] != self._dim:
-                raise ValueError(f"Query dimensionality {matrix.shape[1]} != index dim {self._dim}")
-            faiss.normalize_L2(matrix)
             self._set_nprobe()
-            scores, ids = self._index.search(matrix, top_k)
-        batched: List[List[FaissSearchResult]] = []
-        for row_scores, row_ids in zip(scores, ids):
-            row_results: List[FaissSearchResult] = []
+            return self._index.search(matrix, int(top_k))
+
+    def _resolve_search_results(
+        self, distances: np.ndarray, indices: np.ndarray
+    ) -> List[List[FaissSearchResult]]:
+        results: List[List[FaissSearchResult]] = []
+        for row_scores, row_ids in zip(distances, indices):
+            row: List[FaissSearchResult] = []
             for score, internal_id in zip(row_scores, row_ids):
                 if internal_id == -1:
                     continue
                 vector_id = self._resolve_vector_id(int(internal_id))
                 if vector_id is None:
                     continue
-                row_results.append(FaissSearchResult(vector_id=vector_id, score=float(score)))
-            batched.append(row_results)
-        return batched
-
-    def search_batch(self, queries: np.ndarray, top_k: int) -> List[List[FaissSearchResult]]:
-        """Alias for ``search_many`` to support batch query workflows."""
-
-        return self.search_many(queries, top_k)
+                row.append(FaissSearchResult(vector_id=vector_id, score=float(score)))
+            results.append(row)
+        return results
 
     def serialize(self) -> bytes:
         """Return a CPU-serialised representation of the FAISS index.
@@ -521,12 +556,15 @@ class FaissVectorStore(DenseVectorStore):
         Raises:
             RuntimeError: If the index has not been initialised.
         """
-        with self._lock:
-            if self._index is None:
-                raise RuntimeError("index is empty")
-            cpu_index = self._to_cpu(self._index)
-            blob = faiss.serialize_index(cpu_index)
-            return bytes(blob)
+        with self._observability.trace("faiss_serialize"):
+            with self._lock:
+                if self._index is None:
+                    raise RuntimeError("index is empty")
+                cpu_index = self._to_cpu(self._index)
+                blob = faiss.serialize_index(cpu_index)
+                payload = bytes(blob)
+            self._observability.metrics.increment("faiss_serialize_calls", amount=1.0)
+            return payload
 
     def save(self, path: str) -> None:
         """Persist the FAISS index to ``path`` when persistence is enabled.
@@ -540,33 +578,34 @@ class FaissVectorStore(DenseVectorStore):
         Raises:
             RuntimeError: If the index has not been initialised.
         """
-        if self._index is None:
-            raise RuntimeError("index is empty")
-        if getattr(self._config, "persist_mode", "cpu_bytes") == "disabled":
-            logger.info("faiss-save-skip", extra={"event": {"reason": "persist_mode=disabled"}})
-            return
-        destination = Path(path)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(self.serialize())
+        with self._observability.trace("faiss_save", path=str(path)):
+            if self._index is None:
+                raise RuntimeError("index is empty")
+            if getattr(self._config, "persist_mode", "cpu_bytes") == "disabled":
+                logger.info("faiss-save-skip", extra={"event": {"reason": "persist_mode=disabled"}})
+                return
+            destination = Path(path)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(self.serialize())
+            self._observability.metrics.increment("faiss_save_calls", amount=1.0)
 
     @classmethod
-    def load(cls, path: str, config: DenseIndexConfig, dim: int) -> "FaissVectorStore":
-        """Restore a vector store from disk.
+    def load(
+        cls,
+        path: str,
+        config: DenseIndexConfig,
+        dim: int,
+        *,
+        observability: Optional[Observability] = None,
+    ) -> "FaissVectorStore":
+        """Restore a vector store from disk."""
 
-        Args:
-            path: Filesystem path containing a previously saved index payload.
-            config: Dense index configuration to apply to the reloaded store.
-            dim: Dimensionality of vectors stored in the index.
-
-        Returns:
-            Fresh :class:`FaissVectorStore` instance initialised from ``path``.
-
-        Raises:
-            OSError: If ``path`` cannot be read from disk.
-        """
-        blob = Path(path).read_bytes()
-        manager = cls(dim=dim, config=config)
-        manager.restore(blob)
+        obs = observability or Observability()
+        with obs.trace("faiss_load", path=str(path)):
+            blob = Path(path).read_bytes()
+            manager = cls(dim=dim, config=config, observability=obs)
+            manager.restore(blob)
+            manager._observability.metrics.increment("faiss_load_calls", amount=1.0)
         return manager
 
     def restore(self, payload: bytes) -> None:
@@ -581,15 +620,17 @@ class FaissVectorStore(DenseVectorStore):
         Returns:
             None
         """
-        if not payload:
-            raise ValueError("Empty FAISS payload")
-        with self._lock:
-            cpu_index = faiss.deserialize_index(np.frombuffer(payload, dtype=np.uint8))
-            self._index = self._maybe_to_gpu(cpu_index)
-            self._tombstones.clear()
-            self._dirty_deletes = 0
-            self._needs_rebuild = False
-            self._set_nprobe()
+        with self._observability.trace("faiss_restore"):
+            if not payload:
+                raise ValueError("Empty FAISS payload")
+            with self._lock:
+                cpu_index = faiss.deserialize_index(np.frombuffer(payload, dtype=np.uint8))
+                self._index = self._maybe_to_gpu(cpu_index)
+                self._tombstones.clear()
+                self._dirty_deletes = 0
+                self._needs_rebuild = False
+                self._set_nprobe()
+            self._observability.metrics.increment("faiss_restore_calls", amount=1.0)
 
     def stats(self) -> dict[str, float | str]:
         """Return diagnostic metrics describing the active FAISS index.
@@ -660,12 +701,14 @@ class FaissVectorStore(DenseVectorStore):
             bool: ``True`` if a rebuild was executed.
         """
 
-        with self._lock:
-            if not self.rebuild_needed():
-                return False
-            self._rebuild_index()
-            self._set_nprobe()
-            self._needs_rebuild = False
+        with self._observability.trace("faiss_rebuild_check"):
+            with self._lock:
+                if not self.rebuild_needed():
+                    return False
+                self._rebuild_index()
+                self._set_nprobe()
+                self._needs_rebuild = False
+            self._observability.metrics.increment("faiss_rebuilds", amount=1.0)
             return True
 
     def init_gpu(self) -> None:
@@ -1325,3 +1368,58 @@ def restore_state(faiss_index: FaissVectorStore, payload: dict[str, object]) -> 
 
 # Backwards compatibility alias for downstream imports.
 FaissIndexManager = FaissVectorStore
+
+
+class ManagedFaissAdapter(DenseVectorStore):
+    """Restrictive wrapper exposing only the managed DenseVectorStore surface."""
+
+    def __init__(self, inner: FaissVectorStore) -> None:
+        self._inner = inner
+
+    def search(self, query: np.ndarray, top_k: int) -> List[FaissSearchResult]:
+        return self._inner.search(query, top_k)
+
+    def search_many(self, queries: np.ndarray, top_k: int) -> List[List[FaissSearchResult]]:
+        return self._inner.search_many(queries, top_k)
+
+    def search_batch(self, queries: np.ndarray, top_k: int) -> List[List[FaissSearchResult]]:
+        return self._inner.search_batch(queries, top_k)
+
+    def add(self, vectors: Sequence[np.ndarray], vector_ids: Sequence[str]) -> None:
+        self._inner.add(vectors, vector_ids)
+
+    def add_batch(
+        self,
+        vectors: Sequence[np.ndarray] | np.ndarray,
+        vector_ids: Sequence[str],
+        *,
+        batch_size: int = 65_536,
+    ) -> None:
+        self._inner.add_batch(vectors, vector_ids, batch_size=batch_size)
+
+    def remove(self, vector_ids: Sequence[str]) -> None:
+        self._inner.remove(vector_ids)
+
+    def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
+        self._inner.set_id_resolver(resolver)
+
+    def needs_training(self) -> bool:
+        return self._inner.needs_training()
+
+    def train(self, vectors: Sequence[np.ndarray]) -> None:
+        self._inner.train(vectors)
+
+    @property
+    def device(self) -> int:
+        return self._inner.device
+
+    @property
+    def gpu_resources(self):
+        return self._inner.gpu_resources
+
+    @property
+    def ntotal(self) -> int:
+        return self._inner.ntotal
+
+    def rebuild_if_needed(self) -> bool:
+        return self._inner.rebuild_if_needed()
