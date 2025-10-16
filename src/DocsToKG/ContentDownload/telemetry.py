@@ -18,6 +18,7 @@ Raises:
 from __future__ import annotations
 
 import csv
+import io
 import json
 import sqlite3
 import threading
@@ -31,10 +32,16 @@ if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.core import WorkArtifact
     from DocsToKG.ContentDownload.pipeline import AttemptRecord, DownloadOutcome
 
-from DocsToKG.ContentDownload.core import PDF_LIKE, Classification, ReasonCode
+from DocsToKG.ContentDownload.core import (
+    PDF_LIKE,
+    Classification,
+    ReasonCode,
+    atomic_write_text,
+)
 from DocsToKG.ContentDownload.core import normalize_url
 
 MANIFEST_SCHEMA_VERSION = 2
+SQLITE_SCHEMA_VERSION = 2
 
 
 @dataclass
@@ -61,6 +68,7 @@ class ManifestEntry:
         last_modified: HTTP ``Last-Modified`` header value if supplied.
         extracted_text_path: Path to extracted text artefacts when produced.
         dry_run: Flag indicating whether the artifact was processed in dry-run mode.
+        run_id: Unique identifier for the downloader run that produced the entry.
 
     Examples:
         >>> entry = ManifestEntry(
@@ -99,6 +107,7 @@ class ManifestEntry:
     last_modified: Optional[str] = None
     extracted_text_path: Optional[str] = None
     dry_run: bool = False
+    run_id: Optional[str] = None
 
 
 class AttemptSink(Protocol):
@@ -223,6 +232,7 @@ class JsonlSink:
             {
                 "record_type": "attempt",
                 "timestamp": ts,
+                "run_id": record.run_id,
                 "work_id": record.work_id,
                 "resolver_name": record.resolver_name,
                 "resolver_order": record.resolver_order,
@@ -257,6 +267,7 @@ class JsonlSink:
         self._write(
             {
                 "record_type": "manifest",
+                "run_id": entry.run_id,
                 "schema_version": entry.schema_version,
                 "timestamp": entry.timestamp,
                 "work_id": entry.work_id,
@@ -366,6 +377,7 @@ class CsvSink:
 
     HEADER = [
         "timestamp",
+        "run_id",
         "work_id",
         "resolver_name",
         "resolver_order",
@@ -403,6 +415,7 @@ class CsvSink:
         ts = timestamp or _utc_timestamp()
         row = {
             "timestamp": ts,
+            "run_id": record.run_id,
             "work_id": record.work_id,
             "resolver_name": record.resolver_name,
             "resolver_order": record.resolver_order,
@@ -553,8 +566,7 @@ class ManifestIndexSink:
                 return
             ordered = dict(sorted(self._index.items(), key=lambda item: item[0]))
             self._closed = True
-        _ensure_parent_exists(self._path)
-        self._path.write_text(json.dumps(ordered, indent=2), encoding="utf-8")
+        atomic_write_text(self._path, json.dumps(ordered, indent=2))
 
     def __enter__(self) -> "ManifestIndexSink":
         return self
@@ -568,6 +580,7 @@ class LastAttemptCsvSink:
 
     HEADER = [
         "work_id",
+        "run_id",
         "title",
         "publication_year",
         "resolver",
@@ -611,6 +624,7 @@ class LastAttemptCsvSink:
         classification = Classification.from_wire(entry.classification)
         data = {
             "work_id": entry.work_id,
+            "run_id": self._normalise(entry.run_id),
             "title": self._normalise(entry.title),
             "publication_year": self._normalise(entry.publication_year),
             "resolver": self._normalise(entry.resolver),
@@ -634,12 +648,12 @@ class LastAttemptCsvSink:
                 return
             rows = list(self._records.values())
             self._closed = True
-        _ensure_parent_exists(self._path)
-        with self._path.open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=self.HEADER)
-            writer.writeheader()
-            for row in rows:
-                writer.writerow(row)
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, fieldnames=self.HEADER)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+        atomic_write_text(self._path, buffer.getvalue())
 
     def __enter__(self) -> "LastAttemptCsvSink":
         return self
@@ -696,8 +710,7 @@ class SummarySink:
                 return
             payload = dict(self._summary or {})
             self._closed = True
-        _ensure_parent_exists(self._path)
-        self._path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        atomic_write_text(self._path, json.dumps(payload, indent=2, sort_keys=True))
 
     def __enter__(self) -> "SummarySink":
         return self
@@ -714,73 +727,11 @@ class SqliteSink:
         self._conn = sqlite3.connect(path, check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL;")
         self._conn.execute("PRAGMA synchronous=NORMAL;")
-        self._conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS attempts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT,
-                work_id TEXT,
-                resolver_name TEXT,
-                resolver_order INTEGER,
-                url TEXT,
-                status TEXT,
-                http_status INTEGER,
-                content_type TEXT,
-                elapsed_ms REAL,
-                resolver_wall_time_ms REAL,
-                reason TEXT,
-                reason_detail TEXT,
-                metadata TEXT,
-                sha256 TEXT,
-                content_length INTEGER,
-                dry_run INTEGER,
-                retry_after REAL
-            )
-            """
-        )
-        self._conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS manifests (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT,
-                schema_version INTEGER,
-                work_id TEXT,
-                title TEXT,
-                publication_year INTEGER,
-                resolver TEXT,
-                url TEXT,
-                path TEXT,
-                classification TEXT,
-                content_type TEXT,
-                reason TEXT,
-                reason_detail TEXT,
-                html_paths TEXT,
-                sha256 TEXT,
-                content_length INTEGER,
-                etag TEXT,
-                last_modified TEXT,
-                extracted_text_path TEXT,
-                dry_run INTEGER
-            )
-            """
-        )
-        attempt_columns = {row[1] for row in self._conn.execute("PRAGMA table_info(attempts)")}
-        if "reason_detail" not in attempt_columns:
-            self._conn.execute("ALTER TABLE attempts ADD COLUMN reason_detail TEXT")
-        if "retry_after" not in attempt_columns:
-            self._conn.execute("ALTER TABLE attempts ADD COLUMN retry_after REAL")
-        manifest_columns = {row[1] for row in self._conn.execute("PRAGMA table_info(manifests)")}
-        if "reason_detail" not in manifest_columns:
-            self._conn.execute("ALTER TABLE manifests ADD COLUMN reason_detail TEXT")
-        self._conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS summaries (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                timestamp TEXT,
-                payload TEXT
-            )
-            """
-        )
+        try:
+            current_version = int(self._conn.execute("PRAGMA user_version").fetchone()[0])
+        except Exception:
+            current_version = 0
+        self._initialise_schema(current_version)
         self._lock = threading.Lock()
         self._closed = False
 
@@ -801,6 +752,7 @@ class SqliteSink:
                 """
                 INSERT INTO attempts (
                     timestamp,
+                    run_id,
                     work_id,
                     resolver_name,
                     resolver_order,
@@ -817,10 +769,11 @@ class SqliteSink:
                     content_length,
                     dry_run,
                     retry_after
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     ts,
+                    record.run_id,
                     record.work_id,
                     record.resolver_name,
                     record.resolver_order,
@@ -866,6 +819,7 @@ class SqliteSink:
                 """
                 INSERT INTO manifests (
                     timestamp,
+                    run_id,
                     schema_version,
                     work_id,
                     title,
@@ -884,10 +838,11 @@ class SqliteSink:
                     last_modified,
                     extracted_text_path,
                     dry_run
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     entry.timestamp,
+                    entry.run_id,
                     entry.schema_version,
                     entry.work_id,
                     entry.title,
@@ -919,15 +874,18 @@ class SqliteSink:
         Returns:
             None
         """
+        run_id = summary.get("run_id")
+        if not run_id:
+            raise ValueError("summary payload must include run_id")
         payload = json.dumps(summary, indent=2, sort_keys=True)
         with self._lock:
             self._conn.execute(
                 """
-                INSERT INTO summaries (id, timestamp, payload)
-                VALUES (1, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET timestamp=excluded.timestamp, payload=excluded.payload
+                INSERT INTO summaries (run_id, timestamp, payload)
+                VALUES (?, ?, ?)
+                ON CONFLICT(run_id) DO UPDATE SET timestamp=excluded.timestamp, payload=excluded.payload
                 """,
-                (_utc_timestamp(), payload),
+                (run_id, _utc_timestamp(), payload),
             )
             self._conn.commit()
 
@@ -945,6 +903,113 @@ class SqliteSink:
 
     def __exit__(self, exc_type, exc, tb) -> None:
         self.close()
+
+    def _initialise_schema(self, current_version: int) -> None:
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                run_id TEXT,
+                work_id TEXT,
+                resolver_name TEXT,
+                resolver_order INTEGER,
+                url TEXT,
+                status TEXT,
+                http_status INTEGER,
+                content_type TEXT,
+                elapsed_ms REAL,
+                resolver_wall_time_ms REAL,
+                reason TEXT,
+                reason_detail TEXT,
+                metadata TEXT,
+                sha256 TEXT,
+                content_length INTEGER,
+                dry_run INTEGER,
+                retry_after REAL
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS manifests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                run_id TEXT,
+                schema_version INTEGER,
+                work_id TEXT,
+                title TEXT,
+                publication_year INTEGER,
+                resolver TEXT,
+                url TEXT,
+                path TEXT,
+                classification TEXT,
+                content_type TEXT,
+                reason TEXT,
+                reason_detail TEXT,
+                html_paths TEXT,
+                sha256 TEXT,
+                content_length INTEGER,
+                etag TEXT,
+                last_modified TEXT,
+                extracted_text_path TEXT,
+                dry_run INTEGER
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS summaries (
+                run_id TEXT PRIMARY KEY,
+                timestamp TEXT,
+                payload TEXT
+            )
+            """
+        )
+        if current_version < SQLITE_SCHEMA_VERSION:
+            self._run_migrations(current_version)
+        self._conn.execute(f"PRAGMA user_version={SQLITE_SCHEMA_VERSION}")
+        self._conn.commit()
+
+    def _run_migrations(self, current_version: int) -> None:
+        if current_version < 1:
+            current_version = 1
+        if current_version < 2:
+            self._safe_add_column("attempts", "run_id", "TEXT")
+            self._safe_add_column("manifests", "run_id", "TEXT")
+            self._safe_add_column("attempts", "retry_after", "REAL")
+            self._safe_add_column("attempts", "reason_detail", "TEXT")
+            self._safe_add_column("manifests", "reason_detail", "TEXT")
+            self._migrate_summary_table()
+
+    def _safe_add_column(self, table: str, column: str, declaration: str) -> None:
+        try:
+            self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
+        except sqlite3.OperationalError:
+            pass
+
+    def _migrate_summary_table(self) -> None:
+        try:
+            rows = list(self._conn.execute("SELECT timestamp, payload FROM summaries"))
+        except sqlite3.OperationalError:
+            rows = []
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS summaries_new (
+                run_id TEXT PRIMARY KEY,
+                timestamp TEXT,
+                payload TEXT
+            )
+            """
+        )
+        if rows:
+            timestamp, payload = rows[-1]
+            self._conn.execute(
+                "INSERT OR REPLACE INTO summaries_new (run_id, timestamp, payload) VALUES (?, ?, ?)",
+                ("legacy", timestamp, payload),
+            )
+        self._conn.execute("DROP TABLE IF EXISTS summaries")
+        self._conn.execute("ALTER TABLE summaries_new RENAME TO summaries")
 
 
 def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
@@ -1088,6 +1153,7 @@ def build_manifest_entry(
     html_paths: List[str],
     *,
     dry_run: bool,
+    run_id: Optional[str] = None,
     reason: Optional[ReasonCode | str] = None,
     reason_detail: Optional[str] = None,
 ) -> ManifestEntry:
@@ -1138,6 +1204,7 @@ def build_manifest_entry(
     return ManifestEntry(
         schema_version=MANIFEST_SCHEMA_VERSION,
         timestamp=timestamp,
+        run_id=run_id,
         work_id=getattr(artifact, "work_id"),
         title=getattr(artifact, "title"),
         publication_year=getattr(artifact, "publication_year"),

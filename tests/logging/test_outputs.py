@@ -105,6 +105,7 @@ def test_jsonl_sink_attempt_records_include_wall_time(tmp_path: Path) -> None:
     log_path = tmp_path / "attempts.jsonl"
     logger = JsonlSink(log_path)
     record = AttemptRecord(
+        run_id="run-1",
         work_id="W-1",
         resolver_name="unpaywall",
         resolver_order=1,
@@ -127,12 +128,14 @@ def test_jsonl_sink_attempt_records_include_wall_time(tmp_path: Path) -> None:
     payload = json.loads(lines[0])
     assert payload["resolver_name"] == "unpaywall"
     assert payload["resolver_wall_time_ms"] == 432.5
+    assert payload["run_id"] == "run-1"
 
 
 def test_multi_sink_synchronizes_timestamps(tmp_path: Path) -> None:
     jsonl_path = tmp_path / "attempts.jsonl"
     csv_path = tmp_path / "attempts.csv"
     record = AttemptRecord(
+        run_id="run-2",
         work_id="W-sync",
         resolver_name="crossref",
         resolver_order=2,
@@ -153,6 +156,7 @@ def test_multi_sink_synchronizes_timestamps(tmp_path: Path) -> None:
         rows = list(csv.DictReader(handle))
     assert len(rows) == 1
     assert json_payload["timestamp"] == rows[0]["timestamp"]
+    assert json_payload["run_id"] == rows[0]["run_id"] == "run-2"
 
 
 def test_rotating_jsonl_sink_rotates(tmp_path: Path) -> None:
@@ -243,6 +247,7 @@ def test_jsonl_sink_writes_valid_records(tmp_path: Path) -> None:
     logger = JsonlSink(log_path)
 
     attempt = AttemptRecord(
+        run_id="run-2",
         work_id="W1",
         resolver_name="unpaywall",
         resolver_order=1,
@@ -263,6 +268,7 @@ def test_jsonl_sink_writes_valid_records(tmp_path: Path) -> None:
     manifest_entry = ManifestEntry(
         schema_version=MANIFEST_SCHEMA_VERSION,
         timestamp="2024-01-01T00:00:00Z",
+        run_id="run-2",
         work_id="W1",
         title="Example",
         publication_year=2024,
@@ -281,7 +287,7 @@ def test_jsonl_sink_writes_valid_records(tmp_path: Path) -> None:
         dry_run=False,
     )
     logger.log_manifest(manifest_entry)
-    logger.log_summary({"total_works": 1})
+    logger.log_summary({"run_id": "run-2", "total_works": 1})
     logger.close()
 
     lines = log_path.read_text(encoding="utf-8").strip().splitlines()
@@ -293,6 +299,8 @@ def test_jsonl_sink_writes_valid_records(tmp_path: Path) -> None:
     assert attempt_record["metadata"] == {"source": "test"}
     assert attempt_record["sha256"] == "deadbeef"
     assert attempt_record["resolver_wall_time_ms"] == 321.0
+    assert attempt_record["run_id"] == "run-2"
+    assert parsed[1]["run_id"] == "run-2"
     assert parsed[1]["schema_version"] == MANIFEST_SCHEMA_VERSION
 
 
@@ -300,6 +308,7 @@ def test_export_attempts_csv(tmp_path: Path) -> None:
     log_path = tmp_path / "attempts.jsonl"
     logger = JsonlSink(log_path)
     attempt = AttemptRecord(
+        run_id="run-3",
         work_id="W2",
         resolver_name="crossref",
         resolver_order=2,
@@ -324,6 +333,7 @@ def test_export_attempts_csv(tmp_path: Path) -> None:
 
     assert reader.fieldnames is not None
     assert "sha256" in reader.fieldnames
+    assert "run_id" in reader.fieldnames
     assert len(rows) == 1
     row = rows[0]
     assert row["work_id"] == "W2"
@@ -331,6 +341,7 @@ def test_export_attempts_csv(tmp_path: Path) -> None:
     assert row["status"] == "http_error"
     assert row["dry_run"] == "True"
     assert row["metadata"] == json.dumps({"status": 404}, sort_keys=True)
+    assert row["run_id"] == "run-3"
 
 
 # --- Helper Functions ---
@@ -588,6 +599,7 @@ def test_last_attempt_csv_sink_writes_latest_entries(tmp_path: Path) -> None:
         ManifestEntry(
             schema_version=MANIFEST_SCHEMA_VERSION,
             timestamp="2024-01-01T00:00:00Z",
+            run_id="run-a",
             work_id="W-last",
             title="Initial",
             publication_year=2024,
@@ -605,6 +617,7 @@ def test_last_attempt_csv_sink_writes_latest_entries(tmp_path: Path) -> None:
         ManifestEntry(
             schema_version=MANIFEST_SCHEMA_VERSION,
             timestamp="2024-01-02T00:00:00Z",
+            run_id="run-b",
             work_id="W-last",
             title="Updated",
             publication_year=2024,
@@ -624,6 +637,7 @@ def test_last_attempt_csv_sink_writes_latest_entries(tmp_path: Path) -> None:
         ManifestEntry(
             schema_version=MANIFEST_SCHEMA_VERSION,
             timestamp="2024-01-03T00:00:00Z",
+            run_id="run-c",
             work_id="W-new",
             title="New",
             publication_year=None,
@@ -643,6 +657,7 @@ def test_last_attempt_csv_sink_writes_latest_entries(tmp_path: Path) -> None:
     assert rows == [
         {
             "work_id": "W-last",
+            "run_id": "run-b",
             "title": "Updated",
             "publication_year": "2024",
             "resolver": "crossref",
@@ -656,6 +671,7 @@ def test_last_attempt_csv_sink_writes_latest_entries(tmp_path: Path) -> None:
         },
         {
             "work_id": "W-new",
+            "run_id": "run-c",
             "title": "New",
             "publication_year": "",
             "resolver": "",

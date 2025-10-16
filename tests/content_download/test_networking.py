@@ -2508,6 +2508,7 @@ def test_build_manifest_entry_includes_download_metadata(tmp_path):
         outcome,
         html_paths=["/tmp/example.html"],
         dry_run=False,
+        run_id="test-run",
     )
 
     assert entry.sha256 == "abc123"
@@ -2515,6 +2516,7 @@ def test_build_manifest_entry_includes_download_metadata(tmp_path):
     assert entry.etag == '"etag-manifest"'
     assert entry.last_modified == "Fri, 05 Jan 2024 00:00:00 GMT"
     assert entry.extracted_text_path == str(artifact.html_dir / "saved.txt")
+    assert entry.run_id == "test-run"
 
 
 # --- test_download_outcomes.py ---
@@ -2969,12 +2971,13 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
         resolver_toggles={"stub": True},
         enable_head_precheck=False,
     )
-    pipeline = ResolverPipeline([StubResolver()], config, fake_download, logger, metrics)
+    pipeline = ResolverPipeline([StubResolver()], config, fake_download, logger, metrics, run_id="test-run")
 
     options = DownloadOptions(
         dry_run=False,
         list_only=False,
         extract_html_text=False,
+        run_id="test-run",
         previous_lookup={},
         resume_completed=set(),
         max_bytes=None,
@@ -3011,6 +3014,8 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
     assert len(manifests) == 1
     assert attempts[0]["work_id"] == manifests[0]["work_id"] == "WEDGE"
     assert attempts[0]["sha256"] == "deadbeef"
+    assert attempts[0]["run_id"] == "test-run"
+    assert manifests[0]["run_id"] == "test-run"
     assert manifests[0]["path"].endswith("resolver.pdf")
     assert Path(manifests[0]["path"]).exists()
 
@@ -3076,12 +3081,13 @@ def test_domain_bytes_budget_skips_over_limit(tmp_path: Path) -> None:
         enable_head_precheck=False,
         domain_bytes_budget={"resolver.example": 5},
     )
-    pipeline = ResolverPipeline([StubResolver()], config, fake_download, logger, metrics)
+    pipeline = ResolverPipeline([StubResolver()], config, fake_download, logger, metrics, run_id="test-run")
 
     options = DownloadOptions(
         dry_run=False,
         list_only=False,
         extract_html_text=False,
+        run_id="test-run",
         previous_lookup={},
         resume_completed=set(),
         max_bytes=None,
@@ -3124,8 +3130,11 @@ def test_domain_bytes_budget_skips_over_limit(tmp_path: Path) -> None:
 
     records = [json.loads(line) for line in logger_path.read_text(encoding="utf-8").splitlines()]
     manifest_records = [entry for entry in records if entry["record_type"] == "manifest"]
+    attempts = [entry for entry in records if entry["record_type"] == "attempt"]
     reason_map = {entry["work_id"]: entry.get("reason") for entry in manifest_records}
     assert reason_map.get("WEDGE-2") == ReasonCode.BUDGET_EXHAUSTED.value
+    for record in manifest_records + attempts:
+        assert record.get("run_id") == "test-run"
 
 
 def test_retry_after_updates_breakers(tmp_path: Path) -> None:
@@ -3160,7 +3169,7 @@ def test_retry_after_updates_breakers(tmp_path: Path) -> None:
             }
         },
     )
-    pipeline = ResolverPipeline([StubResolver()], config, lambda *args, **kwargs: None, logger, metrics)
+    pipeline = ResolverPipeline([StubResolver()], config, lambda *args, **kwargs: None, logger, metrics, run_id="test-run")
 
     outcome = DownloadOutcome(
         classification=Classification.HTTP_ERROR,
@@ -3220,6 +3229,7 @@ def test_openalex_attempts_use_session_headers(tmp_path: Path) -> None:
         fake_download,
         logger,
         metrics,
+        run_id="test-run",
     )
 
     pipeline.run(session, artifact)
@@ -3291,6 +3301,7 @@ def test_retry_budget_honours_max_attempts(tmp_path: Path) -> None:
         failing_download,
         ListLogger(),
         ResolverMetrics(),
+        run_id="test-run",
     )
 
     result = pipeline.run(requests.Session(), artifact)
@@ -3304,6 +3315,7 @@ def test_load_manifest_url_index_reads_sqlite(tmp_path: Path) -> None:
     entry = ManifestEntry(
         schema_version=downloader.MANIFEST_SCHEMA_VERSION,
         timestamp="2025-01-01T00:00:00Z",
+        run_id="run-idx",
         work_id="W-index",
         title="Index Test",
         publication_year=2024,

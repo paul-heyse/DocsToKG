@@ -659,6 +659,8 @@ def test_download_stream_sets_known_hash(monkeypatch, tmp_path):
     monkeypatch.setattr(download.pooch, "retrieve", fake_retrieve)
     destination = tmp_path / "file.owl"
 
+    expected_digest = "239f59ed55e737c77147cf55ad0c1b030b6d7ee748a7426952f9b852d5a935e5"
+
     result = download.download_stream(
         url="https://example.org/file.owl",
         destination=destination,
@@ -667,10 +669,10 @@ def test_download_stream_sets_known_hash(monkeypatch, tmp_path):
         http_config=DownloadConfiguration(),
         cache_dir=tmp_path / "cache",
         logger=_noop_logger(),
-        expected_hash="sha256:deadbeef",
+        expected_hash=f"sha256:{expected_digest}",
     )
 
-    assert recorded["known_hash"] == "sha256:deadbeef"
+    assert recorded["known_hash"] == f"sha256:{expected_digest}"
     assert destination.exists()
     assert result.status == "fresh"
 

@@ -4,6 +4,12 @@
 #   "purpose": "Implements DocsToKG.DocParsing.doctags behaviors and helpers",
 #   "sections": [
 #     {
+#       "id": "doctagscfg",
+#       "name": "DoctagsCfg",
+#       "anchor": "class-doctagscfg",
+#       "kind": "class"
+#     },
+#     {
 #       "id": "ensure-docling-dependencies",
 #       "name": "ensure_docling_dependencies",
 #       "anchor": "function-ensure-docling-dependencies",
@@ -200,6 +206,24 @@
 #       "name": "html_main",
 #       "anchor": "function-html-main",
 #       "kind": "function"
+#     },
+#     {
+#       "id": "should-install-docling-test-stubs",
+#       "name": "_should_install_docling_test_stubs",
+#       "anchor": "function-should-install-docling-test-stubs",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-stub-module",
+#       "name": "_ensure_stub_module",
+#       "anchor": "function-ensure-stub-module",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "install-docling-test-stubs",
+#       "name": "_install_docling_test_stubs",
+#       "anchor": "function-install-docling-test-stubs",
+#       "kind": "function"
 #     }
 #   ]
 # }
@@ -245,7 +269,7 @@ import time
 import types
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Deque, Iterable, List, Optional, Tuple
 
@@ -256,6 +280,8 @@ from urllib3.util.retry import Retry
 
 from DocsToKG.DocParsing.core import (
     PDF_MODEL_SUBDIR,
+    CLIOption,
+    build_subcommand,
     acquire_lock,
     compute_content_hash,
     data_doctags,
@@ -277,6 +303,7 @@ from DocsToKG.DocParsing.core import (
     resolve_model_root,
     resolve_pdf_model_path,
     resolve_pipeline_path,
+    StageConfigBase,
     set_spawn_or_warn,
     should_skip_output,
 )
@@ -312,6 +339,7 @@ __all__ = (
     "resolve_pdf_model_path",
     "resolve_pipeline_path",
     "validate_served_models",
+    "DoctagsCfg",
 )
 
 # Default data directories resolved relative to the workspace.
@@ -320,145 +348,165 @@ DEFAULT_INPUT = data_pdfs(DEFAULT_DATA_ROOT)
 DEFAULT_OUTPUT = data_doctags(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "doctags-pdf"
 
-_DOCLING_STUB_INSTALLED = False
+# Execution defaults for the vLLM-backed conversion pipeline.
+PREFERRED_PORT = 8000
+PORT_SCAN_SPAN = 32
+DEFAULT_WORKERS = min(12, (os.cpu_count() or 16) - 4)
+WAIT_TIMEOUT_S = 300
+DEFAULT_GPU_MEMORY_UTILIZATION = 0.30
+DEFAULT_SERVED_MODEL_NAMES: Tuple[str, ...] = (
+    "granite-docling-258M",
+    "ibm-granite/granite-docling-258M",
+)
 
 
-def _should_install_docling_test_stubs() -> bool:
-    """Return ``True`` when docling stubs should be installed for tests."""
+@dataclass
+class DoctagsCfg(StageConfigBase):
+    """Structured configuration for DocTags conversion stages."""
 
-    if os.getenv("DOCSTOKG_ENFORCE_DOCLING") == "1":
-        return False
-    return bool(os.getenv("PYTEST_CURRENT_TEST"))
+    log_level: str = "INFO"
+    data_root: Optional[Path] = None
+    input: Path = DEFAULT_INPUT
+    output: Path = DEFAULT_OUTPUT
+    workers: int = DEFAULT_WORKERS
+    model: Optional[str] = None
+    served_model_names: Tuple[str, ...] = DEFAULT_SERVED_MODEL_NAMES
+    gpu_memory_utilization: float = DEFAULT_GPU_MEMORY_UTILIZATION
+    vlm_prompt: str = "Convert this page to docling."
+    vlm_stop: Tuple[str, ...] = ("</doctag>", "<|end_of_text|>")
+    vllm_wait_timeout: int = WAIT_TIMEOUT_S
+    resume: bool = False
+    force: bool = False
+    overwrite: bool = False
+    mode: str = "pdf"
 
+    ENV_VARS: ClassVar[Dict[str, str]] = {
+        "log_level": "DOCSTOKG_DOCTAGS_LOG_LEVEL",
+        "data_root": "DOCSTOKG_DOCTAGS_DATA_ROOT",
+        "input": "DOCSTOKG_DOCTAGS_INPUT",
+        "output": "DOCSTOKG_DOCTAGS_OUTPUT",
+        "workers": "DOCSTOKG_DOCTAGS_WORKERS",
+        "model": "DOCSTOKG_DOCTAGS_MODEL",
+        "served_model_names": "DOCSTOKG_DOCTAGS_SERVED_MODELS",
+        "gpu_memory_utilization": "DOCSTOKG_DOCTAGS_GPU_MEMORY_UTILIZATION",
+        "vlm_prompt": "DOCSTOKG_DOCTAGS_VLM_PROMPT",
+        "vlm_stop": "DOCSTOKG_DOCTAGS_VLM_STOP",
+        "vllm_wait_timeout": "DOCSTOKG_DOCTAGS_VLLM_WAIT_TIMEOUT",
+        "resume": "DOCSTOKG_DOCTAGS_RESUME",
+        "force": "DOCSTOKG_DOCTAGS_FORCE",
+        "overwrite": "DOCSTOKG_DOCTAGS_OVERWRITE",
+        "mode": "DOCSTOKG_DOCTAGS_MODE",
+        "config": "DOCSTOKG_DOCTAGS_CONFIG",
+    }
 
-def _ensure_stub_module(name: str, *, package: bool = False) -> types.ModuleType:
-    """Register a lightweight stub module in :mod:`sys.modules` if missing."""
+    FIELD_PARSERS: ClassVar[Dict[str, Callable[[Any, Optional[Path]], Any]]] = {
+        "config": StageConfigBase._coerce_optional_path,
+        "log_level": StageConfigBase._coerce_str,
+        "data_root": StageConfigBase._coerce_optional_path,
+        "input": StageConfigBase._coerce_path,
+        "output": StageConfigBase._coerce_path,
+        "workers": StageConfigBase._coerce_int,
+        "model": StageConfigBase._coerce_str,
+        "served_model_names": StageConfigBase._coerce_str_tuple,
+        "gpu_memory_utilization": StageConfigBase._coerce_float,
+        "vlm_prompt": StageConfigBase._coerce_str,
+        "vlm_stop": StageConfigBase._coerce_str_tuple,
+        "vllm_wait_timeout": StageConfigBase._coerce_int,
+        "resume": StageConfigBase._coerce_bool,
+        "force": StageConfigBase._coerce_bool,
+        "overwrite": StageConfigBase._coerce_bool,
+        "mode": StageConfigBase._coerce_str,
+    }
 
-    module = sys.modules.get(name)
-    if module is not None:
-        return module
-    module = types.ModuleType(name)
-    module.__file__ = "<docling-stub>"
-    module.__spec__ = None
-    if package:
-        module.__path__ = []  # type: ignore[attr-defined]
-        module.__package__ = name
-    else:
-        module.__package__ = name.rsplit(".", 1)[0] if "." in name else ""
-    sys.modules[name] = module
-    return module
+    @classmethod
+    def from_sources(cls, args: argparse.Namespace, *, mode: str) -> "DoctagsCfg":
+        """Create a configuration by merging env vars, config files, and CLI arguments."""
+        cfg = cls(mode=mode)
+        cfg.apply_env()
+        if cfg.data_root is None:
+            fallback_root = os.getenv("DOCSTOKG_DATA_ROOT")
+            if fallback_root:
+                cfg.data_root = StageConfigBase._coerce_optional_path(fallback_root, None)
+        config_path = getattr(args, "config", None)
+        if config_path:
+            cfg.update_from_file(config_path)
+        cfg.apply_args(args)
+        cfg.finalize()
+        return cfg
 
-
-def _install_docling_test_stubs() -> None:
-    """Install minimal docling/docling-core shims for unit tests."""
-
-    global _DOCLING_STUB_INSTALLED
-    if _DOCLING_STUB_INSTALLED:
-        return
-
-    _ensure_stub_module("docling", package=True)
-    _ensure_stub_module("docling.backend", package=True)
-    _ensure_stub_module("docling.datamodel", package=True)
-    _ensure_stub_module("docling.datamodel.pipeline", package=True)
-    _ensure_stub_module("docling.pipeline", package=True)
-    _ensure_stub_module("docling_core")
-
-    converter_mod = _ensure_stub_module("docling.document_converter")
-
-    class DocumentConverter:
-        def __init__(self, *args, **kwargs) -> None:
-            self.args = args
-            self.kwargs = kwargs
-
-        def convert(self, *_args, **_kwargs):
-            raise RuntimeError("Docling stubs do not perform real conversions.")
-
-    class PdfFormatOption:
-        def __init__(self, *args, **kwargs) -> None:
-            self.args = args
-            self.kwargs = kwargs
-
-    converter_mod.DocumentConverter = DocumentConverter  # type: ignore[attr-defined]
-    converter_mod.PdfFormatOption = PdfFormatOption  # type: ignore[attr-defined]
-
-    backend_mod = _ensure_stub_module("docling.backend.docling_parse_v4_backend")
-
-    class DoclingParseV4DocumentBackend:  # pragma: no cover - stub only
-        pass
-
-    backend_mod.DoclingParseV4DocumentBackend = DoclingParseV4DocumentBackend  # type: ignore[attr-defined]
-
-    accel_mod = _ensure_stub_module("docling.datamodel.accelerator_options")
-
-    class AcceleratorDevice:  # pragma: no cover - stub only
-        CUDA = "cuda"
-
-    class AcceleratorOptions:  # pragma: no cover - stub only
-        def __init__(self, num_threads: int = 1, device: str | None = None, **_kwargs) -> None:
-            self.num_threads = num_threads
-            self.device = device or AcceleratorDevice.CUDA
-
-    accel_mod.AcceleratorDevice = AcceleratorDevice  # type: ignore[attr-defined]
-    accel_mod.AcceleratorOptions = AcceleratorOptions  # type: ignore[attr-defined]
-
-    base_mod = _ensure_stub_module("docling.datamodel.base_models")
-
-    class _EnumValue:
-        def __init__(self, value: str) -> None:
-            self.value = value
-
-        def __repr__(self) -> str:  # pragma: no cover - trivial
-            return self.value
-
-        def __hash__(self) -> int:  # pragma: no cover - trivial
-            return hash(self.value)
-
-        def __eq__(self, other: object) -> bool:  # pragma: no cover - trivial
-            if isinstance(other, _EnumValue):
-                return self.value == other.value
-            return False
-
-    class ConversionStatus:  # pragma: no cover - stub only
-        SUCCESS = _EnumValue("success")
-        PARTIAL_SUCCESS = _EnumValue("partial_success")
-
-    class InputFormat:  # pragma: no cover - stub only
-        PDF = _EnumValue("pdf")
-
-    base_mod.ConversionStatus = ConversionStatus  # type: ignore[attr-defined]
-    base_mod.InputFormat = InputFormat  # type: ignore[attr-defined]
-
-    pipeline_opts_mod = _ensure_stub_module("docling.datamodel.pipeline_options")
-
-    class VlmPipelineOptions:  # pragma: no cover - stub only
-        def __init__(self, **kwargs) -> None:
-            for key, value in kwargs.items():
-                setattr(self, key, value)
-
-    pipeline_opts_mod.VlmPipelineOptions = VlmPipelineOptions  # type: ignore[attr-defined]
-
-    pipeline_model_mod = _ensure_stub_module("docling.datamodel.pipeline_options_vlm_model")
-
-    class ApiVlmOptions:  # pragma: no cover - stub only
-        def __init__(self, **kwargs) -> None:
-            for key, value in kwargs.items():
-                setattr(self, key, value)
-
-    class ResponseFormat:  # pragma: no cover - stub only
-        DOCTAGS = "doctags"
-
-    pipeline_model_mod.ApiVlmOptions = ApiVlmOptions  # type: ignore[attr-defined]
-    pipeline_model_mod.ResponseFormat = ResponseFormat  # type: ignore[attr-defined]
-
-    pipeline_mod = _ensure_stub_module("docling.pipeline.vlm_pipeline")
-
-    class VlmPipeline:  # pragma: no cover - stub only
-        pass
-
-    pipeline_mod.VlmPipeline = VlmPipeline  # type: ignore[attr-defined]
-
-    _DOCLING_STUB_INSTALLED = True
-
+    def finalize(self) -> None:
+        """Normalise derived fields after configuration sources are applied."""
+        if self.data_root is not None:
+            self.data_root = StageConfigBase._coerce_optional_path(self.data_root, None)
+        self.input = StageConfigBase._coerce_path(self.input, None)
+        self.output = StageConfigBase._coerce_path(self.output, None)
+        if self.config is not None:
+            self.config = StageConfigBase._coerce_optional_path(self.config, None)
+        self.log_level = str(self.log_level).upper()
+        self.mode = (self.mode or "pdf").lower()
+        served = StageConfigBase._coerce_str_tuple(self.served_model_names, None)
+        self.served_model_names = served or DEFAULT_SERVED_MODEL_NAMES
+        stop = StageConfigBase._coerce_str_tuple(self.vlm_stop, None)
+        self.vlm_stop = stop or ("</doctag>", "<|end_of_text|>")
+PDF_CLI_OPTIONS: Tuple[CLIOption, ...] = (
+    CLIOption(
+        ("--config",),
+        {"type": Path, "default": None, "help": "Path to stage config file (JSON/YAML/TOML)."},
+    ),
+    CLIOption(
+        ("--log-level",),
+        {
+            "type": lambda value: str(value).upper(),
+            "default": "INFO",
+            "choices": ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+            "help": "Logging verbosity for console output (default: %(default)s).",
+        },
+    ),
+    CLIOption(("--input",), {"type": Path, "default": DEFAULT_INPUT, "help": "Folder with PDFs (recurses)."}),
+    CLIOption(("--output",), {"type": Path, "default": DEFAULT_OUTPUT, "help": "Folder for Doctags output."}),
+    CLIOption(("--workers",), {"type": int, "default": DEFAULT_WORKERS, "help": "Parallel workers for PDF conversion"}),
+    CLIOption(
+        ("--model",),
+        {
+            "type": str,
+            "default": None,
+            "help": (
+                "Path or identifier for the vLLM model to serve. Defaults to DOCLING_PDF_MODEL, "
+                f"DOCSTOKG_MODEL_ROOT/{PDF_MODEL_SUBDIR}, or HF_HOME/{PDF_MODEL_SUBDIR}."
+            ),
+        },
+    ),
+    CLIOption(
+        ("--served-model-name",),
+        {
+            "dest": "served_model_names",
+            "action": "append",
+            "nargs": "+",
+            "default": None,
+            "help": "Model name to expose via OpenAI compatibility API (repeatable)",
+        },
+    ),
+    CLIOption(
+        ("--gpu-memory-utilization",),
+        {"type": float, "default": DEFAULT_GPU_MEMORY_UTILIZATION, "help": "Fraction of GPU memory the vLLM server may allocate"},
+    ),
+    CLIOption(
+        ("--vlm-prompt",),
+        {"type": str, "default": "Convert this page to docling.", "help": "Prompt passed to the VLM for PDF pages"},
+    ),
+    CLIOption(
+        ("--vlm-stop",),
+        {
+            "action": "append",
+            "default": ["</doctag>", "<|end_of_text|>"],
+            "help": "Stop tokens for the VLM (repeatable)",
+        },
+    ),
+    CLIOption(
+        ("--vllm-wait-timeout",),
+        {"type": int, "default": WAIT_TIMEOUT_S, "help": "Seconds to wait for vLLM server readiness (default: %(default)s)."},
+    ),
+)
 
 def ensure_docling_dependencies() -> None:
     """Validate that required Docling packages are installed."""
@@ -483,12 +531,6 @@ def ensure_docling_dependencies() -> None:
             "Install them with `pip install docling docling-core`."
         ) from exc
 
-
-# Execution defaults for the vLLM-backed conversion pipeline.
-PREFERRED_PORT = 8000
-PORT_SCAN_SPAN = 32
-DEFAULT_WORKERS = min(12, (os.cpu_count() or 16) - 4)
-WAIT_TIMEOUT_S = 300
 
 # Thread hygiene for CPU libs
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -721,81 +763,8 @@ def pdf_build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Convert PDF corpora to DocTags with an optional vLLM backend",
     )
-    parser.add_argument(
-        "--log-level",
-        type=lambda value: str(value).upper(),
-        default="INFO",
-        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
-        help="Logging verbosity for console output (default: %(default)s).",
-    )
-    parser.add_argument(
-        "--data-root",
-        type=Path,
-        default=None,
-        help=(
-            "Override DocsToKG Data directory. Defaults to auto-detection or $DOCSTOKG_DATA_ROOT."
-        ),
-    )
-    parser.add_argument(
-        "--input",
-        type=Path,
-        default=DEFAULT_INPUT,
-        help="Folder with PDFs (recurses).",
-    )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        default=DEFAULT_OUTPUT,
-        help="Folder for Doctags output.",
-    )
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=DEFAULT_WORKERS,
-        help="Parallel workers for PDF conversion",
-    )
-    parser.add_argument(
-        "--model",
-        type=str,
-        default=None,
-        help=(
-            "Path or identifier for the vLLM model to serve. "
-            "Defaults to DOCLING_PDF_MODEL, DOCSTOKG_MODEL_ROOT/"
-            f"{PDF_MODEL_SUBDIR}, or HF_HOME/{PDF_MODEL_SUBDIR}."
-        ),
-    )
-    parser.add_argument(
-        "--served-model-name",
-        dest="served_model_names",
-        action="append",
-        nargs="+",
-        default=None,
-        help="Model name to expose via OpenAI compatibility API (repeatable)",
-    )
-    parser.add_argument(
-        "--gpu-memory-utilization",
-        type=float,
-        default=DEFAULT_GPU_MEMORY_UTILIZATION,
-        help="Fraction of GPU memory the vLLM server may allocate",
-    )
-    parser.add_argument(
-        "--vlm-prompt",
-        type=str,
-        default="Convert this page to docling.",
-        help="Prompt passed to the VLM for PDF pages",
-    )
-    parser.add_argument(
-        "--vlm-stop",
-        action="append",
-        default=["</doctag>", "<|end_of_text|>"],
-        help="Stop tokens for the VLM (repeatable)",
-    )
-    parser.add_argument(
-        "--vllm-wait-timeout",
-        type=int,
-        default=WAIT_TIMEOUT_S,
-        help="Seconds to wait for vLLM server readiness (default: %(default)s).",
-    )
+    add_data_root_option(parser)
+    build_subcommand(parser, PDF_CLI_OPTIONS)
     add_resume_force_options(
         parser,
         resume_help="Skip PDFs whose DocTags already exist with matching content hash",
@@ -820,12 +789,6 @@ def pdf_parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     return pdf_build_parser().parse_args(argv)
 
-
-DEFAULT_SERVED_MODEL_NAMES: Tuple[str, ...] = (
-    "granite-docling-258M",
-    "ibm-granite/granite-docling-258M",
-)
-DEFAULT_GPU_MEMORY_UTILIZATION = 0.30
 
 # --- PDF Pipeline ---
 
@@ -1749,6 +1712,30 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
 HTML_DEFAULT_INPUT_DIR = data_html()
 HTML_DEFAULT_OUTPUT_DIR = data_doctags()
 HTML_MANIFEST_STAGE = "doctags-html"
+HTML_DEFAULT_WORKERS = max(1, (os.cpu_count() or 8) - 1)
+
+HTML_CLI_OPTIONS: Tuple[CLIOption, ...] = (
+    CLIOption(
+        ("--config",),
+        {"type": Path, "default": None, "help": "Path to stage config file (JSON/YAML/TOML)."},
+    ),
+    CLIOption(
+        ("--log-level",),
+        {
+            "type": lambda value: str(value).upper(),
+            "default": "INFO",
+            "choices": ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+            "help": "Logging verbosity for console output (default: %(default)s).",
+        },
+    ),
+    CLIOption(("--input",), {"type": Path, "default": HTML_DEFAULT_INPUT_DIR, "help": "Folder with HTML files (recurses)"}),
+    CLIOption(("--output",), {"type": Path, "default": HTML_DEFAULT_OUTPUT_DIR, "help": "Destination for .doctags"}),
+    CLIOption(
+        ("--workers",),
+        {"type": int, "default": HTML_DEFAULT_WORKERS, "help": "Parallel workers"},
+    ),
+    CLIOption(("--overwrite",), {"action": "store_true", "help": "Overwrite existing .doctags files"}),
+)
 
 if TYPE_CHECKING:
     from docling.document_converter import DocumentConverter
@@ -1774,51 +1761,12 @@ def html_build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Convert HTML corpora to DocTags using Docling",
     )
-    parser.add_argument(
-        "--log-level",
-        type=lambda value: str(value).upper(),
-        default="INFO",
-        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
-        help="Logging verbosity for console output (default: %(default)s).",
-    )
-    parser.add_argument(
-        "--data-root",
-        type=Path,
-        default=None,
-        help=(
-            "Override DocsToKG Data directory. Defaults to auto-detection or $DOCSTOKG_DATA_ROOT."
-        ),
-    )
-    parser.add_argument(
-        "--input",
-        type=Path,
-        default=HTML_DEFAULT_INPUT_DIR,
-        help="Folder with HTML files (recurses)",
-    )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        default=HTML_DEFAULT_OUTPUT_DIR,
-        help="Destination for .doctags",
-    )
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=max(1, (os.cpu_count() or 8) - 1),
-        help="Parallel workers",
-    )
-    parser.add_argument(
-        "--overwrite", action="store_true", help="Overwrite existing .doctags files"
-    )
-    parser.add_argument(
-        "--resume",
-        action="store_true",
-        help="Skip documents whose outputs already exist with matching content hash",
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Force reprocessing even when resume criteria are satisfied",
+    add_data_root_option(parser)
+    build_subcommand(parser, HTML_CLI_OPTIONS)
+    add_resume_force_options(
+        parser,
+        resume_help="Skip documents whose outputs already exist with matching content hash",
+        force_help="Force reprocessing even when resume criteria are satisfied",
     )
     return parser
 
@@ -2240,6 +2188,172 @@ def html_main(args: argparse.Namespace | None = None) -> int:
     )
 
     return 0
+
+
+# --- Docling Test Stubs ---
+
+_DOCLING_STUB_INSTALLED = False
+
+
+def _should_install_docling_test_stubs() -> bool:
+    """Return ``True`` when docling stubs should be installed for tests."""
+
+    if os.getenv("DOCSTOKG_ENFORCE_DOCLING") == "1":
+        return False
+    return bool(os.getenv("PYTEST_CURRENT_TEST"))
+
+
+def _ensure_stub_module(name: str, *, package: bool = False) -> types.ModuleType:
+    """Register a lightweight stub module in :mod:`sys.modules` if missing."""
+
+    module = sys.modules.get(name)
+    if module is not None:
+        return module
+    module = types.ModuleType(name)
+    module.__file__ = "<docling-stub>"
+    module.__spec__ = None
+    if package:
+        module.__path__ = []  # type: ignore[attr-defined]
+        module.__package__ = name
+    else:
+        module.__package__ = name.rsplit(".", 1)[0] if "." in name else ""
+    sys.modules[name] = module
+    return module
+
+
+def _install_docling_test_stubs() -> None:
+    """Install minimal docling/docling-core shims for unit tests."""
+
+    global _DOCLING_STUB_INSTALLED
+    if _DOCLING_STUB_INSTALLED:
+        return
+
+    _ensure_stub_module("docling", package=True)
+    _ensure_stub_module("docling.backend", package=True)
+    _ensure_stub_module("docling.datamodel", package=True)
+    _ensure_stub_module("docling.datamodel.pipeline", package=True)
+    _ensure_stub_module("docling.pipeline", package=True)
+    _ensure_stub_module("docling_core")
+
+    converter_mod = _ensure_stub_module("docling.document_converter")
+
+    class DocumentConverter:
+        """Stubbed ``docling`` converter preserving the real API surface."""
+
+        def __init__(self, *args, **kwargs) -> None:
+            self.args = args
+            self.kwargs = kwargs
+
+        def convert(self, *_args, **_kwargs):
+            """Raise to indicate conversions are not executed in stub mode."""
+
+            raise RuntimeError("Docling stubs do not perform real conversions.")
+
+    class PdfFormatOption:
+        """Stub container matching ``docling`` PDF format options."""
+
+        def __init__(self, *args, **kwargs) -> None:
+            self.args = args
+            self.kwargs = kwargs
+
+    converter_mod.DocumentConverter = DocumentConverter  # type: ignore[attr-defined]
+    converter_mod.PdfFormatOption = PdfFormatOption  # type: ignore[attr-defined]
+
+    backend_mod = _ensure_stub_module("docling.backend.docling_parse_v4_backend")
+
+    class DoclingParseV4DocumentBackend:  # pragma: no cover - stub only
+        """Placeholder backend used when ``docling`` is unavailable."""
+
+        pass
+
+    backend_mod.DoclingParseV4DocumentBackend = DoclingParseV4DocumentBackend  # type: ignore[attr-defined]
+
+    accel_mod = _ensure_stub_module("docling.datamodel.accelerator_options")
+
+    class AcceleratorDevice:  # pragma: no cover - stub only
+        """Minimal enum-like device sentinel for accelerator selection."""
+
+        CUDA = "cuda"
+
+    class AcceleratorOptions:  # pragma: no cover - stub only
+        """Stub options matching the constructor signature of the real class."""
+
+        def __init__(self, num_threads: int = 1, device: str | None = None, **_kwargs) -> None:
+            self.num_threads = num_threads
+            self.device = device or AcceleratorDevice.CUDA
+
+    accel_mod.AcceleratorDevice = AcceleratorDevice  # type: ignore[attr-defined]
+    accel_mod.AcceleratorOptions = AcceleratorOptions  # type: ignore[attr-defined]
+
+    base_mod = _ensure_stub_module("docling.datamodel.base_models")
+
+    class _EnumValue:
+        def __init__(self, value: str) -> None:
+            self.value = value
+
+        def __repr__(self) -> str:  # pragma: no cover - trivial
+            return self.value
+
+        def __hash__(self) -> int:  # pragma: no cover - trivial
+            return hash(self.value)
+
+        def __eq__(self, other: object) -> bool:  # pragma: no cover - trivial
+            if isinstance(other, _EnumValue):
+                return self.value == other.value
+            return False
+
+    class ConversionStatus:  # pragma: no cover - stub only
+        """Enum-like result state mirrors for Docling conversion outcomes."""
+
+        SUCCESS = _EnumValue("success")
+        PARTIAL_SUCCESS = _EnumValue("partial_success")
+
+    class InputFormat:  # pragma: no cover - stub only
+        """Enum-like input format sentinel used in Docling pipelines."""
+
+        PDF = _EnumValue("pdf")
+
+    base_mod.ConversionStatus = ConversionStatus  # type: ignore[attr-defined]
+    base_mod.InputFormat = InputFormat  # type: ignore[attr-defined]
+
+    pipeline_opts_mod = _ensure_stub_module("docling.datamodel.pipeline_options")
+
+    class VlmPipelineOptions:  # pragma: no cover - stub only
+        """Catch-all structure mimicking the real VLM pipeline options."""
+
+        def __init__(self, **kwargs) -> None:
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
+    pipeline_opts_mod.VlmPipelineOptions = VlmPipelineOptions  # type: ignore[attr-defined]
+
+    pipeline_model_mod = _ensure_stub_module("docling.datamodel.pipeline_options_vlm_model")
+
+    class ApiVlmOptions:  # pragma: no cover - stub only
+        """Stub capturing API VLM options forwarded by planners."""
+
+        def __init__(self, **kwargs) -> None:
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
+    class ResponseFormat:  # pragma: no cover - stub only
+        """Response format sentinel mirroring Docling's enumeration."""
+
+        DOCTAGS = "doctags"
+
+    pipeline_model_mod.ApiVlmOptions = ApiVlmOptions  # type: ignore[attr-defined]
+    pipeline_model_mod.ResponseFormat = ResponseFormat  # type: ignore[attr-defined]
+
+    pipeline_mod = _ensure_stub_module("docling.pipeline.vlm_pipeline")
+
+    class VlmPipeline:  # pragma: no cover - stub only
+        """Placeholder VLM pipeline used during tests."""
+
+        pass
+
+    pipeline_mod.VlmPipeline = VlmPipeline  # type: ignore[attr-defined]
+
+    _DOCLING_STUB_INSTALLED = True
 
 
 # --- Entry Points ---

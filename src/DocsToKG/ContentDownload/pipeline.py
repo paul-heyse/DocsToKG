@@ -10,6 +10,12 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "normalise-domain-bytes-budget",
+#       "name": "_normalise_domain_bytes_budget",
+#       "anchor": "function-normalise-domain-bytes-budget",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "resolverconfig",
 #       "name": "ResolverConfig",
 #       "anchor": "class-resolverconfig",
@@ -930,7 +936,6 @@ class AttemptRecord:
         ... )
     """
 
-    run_id: Optional[str] = None
     work_id: str
     resolver_name: str
     resolver_order: Optional[int]
@@ -947,6 +952,7 @@ class AttemptRecord:
     dry_run: bool = False
     resolver_wall_time_ms: Optional[float] = None
     retry_after: Optional[float] = None
+    run_id: Optional[str] = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.status, Classification):
@@ -3379,6 +3385,7 @@ class ResolverPipeline:
         metrics: Optional[ResolverMetrics] = None,
         initial_seen_urls: Optional[Set[str]] = None,
         global_manifest_index: Optional[Dict[str, Dict[str, Any]]] = None,
+        run_id: Optional[str] = None,
     ) -> None:
         """Create a resolver pipeline with ordering, download, and metric hooks.
 
@@ -3398,6 +3405,7 @@ class ResolverPipeline:
         self.download_func = download_func
         self.logger = logger
         self.metrics = metrics or ResolverMetrics()
+        self._run_id = run_id
         self._last_invocation: Dict[str, float] = defaultdict(lambda: 0.0)
         self._lock = threading.Lock()
         self._global_seen_urls: set[str] = set(initial_seen_urls or ())
@@ -3940,6 +3948,7 @@ class ResolverPipeline:
         if resolver is None:
             self._emit_attempt(
                 AttemptRecord(
+                    run_id=self._run_id,
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
                     resolver_order=order_index,
@@ -3959,6 +3968,7 @@ class ResolverPipeline:
         if not self.config.is_enabled(resolver_name):
             self._emit_attempt(
                 AttemptRecord(
+                    run_id=self._run_id,
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
                     resolver_order=order_index,
@@ -3978,6 +3988,7 @@ class ResolverPipeline:
         if not resolver.is_enabled(self.config, artifact):
             self._emit_attempt(
                 AttemptRecord(
+                    run_id=self._run_id,
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
                     resolver_order=order_index,
@@ -3999,6 +4010,7 @@ class ResolverPipeline:
             remaining = breaker.cooldown_remaining()
             self._emit_attempt(
                 AttemptRecord(
+                    run_id=self._run_id,
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
                     resolver_order=order_index,
@@ -4090,6 +4102,7 @@ class ResolverPipeline:
             status_value: Any = result.event or Classification.SKIPPED
             self._emit_attempt(
                 AttemptRecord(
+                    run_id=self._run_id,
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
                     resolver_order=order_index,
@@ -4121,6 +4134,7 @@ class ResolverPipeline:
             if duplicate:
                 self._emit_attempt(
                     AttemptRecord(
+                        run_id=self._run_id,
                         work_id=artifact.work_id,
                         resolver_name=resolver_name,
                         resolver_order=order_index,
@@ -4141,6 +4155,7 @@ class ResolverPipeline:
         if url in state.seen_urls:
             self._emit_attempt(
                 AttemptRecord(
+                    run_id=self._run_id,
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
                     resolver_order=order_index,
@@ -4163,6 +4178,7 @@ class ResolverPipeline:
         if context_data.get("list_only"):
             self._emit_attempt(
                 AttemptRecord(
+                    run_id=self._run_id,
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
                     resolver_order=order_index,
@@ -4198,6 +4214,7 @@ class ResolverPipeline:
             if not head_precheck_passed:
                 self._emit_attempt(
                     AttemptRecord(
+                        run_id=self._run_id,
                         work_id=artifact.work_id,
                         resolver_name=resolver_name,
                         resolver_order=order_index,
@@ -4228,6 +4245,7 @@ class ResolverPipeline:
                     if remaining_budget is not None and remaining_budget <= 0:
                         self._emit_attempt(
                             AttemptRecord(
+                                run_id=self._run_id,
                                 work_id=artifact.work_id,
                                 resolver_name=resolver_name,
                                 resolver_order=order_index,
@@ -4254,6 +4272,7 @@ class ResolverPipeline:
                     detail = f"cooldown-{remaining:.1f}s"
                     self._emit_attempt(
                         AttemptRecord(
+                            run_id=self._run_id,
                             work_id=artifact.work_id,
                             resolver_name=resolver_name,
                             resolver_order=order_index,
@@ -4306,6 +4325,7 @@ class ResolverPipeline:
 
             self._emit_attempt(
                 AttemptRecord(
+                    run_id=self._run_id,
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
                     resolver_order=order_index,

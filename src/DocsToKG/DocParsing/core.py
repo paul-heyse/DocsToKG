@@ -4,6 +4,114 @@
 #   "purpose": "Shared utilities and CLI glue for DocParsing workflows",
 #   "sections": [
 #     {
+#       "id": "dedupe-preserve-order",
+#       "name": "dedupe_preserve_order",
+#       "anchor": "function-dedupe-preserve-order",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-str-sequence",
+#       "name": "_ensure_str_sequence",
+#       "anchor": "function-ensure-str-sequence",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-yaml-markers",
+#       "name": "_load_yaml_markers",
+#       "anchor": "function-load-yaml-markers",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-toml-markers",
+#       "name": "_load_toml_markers",
+#       "anchor": "function-load-toml-markers",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-structural-marker-profile",
+#       "name": "load_structural_marker_profile",
+#       "anchor": "function-load-structural-marker-profile",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-structural-marker-config",
+#       "name": "load_structural_marker_config",
+#       "anchor": "function-load-structural-marker-config",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "clioption",
+#       "name": "CLIOption",
+#       "anchor": "class-clioption",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "build-subcommand",
+#       "name": "build_subcommand",
+#       "anchor": "function-build-subcommand",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-path",
+#       "name": "_coerce_path",
+#       "anchor": "function-coerce-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-optional-path",
+#       "name": "_coerce_optional_path",
+#       "anchor": "function-coerce-optional-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-bool",
+#       "name": "_coerce_bool",
+#       "anchor": "function-coerce-bool",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-int",
+#       "name": "_coerce_int",
+#       "anchor": "function-coerce-int",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-float",
+#       "name": "_coerce_float",
+#       "anchor": "function-coerce-float",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-str",
+#       "name": "_coerce_str",
+#       "anchor": "function-coerce-str",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coerce-str-tuple",
+#       "name": "_coerce_str_tuple",
+#       "anchor": "function-coerce-str-tuple",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest-value",
+#       "name": "_manifest_value",
+#       "anchor": "function-manifest-value",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-config-mapping",
+#       "name": "load_config_mapping",
+#       "anchor": "function-load-config-mapping",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stageconfigbase",
+#       "name": "StageConfigBase",
+#       "anchor": "class-stageconfigbase",
+#       "kind": "class"
+#     },
+#     {
 #       "id": "bm25stats",
 #       "name": "BM25Stats",
 #       "anchor": "class-bm25stats",
@@ -76,6 +184,30 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "ensure-model-environment",
+#       "name": "ensure_model_environment",
+#       "anchor": "function-ensure-model-environment",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-optional-dependency",
+#       "name": "_ensure_optional_dependency",
+#       "anchor": "function-ensure-optional-dependency",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-splade-dependencies",
+#       "name": "ensure_splade_dependencies",
+#       "anchor": "function-ensure-splade-dependencies",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-qwen-dependencies",
+#       "name": "ensure_qwen_dependencies",
+#       "anchor": "function-ensure-qwen-dependencies",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "detect-data-root",
 #       "name": "detect_data_root",
 #       "anchor": "function-detect-data-root",
@@ -133,6 +265,18 @@
 #       "id": "data-html",
 #       "name": "data_html",
 #       "anchor": "function-data-html",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "derive-doc-id-and-doctags-path",
+#       "name": "derive_doc_id_and_doctags_path",
+#       "anchor": "function-derive-doc-id-and-doctags-path",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "derive-doc-id-and-chunks-path",
+#       "name": "derive_doc_id_and_chunks_path",
+#       "anchor": "function-derive-doc-id-and-chunks-path",
 #       "kind": "function"
 #     },
 #     {
@@ -388,9 +532,9 @@
 #       "kind": "function"
 #     },
 #     {
-#       "id": "run-all-public",
+#       "id": "run-all",
 #       "name": "run_all",
-#       "anchor": "function-run-all-public",
+#       "anchor": "function-run-all",
 #       "kind": "function"
 #     },
 #     {
@@ -460,12 +604,13 @@ import socket
 import time
 import unicodedata
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field, fields
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import (
     Any,
     Callable,
+    ClassVar,
     Dict,
     Iterable,
     Iterator,
@@ -473,6 +618,7 @@ from typing import (
     Mapping,
     Optional,
     Sequence,
+    Set,
     TextIO,
     Tuple,
     TypeVar,
@@ -622,6 +768,216 @@ def build_subcommand(
     for option in options:
         parser.add_argument(*option.flags, **option.kwargs)
     return parser
+
+
+def _coerce_path(value: object, base_dir: Optional[Path] = None) -> Path:
+    """Convert ``value`` into an absolute :class:`Path`."""
+
+    if isinstance(value, Path):
+        path = value
+    else:
+        path = Path(str(value))
+    if base_dir is not None and not path.is_absolute():
+        path = (base_dir / path).expanduser()
+    else:
+        path = path.expanduser()
+    return path.resolve()
+
+
+def _coerce_optional_path(value: object, base_dir: Optional[Path] = None) -> Optional[Path]:
+    """Convert optional path-like values."""
+
+    if value in (None, "", False):
+        return None
+    return _coerce_path(value, base_dir)
+
+
+def _coerce_bool(value: object, _base_dir: Optional[Path] = None) -> bool:
+    """Convert truthy strings or numbers to boolean."""
+
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    return bool(normalized)
+
+
+def _coerce_int(value: object, _base_dir: Optional[Path] = None) -> int:
+    """Convert ``value`` to ``int``."""
+
+    if isinstance(value, int):
+        return value
+    return int(str(value).strip())
+
+
+def _coerce_float(value: object, _base_dir: Optional[Path] = None) -> float:
+    """Convert ``value`` to ``float``."""
+
+    if isinstance(value, float):
+        return value
+    if isinstance(value, int):
+        return float(value)
+    return float(str(value).strip())
+
+
+def _coerce_str(value: object, _base_dir: Optional[Path] = None) -> str:
+    """Return ``value`` coerced to string."""
+
+    return str(value)
+
+
+def _coerce_str_tuple(value: object, _base_dir: Optional[Path] = None) -> Tuple[str, ...]:
+    """Return ``value`` as a tuple of strings."""
+
+    if value is None:
+        return ()
+    if isinstance(value, (list, tuple, set)):
+        return tuple(str(item) for item in value)
+    text = str(value).strip()
+    if not text:
+        return ()
+    # Support JSON-style arrays for convenience
+    if (text.startswith("[") and text.endswith("]")) or (text.startswith("(") and text.endswith(")")):
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, (list, tuple, set)):
+                return tuple(str(item) for item in parsed)
+        except json.JSONDecodeError:
+            pass
+    separators = [",", ";"]
+    parts = [text]
+    for sep in separators:
+        if sep in text:
+            parts = [segment.strip() for segment in text.split(sep)]
+            break
+    return tuple(part for part in parts if part)
+
+
+def _manifest_value(value: Any) -> Any:
+    """Convert values to manifest-friendly representations."""
+
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, tuple):
+        return [_manifest_value(item) for item in value]
+    if isinstance(value, list):
+        return [_manifest_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _manifest_value(val) for key, val in value.items()}
+    return value
+
+
+def load_config_mapping(path: Path) -> Dict[str, Any]:
+    """Load a configuration mapping from JSON, YAML, or TOML."""
+
+    raw = path.read_text(encoding="utf-8")
+    suffix = path.suffix.lower()
+    if suffix in {".yaml", ".yml"}:
+        data = _load_yaml_markers(raw)
+    elif suffix == ".toml":
+        data = _load_toml_markers(raw)
+    else:
+        data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise ValueError(f"Stage configuration file {path} must contain an object; received {type(data).__name__}.")
+    return data
+
+
+@dataclass
+class StageConfigBase:
+    """Base dataclass for stage configuration objects."""
+
+    config: Optional[Path] = None
+    overrides: Set[str] = field(default_factory=set, init=False, repr=False)
+
+    ENV_VARS: ClassVar[Dict[str, str]] = {}
+    FIELD_PARSERS: ClassVar[Dict[str, Callable[[Any, Optional[Path]], Any]]] = {}
+
+    def apply_env(self) -> None:
+        """Overlay configuration from environment variables."""
+
+        for field_name, env_name in self.ENV_VARS.items():
+            raw = os.getenv(env_name)
+            if raw is None:
+                continue
+            new_value = self._coerce_field(field_name, raw, None)
+            current = getattr(self, field_name, None)
+            if new_value == current:
+                continue
+            setattr(self, field_name, new_value)
+            self.overrides.add(field_name)
+
+    def update_from_file(self, cfg_path: Path) -> None:
+        """Overlay configuration from ``cfg_path``."""
+
+        mapping = load_config_mapping(cfg_path)
+        base_dir = cfg_path.parent
+        for key, value in mapping.items():
+            if not hasattr(self, key):
+                continue
+            new_value = self._coerce_field(key, value, base_dir)
+            current = getattr(self, key, None)
+            if new_value == current:
+                continue
+            setattr(self, key, new_value)
+            self.overrides.add(key)
+        self.config = _coerce_optional_path(cfg_path, None)
+        self.overrides.add("config")
+
+    def apply_args(self, args: Any) -> None:
+        """Overlay configuration from an argparse namespace."""
+
+        for field_def in fields(self):
+            name = field_def.name
+            if not hasattr(args, name):
+                continue
+            value = getattr(args, name)
+            if value is None:
+                continue
+            new_value = self._coerce_field(name, value, None)
+            current = getattr(self, name, None)
+            if new_value == current:
+                continue
+            setattr(self, name, new_value)
+            self.overrides.add(name)
+
+    @classmethod
+    def from_env(cls) -> "StageConfigBase":
+        """Instantiate a configuration populated solely from environment variables."""
+        cfg = cls()
+        cfg.apply_env()
+        cfg.finalize()
+        return cfg
+
+    def finalize(self) -> None:  # pragma: no cover - overridden by subclasses
+        """Hook allowing subclasses to normalise derived fields."""
+
+    def to_manifest(self) -> Dict[str, Any]:
+        """Return a manifest-friendly snapshot of the configuration."""
+
+        payload: Dict[str, Any] = {}
+        for field_def in fields(self):
+            payload[field_def.name] = _manifest_value(getattr(self, field_def.name))
+        return payload
+
+    def _coerce_field(self, name: str, value: Any, base_dir: Optional[Path]) -> Any:
+        parser = self.FIELD_PARSERS.get(name)
+        if parser is None:
+            return value
+        return parser(value, base_dir)
+
+    def is_overridden(self, field_name: str) -> bool:
+        """Return ``True`` when ``field_name`` was explicitly overridden."""
+
+        return field_name in self.overrides
+
 
 # --- Globals ---
 
@@ -1680,23 +2036,29 @@ def jsonl_append_iter(
 
     if hasattr(target, "write"):
         handle = target  # type: ignore[assignment]
-        close_handle = False
-    else:
-        if atomic:
-            context = atomic_write(target)  # type: ignore[arg-type]
-        else:
-            context = contextlib.nullcontext(target.open("a", encoding="utf-8"))  # type: ignore[arg-type]
-        handle = context.__enter__()
-        close_handle = True
-
-    count = 0
-    try:
+        count = 0
         for row in rows:
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")  # type: ignore[arg-type]
             count += 1
-    finally:
-        if close_handle:
-            context.__exit__(None, None, None)
+        return count
+
+    path = Path(target)
+    if not atomic:
+        count = 0
+        with path.open("a", encoding="utf-8") as handle:
+            for row in rows:
+                handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+                count += 1
+        return count
+
+    count = 0
+    with atomic_write(path) as handle:
+        if path.exists():
+            with path.open("r", encoding="utf-8", errors="replace") as src:
+                shutil.copyfileobj(src, handle)
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+            count += 1
     return count
 
 
@@ -1817,8 +2179,7 @@ def manifest_append(
         entry["error"] = str(error)
     entry.update(metadata)
 
-    with manifest_path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    jsonl_append_iter(manifest_path, [entry])
 
 
 def resolve_hash_algorithm(default: str = "sha1") -> str:

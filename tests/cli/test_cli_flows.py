@@ -265,14 +265,16 @@ def test_main_writes_manifest_and_sets_mailto(download_modules, monkeypatch, tmp
 
     class StubPipeline:
         def __init__(
-            self, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **_
+            self, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **kwargs
         ):
             self.logger = logger
             self.metrics = metrics
+            self.run_id = kwargs.get("run_id")
 
         def run(self, session, artifact, context=None):
             self.logger.log_attempt(
                 resolvers.AttemptRecord(
+                    run_id=self.run_id,
                     work_id=artifact.work_id,
                     resolver_name="openalex",
                     resolver_order=1,
@@ -383,10 +385,13 @@ def test_main_with_csv_writes_last_attempt_csv(download_modules, monkeypatch, tm
         def __init__(self, *_, logger=None, metrics=None, **kwargs):
             self.logger = logger
             self.metrics = metrics
+            self.run_id = kwargs.get("run_id")
+            self.run_id = kwargs.get("run_id")
 
         def run(self, session, artifact, context=None):
             self.logger.log_attempt(
-                resolvers.AttemptRecord(
+                    resolvers.AttemptRecord(
+                        run_id=self.run_id,
                     work_id=artifact.work_id,
                     resolver_name="openalex",
                     resolver_order=1,
@@ -508,6 +513,7 @@ def test_main_with_staging_creates_timestamped_directories(download_modules, mon
             pdf_path.write_bytes(b"%PDF-1.4\n%%EOF")
             self.logger.log_attempt(
                 resolvers.AttemptRecord(
+                    run_id=self.run_id,
                     work_id=artifact.work_id,
                     resolver_name="openalex",
                     resolver_order=1,
@@ -731,8 +737,9 @@ def test_cli_flag_propagation_and_metrics_export(download_modules, monkeypatch, 
     metrics_path = manifest_path.with_suffix(".metrics.json")
     assert metrics_path.exists()
     metrics_doc = json.loads(metrics_path.read_text(encoding="utf-8"))
-    expected_keys = {"processed", "saved", "html_only", "skipped", "resolvers"}
+    expected_keys = {"run_id", "processed", "saved", "html_only", "skipped", "resolvers"}
     assert expected_keys.issubset(metrics_doc.keys())
+    assert metrics_doc["run_id"]
     assert metrics_doc["processed"] == 0
     resolver_summary = metrics_doc["resolvers"]
     expected_resolver_keys = {
@@ -850,6 +857,7 @@ def test_process_one_work_logs_manifest_in_dry_run(download_modules, tmp_path):
         dry_run=True,
         list_only=False,
         extract_html_text=False,
+        run_id="test-run",
         previous_lookup={},
         resume_completed=set(),
         max_bytes=None,
@@ -911,6 +919,7 @@ def test_resume_skips_completed_work(download_modules, tmp_path):
         dry_run=False,
         list_only=False,
         extract_html_text=False,
+        run_id="test-run",
         previous_lookup={},
         resume_completed={"W-RESUME"},
         max_bytes=None,
@@ -988,6 +997,8 @@ def test_cli_resume_from_partial_metadata(download_modules, monkeypatch, tmp_pat
         def __init__(self, *_, logger=None, metrics=None, **kwargs):
             self.logger = logger
             self.metrics = metrics
+            self.run_id = kwargs.get("run_id")
+            self.run_id = kwargs.get("run_id")
 
         def run(self, session, artifact, context=None):
             assert context is not None
@@ -1003,8 +1014,9 @@ def test_cli_resume_from_partial_metadata(download_modules, monkeypatch, tmp_pat
                 elapsed_ms=5.0,
                 error=None,
             )
-            self.logger.log_attempt(
-                resolvers.AttemptRecord(
+                self.logger.log_attempt(
+                    resolvers.AttemptRecord(
+                        run_id=self.run_id,
                     work_id=artifact.work_id,
                     resolver_name="stub",
                     resolver_order=1,
@@ -1174,6 +1186,7 @@ def test_cli_workers_apply_domain_jitter(download_modules, monkeypatch, tmp_path
             )
             self.logger.log_attempt(
                 resolvers.AttemptRecord(
+                    run_id=self.run_id,
                     work_id=artifact.work_id,
                     resolver_name="stub",
                     resolver_order=1,
@@ -1423,6 +1436,7 @@ def test_cli_attempt_records_cover_all_resolvers(download_modules, monkeypatch, 
                     outcome=outcome,
                     html_paths=[],
                     dry_run=False,
+                    run_id=self.run_id,
                 )
             )
             self.metrics.record_attempt("gamma", outcome)

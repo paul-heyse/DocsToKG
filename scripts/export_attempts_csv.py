@@ -46,6 +46,7 @@ from typing import Iterable, List, Optional
 
 CSV_HEADER: List[str] = [
     "timestamp",
+    "run_id",
     "work_id",
     "resolver_name",
     "resolver_order",
@@ -97,6 +98,7 @@ def export_attempts_jsonl_to_csv(input_path: Path, output_path: Path) -> None:
             writer.writerow(
                 {
                     "timestamp": row.get("timestamp"),
+                    "run_id": row.get("run_id"),
                     "work_id": row.get("work_id"),
                     "resolver_name": row.get("resolver_name"),
                     "resolver_order": row.get("resolver_order"),

@@ -5,6 +5,18 @@
 #   "purpose": "Embedding pipelines for DocParsing",
 #   "sections": [
 #     {
+#       "id": "shutdown-llm-instance",
+#       "name": "_shutdown_llm_instance",
+#       "anchor": "function-shutdown-llm-instance",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "close-all-qwen",
+#       "name": "close_all_qwen",
+#       "anchor": "function-close-all-qwen",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "qwen-cache-key",
 #       "name": "_qwen_cache_key",
 #       "anchor": "function-qwen-cache-key",
@@ -32,18 +44,6 @@
 #       "id": "resolve-cli-path",
 #       "name": "_resolve_cli_path",
 #       "anchor": "function-resolve-cli-path",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "missing-splade-dependency-message",
-#       "name": "_missing_splade_dependency_message",
-#       "anchor": "function-missing-splade-dependency-message",
-#       "kind": "function"
-#     },
-#     {
-#       "id": "missing-qwen-dependency-message",
-#       "name": "_missing_qwen_dependency_message",
-#       "anchor": "function-missing-qwen-dependency-message",
 #       "kind": "function"
 #     },
 #     {
@@ -167,6 +167,24 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "vectorwriter",
+#       "name": "VectorWriter",
+#       "anchor": "class-vectorwriter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "jsonlvectorwriter",
+#       "name": "JsonlVectorWriter",
+#       "anchor": "class-jsonlvectorwriter",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "create-vector-writer",
+#       "name": "create_vector_writer",
+#       "anchor": "function-create-vector-writer",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "process-chunk-file-vectors",
 #       "name": "process_chunk_file_vectors",
 #       "anchor": "function-process-chunk-file-vectors",
@@ -262,6 +280,8 @@ from DocsToKG.DocParsing.core import (
     BM25Stats,
     QwenCfg,
     SpladeCfg,
+    CLIOption,
+    build_subcommand,
     acquire_lock,
     atomic_write,
     compute_content_hash,
@@ -469,6 +489,128 @@ DEFAULT_CHUNKS_DIR = data_chunks(DEFAULT_DATA_ROOT)
 DEFAULT_VECTORS_DIR = data_vectors(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "embeddings"
 SPLADE_SPARSITY_WARN_THRESHOLD_PCT = 1.0
+
+EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
+    CLIOption(
+        ("--log-level",),
+        {
+            "type": lambda value: str(value).upper(),
+            "default": "INFO",
+            "choices": ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+            "help": "Logging verbosity for console output (default: %(default)s).",
+        },
+    ),
+    CLIOption(("--no-cache",), {"action": "store_true", "help": "Disable Qwen LLM caching between batches (debug)."}),
+    CLIOption(
+        ("--shard-count",),
+        {"type": int, "default": 1, "help": "Total number of shards for distributed runs (default: %(default)s)."},
+    ),
+    CLIOption(
+        ("--shard-index",),
+        {"type": int, "default": 0, "help": "Zero-based shard index to process (default: %(default)s)."},
+    ),
+    CLIOption(("--chunks-dir",), {"type": Path, "default": DEFAULT_CHUNKS_DIR}),
+    CLIOption(("--out-dir",), {"type": Path, "default": DEFAULT_VECTORS_DIR}),
+    CLIOption(
+        ("--format",),
+        {
+            "dest": "vector_format",
+            "type": lambda value: str(value).lower(),
+            "default": "jsonl",
+            "choices": ["jsonl", "parquet"],
+            "help": "Vector output format written to --out-dir (default: %(default)s).",
+        },
+    ),
+    CLIOption(("--bm25-k1",), {"type": float, "default": 1.5}),
+    CLIOption(("--bm25-b",), {"type": float, "default": 0.75}),
+    CLIOption(("--batch-size-splade",), {"type": int, "default": 32}),
+    CLIOption(("--batch-size-qwen",), {"type": int, "default": 64}),
+    CLIOption(("--splade-max-active-dims",), {"type": int, "default": None}),
+    CLIOption(
+        ("--splade-model-dir",),
+        {
+            "type": Path,
+            "default": None,
+            "help": (
+                "Override SPLADE model directory (CLI > $DOCSTOKG_SPLADE_DIR > "
+                f"{SPLADE_DIR}). Defaults to model root/naver/splade-v3."
+            ),
+        },
+    ),
+    CLIOption(
+        ("--splade-attn",),
+        {
+            "type": str,
+            "default": "auto",
+            "choices": ["auto", "sdpa", "eager", "flash_attention_2"],
+            "help": (
+                "Attention backend for SPLADE. 'auto' tries FlashAttention 2, then SDPA, then eager. "
+                "'flash_attention_2' requires the Flash Attention 2 package. 'sdpa' forces PyTorch scaled "
+                "dot-product attention. 'eager' uses the standard attention implementation."
+            ),
+        },
+    ),
+    CLIOption(("--qwen-dtype",), {"type": str, "default": "bfloat16"}),
+    CLIOption(("--qwen-quant",), {"type": str, "default": None}),
+    CLIOption(
+        ("--qwen-model-dir",),
+        {
+            "type": Path,
+            "default": None,
+            "help": (
+                "Override Qwen model directory (CLI > $DOCSTOKG_QWEN_DIR > "
+                f"{QWEN_DIR}). Defaults to model root/{DEFAULT_TOKENIZER}."
+            ),
+        },
+    ),
+    CLIOption(
+        ("--splade-sparsity-warn-pct",),
+        {
+            "dest": "sparsity_warn_threshold_pct",
+            "type": float,
+            "default": SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
+            "help": (
+                "Warn if percentage of zero-NNZ SPLADE vectors exceeds this threshold "
+                f"(default: {SPLADE_SPARSITY_WARN_THRESHOLD_PCT})."
+            ),
+        },
+    ),
+    CLIOption(
+        ("--splade-zero-pct-warn-threshold",),
+        {"dest": "sparsity_warn_threshold_pct", "type": float, "help": argparse.SUPPRESS},
+    ),
+    CLIOption(("--qwen-dim",), {"type": int, "default": 2560}),
+    CLIOption(("--tp",), {"type": int, "default": 1}),
+    CLIOption(
+        ("--sparsity-report-top-n",),
+        {
+            "type": int,
+            "default": 10,
+            "help": (
+                "Number of zero-NNZ SPLADE chunk UUIDs to list when sparsity exceeds the warning threshold "
+                "(default: 10)."
+            ),
+        },
+    ),
+    CLIOption(
+        ("--files-parallel",),
+        {"type": int, "default": 1, "help": "Process up to N chunk files concurrently during embedding (default: 1 for serial runs)."},
+    ),
+    CLIOption(
+        ("--validate-only",),
+        {"action": "store_true", "help": "Validate existing vectors in --out-dir and exit"},
+    ),
+    CLIOption(
+        ("--offline",),
+        {
+            "action": "store_true",
+            "help": (
+                "Disable network access by setting TRANSFORMERS_OFFLINE=1. "
+                "All models must already exist in local caches."
+            ),
+        },
+    ),
+)
 
 
 def _ensure_splade_dependencies() -> None:
@@ -1164,6 +1306,7 @@ class VectorWriter:
     path: Path
 
     def write_rows(self, rows: Sequence[dict]) -> None:  # pragma: no cover - interface
+        """Persist a batch of vector rows to the underlying storage medium."""
         raise NotImplementedError
 
 
@@ -1187,6 +1330,7 @@ class JsonlVectorWriter(VectorWriter):
         return self._context.__exit__(exc_type, exc, tb)
 
     def write_rows(self, rows: Sequence[dict]) -> None:
+        """Append ``rows`` to the active JSONL artifact created by ``__enter__``."""
         if self._handle is None:
             raise RuntimeError("JsonlVectorWriter not initialised; call __enter__ first.")
         for row in rows:
@@ -1534,133 +1678,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser()
     add_data_root_option(parser)
-    parser.add_argument(
-        "--log-level",
-        type=lambda value: str(value).upper(),
-        default="INFO",
-        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
-        help="Logging verbosity for console output (default: %(default)s).",
-    )
-    parser.add_argument(
-        "--no-cache",
-        action="store_true",
-        help="Disable Qwen LLM caching between batches (debug).",
-    )
-    parser.add_argument(
-        "--shard-count",
-        type=int,
-        default=1,
-        help="Total number of shards for distributed runs (default: %(default)s).",
-    )
-    parser.add_argument(
-        "--shard-index",
-        type=int,
-        default=0,
-        help="Zero-based shard index to process (default: %(default)s).",
-    )
-    parser.add_argument("--chunks-dir", type=Path, default=DEFAULT_CHUNKS_DIR)
-    parser.add_argument("--out-dir", type=Path, default=DEFAULT_VECTORS_DIR)
-    parser.add_argument(
-        "--format",
-        dest="vector_format",
-        type=lambda value: str(value).lower(),
-        default="jsonl",
-        choices=["jsonl", "parquet"],
-        help="Vector output format written to --out-dir (default: %(default)s).",
-    )
-    parser.add_argument("--bm25-k1", type=float, default=1.5)
-    parser.add_argument("--bm25-b", type=float, default=0.75)
-    parser.add_argument("--batch-size-splade", type=int, default=32)
-    parser.add_argument("--batch-size-qwen", type=int, default=64)
-    parser.add_argument("--splade-max-active-dims", type=int, default=None)
-    parser.add_argument(
-        "--splade-model-dir",
-        type=Path,
-        default=None,
-        help=(
-            "Override SPLADE model directory (CLI > $DOCSTOKG_SPLADE_DIR > "
-            f"{SPLADE_DIR})."
-            "model root/naver/splade-v3)."
-        ),
-    )
-    parser.add_argument(
-        "--splade-attn",
-        type=str,
-        default="auto",
-        choices=["auto", "sdpa", "eager", "flash_attention_2"],
-        help=(
-            "Attention backend for SPLADE. 'auto' tries FlashAttention 2, then "
-            "SDPA, then eager. 'flash_attention_2' requires the Flash Attention "
-            "2 package. 'sdpa' forces PyTorch scaled dot-product attention. "
-            "'eager' uses the standard attention implementation."
-        ),
-    )
-    parser.add_argument("--qwen-dtype", type=str, default="bfloat16")
-    parser.add_argument("--qwen-quant", type=str, default=None)
-    parser.add_argument(
-        "--qwen-model-dir",
-        type=Path,
-        default=None,
-        help=(
-            "Override Qwen model directory (CLI > $DOCSTOKG_QWEN_DIR > "
-            f"{QWEN_DIR}). Defaults to model root/{DEFAULT_TOKENIZER}."
-        ),
-    )
-    parser.add_argument(
-        "--splade-sparsity-warn-pct",
-        dest="sparsity_warn_threshold_pct",
-        type=float,
-        default=SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
-        help=(
-            "Warn if percentage of zero-NNZ SPLADE vectors exceeds this threshold "
-            f"(default: {SPLADE_SPARSITY_WARN_THRESHOLD_PCT})."
-        ),
-    )
-    parser.add_argument(
-        "--splade-zero-pct-warn-threshold",
-        dest="sparsity_warn_threshold_pct",
-        type=float,
-        help=argparse.SUPPRESS,
-    )
-    parser.add_argument(
-        "--qwen-dim",
-        type=int,
-        default=2560,
-        help="Dimension of the dense embedding head (model dependent).",
-    )
-    parser.add_argument("--tp", type=int, default=1)
-    parser.add_argument(
-        "--sparsity-report-top-n",
-        type=int,
-        default=10,
-        help=(
-            "Number of zero-NNZ SPLADE chunk UUIDs to list when sparsity exceeds the warning threshold "
-            "(default: 10)."
-        ),
-    )
-    parser.add_argument(
-        "--files-parallel",
-        type=int,
-        default=1,
-        help="Process up to N chunk files concurrently during embedding (default: 1 for serial runs).",
-    )
+    build_subcommand(parser, EMBED_CLI_OPTIONS)
     add_resume_force_options(
         parser,
         resume_help="Skip chunk files whose vector outputs already exist with matching hash",
         force_help="Force reprocessing even when resume criteria are satisfied",
-    )
-    parser.add_argument(
-        "--validate-only",
-        action="store_true",
-        help="Validate existing vectors in --out-dir and exit",
-    )
-    parser.add_argument(
-        "--offline",
-        action="store_true",
-        help=(
-            "Disable network access by setting TRANSFORMERS_OFFLINE=1. "
-            "All models must already exist in local caches."
-        ),
     )
     return parser
 

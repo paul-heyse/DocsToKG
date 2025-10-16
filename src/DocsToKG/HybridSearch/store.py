@@ -16,6 +16,18 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "pendingsearch",
+#       "name": "_PendingSearch",
+#       "anchor": "class-pendingsearch",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "searchcoalescer",
+#       "name": "_SearchCoalescer",
+#       "anchor": "class-searchcoalescer",
+#       "kind": "class"
+#     },
+#     {
 #       "id": "faissvectorstore",
 #       "name": "FaissVectorStore",
 #       "anchor": "class-faissvectorstore",
@@ -113,7 +125,7 @@ from typing import Callable, Dict, Iterator, List, Mapping, Optional, Sequence
 import numpy as np
 
 from .config import DenseIndexConfig
-from .devtools.opensearch_simulator import OpenSearchSimulator
+from .opensearch_simulator import OpenSearchSimulator
 from .interfaces import DenseVectorStore
 from .pipeline import Observability
 from .types import ChunkPayload, vector_uuid_to_faiss_int
@@ -206,14 +218,17 @@ class _PendingSearch:
         self._error: Optional[BaseException] = None
 
     def set_result(self, result: Sequence[FaissSearchResult]) -> None:
+        """Fulfil the pending search with ``result`` and release any waiters."""
         self._result = list(result)
         self._event.set()
 
     def set_exception(self, exc: BaseException) -> None:
+        """Attach ``exc`` to the pending search and release any waiters."""
         self._error = exc
         self._event.set()
 
     def wait(self) -> List[FaissSearchResult]:
+        """Block until a result or exception is produced for this search."""
         self._event.wait()
         if self._error is not None:
             raise self._error
@@ -237,8 +252,10 @@ class _SearchCoalescer:
         self._lock = RLock()
         self._pending: List[_PendingSearch] = []
         self._max_batch = max(1, int(max_batch))
+        self._metrics = store._observability.metrics
 
     def submit(self, vector: np.ndarray, top_k: int) -> List[FaissSearchResult]:
+        """Coalesce a singleton search request and return its results."""
         request = _PendingSearch(vector, top_k)
         with self._lock:
             self._pending.append(request)
@@ -281,6 +298,8 @@ class _SearchCoalescer:
                 self._store._observability.metrics.observe(
                     "faiss_coalesced_batch_size", float(len(batch))
                 )
+            rate = 0.0 if len(batch) <= 1 else float(len(batch) - 1) / float(len(batch))
+            self._metrics.set_gauge("faiss_coalescer_hit_rate", rate)
             # If additional requests arrived while executing, process them next.
             trailing = self._drain()
             if trailing:
@@ -1677,6 +1696,7 @@ def cosine_topk_blockwise(
     device: int,
     resources: "faiss.StandardGpuResources",
     block_rows: int = 65_536,
+    use_fp16: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return Top-K cosine similarities between ``q`` and ``C`` using GPU tiling.
 
@@ -1721,6 +1741,7 @@ def cosine_topk_blockwise(
     k = min(k, C.shape[0])
 
     faiss.normalize_L2(q)
+    q_view = q.astype(np.float16, copy=False) if use_fp16 else q
 
     N, M = q.shape[0], C.shape[0]
     best_scores = np.full((N, k), -np.inf, dtype=np.float32)
@@ -1731,10 +1752,11 @@ def cosine_topk_blockwise(
         end = min(M, start + block_rows)
         block = np.array(C[start:end], dtype=np.float32, copy=True)
         faiss.normalize_L2(block)
+        block_view = block.astype(np.float16, copy=False) if use_fp16 else block
         sims = faiss.pairwise_distance_gpu(
             resources,
-            q,
-            block,
+            q_view,
+            block_view,
             metric=faiss.METRIC_INNER_PRODUCT,
             device=int(device),
         )

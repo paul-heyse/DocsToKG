@@ -89,10 +89,13 @@ def test_manifest_entry_schema_backward_compatible(tmp_path: Path):
         outcome=outcome,
         html_paths=[],
         dry_run=False,
+        run_id="test-run",
     )
     payload = asdict(entry)
+    assert payload["run_id"] == "test-run"
     expected_keys = {
         "timestamp",
+        "run_id",
         "schema_version",
         "work_id",
         "title",

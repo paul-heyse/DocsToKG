@@ -1,3 +1,102 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.resolvers",
+#   "purpose": "Resolver implementations for DocsToKG ontology downloads",
+#   "sections": [
+#     {
+#       "id": "normalize-license-to-spdx",
+#       "name": "normalize_license_to_spdx",
+#       "anchor": "function-normalize-license-to-spdx",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-checksum-extra",
+#       "name": "_parse_checksum_extra",
+#       "anchor": "function-parse-checksum-extra",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse-checksum-url-extra",
+#       "name": "_parse_checksum_url_extra",
+#       "anchor": "function-parse-checksum-url-extra",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetchplan",
+#       "name": "FetchPlan",
+#       "anchor": "class-fetchplan",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolver",
+#       "name": "Resolver",
+#       "anchor": "class-resolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolvercandidate",
+#       "name": "ResolverCandidate",
+#       "anchor": "class-resolvercandidate",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "baseresolver",
+#       "name": "BaseResolver",
+#       "anchor": "class-baseresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "oboresolver",
+#       "name": "OBOResolver",
+#       "anchor": "class-oboresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "olsresolver",
+#       "name": "OLSResolver",
+#       "anchor": "class-olsresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "bioportalresolver",
+#       "name": "BioPortalResolver",
+#       "anchor": "class-bioportalresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "lovresolver",
+#       "name": "LOVResolver",
+#       "anchor": "class-lovresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "skosresolver",
+#       "name": "SKOSResolver",
+#       "anchor": "class-skosresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "directresolver",
+#       "name": "DirectResolver",
+#       "anchor": "class-directresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "xbrlresolver",
+#       "name": "XBRLResolver",
+#       "anchor": "class-xbrlresolver",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ontobeeresolver",
+#       "name": "OntobeeResolver",
+#       "anchor": "class-ontobeeresolver",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Resolver implementations for DocsToKG ontology downloads."""
 
 from __future__ import annotations
@@ -59,6 +158,9 @@ _CHECKSUM_HEX_RE = re.compile(r"^[0-9a-fA-F]{32,128}$")
 _SUPPORTED_CHECKSUM_ALGORITHMS = {"md5", "sha1", "sha256", "sha512"}
 
 LOGGER = logging.getLogger(__name__)
+
+
+# --- Normalization Helpers ---
 
 
 def normalize_license_to_spdx(value: Optional[str]) -> Optional[str]:
@@ -154,6 +256,9 @@ def _parse_checksum_url_extra(value: object, *, context: str) -> Tuple[str, Opti
     raise UserConfigError(f"{context} checksum_url must be a string or mapping")
 
 
+# --- Resolver Data Structures ---
+
+
 @dataclass(slots=True)
 class FetchPlan:
     """Concrete plan output from a resolver."""
@@ -176,6 +281,7 @@ class Resolver(Protocol):
     """Protocol describing resolver planning behaviour."""
 
     def plan(self, spec: "FetchSpec", config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Produce a :class:`FetchPlan` describing how to retrieve ``spec``."""
         ...
 
 
@@ -267,17 +373,16 @@ class BaseResolver:
                 },
             )
 
-        bucket = (
-            get_bucket(
-                http_config=config.defaults.http,
-                service=service,
-                host=None,
-            )
-            if service
-            else None
-        )
-
         def _invoke():
+            bucket = (
+                get_bucket(
+                    http_config=config.defaults.http,
+                    service=service,
+                    host=None,
+                )
+                if service
+                else None
+            )
             if bucket is not None:
                 bucket.consume()
             return func()
@@ -373,10 +478,15 @@ class BaseResolver:
         )
 
 
+# --- Resolver Implementations ---
+
+
 class OBOResolver(BaseResolver):
     """Resolve ontologies hosted on the OBO Library using Bioregistry helpers."""
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Build a :class:`FetchPlan` by resolving OBO-hosted download URLs."""
+
         if get_obo_download is None or get_owl_download is None or get_rdf_download is None:
             raise UserConfigError(
                 "bioregistry is required for the OBO resolver. Install it with: pip install bioregistry"
@@ -432,6 +542,8 @@ class OLSResolver(BaseResolver):
         self.credentials_path = pystow.join("ontology-fetcher", "configs") / "ols_api_token.txt"
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Plan an OLS download by negotiating media type and authentication."""
+
         ontology_id = spec.id.lower()
         headers = self._build_polite_headers(config, logger)
         try:
@@ -516,6 +628,8 @@ class BioPortalResolver(BaseResolver):
         return None
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Plan a BioPortal download by combining ontology and submission metadata."""
+
         acronym = spec.extras.get("acronym", spec.id.upper())
         headers = self._build_polite_headers(config, logger)
         self._apply_headers_to_session(getattr(self.client, "session", None), headers)
@@ -619,6 +733,8 @@ class LOVResolver(BaseResolver):
                 yield from LOVResolver._iter_dicts(item)
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Plan a LOV download by inspecting linked metadata for URLs and licenses."""
+
         uri = spec.extras.get("uri")
         if not uri:
             raise UserConfigError("LOV resolver requires 'extras.uri'")
@@ -683,6 +799,8 @@ class SKOSResolver(BaseResolver):
     """Resolve SKOS vocabularies specified directly via configuration."""
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Plan a SKOS vocabulary download from explicit configuration metadata."""
+
         url = spec.extras.get("url")
         if not url:
             raise UserConfigError("SKOS resolver requires 'extras.url'")
@@ -711,6 +829,8 @@ class DirectResolver(BaseResolver):
     """Resolve direct download links specified in configuration extras."""
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Plan a direct download from declarative extras without discovery."""
+
         extras = spec.extras
         if not isinstance(extras, Mapping):
             raise UserConfigError("direct resolver expects spec.extras to be a mapping")
@@ -782,6 +902,8 @@ class XBRLResolver(BaseResolver):
     """Resolve XBRL taxonomy downloads from regulator endpoints."""
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Plan an XBRL taxonomy download using declarative resolver extras."""
+
         url = spec.extras.get("url")
         if not url:
             raise UserConfigError("XBRL resolver requires 'extras.url'")
@@ -816,6 +938,8 @@ class OntobeeResolver(BaseResolver):
     }
 
     def plan(self, spec, config: ResolvedConfig, logger: logging.Logger) -> FetchPlan:
+        """Plan an Ontobee download by composing the appropriate REST endpoint."""
+
         prefix = spec.id.strip()
         if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]+", prefix):
             raise UserConfigError("Ontobee resolver requires alphanumeric ontology id")

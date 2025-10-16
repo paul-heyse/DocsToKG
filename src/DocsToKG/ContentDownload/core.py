@@ -10,11 +10,15 @@ simplifying imports for both the CLI and resolver pipeline.
 
 from __future__ import annotations
 
+import hashlib
+import os
 import re
+import uuid
+from contextlib import suppress
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Union
 from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 
 __all__ = (
@@ -25,6 +29,8 @@ __all__ = (
     "DEFAULT_MIN_PDF_BYTES",
     "DEFAULT_TAIL_CHECK_BYTES",
     "WorkArtifact",
+    "atomic_write_bytes",
+    "atomic_write_text",
     "classify_payload",
     "_extract_filename_from_disposition",
     "_infer_suffix",
@@ -58,6 +64,43 @@ _SIZE_SUFFIXES = {
     "gb": 1024**3,
     "tb": 1024**4,
 }
+
+
+def atomic_write_bytes(
+    path: Path,
+    chunks: Iterable[bytes],
+    *,
+    hasher: Optional[Any] = None,
+) -> int:
+    """Atomically write ``chunks`` to ``path`` returning the byte count."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_name = f".{path.name}.{uuid.uuid4().hex}.tmp"
+    temp_path = path.with_name(temp_name)
+    written = 0
+    replaced = False
+    try:
+        with temp_path.open("wb") as handle:
+            for chunk in chunks:
+                if not chunk:
+                    continue
+                handle.write(chunk)
+                written += len(chunk)
+                if hasher is not None:
+                    hasher.update(chunk)
+        os.replace(temp_path, path)
+        replaced = True
+        return written
+    finally:
+        if not replaced:
+            with suppress(FileNotFoundError):
+                temp_path.unlink()
+
+
+def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None:
+    """Atomically write ``text`` to ``path`` using :func:`atomic_write_bytes`."""
+
+    atomic_write_bytes(path, [text.encode(encoding)])
 
 
 @dataclass

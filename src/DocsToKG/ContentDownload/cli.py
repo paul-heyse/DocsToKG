@@ -151,6 +151,7 @@ import os
 import shutil
 import threading
 import time
+import uuid
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -183,6 +184,7 @@ from DocsToKG.ContentDownload.core import (
     Classification,
     ReasonCode,
     WorkArtifact,
+    atomic_write_text,
     _infer_suffix,
     classify_payload,
     dedupe,
@@ -296,6 +298,7 @@ class DownloadOptions:
     dry_run: bool
     list_only: bool
     extract_html_text: bool
+    run_id: str
     previous_lookup: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     resume_completed: Set[str] = field(default_factory=set)
     max_bytes: Optional[int] = None
@@ -1354,7 +1357,7 @@ def download_candidate(
                     else:
                         if text:
                             text_path = dest_path.with_suffix(dest_path.suffix + ".txt")
-                            text_path.write_text(text, encoding="utf-8")
+                            atomic_write_text(text_path, text)
                             extracted_text_path = str(text_path)
 
             return _build_download_outcome(
@@ -1452,6 +1455,7 @@ def process_one_work(
         Exception: Bubbling from resolver pipeline internals when not handled.
     """
     artifact = create_artifact(work, pdf_dir=pdf_dir, html_dir=html_dir)
+    run_id = options.run_id
     dry_run = options.dry_run
     list_only = options.list_only
     extract_html_text = options.extract_html_text
@@ -1550,6 +1554,7 @@ def process_one_work(
             outcome=skipped_outcome,
             html_paths=[],
             dry_run=dry_run,
+            run_id=run_id,
             reason=ReasonCode.RESUME_COMPLETE,
             reason_detail="resume-complete",
         )
@@ -1575,6 +1580,7 @@ def process_one_work(
             outcome=existing_outcome,
             html_paths=[],
             dry_run=dry_run,
+            run_id=run_id,
             reason=ReasonCode.ALREADY_DOWNLOADED,
             reason_detail="already-downloaded",
         )
@@ -1597,6 +1603,7 @@ def process_one_work(
             outcome=pipeline_result.outcome,
             html_paths=html_paths_total,
             dry_run=dry_run,
+            run_id=run_id,
         )
         logger.log_manifest(entry)
         if pipeline_result.outcome.is_pdf:
@@ -1655,6 +1662,7 @@ def process_one_work(
             pass
     logger.log_attempt(
         AttemptRecord(
+            run_id=run_id,
             work_id=artifact.work_id,
             resolver_name="final",
             resolver_order=None,
@@ -1682,6 +1690,7 @@ def process_one_work(
         outcome=outcome,
         html_paths=html_paths_total,
         dry_run=dry_run,
+        run_id=run_id,
         reason=reason_code,
     )
     logger.log_manifest(entry)
@@ -1967,6 +1976,7 @@ def main() -> None:
         help="Extract plaintext from HTML fallbacks (requires trafilatura).",
     )
     args = parser.parse_args()
+    run_id = uuid.uuid4().hex
 
     if args.workers < 1:
         parser.error("--workers must be >= 1")
@@ -2128,6 +2138,7 @@ def main() -> None:
             dry_run=args.dry_run,
             list_only=args.list_only,
             extract_html_text=args.extract_html_text,
+            run_id=run_id,
             previous_lookup=resume_lookup,
             resume_completed=resume_completed,
             max_bytes=args.max_bytes,
@@ -2146,6 +2157,7 @@ def main() -> None:
             metrics=metrics,
             initial_seen_urls=persistent_seen_urls if config.enable_global_url_dedup else None,
             global_manifest_index=previous_url_index if config.enable_global_url_dedup else {},
+            run_id=run_id,
         )
 
         def _session_factory() -> requests.Session:
@@ -2289,6 +2301,7 @@ def main() -> None:
             reason_totals = summary.get("reason_totals", {})
             classification_totals = summary.get("classification_totals", {})
             summary_record = {
+                "run_id": run_id,
                 "processed": processed,
                 "saved": saved,
                 "html_only": html_only,
@@ -2312,9 +2325,9 @@ def main() -> None:
             metrics_path = manifest_path.with_suffix(".metrics.json")
             try:
                 ensure_dir(metrics_path.parent)
-                metrics_path.write_text(
+                atomic_write_text(
+                    metrics_path,
                     json.dumps(summary_record, indent=2, sort_keys=True) + "\n",
-                    encoding="utf-8",
                 )
             except Exception:
                 LOGGER.warning("Failed to write metrics sidecar %s", metrics_path, exc_info=True)
@@ -2356,6 +2369,7 @@ def main() -> None:
 
     if not summary_record:
         summary_record = {
+            "run_id": run_id,
             "processed": processed,
             "saved": saved,
             "html_only": html_only,

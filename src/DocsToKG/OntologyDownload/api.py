@@ -1,7 +1,7 @@
 # === NAVMAP v1 ===
 # {
 #   "module": "DocsToKG.OntologyDownload.api",
-#   "purpose": "Command-line interface and helpers for ontology downloads",
+#   "purpose": "CLI entry points for ontology downloads",
 #   "sections": [
 #     {
 #       "id": "main",
@@ -121,6 +121,36 @@
 #       "id": "plan-to-dict",
 #       "name": "_plan_to_dict",
 #       "anchor": "function-plan-to-dict",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-json-atomic",
+#       "name": "_write_json_atomic",
+#       "anchor": "function-write-json-atomic",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-lockfile",
+#       "name": "_write_lockfile",
+#       "anchor": "function-write-lockfile",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load-lockfile-payload",
+#       "name": "_load_lockfile_payload",
+#       "anchor": "function-load-lockfile-payload",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "spec-from-lock-entry",
+#       "name": "_spec_from_lock_entry",
+#       "anchor": "function-spec-from-lock-entry",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "specs-from-lock-payload",
+#       "name": "_specs_from_lock_payload",
+#       "anchor": "function-specs-from-lock-payload",
 #       "kind": "function"
 #     },
 #     {

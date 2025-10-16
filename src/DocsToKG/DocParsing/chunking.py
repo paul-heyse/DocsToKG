@@ -17,6 +17,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "chunkercfg",
+#       "name": "ChunkerCfg",
+#       "anchor": "class-chunkercfg",
+#       "kind": "class"
+#     },
+#     {
 #       "id": "read-utf8",
 #       "name": "read_utf8",
 #       "anchor": "function-read-utf8",
@@ -137,12 +143,13 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import os
 import time
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
-from typing import List, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 # Third-party imports
 from docling_core.transforms.chunker.base import BaseChunk
@@ -155,6 +162,7 @@ from transformers import AutoTokenizer
 
 __all__ = (
     "Rec",
+    "ChunkerCfg",
     "build_doc",
     "build_parser",
     "coalesce_small_runs",
@@ -171,8 +179,11 @@ __all__ = (
 from DocsToKG.DocParsing.core import (
     DEFAULT_SERIALIZER_PROVIDER,
     DEFAULT_TOKENIZER,
+    StageConfigBase,
     DEFAULT_CAPTION_MARKERS,
     DEFAULT_HEADING_MARKERS,
+    CLIOption,
+    build_subcommand,
     ChunkResult,
     ChunkTask,
     ChunkWorkerConfig,
@@ -281,6 +292,174 @@ DEFAULT_IN_DIR = data_doctags(DEFAULT_DATA_ROOT)
 DEFAULT_OUT_DIR = data_chunks(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "chunks"
 
+
+@dataclass
+class ChunkerCfg(StageConfigBase):
+    """Configuration values for the chunking stage."""
+
+    log_level: str = "INFO"
+    data_root: Optional[Path] = None
+    in_dir: Path = DEFAULT_IN_DIR
+    out_dir: Path = DEFAULT_OUT_DIR
+    min_tokens: int = 256
+    max_tokens: int = 512
+    shard_count: int = 1
+    shard_index: int = 0
+    tokenizer_model: str = DEFAULT_TOKENIZER
+    soft_barrier_margin: int = SOFT_BARRIER_MARGIN
+    structural_markers: Optional[Path] = None
+    serializer_provider: str = DEFAULT_SERIALIZER_PROVIDER
+    workers: int = 1
+    validate_only: bool = False
+    resume: bool = False
+    force: bool = False
+
+    ENV_VARS: ClassVar[Dict[str, str]] = {
+        "log_level": "DOCSTOKG_CHUNK_LOG_LEVEL",
+        "data_root": "DOCSTOKG_CHUNK_DATA_ROOT",
+        "in_dir": "DOCSTOKG_CHUNK_IN_DIR",
+        "out_dir": "DOCSTOKG_CHUNK_OUT_DIR",
+        "min_tokens": "DOCSTOKG_CHUNK_MIN_TOKENS",
+        "max_tokens": "DOCSTOKG_CHUNK_MAX_TOKENS",
+        "shard_count": "DOCSTOKG_CHUNK_SHARD_COUNT",
+        "shard_index": "DOCSTOKG_CHUNK_SHARD_INDEX",
+        "tokenizer_model": "DOCSTOKG_CHUNK_TOKENIZER",
+        "soft_barrier_margin": "DOCSTOKG_CHUNK_SOFT_BARRIER_MARGIN",
+        "structural_markers": "DOCSTOKG_CHUNK_STRUCTURAL_MARKERS",
+        "serializer_provider": "DOCSTOKG_CHUNK_SERIALIZER_PROVIDER",
+        "workers": "DOCSTOKG_CHUNK_WORKERS",
+        "validate_only": "DOCSTOKG_CHUNK_VALIDATE_ONLY",
+        "resume": "DOCSTOKG_CHUNK_RESUME",
+        "force": "DOCSTOKG_CHUNK_FORCE",
+        "config": "DOCSTOKG_CHUNK_CONFIG",
+    }
+
+    FIELD_PARSERS: ClassVar[Dict[str, Callable[[Any, Optional[Path]], Any]]] = {
+        "config": StageConfigBase._coerce_optional_path,
+        "log_level": StageConfigBase._coerce_str,
+        "data_root": StageConfigBase._coerce_optional_path,
+        "in_dir": StageConfigBase._coerce_path,
+        "out_dir": StageConfigBase._coerce_path,
+        "min_tokens": StageConfigBase._coerce_int,
+        "max_tokens": StageConfigBase._coerce_int,
+        "shard_count": StageConfigBase._coerce_int,
+        "shard_index": StageConfigBase._coerce_int,
+        "tokenizer_model": StageConfigBase._coerce_str,
+        "soft_barrier_margin": StageConfigBase._coerce_int,
+        "structural_markers": StageConfigBase._coerce_optional_path,
+        "serializer_provider": StageConfigBase._coerce_str,
+        "workers": StageConfigBase._coerce_int,
+        "validate_only": StageConfigBase._coerce_bool,
+        "resume": StageConfigBase._coerce_bool,
+        "force": StageConfigBase._coerce_bool,
+    }
+
+    @classmethod
+    def from_sources(cls, args: argparse.Namespace) -> "ChunkerCfg":
+        """Create a configuration by layering env vars, config files, and CLI args."""
+        cfg = cls()
+        cfg.apply_env()
+        if cfg.data_root is None:
+            fallback_root = os.getenv("DOCSTOKG_DATA_ROOT")
+            if fallback_root:
+                cfg.data_root = StageConfigBase._coerce_optional_path(fallback_root, None)
+        config_path = getattr(args, "config", None)
+        if config_path:
+            cfg.update_from_file(config_path)
+        cfg.apply_args(args)
+        cfg.finalize()
+        return cfg
+
+    def finalize(self) -> None:
+        """Normalise paths, casing, and defaults after all inputs are merged."""
+        if self.data_root is not None:
+            self.data_root = StageConfigBase._coerce_optional_path(self.data_root, None)
+        self.in_dir = StageConfigBase._coerce_path(self.in_dir, None)
+        self.out_dir = StageConfigBase._coerce_path(self.out_dir, None)
+        if self.structural_markers is not None:
+            self.structural_markers = StageConfigBase._coerce_optional_path(
+                self.structural_markers, None
+            )
+        if self.config is not None:
+            self.config = StageConfigBase._coerce_optional_path(self.config, None)
+        self.log_level = str(self.log_level).upper()
+        self.serializer_provider = str(self.serializer_provider)
+CHUNK_CLI_OPTIONS: Tuple[CLIOption, ...] = (
+    CLIOption(
+        ("--config",),
+        {"type": Path, "default": None, "help": "Path to stage config file (JSON/YAML/TOML)."},
+    ),
+    CLIOption(("--in-dir",), {"type": Path, "default": DEFAULT_IN_DIR}),
+    CLIOption(("--out-dir",), {"type": Path, "default": DEFAULT_OUT_DIR}),
+    CLIOption(("--min-tokens",), {"type": int, "default": 256}),
+    CLIOption(("--max-tokens",), {"type": int, "default": 512}),
+    CLIOption(
+        ("--log-level",),
+        {
+            "type": lambda value: str(value).upper(),
+            "default": "INFO",
+            "choices": ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+            "help": "Logging verbosity for console output (default: %(default)s).",
+        },
+    ),
+    CLIOption(
+        ("--shard-count",),
+        {"type": int, "default": 1, "help": "Total number of shards for distributed runs (default: %(default)s)."},
+    ),
+    CLIOption(
+        ("--shard-index",),
+        {"type": int, "default": 0, "help": "Zero-based shard index to process (default: %(default)s)."},
+    ),
+    CLIOption(
+        ("--tokenizer-model",),
+        {
+            "type": str,
+            "default": DEFAULT_TOKENIZER,
+            "help": (
+                "HuggingFace tokenizer model (default aligns with dense embedder: "
+                f"{DEFAULT_TOKENIZER})."
+            ),
+        },
+    ),
+    CLIOption(
+        ("--soft-barrier-margin",),
+        {"type": int, "default": SOFT_BARRIER_MARGIN, "help": "Token margin applied when respecting structural boundaries (default: 64)."},
+    ),
+    CLIOption(
+        ("--structural-markers",),
+        {
+            "type": Path,
+            "default": None,
+            "help": (
+                "Optional JSON/YAML/TOML file listing additional heading prefixes "
+                "(and optionally caption prefixes) to treat as structural boundaries."
+            ),
+        },
+    ),
+    CLIOption(
+        ("--serializer-provider",),
+        {
+            "type": str,
+            "default": DEFAULT_SERIALIZER_PROVIDER,
+            "help": (
+                "Import path (module:Class) for the serializer provider used to build Docling "
+                f"chunkers (default: {DEFAULT_SERIALIZER_PROVIDER})."
+            ),
+        },
+    ),
+    CLIOption(
+        ("--heading-markers",),
+        {"dest": "structural_markers", "type": Path, "help": argparse.SUPPRESS},
+    ),
+    CLIOption(
+        ("--workers",),
+        {"type": int, "default": 1, "help": "Number of worker processes for chunking (default: 1)."},
+    ),
+    CLIOption(
+        ("--validate-only",),
+        {"action": "store_true", "help": "Validate chunk files and exit without producing new outputs."},
+    ),
+)
 
 _LOGGER = get_logger(__name__)
 
@@ -903,76 +1082,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser()
     add_data_root_option(parser)
-    parser.add_argument("--in-dir", type=Path, default=DEFAULT_IN_DIR)
-    parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
-    parser.add_argument("--min-tokens", type=int, default=256)
-    parser.add_argument("--max-tokens", type=int, default=512)
-    parser.add_argument(
-        "--log-level",
-        type=lambda value: str(value).upper(),
-        default="INFO",
-        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
-        help="Logging verbosity for console output (default: %(default)s).",
-    )
-    parser.add_argument(
-        "--shard-count",
-        type=int,
-        default=1,
-        help="Total number of shards for distributed runs (default: %(default)s).",
-    )
-    parser.add_argument(
-        "--shard-index",
-        type=int,
-        default=0,
-        help="Zero-based shard index to process (default: %(default)s).",
-    )
-    parser.add_argument(
-        "--tokenizer-model",
-        type=str,
-        default=DEFAULT_TOKENIZER,
-        help=f"HuggingFace tokenizer model (default aligns with dense embedder: {DEFAULT_TOKENIZER}).",
-    )
-    parser.add_argument(
-        "--soft-barrier-margin",
-        type=int,
-        default=SOFT_BARRIER_MARGIN,
-        help="Token margin applied when respecting structural boundaries (default: 64).",
-    )
-    parser.add_argument(
-        "--structural-markers",
-        type=Path,
-        default=None,
-        help=(
-            "Optional YAML/JSON file listing additional heading prefixes "
-            "(and optionally caption prefixes) to treat as structural boundaries."
-        ),
-    )
-    parser.add_argument(
-        "--serializer-provider",
-        type=str,
-        default=DEFAULT_SERIALIZER_PROVIDER,
-        help=(
-            "Import path (module:Class) for the serializer provider used to build Docling chunkers "
-            f"(default: {DEFAULT_SERIALIZER_PROVIDER})."
-        ),
-    )
-    parser.add_argument(
-        "--heading-markers",
-        dest="structural_markers",
-        type=Path,
-        help=argparse.SUPPRESS,
-    )
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=1,
-        help="Number of worker processes for chunking (default: 1).",
-    )
-    parser.add_argument(
-        "--validate-only",
-        action="store_true",
-        help="Validate chunk files and exit without producing new outputs.",
-    )
+    build_subcommand(parser, CHUNK_CLI_OPTIONS)
     add_resume_force_options(
         parser,
         resume_help="Skip DocTags whose chunk outputs already exist with matching hash",

@@ -273,6 +273,19 @@ def sha256_file(path: Path) -> str:
     return hasher.hexdigest()
 
 
+def _compute_file_hash(path: Path, algorithm: str) -> str:
+    """Compute ``algorithm`` digest for ``path``."""
+
+    try:
+        hasher = hashlib.new(algorithm)
+    except ValueError as exc:  # pragma: no cover - defensive guard for unsupported algs
+        raise ValueError(f"Unsupported checksum algorithm '{algorithm}'") from exc
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1 << 20), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
 _MAX_COMPRESSION_RATIO = 10.0
 
 
@@ -1396,6 +1409,15 @@ class StreamingDownloader(pooch.HTTPDownloader):
         destination_part_path.unlink(missing_ok=True)
 
 
+def _extract_correlation_id(logger: logging.Logger) -> Optional[str]:
+    extra = getattr(logger, "extra", None)
+    if isinstance(extra, dict):
+        value = extra.get("correlation_id")
+        if isinstance(value, str):
+            return value
+    return None
+
+
 def download_stream(
     *,
     url: str,
@@ -1438,9 +1460,15 @@ def download_stream(
 
     start_time = time.monotonic()
     log_memory_usage(logger, stage="download", event="before")
+    polite_headers = http_config.polite_http_headers(
+        correlation_id=_extract_correlation_id(logger)
+    )
+    merged_headers: Dict[str, str] = dict(polite_headers)
+    merged_headers.update({str(k): str(v) for k, v in headers.items()})
+
     downloader = StreamingDownloader(
         destination=destination,
-        headers=headers,
+        headers=merged_headers,
         http_config=http_config,
         previous_manifest=previous_manifest,
         logger=logger,
@@ -1467,21 +1495,79 @@ def download_stream(
                 content_length = None
         return content_type, content_length
 
+    expected_algorithm: Optional[str] = None
+    expected_digest: Optional[str] = None
+    pooch_known_hash: Optional[str] = None
+    if expected_hash:
+        parts = expected_hash.split(":", 1)
+        if len(parts) == 2:
+            candidate_algorithm = parts[0].strip().lower()
+            candidate_digest = parts[1].strip().lower()
+            if candidate_algorithm and candidate_digest:
+                expected_algorithm = candidate_algorithm
+                expected_digest = candidate_digest
+                if candidate_algorithm in {"md5", "sha256", "sha512"}:
+                    pooch_known_hash = f"{candidate_algorithm}:{candidate_digest}"
+        else:
+            logger.warning(
+                "expected checksum malformed",
+                extra={"stage": "download", "checksum": expected_hash, "url": secure_url},
+            )
+
     cache_dir.mkdir(parents=True, exist_ok=True)
     safe_name = sanitize_filename(destination.name)
     url_hash = hashlib.sha256(secure_url.encode("utf-8")).hexdigest()[:12]
     cache_key = f"{url_hash}_{safe_name}"
+    cached_path_ref: Optional[Path] = None
+
+    def _verify_expected_checksum(sha256_value: Optional[str]) -> None:
+        if not expected_algorithm or not expected_digest:
+            return
+        try:
+            if expected_algorithm == "sha256" and sha256_value is not None:
+                actual = sha256_value.lower()
+            else:
+                actual = _compute_file_hash(destination, expected_algorithm).lower()
+        except ValueError:
+            logger.warning(
+                "unsupported checksum algorithm",
+                extra={
+                    "stage": "download",
+                    "algorithm": expected_algorithm,
+                    "url": secure_url,
+                },
+            )
+            return
+        if actual != expected_digest:
+            logger.error(
+                "checksum mismatch detected",
+                extra={
+                    "stage": "download",
+                    "expected": f"{expected_algorithm}:{expected_digest}",
+                    "actual": actual,
+                    "url": secure_url,
+                },
+            )
+            destination.unlink(missing_ok=True)
+            if cached_path_ref is not None:
+                cached_path_ref.unlink(missing_ok=True)
+            raise DownloadFailure(
+                f"Checksum mismatch for {secure_url}",
+                retryable=False,
+            )
+
     try:
         cached_path = Path(
             pooch.retrieve(
                 secure_url,
                 path=cache_dir,
                 fname=cache_key,
-                known_hash=expected_hash,
+                known_hash=pooch_known_hash,
                 downloader=downloader,
                 progressbar=False,
             )
         )
+        cached_path_ref = cached_path
     except requests.HTTPError as exc:
         status_code = getattr(getattr(exc, "response", None), "status_code", None)
         message = f"HTTP error while downloading {secure_url}: {exc}"
@@ -1524,6 +1610,7 @@ def download_stream(
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(cached_path, destination)
         sha256 = sha256_file(destination)
+        _verify_expected_checksum(sha256)
         log_memory_usage(logger, stage="download", event="after")
         content_type, content_length = _resolved_content_metadata()
         return DownloadResult(
@@ -1539,8 +1626,9 @@ def download_stream(
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(cached_path, destination)
     sha256 = sha256_file(destination)
-    expected_hash = previous_manifest.get("sha256") if previous_manifest else None
-    if expected_hash and expected_hash != sha256:
+    _verify_expected_checksum(sha256)
+    previous_sha256 = previous_manifest.get("sha256") if previous_manifest else None
+    if previous_sha256 and previous_sha256 != sha256:
         logger.error(
             "sha256 mismatch detected",
             extra={

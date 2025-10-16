@@ -356,6 +356,10 @@ class ProvenanceMetadata(BaseModel):
         le=1.0,
         description="Confidence score associated with image annotations when available",
     )
+    picture_meta: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Machine-readable picture metadata emitted by serializers (captions, classifications, SMILES).",
+    )
 
     @field_validator("parse_engine")
     @classmethod

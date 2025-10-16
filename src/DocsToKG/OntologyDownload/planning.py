@@ -125,6 +125,7 @@ MANIFEST_JSON_SCHEMA: Dict[str, Any] = {
         "content_type": {"type": ["string", "null"]},
         "content_length": {"type": ["integer", "null"], "minimum": 0},
         "source_media_type_label": {"type": ["string", "null"]},
+        "streaming_prefix_sha256": {"type": ["string", "null"]},
         "expected_checksum": {
             "type": ["object", "null"],
             "properties": {
@@ -609,6 +610,7 @@ class Manifest:
     content_type: Optional[str] = None
     content_length: Optional[int] = None
     source_media_type_label: Optional[str] = None
+    streaming_prefix_sha256: Optional[str] = None
     expected_checksum: Optional[ExpectedChecksum] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -638,6 +640,7 @@ class Manifest:
             "content_type": self.content_type,
             "content_length": self.content_length,
             "source_media_type_label": self.source_media_type_label,
+            "streaming_prefix_sha256": self.streaming_prefix_sha256,
             "expected_checksum": (
                 self.expected_checksum.to_mapping() if self.expected_checksum else None
             ),
@@ -1163,6 +1166,10 @@ def _validate_manifest(manifest: Manifest) -> None:
         raise ConfigurationError("Manifest normalized_sha256 must be a string when provided")
     if manifest.fingerprint is not None and not isinstance(manifest.fingerprint, str):
         raise ConfigurationError("Manifest fingerprint must be a string when provided")
+    if manifest.streaming_prefix_sha256 is not None and not isinstance(
+        manifest.streaming_prefix_sha256, str
+    ):
+        raise ConfigurationError("Manifest streaming_prefix_sha256 must be a string when provided")
 
 
 def _parse_last_modified(value: Optional[str]) -> Optional[datetime]:
@@ -1671,6 +1678,15 @@ def fetch_one(
                     if isinstance(maybe_mode, str):
                         normalization_mode = maybe_mode
 
+                streaming_prefix_hash = None
+                for item in validation_results.values():
+                    details = getattr(item, "details", None)
+                    if isinstance(details, dict):
+                        maybe_stream = details.get("streaming_prefix_sha256")
+                        if isinstance(maybe_stream, str):
+                            streaming_prefix_hash = maybe_stream
+                            break
+
                 target_formats_sorted = ",".join(sorted(effective_spec.target_formats))
 
                 fingerprint_components = [
@@ -1715,6 +1731,7 @@ def fetch_one(
                     content_type=content_type,
                     content_length=content_length,
                     source_media_type_label=source_media_label,
+                    streaming_prefix_sha256=streaming_prefix_hash,
                     expected_checksum=expected_checksum,
                     downloaded_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                     target_formats=effective_spec.target_formats,

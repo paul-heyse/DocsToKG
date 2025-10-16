@@ -1,0 +1,34 @@
+{
+  "entries": [
+    {
+      "candidates": [
+        {
+          "headers": {},
+          "last_modified": null,
+          "license": "CC-BY",
+          "media_type": "application/rdf+xml",
+          "resolver": "obo",
+          "service": "obo",
+          "url": "https://example.org/doc.owl",
+          "version": "2024-01-01"
+        }
+      ],
+      "content_length": 4096,
+      "etag": "\"abc123\"",
+      "headers": {},
+      "id": "hp",
+      "last_modified": "Tue, 01 Aug 2023 00:00:00 GMT",
+      "license": "CC-BY",
+      "media_type": "application/rdf+xml",
+      "resolver": "obo",
+      "service": "obo",
+      "target_formats": [
+        "owl"
+      ],
+      "url": "https://example.org/doc.owl",
+      "version": "2024-01-01"
+    }
+  ],
+  "generated_at": "2025-10-16T21:31:18.841026Z",
+  "schema_version": "1.0"
+}

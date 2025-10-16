@@ -345,12 +345,14 @@ class ResultShaper:
         device: int = 0,
         resources: Optional["faiss.StandardGpuResources"] = None,
         channel_weights: Optional[Mapping[str, float]] = None,
+        fp16_enabled: bool = False,
     ) -> None:
         self._opensearch = opensearch
         self._fusion_config = fusion_config
         self._gpu_device = int(device)
         self._gpu_resources = resources
         self._channel_weights = dict(channel_weights or {})
+        self._fp16_enabled = bool(fp16_enabled)
 
     def shape(
         self,
@@ -449,6 +451,7 @@ class ResultShaper:
                 k=1,
                 device=self._gpu_device,
                 resources=resources,
+                use_fp16=self._fp16_enabled,
             )
             return float(top1[0, 0]) >= self._fusion_config.cosine_dedupe_threshold
         query_norm = np.linalg.norm(query)
@@ -479,6 +482,7 @@ def apply_mmr_diversification(
     embeddings: Optional[np.ndarray] = None,
     device: int = 0,
     resources: Optional["faiss.StandardGpuResources"] = None,
+    use_fp16: bool = False,
 ) -> List[FusionCandidate]:
     """Diversify fused candidates using Maximum Marginal Relevance.
 
@@ -556,6 +560,7 @@ def apply_mmr_diversification(
                     k=pool.shape[0],
                     device=device,
                     resources=resources,
+                    use_fp16=use_fp16,
                 )
                 sims = np.full(pool.shape[0], -np.inf, dtype=np.float32)
                 order = indices_block[0]
@@ -639,6 +644,13 @@ class HybridSearchService:
         self._faiss = self._faiss_router.default_store
         self._faiss_router.set_resolver(self._registry.resolve_faiss_id)
         self._dense_strategy = DenseSearchStrategy()
+        self._executor = ThreadPoolExecutor(max_workers=3)
+
+    def close(self) -> None:
+        """Release pooled resources held by the service."""
+
+        self._executor.shutdown(wait=False)
+
 
     def search(self, request: HybridSearchRequest) -> HybridSearchResponse:
         """Execute a hybrid retrieval round trip for ``request``.
@@ -674,25 +686,24 @@ class HybridSearchService:
             except AttributeError:
                 dense_stats = None
 
-            with ThreadPoolExecutor(max_workers=3) as pool:
-                f_bm25 = pool.submit(
-                    self._execute_bm25, request, filters, config, query_features, timings
-                )
-                f_splade = pool.submit(
-                    self._execute_splade, request, filters, config, query_features, timings
-                )
-                f_dense = pool.submit(
-                    self._execute_dense,
-                    request,
-                    filters,
-                    config,
-                    query_features,
-                    timings,
-                    dense_store,
-                )
-                bm25 = f_bm25.result()
-                splade = f_splade.result()
-                dense = f_dense.result()
+            f_bm25 = self._executor.submit(
+                self._execute_bm25, request, filters, config, query_features, timings
+            )
+            f_splade = self._executor.submit(
+                self._execute_splade, request, filters, config, query_features, timings
+            )
+            f_dense = self._executor.submit(
+                self._execute_dense,
+                request,
+                filters,
+                config,
+                query_features,
+                timings,
+                dense_store,
+            )
+            bm25 = f_bm25.result()
+            splade = f_splade.result()
+            dense = f_dense.result()
 
             embedding_cache: Dict[str, np.ndarray] = {}
             if dense.embeddings is not None:
@@ -734,6 +745,7 @@ class HybridSearchService:
                     np.stack([_resolve_embedding(candidate) for candidate in unique_candidates]),
                     dtype=np.float32,
                 )
+                normalize_rows(unique_embeddings)
                 embedding_index = {
                     candidate.chunk.vector_id: idx
                     for idx, candidate in enumerate(unique_candidates)
@@ -760,6 +772,7 @@ class HybridSearchService:
                 )
                 device_id = dense_stats.device if dense_stats is not None else dense_store.device
                 resources = dense_stats.resources if dense_stats is not None else None
+                fp16_enabled = bool(dense_stats.fp16_enabled) if dense_stats is not None else False
                 selected = apply_mmr_diversification(
                     pool,
                     fused_scores,
@@ -768,6 +781,7 @@ class HybridSearchService:
                     embeddings=pool_embeddings,
                     device=device_id,
                     resources=resources,
+                    use_fp16=fp16_enabled,
                 )
                 selected_ids = {candidate.chunk.vector_id for candidate in selected}
                 pool_remaining = [
@@ -815,6 +829,7 @@ class HybridSearchService:
                 device=(dense_stats.device if dense_stats is not None else dense_store.device),
                 resources=dense_stats.resources if dense_stats is not None else None,
                 channel_weights=adaptive_weights,
+                fp16_enabled=bool(dense_stats.fp16_enabled) if dense_stats is not None else False,
             )
             shaped = shaper.shape(
                 ordered_chunks,
@@ -848,13 +863,22 @@ class HybridSearchService:
                     }
                 },
             )
+            stats_snapshot = build_stats_snapshot(dense_store, self._opensearch, self._registry)
+            if adapter_stats is not None:
+                faiss_stats = stats_snapshot.get("faiss")
+                if isinstance(faiss_stats, Mapping):
+                    faiss_stats = dict(faiss_stats)
+                else:
+                    faiss_stats = {}
+                faiss_stats["nprobe_effective"] = adapter_stats.nprobe
+                stats_snapshot["faiss"] = faiss_stats
             return HybridSearchResponse(
                 results=page_results,
                 next_cursor=next_cursor,
                 total_candidates=len(unique_candidates),
                 timings_ms=timings,
                 fusion_weights=dict(adaptive_weights),
-                stats=build_stats_snapshot(dense_store, self._opensearch, self._registry),
+                stats=stats_snapshot,
             )
 
     def _validate_request(self, request: HybridSearchRequest) -> None:
@@ -1147,6 +1171,11 @@ class HybridSearchService:
         hits = run_dense_search(effective_k)
         filtered, payloads = self._filter_dense_hits(hits, filters)
         observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
+        self._observability.metrics.set_gauge(
+            "dense_pass_through_rate",
+            float(observed),
+            namespace=request.namespace or "*",
+        )
         blended_pass = (
             strategy.observe_pass_rate(signature, observed)
             if not cached_signature
@@ -2213,12 +2242,14 @@ class HybridSearchValidator:
                 perturb_hits += 1
 
             if resources is not None:
+                fp16_enabled = bool(adapter_stats.fp16_enabled) if adapter_stats is not None else False
                 _scores, indices_block = cosine_topk_blockwise(
                     query_vec,
                     vector_matrix,
                     k=top_k,
                     device=device,
                     resources=resources,
+                    use_fp16=fp16_enabled,
                 )
                 top_indices = indices_block[0].astype(int, copy=False)
             else:
