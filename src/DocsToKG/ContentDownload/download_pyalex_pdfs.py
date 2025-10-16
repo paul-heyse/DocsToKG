@@ -63,6 +63,7 @@ from DocsToKG.ContentDownload.network import (
     ConditionalRequestHelper,
     ModifiedResult,
     create_session,
+    head_precheck,
     request_with_retries,
 )
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
@@ -109,57 +110,6 @@ def _has_pdf_eof(path: Path) -> bool:
             return "%%EOF" in tail
     except OSError:
         return False
-
-
-def _head_precheck_candidate(
-    session: requests.Session,
-    url: str,
-    timeout: float,
-) -> bool:
-    """Evaluate whether ``url`` is likely to return a PDF payload.
-
-    The helper performs a single HEAD request with a tight timeout budget
-    to avoid fetching large payloads unnecessarily. Tests rely on this
-    behaviour to ensure dry-run execution does not trigger streaming
-    downloads.
-
-    Args:
-        session: HTTP session used for the outbound HEAD request.
-        url: Candidate download URL that should be validated.
-        timeout: Per-request timeout budget, in seconds.
-
-    Returns:
-        ``True`` when the HEAD response suggests the URL returns a PDF;
-        ``False`` when the response clearly indicates HTML or a missing file.
-    """
-
-    try:
-        response = request_with_retries(
-            session,
-            "HEAD",
-            url,
-            max_retries=1,
-            timeout=min(timeout, 5.0),
-            allow_redirects=True,
-        )
-    except Exception:
-        return True
-
-    try:
-        if response.status_code not in {200, 302, 304}:
-            return False
-
-        content_type = (response.headers.get("Content-Type") or "").lower()
-        content_length = response.headers.get("Content-Length", "")
-
-        if "text/html" in content_type:
-            return False
-        if content_length == "0":
-            return False
-
-        return True
-    finally:
-        response.close()
 
 
 def slugify(text: str, keep: int = 80) -> str:
@@ -627,6 +577,9 @@ class CsvAttemptLoggerAdapter:
             None
         """
         self._logger.close()
+        with self._lock:
+            if not self._file.closed:
+                self._file.close()
 
     def __enter__(self) -> "CsvAttemptLoggerAdapter":
         """Return ``self`` when used as a context manager.
@@ -653,9 +606,6 @@ class CsvAttemptLoggerAdapter:
         """
 
         self.close()
-        with self._lock:
-            if not self._file.closed:
-                self._file.close()
 
 
 def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
@@ -1325,7 +1275,7 @@ def download_candidate(
     dry_run = bool(context.get("dry_run", False))
     head_precheck_passed = head_precheck_passed or bool(context.get("head_precheck_passed", False))
     if not head_precheck_passed and not context.get("skip_head_precheck", False):
-        head_precheck_passed = _head_precheck_candidate(session, url, timeout)
+        head_precheck_passed = head_precheck(session, url, timeout)
         context["head_precheck_passed"] = head_precheck_passed
     extract_html_text = bool(context.get("extract_html_text", False))
     previous_map: Dict[str, Dict[str, Any]] = context.get("previous", {})
@@ -1579,6 +1529,16 @@ def read_resolver_config(path: Path) -> Dict[str, Any]:
         return yaml.safe_load(text) or {}
 
 
+def _seed_resolver_toggle_defaults(
+    config: ResolverConfig, resolver_names: Sequence[str]
+) -> None:
+    """Ensure resolver toggles include defaults for every known resolver."""
+
+    for name in resolver_names:
+        default_enabled = resolvers.DEFAULT_RESOLVER_TOGGLES.get(name, True)
+        config.resolver_toggles.setdefault(name, default_enabled)
+
+
 def apply_config_overrides(
     config: ResolverConfig,
     data: Dict[str, Any],
@@ -1589,7 +1549,7 @@ def apply_config_overrides(
     Args:
         config: Resolver configuration object to mutate.
         data: Mapping loaded from a configuration file.
-        resolver_names: Known resolver names to seed toggle defaults.
+        resolver_names: Known resolver names. Defaults are applied after overrides.
 
     Returns:
         None
@@ -1619,9 +1579,8 @@ def apply_config_overrides(
         legacy_limits = data.get("resolver_rate_limits") or {}
         config.resolver_min_interval_s.update(legacy_limits)
 
-    for name in resolver_names:
-        default_enabled = name not in {"openaire", "hal", "osf"}
-        config.resolver_toggles.setdefault(name, default_enabled)
+    # Resolver toggle defaults are applied once after all overrides via
+    # ``_seed_resolver_toggle_defaults`` to ensure a single source of truth.
 
 
 def load_resolver_config(
@@ -1679,15 +1638,13 @@ def load_resolver_config(
                 ordered.append(name)
         config.resolver_order = ordered
 
-    for name in resolver_names:
-        default_enabled = name not in {"openaire", "hal", "osf"}
-        config.resolver_toggles.setdefault(name, default_enabled)
-
     for disabled in getattr(args, "disable_resolver", []) or []:
         config.resolver_toggles[disabled] = False
 
     for enabled in getattr(args, "enable_resolver", []) or []:
         config.resolver_toggles[enabled] = True
+
+    _seed_resolver_toggle_defaults(config, resolver_names)
 
     if hasattr(args, "global_url_dedup") and args.global_url_dedup is not None:
         config.enable_global_url_dedup = args.global_url_dedup
@@ -2167,37 +2124,9 @@ def main() -> None:
     html_only = 0
     skipped = 0
 
-    with JsonlLogger(manifest_path) as base_logger:
-        attempt_logger: Any = base_logger
-        csv_adapter: Optional[CsvAttemptLoggerAdapter] = None
-        if csv_path:
-            csv_adapter = CsvAttemptLoggerAdapter(base_logger, csv_path)
-            attempt_logger = csv_adapter
-
-        resume_lookup, resume_completed = load_previous_manifest(args.resume_from)
-        if args.resume_from:
-            clear_resolver_caches()
-
-        metrics = ResolverMetrics()
-        pipeline = ResolverPipeline(
-            resolvers=resolver_instances,
-            config=config,
-            download_func=download_candidate,
-            logger=attempt_logger,
-            metrics=metrics,
-        )
-
-        def _session_factory() -> requests.Session:
-            """Build a fresh requests session configured with polite headers."""
-
-    summary_record: Dict[str, Any] = {}
-
     with contextlib.ExitStack() as stack:
         base_logger = stack.enter_context(JsonlLogger(manifest_path))
         attempt_logger: Any = base_logger
-        csv_path = args.log_csv
-        if args.log_format == "csv":
-            csv_path = csv_path or manifest_path.with_suffix(".csv")
         if csv_path:
             attempt_logger = stack.enter_context(CsvAttemptLoggerAdapter(base_logger, csv_path))
 
@@ -2215,9 +2144,19 @@ def main() -> None:
         )
 
         def _session_factory() -> requests.Session:
-            """Build a fresh requests session configured with polite headers."""
+            """Return a new :class:`requests.Session` using the run's polite headers.
 
-            return _make_session(config.polite_headers)
+            The factory is invoked by worker threads to obtain an isolated session
+            that inherits the resolver configuration's polite identification
+            headers. Creating sessions through this helper ensures each worker
+            reuses the shared retry configuration while keeping connection pools
+            thread-local.
+            """Create a session seeded with the resolver polite header defaults.
+
+            Returns:
+                requests.Session: Fresh session for resolver download attempts.
+            """
+
             return _make_session(config.polite_headers)
 
         def _record_result(res: Dict[str, Any]) -> None:
@@ -2320,10 +2259,6 @@ def main() -> None:
                 )
             except Exception:
                 LOGGER.warning("Failed to write metrics sidecar %s", metrics_path, exc_info=True)
-        finally:
-            if csv_adapter is not None:
-                csv_adapter.close()
-
     print(
         f"\nDone. Processed {processed} works, saved {saved} PDFs, HTML-only {html_only}, skipped {skipped}."
     )

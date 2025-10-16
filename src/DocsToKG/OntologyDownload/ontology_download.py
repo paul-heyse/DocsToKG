@@ -3467,6 +3467,20 @@ def download_stream(
 
 
 # --- Validation utilities ---
+import argparse
+import contextlib
+from contextlib import contextmanager
+import heapq
+import logging
+import platform
+import re
+import subprocess
+import tempfile
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
+from dataclasses import dataclass
+from itertools import islice
+from typing import BinaryIO, Iterator
 
 rdflib = get_rdflib()
 pronto = get_pronto()
@@ -5170,6 +5184,20 @@ def infer_version_timestamp(value: Optional[str]) -> Optional[datetime]:
         parsed = parse_version_timestamp(digits_only[:14])
         if parsed is not None:
             return parsed
+    parsed = parse_iso_datetime(value)
+    if parsed is not None:
+        return parsed
+    if not value or not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    for fmt in ("%Y-%m-%d", "%Y%m%d", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            naive = datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+        return naive.replace(tzinfo=timezone.utc)
     return None
 
 

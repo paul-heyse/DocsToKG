@@ -24,6 +24,8 @@ except ModuleNotFoundError:  # pragma: no cover - provide actionable error for r
     get_obo_download = None  # type: ignore[assignment]
     get_owl_download = None  # type: ignore[assignment]
     get_rdf_download = None  # type: ignore[assignment]
+from bioregistry import get_obo_download, get_owl_download, get_rdf_download
+from importlib import metadata
 
 try:  # pragma: no cover - optional dependency shim
     from ols_client import OlsClient as _OlsClient
@@ -995,3 +997,33 @@ __all__ = [
     "RESOLVERS",
     "normalize_license_to_spdx",
 ]
+def _load_resolver_plugins(logger: Optional[logging.Logger] = None) -> None:
+    """Discover resolver plugins registered via Python entry points."""
+
+    logger = logger or logging.getLogger(__name__)
+    try:
+        entry_points = metadata.entry_points()
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning(
+            "resolver plugin discovery failed",
+            extra={"stage": "init", "error": str(exc)},
+        )
+        return
+
+    for entry in entry_points.select(group="docstokg.ontofetch.resolver"):
+        try:
+            loaded = entry.load()
+            resolver = loaded() if isinstance(loaded, type) else loaded
+            if not hasattr(resolver, "plan"):
+                raise TypeError("resolver plugin must define a plan method")
+            name = getattr(resolver, "NAME", entry.name)
+            RESOLVERS[name] = resolver
+            logger.info(
+                "resolver plugin registered",
+                extra={"stage": "init", "resolver": name},
+            )
+        except Exception as exc:  # pragma: no cover - plugin faults
+            logger.warning(
+                "resolver plugin failed",
+                extra={"stage": "init", "resolver": entry.name, "error": str(exc)},
+            )

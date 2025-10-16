@@ -37,11 +37,10 @@ import random
 import re
 import threading
 import time as _time
-import warnings
 from collections import Counter, defaultdict
+from types import MappingProxyType
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
-from functools import lru_cache
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -59,6 +58,7 @@ from urllib.parse import quote, urljoin, urlparse, urlsplit
 
 import requests as _requests
 
+from DocsToKG.ContentDownload.network import head_precheck, request_with_retries
 from DocsToKG.ContentDownload.utils import (
     dedupe,
     normalize_doi,
@@ -75,9 +75,6 @@ except Exception:  # pragma: no cover - optional dependency missing
     BeautifulSoup = None
 
 LOGGER = logging.getLogger(__name__)
-
-_time_alias = _time
-_requests_alias = _requests
 
 DEFAULT_RESOLVER_ORDER: List[str] = [
     "openalex",
@@ -101,6 +98,7 @@ DEFAULT_RESOLVER_ORDER: List[str] = [
 _DEFAULT_RESOLVER_TOGGLES: Dict[str, bool] = {
     name: name not in {"openaire", "hal", "osf"} for name in DEFAULT_RESOLVER_ORDER
 }
+DEFAULT_RESOLVER_TOGGLES = MappingProxyType(_DEFAULT_RESOLVER_TOGGLES)
 
 
 @dataclass
@@ -577,53 +575,6 @@ class ResolverMetrics:
 DownloadFunc = Callable[..., DownloadOutcome]
 
 
-def headers_cache_key(headers: Dict[str, str]) -> Tuple[Tuple[str, str], ...]:
-    """Return a deterministic cache key for HTTP header dictionaries.
-
-    Args:
-        headers: Mapping of header names to values.
-
-    Returns:
-        Tuple of lowercase header names paired with their original values,
-        sorted alphabetically for stable hashing.
-    """
-
-    items: Iterable[Tuple[str, str]] = (
-        (key.lower(), value) for key, value in (headers or {}).items()
-    )
-    return tuple(sorted(items))
-
-
-_headers_cache_key = headers_cache_key
-
-
-def request_with_retries(
-    session: _requests.Session,
-    method: str,
-    url: str,
-    **kwargs: Any,
-) -> _requests.Response:
-    """Proxy to :func:`DocsToKG.ContentDownload.network.request_with_retries`.
-
-    Args:
-        session: Requests session used to perform the HTTP call.
-        method: HTTP method such as ``"GET"`` or ``"HEAD"``.
-        url: Fully-qualified URL for the request.
-        **kwargs: Additional parameters forwarded to the network layer helper.
-
-    Returns:
-        requests.Response: Response returned by the shared network helper.
-
-    Notes:
-        The indirection keeps resolver providers compatible with tests that patch the
-        network-layer helper while avoiding circular imports during module initialisation.
-    """
-
-    from DocsToKG.ContentDownload.network import request_with_retries as _request_with_retries
-
-    return _request_with_retries(session, method, url, **kwargs)
-
-
 class ResolverRegistry:
     """Registry tracking resolver classes by their ``name`` attribute.
 
@@ -724,72 +675,6 @@ def _collect_candidate_urls(node: object, results: List[str]) -> None:
             _collect_candidate_urls(item, results)
     elif isinstance(node, str) and node.lower().startswith("http"):
         results.append(node)
-
-
-@lru_cache(maxsize=1000)
-def _fetch_crossref_data(
-    doi: str,
-    mailto: Optional[str],
-    timeout: float,
-    headers_key: Tuple[Tuple[str, str], ...],
-) -> Dict[str, Any]:
-    """Retrieve Crossref metadata for ``doi`` with polite header caching."""
-
-    headers = dict(headers_key)
-    params = {"mailto": mailto} if mailto else None
-    response = _requests.get(
-        f"https://api.crossref.org/works/{quote(doi)}",
-        params=params,
-        timeout=timeout,
-        headers=headers,
-    )
-    if response.status_code != 200:
-        response.raise_for_status()
-    return response.json()
-
-
-@lru_cache(maxsize=1000)
-def _fetch_unpaywall_data(
-    doi: str,
-    email: Optional[str],
-    timeout: float,
-    headers_key: Tuple[Tuple[str, str], ...],
-) -> Dict[str, Any]:
-    """Fetch Unpaywall metadata for ``doi`` using polite caching."""
-
-    headers = dict(headers_key)
-    response = _requests.get(
-        f"https://api.unpaywall.org/v2/{quote(doi)}",
-        params={"email": email} if email else None,
-        timeout=timeout,
-        headers=headers,
-    )
-    if response.status_code != 200:
-        response.raise_for_status()
-    return response.json()
-
-
-@lru_cache(maxsize=1000)
-def _fetch_semantic_scholar_data(
-    doi: str,
-    api_key: Optional[str],
-    timeout: float,
-    headers_key: Tuple[Tuple[str, str], ...],
-) -> Dict[str, Any]:
-    """Fetch Semantic Scholar Graph API metadata for ``doi`` with caching."""
-
-    headers = dict(headers_key)
-    if api_key:
-        headers["x-api-key"] = api_key
-    response = _requests.get(
-        f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(doi)}",
-        params={"fields": "title,openAccessPdf"},
-        timeout=timeout,
-        headers=headers,
-    )
-    if response.status_code != 200:
-        response.raise_for_status()
-    return response.json()
 
 
 # ---------------------------------------------------------------------------
@@ -1020,128 +905,74 @@ class CrossrefResolver(RegisteredResolver):
         params = {"mailto": email} if email else None
         headers = dict(config.polite_headers)
         data: Optional[Dict[str, Any]] = None
-        if hasattr(session, "get"):
-            response: Optional[_requests.Response] = None
-            try:
-                response = request_with_retries(
-                    session,
-                    "GET",
-                    endpoint,
-                    params=params,
-                    timeout=config.get_timeout(self.name),
-                    headers=headers,
-                    allow_redirects=True,
-                )
-            except _requests.Timeout as exc:
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="timeout",
-                    metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
-                )
-                return
-            except _requests.ConnectionError as exc:
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="connection-error",
-                    metadata={"error": str(exc)},
-                )
-                return
-            except _requests.RequestException as exc:
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="request-error",
-                    metadata={"error": str(exc)},
-                )
-                return
-            except Exception as exc:  # pragma: no cover - defensive
-                LOGGER.exception("Unexpected error in Crossref resolver")
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="unexpected-error",
-                    metadata={"error": str(exc), "error_type": type(exc).__name__},
-                )
-                return
+        response: Optional[_requests.Response] = None
+        try:
+            response = request_with_retries(
+                session,
+                "GET",
+                endpoint,
+                params=params,
+                timeout=config.get_timeout(self.name),
+                headers=headers,
+                allow_redirects=True,
+            )
+        except _requests.Timeout as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="timeout",
+                metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
+            )
+            return
+        except _requests.ConnectionError as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="connection-error",
+                metadata={"error": str(exc)},
+            )
+            return
+        except _requests.RequestException as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="request-error",
+                metadata={"error": str(exc)},
+            )
+            return
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.exception("Unexpected error in Crossref resolver")
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="unexpected-error",
+                metadata={"error": str(exc), "error_type": type(exc).__name__},
+            )
+            return
 
-            status = response.status_code if response is not None else 200
-            if response is not None and status != 200:
+        try:
+            if response.status_code != 200:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="http-error",
+                    http_status=response.status_code,
+                    metadata={"error_detail": f"Crossref API returned {response.status_code}"},
+                )
+                return
+            data = response.json()
+        except ValueError as json_err:
+            preview = response.text[:200] if hasattr(response, "text") else ""
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="json-error",
+                metadata={"error_detail": str(json_err), "content_preview": preview},
+            )
+            return
+        finally:
+            if response is not None:
                 response.close()
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="http-error",
-                    http_status=status,
-                    metadata={"error_detail": f"Crossref API returned {status}"},
-                )
-                return
-
-            try:
-                if response is not None:
-                    data = response.json()
-            except ValueError as json_err:
-                preview = (
-                    response.text[:200]
-                    if response is not None and hasattr(response, "text")
-                    else ""
-                )
-                if response is not None:
-                    response.close()
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="json-error",
-                    metadata={"error_detail": str(json_err), "content_preview": preview},
-                )
-                return
-            finally:
-                if response is not None:
-                    response.close()
-        else:
-            try:
-                data = _fetch_crossref_data(
-                    doi,
-                    email,
-                    config.get_timeout(self.name),
-                    headers_cache_key(config.polite_headers),
-                )
-            except _requests.HTTPError as exc:
-                status = exc.response.status_code if exc.response else None
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="http-error",
-                    http_status=status,
-                    metadata={"error_detail": f"Crossref HTTPError: {status}"},
-                )
-                return
-            except _requests.RequestException as exc:  # pragma: no cover - network errors
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="request-error",
-                    metadata={"error": str(exc)},
-                )
-                return
-            except ValueError as json_err:
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="json-error",
-                    metadata={"error_detail": str(json_err)},
-                )
-                return
-            except Exception as exc:  # pragma: no cover - defensive
-                LOGGER.exception("Unexpected cached request error in Crossref resolver")
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="unexpected-error",
-                    metadata={"error": str(exc), "error_type": type(exc).__name__},
-                )
-                return
 
         message = ((data or {}).get("message") or {}) if isinstance(data, dict) else {}
         link_section = message.get("link") or []
@@ -2356,24 +2187,18 @@ class SemanticScholarResolver(RegisteredResolver):
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
             return
+        headers = dict(config.polite_headers)
+        if config.semantic_scholar_api_key:
+            headers["x-api-key"] = config.semantic_scholar_api_key
         try:
-            data = _fetch_semantic_scholar_data(
-                doi,
-                config.semantic_scholar_api_key,
-                config.get_timeout(self.name),
-                headers_cache_key(config.polite_headers),
+            response = request_with_retries(
+                session,
+                "GET",
+                f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(doi)}",
+                params={"fields": "title,openAccessPdf"},
+                timeout=config.get_timeout(self.name),
+                headers=headers,
             )
-        except _requests.HTTPError as exc:
-            status = getattr(exc.response, "status_code", None)
-            detail = status if status is not None else "unknown"
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="http-error",
-                http_status=status,
-                metadata={"error_detail": f"Semantic Scholar HTTPError: {detail}"},
-            )
-            return
         except _requests.Timeout as exc:
             yield ResolverResult(
                 url=None,
@@ -2398,14 +2223,6 @@ class SemanticScholarResolver(RegisteredResolver):
                 metadata={"error": str(exc)},
             )
             return
-        except ValueError as json_err:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="json-error",
-                metadata={"error_detail": str(json_err)},
-            )
-            return
         except Exception as exc:  # pragma: no cover - defensive
             LOGGER.exception("Unexpected Semantic Scholar resolver error")
             yield ResolverResult(
@@ -2415,6 +2232,30 @@ class SemanticScholarResolver(RegisteredResolver):
                 metadata={"error": str(exc), "error_type": type(exc).__name__},
             )
             return
+
+        try:
+            if response.status_code != 200:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="http-error",
+                    http_status=response.status_code,
+                    metadata={
+                        "error_detail": f"Semantic Scholar HTTPError: {response.status_code}",
+                    },
+                )
+                return
+            data = response.json()
+        except ValueError as json_err:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="json-error",
+                metadata={"error_detail": str(json_err)},
+            )
+            return
+        finally:
+            response.close()
 
         open_access = (data.get("openAccessPdf") or {}) if isinstance(data, dict) else {}
         url = open_access.get("url") if isinstance(open_access, dict) else None
@@ -2477,131 +2318,74 @@ class UnpaywallResolver(RegisteredResolver):
         endpoint = f"https://api.unpaywall.org/v2/{quote(doi)}"
         headers = dict(config.polite_headers)
         params = {"email": config.unpaywall_email} if config.unpaywall_email else None
-        if hasattr(session, "get"):
-            try:
-                response = session.get(
-                    endpoint,
-                    params=params,
-                    timeout=config.get_timeout(self.name),
-                    headers=headers,
-                )
-            except _requests.Timeout as exc:
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="timeout",
-                    metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
-                )
-                return
-            except _requests.ConnectionError as exc:
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="connection-error",
-                    metadata={"error": str(exc)},
-                )
-                return
-            except _requests.RequestException as exc:
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="request-error",
-                    metadata={"error": str(exc)},
-                )
-                return
-            except Exception as exc:  # pragma: no cover - safety
-                LOGGER.exception("Unexpected error in Unpaywall resolver session path")
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="unexpected-error",
-                    metadata={"error": str(exc), "error_type": type(exc).__name__},
-                )
-                return
+        try:
+            response = request_with_retries(
+                session,
+                "GET",
+                endpoint,
+                params=params,
+                timeout=config.get_timeout(self.name),
+                headers=headers,
+            )
+        except _requests.Timeout as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="timeout",
+                metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
+            )
+            return
+        except _requests.ConnectionError as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="connection-error",
+                metadata={"error": str(exc)},
+            )
+            return
+        except _requests.RequestException as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="request-error",
+                metadata={"error": str(exc)},
+            )
+            return
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.exception("Unexpected error in Unpaywall resolver session path")
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="unexpected-error",
+                metadata={"error": str(exc), "error_type": type(exc).__name__},
+            )
+            return
 
-            status = getattr(response, "status_code", 200)
-            if status != 200:
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="http-error",
-                    http_status=status,
-                    metadata={"error_detail": f"Unpaywall returned {status}"},
-                )
-                return
+        if response.status_code != 200:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="http-error",
+                http_status=response.status_code,
+                metadata={"error_detail": f"Unpaywall returned {response.status_code}"},
+            )
+            return
 
-            try:
-                data = response.json()
-            except ValueError as json_err:
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="json-error",
-                    metadata={
-                        "error_detail": str(json_err),
-                        "content_preview": response.text[:200] if hasattr(response, "text") else "",
-                    },
-                )
-                return
-        else:
-            try:
-                data = _fetch_unpaywall_data(
-                    doi,
-                    config.unpaywall_email,
-                    config.get_timeout(self.name),
-                    headers_cache_key(config.polite_headers),
-                )
-            except _requests.HTTPError as exc:
-                status = exc.response.status_code if exc.response else None
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="http-error",
-                    http_status=status,
-                    metadata={"error_detail": f"Unpaywall HTTPError: {status}"},
-                )
-                return
-            except _requests.Timeout as exc:
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="timeout",
-                    metadata={"timeout": config.get_timeout(self.name), "error": str(exc)},
-                )
-                return
-            except _requests.ConnectionError as exc:
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="connection-error",
-                    metadata={"error": str(exc)},
-                )
-                return
-            except _requests.RequestException as exc:  # pragma: no cover - network errors
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="request-error",
-                    metadata={"error": str(exc)},
-                )
-                return
-            except ValueError as json_err:
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="json-error",
-                    metadata={"error_detail": str(json_err)},
-                )
-                return
-            except Exception as exc:  # pragma: no cover - defensive
-                LOGGER.exception("Unexpected cached request error in Unpaywall resolver")
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="unexpected-error",
-                    metadata={"error": str(exc), "error_type": type(exc).__name__},
-                )
-                return
+        try:
+            data = response.json()
+        except ValueError as json_err:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="json-error",
+                metadata={
+                    "error_detail": str(json_err),
+                    "content_preview": response.text[:200] if hasattr(response, "text") else "",
+                },
+            )
+            return
+        finally:
+            response.close()
 
         candidates: List[Tuple[str, Dict[str, Any]]] = []
         best = (data or {}).get("best_oa_location") or {}
@@ -3153,44 +2937,9 @@ class ResolverPipeline:
         url: str,
         timeout: float,
     ) -> bool:
-        """Issue a HEAD request to validate that ``url`` plausibly returns a PDF.
+        """Delegate to the shared network-layer preflight helper."""
 
-        Args:
-            session: Requests session used for issuing the HEAD request.
-            url: Candidate URL whose response should be inspected.
-            timeout: Timeout budget for the preflight request.
-
-        Returns:
-            ``True`` when the response appears to represent a PDF download.
-        """
-
-        try:
-            response = request_with_retries(
-                session,
-                "HEAD",
-                url,
-                max_retries=1,
-                timeout=min(timeout, 5.0),
-                allow_redirects=True,
-            )
-        except Exception:
-            return True
-
-        try:
-            if response.status_code not in {200, 302, 304}:
-                return False
-
-            content_type = (response.headers.get("Content-Type") or "").lower()
-            content_length = response.headers.get("Content-Length", "")
-
-            if "text/html" in content_type:
-                return False
-            if content_length == "0":
-                return False
-
-            return True
-        finally:
-            response.close()
+        return head_precheck(session, url, timeout)
 
     def run(
         self,
@@ -3691,54 +3440,12 @@ class ResolverPipeline:
 def clear_resolver_caches() -> None:
     """Clear resolver-level HTTP caches to force fresh lookups.
 
-    This utility resets the internal LRU caches used by the Unpaywall,
-    Crossref, and Semantic Scholar resolvers. It should be called before
-    executing resolver pipelines when deterministic behaviour across runs is
-    required (for example, in unit tests or benchmarking scenarios).
-
-    Args:
-        None
-
-    Returns:
-        None
+    The resolver implementations now issue requests directly through the
+    shared retry helper and no longer maintain module-level caches. The
+    function remains for backward compatibility with existing call sites.
     """
 
-    _fetch_unpaywall_data.cache_clear()
-    _fetch_crossref_data.cache_clear()
-    _fetch_semantic_scholar_data.cache_clear()
-
-
-_LEGACY_EXPORTS = {
-    "time": _time_alias,
-    "requests": _requests_alias,
-}
-
-_DEPRECATION_MESSAGES = {
-    "time": (
-        "DocsToKG.ContentDownload.resolvers.time is deprecated; import 'time' "
-        "directly. This alias will be removed in a future release."
-    ),
-    "requests": (
-        "DocsToKG.ContentDownload.resolvers.requests is deprecated; import the "
-        "'requests' package directly. This alias will be removed in a future release."
-    ),
-}
-
-
-def __getattr__(name: str):
-    """Return legacy exports while emitting :class:`DeprecationWarning`."""
-
-    if name in _LEGACY_EXPORTS:
-        warnings.warn(
-            _DEPRECATION_MESSAGES.get(
-                name,
-                f"DocsToKG.ContentDownload.resolvers.{name} is deprecated",
-            ),
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return _LEGACY_EXPORTS[name]
-    raise AttributeError(name)
+    LOGGER.debug("clear_resolver_caches() is a no-op; caches removed")
 
 
 __all__ = [
@@ -3755,9 +3462,9 @@ __all__ = [
     "RegisteredResolver",
     "ResolverResult",
     "DEFAULT_RESOLVER_ORDER",
+    "DEFAULT_RESOLVER_TOGGLES",
     "default_resolvers",
     "clear_resolver_caches",
-    "headers_cache_key",
     "ArxivResolver",
     "CoreResolver",
     "CrossrefResolver",
@@ -3774,9 +3481,4 @@ __all__ = [
     "UnpaywallResolver",
     "WaybackResolver",
     "ZenodoResolver",
-    "time",
-    "requests",
 ]
-
-time = _time_alias
-requests = _requests_alias

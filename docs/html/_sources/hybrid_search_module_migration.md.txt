@@ -1,0 +1,36 @@
+## Hybrid Search Module Migration Guide
+
+- `DocsToKG.HybridSearch.operations` → `DocsToKG.HybridSearch.service` (pagination & stats) and
+  `DocsToKG.HybridSearch.vectorstore` (state serialisation).
+- `DocsToKG.HybridSearch.results` → `DocsToKG.HybridSearch.ranking`.
+- `DocsToKG.HybridSearch.similarity` → `DocsToKG.HybridSearch.vectorstore`.
+- `DocsToKG.HybridSearch.retrieval` → `DocsToKG.HybridSearch.service`.
+- `DocsToKG.HybridSearch.schema` → `DocsToKG.HybridSearch.storage`.
+- `DocsToKG.HybridSearch.tools.*` → `python -m DocsToKG.HybridSearch.validation`.
+
+Shims emit `DeprecationWarning` throughout the DocsToKG v0.5.x series and will be removed in v0.6.0.
+
+## Module dependency graph
+
+```mermaid
+graph LR
+    types --> config
+    types --> storage
+    types --> vectorstore
+    config --> ingest
+    config --> service
+    config --> vectorstore
+    config --> validation
+    features --> ingest
+    features --> service
+    observability --> ingest
+    observability --> service
+    storage --> ingest
+    storage --> service
+    vectorstore --> ingest
+    vectorstore --> service
+    vectorstore --> validation
+    ranking --> service
+    ingest --> service
+    service --> validation
+```

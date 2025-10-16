@@ -78,60 +78,53 @@
              
   <section id="module-operations">
 <h1>1. Module: operations<a class="headerlink" href="#module-operations" title="Link to this heading"></a></h1>
+
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.operations</span></code>.</p>
-<p>Operational tooling for FAISS/OpenSearch maintenance.</p>
-<section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="build-stats-snapshot-faiss-index-opensearch-registry">
-<h3><code class="docutils literal notranslate"><span class="pre">build_stats_snapshot(faiss_index,</span> <span class="pre">opensearch,</span> <span class="pre">registry)</span></code><a class="headerlink" href="#build-stats-snapshot-faiss-index-opensearch-registry" title="Link to this heading"></a></h3>
-<p>Capture a lightweight snapshot of hybrid search storage metrics.</p>
-<p>Args:
-faiss_index: Dense vector index manager.
-opensearch: OpenSearch simulator representing lexical storage.
-registry: Chunk registry tracking vector-to-payload mappings.</p>
-<p>Returns:
-Mapping describing FAISS stats, OpenSearch stats, and chunk counts.</p>
-</section>
-<section id="verify-pagination-service-request">
-<h3><code class="docutils literal notranslate"><span class="pre">verify_pagination(service,</span> <span class="pre">request)</span></code><a class="headerlink" href="#verify-pagination-service-request" title="Link to this heading"></a></h3>
-<p>Ensure pagination cursors produce non-duplicated results.</p>
-<p>Args:
-service: Hybrid search service to execute paginated queries.
-request: Initial hybrid search request payload.</p>
-<p>Returns:
-PaginationCheckResult detailing encountered cursors and duplicates.</p>
-</section>
-<section id="serialize-state-faiss-index-registry">
-<h3><code class="docutils literal notranslate"><span class="pre">serialize_state(faiss_index,</span> <span class="pre">registry)</span></code><a class="headerlink" href="#serialize-state-faiss-index-registry" title="Link to this heading"></a></h3>
-<p>Serialize FAISS state and registry metadata for snapshotting.</p>
-<p>Args:
-faiss_index: Dense index manager whose state should be captured.
-registry: Chunk registry providing vector identifiers.</p>
-<p>Returns:
-Mapping containing base64-encoded FAISS bytes and registered vector IDs.</p>
-</section>
-<section id="restore-state-faiss-index-payload">
-<h3><code class="docutils literal notranslate"><span class="pre">restore_state(faiss_index,</span> <span class="pre">payload)</span></code><a class="headerlink" href="#restore-state-faiss-index-payload" title="Link to this heading"></a></h3>
-<p>Restore FAISS index state from a serialized payload.</p>
-<p>Args:
-faiss_index: Dense index manager to restore into.
-payload: Snapshot mapping produced by <code class="docutils literal notranslate"><span class="pre">serialize_state</span></code>.</p>
-<p>Raises:
-ValueError: If the payload does not include a FAISS snapshot.</p>
-<p>Returns:
-None</p>
-</section>
-<section id="should-rebuild-index-registry-deleted-since-snapshot-threshold">
-<h3><code class="docutils literal notranslate"><span class="pre">should_rebuild_index(registry,</span> <span class="pre">deleted_since_snapshot,</span> <span class="pre">threshold)</span></code><a class="headerlink" href="#should-rebuild-index-registry-deleted-since-snapshot-threshold" title="Link to this heading"></a></h3>
-<p>Heuristic to determine when FAISS should be rebuilt after deletions.</p>
-<p>Args:
-registry: Chunk registry reflecting current vector count.
-deleted_since_snapshot: Number of vectors deleted since the last snapshot.
-threshold: Fraction of deletions that triggers a rebuild.</p>
-<p>Returns:
-True when the proportion of deletions exceeds <code class="docutils literal notranslate"><span class="pre">threshold</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Deprecated:</strong> <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.operations</span></code> is a compatibility shim retained for one release cycle. Import helpers directly from their consolidated modules:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service.build_stats_snapshot</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service.verify_pagination</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service.should_rebuild_index</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore.serialize_state</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore.restore_state</span></code></p></li>
+</ul>
+</div>
+<p>The shim re-exports these callables and emits a <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> at import time to help downstream users migrate to the new module structure introduced in the <code class="docutils literal notranslate"><span class="pre">consolidate-hybridsearch-modules</span></code> change.</p>
+<section id="re-exported-symbols">
+<h2>1. Re-exported symbols<a class="headerlink" href="#re-exported-symbols" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Symbol</p></th>
+<th class="head"><p>New home</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">build_stats_snapshot</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">verify_pagination</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">should_rebuild_index</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">serialize_state</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">restore_state</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">PaginationCheckResult</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>All functionality remains unchanged; only import paths differ. New development should target the consolidated modules directly.</p>
 </section>
 </section>
+
 <section id="classes">
 <h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="paginationcheckresult">

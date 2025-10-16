@@ -7,7 +7,7 @@ retrieval subsystems.
 
 ## 3. Calibration Sweeps
 1. Launch the validation harness:
-   `python -m DocsToKG.HybridSearch.tools.run_real_vector_ci --pytest-args "-q --real-vectors"`
+   `python -m DocsToKG.HybridSearch.validation --run-real-ci --pytest-args "-q --real-vectors"`
    or invoke `python -m DocsToKG.HybridSearch.validation --dataset
    tests/data/hybrid_dataset.jsonl` for ad-hoc checks.
 2. Review `calibration.json` in the generated report directory. Confirm that self-hit accuracy is ≥0.95 for oversample ≥2.
@@ -43,3 +43,8 @@ retrieval subsystems.
   1. Drain ingestion traffic.
   2. Reconstruct FAISS from the authoritative registry list.
   3. Re-enable ingestion and confirm `ntotal` aligns with registry count.
+
+## 8. Module Consolidation Migration
+- Legacy modules (`results`, `similarity`, `retrieval`, `schema`, `operations`, `tools`) now emit
+  `DeprecationWarning`. Update automation and notebooks to import from the consolidated
+  modules documented in `docs/hybrid_search_module_migration.md` before the v0.6.0 release.

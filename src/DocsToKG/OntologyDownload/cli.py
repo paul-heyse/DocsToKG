@@ -47,6 +47,7 @@ from .ontology_download import (
     get_manifest_schema,
     infer_version_timestamp,
     load_config,
+    infer_version_timestamp,
     parse_iso_datetime,
     parse_rate_limit_to_rps,
     parse_version_timestamp,
@@ -56,6 +57,7 @@ from .ontology_download import (
     setup_logging,
     validate_config,
     validate_manifest_dict,
+    _directory_size,
 )
 
 ONTOLOGY_DIR = LOCAL_ONTOLOGY_DIR
@@ -555,6 +557,10 @@ def _apply_cli_overrides(config: ResolvedConfig, args) -> None:
         config.defaults.http.allowed_hosts = existing
 
 
+_RATE_LIMIT_RE = re.compile(r"^([\d.]+)/(second|sec|s|minute|min|m|hour|h)$")
+
+
+
 def _results_to_dict(result: FetchResult) -> dict:
     """Convert a ``FetchResult`` instance into a JSON-friendly mapping.
 
@@ -671,6 +677,56 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
     if metadata.get("etag"):
         payload["etag"] = metadata["etag"]
     return payload
+
+
+def _directory_size_bytes(path: Path) -> int:
+    return _directory_size(path)
+
+
+def _directory_size_bytes(path: Path) -> int:
+    """Return the cumulative size of files within ``path``.
+
+    Args:
+        path: Directory whose contents should be measured.
+
+    Returns:
+        Total number of bytes encountered within the directory tree.
+    """
+
+    total = 0
+    for entry in path.rglob("*"):
+        try:
+            if entry.is_file():
+                total += entry.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def _infer_version_timestamp(version: str) -> Optional[datetime]:
+    """Attempt to derive a datetime from a version string.
+
+    Args:
+        version: Version identifier emitted by upstream resolvers.
+
+    Returns:
+        Datetime derived from the version string, or ``None`` when no format matches.
+    """
+
+    candidates = [version, version.replace("_", "-"), version.replace("/", "-"), version.replace("_", "")] 
+    for candidate in candidates:
+        parsed = parse_version_timestamp(candidate)
+        if parsed is not None:
+            return parsed
+    formats = ["%Y%m%dT%H%M%S", "%Y-%m-%d-%H-%M-%S"]
+    for candidate in candidates:
+        for fmt in formats:
+            try:
+                parsed = datetime.strptime(candidate, fmt)
+            except ValueError:
+                continue
+            return parsed.replace(tzinfo=timezone.utc)
+    return None
 
 
 def _resolve_version_metadata(

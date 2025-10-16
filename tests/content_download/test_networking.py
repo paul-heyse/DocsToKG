@@ -32,6 +32,7 @@ from DocsToKG.ContentDownload.network import (
     CachedResult,
     ConditionalRequestHelper,
     ModifiedResult,
+    head_precheck,
     parse_retry_after_header,
     request_with_retries,
 )
@@ -43,10 +44,6 @@ from DocsToKG.ContentDownload.resolvers import (
     ResolverPipeline,
     ResolverResult,
     WaybackResolver,
-    headers_cache_key,
-)
-from DocsToKG.ContentDownload.resolvers import (
-    _headers_cache_key as resolver_headers_cache_key,
 )
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
 
@@ -571,6 +568,120 @@ def test_download_candidate_avoids_per_request_head(http_server, tmp_path):
         assert handler.calls == [200]
     finally:
         session.close()
+
+
+# ---- test_head_precheck.py -----------------------------
+def test_head_precheck_allows_pdf(monkeypatch):
+    head_response = Mock(status_code=200, headers={"Content-Type": "application/pdf"})
+    head_response.close = Mock()
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.network.request_with_retries",
+        lambda *args, **kwargs: head_response,
+    )
+
+    assert head_precheck(Mock(), "https://example.org/file.pdf", timeout=10.0)
+    head_response.close.assert_called_once()
+
+
+def test_head_precheck_rejects_html(monkeypatch):
+    head_response = Mock(status_code=200, headers={"Content-Type": "text/html"})
+    head_response.close = Mock()
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.network.request_with_retries",
+        lambda *args, **kwargs: head_response,
+    )
+
+    assert not head_precheck(Mock(), "https://example.org/page", timeout=10.0)
+    head_response.close.assert_called_once()
+
+
+@pytest.mark.parametrize("status", [405, 501])
+def test_head_precheck_degrades_to_get_pdf(monkeypatch, status):
+    class _StreamResponse:
+        def __init__(self) -> None:
+            self.status_code = 200
+            self.headers = {"Content-Type": "application/pdf"}
+            self.closed = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            self.close()
+
+        def iter_content(self, chunk_size: int = 1024):
+            yield b"%PDF"
+
+        def close(self) -> None:
+            self.closed = True
+
+    head_response = Mock(status_code=status, headers={})
+    head_response.close = Mock()
+    stream_response = _StreamResponse()
+
+    responses = [head_response, stream_response]
+
+    def fake_request(*args, **kwargs):
+        return responses.pop(0)
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.network.request_with_retries",
+        fake_request,
+    )
+
+    assert head_precheck(Mock(), "https://example.org/pdf", timeout=10.0)
+    assert stream_response.closed is True
+
+
+@pytest.mark.parametrize("status", [405, 501])
+def test_head_precheck_degrades_to_get_html(monkeypatch, status):
+    class _StreamResponse:
+        def __init__(self) -> None:
+            self.status_code = 200
+            self.headers = {"Content-Type": "text/html"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            self.close()
+
+        def iter_content(self, chunk_size: int = 1024):
+            yield b"<html></html>"
+
+        def close(self) -> None:
+            return None
+
+    head_response = Mock(status_code=status, headers={})
+    head_response.close = Mock()
+    stream_response = _StreamResponse()
+
+    responses = [head_response, stream_response]
+
+    def fake_request(*args, **kwargs):
+        return responses.pop(0)
+
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.network.request_with_retries",
+        fake_request,
+    )
+
+    assert not head_precheck(Mock(), "https://example.org/html", timeout=10.0)
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [requests.Timeout("boom"), requests.ConnectionError("boom")],
+)
+def test_head_precheck_returns_true_on_exception(monkeypatch, exc):
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.network.request_with_retries",
+        Mock(side_effect=exc),
+    )
+
+    assert head_precheck(Mock(), "https://example.org/err", timeout=5.0)
 
 
 # ---- test_download_retries.py -----------------------------
@@ -1496,12 +1607,6 @@ except ImportError:  # pragma: no cover - optional dependency
     pytest.skip("hypothesis is required for these tests", allow_module_level=True)
 
 # ---- test_content_download_utils.py -----------------------------
-crossref_headers_cache_key = resolver_headers_cache_key
-
-# ---- test_content_download_utils.py -----------------------------
-unpaywall_headers_cache_key = resolver_headers_cache_key
-
-# ---- test_content_download_utils.py -----------------------------
 given = hypothesis.given
 
 
@@ -1583,17 +1688,6 @@ def test_dedupe_property(values: List[str]) -> None:
             seen.add(item)
 
     assert dedupe(values) == expected
-
-
-# ---- test_content_download_utils.py -----------------------------
-def test_headers_cache_key_determinism() -> None:
-    headers = {"User-Agent": "TestAgent", "accept": "text/html"}
-    expected = (("accept", "text/html"), ("user-agent", "TestAgent"))
-    key = headers_cache_key(headers)
-    assert key == expected
-    assert headers_cache_key(dict(headers)) == expected
-    assert unpaywall_headers_cache_key(headers) == expected
-    assert crossref_headers_cache_key(headers) == expected
 
 
 # ---- test_edge_cases.py -----------------------------
