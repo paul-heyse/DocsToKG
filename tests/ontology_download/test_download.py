@@ -12,7 +12,7 @@ Key Scenarios:
 
 Dependencies:
 - pytest/requests: Network simulation and assertions
-- DocsToKG.OntologyDownload.download: Streaming implementation under test
+- DocsToKG.OntologyDownload.ontology_download: Streaming implementation under test
 
 Usage:
     pytest tests/ontology_download/test_download.py
@@ -30,18 +30,15 @@ import requests
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import download
-from DocsToKG.OntologyDownload.config import (
+from DocsToKG.OntologyDownload import (
     ConfigError,
+    ConfigurationError,
     DefaultsConfig,
     DownloadConfiguration,
+    FetchSpec,
     ResolvedConfig,
 )
-from DocsToKG.OntologyDownload.core import (
-    ConfigurationError,
-    FetchSpec,
-    _ensure_license_allowed,
-)
+from DocsToKG.OntologyDownload import ontology_download as download
 from DocsToKG.OntologyDownload.resolvers import FetchPlan
 
 
@@ -653,7 +650,7 @@ def test_ensure_license_allowed_normalizes_spdx() -> None:
         service="obo",
     )
 
-    _ensure_license_allowed(plan, config, spec)
+    download._ensure_license_allowed(plan, config, spec)
 
     disallowed_plan = FetchPlan(
         url="https://example.org/hp.owl",
@@ -666,7 +663,7 @@ def test_ensure_license_allowed_normalizes_spdx() -> None:
     )
 
     with pytest.raises(ConfigurationError):
-        _ensure_license_allowed(disallowed_plan, config, spec)
+        download._ensure_license_allowed(disallowed_plan, config, spec)
 
 
 def test_sanitize_filename_removes_traversal():

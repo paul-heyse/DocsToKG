@@ -1,8 +1,8 @@
 # 1. Module: validators
 
-This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.validators``.
-
-Ontology validation pipeline.
+The standalone module ``DocsToKG.OntologyDownload.validators`` has been retired. The
+validation pipeline now lives in ``DocsToKG.OntologyDownload.ontology_download`` and
+is exposed through the consolidated ``DocsToKG.OntologyDownload`` facade.
 
 This module implements the post-download workflow that verifies ontologies,
 normalizes output, and collects structured telemetry for DocsToKG. Validators
