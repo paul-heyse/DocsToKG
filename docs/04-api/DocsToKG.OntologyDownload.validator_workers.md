@@ -1,8 +1,8 @@
 # 1. Module: validator_workers
 
-This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.validator_workers``.
-
-Subprocess workers for memory-intensive ontology validators.
+Validator worker entry points are bundled with the primary
+``DocsToKG.OntologyDownload.ontology_download`` module. The legacy
+``DocsToKG.OntologyDownload.validator_workers`` namespace is no longer published.
 
 These helpers execute within isolated Python interpreters to release
 memory promptly after heavy validation steps such as Pronto and

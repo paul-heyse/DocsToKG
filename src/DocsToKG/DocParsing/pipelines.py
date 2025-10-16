@@ -90,6 +90,28 @@ def _looks_like_filesystem_path(candidate: str) -> bool:
     if alt and alt not in prefixes:
         prefixes.append(alt)
     return any(candidate.startswith(prefix) for prefix in prefixes)
+def _expand_path(path: str | Path) -> Path:
+    """Expand a filesystem path to an absolute :class:`Path`."""
+
+    return Path(path).expanduser().resolve()
+
+
+def resolve_hf_home() -> Path:
+    """Resolve the HuggingFace cache directory respecting ``HF_HOME``."""
+
+    env = os.getenv("HF_HOME")
+    if env:
+        return _expand_path(env)
+    return Path.home().expanduser() / ".cache" / "huggingface"
+
+
+def resolve_model_root() -> Path:
+    """Resolve DocsToKG model root with environment override."""
+
+    env = os.getenv("DOCSTOKG_MODEL_ROOT")
+    if env:
+        return _expand_path(env)
+    return resolve_hf_home()
 
 
 def resolve_pdf_model_path(cli_value: str | None = None) -> str:
@@ -104,6 +126,17 @@ def resolve_pdf_model_path(cli_value: str | None = None) -> str:
         return str(expand_path(env_model))
     model_root = resolve_model_root()
     return str(expand_path(model_root / PDF_MODEL_SUBDIR))
+        return cli_value
+    env_model = os.getenv("DOCLING_PDF_MODEL")
+    if env_model:
+        return str(_expand_path(env_model))
+    model_root_env = os.getenv("DOCSTOKG_MODEL_ROOT")
+    if model_root_env:
+        return str((_expand_path(model_root_env) / PDF_MODEL_SUBDIR).resolve())
+    hf_home_env = os.getenv("HF_HOME")
+    if hf_home_env:
+        return str((_expand_path(hf_home_env) / PDF_MODEL_SUBDIR).resolve())
+    return str((Path.home().expanduser() / ".cache" / "huggingface" / PDF_MODEL_SUBDIR).resolve())
 
 
 # -------- Paths --------
