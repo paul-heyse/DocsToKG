@@ -47,6 +47,7 @@ from logging.handlers import RotatingFileHandler
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
 
+from . import net as net_module
 from .config import (
     ConfigError,
     DefaultsConfig,
@@ -1040,7 +1041,7 @@ def _read_manifest(manifest_path: Path) -> Optional[dict]:
     except json.JSONDecodeError:
         return None
     _migrate_manifest_inplace(payload)
-    validate_manifest_dict(payload, source=manifest_path)
+    net_module.validate_manifest_dict(payload, source=manifest_path)
     return payload
 
 
@@ -1053,7 +1054,7 @@ def _validate_manifest(manifest: Manifest) -> None:
     Raises:
         ConfigurationError: If required fields are missing or contain invalid types.
     """
-    validate_manifest_dict(manifest.to_dict())
+    net_module.validate_manifest_dict(manifest.to_dict())
 
     required_fields = [
         "id",

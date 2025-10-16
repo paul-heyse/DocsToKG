@@ -33,6 +33,9 @@ from .plugins import ensure_validator_plugins
 rdflib = get_rdflib()
 pronto = get_pronto()
 owlready2 = get_owlready2()
+
+
+@dataclass(slots=True)
 class ValidationRequest:
     """Parameters describing a single validation task.
 

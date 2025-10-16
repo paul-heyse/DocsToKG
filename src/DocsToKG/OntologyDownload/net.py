@@ -13,17 +13,22 @@ import threading
 import time
 import unicodedata
 import zipfile
+import stat
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Callable, Dict, List, Optional, Set, Tuple, TypeVar
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Set, Tuple, TypeVar
 
 import pooch
 import psutil
 import requests
 
+from urllib.parse import ParseResult, urlparse, urlunparse
+
 from .config import ConfigError, DownloadConfiguration
 from .io_safe import sanitize_filename
-from urllib.parse import ParseResult, urlparse, urlunparse
+
+if TYPE_CHECKING:  # pragma: no cover - import cycle guard for type checkers only
+    from .pipeline import validate_manifest_dict as _validate_manifest_dict
 
 T = TypeVar("T")
 
@@ -505,6 +510,9 @@ def extract_zip_safe(
         total_uncompressed = 0
         for member in members:
             member_path = _validate_member_path(member.filename)
+            mode = (member.external_attr >> 16) & 0xFFFF
+            if stat.S_IFMT(mode) == stat.S_IFLNK:
+                raise ConfigError(f"Unsafe link detected in archive: {member.filename}")
             if member.is_dir():
                 safe_members.append((member, member_path))
                 continue
@@ -1215,6 +1223,17 @@ __all__ = [
     "extract_archive_safe",
     "validate_url_security",
     "sha256_file",
+    "validate_manifest_dict",
 ]
+
+
+def __getattr__(name: str):
+    """Lazily proxy pipeline helpers without incurring import cycles."""
+
+    if name == "validate_manifest_dict":
+        from .pipeline import validate_manifest_dict as _validate_manifest_dict
+
+        return _validate_manifest_dict
+    raise AttributeError(name)
 
 
