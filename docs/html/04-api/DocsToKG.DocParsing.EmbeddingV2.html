@@ -130,10 +130,6 @@ Absolute path to the SPLADE model directory.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_derive_doc_id_and_output_path(chunk_file,</span> <span class="pre">chunks_root,</span> <span class="pre">vectors_root)</span></code><a class="headerlink" href="#derive-doc-id-and-output-path-chunk-file-chunks-root-vectors-root" title="Link to this heading"></a></h3>
 <p>Return manifest doc_id and vector output path for a chunk artifact.</p>
 </section>
-<section id="id1">
-<h3><code class="docutils literal notranslate"><span class="pre">_derive_doc_id_and_output_path(chunk_file,</span> <span class="pre">chunks_root,</span> <span class="pre">vectors_root)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
-<p>Return manifest doc_id and vector output path for a chunk artifact.</p>
-</section>
 <section id="expand-optional-path">
 <h3><code class="docutils literal notranslate"><span class="pre">_expand_optional(path)</span></code><a class="headerlink" href="#expand-optional-path" title="Link to this heading"></a></h3>
 <p>Expand optional :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code> values to absolutes when provided.</p>
@@ -274,11 +270,20 @@ Iterator[List[dict]]: Lazy iterator producing batched chunk rows.</p>
 <p>Yields:
 Lists of row dictionaries, each containing up to batch_size items.</p>
 </section>
+<section id="iter-chunk-files-directory">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_chunk_files(directory)</span></code><a class="headerlink" href="#iter-chunk-files-directory" title="Link to this heading"></a></h3>
+<p>Deprecated shim that forwards to :func:<code class="docutils literal notranslate"><span class="pre">iter_chunks</span></code>.</p>
+<p>Args:
+directory: Directory to scan for chunk artifacts.</p>
+<p>Returns:
+Iterator over chunk files.</p>
+</section>
 <section id="process-chunk-file-vectors-chunk-file-out-path-stats-args-validator-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">process_chunk_file_vectors(chunk_file,</span> <span class="pre">out_path,</span> <span class="pre">stats,</span> <span class="pre">args,</span> <span class="pre">validator,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#process-chunk-file-vectors-chunk-file-out-path-stats-args-validator-logger" title="Link to this heading"></a></h3>
 <p>Generate vectors for a single chunk file and persist them to disk.</p>
 <p>Args:
 chunk_file: Chunk JSONL file to process.
+out_path: Destination path for vectors.
 stats: Precomputed BM25 statistics.
 args: Parsed CLI arguments with runtime configuration.
 validator: SPLADE validator for sparsity metrics.
@@ -307,6 +312,12 @@ Tuple containing the number of vectors written, SPLADE nnz counts,
 and Qwen vector norms.</p>
 <p>Raises:
 ValueError: If vector lengths are inconsistent or fail validation.</p>
+</section>
+<section id="validate-vectors-in-dir-vectors-dir-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">_validate_vectors_in_dir(vectors_dir,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#validate-vectors-in-dir-vectors-dir-logger" title="Link to this heading"></a></h3>
+<p>Validate all *.vectors.jsonl files under a directory tree.</p>
+<p>Returns:
+(files_checked, rows_validated)</p>
 </section>
 <section id="build-parser">
 <h3><code class="docutils literal notranslate"><span class="pre">build_parser()</span></code><a class="headerlink" href="#build-parser" title="Link to this heading"></a></h3>

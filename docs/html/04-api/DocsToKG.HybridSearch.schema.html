@@ -79,30 +79,9 @@
   <section id="module-schema">
 <h1>1. Module: schema<a class="headerlink" href="#module-schema" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.schema</span></code>.</p>
-<blockquote>
-<div><p><strong>Deprecated:</strong> <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.schema</span></code> is a compatibility shim that re-exports
-OpenSearch schema utilities from <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.storage</span></code>. The shim emits a
-:class:<code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> on import to guide migrations.</p>
-</div></blockquote>
-<section id="re-exported-symbols">
-<h2>1. Re-exported symbols<a class="headerlink" href="#re-exported-symbols" title="Link to this heading"></a></h2>
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p>Symbol</p></th>
-<th class="head"><p>New home</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">OpenSearchIndexTemplate</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.storage</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">OpenSearchSchemaManager</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.storage</span></code></p></td>
-</tr>
-</tbody>
-</table>
-<p>The underlying schema management API is unchanged. Update imports to reference the
-<code class="docutils literal notranslate"><span class="pre">storage</span></code> module to ensure compatibility once the shim is removed.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Deprecated compatibility shim for hybrid search storage schema helpers.</p>
 </section>
 </section>
 

@@ -14,7 +14,7 @@ Capture a lightweight snapshot of hybrid search storage metrics.
 
 Args:
 faiss_index: Dense vector index manager.
-opensearch: OpenSearch simulator representing lexical storage.
+opensearch: Lexical index representing sparse storage.
 registry: Chunk registry tracking vector-to-payload mappings.
 
 Returns:
@@ -143,13 +143,17 @@ Attributes:
 _config_manager: Source of runtime hybrid-search configuration.
 _feature_generator: Component producing BM25/SPLADE/dense features.
 _faiss: GPU-backed FAISS index manager for dense retrieval.
-_opensearch: Simulator used for BM25 and SPLADE lookups.
+_opensearch: Lexical index used for BM25 and SPLADE lookups.
 _registry: Chunk registry providing metadata and FAISS id lookups.
 _observability: Telemetry facade for metrics and traces.
 
 Examples:
+>>> # File-backed config manager (JSON/YAML on disk)
+>>> from pathlib import Path  # doctest: +SKIP
+>>> manager = HybridSearchConfigManager(Path("config.json"))  # doctest: +SKIP
+>>> from DocsToKG.HybridSearch.devtools.opensearch_simulator import OpenSearchSimulator  # doctest: +SKIP
 >>> service = HybridSearchService(  # doctest: +SKIP
-...     config_manager=HybridSearchConfigManager.from_dict({}),
+...     config_manager=manager,
 ...     feature_generator=FeatureGenerator(embedding_dim=16),
 ...     faiss_index=FaissVectorStore(dim=16, config=HybridSearchConfig().dense),
 ...     opensearch=OpenSearchSimulator(),

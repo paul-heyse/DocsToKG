@@ -87,13 +87,13 @@ from DocsToKG.ContentDownload.download_pyalex_pdfs import (  # noqa: E402
     CsvAttemptLoggerAdapter,
     CsvSink,
     JsonlSink,
-    LastAttemptCsvSink,
     ManifestEntry,
-    ManifestIndexSink,
     MultiSink,
 )
 from DocsToKG.ContentDownload.resolvers import AttemptRecord  # noqa: E402
 from scripts.export_attempts_csv import export_attempts_jsonl_to_csv  # noqa: E402
+from tools.manifest_to_csv import convert_manifest_to_csv  # noqa: E402
+from tools.manifest_to_index import convert_manifest_to_index  # noqa: E402
 # --- Test Cases ---
 
 
@@ -366,105 +366,103 @@ def test_multi_sink_thread_safety(tmp_path: Path) -> None:
         assert row["content_length"] == "2048"
 
 
-def test_manifest_index_sink_writes_sorted_index(tmp_path: Path) -> None:
+def test_manifest_to_index_tool_writes_sorted_index(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "manifest.jsonl"
+    manifest_path.write_text(
+        "\n".join(
+            [
+                json.dumps({"record_type": "attempt", "work_id": "W0"}),
+                json.dumps(
+                    {
+                        "record_type": "manifest",
+                        "work_id": "W2",
+                        "classification": "pdf",
+                        "path": "/tmp/example.pdf",
+                        "sha256": "abc",
+                    }
+                ),
+                json.dumps(
+                    {
+                        "record_type": "manifest",
+                        "work_id": "W1",
+                        "classification": "html",
+                        "path": "/tmp/example.html",
+                        "sha256": None,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "record_type": "manifest",
+                        "work_id": "W2",
+                        "classification": "cached",
+                        "path": "/tmp/cached.pdf",
+                        "sha256": "def",
+                    }
+                ),
+                json.dumps({"record_type": "summary"}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     index_path = tmp_path / "manifest.index.json"
-    sink = ManifestIndexSink(index_path)
-    entries = [
-        ManifestEntry(
-            timestamp="2024-01-01T00:00:00Z",
-            work_id="W2",
-            title="Example",
-            publication_year=2024,
-            resolver="unpaywall",
-            url="https://example.org/pdf",
-            path="/tmp/example.pdf",
-            classification="pdf",
-            content_type="application/pdf",
-            reason=None,
-            html_paths=[],
-            sha256="abc",
-            content_length=1024,
-            etag=None,
-            last_modified=None,
-            extracted_text_path=None,
-            dry_run=False,
-        ),
-        ManifestEntry(
-            timestamp="2024-01-01T00:00:01Z",
-            work_id="W1",
-            title="HTML",
-            publication_year=2023,
-            resolver="landing",
-            url="https://example.org/html",
-            path="/tmp/example.html",
-            classification="html",
-            content_type="text/html",
-            reason=None,
-            html_paths=["/tmp/example.html"],
-            sha256=None,
-            content_length=512,
-            etag=None,
-            last_modified=None,
-            extracted_text_path=None,
-            dry_run=False,
-        ),
-    ]
-    for entry in entries:
-        sink.log_manifest(entry)
-    sink.close()
+    convert_manifest_to_index(manifest_path, index_path)
 
     payload = json.loads(index_path.read_text(encoding="utf-8"))
     assert list(payload.keys()) == ["W1", "W2"]
-    assert payload["W1"]["classification"] == "html"
-    assert payload["W1"]["pdf_path"] is None
-    assert payload["W2"]["pdf_path"] == "/tmp/example.pdf"
-    assert payload["W2"]["sha256"] == "abc"
+    assert payload["W1"] == {"classification": "html", "pdf_path": None, "sha256": None}
+    assert payload["W2"] == {
+        "classification": "cached",
+        "pdf_path": "/tmp/cached.pdf",
+        "sha256": "def",
+    }
 
 
-def test_last_attempt_csv_sink_writes_latest_entries(tmp_path: Path) -> None:
+def test_manifest_to_csv_tool_writes_latest_entries(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "manifest.jsonl"
+    manifest_path.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "record_type": "manifest",
+                        "work_id": "W-last",
+                        "title": "Initial",
+                        "publication_year": 2024,
+                        "resolver": "unpaywall",
+                        "url": "https://example.org/first",
+                        "classification": "pdf",
+                        "path": "/tmp/first.pdf",
+                        "sha256": "111",
+                        "content_length": 100,
+                        "etag": None,
+                        "last_modified": None,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "record_type": "manifest",
+                        "work_id": "W-last",
+                        "title": "Updated",
+                        "publication_year": 2024,
+                        "resolver": "crossref",
+                        "url": "https://example.org/second",
+                        "classification": "pdf",
+                        "path": "/tmp/second.pdf",
+                        "sha256": "222",
+                        "content_length": 200,
+                        "etag": "",
+                        "last_modified": "",
+                    }
+                ),
+                json.dumps({"record_type": "manifest", "work_id": "W-new"}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     csv_path = tmp_path / "manifest.last.csv"
-    sink = LastAttemptCsvSink(csv_path)
-    first = ManifestEntry(
-        timestamp="2024-01-01T00:00:00Z",
-        work_id="W-last",
-        title="Initial",
-        publication_year=2024,
-        resolver="unpaywall",
-        url="https://example.org/first",
-        path="/tmp/first.pdf",
-        classification="pdf",
-        content_type="application/pdf",
-        reason=None,
-        html_paths=[],
-        sha256="111",
-        content_length=100,
-        etag=None,
-        last_modified=None,
-        extracted_text_path=None,
-        dry_run=False,
-    )
-    second = ManifestEntry(
-        timestamp="2024-01-01T00:01:00Z",
-        work_id="W-last",
-        title="Updated",
-        publication_year=2024,
-        resolver="crossref",
-        url="https://example.org/second",
-        path="/tmp/second.pdf",
-        classification="pdf",
-        content_type="application/pdf",
-        reason=None,
-        html_paths=[],
-        sha256="222",
-        content_length=200,
-        etag=None,
-        last_modified=None,
-        extracted_text_path=None,
-        dry_run=False,
-    )
-    sink.log_manifest(first)
-    sink.log_manifest(second)
-    sink.close()
+    convert_manifest_to_csv(manifest_path, csv_path)
 
     with csv_path.open("r", encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
@@ -482,5 +480,18 @@ def test_last_attempt_csv_sink_writes_latest_entries(tmp_path: Path) -> None:
             "content_length": "200",
             "etag": "",
             "last_modified": "",
-        }
+        },
+        {
+            "work_id": "W-new",
+            "title": "",
+            "publication_year": "",
+            "resolver": "",
+            "url": "",
+            "classification": "",
+            "path": "",
+            "sha256": "",
+            "content_length": "",
+            "etag": "",
+            "last_modified": "",
+        },
     ]

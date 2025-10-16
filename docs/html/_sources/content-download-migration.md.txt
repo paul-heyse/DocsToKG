@@ -1,10 +1,10 @@
-# Content Download Migration Guide
+# 1. Content Download Migration Guide
 
 This brief guide helps downstream consumers migrate to the refactored content
 download pipeline introduced in the `refactor-content-download-robustness`
 change set.
 
-## Removed Compatibility Shims
+## 1. Removed Compatibility Shims
 
 - `DocsToKG.ContentDownload.resolvers.time` and
   `DocsToKG.ContentDownload.resolvers.requests` were deleted. Import these
@@ -16,7 +16,7 @@ change set.
   consolidated modules (`ranking`, `vectorstore`, `service`, `storage`)
   instead.
 
-## Resolver Implementations
+## 2. Resolver Implementations
 
 - New resolvers should inherit from `ApiResolverBase` to leverage shared error
   handling via `_request_json()`.
@@ -24,7 +24,7 @@ change set.
   every resolver must use the provided `requests.Session` instance and the
   shared network helpers.
 
-## CLI Behaviour Changes
+## 3. CLI Behaviour Changes
 
 - Use `--staging` to create timestamped run directories with separate `PDF/`
   and `HTML/` folders plus `manifest.jsonl`, `manifest.index.json`, and
@@ -38,7 +38,7 @@ change set.
   longer raise errors and conditional requests fall back to full downloads when
   required fields are missing.
 
-## Manifest Consumers
+## 4. Manifest Consumers
 
 - Manifest entries maintain their historical schema. New sidecar files
   (`.index.json`, `.metrics.json`, `manifest.last.csv`) provide faster lookup

@@ -285,18 +285,15 @@ import pytest
 from DocsToKG.HybridSearch import (
     ChunkIngestionPipeline,
     DocumentInput,
-    FeatureGenerator,
     HybridSearchAPI,
     HybridSearchConfigManager,
     HybridSearchRequest,
     HybridSearchService,
     HybridSearchValidator,
     Observability,
-    OpenSearchIndexTemplate,
-    OpenSearchSchemaManager,
 )
 from DocsToKG.HybridSearch.config import DenseIndexConfig, FusionConfig
-from DocsToKG.HybridSearch.features import tokenize
+from DocsToKG.HybridSearch.devtools.features import FeatureGenerator, tokenize
 from DocsToKG.HybridSearch.ingest import IngestError
 from DocsToKG.HybridSearch.ranking import ResultShaper
 from DocsToKG.HybridSearch.service import (
@@ -306,7 +303,12 @@ from DocsToKG.HybridSearch.service import (
     should_rebuild_index,
     verify_pagination,
 )
-from DocsToKG.HybridSearch.storage import ChunkRegistry, OpenSearchSimulator
+from DocsToKG.HybridSearch.devtools.opensearch_simulator import (
+    OpenSearchIndexTemplate,
+    OpenSearchSchemaManager,
+    OpenSearchSimulator,
+)
+from DocsToKG.HybridSearch.storage import ChunkRegistry
 from DocsToKG.HybridSearch.types import (
     ChunkFeatures,
     ChunkPayload,

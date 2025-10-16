@@ -16,6 +16,12 @@
 #       "kind": "class"
 #     },
 #     {
+#       "id": "basic-tokenize",
+#       "name": "_basic_tokenize",
+#       "anchor": "function-_basic-tokenize",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "apply-mmr-diversification",
 #       "name": "apply_mmr_diversification",
 #       "anchor": "function-apply-mmr-diversification",
@@ -29,14 +35,14 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 
 from .config import FusionConfig
-from .features import tokenize
-from .storage import OpenSearchSimulator
+from .interfaces import LexicalIndex
 from .types import (
     ChunkPayload,
     FusionCandidate,
@@ -57,6 +63,8 @@ __all__ = (
     "apply_mmr_diversification",
 )
 
+_TOKEN_PATTERN = re.compile(r"[\w']+")
+
 
 # --- Public Classes ---
 
@@ -73,11 +81,15 @@ class ReciprocalRankFusion:
         {}
     """
 
-    def __init__(self, k0: float = 60.0) -> None:
+    def __init__(
+        self, k0: float = 60.0, *, channel_weights: Mapping[str, float] | None = None
+    ) -> None:
         """Create a new fusion helper.
 
         Args:
             k0: Smoothing constant added to ranks before inversion.
+            channel_weights: Optional per-channel weights for weighted RRF
+                (e.g., {"bm25": 1.0, "splade": 1.0, "dense": 1.3}).
 
         Raises:
             ValueError: If ``k0`` is not strictly positive.
@@ -88,6 +100,7 @@ class ReciprocalRankFusion:
         if k0 <= 0:
             raise ValueError("k0 must be positive")
         self._k0 = k0
+        self._w = dict(channel_weights or {})
 
     def fuse(self, candidates: Sequence[FusionCandidate]) -> Dict[str, float]:
         """Fuse ranked candidates using Reciprocal Rank Fusion.
@@ -100,7 +113,8 @@ class ReciprocalRankFusion:
         """
         scores: Dict[str, float] = defaultdict(float)
         for candidate in candidates:
-            contribution = 1.0 / (self._k0 + candidate.rank)
+            weight = float(self._w.get(candidate.source, 1.0))
+            contribution = weight * (1.0 / (self._k0 + candidate.rank))
             scores[candidate.chunk.vector_id] += contribution
         return dict(scores)
 
@@ -109,12 +123,13 @@ class ResultShaper:
     """Collapse duplicates, enforce quotas, and generate highlights.
 
     Attributes:
-        _opensearch: Simulator providing metadata and highlights.
+        _opensearch: Lexical index providing metadata and highlights.
         _fusion_config: Fusion configuration controlling result shaping.
         _gpu_device: CUDA device used for optional similarity checks.
         _gpu_resources: Optional FAISS resources for GPU pairwise similarity.
 
     Examples:
+        >>> from DocsToKG.HybridSearch.devtools.opensearch_simulator import OpenSearchSimulator  # doctest: +SKIP
         >>> shaper = ResultShaper(OpenSearchSimulator(), FusionConfig())  # doctest: +SKIP
         >>> shaper.shape([], {}, HybridSearchRequest(query="", namespace=None, filters={}, page_size=1), {})  # doctest: +SKIP
         []
@@ -122,7 +137,7 @@ class ResultShaper:
 
     def __init__(
         self,
-        opensearch: OpenSearchSimulator,
+        opensearch: LexicalIndex,
         fusion_config: FusionConfig,
         *,
         device: int = 0,
@@ -131,7 +146,7 @@ class ResultShaper:
         """Initialise the shaper with supporting components.
 
         Args:
-            opensearch: Simulator used to fetch highlights and metadata.
+            opensearch: Lexical index used to fetch highlights and metadata.
             fusion_config: Fusion configuration influencing dedupe limits.
             device: CUDA device index for GPU-assisted operations.
             resources: Optional FAISS GPU resources passed to similarity helpers.
@@ -178,7 +193,7 @@ class ResultShaper:
         doc_buckets: Dict[str, int] = defaultdict(int)
         emitted_indices: List[int] = []
         results: List[HybridSearchResult] = []
-        query_tokens = tokenize(request.query)
+        query_tokens = _basic_tokenize(request.query)
         for current_idx, chunk in enumerate(ordered_chunks):
             rank = current_idx + 1
             if not self._within_doc_limit(chunk.doc_id, doc_buckets):
@@ -242,11 +257,24 @@ class ResultShaper:
         highlights = self._opensearch.highlight(chunk, query_tokens)
         if highlights:
             return highlights
-        tokens = tokenize(chunk.text)
+        tokens = _basic_tokenize(chunk.text)
         matches = [token for token in tokens if token in set(query_tokens)]
         if matches:
             return [" ".join(tokens[: min(len(tokens), 40)])]
         return [chunk.text[: min(len(chunk.text), 200)]]
+
+
+def _basic_tokenize(text: str) -> List[str]:
+    """Tokenize ``text`` using a simple regex to avoid devtools dependencies.
+
+    Args:
+        text: Source string to segment into lowercase tokens.
+
+    Returns:
+        List of tokens extracted from ``text``.
+    """
+
+    return [match.group(0).lower() for match in _TOKEN_PATTERN.finditer(text)]
 
 
 # --- Public Functions ---

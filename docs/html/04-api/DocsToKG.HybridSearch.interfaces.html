@@ -1,0 +1,152 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1. Module: interfaces &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">1. Module: interfaces</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/04-api/DocsToKG.HybridSearch.interfaces.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-interfaces">
+<h1>1. Module: interfaces<a class="headerlink" href="#module-interfaces" title="Link to this heading"></a></h1>
+<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.interfaces</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Protocols defining hybrid-search integration points.</p>
+</section>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="bulk-upsert-self-chunks">
+<h3><code class="docutils literal notranslate"><span class="pre">bulk_upsert(self,</span> <span class="pre">chunks)</span></code><a class="headerlink" href="#bulk-upsert-self-chunks" title="Link to this heading"></a></h3>
+<p>Insert or update chunk payloads.</p>
+</section>
+<section id="bulk-delete-self-vector-ids">
+<h3><code class="docutils literal notranslate"><span class="pre">bulk_delete(self,</span> <span class="pre">vector_ids)</span></code><a class="headerlink" href="#bulk-delete-self-vector-ids" title="Link to this heading"></a></h3>
+<p>Remove chunk payloads for the supplied vector identifiers.</p>
+</section>
+<section id="search-bm25-self-query-weights-filters-top-k-cursor">
+<h3><code class="docutils literal notranslate"><span class="pre">search_bm25(self,</span> <span class="pre">query_weights,</span> <span class="pre">filters,</span> <span class="pre">top_k,</span> <span class="pre">cursor)</span></code><a class="headerlink" href="#search-bm25-self-query-weights-filters-top-k-cursor" title="Link to this heading"></a></h3>
+<p>Execute a BM25-style sparse search.</p>
+</section>
+<section id="search-splade-self-query-weights-filters-top-k-cursor">
+<h3><code class="docutils literal notranslate"><span class="pre">search_splade(self,</span> <span class="pre">query_weights,</span> <span class="pre">filters,</span> <span class="pre">top_k,</span> <span class="pre">cursor)</span></code><a class="headerlink" href="#search-splade-self-query-weights-filters-top-k-cursor" title="Link to this heading"></a></h3>
+<p>Execute a SPLADE sparse search.</p>
+</section>
+<section id="highlight-self-chunk-query-tokens">
+<h3><code class="docutils literal notranslate"><span class="pre">highlight(self,</span> <span class="pre">chunk,</span> <span class="pre">query_tokens)</span></code><a class="headerlink" href="#highlight-self-chunk-query-tokens" title="Link to this heading"></a></h3>
+<p>Return highlight snippets for <code class="docutils literal notranslate"><span class="pre">chunk</span></code> given <code class="docutils literal notranslate"><span class="pre">query_tokens</span></code>.</p>
+</section>
+<section id="stats-self">
+<h3><code class="docutils literal notranslate"><span class="pre">stats(self)</span></code><a class="headerlink" href="#stats-self" title="Link to this heading"></a></h3>
+<p>Return implementation-defined statistics about the lexical index.</p>
+</section>
+</section>
+<section id="classes">
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="lexicalindex">
+<h3><code class="docutils literal notranslate"><span class="pre">LexicalIndex</span></code><a class="headerlink" href="#lexicalindex" title="Link to this heading"></a></h3>
+<p>Protocol describing the lexical (BM25/SPLADE) index interface.</p>
+<p>Implementations are expected to manage chunk persistence, sparse search, and
+highlighting in a way that is compatible with the hybrid search pipeline.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

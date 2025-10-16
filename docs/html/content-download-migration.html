@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Content Download Migration Guide &mdash; DocsToKG 1.0.0 documentation</title>
+  <title>1. Content Download Migration Guide &mdash; DocsToKG 1.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="_static/css/custom.css" />
@@ -66,7 +66,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Content Download Migration Guide</li>
+      <li class="breadcrumb-item active">1. Content Download Migration Guide</li>
       <li class="wy-breadcrumbs-aside">
             <a href="_sources/content-download-migration.md.txt" rel="nofollow"> View page source</a>
       </li>
@@ -77,12 +77,12 @@
            <div itemprop="articleBody">
              
   <section id="content-download-migration-guide">
-<h1>Content Download Migration Guide<a class="headerlink" href="#content-download-migration-guide" title="Link to this heading"></a></h1>
+<h1>1. Content Download Migration Guide<a class="headerlink" href="#content-download-migration-guide" title="Link to this heading"></a></h1>
 <p>This brief guide helps downstream consumers migrate to the refactored content
 download pipeline introduced in the <code class="docutils literal notranslate"><span class="pre">refactor-content-download-robustness</span></code>
 change set.</p>
 <section id="removed-compatibility-shims">
-<h2>Removed Compatibility Shims<a class="headerlink" href="#removed-compatibility-shims" title="Link to this heading"></a></h2>
+<h2>1. Removed Compatibility Shims<a class="headerlink" href="#removed-compatibility-shims" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.time</span></code> and
 <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.requests</span></code> were deleted. Import these
@@ -96,7 +96,7 @@ instead.</p></li>
 </ul>
 </section>
 <section id="resolver-implementations">
-<h2>Resolver Implementations<a class="headerlink" href="#resolver-implementations" title="Link to this heading"></a></h2>
+<h2>2. Resolver Implementations<a class="headerlink" href="#resolver-implementations" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p>New resolvers should inherit from <code class="docutils literal notranslate"><span class="pre">ApiResolverBase</span></code> to leverage shared error
 handling via <code class="docutils literal notranslate"><span class="pre">_request_json()</span></code>.</p></li>
@@ -106,7 +106,7 @@ shared network helpers.</p></li>
 </ul>
 </section>
 <section id="cli-behaviour-changes">
-<h2>CLI Behaviour Changes<a class="headerlink" href="#cli-behaviour-changes" title="Link to this heading"></a></h2>
+<h2>3. CLI Behaviour Changes<a class="headerlink" href="#cli-behaviour-changes" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p>Use <code class="docutils literal notranslate"><span class="pre">--staging</span></code> to create timestamped run directories with separate <code class="docutils literal notranslate"><span class="pre">PDF/</span></code>
 and <code class="docutils literal notranslate"><span class="pre">HTML/</span></code> folders plus <code class="docutils literal notranslate"><span class="pre">manifest.jsonl</span></code>, <code class="docutils literal notranslate"><span class="pre">manifest.index.json</span></code>, and
@@ -122,7 +122,7 @@ required fields are missing.</p></li>
 </ul>
 </section>
 <section id="manifest-consumers">
-<h2>Manifest Consumers<a class="headerlink" href="#manifest-consumers" title="Link to this heading"></a></h2>
+<h2>4. Manifest Consumers<a class="headerlink" href="#manifest-consumers" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p>Manifest entries maintain their historical schema. New sidecar files
 (<code class="docutils literal notranslate"><span class="pre">.index.json</span></code>, <code class="docutils literal notranslate"><span class="pre">.metrics.json</span></code>, <code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code>) provide faster lookup

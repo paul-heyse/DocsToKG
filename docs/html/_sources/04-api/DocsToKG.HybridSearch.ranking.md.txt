@@ -8,6 +8,10 @@ Ranking, fusion, and result shaping utilities for DocsToKG hybrid search.
 
 ## 2. Functions
 
+### `_basic_tokenize(text)`
+
+Minimal tokenizer used to avoid devtools dependencies in production code.
+
 ### `apply_mmr_diversification(fused_candidates, fused_scores, lambda_param, top_k)`
 
 Apply maximal marginal relevance to promote diversity.
@@ -18,14 +22,14 @@ fused_scores: Precomputed fused scores for each candidate vector ID.
 lambda_param: Balancing factor between relevance and diversity (0-1).
 top_k: Maximum number of diversified candidates to retain.
 device: GPU device identifier used for similarity computations.
-resources: FAISS GPU resources used for pairwise similarity.
+resources: Optional FAISS GPU resources used for pairwise similarity; falls back to
+CPU cosine when ``None``.
 
 Returns:
 List[FusionCandidate]: Diversified candidate list ordered by MMR score.
 
 Raises:
 ValueError: If ``lambda_param`` falls outside ``[0, 1]``.
-RuntimeError: When GPU resources are not available for diversification.
 
 ### `fuse(self, candidates)`
 
@@ -55,7 +59,7 @@ and duplicate suppression.
 
 *No documentation available.*
 
-### `_is_near_duplicate(self, embeddings, current_idx, emitted_indices, pairwise)`
+### `_is_near_duplicate(self, embeddings, current_idx, emitted_indices)`
 
 *No documentation available.*
 
@@ -83,12 +87,13 @@ Examples:
 Collapse duplicates, enforce quotas, and generate highlights.
 
 Attributes:
-_opensearch: Simulator providing metadata and highlights.
+_opensearch: Lexical index providing metadata and highlights.
 _fusion_config: Fusion configuration controlling result shaping.
 _gpu_device: CUDA device used for optional similarity checks.
 _gpu_resources: Optional FAISS resources for GPU pairwise similarity.
 
 Examples:
+>>> from DocsToKG.HybridSearch.devtools.opensearch_simulator import OpenSearchSimulator  # doctest: +SKIP
 >>> shaper = ResultShaper(OpenSearchSimulator(), FusionConfig())  # doctest: +SKIP
 >>> shaper.shape([], {}, HybridSearchRequest(query="", namespace=None, filters={}, page_size=1), {})  # doctest: +SKIP
 []

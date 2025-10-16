@@ -1,0 +1,484 @@
+"""In-memory OpenSearch simulator and schema helpers for development.
+
+Args:
+    None
+
+Returns:
+    None
+
+Raises:
+    None
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Callable, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
+
+from ..config import ChunkingConfig
+from ..types import ChunkPayload
+
+__all__ = (
+    "OpenSearchIndexTemplate",
+    "OpenSearchSchemaManager",
+    "OpenSearchSimulator",
+    "matches_filters",
+)
+
+
+@dataclass(slots=True)
+class OpenSearchIndexTemplate:
+    """Representation of a namespace-specific OpenSearch template.
+
+    Attributes:
+        name: Human-readable name of the template (e.g. ``"hybrid-chunks-demo"``).
+        namespace: DocsToKG namespace that owns the template.
+        body: Raw OpenSearch template payload including settings and mappings.
+        chunking: Chunking configuration applied to documents within the namespace.
+
+    Examples:
+        >>> template = OpenSearchIndexTemplate(
+        ...     name="hybrid-chunks-demo",
+        ...     namespace="demo",
+        ...     body={"settings": {}, "mappings": {}},
+        ...     chunking=ChunkingConfig(),
+        ... )
+        >>> template.asdict()["namespace"]
+        'demo'
+    """
+
+    name: str
+    namespace: str
+    body: Mapping[str, object]
+    chunking: ChunkingConfig
+
+    def asdict(self) -> Dict[str, object]:
+        """Return a dictionary representation of the template.
+
+        Args:
+            None
+
+        Returns:
+            Dictionary containing serializable template fields.
+        """
+        return {
+            "name": self.name,
+            "namespace": self.namespace,
+            "body": dict(self.body),
+            "chunking": {
+                "max_tokens": self.chunking.max_tokens,
+                "overlap": self.chunking.overlap,
+            },
+        }
+
+
+class OpenSearchSchemaManager:
+    """Manage simulated OpenSearch index templates for tests.
+
+    The manager mirrors the minimal subset of the OpenSearch API required by the
+    validation harness. It stores templates keyed by namespace and exposes helper
+    methods to create or retrieve definitions.
+
+    Attributes:
+        _templates: Internal mapping of namespace names to template instances.
+
+    Examples:
+        >>> manager = OpenSearchSchemaManager()
+        >>> template = manager.bootstrap_template("demo")
+        >>> manager.get_template("demo") is template
+        True
+    """
+
+    def __init__(self) -> None:
+        self._templates: MutableMapping[str, OpenSearchIndexTemplate] = {}
+
+    def bootstrap_template(
+        self,
+        namespace: str,
+        chunking: Optional[ChunkingConfig] = None,
+    ) -> OpenSearchIndexTemplate:
+        """Create and cache a template for ``namespace``.
+
+        Args:
+            namespace: Namespace identifier that will own the template.
+            chunking: Optional chunking configuration. Defaults to ``ChunkingConfig()``.
+
+        Returns:
+            Registered template instance for ``namespace``.
+        """
+        chunking_config = chunking or ChunkingConfig()
+        body = {
+            "settings": {
+                "index": {
+                    "number_of_shards": 1,
+                    "number_of_replicas": 1,
+                },
+                "analysis": {
+                    "analyzer": {
+                        "default": {
+                            "type": "standard",
+                        }
+                    }
+                },
+            },
+            "mappings": {
+                "dynamic": "strict",
+                "properties": {
+                    "doc_id": {"type": "keyword"},
+                    "chunk_id": {"type": "keyword"},
+                    "namespace": {"type": "keyword"},
+                    "vector_id": {"type": "keyword"},
+                    "text": {"type": "text", "analyzer": "standard"},
+                    "splade": {"type": "rank_features"},
+                    "token_count": {"type": "integer"},
+                    "metadata": {
+                        "type": "object",
+                        "properties": {
+                            "author": {"type": "keyword"},
+                            "tags": {"type": "keyword"},
+                            "published_at": {"type": "date"},
+                            "acl": {"type": "keyword"},
+                        },
+                    },
+                },
+            },
+        }
+        template = OpenSearchIndexTemplate(
+            name=f"hybrid-chunks-{namespace}",
+            namespace=namespace,
+            body=body,
+            chunking=chunking_config,
+        )
+        self._templates[namespace] = template
+        return template
+
+    def get_template(self, namespace: str) -> Optional[OpenSearchIndexTemplate]:
+        """Return the template registered for ``namespace`` if it exists.
+
+        Args:
+            namespace: Namespace identifier used during registration.
+
+        Returns:
+            Template for ``namespace`` or ``None`` when the namespace is unknown.
+        """
+
+        return self._templates.get(namespace)
+
+    def list_templates(self) -> Mapping[str, OpenSearchIndexTemplate]:
+        """Return a shallow copy of the namespace → template mapping.
+
+        Returns:
+            Mapping of namespace names to template definitions.
+        """
+
+        return dict(self._templates)
+
+
+@dataclass(slots=True)
+class _StoredChunk:
+    """Wrapper used to keep chunk payloads inside the simulator.
+
+    Attributes:
+        payload: Chunk payload stored in memory.
+
+    Examples:
+        >>> from DocsToKG.HybridSearch.types import ChunkFeatures, ChunkPayload
+        >>> features = ChunkFeatures(bm25_terms={}, splade_weights={}, embedding=[])  # doctest: +SKIP
+        >>> chunk = ChunkPayload(  # doctest: +SKIP
+        ...     doc_id="d1",
+        ...     chunk_id="c1",
+        ...     vector_id="v1",
+        ...     namespace="demo",
+        ...     text="example",
+        ...     token_count=1,
+        ...     metadata={},
+        ...     features=features,
+        ... )
+        >>> _StoredChunk(chunk).payload is chunk  # doctest: +SKIP
+        True
+    """
+
+    payload: ChunkPayload
+
+
+class OpenSearchSimulator:
+    """Simplified OpenSearch-like index used for development and tests.
+
+    The simulator implements the :class:`~DocsToKG.HybridSearch.interfaces.LexicalIndex`
+    protocol and mimics the behaviour of the production OpenSearch integration.
+
+    Attributes:
+        _chunks: Mapping of vector identifiers to stored chunk payloads.
+        _avg_length: Average token length across indexed chunks (used for BM25).
+        _templates: Registry of namespace templates registered via ``register_template``.
+
+    Examples:
+        >>> simulator = OpenSearchSimulator()
+        >>> simulator.bulk_upsert([])
+        >>> simulator.stats()["document_count"]
+        0.0
+    """
+
+    def __init__(self) -> None:
+        self._chunks: Dict[str, _StoredChunk] = {}
+        self._avg_length: float = 0.0
+        self._templates: Dict[str, OpenSearchIndexTemplate] = {}
+
+    def bulk_upsert(self, chunks: Sequence[ChunkPayload]) -> None:
+        """Insert or update ``chunks`` within the simulator.
+
+        Args:
+            chunks: Iterable of chunk payloads to store or replace.
+        """
+        for chunk in chunks:
+            self._chunks[chunk.vector_id] = _StoredChunk(chunk)
+        self._recompute_avg_length()
+
+    def bulk_delete(self, vector_ids: Sequence[str]) -> None:
+        """Remove chunk payloads whose vector identifiers are present in ``vector_ids``.
+
+        Args:
+            vector_ids: Vector identifiers associated with chunks to remove.
+        """
+        for vector_id in vector_ids:
+            self._chunks.pop(vector_id, None)
+        self._recompute_avg_length()
+
+    def fetch(self, vector_ids: Sequence[str]) -> List[ChunkPayload]:
+        """Return the stored payloads matching ``vector_ids``.
+
+        Args:
+            vector_ids: Identifiers of the desired chunks.
+
+        Returns:
+            List of chunk payloads that were previously stored.
+        """
+        return [self._chunks[vid].payload for vid in vector_ids if vid in self._chunks]
+
+    def vector_ids(self) -> List[str]:
+        """Return all vector identifiers currently stored.
+
+        Returns:
+            Vector identifiers known to the simulator.
+        """
+        return list(self._chunks.keys())
+
+    def register_template(self, template: OpenSearchIndexTemplate) -> None:
+        """Associate ``template`` with its namespace for later lookups.
+
+        Args:
+            template: Template definition to register.
+        """
+        self._templates[template.namespace] = template
+
+    def template_for(self, namespace: str) -> Optional[OpenSearchIndexTemplate]:
+        """Return the registered template for ``namespace`` if present.
+
+        Args:
+            namespace: Namespace identifier to look up.
+
+        Returns:
+            Registered template or ``None`` when no template exists.
+        """
+        return self._templates.get(namespace)
+
+    def search_bm25(
+        self,
+        query_weights: Mapping[str, float],
+        filters: Mapping[str, object],
+        top_k: int,
+        cursor: Optional[int] = None,
+    ) -> Tuple[List[Tuple[ChunkPayload, float]], Optional[int]]:
+        """Execute a BM25-like search using ``query_weights``.
+
+        Args:
+            query_weights: Sparse query representation with token weights.
+            filters: Metadata filters applied to stored chunks.
+            top_k: Maximum number of results to return in the current page.
+            cursor: Optional cursor returned from a previous call.
+
+        Returns:
+            Tuple containing hits and the next pagination cursor (or ``None``).
+        """
+        return self._search_sparse(
+            lambda stored: self._bm25_score(stored, query_weights),
+            filters,
+            top_k,
+            cursor,
+        )
+
+    def search_splade(
+        self,
+        query_weights: Mapping[str, float],
+        filters: Mapping[str, object],
+        top_k: int,
+        cursor: Optional[int] = None,
+    ) -> Tuple[List[Tuple[ChunkPayload, float]], Optional[int]]:
+        """Execute a SPLADE-style sparse search using ``query_weights``.
+
+        Args:
+            query_weights: Sparse query with SPLADE activations.
+            filters: Metadata filters applied to stored chunks.
+            top_k: Maximum number of results to return in the current page.
+            cursor: Optional cursor returned from a previous call.
+
+        Returns:
+            Tuple containing hits and the next pagination cursor (or ``None``).
+        """
+        return self._search_sparse(
+            lambda stored: sum(
+                weight * stored.payload.features.splade_weights.get(token, 0.0)
+                for token, weight in query_weights.items()
+            ),
+            filters,
+            top_k,
+            cursor,
+        )
+
+    def highlight(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
+        """Return naive highlight tokens that appear in ``chunk``."""
+        lowered = chunk.text.lower()
+        highlights: List[str] = []
+        for token in query_tokens:
+            token_lower = token.lower()
+            if token_lower in lowered:
+                highlights.append(token)
+        return highlights
+
+    def stats(self) -> Mapping[str, float]:
+        """Return summary statistics about the indexed corpus.
+
+        Args:
+            None
+
+        Returns:
+            Mapping containing document counts and average chunk length.
+        """
+        return {
+            "document_count": float(len(self._chunks)),
+            "avg_token_length": float(self._avg_length),
+        }
+
+    def _filtered_chunks(self, filters: Mapping[str, object]) -> List[_StoredChunk]:
+        """Return stored chunks that satisfy ``filters``.
+
+        Args:
+            filters: Metadata filters applied to stored chunks.
+
+        Returns:
+            Stored chunks matching the provided filters.
+        """
+        return [chunk for chunk in self._chunks.values() if matches_filters(chunk.payload, filters)]
+
+    def _bm25_score(
+        self,
+        stored: _StoredChunk,
+        query_weights: Mapping[str, float],
+    ) -> float:
+        """Compute a BM25-inspired score for ``stored`` given ``query_weights``.
+
+        Args:
+            stored: Stored chunk candidate being scored.
+            query_weights: Sparse query representation with token weights.
+
+        Returns:
+            BM25-inspired similarity score for the stored chunk.
+        """
+        score = 0.0
+        for token, weight in query_weights.items():
+            chunk_weight = stored.payload.features.bm25_terms.get(token)
+            if chunk_weight is None:
+                continue
+            score += weight * chunk_weight
+        return float(score)
+
+    def _paginate(
+        self,
+        results: List[Tuple[ChunkPayload, float]],
+        top_k: int,
+        cursor: Optional[int],
+    ) -> Tuple[List[Tuple[ChunkPayload, float]], Optional[int]]:
+        """Paginate ``results`` according to ``top_k`` and ``cursor``.
+
+        Args:
+            results: Ranked search hits produced by a sparse search.
+            top_k: Maximum number of results to include in the response.
+            cursor: Optional offset cursor used for pagination.
+
+        Returns:
+            Tuple containing the sliced page of results and the next cursor.
+        """
+        offset = cursor or 0
+        end = offset + top_k
+        page = results[offset:end]
+        next_cursor = end if end < len(results) else None
+        return page, next_cursor
+
+    def _search_sparse(
+        self,
+        scoring_fn: Callable[[_StoredChunk], float],
+        filters: Mapping[str, object],
+        top_k: int,
+        cursor: Optional[int],
+    ) -> Tuple[List[Tuple[ChunkPayload, float]], Optional[int]]:
+        """Shared sparse search implementation used by BM25 and SPLADE search.
+
+        Args:
+            scoring_fn: Callable that scores stored chunks.
+            filters: Metadata filters applied to the search corpus.
+            top_k: Maximum number of results requested by the caller.
+            cursor: Optional pagination cursor.
+
+        Returns:
+            Tuple containing search hits and a possible pagination cursor.
+        """
+        candidates = self._filtered_chunks(filters)
+        scored: List[Tuple[ChunkPayload, float]] = []
+        for stored in candidates:
+            score = scoring_fn(stored)
+            if score > 0.0:
+                scored.append((stored.payload, float(score)))
+        scored.sort(key=lambda item: item[1], reverse=True)
+        return self._paginate(scored, top_k, cursor)
+
+    def _recompute_avg_length(self) -> None:
+        """Update the cached average chunk length metric.
+
+        Returns:
+            None
+        """
+        if not self._chunks:
+            self._avg_length = 0.0
+            return
+        total = sum(chunk.payload.token_count for chunk in self._chunks.values())
+        self._avg_length = total / len(self._chunks)
+
+
+def matches_filters(chunk: ChunkPayload, filters: Mapping[str, object]) -> bool:
+    """Return ``True`` when ``chunk`` satisfies the provided ``filters``.
+
+    Args:
+        chunk: Chunk payload whose metadata and namespace should be evaluated.
+        filters: Mapping of filter keys to expected values mirroring the production
+            API contract. Values may be scalars or lists of acceptable values.
+
+    Returns:
+        ``True`` if ``chunk`` matches all supplied filters, otherwise ``False``.
+    """
+    for key, expected in filters.items():
+        if key == "namespace":
+            if chunk.namespace != expected:
+                return False
+            continue
+        value = chunk.metadata.get(key)
+        if isinstance(expected, list):
+            if isinstance(value, list):
+                if not any(item in value for item in expected):
+                    return False
+            else:
+                if value not in expected:
+                    return False
+        else:
+            if value != expected:
+                return False
+    return True

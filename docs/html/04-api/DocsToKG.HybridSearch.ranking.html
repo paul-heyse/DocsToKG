@@ -85,6 +85,10 @@
 </section>
 <section id="functions">
 <h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="basic-tokenize-text">
+<h3><code class="docutils literal notranslate"><span class="pre">_basic_tokenize(text)</span></code><a class="headerlink" href="#basic-tokenize-text" title="Link to this heading"></a></h3>
+<p>Minimal tokenizer used to avoid devtools dependencies in production code.</p>
+</section>
 <section id="apply-mmr-diversification-fused-candidates-fused-scores-lambda-param-top-k">
 <h3><code class="docutils literal notranslate"><span class="pre">apply_mmr_diversification(fused_candidates,</span> <span class="pre">fused_scores,</span> <span class="pre">lambda_param,</span> <span class="pre">top_k)</span></code><a class="headerlink" href="#apply-mmr-diversification-fused-candidates-fused-scores-lambda-param-top-k" title="Link to this heading"></a></h3>
 <p>Apply maximal marginal relevance to promote diversity.</p>
@@ -94,12 +98,12 @@ fused_scores: Precomputed fused scores for each candidate vector ID.
 lambda_param: Balancing factor between relevance and diversity (0-1).
 top_k: Maximum number of diversified candidates to retain.
 device: GPU device identifier used for similarity computations.
-resources: FAISS GPU resources used for pairwise similarity.</p>
+resources: Optional FAISS GPU resources used for pairwise similarity; falls back to
+CPU cosine when <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
 <p>Returns:
 List[FusionCandidate]: Diversified candidate list ordered by MMR score.</p>
 <p>Raises:
-ValueError: If <code class="docutils literal notranslate"><span class="pre">lambda_param</span></code> falls outside <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">1]</span></code>.
-RuntimeError: When GPU resources are not available for diversification.</p>
+ValueError: If <code class="docutils literal notranslate"><span class="pre">lambda_param</span></code> falls outside <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">1]</span></code>.</p>
 </section>
 <section id="fuse-self-candidates">
 <h3><code class="docutils literal notranslate"><span class="pre">fuse(self,</span> <span class="pre">candidates)</span></code><a class="headerlink" href="#fuse-self-candidates" title="Link to this heading"></a></h3>
@@ -125,8 +129,8 @@ and duplicate suppression.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_within_doc_limit(self,</span> <span class="pre">doc_id,</span> <span class="pre">doc_buckets)</span></code><a class="headerlink" href="#within-doc-limit-self-doc-id-doc-buckets" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
-<section id="is-near-duplicate-self-embeddings-current-idx-emitted-indices-pairwise">
-<h3><code class="docutils literal notranslate"><span class="pre">_is_near_duplicate(self,</span> <span class="pre">embeddings,</span> <span class="pre">current_idx,</span> <span class="pre">emitted_indices,</span> <span class="pre">pairwise)</span></code><a class="headerlink" href="#is-near-duplicate-self-embeddings-current-idx-emitted-indices-pairwise" title="Link to this heading"></a></h3>
+<section id="is-near-duplicate-self-embeddings-current-idx-emitted-indices">
+<h3><code class="docutils literal notranslate"><span class="pre">_is_near_duplicate(self,</span> <span class="pre">embeddings,</span> <span class="pre">current_idx,</span> <span class="pre">emitted_indices)</span></code><a class="headerlink" href="#is-near-duplicate-self-embeddings-current-idx-emitted-indices" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 <section id="build-highlights-self-chunk-query-tokens">
@@ -157,7 +161,7 @@ scores
 <h3><code class="docutils literal notranslate"><span class="pre">ResultShaper</span></code><a class="headerlink" href="#resultshaper" title="Link to this heading"></a></h3>
 <p>Collapse duplicates, enforce quotas, and generate highlights.</p>
 <p>Attributes:
-_opensearch: Simulator providing metadata and highlights.
+_opensearch: Lexical index providing metadata and highlights.
 _fusion_config: Fusion configuration controlling result shaping.
 _gpu_device: CUDA device used for optional similarity checks.
 _gpu_resources: Optional FAISS resources for GPU pairwise similarity.</p>
@@ -165,7 +169,8 @@ _gpu_resources: Optional FAISS resources for GPU pairwise similarity.</p>
 <blockquote>
 <div><blockquote>
 <div><blockquote>
-<div><p>shaper = ResultShaper(OpenSearchSimulator(), FusionConfig())  # doctest: +SKIP
+<div><p>from DocsToKG.HybridSearch.devtools.opensearch_simulator import OpenSearchSimulator  # doctest: +SKIP
+shaper = ResultShaper(OpenSearchSimulator(), FusionConfig())  # doctest: +SKIP
 shaper.shape([], {}, HybridSearchRequest(query=””, namespace=None, filters={}, page_size=1), {})  # doctest: +SKIP
 []</p>
 </div></blockquote>

@@ -54,10 +54,10 @@ retrieval parameters with thread-safe configuration management.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from threading import RLock
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Literal, Mapping, Optional
 
 # --- Globals ---
 
@@ -183,6 +183,10 @@ class FusionConfig:
     enable_mmr: bool = True
     cosine_dedupe_threshold: float = 0.98
     max_chunks_per_doc: int = 3
+    channel_weights: Mapping[str, float] = field(
+        default_factory=lambda: {"bm25": 1.0, "splade": 1.0, "dense": 1.0}
+    )
+    mmr_pool_size: int = 200
 
 
 @dataclass(frozen=True)

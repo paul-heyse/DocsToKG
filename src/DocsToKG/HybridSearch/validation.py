@@ -65,11 +65,12 @@ import numpy as np
 import faiss  # type: ignore
 
 from .config import HybridSearchConfigManager
-from .features import FeatureGenerator
+from .devtools.features import FeatureGenerator
+from .devtools.opensearch_simulator import OpenSearchSimulator
 from .ingest import ChunkIngestionPipeline
 from .observability import Observability
 from .service import HybridSearchService
-from .storage import ChunkRegistry, OpenSearchSimulator
+from .storage import ChunkRegistry
 from .types import (
     ChunkPayload,
     DocumentInput,

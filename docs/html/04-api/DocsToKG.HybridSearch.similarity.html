@@ -79,37 +79,9 @@
   <section id="module-similarity">
 <h1>1. Module: similarity<a class="headerlink" href="#module-similarity" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.similarity</span></code>.</p>
-<blockquote>
-<div><p><strong>Deprecated:</strong> <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.similarity</span></code> is a compatibility shim that now
-forwards to <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore</span></code>. The module re-exports the GPU
-similarity helpers listed below and emits a :class:<code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> when imported.</p>
-</div></blockquote>
-<section id="re-exported-symbols">
-<h2>1. Re-exported symbols<a class="headerlink" href="#re-exported-symbols" title="Link to this heading"></a></h2>
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p>Symbol</p></th>
-<th class="head"><p>New home</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">normalize_rows</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">cosine_against_corpus_gpu</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore</span></code></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">pairwise_inner_products</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">max_inner_product</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore</span></code></p></td>
-</tr>
-</tbody>
-</table>
-<p>All function signatures remain unchanged. Update imports to reference the
-<code class="docutils literal notranslate"><span class="pre">vectorstore</span></code> module directly to avoid future breakage when the shim is
-removed.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Deprecated compatibility shim for hybrid search similarity helpers.</p>
 </section>
 </section>
 

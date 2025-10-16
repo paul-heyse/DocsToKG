@@ -278,6 +278,7 @@ import warnings
 from collections import Counter, defaultdict
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
+from threading import Lock
 from types import MappingProxyType
 from typing import (
     TYPE_CHECKING,
@@ -304,6 +305,7 @@ from DocsToKG.ContentDownload.utils import (
     normalize_pmcid,
     strip_prefix,
 )
+from DocsToKG.ContentDownload.telemetry import AttemptSink
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
@@ -611,45 +613,6 @@ class AttemptRecord:
     resolver_wall_time_ms: Optional[float] = None
 
 
-class AttemptSink(Protocol):
-    """Protocol for logging resolver attempts.
-
-    Attributes:
-        None: The protocol formalises the callable surface without storing state.
-
-    Examples:
-        >>> class Collector:
-        ...     def __init__(self):
-        ...         self.records = []
-        ...     def log(self, record: AttemptRecord) -> None:
-        ...         self.records.append(record)
-        >>> collector = Collector()
-        >>> isinstance(collector, AttemptSink)
-        True
-    """
-
-    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
-        """Log a resolver attempt with optional timestamp override.
-
-        Args:
-            record: Structured attempt event emitted by a resolver.
-            timestamp: Override timestamp string for deterministic replay.
-
-        Returns:
-            None
-        """
-
-    def log(self, record: AttemptRecord) -> None:
-        """Log a resolver attempt.
-
-        Args:
-            record: Attempt record describing the resolver execution.
-
-        Returns:
-            None
-        """
-
-
 @dataclass
 class DownloadOutcome:
     """Outcome of a resolver download attempt.
@@ -788,6 +751,7 @@ class ResolverMetrics:
     html: Counter = field(default_factory=Counter)
     skips: Counter = field(default_factory=Counter)
     failures: Counter = field(default_factory=Counter)
+    _lock: Lock = field(default_factory=Lock, repr=False, compare=False)
 
     def record_attempt(self, resolver_name: str, outcome: DownloadOutcome) -> None:
         """Record a resolver attempt and update success/html counters.
@@ -800,11 +764,12 @@ class ResolverMetrics:
             None
         """
 
-        self.attempts[resolver_name] += 1
-        if outcome.classification == "html":
-            self.html[resolver_name] += 1
-        if outcome.is_pdf:
-            self.successes[resolver_name] += 1
+        with self._lock:
+            self.attempts[resolver_name] += 1
+            if outcome.classification == "html":
+                self.html[resolver_name] += 1
+            if outcome.is_pdf:
+                self.successes[resolver_name] += 1
 
     def record_skip(self, resolver_name: str, reason: str) -> None:
         """Record a skip event for a resolver with a reason tag.
@@ -817,8 +782,9 @@ class ResolverMetrics:
             None
         """
 
-        key = f"{resolver_name}:{reason}"
-        self.skips[key] += 1
+        with self._lock:
+            key = f"{resolver_name}:{reason}"
+            self.skips[key] += 1
 
     def record_failure(self, resolver_name: str) -> None:
         """Record a resolver failure occurrence.
@@ -830,7 +796,8 @@ class ResolverMetrics:
             None
         """
 
-        self.failures[resolver_name] += 1
+        with self._lock:
+            self.failures[resolver_name] += 1
 
     def summary(self) -> Dict[str, Any]:
         """Return aggregated metrics summarizing resolver behaviour.
@@ -848,13 +815,14 @@ class ResolverMetrics:
             1
         """
 
-        return {
-            "attempts": dict(self.attempts),
-            "successes": dict(self.successes),
-            "html": dict(self.html),
-            "skips": dict(self.skips),
-            "failures": dict(self.failures),
-        }
+        with self._lock:
+            return {
+                "attempts": dict(self.attempts),
+                "successes": dict(self.successes),
+                "html": dict(self.html),
+                "skips": dict(self.skips),
+                "failures": dict(self.failures),
+            }
 
 
 # --- Shared Helpers ---

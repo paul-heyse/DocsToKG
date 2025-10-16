@@ -287,11 +287,9 @@ from typing import (
     Iterable,
     List,
     Optional,
-    Protocol,
     Sequence,
     Set,
     Tuple,
-    runtime_checkable,
 )
 from urllib.parse import unquote, urlsplit
 
@@ -309,6 +307,7 @@ from DocsToKG.ContentDownload.network import (
     request_with_retries,
 )
 from DocsToKG.ContentDownload.utils import dedupe, normalize_doi, normalize_pmcid, strip_prefix
+from DocsToKG.ContentDownload.telemetry import AttemptSink, ManifestEntry
 
 ResolverPipeline = resolvers.ResolverPipeline
 ResolverConfig = resolvers.ResolverConfig
@@ -325,9 +324,7 @@ __all__ = (
     "CsvSink",
     "DownloadState",
     "JsonlSink",
-    "LastAttemptCsvSink",
     "ManifestEntry",
-    "ManifestIndexSink",
     "MultiSink",
     "WorkArtifact",
     "apply_config_overrides",
@@ -479,132 +476,6 @@ def _make_session(headers: Dict[str, str]) -> requests.Session:
 
     # Delegate to shared network helper to keep adapter defaults aligned.
     return create_session(headers)
-
-
-# --- Data Models ---
-
-@dataclass
-class ManifestEntry:
-    """Structured record capturing the outcome of a resolver attempt.
-
-    Attributes:
-        timestamp: ISO timestamp when the manifest entry was created.
-        work_id: OpenAlex work identifier associated with the download.
-        title: Human-readable work title.
-        publication_year: Publication year when available.
-        resolver: Name of the resolver that produced the asset.
-        url: Source URL of the downloaded artifact.
-        path: Local filesystem path to the stored artifact.
-        classification: Classification label describing the outcome (e.g., 'pdf').
-        content_type: MIME type reported by the server.
-        reason: Failure or status reason for non-successful attempts.
-        html_paths: Paths to any captured HTML artifacts.
-        sha256: SHA-256 digest of the downloaded content.
-        content_length: Size of the artifact in bytes.
-        etag: HTTP ETag header value if provided.
-        last_modified: HTTP Last-Modified timestamp.
-        extracted_text_path: Optional path to extracted text content.
-        dry_run: Flag indicating whether the download was simulated.
-
-    Examples:
-        >>> ManifestEntry(
-        ...     timestamp="2024-01-01T00:00:00Z",
-        ...     work_id="W123",
-        ...     title="Sample Work",
-        ...     publication_year=2024,
-        ...     resolver="unpaywall",
-        ...     url="https://example.org/sample.pdf",
-        ...     path="pdfs/sample.pdf",
-        ...     classification="pdf",
-        ...     content_type="application/pdf",
-        ...     reason=None,
-        ...     dry_run=False,
-        ... )
-    """
-
-    timestamp: str
-    work_id: str
-    title: str
-    publication_year: Optional[int]
-    resolver: Optional[str]
-    url: Optional[str]
-    path: Optional[str]
-    classification: str
-    content_type: Optional[str]
-    reason: Optional[str]
-    html_paths: List[str] = field(default_factory=list)
-    sha256: Optional[str] = None
-    content_length: Optional[int] = None
-    etag: Optional[str] = None
-    last_modified: Optional[str] = None
-    extracted_text_path: Optional[str] = None
-    dry_run: bool = False
-
-
-@runtime_checkable
-class AttemptSink(Protocol):
-    """Protocol implemented by logging sinks that consume download telemetry.
-
-    Attributes:
-        log_attempt: Callable accepting an :class:`AttemptRecord` plus optional timestamp.
-        log_manifest: Callable that receives :class:`ManifestEntry` objects for storage.
-        log_summary: Callable that ingests aggregate metrics collected during a run.
-        close: Callable that finalises resources owned by the sink.
-
-    Examples:
-        >>> class Collector:
-        ...     def log_attempt(self, record, *, timestamp=None):
-        ...         ...  # doctest: +SKIP
-        ...     def log_manifest(self, entry):
-        ...         ...  # doctest: +SKIP
-        ...     def log_summary(self, summary):
-        ...         ...  # doctest: +SKIP
-        ...     def close(self):
-        ...         ...  # doctest: +SKIP
-        >>> isinstance(Collector(), AttemptSink)  # doctest: +SKIP
-        True
-    """
-
-    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
-        """Log a resolver attempt.
-
-        Args:
-            record: Structured attempt telemetry emitted by a resolver.
-            timestamp: Optional ISO8601 timestamp override for deterministic runs.
-
-        Returns:
-            None
-        """
-
-    def log_manifest(self, entry: ManifestEntry) -> None:
-        """Persist a manifest entry.
-
-        Args:
-            entry: Manifest record describing the resolved document.
-
-        Returns:
-            None
-        """
-
-    def log_summary(self, summary: Dict[str, Any]) -> None:
-        """Record summary metrics for the run.
-
-        Args:
-            summary: Mapping containing aggregated counters and timings.
-
-        Returns:
-            None
-        """
-
-    def close(self) -> None:
-        """Release any underlying resources.
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
 
 
 # --- Logging Sinks ---
@@ -1060,239 +931,6 @@ class MultiSink:
             self.close()
         finally:
             return None
-
-
-class ManifestIndexSink:
-    """Sink that accumulates manifest entries into a JSON index.
-
-    Attributes:
-        _path: Filesystem destination for the generated JSON index.
-        _index: In-memory mapping from work IDs to manifest payloads.
-        _closed: Flag guarding idempotent close operations.
-
-    Examples:
-        >>> sink = ManifestIndexSink(Path('/tmp/manifests.json'))  # doctest: +SKIP
-        >>> sink.close()  # doctest: +SKIP
-    """
-
-    def __init__(self, path: Path) -> None:
-        """Initialize the sink with the on-disk index location.
-
-        Args:
-            path: JSON file that will receive manifest projections.
-
-        Returns:
-            None
-        """
-
-        self._path = path
-        self._index: Dict[str, Dict[str, Optional[str]]] = {}
-        self._closed = False
-
-    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
-        """Ignore attempt telemetry; only manifests are indexed.
-
-        Args:
-            record: Attempt record supplied by the pipeline.
-            timestamp: Optional timestamp provided by the caller.
-
-        Returns:
-            None
-        """
-
-        return None
-
-    def log_manifest(self, entry: ManifestEntry) -> None:
-        """Persist manifest metadata for inclusion in the JSON index.
-
-        Newly received manifest entries replace any existing payload stored under
-        the same ``work_id`` so downstream tools can rely on deterministic output.
-
-        Args:
-            entry: Manifest record describing a resolved document.
-
-        Returns:
-            None
-        """
-
-        payload: Dict[str, Optional[str]] = {
-            "classification": entry.classification,
-            "pdf_path": None,
-            "sha256": None,
-        }
-        if entry.path and entry.classification and entry.classification.startswith("pdf"):
-            payload["pdf_path"] = entry.path
-            payload["sha256"] = entry.sha256
-        elif entry.classification == "cached" and entry.path:
-            payload["pdf_path"] = entry.path
-            payload["sha256"] = entry.sha256
-        self._index[entry.work_id] = payload
-
-    def log_summary(self, summary: Dict[str, Any]) -> None:
-        """Ignore summary telemetry; manifests only are indexed.
-
-        Args:
-            summary: Mapping of summary metrics supplied by the pipeline.
-
-        Returns:
-            None
-        """
-
-        return None
-
-    def close(self) -> None:
-        """Write the manifest index to disk if not already closed.
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-
-        if self._closed:
-            return
-        self._closed = True
-        ensure_dir(self._path.parent)
-        serializable = {k: v for k, v in sorted(self._index.items(), key=lambda item: item[0])}
-        try:
-            self._path.write_text(
-                json.dumps(serializable, indent=2, sort_keys=True), encoding="utf-8"
-            )
-        except OSError as exc:
-            LOGGER.warning("Failed to write manifest index %s: %s", self._path, exc)
-
-    def __enter__(self) -> "ManifestIndexSink":
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        self.close()
-
-
-class LastAttemptCsvSink:
-    """Sink that writes one manifest row per work to a CSV on close.
-
-    Attributes:
-        _path: Filesystem destination for the aggregated CSV.
-        _entries: Mapping of work IDs to their most recent manifest entry.
-        _closed: Flag guarding idempotent close operations.
-
-    Examples:
-        >>> sink = LastAttemptCsvSink(Path('/tmp/last_attempt.csv'))  # doctest: +SKIP
-        >>> sink.close()  # doctest: +SKIP
-    """
-
-    HEADER = [
-        "work_id",
-        "title",
-        "publication_year",
-        "resolver",
-        "url",
-        "classification",
-        "path",
-        "sha256",
-        "content_length",
-        "etag",
-        "last_modified",
-    ]
-
-    def __init__(self, path: Path) -> None:
-        """Prepare the sink and reset internal manifest state.
-
-        Args:
-            path: Destination CSV path for the final consolidated manifest.
-
-        Returns:
-            None
-        """
-
-        self._path = path
-        self._entries: Dict[str, ManifestEntry] = {}
-        self._closed = False
-
-    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
-        """Ignore attempt telemetry; only manifest rows are retained.
-
-        Args:
-            record: Attempt record supplied by the pipeline.
-            timestamp: Optional timestamp associated with the attempt.
-
-        Returns:
-            None
-        """
-
-        return None
-
-    def log_manifest(self, entry: ManifestEntry) -> None:
-        """Record the manifest entry so the latest attempt is written at close.
-
-        The sink keeps only the most recent entry for each ``work_id`` so that
-        duplicate retries collapse into a single CSV row.
-
-        Args:
-            entry: Manifest record describing the resolved document.
-
-        Returns:
-            None
-        """
-
-        self._entries[entry.work_id] = entry
-
-    def log_summary(self, summary: Dict[str, Any]) -> None:
-        """Ignore summary telemetry; output only includes manifest rows.
-
-        Args:
-            summary: Mapping of summary metrics supplied by the pipeline.
-
-        Returns:
-            None
-        """
-
-        return None
-
-    def close(self) -> None:
-        """Write the consolidated manifest CSV to disk when invoked.
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-
-        if self._closed:
-            return
-        self._closed = True
-        ensure_dir(self._path.parent)
-        try:
-            with self._path.open("w", newline="", encoding="utf-8") as handle:
-                writer = csv.DictWriter(handle, fieldnames=self.HEADER)
-                writer.writeheader()
-                for work_id in sorted(self._entries.keys()):
-                    entry = self._entries[work_id]
-                    writer.writerow(
-                        {
-                            "work_id": entry.work_id,
-                            "title": entry.title,
-                            "publication_year": entry.publication_year or "",
-                            "resolver": entry.resolver or "",
-                            "url": entry.url or "",
-                            "classification": entry.classification,
-                            "path": entry.path or "",
-                            "sha256": entry.sha256 or "",
-                            "content_length": entry.content_length or "",
-                            "etag": entry.etag or "",
-                            "last_modified": entry.last_modified or "",
-                        }
-                    )
-        except OSError as exc:
-            LOGGER.warning("Failed to write last-attempt CSV %s: %s", self._path, exc)
-
-    def __enter__(self) -> "LastAttemptCsvSink":
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        self.close()
 
 
 # --- Manifest Utilities ---
@@ -2843,20 +2481,12 @@ def main() -> None:
     skipped = 0
 
     with contextlib.ExitStack() as stack:
-        sinks: List[AttemptSink] = []
         jsonl_sink = stack.enter_context(JsonlSink(manifest_path))
-        sinks.append(jsonl_sink)
-        index_path = manifest_path.with_suffix(".index.json")
-        index_sink = stack.enter_context(ManifestIndexSink(index_path))
-        sinks.append(index_sink)
         if csv_path:
             csv_sink = stack.enter_context(CsvSink(csv_path))
-            sinks.append(csv_sink)
-        if args.log_format == "csv":
-            last_csv_path = manifest_path.with_name("manifest.last.csv")
-            last_attempt_sink = stack.enter_context(LastAttemptCsvSink(last_csv_path))
-            sinks.append(last_attempt_sink)
-        attempt_logger: AttemptSink = jsonl_sink if len(sinks) == 1 else MultiSink(sinks)
+            attempt_logger = MultiSink([jsonl_sink, csv_sink])
+        else:
+            attempt_logger = jsonl_sink
 
         resume_lookup, resume_completed = load_previous_manifest(args.resume_from)
         metrics = ResolverMetrics()

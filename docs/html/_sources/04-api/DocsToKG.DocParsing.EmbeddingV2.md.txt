@@ -57,10 +57,6 @@ Absolute path to the SPLADE model directory.
 
 Return manifest doc_id and vector output path for a chunk artifact.
 
-### `_derive_doc_id_and_output_path(chunk_file, chunks_root, vectors_root)`
-
-Return manifest doc_id and vector output path for a chunk artifact.
-
 ### `_expand_optional(path)`
 
 Expand optional :class:`Path` values to absolutes when provided.
@@ -229,12 +225,23 @@ Iterator[List[dict]]: Lazy iterator producing batched chunk rows.
 Yields:
 Lists of row dictionaries, each containing up to batch_size items.
 
+### `iter_chunk_files(directory)`
+
+Deprecated shim that forwards to :func:`iter_chunks`.
+
+Args:
+directory: Directory to scan for chunk artifacts.
+
+Returns:
+Iterator over chunk files.
+
 ### `process_chunk_file_vectors(chunk_file, out_path, stats, args, validator, logger)`
 
 Generate vectors for a single chunk file and persist them to disk.
 
 Args:
 chunk_file: Chunk JSONL file to process.
+out_path: Destination path for vectors.
 stats: Precomputed BM25 statistics.
 args: Parsed CLI arguments with runtime configuration.
 validator: SPLADE validator for sparsity metrics.
@@ -268,6 +275,13 @@ and Qwen vector norms.
 
 Raises:
 ValueError: If vector lengths are inconsistent or fail validation.
+
+### `_validate_vectors_in_dir(vectors_dir, logger)`
+
+Validate all *.vectors.jsonl files under a directory tree.
+
+Returns:
+(files_checked, rows_validated)
 
 ### `build_parser()`
 

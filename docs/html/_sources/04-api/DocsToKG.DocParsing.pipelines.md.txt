@@ -37,26 +37,6 @@ Return ``True`` when ``candidate`` appears to reference a local path.
 
 Expand a filesystem path to an absolute :class:`Path`.
 
-### `resolve_hf_home()`
-
-Resolve the HuggingFace cache directory respecting ``HF_HOME``.
-
-Args:
-None
-
-Returns:
-Path: Absolute location of the HuggingFace cache directory.
-
-### `resolve_model_root()`
-
-Resolve DocsToKG model root with environment override.
-
-Args:
-None
-
-Returns:
-Path: Absolute model root directory for DocsToKG artifacts.
-
 ### `resolve_pdf_model_path(cli_value)`
 
 Determine PDF model path using CLI and environment precedence.
@@ -232,16 +212,6 @@ Namespace containing parsed CLI options.
 Raises:
 SystemExit: Propagated if ``argparse`` detects invalid arguments.
 
-### `_normalize_status(raw)`
-
-Coerce legacy status strings into the canonical vocabulary.
-
-Args:
-raw: Status string emitted by historical workers or manifests.
-
-Returns:
-Canonical status string (``"success"``, ``"skip"``, or ``"failure"``).
-
 ### `_safe_float(value)`
 
 Convert the supplied value to ``float`` when possible.
@@ -254,21 +224,17 @@ Floating point representation of ``value`` or ``0.0`` if conversion fails.
 
 ### `normalize_conversion_result(result, task)`
 
-Adapt heterogeneous worker return values into :class:`PdfConversionResult`.
-
-Historically the converter returned a tuple ``(doc_id, status)``.  The
-refactor switched to ``PdfConversionResult`` which broke a regression test
-that still emits tuples.  This helper accepts both shapes—as well as dicts
-produced by ad-hoc stubs—and populates missing metadata from the associated
-:class:`PdfTask` when available.
+Validate that worker results conform to :class:`PdfConversionResult`.
 
 Args:
 result: Object returned by a worker invocation.
-task: Related :class:`PdfTask` used to back-fill metadata when needed.
+task: Deprecated parameter retained for API stability; ignored.
 
 Returns:
-Normalised :class:`PdfConversionResult` instance encapsulating the
-conversion outcome.
+The original :class:`PdfConversionResult` when the type check passes.
+
+Raises:
+TypeError: If the worker returned an unexpected result type.
 
 ### `port_is_free(port)`
 
@@ -446,10 +412,6 @@ SystemExit: Propagated if ``argparse`` detects invalid options.
 
 Instantiate and cache a Docling HTML converter per worker process.
 
-Returns:
-DocumentConverter configured for HTML input, cached for reuse within
-the worker process.
-
 ### `list_htmls(root)`
 
 Enumerate HTML-like files beneath a directory tree.
@@ -482,19 +444,6 @@ args: Optional pre-parsed CLI namespace to override command-line inputs.
 
 Returns:
 Process exit code, where ``0`` denotes success.
-
-### `__getitem__(self, index)`
-
-Provide tuple-like access for compatibility with legacy tests.
-
-Args:
-index: Position requested by tuple-style accessors.
-
-Returns:
-PDF path when ``index`` is ``0``.
-
-Raises:
-IndexError: If ``index`` is not ``0``.
 
 ## 3. Classes
 

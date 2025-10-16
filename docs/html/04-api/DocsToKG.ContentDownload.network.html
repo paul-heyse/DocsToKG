@@ -191,14 +191,6 @@ response when streaming content.</p>
 ValueError: If <code class="docutils literal notranslate"><span class="pre">max_retries</span></code> or <code class="docutils literal notranslate"><span class="pre">backoff_factor</span></code> are invalid or <code class="docutils literal notranslate"><span class="pre">url</span></code>/<code class="docutils literal notranslate"><span class="pre">method</span></code> are empty.
 requests.RequestException: If all retry attempts fail due to network errors or the session raises an exception.</p>
 </section>
-<section id="looks-like-pdf-headers">
-<h3><code class="docutils literal notranslate"><span class="pre">_looks_like_pdf(headers)</span></code><a class="headerlink" href="#looks-like-pdf-headers" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when response headers suggest a PDF payload.</p>
-</section>
-<section id="head-precheck-via-get-session-url-timeout">
-<h3><code class="docutils literal notranslate"><span class="pre">_head_precheck_via_get(session,</span> <span class="pre">url,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#head-precheck-via-get-session-url-timeout" title="Link to this heading"></a></h3>
-<p>Fallback GET probe for providers that reject HEAD requests.</p>
-</section>
 <section id="head-precheck-session-url-timeout">
 <h3><code class="docutils literal notranslate"><span class="pre">head_precheck(session,</span> <span class="pre">url,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#head-precheck-session-url-timeout" title="Link to this heading"></a></h3>
 <p>Issue a lightweight request to determine whether <code class="docutils literal notranslate"><span class="pre">url</span></code> returns a PDF.</p>
@@ -215,6 +207,14 @@ timeout: Maximum time budget in seconds for the probe.</p>
 a PDF. <code class="docutils literal notranslate"><span class="pre">False</span></code> when the response clearly corresponds to HTML or an
 error status. Any network exception results in <code class="docutils literal notranslate"><span class="pre">True</span></code> to avoid
 blocking legitimate downloads.</p>
+</section>
+<section id="looks-like-pdf-headers">
+<h3><code class="docutils literal notranslate"><span class="pre">_looks_like_pdf(headers)</span></code><a class="headerlink" href="#looks-like-pdf-headers" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when response headers suggest a PDF payload.</p>
+</section>
+<section id="head-precheck-via-get-session-url-timeout">
+<h3><code class="docutils literal notranslate"><span class="pre">_head_precheck_via_get(session,</span> <span class="pre">url,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#head-precheck-via-get-session-url-timeout" title="Link to this heading"></a></h3>
+<p>Fallback GET probe for providers that reject HEAD requests.</p>
 </section>
 <section id="build-headers-self">
 <h3><code class="docutils literal notranslate"><span class="pre">build_headers(self)</span></code><a class="headerlink" href="#build-headers-self" title="Link to this heading"></a></h3>
@@ -240,13 +240,33 @@ TypeError: If <code class="docutils literal notranslate"><span class="pre">respo
 </section>
 <section id="request-func">
 <h3><code class="docutils literal notranslate"><span class="pre">request_func()</span></code><a class="headerlink" href="#request-func" title="Link to this heading"></a></h3>
-<p>Invoke the fallback HTTP method when <code class="docutils literal notranslate"><span class="pre">Session.request</span></code> is unavailable.</p>
+<p>Invoke :meth:<code class="docutils literal notranslate"><span class="pre">requests.Session.request</span></code> via the pooled session.</p>
 <p>Args:
-method: HTTP method name forwarded for logging parity.
-url: Target URL for the request.
-**call_kwargs: Keyword arguments forwarded to the fallback request callable.</p>
+method: HTTP method name such as <code class="docutils literal notranslate"><span class="pre">&quot;GET&quot;</span></code>.
+url: Fully qualified URL to request.
+**call_kwargs: Forwarded keyword arguments for <code class="docutils literal notranslate"><span class="pre">session.request</span></code>.</p>
 <p>Returns:
-requests.Response: Response returned by the fallback HTTP method.</p>
+requests.Response: Response object produced by the session.</p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">request_func()</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Call the method-specific session helper when available.</p>
+<p>Args:
+method: HTTP method name (used for diagnostics).
+url: Fully qualified URL to request.
+**call_kwargs: Additional arguments forwarded to the helper.</p>
+<p>Returns:
+requests.Response: Response object produced by the method helper.</p>
+</section>
+<section id="id2">
+<h3><code class="docutils literal notranslate"><span class="pre">request_func()</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<p>Fallback to the session-level <code class="docutils literal notranslate"><span class="pre">request</span></code> implementation.</p>
+<p>Args:
+method: HTTP method name such as <code class="docutils literal notranslate"><span class="pre">&quot;GET&quot;</span></code>.
+url: Fully qualified URL to request.
+**call_kwargs: Keyword arguments forwarded to <code class="docutils literal notranslate"><span class="pre">session.request</span></code>.</p>
+<p>Returns:
+requests.Response: Response object produced by the session.</p>
 </section>
 </section>
 <section id="classes">

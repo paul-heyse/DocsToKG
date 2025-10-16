@@ -57,10 +57,6 @@ Absolute path to the SPLADE model directory.
 
 Return manifest doc_id and vector output path for a chunk artifact.
 
-### `_derive_doc_id_and_output_path(chunk_file, chunks_root, vectors_root)`
-
-Return manifest doc_id and vector output path for a chunk artifact.
-
 ### `_expand_optional(path)`
 
 Expand optional :class:`Path` values to absolutes when provided.
@@ -279,6 +275,13 @@ and Qwen vector norms.
 
 Raises:
 ValueError: If vector lengths are inconsistent or fail validation.
+
+### `_validate_vectors_in_dir(vectors_dir, logger)`
+
+Validate all *.vectors.jsonl files under a directory tree.
+
+Returns:
+(files_checked, rows_validated)
 
 ### `build_parser()`
 

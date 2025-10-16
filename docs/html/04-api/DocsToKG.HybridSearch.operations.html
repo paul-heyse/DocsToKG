@@ -79,51 +79,9 @@
   <section id="module-operations">
 <h1>1. Module: operations<a class="headerlink" href="#module-operations" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.operations</span></code>.</p>
-<blockquote>
-<div><p><strong>Deprecated:</strong> <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.operations</span></code> is a compatibility shim retained for
-one release cycle. Import helpers directly from their consolidated modules:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service.build_stats_snapshot</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service.verify_pagination</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service.should_rebuild_index</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore.serialize_state</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore.restore_state</span></code></p></li>
-</ul>
-</div></blockquote>
-<p>The shim re-exports these callables and emits a <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> at import time to
-help downstream users migrate to the new module structure introduced in the
-<code class="docutils literal notranslate"><span class="pre">consolidate-hybridsearch-modules</span></code> change.</p>
-<section id="re-exported-symbols">
-<h2>1. Re-exported symbols<a class="headerlink" href="#re-exported-symbols" title="Link to this heading"></a></h2>
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p>Symbol</p></th>
-<th class="head"><p>New home</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">build_stats_snapshot</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">verify_pagination</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service</span></code></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">should_rebuild_index</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">serialize_state</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore</span></code></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">restore_state</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">PaginationCheckResult</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service</span></code></p></td>
-</tr>
-</tbody>
-</table>
-<p>All functionality remains unchanged; only import paths differ. New development should
-target the consolidated modules directly.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Deprecated compatibility shim for hybrid search operations helpers.</p>
 </section>
 </section>
 

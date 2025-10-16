@@ -117,6 +117,10 @@ pipeline = resolvers.ResolverPipeline(
 <h3><code class="docutils literal notranslate"><span class="pre">_fetch_semantic_scholar_data(session,</span> <span class="pre">config,</span> <span class="pre">doi)</span></code><a class="headerlink" href="#fetch-semantic-scholar-data-session-config-doi" title="Link to this heading"></a></h3>
 <p>Return Semantic Scholar metadata for <code class="docutils literal notranslate"><span class="pre">doi</span></code> using configured headers.</p>
 </section>
+<section id="fetch-unpaywall-data-session-config-doi">
+<h3><code class="docutils literal notranslate"><span class="pre">_fetch_unpaywall_data(session,</span> <span class="pre">config,</span> <span class="pre">doi)</span></code><a class="headerlink" href="#fetch-unpaywall-data-session-config-doi" title="Link to this heading"></a></h3>
+<p>Return Unpaywall metadata for <code class="docutils literal notranslate"><span class="pre">doi</span></code> using configured headers.</p>
+</section>
 <section id="absolute-url-base-href">
 <h3><code class="docutils literal notranslate"><span class="pre">_absolute_url(base,</span> <span class="pre">href)</span></code><a class="headerlink" href="#absolute-url-base-href" title="Link to this heading"></a></h3>
 <p>Resolve relative <code class="docutils literal notranslate"><span class="pre">href</span></code> values against <code class="docutils literal notranslate"><span class="pre">base</span></code> to obtain absolute URLs.</p>
@@ -158,18 +162,7 @@ Optional[str]: Absolute PDF URL when an anchor appears to reference one.</p>
 <p>Args:
 None</p>
 <p>Returns:
-List[Resolver]: Resolver instances ordered according to
-<code class="docutils literal notranslate"><span class="pre">DEFAULT_RESOLVER_ORDER</span></code>.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>from DocsToKG.ContentDownload import resolvers
-[resolver.name for resolver in resolvers.default_resolvers()]  # doctest: +ELLIPSIS
-[‘openalex’, ‘unpaywall’, …]</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
+List[Resolver]: Resolver instances ordered according to <code class="docutils literal notranslate"><span class="pre">DEFAULT_RESOLVER_ORDER</span></code>.</p>
 </section>
 <section id="callable-accepts-argument-func-name">
 <h3><code class="docutils literal notranslate"><span class="pre">_callable_accepts_argument(func,</span> <span class="pre">name)</span></code><a class="headerlink" href="#callable-accepts-argument-func-name" title="Link to this heading"></a></h3>
@@ -637,7 +630,7 @@ Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.<
 </section>
 <section id="emit-attempt-self-record">
 <h3><code class="docutils literal notranslate"><span class="pre">_emit_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#emit-attempt-self-record" title="Link to this heading"></a></h3>
-<p>Invoke the configured logger while supporting legacy log-only adapters.</p>
+<p>Invoke the configured logger using the structured attempt contract.</p>
 <p>Args:
 record: Attempt payload emitted by the pipeline.
 timestamp: Optional ISO timestamp forwarded to sinks that accept it.</p>

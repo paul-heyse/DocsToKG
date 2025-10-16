@@ -66,10 +66,11 @@ from http import HTTPStatus
 from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Sequence
 
 from .config import HybridSearchConfig, HybridSearchConfigManager
-from .features import FeatureGenerator
+from .devtools.features import FeatureGenerator
+from .interfaces import LexicalIndex
 from .observability import Observability
 from .ranking import ReciprocalRankFusion, ResultShaper, apply_mmr_diversification
-from .storage import ChunkRegistry, OpenSearchSimulator, matches_filters
+from .storage import ChunkRegistry, matches_filters
 from .types import (
     ChunkFeatures,
     ChunkPayload,
@@ -134,7 +135,7 @@ class HybridSearchService:
         _config_manager: Source of runtime hybrid-search configuration.
         _feature_generator: Component producing BM25/SPLADE/dense features.
         _faiss: GPU-backed FAISS index manager for dense retrieval.
-        _opensearch: Simulator used for BM25 and SPLADE lookups.
+        _opensearch: Lexical index used for BM25 and SPLADE lookups.
         _registry: Chunk registry providing metadata and FAISS id lookups.
         _observability: Telemetry facade for metrics and traces.
 
@@ -142,6 +143,7 @@ class HybridSearchService:
         >>> # File-backed config manager (JSON/YAML on disk)
         >>> from pathlib import Path  # doctest: +SKIP
         >>> manager = HybridSearchConfigManager(Path("config.json"))  # doctest: +SKIP
+        >>> from DocsToKG.HybridSearch.devtools.opensearch_simulator import OpenSearchSimulator  # doctest: +SKIP
         >>> service = HybridSearchService(  # doctest: +SKIP
         ...     config_manager=manager,
         ...     feature_generator=FeatureGenerator(embedding_dim=16),
@@ -160,7 +162,7 @@ class HybridSearchService:
         config_manager: HybridSearchConfigManager,
         feature_generator: FeatureGenerator,
         faiss_index: FaissVectorStore,
-        opensearch: OpenSearchSimulator,
+        opensearch: LexicalIndex,
         registry: ChunkRegistry,
         observability: Optional[Observability] = None,
     ) -> None:
@@ -170,7 +172,7 @@ class HybridSearchService:
             config_manager: Manager providing the latest search configuration.
             feature_generator: Component responsible for feature extraction.
             faiss_index: Dense retrieval index manager (GPU-backed).
-            opensearch: Simulator providing BM25/SPLADE access.
+            opensearch: Lexical index providing BM25/SPLADE access.
             registry: Chunk registry used for metadata lookups.
             observability: Optional observability facade (defaults to a no-op).
 
@@ -227,20 +229,33 @@ class HybridSearchService:
                 dense = f_dense.result()
 
             fusion_start = time.perf_counter()
-            fusion = ReciprocalRankFusion(config.fusion.k0)
+            channel_weights = getattr(config.fusion, "channel_weights", None)
+            fusion = ReciprocalRankFusion(
+                k0=config.fusion.k0,
+                channel_weights=dict(channel_weights) if channel_weights is not None else None,
+            )
             combined_candidates = bm25.candidates + splade.candidates + dense.candidates
             fused_scores = fusion.fuse(combined_candidates)
             unique_candidates = self._dedupe_candidates(combined_candidates, fused_scores)
 
             if request.diversification and config.fusion.enable_mmr:
-                diversified = apply_mmr_diversification(
-                    unique_candidates,
+                pool_size = int(
+                    max(1, min(getattr(config.fusion, "mmr_pool_size", len(unique_candidates)), len(unique_candidates)))
+                )
+                pool = list(unique_candidates[:pool_size])
+                desired = min(request.page_size, len(pool))
+                selected = apply_mmr_diversification(
+                    pool,
                     fused_scores,
                     config.fusion.mmr_lambda,
-                    request.page_size * config.dense.oversample,
+                    desired,
                     device=self._faiss.device,
                     resources=self._faiss.gpu_resources,
                 )
+                selected_ids = {candidate.chunk.vector_id for candidate in selected}
+                pool_remaining = [candidate for candidate in pool if candidate.chunk.vector_id not in selected_ids]
+                tail = list(unique_candidates[pool_size:])
+                diversified = [*selected, *pool_remaining, *tail]
             else:
                 diversified = unique_candidates
 
@@ -584,14 +599,14 @@ class PaginationCheckResult:
 
 def build_stats_snapshot(
     faiss_index: FaissVectorStore,
-    opensearch: OpenSearchSimulator,
+    opensearch: LexicalIndex,
     registry: ChunkRegistry,
 ) -> Mapping[str, object]:
     """Capture a lightweight snapshot of hybrid search storage metrics.
 
     Args:
         faiss_index: Dense vector index manager.
-        opensearch: OpenSearch simulator representing lexical storage.
+        opensearch: Lexical index representing sparse storage.
         registry: Chunk registry tracking vector-to-payload mappings.
 
     Returns:

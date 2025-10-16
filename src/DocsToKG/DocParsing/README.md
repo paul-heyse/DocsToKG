@@ -189,9 +189,19 @@ can reason about historical data sets.
   processing aligned with the canonical layout.
 
 
-### Deprecations
+## Module Removal
 
-* The legacy module `DocsToKG.DocParsing.pdf_pipeline` is now **deprecated** and will be removed in a future release. Use the CLI (`python -m DocsToKG.DocParsing.cli --pdf`) or the `DocsToKG.DocParsing.pipelines` APIs instead.
+The legacy module `DocsToKG.DocParsing.pdf_pipeline` has been **removed**. Use the unified CLI and pipeline APIs instead:
+
+* **CLI (recommended)**:
+  ```bash
+  python -m DocsToKG.DocParsing.cli doctags --mode pdf
+  ```
+* **Programmatic**:
+  ```python
+  from DocsToKG.DocParsing import pipelines as dp
+  dp.pdf_main(...)
+  ```
 ## Synthetic Benchmarking & Test Utilities
 
 The test suite ships lightweight fixtures that allow end-to-end validation

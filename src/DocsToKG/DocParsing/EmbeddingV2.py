@@ -693,11 +693,15 @@ class SPLADEValidator:
         0
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        warn_threshold_pct: float = SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
+    ) -> None:
         """Initialise internal counters for SPLADE sparsity tracking.
 
         Args:
             self: Validator instance being initialised.
+            warn_threshold_pct: Percentage of zero-NNZ vectors above which a warning is emitted.
 
         Returns:
             None
@@ -705,6 +709,7 @@ class SPLADEValidator:
         self.total_chunks = 0
         self.zero_nnz_chunks: List[str] = []
         self.nnz_counts: List[int] = []
+        self.warn_threshold_pct = float(warn_threshold_pct)
 
     def validate(self, uuid: str, tokens: Sequence[str], weights: Sequence[float]) -> None:
         """Record sparsity information for a single chunk.
@@ -740,12 +745,14 @@ class SPLADEValidator:
         if not self.total_chunks:
             return
         pct = 100 * len(self.zero_nnz_chunks) / self.total_chunks
-        if pct > 1.0:
+        if pct > self.warn_threshold_pct:
             logger.warning(
-                "SPLADE sparsity warning: %s / %s (%.1f%%) chunks have zero non-zero elements.",
+                "SPLADE sparsity warning: %s / %s (%.1f%%) chunks have zero non-zero "
+                "elements (threshold=%.1f%%).",
                 len(self.zero_nnz_chunks),
                 self.total_chunks,
                 pct,
+                self.warn_threshold_pct,
             )
             logger.warning(
                 "Affected UUIDs (first 10): %s",
@@ -823,7 +830,12 @@ def qwen_embed(
 
 
 def process_pass_a(files: Sequence[Path], logger) -> BM25Stats:
-    """Assign UUIDs and build BM25 statistics for a corpus of chunk files.
+    """Assign UUIDs and build BM25 statistics (streaming + atomic rewrite).
+
+    This implementation streams each JSONL row and writes a temporary file with
+    normalised schema/UUIDs. The original file is atomically replaced **only**
+    when changes are detected. This bounds memory on huge shards and prevents
+    partial writes.
 
     Args:
         files: Sequence of chunk file paths to process.
@@ -831,23 +843,48 @@ def process_pass_a(files: Sequence[Path], logger) -> BM25Stats:
 
     Returns:
         Aggregated BM25 statistics for the supplied chunk corpus.
-
-    Raises:
-        ValueError: Propagated when chunk rows are missing required fields.
     """
 
     accumulator = BM25StatsAccumulator()
 
     for chunk_file in tqdm(files, desc="Pass A: UUID + BM25 stats", unit="file"):
-        rows = jsonl_load(chunk_file)
-        if not rows:
-            continue
-        ensure_chunk_schema(rows, chunk_file)
-        if ensure_uuid(rows):
-            jsonl_save(chunk_file, rows)
-        for row in rows:
-            text = row.get("text", "")
-            accumulator.add_document(text)
+        updated = False
+        tmp = chunk_file.with_suffix(chunk_file.suffix + ".tmp")
+        tmp.parent.mkdir(parents=True, exist_ok=True)
+        with chunk_file.open("r", encoding="utf-8", errors="replace") as src, \
+             tmp.open("w", encoding="utf-8") as dst:
+            for line_no, line in enumerate(src, start=1):
+                line = line.strip()
+                if not line:
+                    continue
+                row = json.loads(line)
+
+                # Ensure schema version
+                version = row.get("schema_version")
+                if not version:
+                    row["schema_version"] = COMPATIBLE_CHUNK_VERSIONS[-1]
+                    updated = True
+                else:
+                    validate_schema_version(
+                        version,
+                        COMPATIBLE_CHUNK_VERSIONS,
+                        kind="chunk",
+                        source=f"{chunk_file}:{line_no}",
+                    )
+
+                # Ensure UUID
+                if not row.get("uuid"):
+                    row["uuid"] = str(uuid.uuid4())
+                    updated = True
+
+                accumulator.add_document(str(row.get("text", "")))
+                dst.write(json.dumps(row, ensure_ascii=False) + "\n")
+            dst.flush()
+            os.fsync(dst.fileno())
+        if updated:
+            tmp.replace(chunk_file)
+        else:
+            tmp.unlink(missing_ok=True)
 
     stats = accumulator.finalize()
     print_bm25_summary(stats)
@@ -1236,6 +1273,16 @@ def build_parser() -> argparse.ArgumentParser:
             "model root/Qwen/Qwen3-Embedding-4B)."
         ),
     )
+    parser.add_argument(
+        "--splade-sparsity-warn-pct",
+        dest="sparsity_warn_threshold_pct",
+        type=float,
+        default=SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
+        help=(
+            "Warn if percentage of zero-NNZ SPLADE vectors exceeds this threshold "
+            f"(default: {SPLADE_SPARSITY_WARN_THRESHOLD_PCT})."
+        ),
+    )
     parser.add_argument("--qwen-dim", type=int, default=2560, help="Expected Qwen output dimension (set when using MRL).")
     parser.add_argument("--tp", type=int, default=1)
     add_resume_force_options(
@@ -1447,7 +1494,13 @@ def main(args: argparse.Namespace | None = None) -> int:
         logger.warning("No chunks found after Pass A")
         return 0
 
-    validator = SPLADEValidator()
+    validator = SPLADEValidator(
+        warn_threshold_pct=getattr(
+            args,
+            "sparsity_warn_threshold_pct",
+            SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
+        )
+    )
     tracemalloc.start()
     pass_b_start = time.perf_counter()
     total_vectors = 0
@@ -1562,7 +1615,11 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "pass_b_seconds": round(elapsed_b, 3),
                 "skipped_files": skipped_files,
                 "splade_attn_backend_used": backend_used,
-                "sparsity_warn_threshold_pct": SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
+                "sparsity_warn_threshold_pct": getattr(
+                    args,
+                    "sparsity_warn_threshold_pct",
+                    SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
+                ),
             }
         },
     )
@@ -1584,7 +1641,11 @@ def main(args: argparse.Namespace | None = None) -> int:
         peak_memory_gb=peak / 1024**3,
         skipped_files=skipped_files,
         splade_attn_backend_used=backend_used,
-        sparsity_warn_threshold_pct=SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
+        sparsity_warn_threshold_pct=getattr(
+            args,
+            "sparsity_warn_threshold_pct",
+            SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
+        ),
     )
 
     logger.info(

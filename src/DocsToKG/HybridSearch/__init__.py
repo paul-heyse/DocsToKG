@@ -55,7 +55,6 @@ __all__ = (
     "ChunkIngestionPipeline",
     "ChunkPayload",
     "DocumentInput",
-    "FeatureGenerator",
     "FaissVectorStore",
     "HybridSearchAPI",
     "HybridSearchConfig",
@@ -65,9 +64,8 @@ __all__ = (
     "HybridSearchResult",
     "HybridSearchService",
     "HybridSearchValidator",
+    "LexicalIndex",
     "Observability",
-    "OpenSearchIndexTemplate",
-    "OpenSearchSchemaManager",
     "PaginationCheckResult",
     "ReciprocalRankFusion",
     "ResultShaper",
@@ -84,8 +82,8 @@ __all__ = (
 # --- Re-exports ---
 
 from .config import HybridSearchConfig, HybridSearchConfigManager
-from .features import FeatureGenerator
 from .ingest import ChunkIngestionPipeline
+from .interfaces import LexicalIndex
 from .observability import Observability
 from .ranking import ReciprocalRankFusion, ResultShaper, apply_mmr_diversification
 from .service import (
@@ -96,7 +94,6 @@ from .service import (
     should_rebuild_index,
     verify_pagination,
 )
-from .storage import OpenSearchIndexTemplate, OpenSearchSchemaManager
 from .types import (
     ChunkPayload,
     DocumentInput,

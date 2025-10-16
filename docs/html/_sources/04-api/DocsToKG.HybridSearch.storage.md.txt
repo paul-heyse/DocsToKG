@@ -4,383 +4,48 @@ This reference documents the DocsToKG module ``DocsToKG.HybridSearch.storage``.
 
 ## 1. Overview
 
-OpenSearch simulators, schema templates, and chunk registry helpers.
+Chunk registry helpers and shared filter utilities.
 
 ## 2. Functions
 
 ### `matches_filters(chunk, filters)`
 
-Check whether a chunk satisfies OpenSearch-style filter conditions.
-
-Args:
-chunk: Chunk payload under evaluation.
-filters: Mapping of filter names to expected values or lists.
-
-Returns:
-True if the chunk matches all supplied filters, False otherwise.
-
-### `asdict(self)`
-
-Serialize the template to a dictionary payload.
-
-Args:
-None
-
-Returns:
-Dict[str, object]: OpenSearch template representation suitable for APIs.
-
-### `bootstrap_template(self, namespace, chunking)`
-
-Create and register an index template for a namespace.
-
-Args:
-namespace: Logical namespace that owns the index template.
-chunking: Optional chunking configuration for new documents.
-
-Returns:
-OpenSearchIndexTemplate: Newly created template stored in the registry.
-
-### `get_template(self, namespace)`
-
-Retrieve a registered template for the namespace.
-
-Args:
-namespace: Namespace identifier used during bootstrap.
-
-Returns:
-Optional[OpenSearchIndexTemplate]: Template when present, otherwise ``None``.
-
-### `list_templates(self)`
-
-Return all registered templates indexed by namespace.
-
-Args:
-None
-
-Returns:
-Mapping[str, OpenSearchIndexTemplate]: Copy of known templates keyed by namespace.
+Check whether ``chunk`` satisfies the provided OpenSearch-style filters.
 
 ### `upsert(self, chunks)`
 
-Insert or update chunk metadata for the provided vector IDs.
-
-Args:
-chunks: Sequence of chunks to cache by vector identifier.
-
-Returns:
-None
+Insert or update registry entries for ``chunks``.
 
 ### `delete(self, vector_ids)`
 
-Remove chunk entries associated with the supplied vector IDs.
-
-Args:
-vector_ids: Vector identifiers whose payloads should be removed.
-
-Returns:
-None
-
-Raises:
-None
+Remove registry entries for the supplied vector identifiers.
 
 ### `get(self, vector_id)`
 
-Retrieve a chunk payload by its vector identifier.
-
-Args:
-vector_id: Vector identifier to look up.
-
-Returns:
-Matching `ChunkPayload` or None if not present.
+Return the chunk payload for ``vector_id`` when available.
 
 ### `bulk_get(self, vector_ids)`
 
-Return existing chunks for the provided vector identifiers.
-
-Args:
-vector_ids: Collection of vector identifiers to fetch.
-
-Returns:
-List of chunk payloads found in the registry.
+Return chunk payloads for identifiers present in the registry.
 
 ### `resolve_faiss_id(self, internal_id)`
 
-Translate a FAISS internal ID back to the original vector UUID.
-
-Args:
-internal_id: Integer identifier assigned by FAISS.
-
-Returns:
-Vector UUID if the mapping exists, else None.
+Translate a FAISS integer id back to the original vector identifier.
 
 ### `all(self)`
 
-Return a list of all registered chunk payloads.
-
-Args:
-None
-
-Returns:
-List of all cached chunk payloads.
+Return all cached chunk payloads.
 
 ### `count(self)`
 
-Return the total number of tracked chunks.
-
-Args:
-None
-
-Returns:
-Number of chunks currently cached.
+Return the number of chunks tracked by the registry.
 
 ### `vector_ids(self)`
 
-List all vector identifiers in insertion order.
-
-Args:
-None
-
-Returns:
-List of vector identifiers tracked by the registry.
-
-### `bulk_upsert(self, chunks)`
-
-Insert or replace OpenSearch documents for the provided chunks.
-
-Args:
-chunks: Sequence of chunk payloads to index.
-
-Returns:
-None
-
-### `bulk_delete(self, vector_ids)`
-
-Delete OpenSearch documents associated with the vector identifiers.
-
-Args:
-vector_ids: Vector identifiers whose documents should be removed.
-
-Returns:
-None
-
-Raises:
-None
-
-### `fetch(self, vector_ids)`
-
-Fetch stored chunk payloads for a list of vector IDs.
-
-Args:
-vector_ids: Vector identifiers to retrieve.
-
-Returns:
-List of chunk payloads matching the provided identifiers.
-
-### `vector_ids(self)`
-
-Return all vector identifiers currently stored in OpenSearch.
-
-Args:
-None
-
-Returns:
-List of vector identifiers present in the simulator.
-
-### `register_template(self, template)`
-
-Register an index template used for namespace-specific behavior.
-
-Args:
-template: Template to associate with its namespace.
-
-Returns:
-None
-
-### `template_for(self, namespace)`
-
-Look up an index template for the given namespace.
-
-Args:
-namespace: Namespace identifier whose template is needed.
-
-Returns:
-Matching `OpenSearchIndexTemplate`, or None when missing.
-
-### `search_bm25(self, query_weights, filters, top_k, cursor)`
-
-Execute a BM25-style search over stored chunks.
-
-Args:
-query_weights: Weighted token map for the query.
-filters: Filter constraints to apply before scoring.
-top_k: Maximum number of results to return.
-cursor: Optional pagination offset.
-
-Returns:
-Tuple of scored results and optional next cursor.
-
-### `search_splade(self, query_weights, filters, top_k, cursor)`
-
-Execute a SPLADE-style sparse search over stored chunks.
-
-Args:
-query_weights: Weighted token map for SPLADE features.
-filters: Filter constraints applied before scoring.
-top_k: Maximum results to return.
-cursor: Optional pagination offset.
-
-Returns:
-Tuple of scored results and optional next cursor.
-
-### `highlight(self, chunk, query_tokens)`
-
-Return basic term highlights for the given chunk.
-
-Args:
-chunk: Chunk payload whose text requires highlighting.
-query_tokens: Tokens derived from the query.
-
-Returns:
-List of highlight strings.
-
-### `_filtered_chunks(self, filters)`
-
-Return chunks that match the provided filter constraints.
-
-Args:
-filters: Filter mapping applied to chunk metadata.
-
-Returns:
-List of stored chunks satisfying the filters.
-
-### `_bm25_score(self, stored, query_weights)`
-
-Compute BM25 similarity between a stored chunk and query weights.
-
-Args:
-stored: Chunk under evaluation.
-query_weights: Weighted token map for the query.
-
-Returns:
-BM25 score for the chunk.
-
-### `_paginate(self, scores, top_k, cursor)`
-
-Slice scored results according to the pagination cursor.
-
-Args:
-scores: Pre-sorted list of chunk-score tuples.
-top_k: Maximum number of items to emit.
-cursor: Optional offset into the ranked list.
-
-Returns:
-Tuple of the current page and optional next cursor.
-
-### `_search_sparse(self, scoring_fn, filters, top_k, cursor)`
-
-Search sparse features using the supplied scoring function.
-
-Args:
-scoring_fn: Callable to compute a score for each stored chunk.
-filters: Filter mapping applied prior to scoring.
-top_k: Maximum number of results to return.
-cursor: Optional pagination offset.
-
-Returns:
-Tuple of scored results and optional next cursor.
-
-### `_recompute_avg_length(self)`
-
-Maintain the running average token length for stored chunks.
-
-Args:
-None
-
-Returns:
-None
-
-### `stats(self)`
-
-Return summary statistics for stored documents.
-
-Args:
-None
-
-Returns:
-Mapping containing document count and average token length.
+Return all vector identifiers in insertion order.
 
 ## 3. Classes
 
-### `OpenSearchIndexTemplate`
-
-Representation of an OpenSearch index template body.
-
-Attributes:
-name: Canonical name of the index template.
-namespace: DocsToKG namespace the template belongs to.
-body: OpenSearch template payload including settings and mappings.
-chunking: Chunking configuration applied when indexing documents.
-
-Examples:
->>> template = OpenSearchIndexTemplate(
-...     name="hybrid-chunks-research",
-...     namespace="research",
-...     body={"settings": {}},
-...     chunking=ChunkingConfig(),
-... )
->>> template.asdict()["name"]
-'hybrid-chunks-research'
-
-### `OpenSearchSchemaManager`
-
-Bootstrap and track index templates per namespace.
-
-Attributes:
-_templates: Internal registry mapping namespace → template instances.
-
-Examples:
->>> manager = OpenSearchSchemaManager()  # doctest: +SKIP
->>> manager.bootstrap_template("research")  # doctest: +SKIP
-OpenSearchIndexTemplate(name='hybrid-chunks-research', namespace='research', ...)
-
-### `StoredChunk`
-
-Internal representation of a chunk stored in the OpenSearch simulator.
-
-Attributes:
-payload: Chunk payload persisted in the simulator.
-
-Examples:
->>> # from DocsToKG.HybridSearch.types import ChunkFeatures, ChunkPayload  # doctest: +SKIP
->>> # import numpy as np  # doctest: +SKIP
->>> # payload = ChunkPayload(..., features=ChunkFeatures(...))  # doctest: +SKIP
->>> # stored = StoredChunk(payload=payload)  # doctest: +SKIP
->>> # stored.payload is payload  # doctest: +SKIP
-True
-
 ### `ChunkRegistry`
 
-Durable mapping of `vector_id` → `ChunkPayload` for joins and reconciliation.
-
-Attributes:
-_chunks: Mapping from vector identifiers to chunk payloads.
-_bridge: Mapping from FAISS integer IDs to vector identifiers.
-
-Examples:
->>> registry = ChunkRegistry()
->>> registry.count()
-0
-
-### `OpenSearchSimulator`
-
-Subset of OpenSearch capabilities required for hybrid retrieval tests.
-
-Attributes:
-_chunks: Mapping from vector IDs to stored chunk metadata.
-_avg_length: Average chunk length for BM25 scoring.
-_templates: Registered namespace templates for index behavior.
-
-Examples:
->>> os_sim = OpenSearchSimulator()
->>> os_sim.vector_ids()
-[]
+Durable mapping of vector identifiers to chunk payloads.

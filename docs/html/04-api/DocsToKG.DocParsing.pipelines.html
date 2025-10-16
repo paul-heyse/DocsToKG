@@ -114,22 +114,6 @@ exit_code = pipelines.pdf_main(args)
 <h3><code class="docutils literal notranslate"><span class="pre">_expand_path(path)</span></code><a class="headerlink" href="#expand-path-path" title="Link to this heading"></a></h3>
 <p>Expand a filesystem path to an absolute :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code>.</p>
 </section>
-<section id="resolve-hf-home">
-<h3><code class="docutils literal notranslate"><span class="pre">resolve_hf_home()</span></code><a class="headerlink" href="#resolve-hf-home" title="Link to this heading"></a></h3>
-<p>Resolve the HuggingFace cache directory respecting <code class="docutils literal notranslate"><span class="pre">HF_HOME</span></code>.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Path: Absolute location of the HuggingFace cache directory.</p>
-</section>
-<section id="resolve-model-root">
-<h3><code class="docutils literal notranslate"><span class="pre">resolve_model_root()</span></code><a class="headerlink" href="#resolve-model-root" title="Link to this heading"></a></h3>
-<p>Resolve DocsToKG model root with environment override.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Path: Absolute model root directory for DocsToKG artifacts.</p>
-</section>
 <section id="resolve-pdf-model-path-cli-value">
 <h3><code class="docutils literal notranslate"><span class="pre">resolve_pdf_model_path(cli_value)</span></code><a class="headerlink" href="#resolve-pdf-model-path-cli-value" title="Link to this heading"></a></h3>
 <p>Determine PDF model path using CLI and environment precedence.</p>
@@ -311,14 +295,6 @@ Namespace containing parsed CLI options.</p>
 <p>Raises:
 SystemExit: Propagated if <code class="docutils literal notranslate"><span class="pre">argparse</span></code> detects invalid arguments.</p>
 </section>
-<section id="normalize-status-raw">
-<h3><code class="docutils literal notranslate"><span class="pre">_normalize_status(raw)</span></code><a class="headerlink" href="#normalize-status-raw" title="Link to this heading"></a></h3>
-<p>Coerce legacy status strings into the canonical vocabulary.</p>
-<p>Args:
-raw: Status string emitted by historical workers or manifests.</p>
-<p>Returns:
-Canonical status string (<code class="docutils literal notranslate"><span class="pre">&quot;success&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;skip&quot;</span></code>, or <code class="docutils literal notranslate"><span class="pre">&quot;failure&quot;</span></code>).</p>
-</section>
 <section id="safe-float-value">
 <h3><code class="docutils literal notranslate"><span class="pre">_safe_float(value)</span></code><a class="headerlink" href="#safe-float-value" title="Link to this heading"></a></h3>
 <p>Convert the supplied value to <code class="docutils literal notranslate"><span class="pre">float</span></code> when possible.</p>
@@ -329,18 +305,14 @@ Floating point representation of <code class="docutils literal notranslate"><spa
 </section>
 <section id="normalize-conversion-result-result-task">
 <h3><code class="docutils literal notranslate"><span class="pre">normalize_conversion_result(result,</span> <span class="pre">task)</span></code><a class="headerlink" href="#normalize-conversion-result-result-task" title="Link to this heading"></a></h3>
-<p>Adapt heterogeneous worker return values into :class:<code class="docutils literal notranslate"><span class="pre">PdfConversionResult</span></code>.</p>
-<p>Historically the converter returned a tuple <code class="docutils literal notranslate"><span class="pre">(doc_id,</span> <span class="pre">status)</span></code>.  The
-refactor switched to <code class="docutils literal notranslate"><span class="pre">PdfConversionResult</span></code> which broke a regression test
-that still emits tuples.  This helper accepts both shapes—as well as dicts
-produced by ad-hoc stubs—and populates missing metadata from the associated
-:class:<code class="docutils literal notranslate"><span class="pre">PdfTask</span></code> when available.</p>
+<p>Validate that worker results conform to :class:<code class="docutils literal notranslate"><span class="pre">PdfConversionResult</span></code>.</p>
 <p>Args:
 result: Object returned by a worker invocation.
-task: Related :class:<code class="docutils literal notranslate"><span class="pre">PdfTask</span></code> used to back-fill metadata when needed.</p>
+task: Deprecated parameter retained for API stability; ignored.</p>
 <p>Returns:
-Normalised :class:<code class="docutils literal notranslate"><span class="pre">PdfConversionResult</span></code> instance encapsulating the
-conversion outcome.</p>
+The original :class:<code class="docutils literal notranslate"><span class="pre">PdfConversionResult</span></code> when the type check passes.</p>
+<p>Raises:
+TypeError: If the worker returned an unexpected result type.</p>
 </section>
 <section id="port-is-free-port">
 <h3><code class="docutils literal notranslate"><span class="pre">port_is_free(port)</span></code><a class="headerlink" href="#port-is-free-port" title="Link to this heading"></a></h3>
@@ -485,9 +457,6 @@ SystemExit: Propagated if <code class="docutils literal notranslate"><span class
 <section id="get-converter">
 <h3><code class="docutils literal notranslate"><span class="pre">_get_converter()</span></code><a class="headerlink" href="#get-converter" title="Link to this heading"></a></h3>
 <p>Instantiate and cache a Docling HTML converter per worker process.</p>
-<p>Returns:
-DocumentConverter configured for HTML input, cached for reuse within
-the worker process.</p>
 </section>
 <section id="list-htmls-root">
 <h3><code class="docutils literal notranslate"><span class="pre">list_htmls(root)</span></code><a class="headerlink" href="#list-htmls-root" title="Link to this heading"></a></h3>
@@ -514,16 +483,6 @@ ValueError: Propagated when Docling validation fails prior to internal handling.
 args: Optional pre-parsed CLI namespace to override command-line inputs.</p>
 <p>Returns:
 Process exit code, where <code class="docutils literal notranslate"><span class="pre">0</span></code> denotes success.</p>
-</section>
-<section id="getitem-self-index">
-<h3><code class="docutils literal notranslate"><span class="pre">__getitem__(self,</span> <span class="pre">index)</span></code><a class="headerlink" href="#getitem-self-index" title="Link to this heading"></a></h3>
-<p>Provide tuple-like access for compatibility with legacy tests.</p>
-<p>Args:
-index: Position requested by tuple-style accessors.</p>
-<p>Returns:
-PDF path when <code class="docutils literal notranslate"><span class="pre">index</span></code> is <code class="docutils literal notranslate"><span class="pre">0</span></code>.</p>
-<p>Raises:
-IndexError: If <code class="docutils literal notranslate"><span class="pre">index</span></code> is not <code class="docutils literal notranslate"><span class="pre">0</span></code>.</p>
 </section>
 </section>
 <section id="classes">

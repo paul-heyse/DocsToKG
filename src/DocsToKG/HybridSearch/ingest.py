@@ -42,8 +42,9 @@ from typing import Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 
+from .interfaces import LexicalIndex
 from .observability import Observability
-from .storage import ChunkRegistry, OpenSearchSimulator
+from .storage import ChunkRegistry
 from .types import ChunkFeatures, ChunkPayload, DocumentInput
 from .vectorstore import FaissVectorStore
 
@@ -113,7 +114,7 @@ class ChunkIngestionPipeline:
 
     Attributes:
         _faiss: FAISS index manager responsible for vector persistence.
-        _opensearch: OpenSearch simulator handling lexical storage.
+        _opensearch: Lexical index handling sparse storage.
         _registry: Registry mapping vector identifiers to chunk metadata.
         _metrics: Aggregated ingestion metrics recorded during operations.
         _observability: Observability facade for tracing and logging.
@@ -121,7 +122,7 @@ class ChunkIngestionPipeline:
     Examples:
         >>> pipeline = ChunkIngestionPipeline(
         ...     faiss_index=FaissVectorStore.build_in_memory(),
-        ...     opensearch=OpenSearchSimulator(),
+        ...     opensearch=OpenSearchSimulator(),  # from DocsToKG.HybridSearch.devtools.opensearch_simulator  # doctest: +SKIP
         ...     registry=ChunkRegistry(),
         ... )
         >>> isinstance(pipeline.metrics.chunks_upserted, int)
@@ -132,7 +133,7 @@ class ChunkIngestionPipeline:
         self,
         *,
         faiss_index: FaissVectorStore,
-        opensearch: OpenSearchSimulator,
+        opensearch: LexicalIndex,
         registry: ChunkRegistry,
         observability: Optional[Observability] = None,
     ) -> None:
@@ -140,7 +141,7 @@ class ChunkIngestionPipeline:
 
         Args:
             faiss_index: FAISS index manager responsible for dense vector storage.
-            opensearch: OpenSearch simulator handling lexical storage.
+            opensearch: Lexical index handling sparse storage.
             registry: Registry mapping vector identifiers to chunk metadata.
             observability: Optional observability façade for tracing and metrics.
 

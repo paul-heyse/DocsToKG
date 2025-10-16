@@ -37,26 +37,6 @@ Return ``True`` when ``candidate`` appears to reference a local path.
 
 Expand a filesystem path to an absolute :class:`Path`.
 
-### `resolve_hf_home()`
-
-Resolve the HuggingFace cache directory respecting ``HF_HOME``.
-
-Args:
-None
-
-Returns:
-Path: Absolute location of the HuggingFace cache directory.
-
-### `resolve_model_root()`
-
-Resolve DocsToKG model root with environment override.
-
-Args:
-None
-
-Returns:
-Path: Absolute model root directory for DocsToKG artifacts.
-
 ### `resolve_pdf_model_path(cli_value)`
 
 Determine PDF model path using CLI and environment precedence.

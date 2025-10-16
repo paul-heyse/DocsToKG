@@ -93,16 +93,10 @@ class _RecordingSink:
         self.closed = True
 
 
-class _RecordingLastAttemptSink(_RecordingSink):
-    pass
-
-
 class _RecordingCsvSink(_RecordingSink):
     pass
 
 
-class _RecordingIndexSink(_RecordingSink):
-    pass
 # --- Helper Functions ---
 
 
@@ -145,9 +139,7 @@ def test_main_closes_sinks_when_pipeline_raises(monkeypatch, tmp_path):
     _RecordingSink.instances = []
 
     monkeypatch.setattr(downloader, "JsonlSink", _RecordingSink)
-    monkeypatch.setattr(downloader, "ManifestIndexSink", _RecordingIndexSink)
     monkeypatch.setattr(downloader, "CsvSink", _RecordingCsvSink)
-    monkeypatch.setattr(downloader, "LastAttemptCsvSink", _RecordingLastAttemptSink)
 
     def boom(*_args, **_kwargs):
         raise RuntimeError("resolver boom")
@@ -230,10 +222,9 @@ def test_main_with_csv_releases_attempt_files(monkeypatch, tmp_path):
 
     manifest = Path(argv[argv.index("--manifest") + 1])
     csv_path = manifest.with_suffix(".csv")
-    last_path = manifest.with_name("manifest.last.csv")
 
     assert csv_path.exists()
-    assert last_path.exists()
+    assert not manifest.with_name("manifest.last.csv").exists()
 
     moved = csv_path.with_name(csv_path.name + ".moved")
     csv_path.rename(moved)

@@ -182,7 +182,7 @@ Coordinate loading of chunk/vector artifacts and dual writes.
 
 Attributes:
 _faiss: FAISS index manager responsible for vector persistence.
-_opensearch: OpenSearch simulator handling lexical storage.
+_opensearch: Lexical index handling sparse storage.
 _registry: Registry mapping vector identifiers to chunk metadata.
 _metrics: Aggregated ingestion metrics recorded during operations.
 _observability: Observability facade for tracing and logging.
@@ -190,7 +190,7 @@ _observability: Observability facade for tracing and logging.
 Examples:
 >>> pipeline = ChunkIngestionPipeline(
 ...     faiss_index=FaissVectorStore.build_in_memory(),
-...     opensearch=OpenSearchSimulator(),
+...     opensearch=OpenSearchSimulator(),  # from DocsToKG.HybridSearch.devtools.opensearch_simulator  # doctest: +SKIP
 ...     registry=ChunkRegistry(),
 ... )
 >>> isinstance(pipeline.metrics.chunks_upserted, int)
