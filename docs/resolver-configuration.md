@@ -39,7 +39,9 @@ specific providers while leaving the feature enabled globally:
 ```yaml
 enable_head_precheck: true
 resolver_head_precheck:
+  landing_page: false
   wayback: false
+  zenodo: true
 ```
 
 Resolvers omitted from ``resolver_head_precheck`` inherit the global

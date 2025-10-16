@@ -42,11 +42,10 @@ from typing import Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 
-from .interfaces import LexicalIndex
+from .interfaces import DenseVectorStore, LexicalIndex
 from .observability import Observability
 from .storage import ChunkRegistry
 from .types import ChunkFeatures, ChunkPayload, DocumentInput
-from .vectorstore import FaissVectorStore
 
 # --- Globals ---
 
@@ -121,7 +120,7 @@ class ChunkIngestionPipeline:
 
     Examples:
         >>> pipeline = ChunkIngestionPipeline(
-        ...     faiss_index=FaissVectorStore.build_in_memory(),
+        ...     faiss_index=DenseVectorStore(...),
         ...     opensearch=OpenSearchSimulator(),  # from DocsToKG.HybridSearch.storage  # doctest: +SKIP
         ...     registry=ChunkRegistry(),
         ... )
@@ -132,7 +131,7 @@ class ChunkIngestionPipeline:
     def __init__(
         self,
         *,
-        faiss_index: FaissVectorStore,
+        faiss_index: DenseVectorStore,
         opensearch: LexicalIndex,
         registry: ChunkRegistry,
         observability: Optional[Observability] = None,
@@ -169,14 +168,14 @@ class ChunkIngestionPipeline:
         return self._metrics
 
     @property
-    def faiss_index(self) -> FaissVectorStore:
+    def faiss_index(self) -> DenseVectorStore:
         """Access the FAISS index manager used for vector persistence.
 
         Args:
             None
 
         Returns:
-            FaissVectorStore associated with the ingestion pipeline.
+            DenseVectorStore associated with the ingestion pipeline.
         """
         return self._faiss
 
@@ -211,7 +210,7 @@ class ChunkIngestionPipeline:
 
         with self._observability.trace("ingest_dual_write", count=str(len(new_chunks))):
             self._prepare_faiss(new_chunks)
-            self._faiss.add(
+            self._faiss.add_batch(
                 [chunk.features.embedding for chunk in new_chunks],
                 [chunk.vector_id for chunk in new_chunks],
             )
@@ -272,19 +271,34 @@ class ChunkIngestionPipeline:
         Returns:
             Sequence of embedding vectors used for index training.
         """
-        existing = self._registry.all()
-        population = list(existing) + list(new_chunks)
-        if not population:
-            return [chunk.features.embedding for chunk in new_chunks]
         nlist = int(getattr(self._faiss.config, "nlist", 1024))
         factor = max(1, int(getattr(self._faiss.config, "ivf_train_factor", 8)))
-        sample_size = min(len(population), max(1024, nlist * factor))
-        if sample_size >= len(population):
-            sample = population
-        else:
-            indices = TRAINING_SAMPLE_RNG.choice(len(population), size=sample_size, replace=False)
-            sample = [population[idx] for idx in indices]
-        return [chunk.features.embedding for chunk in sample]
+        target = max(1024, nlist * factor)
+
+        reservoir: List[ChunkPayload] = []
+        # Reservoir sampling over existing registry entries
+        iterator = self._registry.iter_all()
+        i = 0
+        for item in iterator:
+            if i < target:
+                reservoir.append(item)
+            else:
+                j = int(TRAINING_SAMPLE_RNG.integers(0, i + 1))
+                if j < target:
+                    reservoir[j] = item
+            i += 1
+        # Stream over new chunks as well
+        for item in new_chunks:
+            if i < target:
+                reservoir.append(item)
+            else:
+                j = int(TRAINING_SAMPLE_RNG.integers(0, i + 1))
+                if j < target:
+                    reservoir[j] = item
+            i += 1
+        if not reservoir:
+            return [chunk.features.embedding for chunk in new_chunks]
+        return [chunk.features.embedding for chunk in reservoir]
 
     def _load_precomputed_chunks(self, document: DocumentInput) -> List[ChunkPayload]:
         """Load chunk and vector artifacts from disk for a document.

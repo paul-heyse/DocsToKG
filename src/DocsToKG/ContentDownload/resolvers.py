@@ -79,6 +79,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import random
 import re
 import threading
@@ -452,7 +453,7 @@ class DownloadOutcome:
         ...                 content_type="application/pdf", elapsed_ms=150.0)
     """
 
-    classification: Classification | str
+    classification: Classification
     path: Optional[str] = None
     http_status: Optional[int] = None
     content_type: Optional[str] = None
@@ -475,8 +476,11 @@ class DownloadOutcome:
             bool: ``True`` if the outcome corresponds to a PDF download.
         """
 
-        classification = Classification.from_wire(self.classification)
-        return classification in PDF_LIKE
+        return self.classification in PDF_LIKE
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.classification, Classification):
+            self.classification = Classification.from_wire(self.classification)
 
 
 @dataclass
@@ -569,6 +573,15 @@ class ResolverMetrics:
     html: Counter = field(default_factory=Counter)
     skips: Counter = field(default_factory=Counter)
     failures: Counter = field(default_factory=Counter)
+    latency_ms: defaultdict[str, List[float]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
+    status_counts: defaultdict[str, Counter] = field(
+        default_factory=lambda: defaultdict(Counter)
+    )
+    error_reasons: defaultdict[str, Counter] = field(
+        default_factory=lambda: defaultdict(Counter)
+    )
     _lock: Lock = field(default_factory=Lock, repr=False, compare=False)
 
     def record_attempt(self, resolver_name: str, outcome: DownloadOutcome) -> None:
@@ -582,13 +595,24 @@ class ResolverMetrics:
             None
         """
 
-        classification = Classification.from_wire(outcome.classification)
         with self._lock:
             self.attempts[resolver_name] += 1
-            if classification is Classification.HTML:
+            if outcome.classification is Classification.HTML:
                 self.html[resolver_name] += 1
             if outcome.is_pdf:
                 self.successes[resolver_name] += 1
+            classification_key = outcome.classification.value
+            self.status_counts[resolver_name][classification_key] += 1
+            if outcome.elapsed_ms is not None:
+                self.latency_ms[resolver_name].append(float(outcome.elapsed_ms))
+            reason = outcome.error
+            if not reason and outcome.classification not in {
+                Classification.PDF,
+                Classification.PDF_UNKNOWN,
+            }:
+                reason = classification_key
+            if reason:
+                self.error_reasons[resolver_name][reason] += 1
 
     def record_skip(self, resolver_name: str, reason: str) -> None:
         """Record a skip event for a resolver with a reason tag.
@@ -634,13 +658,56 @@ class ResolverMetrics:
             1
         """
 
+        def _percentile(sorted_values: List[float], percentile: float) -> float:
+            if not sorted_values:
+                return 0.0
+            if len(sorted_values) == 1:
+                return sorted_values[0]
+            k = (len(sorted_values) - 1) * (percentile / 100.0)
+            f = math.floor(k)
+            c = math.ceil(k)
+            if f == c:
+                return sorted_values[int(k)]
+            d0 = sorted_values[f] * (c - k)
+            d1 = sorted_values[c] * (k - f)
+            return d0 + d1
+
         with self._lock:
+            latency_summary: Dict[str, Dict[str, float]] = {}
+            for resolver_name, samples in self.latency_ms.items():
+                if not samples:
+                    continue
+                ordered = sorted(samples)
+                count = len(samples)
+                total = sum(samples)
+                latency_summary[resolver_name] = {
+                    "count": count,
+                    "mean_ms": total / count,
+                    "min_ms": ordered[0],
+                    "p50_ms": _percentile(ordered, 50.0),
+                    "p95_ms": _percentile(ordered, 95.0),
+                    "max_ms": ordered[-1],
+                }
+
+            status_summary = {resolver: dict(counter) for resolver, counter in self.status_counts.items() if counter}
+            reason_summary = {
+                resolver: [
+                    {"reason": reason, "count": count}
+                    for reason, count in counter.most_common(5)
+                ]
+                for resolver, counter in self.error_reasons.items()
+                if counter
+            }
+
             return {
                 "attempts": dict(self.attempts),
                 "successes": dict(self.successes),
                 "html": dict(self.html),
                 "skips": dict(self.skips),
                 "failures": dict(self.failures),
+                "latency_ms": latency_summary,
+                "status_counts": status_summary,
+                "error_reasons": reason_summary,
             }
 
 
@@ -3371,7 +3438,7 @@ class ResolverPipeline:
                 resolver_name=resolver_name,
                 resolver_order=order_index,
                 url=url,
-                status=outcome.classification,
+                status=outcome.classification.value,
                 http_status=outcome.http_status,
                 content_type=outcome.content_type,
                 elapsed_ms=outcome.elapsed_ms,
@@ -3385,7 +3452,7 @@ class ResolverPipeline:
         )
         self.metrics.record_attempt(resolver_name, outcome)
 
-        classification = Classification.from_wire(outcome.classification)
+        classification = outcome.classification
         if classification is Classification.HTML and outcome.path:
             state.html_paths.append(outcome.path)
 

@@ -12,7 +12,7 @@ Raises:
 
 from __future__ import annotations
 
-from typing import Dict, List, Mapping, Optional, Sequence
+from typing import Dict, Iterator, List, Mapping, Optional, Sequence
 
 from .types import ChunkPayload, vector_uuid_to_faiss_int
 
@@ -111,6 +111,11 @@ class ChunkRegistry:
             List containing every chunk payload stored in the registry.
         """
         return list(self._chunks.values())
+
+    def iter_all(self) -> typing.Iterator[ChunkPayload]:
+        """Yield chunk payloads without materialising the full list."""
+
+        return iter(self._chunks.values())
 
     def count(self) -> int:
         """Return the number of chunks tracked by the registry.

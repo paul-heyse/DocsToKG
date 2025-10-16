@@ -217,7 +217,7 @@ import socket
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Iterator, List, Optional, TextIO, TypeVar
+from typing import Callable, Dict, Iterable, Iterator, List, Mapping, Optional, TextIO, TypeVar
 
 T = TypeVar("T")
 
@@ -243,12 +243,18 @@ __all__ = [
     "get_logger",
     "Batcher",
     "manifest_append",
+    "manifest_log_failure",
+    "manifest_log_skip",
+    "manifest_log_success",
     "compute_content_hash",
     "resolve_hash_algorithm",
     "load_manifest_index",
     "acquire_lock",
     "set_spawn_or_warn",
     "derive_doc_id_and_vectors_path",
+    "compute_relative_doc_id",
+    "should_skip_output",
+    "init_hf_env",
 ]
 
 # --- Path Resolution ---
@@ -297,6 +303,38 @@ def resolve_model_root(hf_home: Optional[Path] = None) -> Path:
         return expand_path(env)
     base = hf_home if hf_home is not None else resolve_hf_home()
     return expand_path(base)
+
+
+def init_hf_env(
+    hf_home: Optional[Path] = None,
+    model_root: Optional[Path] = None,
+) -> tuple[Path, Path]:
+    """Initialise Hugging Face and transformer cache environment variables.
+
+    Args:
+        hf_home: Optional explicit HF cache directory.
+        model_root: Optional DocsToKG model root override.
+
+    Returns:
+        Tuple of ``(hf_home, model_root)`` paths after normalisation.
+    """
+
+    resolved_hf = (
+        expand_path(hf_home) if isinstance(hf_home, Path) else resolve_hf_home()
+    )
+    resolved_model_root = (
+        expand_path(model_root)
+        if isinstance(model_root, Path)
+        else resolve_model_root(resolved_hf)
+    )
+
+    os.environ["HF_HOME"] = str(resolved_hf)
+    os.environ["HF_HUB_CACHE"] = str(resolved_hf / "hub")
+    os.environ["TRANSFORMERS_CACHE"] = str(resolved_hf / "transformers")
+    os.environ["SENTENCE_TRANSFORMERS_HOME"] = str(resolved_model_root)
+    os.environ["DOCSTOKG_MODEL_ROOT"] = str(resolved_model_root)
+
+    return resolved_hf, resolved_model_root
 
 
 def detect_data_root(start: Optional[Path] = None) -> Path:
@@ -493,6 +531,128 @@ def derive_doc_id_and_vectors_path(
     doc_id = base.with_suffix(".doctags").as_posix()
     vector_relative = base.with_suffix(".vectors.jsonl")
     return doc_id, vectors_root / vector_relative
+
+
+def compute_relative_doc_id(path: Path, root: Path) -> str:
+    """Return POSIX-style relative identifier for a document path.
+
+    Args:
+        path: Absolute path to the document on disk.
+        root: Root directory that anchors relative identifiers.
+
+    Returns:
+        str: POSIX-style relative path suitable for manifest IDs.
+    """
+
+    return path.relative_to(root).as_posix()
+
+
+def should_skip_output(
+    output_path: Path,
+    manifest_entry: Optional[Mapping[str, object]],
+    input_hash: str,
+    resume: bool,
+    force: bool,
+) -> bool:
+    """Return ``True`` when resume/skip conditions indicate work can be skipped."""
+
+    if not resume or force:
+        return False
+    if not output_path.exists():
+        return False
+    if not manifest_entry:
+        return False
+    stored_hash = manifest_entry.get("input_hash") if isinstance(manifest_entry, Mapping) else None
+    return stored_hash == input_hash
+
+
+def _stringify_path(value: Path | str | None) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
+def manifest_log_skip(
+    *,
+    stage: str,
+    doc_id: str,
+    input_path: Path | str,
+    input_hash: str,
+    output_path: Path | str,
+    duration_s: float = 0.0,
+    schema_version: Optional[str] = None,
+    hash_alg: Optional[str] = None,
+    **extra: object,
+) -> None:
+    payload: Dict[str, object] = {
+        "stage": stage,
+        "doc_id": doc_id,
+        "status": "skip",
+        "duration_s": float(duration_s),
+        "schema_version": schema_version,
+        "input_path": _stringify_path(input_path),
+        "input_hash": input_hash,
+        "hash_alg": hash_alg or resolve_hash_algorithm(),
+        "output_path": _stringify_path(output_path),
+    }
+    payload.update(extra)
+    manifest_append(**payload)
+
+
+def manifest_log_success(
+    *,
+    stage: str,
+    doc_id: str,
+    duration_s: float,
+    schema_version: str,
+    input_path: Path | str,
+    input_hash: str,
+    output_path: Path | str,
+    hash_alg: Optional[str] = None,
+    **extra: object,
+) -> None:
+    payload: Dict[str, object] = {
+        "stage": stage,
+        "doc_id": doc_id,
+        "status": "success",
+        "duration_s": float(duration_s),
+        "schema_version": schema_version,
+        "input_path": _stringify_path(input_path),
+        "input_hash": input_hash,
+        "hash_alg": hash_alg or resolve_hash_algorithm(),
+        "output_path": _stringify_path(output_path),
+    }
+    payload.update(extra)
+    manifest_append(**payload)
+
+
+def manifest_log_failure(
+    *,
+    stage: str,
+    doc_id: str,
+    duration_s: float,
+    schema_version: str,
+    input_path: Path | str,
+    input_hash: str,
+    output_path: Path | str,
+    error: str,
+    hash_alg: Optional[str] = None,
+    **extra: object,
+) -> None:
+    payload: Dict[str, object] = {
+        "stage": stage,
+        "doc_id": doc_id,
+        "status": "failure",
+        "duration_s": float(duration_s),
+        "schema_version": schema_version,
+        "input_path": _stringify_path(input_path),
+        "input_hash": input_hash,
+        "hash_alg": hash_alg or resolve_hash_algorithm(),
+        "output_path": _stringify_path(output_path),
+        "error": error,
+    }
+    payload.update(extra)
+    manifest_append(**payload)
 
 
 # --- Logging and I/O Utilities ---

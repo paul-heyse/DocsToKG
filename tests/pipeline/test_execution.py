@@ -241,6 +241,7 @@ import requests
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
 from DocsToKG.ContentDownload import resolvers
+from DocsToKG.ContentDownload.classifications import Classification
 from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 from DocsToKG.ContentDownload.resolvers import (
     AttemptRecord,
@@ -266,6 +267,9 @@ class RecordingLogger:
     def log(self, record: AttemptRecord) -> None:
         with self._lock:
             self.records.append(record)
+
+    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
+        self.log(record)
 
 
 # --- test_bounded_concurrency.py ---
@@ -1255,5 +1259,5 @@ def test_download_candidate_marks_corrupt_without_eof(tmp_path):
     responses.add(responses.HEAD, pdf_url, headers={"Content-Type": "application/pdf"}, status=200)
     session = requests.Session()
     outcome = downloader.download_candidate(session, artifact, pdf_url, referer=None, timeout=5.0)
-    assert outcome.classification == "pdf_corrupt"
+    assert outcome.classification is Classification.PDF_CORRUPT
     assert outcome.path is None

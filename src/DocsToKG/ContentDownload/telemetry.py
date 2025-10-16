@@ -328,8 +328,6 @@ class CsvSink:
     def __exit__(self, exc_type, exc, tb) -> None:
         self.close()
 
-    DictReader = staticmethod(csv.DictReader)
-
 
 class MultiSink:
     """Composite sink that fans out logging calls to multiple sinks."""

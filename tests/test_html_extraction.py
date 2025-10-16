@@ -48,6 +48,7 @@ import pytest
 
 pytest.importorskip("pyalex")
 
+from DocsToKG.ContentDownload.classifications import Classification
 from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact, download_candidate
 # --- Globals ---
 
@@ -92,7 +93,7 @@ def test_html_extraction_creates_text_file(tmp_path: Path, monkeypatch: pytest.M
     context = {"dry_run": False, "extract_html_text": True, "previous": {}}
     outcome = download_candidate(session, artifact, url, None, timeout=15.0, context=context)
 
-    assert outcome.classification == "html"
+    assert outcome.classification is Classification.HTML
     assert outcome.extracted_text_path is not None
     html_path = Path(outcome.path)
     text_path = Path(outcome.extracted_text_path)

@@ -56,6 +56,9 @@ __all__ = (
     "ChunkPayload",
     "DocumentInput",
     "FaissVectorStore",
+    "FaissIndexManager",
+    "ManagedFaissAdapter",
+    "FaissRouter",
     "HybridSearchAPI",
     "HybridSearchConfig",
     "HybridSearchConfigManager",
@@ -86,6 +89,7 @@ from .ingest import ChunkIngestionPipeline
 from .interfaces import LexicalIndex
 from .observability import Observability
 from .ranking import ReciprocalRankFusion, ResultShaper, apply_mmr_diversification
+from .router import FaissRouter
 from .service import (
     HybridSearchAPI,
     HybridSearchService,
@@ -103,7 +107,7 @@ from .types import (
     vector_uuid_to_faiss_int,
 )
 from .validation import HybridSearchValidator
-from .vectorstore import FaissVectorStore, restore_state, serialize_state
+from .vectorstore import FaissIndexManager, FaissVectorStore, ManagedFaissAdapter, restore_state, serialize_state
 
 
 # --- Package Setup ---

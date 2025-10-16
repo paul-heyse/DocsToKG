@@ -104,12 +104,14 @@ Raises:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import random
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from pathlib import Path
 from typing import Any, Mapping, MutableMapping, Optional, Set, Union
 
 import requests
@@ -676,6 +678,38 @@ class ConditionalRequestHelper:
             assert self.prior_path is not None
             assert self.prior_sha256 is not None
             assert self.prior_content_length is not None
+
+            cached_path = Path(self.prior_path)
+            if not cached_path.exists():
+                raise FileNotFoundError(
+                    f"Cached artifact missing at {cached_path}; cannot reuse prior download."
+                )
+
+            try:
+                actual_size = cached_path.stat().st_size
+            except OSError as exc:  # pragma: no cover - defensive
+                raise FileNotFoundError(
+                    f"Unable to stat cached artifact at {cached_path}: {exc}"
+                ) from exc
+
+            if actual_size != self.prior_content_length:
+                raise ValueError(
+                    "Cached content length mismatch: "
+                    f"expected {self.prior_content_length}, got {actual_size}"
+                )
+
+            if self.prior_sha256:
+                hasher = hashlib.sha256()
+                with cached_path.open("rb") as handle:
+                    for chunk in iter(lambda: handle.read(8192), b""):
+                        hasher.update(chunk)
+                digest = hasher.hexdigest()
+                if digest != self.prior_sha256:
+                    raise ValueError(
+                        "Cached SHA256 mismatch: "
+                        f"expected {self.prior_sha256}, got {digest}"
+                    )
+
             return CachedResult(
                 path=self.prior_path,
                 sha256=self.prior_sha256,

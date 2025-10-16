@@ -119,9 +119,10 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 # Third-party imports
 from docling_core.transforms.chunker.base import BaseChunk
@@ -149,16 +150,21 @@ __all__ = (
 )
 
 from DocsToKG.DocParsing._common import (
+    acquire_lock,
     atomic_write,
     compute_content_hash,
+    compute_relative_doc_id,
     data_chunks,
     data_doctags,
     detect_data_root,
     get_logger,
     iter_doctags,
     load_manifest_index,
-    manifest_append,
+    manifest_log_failure,
+    manifest_log_skip,
+    manifest_log_success,
     resolve_hash_algorithm,
+    should_skip_output,
 )
 from DocsToKG.DocParsing.pipelines import (
     add_data_root_option,
@@ -171,10 +177,118 @@ from DocsToKG.DocParsing.schemas import (
     ChunkRow,
     ProvenanceMetadata,
     get_docling_version,
+    validate_chunk_row,
 )
 from DocsToKG.DocParsing.serializers import RichSerializerProvider
 
 SOFT_BARRIER_MARGIN = 64
+DEFAULT_HEADING_MARKERS: Tuple[str, ...] = ("#",)
+DEFAULT_CAPTION_MARKERS: Tuple[str, ...] = (
+    "Figure caption:",
+    "Table:",
+    "Picture description:",
+    "<!-- image -->",
+)
+
+
+def _dedupe_preserve_order(markers: Sequence[str]) -> Tuple[str, ...]:
+    """Return a tuple with duplicates removed while preserving original order."""
+
+    seen: set[str] = set()
+    ordered: List[str] = []
+    for marker in markers:
+        if marker not in seen:
+            seen.add(marker)
+            ordered.append(marker)
+    return tuple(ordered)
+
+
+def _ensure_str_list(value: object, label: str) -> List[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"Expected a list of strings for '{label}'")
+    return [item for item in value if item]
+
+
+def _load_structural_marker_config(path: Path) -> Tuple[List[str], List[str]]:
+    """Load custom heading and caption markers from a YAML or JSON file."""
+
+    raw = path.read_text(encoding="utf-8")
+    suffix = path.suffix.lower()
+    data: object
+    if suffix in {".yaml", ".yml"}:
+        try:
+            import yaml
+        except ImportError as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError(
+                "Loading YAML heading markers requires the 'PyYAML' package"
+            ) from exc
+        data = yaml.safe_load(raw) or {}
+    else:
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            try:
+                import yaml
+            except ImportError as exc:  # pragma: no cover - optional dependency
+                raise ValueError(
+                    f"Unable to parse heading markers file {path}: not valid JSON."
+                ) from exc
+            data = yaml.safe_load(raw) or {}
+
+    if isinstance(data, list):
+        headings = _ensure_str_list(data, "headings")
+        captions: List[str] = []
+    elif isinstance(data, dict):
+        headings = _ensure_str_list(data.get("headings"), "headings")
+        captions = _ensure_str_list(data.get("captions"), "captions")
+    else:
+        raise ValueError(
+            f"Unsupported heading markers format in {path}: expected list or mapping."
+        )
+
+    return headings, captions
+
+
+def _validate_chunk_files(files: Sequence[Path], logger) -> tuple[int, int]:
+    """Validate chunk JSONL rows across supplied files."""
+
+    total_files = 0
+    total_rows = 0
+    errors: List[str] = []
+
+    for path in files:
+        total_files += 1
+        with path.open("r", encoding="utf-8", errors="replace") as handle:
+            for line_no, line in enumerate(handle, start=1):
+                line = line.strip()
+                if not line:
+                    continue
+                total_rows += 1
+                try:
+                    validate_chunk_row(json.loads(line))
+                except ValueError as exc:
+                    message = f"{path}:{line_no}: {exc}"
+                    logger.error("Chunk validation error: %s", message)
+                    errors.append(message)
+
+    if errors:
+        preview = ", ".join(errors[:5])
+        if len(errors) > 5:
+            preview += ", ..."
+        raise ValueError(
+            "Chunk validation failed; fix the highlighted rows before continuing: " + preview
+        )
+
+    logger.info(
+        "Chunk validation complete",
+        extra={"extra_fields": {"files": total_files, "rows": total_rows}},
+    )
+    print(f"Validated {total_rows} rows across {total_files} chunk files.")
+    return total_files, total_rows
 
 # --- Defaults ---
 
@@ -188,20 +302,6 @@ _LOGGER = get_logger(__name__)
 
 
 # --- Public Functions ---
-
-def compute_relative_doc_id(path: Path, root: Path) -> str:
-    """Return POSIX-style relative identifier for a document path.
-
-    Args:
-        path: Absolute path to the document on disk.
-        root: Root directory that anchors relative identifiers.
-
-    Returns:
-        str: POSIX-style relative path suitable for manifest IDs.
-    """
-
-    return path.relative_to(root).as_posix()
-
 
 def read_utf8(p: Path) -> str:
     """Load text from disk using UTF-8 with replacement for invalid bytes.
@@ -307,7 +407,7 @@ def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, i
 # --- Public Classes ---
 
 
-@dataclass
+@dataclass(slots=True)
 class Rec:
     """Intermediate record tracking chunk text and provenance.
 
@@ -334,19 +434,179 @@ class Rec:
     num_images: int = 0
 
 
-def merge_rec(a: Rec, b: Rec, tokenizer: HuggingFaceTokenizer) -> Rec:
+@dataclass(slots=True)
+class ChunkWorkerConfig:
+    tokenizer_model: str
+    min_tokens: int
+    max_tokens: int
+    soft_barrier_margin: int
+    heading_markers: Tuple[str, ...]
+    caption_markers: Tuple[str, ...]
+    docling_version: str
+
+
+@dataclass(slots=True)
+class ChunkTask:
+    doc_path: Path
+    output_path: Path
+    doc_id: str
+    doc_stem: str
+    input_hash: str
+    parse_engine: str
+
+
+@dataclass(slots=True)
+class ChunkResult:
+    doc_id: str
+    doc_stem: str
+    status: str
+    duration_s: float
+    input_path: Path
+    output_path: Path
+    input_hash: str
+    chunk_count: int
+    parse_engine: str
+    error: Optional[str] = None
+
+
+_CHUNK_WORKER_CONFIG: Optional[ChunkWorkerConfig] = None
+_CHUNK_WORKER_TOKENIZER: Optional[HuggingFaceTokenizer] = None
+_CHUNK_WORKER_CHUNKER: Optional[HybridChunker] = None
+
+
+def _chunk_worker_initializer(cfg: ChunkWorkerConfig) -> None:
+    global _CHUNK_WORKER_CONFIG, _CHUNK_WORKER_TOKENIZER, _CHUNK_WORKER_CHUNKER
+    _CHUNK_WORKER_CONFIG = cfg
+    hf = AutoTokenizer.from_pretrained(cfg.tokenizer_model, use_fast=True)
+    tokenizer = HuggingFaceTokenizer(tokenizer=hf, max_tokens=cfg.max_tokens)
+    chunker = HybridChunker(
+        tokenizer=tokenizer,
+        merge_peers=True,
+        serializer_provider=RichSerializerProvider(),
+    )
+    _CHUNK_WORKER_TOKENIZER = tokenizer
+    _CHUNK_WORKER_CHUNKER = chunker
+
+
+def _process_chunk_task(task: ChunkTask) -> ChunkResult:
+    if _CHUNK_WORKER_CONFIG is None or _CHUNK_WORKER_TOKENIZER is None or _CHUNK_WORKER_CHUNKER is None:
+        raise RuntimeError("Chunk worker not initialised")
+
+    cfg = _CHUNK_WORKER_CONFIG
+    tokenizer = _CHUNK_WORKER_TOKENIZER
+    chunker = _CHUNK_WORKER_CHUNKER
+
+    start = time.perf_counter()
+    try:
+        doctags_text = read_utf8(task.doc_path)
+        doc = build_doc(doc_name=task.doc_stem, doctags_text=doctags_text)
+
+        chunks = list(chunker.chunk(dl_doc=doc))
+        recs: List[Rec] = []
+        for idx, ch in enumerate(chunks):
+            text = chunker.contextualize(ch)
+            n_tok = tokenizer.count_tokens(text=text)
+            refs, pages = extract_refs_and_pages(ch)
+            has_caption, has_classification, num_images = summarize_image_metadata(ch, text)
+            recs.append(
+                Rec(
+                    text=text,
+                    n_tok=n_tok,
+                    src_idxs=[idx],
+                    refs=refs,
+                    pages=pages,
+                    has_image_captions=has_caption,
+                    has_image_classification=has_classification,
+                    num_images=num_images,
+                )
+            )
+
+        final_recs = coalesce_small_runs(
+            records=recs,
+            tokenizer=tokenizer,
+            min_tokens=cfg.min_tokens,
+            max_tokens=cfg.max_tokens,
+            soft_barrier_margin=cfg.soft_barrier_margin,
+            heading_markers=cfg.heading_markers,
+            caption_markers=cfg.caption_markers,
+        )
+
+        task.output_path.parent.mkdir(parents=True, exist_ok=True)
+        with acquire_lock(task.output_path):
+            with atomic_write(task.output_path) as handle:
+                for cid, r in enumerate(final_recs):
+                    provenance = ProvenanceMetadata(
+                        parse_engine=task.parse_engine,
+                        docling_version=cfg.docling_version,
+                        has_image_captions=r.has_image_captions,
+                        has_image_classification=r.has_image_classification,
+                        num_images=r.num_images,
+                    )
+                    row = ChunkRow(
+                        doc_id=task.doc_id,
+                        source_path=str(task.doc_path),
+                        chunk_id=cid,
+                        source_chunk_idxs=r.src_idxs,
+                        num_tokens=r.n_tok,
+                        text=r.text,
+                        doc_items_refs=r.refs,
+                        page_nos=r.pages,
+                        schema_version=CHUNK_SCHEMA_VERSION,
+                        has_image_captions=r.has_image_captions,
+                        has_image_classification=r.has_image_classification,
+                        num_images=r.num_images,
+                        provenance=provenance,
+                    )
+                    payload = row.model_dump(mode="json", exclude_none=True)
+                    handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+        duration = time.perf_counter() - start
+        return ChunkResult(
+            doc_id=task.doc_id,
+            doc_stem=task.doc_stem,
+            status="success",
+            duration_s=duration,
+            input_path=task.doc_path,
+            output_path=task.output_path,
+            input_hash=task.input_hash,
+            chunk_count=len(final_recs),
+            parse_engine=task.parse_engine,
+        )
+    except Exception as exc:  # pragma: no cover - propagated to main for handling
+        duration = time.perf_counter() - start
+        return ChunkResult(
+            doc_id=task.doc_id,
+            doc_stem=task.doc_stem,
+            status="failure",
+            duration_s=duration,
+            input_path=task.doc_path,
+            output_path=task.output_path,
+            input_hash=task.input_hash,
+            chunk_count=0,
+            parse_engine=task.parse_engine,
+            error=str(exc),
+        )
+def merge_rec(
+    a: Rec,
+    b: Rec,
+    tokenizer: HuggingFaceTokenizer,
+    *,
+    recount: bool = True,
+) -> Rec:
     """Merge two chunk records, updating token counts and provenance metadata.
 
     Args:
         a: First record to merge.
         b: Second record to merge.
         tokenizer: Tokenizer used to recompute token counts for combined text.
+        recount: When ``True`` the merged text is re-tokenized; otherwise token
+            counts are summed from inputs.
 
     Returns:
         New `Rec` instance containing fused text, token counts, and metadata.
     """
     text = a.text + "\n\n" + b.text
-    n_tok = tokenizer.count_tokens(text=text)
+    n_tok = tokenizer.count_tokens(text=text) if recount else a.n_tok + b.n_tok
     refs = a.refs + [r for r in b.refs if r not in a.refs]
     pages = sorted(set(a.pages).union(b.pages))
     return Rec(
@@ -363,11 +623,17 @@ def merge_rec(a: Rec, b: Rec, tokenizer: HuggingFaceTokenizer) -> Rec:
 
 # --- Topic-aware boundary detection ---
 
-def is_structural_boundary(rec: Rec) -> bool:
+def is_structural_boundary(
+    rec: Rec,
+    heading_markers: Optional[Sequence[str]] = None,
+    caption_markers: Optional[Sequence[str]] = None,
+) -> bool:
     """Detect whether a chunk begins with a structural heading or caption marker.
 
     Args:
         rec: Chunk record to inspect.
+        heading_markers: Optional prefixes treated as section headings.
+        caption_markers: Optional prefixes treated as caption markers.
 
     Returns:
         ``True`` when ``rec.text`` starts with a heading indicator (``#``) or a
@@ -381,16 +647,12 @@ def is_structural_boundary(rec: Rec) -> bool:
     """
 
     text = rec.text.lstrip()
-    if text.startswith("#"):
+    heading_prefixes = tuple(heading_markers) if heading_markers else DEFAULT_HEADING_MARKERS
+    if any(text.startswith(marker) for marker in heading_prefixes):
         return True
 
-    caption_markers = (
-        "Figure caption:",
-        "Table:",
-        "Picture description:",
-        "<!-- image -->",
-    )
-    return any(text.startswith(marker) for marker in caption_markers)
+    caption_prefixes = tuple(caption_markers) if caption_markers else DEFAULT_CAPTION_MARKERS
+    return any(text.startswith(marker) for marker in caption_prefixes)
 
 
 # --- Smart coalescence of SMALL-RUNS (< min_tokens) ---
@@ -400,6 +662,9 @@ def coalesce_small_runs(
     tokenizer: HuggingFaceTokenizer,
     min_tokens: int = 256,
     max_tokens: int = 512,
+    soft_barrier_margin: int = SOFT_BARRIER_MARGIN,
+    heading_markers: Optional[Sequence[str]] = None,
+    caption_markers: Optional[Sequence[str]] = None,
 ) -> List[Rec]:
     """Merge contiguous short chunks until they satisfy minimum token thresholds.
 
@@ -408,6 +673,9 @@ def coalesce_small_runs(
         tokenizer: Tokenizer used to recompute token counts for merged chunks.
         min_tokens: Target minimum tokens per chunk after coalescing.
         max_tokens: Hard ceiling to avoid producing overly large chunks.
+        soft_barrier_margin: Margin applied when respecting structural boundaries.
+        heading_markers: Optional heading prefixes treated as structural boundaries.
+        caption_markers: Optional caption prefixes treated as structural boundaries.
 
     Returns:
         New list of records where small runs are merged while preserving order.
@@ -423,6 +691,11 @@ def coalesce_small_runs(
     """
     out: List[Rec] = []
     i, N = 0, len(records)
+    margin = max(0, soft_barrier_margin)
+    heading_prefixes = tuple(heading_markers) if heading_markers is not None else DEFAULT_HEADING_MARKERS
+    caption_prefixes = (
+        tuple(caption_markers) if caption_markers is not None else DEFAULT_CAPTION_MARKERS
+    )
 
     def is_small(idx: int) -> bool:
         """Return True when the chunk at `idx` is below the minimum token threshold.
@@ -456,9 +729,14 @@ def coalesce_small_runs(
             while k < e and g.n_tok < min_tokens:
                 next_rec = records[k]
                 combined_size = g.n_tok + next_rec.n_tok
-                threshold = max_tokens - SOFT_BARRIER_MARGIN
+                threshold = max_tokens - margin
 
-                if is_structural_boundary(next_rec) and combined_size > threshold:
+                if (
+                    is_structural_boundary(
+                        next_rec, heading_markers=heading_prefixes, caption_markers=caption_prefixes
+                    )
+                    and combined_size > threshold
+                ):
                     _LOGGER.debug(
                         "Soft barrier at chunk %s: boundary detected, combined size %s > %s",
                         k,
@@ -476,7 +754,7 @@ def coalesce_small_runs(
                     break
 
                 if combined_size <= max_tokens:
-                    g = merge_rec(g, next_rec, tokenizer)
+                    g = merge_rec(g, next_rec, tokenizer, recount=False)
                     k += 1
                 else:
                     break
@@ -491,11 +769,16 @@ def coalesce_small_runs(
 
         if trailing_small:
             tail = groups[-1]
-            threshold = max_tokens - SOFT_BARRIER_MARGIN
+            threshold = max_tokens - margin
 
             if len(groups) >= 2:
                 combined_size = groups[-2].n_tok + tail.n_tok
-                if is_structural_boundary(tail) and combined_size > threshold:
+                if (
+                    is_structural_boundary(
+                        tail, heading_markers=heading_prefixes, caption_markers=caption_prefixes
+                    )
+                    and combined_size > threshold
+                ):
                     _LOGGER.debug(
                         "Soft barrier prevented intra-run merge: combined size %s > %s",
                         combined_size,
@@ -510,7 +793,7 @@ def coalesce_small_runs(
                         },
                     )
                 elif combined_size <= max_tokens:
-                    merged = merge_rec(groups[-2], tail, tokenizer)
+                    merged = merge_rec(groups[-2], tail, tokenizer, recount=False)
                     if out and out[-1].src_idxs == groups[-2].src_idxs:
                         out[-1] = merged
                     else:
@@ -524,7 +807,12 @@ def coalesce_small_runs(
 
             if left_can:
                 combined_size = out[-1].n_tok + tail.n_tok
-                if is_structural_boundary(tail) and combined_size > threshold:
+                if (
+                    is_structural_boundary(
+                        tail, heading_markers=heading_prefixes, caption_markers=caption_prefixes
+                    )
+                    and combined_size > threshold
+                ):
                     _LOGGER.debug(
                         "Soft barrier prevented left merge: combined size %s > %s",
                         combined_size,
@@ -543,7 +831,12 @@ def coalesce_small_runs(
 
             if right_can:
                 combined_size = records[e].n_tok + tail.n_tok
-                if is_structural_boundary(tail) and combined_size > threshold:
+                if (
+                    is_structural_boundary(
+                        tail, heading_markers=heading_prefixes, caption_markers=caption_prefixes
+                    )
+                    and combined_size > threshold
+                ):
                     _LOGGER.debug(
                         "Soft barrier prevented right merge: combined size %s > %s",
                         combined_size,
@@ -562,15 +855,18 @@ def coalesce_small_runs(
 
             if left_ok and right_ok:
                 if out[-1].n_tok <= records[e].n_tok:
-                    out[-1] = merge_rec(out[-1], tail, tokenizer)
+                    out[-1] = merge_rec(out[-1], tail, tokenizer, recount=False)
                 else:
-                    records[e] = merge_rec(tail, records[e], tokenizer)
+                    records[e] = merge_rec(tail, records[e], tokenizer, recount=False)
             elif left_ok:
-                out[-1] = merge_rec(out[-1], tail, tokenizer)
+                out[-1] = merge_rec(out[-1], tail, tokenizer, recount=False)
             elif right_ok:
-                records[e] = merge_rec(tail, records[e], tokenizer)
+                records[e] = merge_rec(tail, records[e], tokenizer, recount=False)
             else:
                 out.append(tail)
+
+    for rec in out:
+        rec.n_tok = tokenizer.count_tokens(text=rec.text)
 
     return out
 
@@ -601,6 +897,32 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         default="Qwen/Qwen3-Embedding-4B",
         help="HuggingFace tokenizer model (default aligns with dense embedder)",
+    )
+    parser.add_argument(
+        "--soft-barrier-margin",
+        type=int,
+        default=SOFT_BARRIER_MARGIN,
+        help="Token margin applied when respecting structural boundaries (default: 64).",
+    )
+    parser.add_argument(
+        "--heading-markers",
+        type=Path,
+        default=None,
+        help=(
+            "Optional YAML/JSON file listing additional heading prefixes "
+            "(and optionally caption prefixes) to treat as structural boundaries."
+        ),
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of worker processes for chunking (default: 1).",
+    )
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Validate chunk files and exit without producing new outputs.",
     )
     add_resume_force_options(
         parser,
@@ -674,6 +996,27 @@ def main(args: argparse.Namespace | None = None) -> int:
         resolver=data_chunks,
     )
 
+    heading_markers: Tuple[str, ...] = DEFAULT_HEADING_MARKERS
+    caption_markers: Tuple[str, ...] = DEFAULT_CAPTION_MARKERS
+    custom_heading_markers: List[str] = []
+    custom_caption_markers: List[str] = []
+    if getattr(args, "heading_markers", None) is not None:
+        markers_path = args.heading_markers.expanduser().resolve()
+        if not markers_path.exists():
+            raise FileNotFoundError(f"Heading markers file not found: {markers_path}")
+        extra_headings, extra_captions = _load_structural_marker_config(markers_path)
+        custom_heading_markers = extra_headings
+        custom_caption_markers = extra_captions
+        if extra_headings:
+            heading_markers = _dedupe_preserve_order(
+                (*heading_markers, *tuple(extra_headings))
+            )
+        if extra_captions:
+            caption_markers = _dedupe_preserve_order(
+                (*caption_markers, *tuple(extra_captions))
+            )
+        args.heading_markers = markers_path
+
     logger.info(
         "Chunking configuration",
         extra={
@@ -683,6 +1026,10 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "output_dir": str(out_dir),
                 "min_tokens": args.min_tokens,
                 "max_tokens": args.max_tokens,
+                "soft_barrier_margin": args.soft_barrier_margin,
+                "custom_heading_markers": custom_heading_markers,
+                "custom_caption_markers": custom_caption_markers,
+                "workers": int(getattr(args, "workers", 1)),
             }
         },
     )
@@ -711,7 +1058,25 @@ def main(args: argparse.Namespace | None = None) -> int:
         "Loading tokenizer",
         extra={"extra_fields": {"tokenizer_model": tokenizer_model}},
     )
-    hf = AutoTokenizer.from_pretrained(tokenizer_model, use_fast=True)
+
+    chunk_manifest_index = (
+        load_manifest_index(MANIFEST_STAGE, resolved_data_root) if args.resume else {}
+    )
+
+    if getattr(args, "validate_only", False):
+        _validate_chunk_files(files, logger)
+        return 0
+
+    chunk_config = ChunkWorkerConfig(
+        tokenizer_model=tokenizer_model,
+        min_tokens=int(args.min_tokens),
+        max_tokens=int(args.max_tokens),
+        soft_barrier_margin=int(args.soft_barrier_margin),
+        heading_markers=heading_markers,
+        caption_markers=caption_markers,
+        docling_version=docling_version,
+    )
+
     if "bert" in tokenizer_model.lower():
         logger.warning(
             "BERT tokenizer may not align with Qwen embedder. Consider running "
@@ -719,15 +1084,10 @@ def main(args: argparse.Namespace | None = None) -> int:
             "Qwen/Qwen3-Embedding-4B.",
             extra={"extra_fields": {"tokenizer_model": tokenizer_model}},
         )
-    tokenizer = HuggingFaceTokenizer(tokenizer=hf, max_tokens=args.max_tokens)
 
-    # HybridChunker: token-aware split + peer-merge; no overlap
-    chunker = HybridChunker(
-        tokenizer=tokenizer,
-        merge_peers=True,
-        serializer_provider=RichSerializerProvider(),
-    )
+    worker_count = max(1, int(getattr(args, "workers", 1)))
 
+    tasks: List[ChunkTask] = []
     for path in files:
         rel_id = compute_relative_doc_id(path, in_dir)
         name = path.stem
@@ -742,135 +1102,89 @@ def main(args: argparse.Namespace | None = None) -> int:
                 extra={"extra_fields": {"doc_id": rel_id}},
             )
 
-        if (
-            args.resume
-            and not args.force
-            and out_path.exists()
-            and manifest_entry
-            and manifest_entry.get("input_hash") == input_hash
-        ):
-            logger.info("Skipping %s: output exists and input unchanged", rel_id)
-            manifest_append(
+        if should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force):
+            manifest_log_skip(
                 stage=MANIFEST_STAGE,
                 doc_id=rel_id,
-                status="skip",
-                duration_s=0.0,
-                schema_version=CHUNK_SCHEMA_VERSION,
-                input_path=str(path),
+                input_path=path,
                 input_hash=input_hash,
-                hash_alg=resolve_hash_algorithm(),
-                output_path=str(out_path),
+                output_path=out_path,
+                schema_version=CHUNK_SCHEMA_VERSION,
                 parse_engine=parse_engine,
             )
             continue
 
-        start = time.perf_counter()
-        try:
-            doctags_text = read_utf8(path)
-            doc = build_doc(doc_name=name, doctags_text=doctags_text)
-
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Stage 1: Docling chunking
-            chunks = list(chunker.chunk(dl_doc=doc))
-
-            # Stage 2: materialize contextualized text + metadata
-            recs: List[Rec] = []
-            for idx, ch in enumerate(chunks):
-                text = chunker.contextualize(ch)
-                n_tok = tokenizer.count_tokens(text=text)
-                refs, pages = extract_refs_and_pages(ch)
-                has_caption, has_classification, num_images = summarize_image_metadata(ch, text)
-                recs.append(
-                    Rec(
-                        text=text,
-                        n_tok=n_tok,
-                        src_idxs=[idx],
-                        refs=refs,
-                        pages=pages,
-                        has_image_captions=has_caption,
-                        has_image_classification=has_classification,
-                        num_images=num_images,
-                    )
-                )
-
-            # Stage 3: smart coalescence of contiguous small runs
-            final_recs = coalesce_small_runs(
-                records=recs,
-                tokenizer=tokenizer,
-                min_tokens=args.min_tokens,
-                max_tokens=args.max_tokens,
-            )
-
-            # Stage 4: write JSONL with schema validation
-            with atomic_write(out_path) as handle:
-                for cid, r in enumerate(final_recs):
-                    provenance = ProvenanceMetadata(
-                        parse_engine=parse_engine,
-                        docling_version=docling_version,
-                        has_image_captions=r.has_image_captions,
-                        has_image_classification=r.has_image_classification,
-                        num_images=r.num_images,
-                    )
-                    row = ChunkRow(
-                        doc_id=rel_id,
-                        source_path=str(path),
-                        chunk_id=cid,
-                        source_chunk_idxs=r.src_idxs,
-                        num_tokens=r.n_tok,
-                        text=r.text,
-                        doc_items_refs=r.refs,
-                        page_nos=r.pages,
-                        schema_version=CHUNK_SCHEMA_VERSION,
-                        has_image_captions=r.has_image_captions,
-                        has_image_classification=r.has_image_classification,
-                        num_images=r.num_images,
-                        provenance=provenance,
-                    )
-                    payload = row.model_dump(mode="json", exclude_none=True)
-                    handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
-
-            duration = time.perf_counter() - start
-            logger.info(
-                "Chunk file written",
-                extra={
-                    "extra_fields": {
-                        "doc_id": rel_id,
-                        "doc_stem": name,
-                        "chunks": len(final_recs),
-                        "output_file": out_path.name,
-                    }
-                },
-            )
-            manifest_append(
-                stage=MANIFEST_STAGE,
+        tasks.append(
+            ChunkTask(
+                doc_path=path,
+                output_path=out_path,
                 doc_id=rel_id,
-                status="success",
-                duration_s=round(duration, 3),
-                schema_version=CHUNK_SCHEMA_VERSION,
-                input_path=str(path),
+                doc_stem=name,
                 input_hash=input_hash,
-                hash_alg=resolve_hash_algorithm(),
-                output_path=str(out_path),
-                chunk_count=len(final_recs),
                 parse_engine=parse_engine,
             )
-        except Exception as exc:
-            duration = time.perf_counter() - start
-            manifest_append(
+        )
+
+    if not tasks:
+        return 0
+
+    def handle_result(result: ChunkResult) -> None:
+        duration = round(result.duration_s, 3)
+        if result.status != "success":
+            manifest_log_failure(
                 stage=MANIFEST_STAGE,
-                doc_id=rel_id,
-                status="failure",
-                duration_s=round(duration, 3),
+                doc_id=result.doc_id,
+                duration_s=duration,
                 schema_version=CHUNK_SCHEMA_VERSION,
-                input_path=str(path),
-                input_hash=input_hash,
-                hash_alg=resolve_hash_algorithm(),
-                output_path=str(out_path),
-                error=str(exc),
-                parse_engine=parse_engine,
+                input_path=result.input_path,
+                input_hash=result.input_hash,
+                output_path=result.output_path,
+                error=result.error or "unknown error",
+                parse_engine=result.parse_engine,
             )
-            raise
+            raise RuntimeError(
+                f"Chunking failed for {result.doc_id}: {result.error or 'unknown error'}"
+            )
+
+        logger.info(
+            "Chunk file written",
+            extra={
+                "extra_fields": {
+                    "doc_id": result.doc_id,
+                    "doc_stem": result.doc_stem,
+                    "chunks": result.chunk_count,
+                    "output_file": result.output_path.name,
+                }
+            },
+        )
+        manifest_log_success(
+            stage=MANIFEST_STAGE,
+            doc_id=result.doc_id,
+            duration_s=duration,
+            schema_version=CHUNK_SCHEMA_VERSION,
+            input_path=result.input_path,
+            input_hash=result.input_hash,
+            output_path=result.output_path,
+            chunk_count=result.chunk_count,
+            parse_engine=result.parse_engine,
+        )
+
+    if worker_count == 1:
+        _chunk_worker_initializer(chunk_config)
+        for task in tasks:
+            handle_result(_process_chunk_task(task))
+    else:
+        logger.info(
+            "Parallel chunking enabled",
+            extra={"extra_fields": {"workers": worker_count}},
+        )
+        with ProcessPoolExecutor(
+            max_workers=worker_count,
+            initializer=_chunk_worker_initializer,
+            initargs=(chunk_config,),
+        ) as pool:
+            for result in pool.map(_process_chunk_task, tasks):
+                handle_result(result)
 
     return 0
 

@@ -232,7 +232,7 @@ if DOWNLOAD_DEPS_AVAILABLE:
         artifact, final_path, _, outcome = _download_with_session(session, tmp_path)
 
         part_path = final_path.with_suffix(".pdf.part")
-        assert outcome.classification == "request_error"
+        assert outcome.classification is Classification.REQUEST_ERROR
         assert not final_path.exists()
         assert part_path.exists()
 
@@ -245,7 +245,7 @@ if DOWNLOAD_DEPS_AVAILABLE:
 
         artifact, final_path, _, outcome = _download_with_session(session, tmp_path)
 
-        assert outcome.classification == "pdf"
+        assert outcome.classification is Classification.PDF
         assert outcome.sha256 == expected_sha
         assert outcome.content_length == len(payload)
         assert final_path.exists()
@@ -310,6 +310,7 @@ _stub_module(
 
 import DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin as chunker  # noqa: E402
 import DocsToKG.DocParsing.EmbeddingV2 as embeddings  # noqa: E402
+from DocsToKG.ContentDownload.classifications import Classification  # noqa: E402
 from DocsToKG.DocParsing._common import jsonl_load  # noqa: E402
 
 

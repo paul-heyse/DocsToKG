@@ -89,6 +89,7 @@ from tqdm import tqdm
 
 from DocsToKG.DocParsing._common import (
     Batcher,
+    acquire_lock,
     atomic_write,
     compute_content_hash,
     data_chunks,
@@ -97,14 +98,19 @@ from DocsToKG.DocParsing._common import (
     derive_doc_id_and_vectors_path,
     expand_path,
     get_logger,
+    init_hf_env,
     iter_chunks,
     jsonl_load,
     jsonl_save,
     load_manifest_index,
     manifest_append,
+    manifest_log_failure,
+    manifest_log_skip,
+    manifest_log_success,
     resolve_hash_algorithm,
     resolve_hf_home,
     resolve_model_root,
+    should_skip_output,
 )
 from DocsToKG.DocParsing.pipelines import (
     add_data_root_option,
@@ -218,8 +224,7 @@ def _resolve_splade_dir(model_root: Path) -> Path:
     return expand_path(env) if env else model_root / "naver" / "splade-v3"
 
 
-HF_HOME = resolve_hf_home()
-MODEL_ROOT = resolve_model_root(HF_HOME)
+HF_HOME, MODEL_ROOT = init_hf_env()
 QWEN_DIR = expand_path(_resolve_qwen_dir(MODEL_ROOT))
 SPLADE_DIR = expand_path(_resolve_splade_dir(MODEL_ROOT))
 
@@ -259,14 +264,6 @@ DEFAULT_CHUNKS_DIR = data_chunks(DEFAULT_DATA_ROOT)
 DEFAULT_VECTORS_DIR = data_vectors(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "embeddings"
 SPLADE_SPARSITY_WARN_THRESHOLD_PCT = 1.0
-
-# Make sure every lib (Transformers / HF Hub / Sentence-Transformers) honors this cache.
-os.environ.setdefault("HF_HOME", str(HF_HOME))
-os.environ.setdefault("HF_HUB_CACHE", str(HF_HOME / "hub"))
-os.environ.setdefault("TRANSFORMERS_CACHE", str(HF_HOME / "transformers"))
-os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", str(MODEL_ROOT))
-os.environ.setdefault("DOCSTOKG_MODEL_ROOT", str(MODEL_ROOT))
-
 
 def _missing_splade_dependency_message() -> str:
     """Return a human-readable installation hint for SPLADE extras."""
@@ -703,6 +700,7 @@ class SPLADEValidator:
     def __init__(
         self,
         warn_threshold_pct: float = SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
+        top_n: int = 10,
     ) -> None:
         """Initialise internal counters for SPLADE sparsity tracking.
 
@@ -717,6 +715,7 @@ class SPLADEValidator:
         self.zero_nnz_chunks: List[str] = []
         self.nnz_counts: List[int] = []
         self.warn_threshold_pct = float(warn_threshold_pct)
+        self.top_n = max(1, int(top_n))
 
     def validate(self, uuid: str, tokens: Sequence[str], weights: Sequence[float]) -> None:
         """Record sparsity information for a single chunk.
@@ -752,17 +751,24 @@ class SPLADEValidator:
         if not self.total_chunks:
             return
         pct = 100 * len(self.zero_nnz_chunks) / self.total_chunks
-        if pct > self.warn_threshold_pct:
+        threshold = getattr(self, "warn_threshold_pct", SPLADE_SPARSITY_WARN_THRESHOLD_PCT)
+        try:
+            threshold = float(threshold)
+        except (TypeError, ValueError):
+            threshold = SPLADE_SPARSITY_WARN_THRESHOLD_PCT
+        if pct > threshold:
             logger.warning(
-                "SPLADE sparsity warning: %s / %s (%.1f%%) chunks have zero non-zero elements.",
+                "SPLADE sparsity warning (threshold %.1f%%): %s / %s (%.1f%%) chunks have zero non-zero elements.",
+                threshold,
                 len(self.zero_nnz_chunks),
                 self.total_chunks,
                 pct,
             )
             logger.warning(
-                "Affected UUIDs (first 10 of %s): %s",
+                "Affected UUIDs (first %s of %s): %s",
+                self.top_n,
                 len(self.zero_nnz_chunks),
-                self.zero_nnz_chunks[:10],
+                self.zero_nnz_chunks[: self.top_n],
             )
 
 
@@ -1119,12 +1125,15 @@ def write_vectors(
                 f"got {len(qwen_vector)}"
             )
             doc_id = row.get("doc_id", "unknown")
-            manifest_append(
+            manifest_log_failure(
                 stage="embeddings",
                 doc_id=doc_id,
-                status="failure",
-                error=message,
+                duration_s=0.0,
                 schema_version="embeddings/1.0.0",
+                input_path=row.get("source_path", "unknown"),
+                input_hash=row.get("input_hash", ""),
+                output_path=path_or_handle if isinstance(path_or_handle, Path) else None,
+                error=message,
             )
             raise ValueError(message)
 
@@ -1133,12 +1142,15 @@ def write_vectors(
             doc_id = row.get("doc_id", "unknown")
             message = f"Invalid Qwen vector (zero norm) for UUID={uuid_value}"
             logger.error(message)
-            manifest_append(
+            manifest_log_failure(
                 stage="embeddings",
                 doc_id=doc_id,
-                status="failure",
-                error=message,
+                duration_s=0.0,
                 schema_version="embeddings/1.0.0",
+                input_path=row.get("source_path", "unknown"),
+                input_hash=row.get("input_hash", ""),
+                output_path=path_or_handle if isinstance(path_or_handle, Path) else None,
+                error=message,
             )
             raise ValueError(message)
 
@@ -1326,7 +1338,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--splade-zero-pct-warn-threshold",
+        "--splade-sparsity-warn-pct",
         dest="sparsity_warn_threshold_pct",
         type=float,
         default=SPLADE_SPARSITY_WARN_THRESHOLD_PCT,
@@ -1335,7 +1347,18 @@ def build_parser() -> argparse.ArgumentParser:
             f"(default: {SPLADE_SPARSITY_WARN_THRESHOLD_PCT})."
         ),
     )
-    parser.add_argument("--qwen-dim", type=int, default=2560, help="Expected Qwen output dimension (set when using MRL).")
+    parser.add_argument(
+        "--splade-zero-pct-warn-threshold",
+        dest="sparsity_warn_threshold_pct",
+        type=float,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--qwen-dim",
+        type=int,
+        default=2560,
+        help="Dimension of the dense embedding head (model dependent).",
+    )
     parser.add_argument("--tp", type=int, default=1)
     add_resume_force_options(
         parser,
@@ -1411,15 +1434,11 @@ def main(args: argparse.Namespace | None = None) -> int:
     qwen_model_dir = cli_qwen or default_qwen_dir
 
     global HF_HOME, MODEL_ROOT, QWEN_DIR, SPLADE_DIR
-    HF_HOME = hf_home
-    MODEL_ROOT = model_root
-    QWEN_DIR = default_qwen_dir
-    SPLADE_DIR = default_splade_dir
-
-    os.environ["HF_HOME"] = str(hf_home)
-    os.environ["HF_HUB_CACHE"] = str(hf_home / "hub")
-    os.environ["TRANSFORMERS_CACHE"] = str(hf_home / "transformers")
-    os.environ["SENTENCE_TRANSFORMERS_HOME"] = str(model_root)
+    HF_HOME, MODEL_ROOT = init_hf_env(hf_home, model_root)
+    QWEN_DIR = expand_path(_resolve_qwen_dir(MODEL_ROOT))
+    SPLADE_DIR = expand_path(_resolve_splade_dir(MODEL_ROOT))
+    default_qwen_dir = QWEN_DIR
+    default_splade_dir = SPLADE_DIR
 
     validate_only = bool(getattr(args, "validate_only", False))
 
@@ -1532,6 +1551,31 @@ def main(args: argparse.Namespace | None = None) -> int:
         )
         return 0
 
+    incompatible_chunks: List[Path] = []
+    for chunk_file in files:
+        rows = jsonl_load(chunk_file)
+        try:
+            ensure_chunk_schema(rows, chunk_file)
+        except ValueError as exc:
+            incompatible_chunks.append(chunk_file)
+            logger.error(
+                "Chunk file rejected: incompatible schema",
+                extra={
+                    "extra_fields": {
+                        "chunk_file": str(chunk_file),
+                        "error": str(exc),
+                    }
+                },
+            )
+    if incompatible_chunks:
+        summary = ", ".join(str(path) for path in incompatible_chunks[:5])
+        if len(incompatible_chunks) > 5:
+            summary += ", ..."
+        raise ValueError(
+            "Incompatible chunk schema detected; review chunk files before proceeding: "
+            + summary
+        )
+
     if args.force:
         logger.info("Force mode: reprocessing all chunk files")
     elif args.resume:
@@ -1580,13 +1624,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         doc_id, out_path = derive_doc_id_and_vectors_path(chunk_file, chunks_dir, args.out_dir)
         input_hash = compute_content_hash(chunk_file)
         entry = manifest_index.get(doc_id)
-        if (
-            args.resume
-            and not args.force
-            and out_path.exists()
-            and entry
-            and entry.get("input_hash") == input_hash
-        ):
+        if should_skip_output(out_path, entry, input_hash, args.resume, args.force):
             logger.info(
                 "Skipping chunk file: output exists and input unchanged",
                 extra={
@@ -1596,16 +1634,13 @@ def main(args: argparse.Namespace | None = None) -> int:
                     }
                 },
             )
-            manifest_append(
+            manifest_log_skip(
                 stage=MANIFEST_STAGE,
                 doc_id=doc_id,
-                status="skip",
-                duration_s=0.0,
-                schema_version="embeddings/1.0.0",
-                input_path=str(chunk_file),
+                input_path=chunk_file,
                 input_hash=input_hash,
-                hash_alg=resolve_hash_algorithm(),
-                output_path=str(out_path),
+                output_path=out_path,
+                schema_version="embeddings/1.0.0",
             )
             skipped_files += 1
             continue
@@ -1614,43 +1649,40 @@ def main(args: argparse.Namespace | None = None) -> int:
     for chunk_file, out_path, input_hash, doc_id in tqdm(
         file_entries, desc="Pass B: Encoding vectors", unit="file"
     ):
-        start = time.perf_counter()
-        try:
-            count, nnz, norms = process_chunk_file_vectors(
-                chunk_file, out_path, stats, args, validator, logger
-            )
-        except Exception as exc:
+        with acquire_lock(out_path):
+            start = time.perf_counter()
+            try:
+                count, nnz, norms = process_chunk_file_vectors(
+                    chunk_file, out_path, stats, args, validator, logger
+                )
+            except Exception as exc:
+                duration = time.perf_counter() - start
+                manifest_log_failure(
+                    stage=MANIFEST_STAGE,
+                    doc_id=doc_id,
+                    duration_s=round(duration, 3),
+                    schema_version="embeddings/1.0.0",
+                    input_path=chunk_file,
+                    input_hash=input_hash,
+                    output_path=out_path,
+                    error=str(exc),
+                )
+                raise
+
             duration = time.perf_counter() - start
-            manifest_append(
+            total_vectors += count
+            splade_nnz_all.extend(nnz)
+            qwen_norms_all.extend(norms)
+            manifest_log_success(
                 stage=MANIFEST_STAGE,
                 doc_id=doc_id,
-                status="failure",
                 duration_s=round(duration, 3),
                 schema_version="embeddings/1.0.0",
-                input_path=str(chunk_file),
+                input_path=chunk_file,
                 input_hash=input_hash,
-                hash_alg=resolve_hash_algorithm(),
-                output_path=str(out_path),
-                error=str(exc),
+                output_path=out_path,
+                vector_count=count,
             )
-            raise
-
-        duration = time.perf_counter() - start
-        total_vectors += count
-        splade_nnz_all.extend(nnz)
-        qwen_norms_all.extend(norms)
-        manifest_append(
-            stage=MANIFEST_STAGE,
-            doc_id=doc_id,
-            status="success",
-            duration_s=round(duration, 3),
-            schema_version="embeddings/1.0.0",
-            input_path=str(chunk_file),
-            input_hash=input_hash,
-            hash_alg=resolve_hash_algorithm(),
-            output_path=str(out_path),
-            vector_count=count,
-        )
 
     _current, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
@@ -1696,7 +1728,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         doc_id="__corpus__",
         status="success",
         duration_s=round(time.perf_counter() - overall_start, 3),
-        warnings=validator.zero_nnz_chunks[:10] if validator.zero_nnz_chunks else [],
+        warnings=validator.zero_nnz_chunks[: validator.top_n] if validator.zero_nnz_chunks else [],
         schema_version="embeddings/1.0.0",
         total_vectors=total_vectors,
         splade_avg_nnz=avg_nnz,

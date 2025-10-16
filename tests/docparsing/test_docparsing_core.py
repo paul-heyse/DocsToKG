@@ -743,16 +743,14 @@ def test_set_spawn_or_warn_warns_on_incompatible_method(
 
 
 def test_compute_relative_doc_id_handles_subdirectories(tmp_path: Path) -> None:
-    from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import (
-        compute_relative_doc_id,
-    )
+    from DocsToKG.DocParsing import _common
 
     root = tmp_path / "docs"
     nested = root / "teamA" / "report.doctags"
     nested.parent.mkdir(parents=True, exist_ok=True)
     nested.write_text("{}", encoding="utf-8")
 
-    assert compute_relative_doc_id(nested, root) == "teamA/report.doctags"
+    assert _common.compute_relative_doc_id(nested, root) == "teamA/report.doctags"
 
 
 def test_derive_doc_id_and_vectors_path(tmp_path: Path) -> None:

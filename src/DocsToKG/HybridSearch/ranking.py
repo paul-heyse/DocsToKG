@@ -16,12 +16,6 @@
 #       "kind": "class"
 #     },
 #     {
-#       "id": "basic-tokenize",
-#       "name": "_basic_tokenize",
-#       "anchor": "function-_basic-tokenize",
-#       "kind": "function"
-#     },
-#     {
 #       "id": "apply-mmr-diversification",
 #       "name": "apply_mmr_diversification",
 #       "anchor": "function-apply-mmr-diversification",
@@ -35,13 +29,13 @@
 
 from __future__ import annotations
 
-import re
 from collections import defaultdict
 from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 
 from .config import FusionConfig
+from .features import tokenize
 from .interfaces import LexicalIndex
 from .types import (
     ChunkPayload,
@@ -50,7 +44,7 @@ from .types import (
     HybridSearchRequest,
     HybridSearchResult,
 )
-from .vectorstore import cosine_batch, cosine_topk_blockwise, pairwise_inner_products
+from .vectorstore import cosine_batch, cosine_topk_blockwise
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import faiss  # type: ignore
@@ -62,8 +56,6 @@ __all__ = (
     "ResultShaper",
     "apply_mmr_diversification",
 )
-
-_TOKEN_PATTERN = re.compile(r"[\w']+")
 
 
 # --- Public Classes ---
@@ -193,7 +185,7 @@ class ResultShaper:
         doc_buckets: Dict[str, int] = defaultdict(int)
         emitted_indices: List[int] = []
         results: List[HybridSearchResult] = []
-        query_tokens = _basic_tokenize(request.query)
+        query_tokens = tokenize(request.query)
         for current_idx, chunk in enumerate(ordered_chunks):
             rank = current_idx + 1
             if not self._within_doc_limit(chunk.doc_id, doc_buckets):
@@ -263,24 +255,13 @@ class ResultShaper:
         highlights = self._opensearch.highlight(chunk, query_tokens)
         if highlights:
             return highlights
-        tokens = _basic_tokenize(chunk.text)
+        tokens = tokenize(chunk.text)
         matches = [token for token in tokens if token in set(query_tokens)]
         if matches:
             return [" ".join(tokens[: min(len(tokens), 40)])]
         return [chunk.text[: min(len(chunk.text), 200)]]
 
 
-def _basic_tokenize(text: str) -> List[str]:
-    """Tokenize ``text`` using a simple regex to avoid devtools dependencies.
-
-    Args:
-        text: Source string to segment into lowercase tokens.
-
-    Returns:
-        List of tokens extracted from ``text``.
-    """
-
-    return [match.group(0).lower() for match in _TOKEN_PATTERN.finditer(text)]
 
 
 # --- Public Functions ---
@@ -302,8 +283,7 @@ def apply_mmr_diversification(
         lambda_param: Balancing factor between relevance and diversity (0-1).
         top_k: Maximum number of diversified candidates to retain.
         device: GPU device identifier used for similarity computations.
-        resources: Optional FAISS GPU resources used for pairwise similarity; falls back to
-            CPU cosine when ``None``.
+        resources: Optional FAISS GPU resources; falls back to CPU cosine when ``None``.
 
     Returns:
         List[FusionCandidate]: Diversified candidate list ordered by MMR score.
@@ -316,39 +296,49 @@ def apply_mmr_diversification(
         raise ValueError("lambda_param must be within [0, 1]")
     if not fused_candidates:
         return []
+
     embeddings = np.stack(
-        [
-            candidate.chunk.features.embedding.astype(np.float32, copy=False)
-            for candidate in fused_candidates
-        ]
+        [candidate.chunk.features.embedding.astype(np.float32, copy=False) for candidate in fused_candidates]
     )
+    total = embeddings.shape[0]
+    if total <= 0:
+        return []
+    if total <= top_k:
+        return list(fused_candidates[:total])
 
-    candidate_indices = list(range(len(fused_candidates)))
-    selected_indices: List[int] = []
-    if resources is not None:
-        sims_all = pairwise_inner_products(embeddings, device=int(device), resources=resources)
-    else:
-        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-        norms[norms == 0.0] = 1.0
-        normalised = embeddings / norms
-        sims_all = (normalised @ normalised.T).astype(np.float32, copy=False)
+    scores = np.array(
+        [fused_scores.get(candidate.chunk.vector_id, 0.0) for candidate in fused_candidates],
+        dtype=np.float32,
+    )
+    selected: List[int] = []
+    remaining = np.arange(total, dtype=np.int64)
+    max_sim = np.zeros(total, dtype=np.float32)
 
-    while candidate_indices and len(selected_indices) < top_k:
-        best_idx: Optional[int] = None
-        best_score = float("-inf")
-        for idx in candidate_indices:
-            vector_id = fused_candidates[idx].chunk.vector_id
-            relevance = fused_scores.get(vector_id, 0.0)
-            diversity_penalty = (
-                float(sims_all[idx, selected_indices].max()) if selected_indices else 0.0
-            )
-            score = lambda_param * relevance - (1 - lambda_param) * diversity_penalty
-            if score > best_score:
-                best_idx = idx
-                best_score = score
-        if best_idx is None:
+    def _cosine_cpu(query: np.ndarray, pool: np.ndarray) -> np.ndarray:
+        q_norm = np.linalg.norm(query, axis=1, keepdims=True)
+        p_norm = np.linalg.norm(pool, axis=1, keepdims=True).T
+        q_norm[q_norm == 0.0] = 1.0
+        p_norm[p_norm == 0.0] = 1.0
+        return (query @ pool.T) / (q_norm * p_norm)
+
+    for _ in range(min(top_k, total)):
+        if remaining.size == 0:
             break
-        selected_indices.append(best_idx)
-        candidate_indices = [idx for idx in candidate_indices if idx != best_idx]
+        relevance = scores[remaining]
+        penalty = max_sim[remaining]
+        objective = lambda_param * relevance - (1.0 - lambda_param) * penalty
+        pick_pos = int(np.argmax(objective))
+        pick = int(remaining[pick_pos])
+        selected.append(pick)
+        remaining = np.delete(remaining, pick_pos)
+        if remaining.size == 0:
+            break
+        query = embeddings[pick : pick + 1]
+        pool = embeddings[remaining]
+        if resources is not None:
+            sims = cosine_batch(query, pool, device=device, resources=resources)[0]
+        else:
+            sims = _cosine_cpu(query, pool)[0]
+        max_sim[remaining] = np.maximum(max_sim[remaining], sims.astype(np.float32, copy=False))
 
-    return [fused_candidates[idx] for idx in selected_indices]
+    return [fused_candidates[idx] for idx in selected]
