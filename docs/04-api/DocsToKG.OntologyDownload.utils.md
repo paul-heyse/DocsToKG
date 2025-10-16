@@ -1,8 +1,7 @@
 # 1. Module: utils
 
-This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.utils``.
-
-Utility helpers shared across ontology download modules.
+Utility helpers originally documented under ``DocsToKG.OntologyDownload.utils`` are
+consolidated into ``DocsToKG.OntologyDownload.ontology_download``.
 
 Currently hosts the unified exponential backoff helper that underpins resolver
 planning and download retries in the refactored ontology downloader.

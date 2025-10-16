@@ -12,9 +12,15 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
+from DocsToKG.OntologyDownload import (
+    DefaultsConfig,
+    FetchResult,
+    FetchSpec,
+    PlannedFetch,
+    ResolverCandidate,
+    ResolvedConfig,
+)
 from DocsToKG.OntologyDownload import cli
-from DocsToKG.OntologyDownload.config import DefaultsConfig, ResolvedConfig
-from DocsToKG.OntologyDownload.core import FetchResult, FetchSpec, PlannedFetch, ResolverCandidate
 from DocsToKG.OntologyDownload.resolvers import FetchPlan
 
 

@@ -12,7 +12,7 @@ Key Scenarios:
 
 Dependencies:
 - pytest: Fixtures and monkeypatching
-- DocsToKG.OntologyDownload.validators: Validation entry points under test
+- DocsToKG.OntologyDownload.ontology_download: Validation entry points under test
 
 Usage:
     pytest tests/ontology_download/test_validators.py
@@ -31,9 +31,8 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload.config import DefaultsConfig, ResolvedConfig
-from DocsToKG.OntologyDownload.validators import (
-    ValidationRequest,
+from DocsToKG.OntologyDownload import DefaultsConfig, ResolvedConfig, ValidationRequest
+from DocsToKG.OntologyDownload.ontology_download import (
     ValidatorSubprocessError,
     normalize_streaming,
     validate_arelle,
@@ -191,6 +190,24 @@ def test_validate_pronto_success(monkeypatch, obo_file, tmp_path, config):
     assert payload["ok"]
 
 
+def test_validate_pronto_handles_exception(monkeypatch, obo_file, tmp_path, config):
+    request = ValidationRequest("pronto", obo_file, tmp_path / "norm", tmp_path / "val", config)
+
+    def _boom(*_args, **_kwargs):  # pragma: no cover - deterministic failure path
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(
+        "DocsToKG.OntologyDownload.ontology_download._run_validator_subprocess",
+        _boom,
+    )
+
+    result = validate_pronto(request, _noop_logger())
+    assert not result.ok
+    payload = json.loads((request.validation_dir / "pronto_parse.json").read_text())
+    assert payload["ok"] is False
+    assert payload["error"] == "boom"
+
+
 def test_validate_owlready2_success(monkeypatch, owl_file, tmp_path, config):
     pytest.importorskip("owlready2")
     pytest.importorskip("ols_client")
@@ -235,7 +252,7 @@ def test_validate_owlready2_memory_error(monkeypatch, owl_file, tmp_path, config
         raise ValidatorSubprocessError("memory exceeded")
 
     monkeypatch.setattr(
-        "DocsToKG.OntologyDownload.validators._run_validator_subprocess",
+        "DocsToKG.OntologyDownload.ontology_download._run_validator_subprocess",
         _raise,
     )
     result = validate_owlready2(request, _noop_logger())

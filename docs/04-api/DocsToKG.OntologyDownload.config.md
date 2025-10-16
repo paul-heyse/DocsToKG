@@ -1,8 +1,8 @@
 # 1. Module: config
 
-This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.config``.
-
-Ontology downloader configuration utilities.
+Configuration utilities previously exposed from ``DocsToKG.OntologyDownload.config``
+reside in ``DocsToKG.OntologyDownload.ontology_download`` and are re-exported via the
+package facade.
 
 This module defines the Pydantic models and helpers that drive manifest schema
 validation, concurrency defaults, rate limit enforcement, and the CLI override

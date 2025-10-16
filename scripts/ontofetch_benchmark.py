@@ -7,8 +7,8 @@ import statistics
 import time
 from pathlib import Path
 
+from DocsToKG.OntologyDownload import ResolvedConfig
 from DocsToKG.OntologyDownload.cli import _handle_pull
-from DocsToKG.OntologyDownload.config import ResolvedConfig
 
 
 def benchmark(spec_path: Path, iterations: int) -> None:
