@@ -15,9 +15,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Dict, List, Mapping, Optional, Sequence
 
-import numpy as np
-
 import faiss  # type: ignore
+import numpy as np
 
 from .config import HybridSearchConfigManager
 from .features import FeatureGenerator
@@ -33,12 +32,9 @@ from .types import (
     ValidationReport,
     ValidationSummary,
 )
-from .vectorstore import (
-    FaissIndexManager,
-    pairwise_inner_products,
-    restore_state as vectorstore_restore_state,
-    serialize_state as vectorstore_serialize_state,
-)
+from .vectorstore import FaissIndexManager, pairwise_inner_products
+from .vectorstore import restore_state as vectorstore_restore_state
+from .vectorstore import serialize_state as vectorstore_serialize_state
 
 
 def load_dataset(path: Path) -> List[Mapping[str, object]]:

@@ -2154,6 +2154,8 @@ def main() -> None:
         index_path = manifest_path.with_suffix(".index.json")
         index_sink = stack.enter_context(ManifestIndexSink(index_path))
         sinks.append(index_sink)
+        base_logger = stack.enter_context(JsonlLogger(manifest_path))
+        attempt_logger: Any = base_logger
         if csv_path:
             csv_sink = stack.enter_context(CsvSink(csv_path))
             sinks.append(csv_sink)
@@ -2184,6 +2186,10 @@ def main() -> None:
             headers. Creating sessions through this helper ensures each worker
             reuses the shared retry configuration while keeping connection pools
             thread-local.
+            """Create a session seeded with the resolver polite header defaults.
+
+            Returns:
+                requests.Session: Fresh session for resolver download attempts.
             """
 
             return _make_session(config.polite_headers)

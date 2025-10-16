@@ -90,3 +90,32 @@ def test_streaming_edge_cases(tmp_path: Path, content: str) -> None:
     streaming = _run_rdflib(source, tmp_path / "stream", threshold_mb=0)
     stream_hash = normalize_streaming(source)
     assert streaming.get("streaming_nt_sha256") == stream_hash
+
+
+def test_streaming_flushes_chunks(monkeypatch, tmp_path: Path) -> None:
+    class _Tracker:
+        def __init__(self) -> None:
+            self.updates: list[int] = []
+
+        def update(self, data: bytes) -> None:
+            self.updates.append(len(data))
+
+        def hexdigest(self) -> str:
+            return "stub-digest"
+
+    tracker = _Tracker()
+
+    monkeypatch.setattr(
+        "DocsToKG.OntologyDownload.ontology_download.hashlib.sha256", lambda: tracker
+    )
+
+    destination = tmp_path / "chunked.ttl"
+    digest = normalize_streaming(
+        _COMPLEX_FIXTURE, output_path=destination, chunk_bytes=64
+    )
+
+    assert digest == "stub-digest"
+    assert len(tracker.updates) > 1
+
+    emitted = destination.read_bytes()
+    assert sum(tracker.updates) == len(emitted)
