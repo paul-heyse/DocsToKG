@@ -324,6 +324,7 @@ Usage:
 import io
 import json
 import logging
+import re
 import stat
 import tarfile
 import threading
@@ -536,7 +537,33 @@ def test_streaming_downloader_handles_cached_response(monkeypatch, tmp_path):
     assert downloader.response_last_modified == "Thu, 02 Jan 2024 00:00:00 GMT"
     assert not part_file.exists()
     assert session.calls[0]["If-None-Match"] == "old-tag"
+    assert session.calls[0]["If-Modified-Since"] == previous_manifest["last_modified"]
     assert session.calls[0]["Range"] == f"bytes={len(initial)}-"
+
+
+def test_streaming_downloader_skips_invalid_conditional_headers(monkeypatch, tmp_path):
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    output_file = cache_dir / "conditional_entry"
+    destination = tmp_path / "destination.owl"
+    previous_manifest = {"etag": None, "last_modified": "   "}
+    response = DummyResponse(200, b"fresh", {})
+    session = make_session(monkeypatch, [response])
+    downloader = download.StreamingDownloader(
+        destination=destination,
+        headers={},
+        http_config=DownloadConfiguration(),
+        previous_manifest=previous_manifest,
+        logger=_noop_logger(),
+    )
+    downloader(
+        "https://example.org/file.owl",
+        output_file.as_posix(),
+        logging.getLogger("pooch-test"),
+    )
+
+    assert session.calls[0].get("If-None-Match") is None
+    assert session.calls[0].get("If-Modified-Since") is None
 
 
 def test_streaming_downloader_resumes_range_request(monkeypatch, tmp_path):
@@ -718,6 +745,20 @@ def test_get_bucket_independent_keys_for_services():
     assert ols_bucket is not bioportal_bucket
     assert ols_bucket.rate == pytest.approx(2.0)
     assert bioportal_bucket.rate == pytest.approx(1.0)
+
+
+def test_shared_token_bucket_persists_state(tmp_path):
+    config = DownloadConfiguration(shared_rate_limit_dir=tmp_path)
+    download.reset()
+
+    bucket = download.get_bucket(http_config=config, service="ols", host="ols.example.org")
+
+    assert isinstance(bucket, download.SharedTokenBucket)
+    bucket.consume()
+
+    expected_name = re.sub(r"[^A-Za-z0-9._-]", "_", "ols:ols.example.org")
+    expected_path = tmp_path / f"{expected_name}.json"
+    assert expected_path.exists()
 
 
 def test_head_check_success(monkeypatch, tmp_path):

@@ -413,6 +413,9 @@ class EnvironmentOverrides(BaseSettings):
     per_host_rate_limit: Optional[str] = Field(default=None, alias="ONTOFETCH_PER_HOST_RATE_LIMIT")
     backoff_factor: Optional[float] = Field(default=None, alias="ONTOFETCH_BACKOFF_FACTOR")
     log_level: Optional[str] = Field(default=None, alias="ONTOFETCH_LOG_LEVEL")
+    shared_rate_limit_dir: Optional[Path] = Field(
+        default=None, alias="ONTOFETCH_SHARED_RATE_LIMIT_DIR"
+    )
 
     model_config = SettingsConfigDict(env_prefix="ONTOFETCH_", case_sensitive=False, extra="ignore")
 
@@ -462,6 +465,13 @@ def _apply_env_overrides(defaults: DefaultsConfig) -> None:
     if env.log_level is not None:
         defaults.logging.level = env.log_level
         logger.info("Config overridden: log_level=%s", env.log_level, extra={"stage": "config"})
+    if env.shared_rate_limit_dir is not None:
+        defaults.http.shared_rate_limit_dir = env.shared_rate_limit_dir
+        logger.info(
+            "Config overridden: shared_rate_limit_dir=%s",
+            env.shared_rate_limit_dir,
+            extra={"stage": "config"},
+        )
 
 
 def build_resolved_config(raw_config: Mapping[str, object]) -> ResolvedConfig:

@@ -271,7 +271,7 @@ from collections import deque
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Deque, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, ClassVar, Deque, Dict, Iterable, List, Optional, Tuple
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -479,10 +479,38 @@ class DoctagsCfg(StageConfigBase):
             self.vlm_stop = ("</doctag>", "<|end_of_text|>")
 
     from_sources = from_args
+PROFILE_PRESETS: Dict[str, Dict[str, Any]] = {
+    "cpu-small": {
+        "workers": 1,
+        "gpu_memory_utilization": 0.0,
+        "vllm_wait_timeout": 180,
+    },
+    "gpu-default": {
+        "workers": DEFAULT_WORKERS,
+        "gpu_memory_utilization": DEFAULT_GPU_MEMORY_UTILIZATION,
+        "vllm_wait_timeout": WAIT_TIMEOUT_S,
+    },
+    "gpu-max": {
+        "workers": max(1, (os.cpu_count() or 16) - 2),
+        "gpu_memory_utilization": min(0.9, DEFAULT_GPU_MEMORY_UTILIZATION + 0.15),
+        "vllm_wait_timeout": WAIT_TIMEOUT_S * 2,
+    },
+}
+
+
 PDF_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     CLIOption(
         ("--config",),
         {"type": Path, "default": None, "help": "Path to stage config file (JSON/YAML/TOML)."},
+    ),
+    CLIOption(
+        ("--profile",),
+        {
+            "type": str,
+            "default": None,
+            "choices": sorted(PROFILE_PRESETS),
+            "help": "Apply a preset for batch sizes and workers (cpu-small, gpu-default, gpu-max).",
+        },
     ),
     CLIOption(
         ("--log-level",),
@@ -1447,10 +1475,21 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
     else:
         namespace = pdf_parse_args(args)
 
-    cfg = DoctagsCfg.from_args(namespace, mode="pdf")
+    profile = getattr(namespace, "profile", None)
+    defaults = PROFILE_PRESETS.get(profile or "", {})
+    cfg = DoctagsCfg.from_args(namespace, mode="pdf", defaults=defaults)
     config_snapshot = cfg.to_manifest()
     for field_def in fields(DoctagsCfg):
         setattr(namespace, field_def.name, getattr(cfg, field_def.name))
+    if profile:
+        config_snapshot.setdefault("profile", profile)
+
+    if profile and defaults:
+        logger = get_logger(__name__, level=str(cfg.log_level))
+        logger.info(
+            "Applying profile",
+            extra={"extra_fields": {"profile": profile, **{k: str(v) for k, v in defaults.items()}}},
+        )
 
     log_level = cfg.log_level
     logger = get_logger(__name__, level=str(log_level))

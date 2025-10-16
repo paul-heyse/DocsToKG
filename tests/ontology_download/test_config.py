@@ -420,24 +420,32 @@ def test_defaults_config_prefer_source_validation() -> None:
         DefaultsConfig(prefer_source=["obo", "invalid-resolver"])
 
 
-def test_env_override_applies_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_env_override_applies_settings(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Environment overrides should be merged into defaults via Pydantic settings."""
 
     monkeypatch.setenv("ONTOFETCH_MAX_RETRIES", "3")
     monkeypatch.setenv("ONTOFETCH_TIMEOUT_SEC", "45")
+    monkeypatch.setenv("ONTOFETCH_SHARED_RATE_LIMIT_DIR", str(tmp_path))
     raw_config: Dict[str, object] = {"ontologies": []}
 
     resolved = build_resolved_config(raw_config)
     assert resolved.defaults.http.max_retries == 3
     assert resolved.defaults.http.timeout_sec == 45
+    assert resolved.defaults.http.shared_rate_limit_dir == tmp_path
 
 
-def test_get_env_overrides_backwards_compatible(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_env_overrides_backwards_compatible(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """get_env_overrides should expose overrides for legacy code paths."""
 
     monkeypatch.setenv("ONTOFETCH_BACKOFF_FACTOR", "1.5")
+    monkeypatch.setenv("ONTOFETCH_SHARED_RATE_LIMIT_DIR", str(tmp_path))
     overrides = get_env_overrides()
     assert overrides["backoff_factor"] == "1.5"
+    assert overrides["shared_rate_limit_dir"] == str(tmp_path)
 
 
 def test_load_config_parses_defaults(tmp_path: Path) -> None:

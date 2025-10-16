@@ -67,7 +67,8 @@ python -m DocsToKG.ContentDownload.cli \
     --global-url-dedup
 ```
 
-The feature remains disabled by default to preserve legacy behaviour.
+Global deduplication is enabled by default; supply ``--no-global-url-dedup`` when
+you need to reprocess URLs regardless of prior runs.
 
 ## 4. Configuring Domain-Level Rate Limiting
 

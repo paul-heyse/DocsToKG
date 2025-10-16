@@ -814,24 +814,28 @@ def test_detect_mode_raises_when_both_present(tmp_path: Path) -> None:
 
 def test_ensure_uuid_deterministic_generation() -> None:
     from DocsToKG.DocParsing import embedding as embedding
+    from DocsToKG.DocParsing.core import compute_chunk_uuid
 
     rows = [
         {
             "doc_id": "teamA/report.doctags",
             "source_chunk_idxs": [0, 2],
             "text": "Chunk content for reproducible UUID.",
+            "start_offset": 128,
         }
     ]
 
     assert embedding.ensure_uuid(rows) is True
     generated = rows[0]["uuid"]
     assert uuid.UUID(generated).version == 5
+    assert generated == compute_chunk_uuid("teamA/report.doctags", 128, "Chunk content for reproducible UUID.")
 
     replica_rows = [
         {
             "doc_id": "teamA/report.doctags",
             "source_chunk_idxs": [0, 2],
             "text": "Chunk content for reproducible UUID.",
+            "start_offset": 128,
         }
     ]
     embedding.ensure_uuid(replica_rows)

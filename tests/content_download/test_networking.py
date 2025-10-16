@@ -3162,6 +3162,7 @@ def test_domain_bytes_budget_skips_over_limit(tmp_path: Path) -> None:
         resolver_order=["stub"],
         resolver_toggles={"stub": True},
         enable_head_precheck=False,
+        enable_global_url_dedup=False,
         domain_bytes_budget={"resolver.example": 5},
     )
     pipeline = ResolverPipeline([StubResolver()], config, fake_download, logger, metrics, run_id="test-run")

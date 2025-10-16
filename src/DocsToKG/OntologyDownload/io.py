@@ -1170,10 +1170,13 @@ class StreamingDownloader(pooch.HTTPDownloader):
             None
         """
         manifest_headers: Dict[str, str] = {}
-        if "etag" in self.previous_manifest:
-            manifest_headers["If-None-Match"] = self.previous_manifest["etag"]
-        if "last_modified" in self.previous_manifest:
-            manifest_headers["If-Modified-Since"] = self.previous_manifest["last_modified"]
+        if self.previous_manifest:
+            etag_value = self.previous_manifest.get("etag")
+            if isinstance(etag_value, str) and etag_value.strip():
+                manifest_headers["If-None-Match"] = etag_value
+            last_modified_value = self.previous_manifest.get("last_modified")
+            if isinstance(last_modified_value, str) and last_modified_value.strip():
+                manifest_headers["If-Modified-Since"] = last_modified_value
         request_headers = {**self.custom_headers, **manifest_headers}
         part_path = Path(output_file + ".part")
         destination_part_path = Path(str(self.destination) + ".part")

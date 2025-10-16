@@ -1033,6 +1033,7 @@ __all__ = [
     "get_logger",
     "log_event",
     "Batcher",
+    "compute_chunk_uuid",
     "manifest_append",
     "manifest_log_failure",
     "manifest_log_skip",
@@ -2225,6 +2226,49 @@ def resolve_hash_algorithm(default: str = "sha1") -> str:
 
     env_override = os.getenv("DOCSTOKG_HASH_ALG")
     return env_override.strip() if env_override else default
+
+
+def compute_chunk_uuid(
+    doc_id: str,
+    start_offset: int,
+    text: str,
+    *,
+    algorithm: str = "sha1",
+) -> str:
+    """Derive a deterministic UUID for a chunk using doc ID, offset, and text content.
+
+    Args:
+        doc_id: Identifier for the source document (used as a namespace component).
+        start_offset: Character offset of the chunk text within the document.
+        text: Chunk text used for content-based stability.
+        algorithm: Hash algorithm name; defaults to ``sha1`` but honours
+            :envvar:`DOCSTOKG_HASH_ALG` overrides.
+
+    Returns:
+        UUID string derived from the hash digest while enforcing RFC4122 metadata bits.
+    """
+
+    safe_doc_id = str(doc_id)
+    try:
+        safe_offset = int(start_offset)
+    except (TypeError, ValueError):
+        safe_offset = 0
+    normalised_text = unicodedata.normalize("NFKC", str(text or ""))
+
+    selected_algorithm = resolve_hash_algorithm(algorithm)
+    hasher = hashlib.new(selected_algorithm)
+    hasher.update(safe_doc_id.encode("utf-8"))
+    hasher.update(b"\x1f")
+    hasher.update(str(safe_offset).encode("utf-8"))
+    hasher.update(b"\x1f")
+    hasher.update(normalised_text.encode("utf-8"))
+    digest = hasher.digest()
+    if len(digest) < 16:
+        digest = (digest * ((16 // len(digest)) + 1))[:16]
+    raw = bytearray(digest[:16])
+    raw[6] = (raw[6] & 0x0F) | 0x50  # version 5 (0101xxxx)
+    raw[8] = (raw[8] & 0x3F) | 0x80  # variant 10xxxxxx
+    return str(uuid.UUID(bytes=bytes(raw)))
 
 
 def compute_content_hash(path: Path, algorithm: str = "sha1") -> str:

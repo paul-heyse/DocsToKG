@@ -292,6 +292,7 @@ from DocsToKG.DocParsing.core import (
     build_subcommand,
     acquire_lock,
     atomic_write,
+    compute_chunk_uuid,
     compute_content_hash,
     compute_stable_shard,
     data_chunks,
@@ -801,46 +802,61 @@ TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)?")
 
 
 def ensure_uuid(rows: List[dict]) -> bool:
-    """Populate missing chunk UUIDs in-place using deterministic UUIDv5 derivation.
+    """Validate or assign deterministic chunk UUIDs based on content offsets.
 
     Args:
-        rows: Chunk dictionaries that should include a `uuid` key.
+        rows: Chunk dictionaries to normalise. Each row may include ``start_offset``
+            (preferred); when absent the legacy UUID derivation is applied.
 
     Returns:
-        True when at least one UUID was newly assigned; otherwise False. UUIDs are
-        derived from a namespace, doc ID, source chunk indices, and the first 16 hex
-        characters of the chunk text SHA-1 digest. If deterministic generation fails,
-        a UUID4 is assigned as a fallback.
+        ``True`` when at least one UUID was added or corrected; otherwise ``False``.
     """
 
     updated = False
     for row in rows:
-        if not row.get("uuid"):
+        doc_id = str(row.get("doc_id") or "")
+        text_raw = row.get("text", "")
+        if isinstance(text_raw, bytes):
+            text_value = text_raw.decode("utf-8", errors="ignore")
+        else:
+            text_value = str(text_raw) if text_raw is not None else ""
+        text_value = unicodedata.normalize("NFKC", text_value)
+
+        start_offset_raw = row.get("start_offset")
+        expected_uuid: str
+        if isinstance(start_offset_raw, (int, str)) and start_offset_raw not in {"", None}:
             try:
-                doc_id = row.get("doc_id") or ""
-                src_raw = row.get("source_chunk_idxs") or []
-                if isinstance(src_raw, (str, bytes)):
-                    src_iterable = [src_raw]
-                elif isinstance(src_raw, Sequence):
-                    src_iterable = list(src_raw)
-                else:
-                    src_iterable = [src_raw] if src_raw is not None else []
-                src = ",".join(str(idx) for idx in src_iterable)
+                start_offset = int(start_offset_raw)
+            except (TypeError, ValueError):
+                start_offset = 0
+            expected_uuid = compute_chunk_uuid(doc_id, start_offset, text_value)
+        else:
+            expected_uuid = _legacy_chunk_uuid(doc_id, row.get("source_chunk_idxs"), text_value)
 
-                text_raw = row.get("text", "")
-                if isinstance(text_raw, bytes):
-                    text_value = text_raw.decode("utf-8", errors="ignore")
-                else:
-                    text_value = str(text_raw) if text_raw is not None else ""
-                text_value = unicodedata.normalize("NFKC", text_value)
-                digest = hashlib.sha1(text_value.encode("utf-8")).hexdigest()[:16]
-
-                name = f"{doc_id}|{src}|{digest}"
-                row["uuid"] = str(uuid.uuid5(UUID_NAMESPACE, name))
-            except Exception:
-                row["uuid"] = str(uuid.uuid4())
+        current = row.get("uuid")
+        if current != expected_uuid:
+            row["uuid"] = expected_uuid
             updated = True
     return updated
+
+
+def _legacy_chunk_uuid(doc_id: str, source_chunk_idxs: Any, text_value: str) -> str:
+    """Derive the historical UUID used before deterministic start offsets."""
+
+    src_raw = source_chunk_idxs or []
+    if isinstance(src_raw, (str, bytes)):
+        src_iterable = [src_raw]
+    elif isinstance(src_raw, Sequence):
+        src_iterable = list(src_raw)
+    else:
+        src_iterable = [src_raw] if src_raw is not None else []
+    src = ",".join(str(idx) for idx in src_iterable)
+    digest = hashlib.sha1(text_value.encode("utf-8")).hexdigest()[:16]
+    name = f"{doc_id}|{src}|{digest}"
+    try:
+        return str(uuid.uuid5(UUID_NAMESPACE, name))
+    except Exception:
+        return str(uuid.uuid4())
 
 
 def ensure_chunk_schema(rows: Sequence[dict], source: Path) -> None:

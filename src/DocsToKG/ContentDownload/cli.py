@@ -1929,13 +1929,13 @@ def main() -> None:
         "--global-url-dedup",
         dest="global_url_dedup",
         action="store_true",
-        help="Skip downloads when a URL was already fetched in this run.",
+        help="Skip downloads when a URL was already fetched in this run (default).",
     )
     resolver_group.add_argument(
         "--no-global-url-dedup",
         dest="global_url_dedup",
         action="store_false",
-        help="Disable global URL deduplication (default).",
+        help="Disable global URL deduplication.",
     )
     resolver_group.add_argument(
         "--domain-min-interval",
@@ -2134,9 +2134,7 @@ def main() -> None:
         csv_path = csv_path or manifest_path.with_suffix(".csv")
 
     sqlite_path = manifest_path.with_suffix(".sqlite3")
-    previous_url_index: Dict[str, Dict[str, Any]] = {}
-    if config.enable_global_url_dedup:
-        previous_url_index = load_manifest_url_index(sqlite_path)
+    previous_url_index: Dict[str, Dict[str, Any]] = load_manifest_url_index(sqlite_path)
     persistent_seen_urls: Set[str] = {
         url
         for url, meta in previous_url_index.items()
@@ -2222,8 +2220,8 @@ def main() -> None:
             download_func=download_candidate,
             logger=attempt_logger,
             metrics=metrics,
-            initial_seen_urls=persistent_seen_urls if config.enable_global_url_dedup else None,
-            global_manifest_index=previous_url_index if config.enable_global_url_dedup else {},
+            initial_seen_urls=persistent_seen_urls or None,
+            global_manifest_index=previous_url_index,
             run_id=run_id,
         )
 

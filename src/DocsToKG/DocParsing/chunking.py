@@ -149,7 +149,7 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Callable, ClassVar, Dict, List, Optional, Sequence, Tuple
 
 # Third-party imports
 from docling_core.transforms.chunker.base import BaseChunk
@@ -189,6 +189,7 @@ from DocsToKG.DocParsing.core import (
     ChunkWorkerConfig,
     acquire_lock,
     atomic_write,
+    compute_chunk_uuid,
     compute_content_hash,
     compute_relative_doc_id,
     compute_stable_shard,
@@ -646,6 +647,30 @@ def summarize_image_metadata(
     return has_caption, has_classification, num_images, confidence, picture_meta
 
 
+def _extract_chunk_start(chunk: BaseChunk) -> Optional[int]:
+    """Best-effort extraction of the chunk's starting character offset."""
+
+    candidates: List[int] = []
+
+    def _collect(source: object, *attrs: str) -> None:
+        if source is None:
+            return
+        for attr in attrs:
+            value = getattr(source, attr, None)
+            if isinstance(value, bool):
+                continue
+            if isinstance(value, int):
+                candidates.append(value)
+
+    _collect(chunk, "char_start", "start_offset", "start", "begin", "offset")
+    _collect(getattr(chunk, "span", None), "start", "start_offset", "begin", "offset")
+    _collect(getattr(chunk, "meta", None), "start_offset", "char_start", "start", "begin")
+
+    if not candidates:
+        return None
+    return min(candidates)
+
+
 # --- Public Classes ---
 
 
@@ -675,6 +700,7 @@ class Rec:
     has_image_classification: bool = False
     num_images: int = 0
     image_confidence: Optional[float] = None
+    start_offset: Optional[int] = None
     picture_meta: List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -744,6 +770,7 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
                     has_image_classification=has_classification,
                     num_images=num_images,
                     image_confidence=image_confidence,
+                    start_offset=_extract_chunk_start(ch),
                     picture_meta=picture_meta,
                 )
             )
@@ -761,7 +788,11 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
         task.output_path.parent.mkdir(parents=True, exist_ok=True)
         with acquire_lock(task.output_path):
             with atomic_write(task.output_path) as handle:
+                cursor = 0
                 for cid, r in enumerate(final_recs):
+                    start_offset = r.start_offset if r.start_offset is not None else cursor
+                    start_offset = max(0, start_offset)
+                    uuid_value = compute_chunk_uuid(task.doc_id, start_offset, r.text)
                     meta_payload = {"items": r.picture_meta} if r.picture_meta else None
                     provenance = ProvenanceMetadata(
                         parse_engine=task.parse_engine,
@@ -786,11 +817,14 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
                         has_image_classification=r.has_image_classification,
                         num_images=r.num_images,
                         image_confidence=r.image_confidence,
+                        start_offset=start_offset,
                         provenance=provenance,
+                        uuid=uuid_value,
                     )
                     payload = row.model_dump(mode="json", exclude_none=True)
                     validate_chunk_row(payload)
                     handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+                    cursor = max(cursor, start_offset) + len(r.text)
 
         duration = time.perf_counter() - start
         return ChunkResult(
@@ -845,6 +879,12 @@ def merge_rec(
     pages = sorted(set(a.pages).union(b.pages))
     confidences = [conf for conf in (a.image_confidence, b.image_confidence) if conf is not None]
     combined_confidence = max(confidences) if confidences else None
+    if a.start_offset is None:
+        start_offset = b.start_offset
+    elif b.start_offset is None:
+        start_offset = a.start_offset
+    else:
+        start_offset = min(a.start_offset, b.start_offset)
     return Rec(
         text=text,
         n_tok=n_tok,
@@ -855,6 +895,7 @@ def merge_rec(
         has_image_classification=a.has_image_classification or b.has_image_classification,
         num_images=a.num_images + b.num_images,
         image_confidence=combined_confidence,
+        start_offset=start_offset,
         picture_meta=list(a.picture_meta) + list(b.picture_meta),
     )
 

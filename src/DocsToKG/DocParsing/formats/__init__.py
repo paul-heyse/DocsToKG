@@ -394,6 +394,7 @@ class ChunkRow(BaseModel):
         doc_items_refs: References to downstream document item metadata.
         page_nos: List of 1-based page numbers touched by the chunk.
         schema_version: Version identifier for the chunk schema.
+        start_offset: Character offset of the chunk text within the source document.
         provenance: Optional provenance metadata describing parsing context.
         uuid: Optional stable identifier for the chunk.
         has_image_captions: Optional duplicate of provenance flag for convenience.
@@ -426,6 +427,11 @@ class ChunkRow(BaseModel):
     page_nos: List[int] = Field(default_factory=list, description="Page numbers")
     schema_version: str = Field(
         default=CHUNK_SCHEMA_VERSION, description="Schema version identifier"
+    )
+    start_offset: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="Character offset of the chunk within the source document",
     )
     has_image_captions: Optional[bool] = Field(
         default=None,

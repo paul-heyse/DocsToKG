@@ -631,7 +631,7 @@ class ResolverConfig:
     mailto: Optional[str] = None
     max_concurrent_resolvers: int = 1
     max_concurrent_per_host: int = 3
-    enable_global_url_dedup: bool = False
+    enable_global_url_dedup: bool = True
     domain_token_buckets: Dict[str, Dict[str, float]] = field(default_factory=dict)
     domain_bytes_budget: Dict[str, int] = field(default_factory=dict)
     domain_content_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
