@@ -627,6 +627,9 @@ class CsvAttemptLoggerAdapter:
             None
         """
         self._logger.close()
+        with self._lock:
+            if not self._file.closed:
+                self._file.close()
 
     def __enter__(self) -> "CsvAttemptLoggerAdapter":
         """Return ``self`` when used as a context manager.
@@ -653,9 +656,6 @@ class CsvAttemptLoggerAdapter:
         """
 
         self.close()
-        with self._lock:
-            if not self._file.closed:
-                self._file.close()
 
 
 def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:

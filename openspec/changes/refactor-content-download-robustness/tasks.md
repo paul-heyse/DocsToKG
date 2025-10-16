@@ -13,10 +13,10 @@
 
 ### 1.2 Fix CSV Resource Leak
 
-- [ ] 1.2.1 Modify `CsvAttemptLoggerAdapter.close()` to close CSV file handle under lock
-- [ ] 1.2.2 Ensure close() checks `self._file.closed` before closing to enable idempotency
-- [ ] 1.2.3 Update `__exit__()` to safely handle already-closed file
-- [ ] 1.2.4 Add unit test verifying file descriptor closure after explicit `close()` call
+- [x] 1.2.1 Modify `CsvAttemptLoggerAdapter.close()` to close CSV file handle under lock
+- [x] 1.2.2 Ensure close() checks `self._file.closed` before closing to enable idempotency
+- [x] 1.2.3 Update `__exit__()` to safely handle already-closed file
+- [x] 1.2.4 Add unit test verifying file descriptor closure after explicit `close()` call
 - [ ] 1.2.5 Add integration test confirming clean process exit on all platforms including Windows
 
 ### 1.3 Remove Duplicate Session Factory
