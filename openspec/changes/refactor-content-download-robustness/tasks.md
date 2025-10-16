@@ -27,92 +27,92 @@
 
 ### 1.4 Unify HEAD Precheck Implementation
 
-- [ ] 1.4.1 Create `head_precheck(session, url, timeout)` function in `network.py`
-- [ ] 1.4.2 Implement HEAD request with `request_with_retries` using `max_retries=1` and `min(timeout, 5.0)`
-- [ ] 1.4.3 Handle exceptions by returning True (conservative pass-through)
-- [ ] 1.4.4 Check status codes in {200, 302, 304} set for success
-- [ ] 1.4.5 Reject responses with Content-Type containing "text/html" or Content-Length of "0"
-- [ ] 1.4.6 Implement optional HEAD-to-GET degradation for 405/501 status codes
-- [ ] 1.4.7 Replace `_head_precheck_candidate()` in CLI with call to unified function
-- [ ] 1.4.8 Replace `ResolverPipeline._head_precheck_url()` with call to unified function
-- [ ] 1.4.9 Preserve per-resolver opt-out via `ResolverConfig.resolver_head_precheck` consultation
-- [ ] 1.4.10 Add unit tests for 200/pdf, 200/html, 405, 501, timeout, and connection error cases
-- [ ] 1.4.11 Verify dry-run behavior remains deterministic (no streaming downloads)
+- [x] 1.4.1 Create `head_precheck(session, url, timeout)` function in `network.py`
+- [x] 1.4.2 Implement HEAD request with `request_with_retries` using `max_retries=1` and `min(timeout, 5.0)`
+- [x] 1.4.3 Handle exceptions by returning True (conservative pass-through)
+- [x] 1.4.4 Check status codes in {200, 302, 304} set for success
+- [x] 1.4.5 Reject responses with Content-Type containing "text/html" or Content-Length of "0"
+- [x] 1.4.6 Implement optional HEAD-to-GET degradation for 405/501 status codes
+- [x] 1.4.7 Replace `_head_precheck_candidate()` in CLI with call to unified function
+- [x] 1.4.8 Replace `ResolverPipeline._head_precheck_url()` with call to unified function
+- [x] 1.4.9 Preserve per-resolver opt-out via `ResolverConfig.resolver_head_precheck` consultation
+- [x] 1.4.10 Add unit tests for 200/pdf, 200/html, 405, 501, timeout, and connection error cases
+- [x] 1.4.11 Verify dry-run behavior remains deterministic (no streaming downloads)
 
 ## 2. Legacy Code Removal
 
 ### 2.1 Remove __getattr__ Compatibility Shims
 
-- [ ] 2.1.1 Delete `__getattr__` function exporting `time` and `requests` from `resolvers.py`
-- [ ] 2.1.2 Remove `time` and `requests` entries from `__all__` export list
-- [ ] 2.1.3 Search codebase for any remaining `from DocsToKG.ContentDownload.resolvers import time` patterns
-- [ ] 2.1.4 Replace located imports with direct `import time` or `import requests as _requests`
-- [ ] 2.1.5 Add CHANGELOG entry documenting breaking change with migration instructions
+- [x] 2.1.1 Delete `__getattr__` function exporting `time` and `requests` from `resolvers.py`
+- [x] 2.1.2 Remove `time` and `requests` entries from `__all__` export list
+- [x] 2.1.3 Search codebase for any remaining `from DocsToKG.ContentDownload.resolvers import time` patterns
+- [x] 2.1.4 Replace located imports with direct `import time` or `import requests as _requests`
+- [x] 2.1.5 Add CHANGELOG entry documenting breaking change with migration instructions
 
 ### 2.2 Delete request_with_retries Proxy
 
-- [ ] 2.2.1 Remove `request_with_retries()` proxy function definition from `resolvers.py`
-- [ ] 2.2.2 Add direct import `from DocsToKG.ContentDownload.network import request_with_retries` at module top
-- [ ] 2.2.3 Search all resolver implementations for calls to local `request_with_retries`
-- [ ] 2.2.4 Verify all calls now resolve to network module import
-- [ ] 2.2.5 Update test mocks/patches to target `network.request_with_retries` instead of `resolvers.request_with_retries`
+- [x] 2.2.1 Remove `request_with_retries()` proxy function definition from `resolvers.py`
+- [x] 2.2.2 Add direct import `from DocsToKG.ContentDownload.network import request_with_retries` at module top
+- [x] 2.2.3 Search all resolver implementations for calls to local `request_with_retries`
+- [x] 2.2.4 Verify all calls now resolve to network module import
+- [x] 2.2.5 Update test mocks/patches to target `network.request_with_retries` instead of `resolvers.request_with_retries`
 
 ### 2.3 Eliminate Session-Less Resolver Branches
 
-- [ ] 2.3.1 Remove `hasattr(session, "get")` conditional branches from `CrossrefResolver`
-- [ ] 2.3.2 Remove `hasattr(session, "get")` conditional branches from `UnpaywallResolver`
-- [ ] 2.3.3 Remove `hasattr(session, "get")` conditional branches from `SemanticScholarResolver`
-- [ ] 2.3.4 Delete `_fetch_crossref_data()` LRU cache function and `@lru_cache` decorator
-- [ ] 2.3.5 Delete `_fetch_unpaywall_data()` LRU cache function
-- [ ] 2.3.6 Delete `_fetch_semantic_scholar_data()` LRU cache function
-- [ ] 2.3.7 Replace deleted function calls with direct `request_with_retries(session, ...)` invocations
-- [ ] 2.3.8 Remove `headers_cache_key()` utility function if no longer referenced
-- [ ] 2.3.9 Verify all resolvers now require and use `session` parameter
+- [x] 2.3.1 Remove `hasattr(session, "get")` conditional branches from `CrossrefResolver`
+- [x] 2.3.2 Remove `hasattr(session, "get")` conditional branches from `UnpaywallResolver`
+- [x] 2.3.3 Remove `hasattr(session, "get")` conditional branches from `SemanticScholarResolver`
+- [x] 2.3.4 Delete `_fetch_crossref_data()` LRU cache function and `@lru_cache` decorator
+- [x] 2.3.5 Delete `_fetch_unpaywall_data()` LRU cache function
+- [x] 2.3.6 Delete `_fetch_semantic_scholar_data()` LRU cache function
+- [x] 2.3.7 Replace deleted function calls with direct `request_with_retries(session, ...)` invocations
+- [x] 2.3.8 Remove `headers_cache_key()` utility function if no longer referenced
+- [x] 2.3.9 Verify all resolvers now require and use `session` parameter
 
 ### 2.4 Consolidate Resolver Toggle Defaults
 
-- [ ] 2.4.1 Identify single authoritative location for toggle defaults (recommend `_DEFAULT_RESOLVER_TOGGLES` in resolvers module)
-- [ ] 2.4.2 Remove duplicate default computation from `apply_config_overrides()` in CLI module
-- [ ] 2.4.3 Remove duplicate default computation from `load_resolver_config()` in CLI module
-- [ ] 2.4.4 Import authoritative defaults into CLI module and reference directly
-- [ ] 2.4.5 Verify toggle behavior remains identical for enabled/disabled resolvers
-- [ ] 2.4.6 Add unit test confirming single source of truth for defaults
+- [x] 2.4.1 Identify single authoritative location for toggle defaults (recommend `_DEFAULT_RESOLVER_TOGGLES` in resolvers module)
+- [x] 2.4.2 Remove duplicate default computation from `apply_config_overrides()` in CLI module
+- [x] 2.4.3 Remove duplicate default computation from `load_resolver_config()` in CLI module
+- [x] 2.4.4 Import authoritative defaults into CLI module and reference directly
+- [x] 2.4.5 Verify toggle behavior remains identical for enabled/disabled resolvers
+- [x] 2.4.6 Add unit test confirming single source of truth for defaults
 
 ## 3. HTTP Behavior Standardization
 
 ### 3.1 Replace Direct session.get() Calls
 
-- [ ] 3.1.1 Replace `session.get()` in `UnpaywallResolver.iter_urls()` with `request_with_retries(session, "GET", ...)`
-- [ ] 3.1.2 Replace any remaining `session.post()` calls with `request_with_retries(session, "POST", ...)`
-- [ ] 3.1.3 Search codebase for pattern `session\.(get|post|head|put|delete)\(` and verify all use retry helper
-- [ ] 3.1.4 Ensure all replacements preserve `params`, `json`, `headers`, `timeout` keyword arguments
+- [x] 3.1.1 Replace `session.get()` in `UnpaywallResolver.iter_urls()` with `request_with_retries(session, "GET", ...)`
+- [x] 3.1.2 Replace any remaining `session.post()` calls with `request_with_retries(session, "POST", ...)`
+- [x] 3.1.3 Search codebase for pattern `session\.(get|post|head|put|delete)\(` and verify all use retry helper
+- [x] 3.1.4 Ensure all replacements preserve `params`, `json`, `headers`, `timeout` keyword arguments
 
 ### 3.2 Enforce config.get_timeout() Usage
 
-- [ ] 3.2.1 Audit all `request_with_retries` calls in resolver implementations for timeout parameter
-- [ ] 3.2.2 Replace hardcoded `config.timeout` references with `config.get_timeout(self.name)`
-- [ ] 3.2.3 Replace `timeout=30.0` literals with `timeout=config.get_timeout(self.name)`
-- [ ] 3.2.4 Verify each resolver uses its own name for timeout lookups
-- [ ] 3.2.5 Add unit test confirming per-resolver timeout overrides function correctly
+- [x] 3.2.1 Audit all `request_with_retries` calls in resolver implementations for timeout parameter
+- [x] 3.2.2 Replace hardcoded `config.timeout` references with `config.get_timeout(self.name)`
+- [x] 3.2.3 Replace `timeout=30.0` literals with `timeout=config.get_timeout(self.name)`
+- [x] 3.2.4 Verify each resolver uses its own name for timeout lookups
+- [x] 3.2.5 Add unit test confirming per-resolver timeout overrides function correctly
 
 ### 3.3 Standardize Polite Headers Application
 
-- [ ] 3.3.1 Audit resolver HTTP calls for headers parameter
-- [ ] 3.3.2 Ensure base case passes `headers=config.polite_headers` to request_with_retries
-- [ ] 3.3.3 For resolvers needing custom headers, use `headers = dict(config.polite_headers); headers.update(...)` pattern
-- [ ] 3.3.4 Verify API key headers (CORE, Semantic Scholar, DOAJ) properly extend polite headers rather than replace
-- [ ] 3.3.5 Confirm User-Agent and mailto headers present in all outbound requests during integration tests
+- [x] 3.3.1 Audit resolver HTTP calls for headers parameter
+- [x] 3.3.2 Ensure base case passes `headers=config.polite_headers` to request_with_retries
+- [x] 3.3.3 For resolvers needing custom headers, use `headers = dict(config.polite_headers); headers.update(...)` pattern
+- [x] 3.3.4 Verify API key headers (CORE, Semantic Scholar, DOAJ) properly extend polite headers rather than replace
+- [x] 3.3.5 Confirm User-Agent and mailto headers present in all outbound requests during integration tests
 
 ### 3.4 Implement HEAD-to-GET Degradation
 
-- [ ] 3.4.1 In unified `head_precheck()` function, detect 405 and 501 status codes
-- [ ] 3.4.2 On detection, issue short GET request with `stream=True` and `timeout=min(timeout, 5.0)`
-- [ ] 3.4.3 Read only first chunk from response iterator without downloading full body
-- [ ] 3.4.4 Inspect Content-Type header from GET response
-- [ ] 3.4.5 Return False if Content-Type contains "html", True otherwise
-- [ ] 3.4.6 Ensure GET degradation wrapped in try-except returning True on any exception
-- [ ] 3.4.7 Add unit test simulating 405 response with PDF content-type
-- [ ] 3.4.8 Add unit test simulating 405 response with HTML content-type
+- [x] 3.4.1 In unified `head_precheck()` function, detect 405 and 501 status codes
+- [x] 3.4.2 On detection, issue short GET request with `stream=True` and `timeout=min(timeout, 5.0)`
+- [x] 3.4.3 Read only first chunk from response iterator without downloading full body
+- [x] 3.4.4 Inspect Content-Type header from GET response
+- [x] 3.4.5 Return False if Content-Type contains "html", True otherwise
+- [x] 3.4.6 Ensure GET degradation wrapped in try-except returning True on any exception
+- [x] 3.4.7 Add unit test simulating 405 response with PDF content-type
+- [x] 3.4.8 Add unit test simulating 405 response with HTML content-type
 
 ## 4. Code Reduction Through Abstraction
 
