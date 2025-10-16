@@ -266,7 +266,6 @@ def test_cli_prune_dry_run_json(monkeypatch, stub_logger, capsys):
     ]
 
     monkeypatch.setattr(cli, "_collect_version_metadata", lambda oid: list(metadata))
-    monkeypatch.setattr(cli, "_update_latest_symlink", lambda *_, **__: None)
     monkeypatch.setattr(
         cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
     )
@@ -275,6 +274,7 @@ def test_cli_prune_dry_run_json(monkeypatch, stub_logger, capsys):
     monkeypatch.setattr(cli.STORAGE, "available_ontologies", lambda: ["hp"])
     monkeypatch.setattr(cli.STORAGE, "available_versions", lambda oid: ["2023", "2024"])
     monkeypatch.setattr(cli.STORAGE, "delete_version", lambda *_, **__: 0)
+    monkeypatch.setattr(cli.STORAGE, "set_latest_version", lambda *_, **__: None)
 
     exit_code = cli.main(["prune", "--keep", "1", "--dry-run", "--json"])
     assert exit_code == 0
@@ -282,3 +282,63 @@ def test_cli_prune_dry_run_json(monkeypatch, stub_logger, capsys):
     assert payload["dry_run"] is True
     assert payload["total_deleted"] == 1
     assert payload["total_reclaimed_bytes"] == 1024
+
+
+def test_cli_prune_updates_latest_marker(monkeypatch, stub_logger):
+    metadata = [
+        {
+            "version": "2024",
+            "path": Path("/tmp/hp/2024"),
+            "size": 2048,
+            "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
+        },
+        {
+            "version": "2023",
+            "path": Path("/tmp/hp/2023"),
+            "size": 1024,
+            "timestamp": datetime(2023, 1, 1, tzinfo=timezone.utc),
+        },
+    ]
+
+    monkeypatch.setattr(cli, "_collect_version_metadata", lambda oid: list(metadata))
+    monkeypatch.setattr(
+        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+    )
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+
+    monkeypatch.setattr(cli.STORAGE, "available_ontologies", lambda: ["hp"])
+    monkeypatch.setattr(cli.STORAGE, "available_versions", lambda oid: ["2023", "2024"])
+
+    monkeypatch.setattr(cli.STORAGE, "delete_version", lambda *_: 0)
+
+    latest_calls: list[tuple[str, Path]] = []
+
+    def _record_latest(ontology_id: str, path: Path) -> None:
+        latest_calls.append((ontology_id, path))
+
+    monkeypatch.setattr(cli.STORAGE, "set_latest_version", _record_latest)
+
+    exit_code = cli.main(["prune", "--keep", "1"])
+    assert exit_code == 0
+    assert latest_calls == [("hp", Path("/tmp/hp/2024"))]
+
+
+def test_cli_plan_serializes_enriched_metadata(monkeypatch, stub_logger, capsys):
+    plan = _planned_fetch("hp")
+    plan.metadata = {
+        "last_modified": "Tue, 01 Aug 2023 00:00:00 GMT",
+        "content_length": 4096,
+        "etag": "\"abc123\"",
+    }
+    monkeypatch.setattr(cli, "plan_all", lambda specs, *, config=None, since=None: [plan])
+    monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
+    monkeypatch.setattr(
+        cli.ResolvedConfig, "from_defaults", classmethod(lambda cls: _default_config())
+    )
+
+    exit_code = cli.main(["plan", "hp", "--json"])
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload[0]["last_modified"] == "Tue, 01 Aug 2023 00:00:00 GMT"
+    assert payload[0]["content_length"] == 4096
+    assert payload[0]["etag"] == "\"abc123\""

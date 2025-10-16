@@ -19,8 +19,11 @@ Usage:
 """
 
 import io
+import json
 import logging
 import tarfile
+import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -672,6 +675,44 @@ def test_sanitize_filename_removes_traversal():
     assert sanitized.endswith("evil.owl")
 
 
+def test_migrate_manifest_sets_default_version():
+    payload = {}
+    download._migrate_manifest_inplace(payload)
+    assert payload["schema_version"] == "1.0"
+
+
+def test_migrate_manifest_upgrades_old_schema():
+    payload = {"schema_version": "0.9"}
+    download._migrate_manifest_inplace(payload)
+    assert payload["schema_version"] == "1.0"
+    assert payload["resolver_attempts"] == []
+
+
+def test_migrate_manifest_warns_unknown_version(caplog):
+    caplog.set_level(logging.WARNING)
+    payload = {"schema_version": "2.0"}
+    download._migrate_manifest_inplace(payload)
+    assert any("unknown manifest schema version" in record.message for record in caplog.records)
+
+
+def test_read_manifest_applies_migration(tmp_path, monkeypatch):
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps({"schema_version": "0.9"}))
+
+    observed = {}
+
+    def _validate(payload, source=None):  # pragma: no cover - minimal validation stub
+        observed["schema_version"] = payload.get("schema_version")
+        observed["resolver_attempts"] = payload.get("resolver_attempts")
+
+    monkeypatch.setattr(download, "validate_manifest_dict", _validate)
+
+    payload = download._read_manifest(manifest_path)
+    assert payload["schema_version"] == "1.0"
+    assert payload["resolver_attempts"] == []
+    assert observed == {"schema_version": "1.0", "resolver_attempts": []}
+
+
 def test_download_stream_rejects_large_content(monkeypatch, tmp_path):
     response = DummyResponse(200, b"data", {"Content-Length": str(10 * 1024 * 1024 * 1024)})
     make_session(monkeypatch, [response])
@@ -685,6 +726,36 @@ def test_download_stream_rejects_large_content(monkeypatch, tmp_path):
             cache_dir=tmp_path / "cache",
             logger=_noop_logger(),
         )
+
+
+def test_version_lock_serializes_concurrent_writers(tmp_path):
+    barrier = threading.Barrier(2)
+    state = {"active": 0, "max_active": 0}
+    lock = threading.Lock()
+    completed = []
+
+    def _worker(name: str):
+        barrier.wait()
+        with download._version_lock("hp", "2024-01-01"):
+            with lock:
+                state["active"] += 1
+                state["max_active"] = max(state["max_active"], state["active"])
+            time.sleep(0.05)
+            with lock:
+                state["active"] -= 1
+                completed.append(name)
+
+    threads = [threading.Thread(target=_worker, args=(f"worker-{idx}",)) for idx in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert state["max_active"] == 1
+    assert len(completed) == 2
+    lock_path = download.CACHE_DIR / "locks" / "hp__2024-01-01.lock"
+    assert lock_path.exists()
+    assert lock_path.stat().st_size > 0
 
 
 def _noop_logger():
