@@ -169,9 +169,13 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import DefaultsConfig, ResolvedConfig, ValidationRequest
-from DocsToKG.OntologyDownload import ontology_download as download
-from DocsToKG.OntologyDownload.ontology_download import (
+import DocsToKG.OntologyDownload.plugins as plugins
+import DocsToKG.OntologyDownload.validation_core as validation_core
+from DocsToKG.OntologyDownload.config import DefaultsConfig, ResolvedConfig
+from DocsToKG.OntologyDownload.plugins import load_validator_plugins
+from DocsToKG.OntologyDownload.validation_core import (
+    VALIDATORS,
+    ValidationRequest,
     ValidationResult,
     ValidatorSubprocessError,
     _sort_triple_file,
@@ -354,7 +358,7 @@ def test_run_validators_respects_concurrency(monkeypatch, tmp_path, config):
         "two": _make_validator("two"),
         "three": _make_validator("three"),
     }
-    monkeypatch.setattr(download, "VALIDATORS", validators)
+    monkeypatch.setattr(validation_core, "VALIDATORS", validators)
 
     requests = []
     for name in validators:
@@ -397,7 +401,7 @@ def test_run_validators_matches_sequential(monkeypatch, tmp_path, config):
         "beta": _validator,
         "gamma": _validator,
     }
-    monkeypatch.setattr(download, "VALIDATORS", validators)
+    monkeypatch.setattr(validation_core, "VALIDATORS", validators)
 
     def _build_requests(prefix: str, cfg: ResolvedConfig) -> list[ValidationRequest]:
         requests = []
@@ -435,8 +439,8 @@ def test_sort_triple_file_falls_back_without_sort(monkeypatch, tmp_path):
 
 
 def test_validator_plugin_loader_registers_and_warns(monkeypatch, caplog):
-    base = download.VALIDATORS.copy()
-    monkeypatch.setattr(download, "VALIDATORS", base.copy())
+    base = validation_core.VALIDATORS.copy()
+    monkeypatch.setattr(validation_core, "VALIDATORS", base.copy())
 
     def _plugin(request, logger):  # pragma: no cover - handler not executed here
         return ValidationResult(ok=True, details={"ok": True}, output_files=[])
@@ -460,13 +464,14 @@ def test_validator_plugin_loader_registers_and_warns(monkeypatch, caplog):
     stub = SimpleNamespace(
         select=lambda *, group=None: entries if group == "docstokg.ontofetch.validator" else []
     )
-    monkeypatch.setattr(download.metadata, "entry_points", lambda: stub)
+    monkeypatch.setattr(plugins.metadata, "entry_points", lambda: stub)
+    monkeypatch.setattr(plugins, "_VALIDATOR_PLUGINS_LOADED", False)
 
     caplog.set_level(logging.INFO)
-    download._load_validator_plugins(logging.getLogger("test"))
+    load_validator_plugins(validation_core.VALIDATORS, logger=logging.getLogger("test"))
 
-    assert "plugin_validator" in download.VALIDATORS
-    assert download.VALIDATORS["plugin_validator"] is _plugin
+    assert "plugin_validator" in validation_core.VALIDATORS
+    assert validation_core.VALIDATORS["plugin_validator"] is _plugin
     assert any(record.message == "validator plugin failed" for record in caplog.records)
 
 
@@ -489,7 +494,7 @@ def test_validate_pronto_handles_exception(monkeypatch, obo_file, tmp_path, conf
         raise RuntimeError("boom")
 
     monkeypatch.setattr(
-        "DocsToKG.OntologyDownload.ontology_download._run_validator_subprocess",
+        "DocsToKG.OntologyDownload.validation_core._run_validator_subprocess",
         _boom,
     )
 
@@ -547,7 +552,7 @@ def test_validate_owlready2_memory_error(monkeypatch, owl_file, tmp_path, config
         raise ValidatorSubprocessError("memory exceeded")
 
     monkeypatch.setattr(
-        "DocsToKG.OntologyDownload.ontology_download._run_validator_subprocess",
+        "DocsToKG.OntologyDownload.validation_core._run_validator_subprocess",
         _raise,
     )
     result = validate_owlready2(request, _noop_logger())

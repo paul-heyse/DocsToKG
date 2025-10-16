@@ -34,7 +34,6 @@ import logging
 import re
 import threading
 from dataclasses import dataclass
-from importlib import metadata
 from typing import Any, Dict, Iterable, Optional
 
 import requests
@@ -59,13 +58,10 @@ try:  # pragma: no cover - optional dependency guidance
 except ModuleNotFoundError:  # pragma: no cover - provide actionable error later
     BioPortalClient = None  # type: ignore[assignment]
 
-from .ontology_download import (
-    ConfigError,
-    ResolvedConfig,
-    TokenBucket,
-    get_pystow,
-    retry_with_backoff,
-)
+from .config import ConfigError, ResolvedConfig
+from .net import TokenBucket, retry_with_backoff
+from .optdeps import get_pystow
+from .plugins import ensure_resolver_plugins
 # --- Globals ---
 
 OlsClient = _OlsClient
@@ -1009,51 +1005,6 @@ class OntobeeResolver(BaseResolver):
         return self._build_plan(url=url, media_type="application/rdf+xml", service="ontobee")
 
 
-def _load_resolver_plugins(logger: Optional[logging.Logger] = None) -> None:
-    """Discover resolver plugins registered via Python entry points."""
-
-    logger = logger or logging.getLogger(__name__)
-    try:
-        entry_points = metadata.entry_points()
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.warning(
-            "resolver plugin discovery failed",
-            extra={"stage": "init", "error": str(exc)},
-        )
-        return
-
-    for entry in entry_points.select(group="docstokg.ontofetch.resolver"):
-        try:
-            loaded = entry.load()
-            resolver = loaded() if isinstance(loaded, type) else loaded
-            if not hasattr(resolver, "plan"):
-                raise TypeError("resolver plugin must define a plan method")
-            name = getattr(resolver, "NAME", entry.name)
-            RESOLVERS[name] = resolver
-            logger.info(
-                "resolver plugin registered",
-                extra={"stage": "init", "resolver": name},
-            )
-        except Exception as exc:  # pragma: no cover - plugin faults
-            logger.warning(
-                "resolver plugin failed",
-                extra={"stage": "init", "resolver": entry.name, "error": str(exc)},
-            )
-
-
-_PLUGINS_LOADED = False
-
-
-def _ensure_plugins_loaded(logger: Optional[logging.Logger] = None) -> None:
-    """Ensure resolver plugins are loaded at most once per interpreter."""
-
-    global _PLUGINS_LOADED
-    if _PLUGINS_LOADED:
-        return
-    _load_resolver_plugins(logger)
-    _PLUGINS_LOADED = True
-
-
 _LOGGER = logging.getLogger(__name__)
 
 RESOLVERS: Dict[str, BaseResolver] = {
@@ -1082,7 +1033,7 @@ if BioPortalClient is not None:
 else:  # pragma: no cover - depends on optional dependency presence
     _LOGGER.debug("BioPortal resolver disabled because ontoportal-client is not installed")
 
-_ensure_plugins_loaded()
+ensure_resolver_plugins(RESOLVERS, logger=_LOGGER)
 
 
 # --- Globals ---
