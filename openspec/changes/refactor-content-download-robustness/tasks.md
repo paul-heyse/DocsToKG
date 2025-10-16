@@ -152,93 +152,93 @@
 
 ### 4.4 Refactor Logging to AttemptSink Protocol
 
-- [ ] 4.4.1 Define `AttemptSink` Protocol with `log_attempt()`, `log_manifest()`, `log_summary()`, `close()` methods
-- [ ] 4.4.2 Rename `JsonlLogger` to `JsonlSink` and implement `AttemptSink` protocol
-- [ ] 4.4.3 Create `CsvSink` class implementing `AttemptSink` protocol (no longer wrapping JSONL)
-- [ ] 4.4.4 Implement `MultiSink` class accepting list of sinks and forwarding all method calls
-- [ ] 4.4.5 Update CLI `main()` to build sink list based on `--log-format` argument
-- [ ] 4.4.6 Use `MultiSink([JsonlSink(...), CsvSink(...)])` when CSV format requested
-- [ ] 4.4.7 Remove `CsvAttemptLoggerAdapter` class after confirming no external references
-- [ ] 4.4.8 Update resolver pipeline to accept any `AttemptSink`-compatible logger
-- [ ] 4.4.9 Verify all sink methods called correctly during dry-run and live execution
+- [x] 4.4.1 Define `AttemptSink` Protocol with `log_attempt()`, `log_manifest()`, `log_summary()`, `close()` methods
+- [x] 4.4.2 Rename `JsonlLogger` to `JsonlSink` and implement `AttemptSink` protocol
+- [x] 4.4.3 Create `CsvSink` class implementing `AttemptSink` protocol (no longer wrapping JSONL)
+- [x] 4.4.4 Implement `MultiSink` class accepting list of sinks and forwarding all method calls
+- [x] 4.4.5 Update CLI `main()` to build sink list based on `--log-format` argument
+- [x] 4.4.6 Use `MultiSink([JsonlSink(...), CsvSink(...)])` when CSV format requested
+- [x] 4.4.7 Remove `CsvAttemptLoggerAdapter` class after confirming no external references
+- [x] 4.4.8 Update resolver pipeline to accept any `AttemptSink`-compatible logger
+- [x] 4.4.9 Verify all sink methods called correctly during dry-run and live execution
 
 ## 5. Robustness Enhancements
 
 ### 5.1 Add Conditional Request Pre-Validation
 
-- [ ] 5.1.1 In `ConditionalRequestHelper.build_headers()`, check if etag or last_modified present
-- [ ] 5.1.2 When conditional headers present, validate sha256, content_length, and path are all non-None
-- [ ] 5.1.3 If validation fails, log warning "resume-metadata-incomplete: falling back to full fetch"
-- [ ] 5.1.4 Return empty headers dict to force 200 response instead of 304
-- [ ] 5.1.5 Add unit test with partial metadata triggering fallback
-- [ ] 5.1.6 Add integration test confirming graceful handling of corrupted resume manifests
+- [x] 5.1.1 In `ConditionalRequestHelper.build_headers()`, check if etag or last_modified present
+- [x] 5.1.2 When conditional headers present, validate sha256, content_length, and path are all non-None
+- [x] 5.1.3 If validation fails, log warning "resume-metadata-incomplete: falling back to full fetch"
+- [x] 5.1.4 Return empty headers dict to force 200 response instead of 304
+- [x] 5.1.5 Add unit test with partial metadata triggering fallback
+- [x] 5.1.6 Add integration test confirming graceful handling of corrupted resume manifests
 
 ### 5.2 Implement Jittered Domain Throttling
 
-- [ ] 5.2.1 Locate `ResolverPipeline._respect_domain_limit()` method
-- [ ] 5.2.2 Add `+ random.random() * 0.05` to computed sleep duration
-- [ ] 5.2.3 Ensure jitter applied after lock-protected last hit time update
-- [ ] 5.2.4 Verify jitter prevents synchronized wakeup across concurrent resolver threads
-- [ ] 5.2.5 Add integration test measuring sleep time distribution with multiple workers
+- [x] 5.2.1 Locate `ResolverPipeline._respect_domain_limit()` method
+- [x] 5.2.2 Add `+ random.random() * 0.05` to computed sleep duration
+- [x] 5.2.3 Ensure jitter applied after lock-protected last hit time update
+- [x] 5.2.4 Verify jitter prevents synchronized wakeup across concurrent resolver threads
+- [x] 5.2.5 Add integration test measuring sleep time distribution with multiple workers
 
 ### 5.3 Harden PDF Detection Heuristics
 
-- [ ] 5.3.1 In `classify_payload()`, check if content_type equals "application/octet-stream"
-- [ ] 5.3.2 For octet-stream, return None to force continued sniffing regardless of URL extension
-- [ ] 5.3.3 Move URL extension check (.pdf) after all other heuristics as final fallback
-- [ ] 5.3.4 Add unit test with octet-stream and .pdf URL confirming sniff-based detection
-- [ ] 5.3.5 Add unit test with octet-stream and %PDF header confirming correct classification
+- [x] 5.3.1 In `classify_payload()`, check if content_type equals "application/octet-stream"
+- [x] 5.3.2 For octet-stream, return None to force continued sniffing regardless of URL extension
+- [x] 5.3.3 Move URL extension check (.pdf) after all other heuristics as final fallback
+- [x] 5.3.4 Add unit test with octet-stream and .pdf URL confirming sniff-based detection
+- [x] 5.3.5 Add unit test with octet-stream and %PDF header confirming correct classification
 
 ### 5.4 Enhance Corruption Detection
 
-- [ ] 5.4.1 In `_build_download_outcome()`, verify `head_precheck_passed` flag propagated correctly
-- [ ] 5.4.2 Apply tiny PDF (<1 KiB) rejection only when `head_precheck_passed` is False
-- [ ] 5.4.3 Ensure HEAD-validated tiny PDFs are not rejected as corrupt
-- [ ] 5.4.4 Maintain existing tail buffer HTML detection logic unchanged
-- [ ] 5.4.5 Preserve %%EOF validation for all PDF classifications
-- [ ] 5.4.6 Add unit test with 800-byte HEAD-validated PDF confirming acceptance
-- [ ] 5.4.7 Add unit test with 800-byte non-validated PDF confirming rejection
+- [x] 5.4.1 In `_build_download_outcome()`, verify `head_precheck_passed` flag propagated correctly
+- [x] 5.4.2 Apply tiny PDF (<1 KiB) rejection only when `head_precheck_passed` is False
+- [x] 5.4.3 Ensure HEAD-validated tiny PDFs are not rejected as corrupt
+- [x] 5.4.4 Maintain existing tail buffer HTML detection logic unchanged
+- [x] 5.4.5 Preserve %%EOF validation for all PDF classifications
+- [x] 5.4.6 Add unit test with 800-byte HEAD-validated PDF confirming acceptance
+- [x] 5.4.7 Add unit test with 800-byte non-validated PDF confirming rejection
 
 ## 6. Observability Improvements
 
 ### 6.1 Add Staging Directory Mode
 
-- [ ] 6.1.1 Add `--staging` boolean CLI flag with help text explaining timestamped run directories
-- [ ] 6.1.2 When enabled, compute run directory as `args.out / datetime.now(UTC).strftime("%Y%m%d_%H%M")`
-- [ ] 6.1.3 Set `pdf_dir = run_dir / "PDF"` and `html_dir = run_dir / "HTML"`
-- [ ] 6.1.4 Set `manifest_path = run_dir / "manifest.jsonl"`
-- [ ] 6.1.5 Ensure `ensure_dir()` creates run directory structure before downloads begin
-- [ ] 6.1.6 Preserve existing non-staging behavior as default
-- [ ] 6.1.7 Add integration test verifying isolated staging directory creation
+- [x] 6.1.1 Add `--staging` boolean CLI flag with help text explaining timestamped run directories
+- [x] 6.1.2 When enabled, compute run directory as `args.out / datetime.now(UTC).strftime("%Y%m%d_%H%M")`
+- [x] 6.1.3 Set `pdf_dir = run_dir / "PDF"` and `html_dir = run_dir / "HTML"`
+- [x] 6.1.4 Set `manifest_path = run_dir / "manifest.jsonl"`
+- [x] 6.1.5 Ensure `ensure_dir()` creates run directory structure before downloads begin
+- [x] 6.1.6 Preserve existing non-staging behavior as default
+- [x] 6.1.7 Add integration test verifying isolated staging directory creation
 
 ### 6.2 Generate Manifest Index
 
-- [ ] 6.2.1 Define index format as `{"work_id": {"pdf_path": str, "sha256": str, "classification": str}}`
-- [ ] 6.2.2 Accumulate index entries as manifest entries are written
-- [ ] 6.2.3 On successful PDF downloads, store path and sha256 under work_id key
-- [ ] 6.2.4 On completion, write `manifest_path.with_suffix(".index.json")` with sorted JSON
-- [ ] 6.2.5 Handle exceptions during index write gracefully with logged warning
-- [ ] 6.2.6 Document index as derived artifact for fast resumption queries
-- [ ] 6.2.7 Add unit test parsing sample manifest and generating correct index
+- [x] 6.2.1 Define index format as `{"work_id": {"pdf_path": str, "sha256": str, "classification": str}}`
+- [x] 6.2.2 Accumulate index entries as manifest entries are written
+- [x] 6.2.3 On successful PDF downloads, store path and sha256 under work_id key
+- [x] 6.2.4 On completion, write `manifest_path.with_suffix(".index.json")` with sorted JSON
+- [x] 6.2.5 Handle exceptions during index write gracefully with logged warning
+- [x] 6.2.6 Document index as derived artifact for fast resumption queries
+- [x] 6.2.7 Add unit test parsing sample manifest and generating correct index
 
 ### 6.3 Produce Last-Attempt CSV
 
-- [ ] 6.3.1 When `--log-format csv` specified, also initialize `manifest.last.csv` writer
-- [ ] 6.3.2 Maintain dict mapping work_id to latest ManifestEntry as processing proceeds
-- [ ] 6.3.3 Define columns: work_id, title, publication_year, resolver, url, classification, path, sha256, content_length, etag, last_modified
-- [ ] 6.3.4 On completion, write accumulated entries to last-attempt CSV
-- [ ] 6.3.5 Ensure CSV sorted by work_id for reviewability
-- [ ] 6.3.6 Add integration test confirming one row per work in output
+- [x] 6.3.1 When `--log-format csv` specified, also initialize `manifest.last.csv` writer
+- [x] 6.3.2 Maintain dict mapping work_id to latest ManifestEntry as processing proceeds
+- [x] 6.3.3 Define columns: work_id, title, publication_year, resolver, url, classification, path, sha256, content_length, etag, last_modified
+- [x] 6.3.4 On completion, write accumulated entries to last-attempt CSV
+- [x] 6.3.5 Ensure CSV sorted by work_id for reviewability
+- [x] 6.3.6 Add integration test confirming one row per work in output
 
 ### 6.4 Improve CLI Help Organization
 
-- [ ] 6.4.1 Create argparse group "Resolver Settings" using `parser.add_argument_group()`
-- [ ] 6.4.2 Move `--resolver-config`, `--resolver-order`, `--unpaywall-email`, `--core-api-key`, `--semantic-scholar-api-key`, `--doaj-api-key` into group
-- [ ] 6.4.3 Move `--disable-resolver`, `--enable-resolver`, `--max-resolver-attempts`, `--resolver-timeout`, `--concurrent-resolvers` into group
-- [ ] 6.4.4 Move `--head-precheck`, `--no-head-precheck`, `--domain-min-interval` into group
-- [ ] 6.4.5 Remove `--log-path` argument or mark as deprecated hidden argument
-- [ ] 6.4.6 Update `--manifest` help text to mention it replaces deprecated `--log-path`
-- [ ] 6.4.7 Verify `--help` output shows organized sections
+- [x] 6.4.1 Create argparse group "Resolver Settings" using `parser.add_argument_group()`
+- [x] 6.4.2 Move `--resolver-config`, `--resolver-order`, `--unpaywall-email`, `--core-api-key`, `--semantic-scholar-api-key`, `--doaj-api-key` into group
+- [x] 6.4.3 Move `--disable-resolver`, `--enable-resolver`, `--max-resolver-attempts`, `--resolver-timeout`, `--concurrent-resolvers` into group
+- [x] 6.4.4 Move `--head-precheck`, `--no-head-precheck`, `--domain-min-interval` into group
+- [x] 6.4.5 Remove `--log-path` argument or mark as deprecated hidden argument
+- [x] 6.4.6 Update `--manifest` help text to mention it replaces deprecated `--log-path`
+- [x] 6.4.7 Verify `--help` output shows organized sections
 
 ## 7. Testing and Validation
 

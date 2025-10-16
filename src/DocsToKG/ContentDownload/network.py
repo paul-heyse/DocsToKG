@@ -529,6 +529,20 @@ class ConditionalRequestHelper:
         """
 
         headers: dict[str, str] = {}
+        if self.prior_etag or self.prior_last_modified:
+            missing: list[str] = []
+            if not self.prior_sha256:
+                missing.append("sha256")
+            if self.prior_content_length is None:
+                missing.append("content_length")
+            if not self.prior_path:
+                missing.append("path")
+            if missing:
+                LOGGER.warning(
+                    "resume-metadata-incomplete: falling back to full fetch (missing %s)",
+                    ", ".join(missing),
+                )
+                return {}
         if self.prior_etag:
             headers["If-None-Match"] = self.prior_etag
         if self.prior_last_modified:

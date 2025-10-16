@@ -607,6 +607,22 @@ def test_classify_payload_detects_pdf_and_html():
     assert classify_payload(pdf, "application/pdf", "https://example.com/doc.pdf") == "pdf"
 
 
+def test_classify_payload_octet_stream_requires_sniff() -> None:
+    data = b"binary data with no signature"
+    assert (
+        classify_payload(data, "application/octet-stream", "https://example.com/file.pdf")
+        is None
+    )
+
+
+def test_classify_payload_octet_stream_with_pdf_signature() -> None:
+    data = b"%PDF-1.7"
+    assert (
+        classify_payload(data, "application/octet-stream", "https://example.com/file.pdf")
+        == "pdf"
+    )
+
+
 # ---- test_resolver_pipeline.py -----------------------------
 def test_pipeline_stops_on_first_success(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -1549,8 +1565,42 @@ def test_pipeline_domain_rate_limiting_enforces_interval(monkeypatch, tmp_path):
         "https://other.org/alt.pdf",
     ]
     assert fake.sleeps
-    assert fake.sleeps[0] == pytest.approx(0.4, rel=0.05)
+    assert 0.4 <= fake.sleeps[0] <= 0.45
     assert len(fake.sleeps) == 1
+
+
+# ---- new jitter test -----------------------------
+def test_domain_limit_includes_jitter_component(monkeypatch, tmp_path: Path) -> None:
+    class FakeClock:
+        def __init__(self) -> None:
+            self.now = 0.0
+            self.sleeps: List[float] = []
+
+        def monotonic(self) -> float:
+            return self.now
+
+        def sleep(self, duration: float) -> None:
+            self.sleeps.append(duration)
+            self.now += duration
+
+    fake = FakeClock()
+    monkeypatch.setattr(pipeline_module._time, "monotonic", fake.monotonic)
+    monkeypatch.setattr(pipeline_module._time, "sleep", fake.sleep)
+    monkeypatch.setattr(pipeline_module.random, "random", lambda: 0.5)
+
+    config = ResolverConfig(resolver_order=[], resolver_toggles={})
+    config.domain_min_interval_s = {"example.org": 0.1}
+    logger = ListLogger()
+    metrics = ResolverMetrics()
+    pipeline = ResolverPipeline([], config, lambda *a, **k: None, logger, metrics)
+
+    pipeline._last_host_hit["example.org"] = 0.0
+    fake.now = 0.02
+    pipeline._respect_domain_limit("https://example.org/resource")
+
+    expected_wait = 0.1 - 0.02
+    jitter = 0.5 * 0.05
+    assert fake.sleeps == [pytest.approx(expected_wait + jitter)]
 
 
 # ---- test_resolver_providers_additional.py -----------------------------

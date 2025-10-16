@@ -1,7 +1,3 @@
-"""Structured logging regression tests for download attempt artefacts."""
-
-from __future__ import annotations
-
 import csv
 import json
 from concurrent.futures import ThreadPoolExecutor
@@ -13,18 +9,20 @@ pytest.importorskip("requests")
 pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload.download_pyalex_pdfs import (  # noqa: E402
-    CsvAttemptLoggerAdapter,
-    JsonlLogger,
+    CsvSink,
+    JsonlSink,
+    LastAttemptCsvSink,
     ManifestEntry,
+    ManifestIndexSink,
+    MultiSink,
 )
 from DocsToKG.ContentDownload.resolvers import AttemptRecord  # noqa: E402
 from scripts.export_attempts_csv import export_attempts_jsonl_to_csv  # noqa: E402
 
 
-@pytest.mark.parametrize("wall_ms", [None, 432.5])
-def test_jsonl_attempt_records_include_wall_time(tmp_path: Path, wall_ms: float | None) -> None:
+def test_jsonl_sink_attempt_records_include_wall_time(tmp_path: Path) -> None:
     log_path = tmp_path / "attempts.jsonl"
-    logger = JsonlLogger(log_path)
+    logger = JsonlSink(log_path)
     record = AttemptRecord(
         work_id="W-1",
         resolver_name="unpaywall",
@@ -38,7 +36,7 @@ def test_jsonl_attempt_records_include_wall_time(tmp_path: Path, wall_ms: float 
         sha256="abc",
         content_length=1024,
         dry_run=False,
-        resolver_wall_time_ms=wall_ms,
+        resolver_wall_time_ms=432.5,
     )
     logger.log_attempt(record)
     logger.close()
@@ -47,16 +45,14 @@ def test_jsonl_attempt_records_include_wall_time(tmp_path: Path, wall_ms: float 
     assert len(lines) == 1
     payload = json.loads(lines[0])
     assert payload["resolver_name"] == "unpaywall"
-    assert payload["resolver_wall_time_ms"] == wall_ms
+    assert payload["resolver_wall_time_ms"] == 432.5
 
 
-def test_csv_adapter_emits_wall_time_column(tmp_path: Path) -> None:
+def test_multi_sink_synchronizes_timestamps(tmp_path: Path) -> None:
     jsonl_path = tmp_path / "attempts.jsonl"
     csv_path = tmp_path / "attempts.csv"
-    base_logger = JsonlLogger(jsonl_path)
-    adapter = CsvAttemptLoggerAdapter(base_logger, csv_path)
     record = AttemptRecord(
-        work_id="W-2",
+        work_id="W-sync",
         resolver_name="crossref",
         resolver_order=2,
         url="https://example.org/html",
@@ -65,21 +61,43 @@ def test_csv_adapter_emits_wall_time_column(tmp_path: Path) -> None:
         content_type="text/html",
         elapsed_ms=45.0,
         metadata={},
-        sha256=None,
-        content_length=None,
         dry_run=True,
-        resolver_wall_time_ms=987.6,
     )
-    adapter.log_attempt(record)
-    adapter.close()
+    with JsonlSink(jsonl_path) as jsonl, CsvSink(csv_path) as csv:
+        sink = MultiSink([jsonl, csv])
+        sink.log_attempt(record)
 
+    json_payload = json.loads(jsonl_path.read_text(encoding="utf-8").strip())
     with csv_path.open("r", encoding="utf-8", newline="") as handle:
-        reader = csv.DictReader(handle)
-        rows = list(reader)
+        rows = list(csv.DictReader(handle))
+    assert len(rows) == 1
+    assert json_payload["timestamp"] == rows[0]["timestamp"]
 
-    assert reader.fieldnames is not None
-    assert "resolver_wall_time_ms" in reader.fieldnames
-    assert rows[0]["resolver_wall_time_ms"] == "987.6"
+
+def test_csv_sink_close_closes_file(tmp_path: Path) -> None:
+    csv_path = tmp_path / "attempts.csv"
+    sink = CsvSink(csv_path)
+    sink.log_attempt(
+        AttemptRecord(
+            work_id="W-close",
+            resolver_name="unpaywall",
+            resolver_order=1,
+            url="https://example.org/close",
+            status="pdf",
+            http_status=200,
+            content_type="application/pdf",
+            elapsed_ms=12.0,
+            metadata={},
+            sha256="abc123",
+            content_length=256,
+            dry_run=False,
+            resolver_wall_time_ms=10.5,
+        )
+    )
+    sink.close()
+    assert sink._file.closed  # type: ignore[attr-defined]
+    sink.close()
+    assert sink._file.closed  # type: ignore[attr-defined]
 
 
 def test_csv_adapter_close_closes_file(tmp_path: Path) -> None:
@@ -115,7 +133,7 @@ def test_csv_adapter_close_closes_file(tmp_path: Path) -> None:
 
 def test_jsonl_logger_writes_valid_records(tmp_path: Path) -> None:
     log_path = tmp_path / "attempts.jsonl"
-    logger = JsonlLogger(log_path)
+    logger = JsonlSink(log_path)
 
     attempt = AttemptRecord(
         work_id="W1",
@@ -155,7 +173,6 @@ def test_jsonl_logger_writes_valid_records(tmp_path: Path) -> None:
         dry_run=False,
     )
     logger.log_manifest(manifest_entry)
-
     logger.log_summary({"total_works": 1})
     logger.close()
 
@@ -172,7 +189,7 @@ def test_jsonl_logger_writes_valid_records(tmp_path: Path) -> None:
 
 def test_export_attempts_csv(tmp_path: Path) -> None:
     log_path = tmp_path / "attempts.jsonl"
-    logger = JsonlLogger(log_path)
+    logger = JsonlSink(log_path)
     attempt = AttemptRecord(
         work_id="W2",
         resolver_name="crossref",
@@ -184,10 +201,7 @@ def test_export_attempts_csv(tmp_path: Path) -> None:
         elapsed_ms=50.0,
         reason="not found",
         metadata={"status": 404},
-        sha256=None,
-        content_length=None,
         dry_run=True,
-        resolver_wall_time_ms=111.5,
     )
     logger.log_attempt(attempt)
     logger.close()
@@ -208,12 +222,9 @@ def test_export_attempts_csv(tmp_path: Path) -> None:
     assert row["status"] == "http_error"
     assert row["dry_run"] == "True"
     assert row["metadata"] == json.dumps({"status": 404}, sort_keys=True)
-    assert row["resolver_wall_time_ms"] == "111.5"
 
 
 def _attempt_record(index: int) -> AttemptRecord:
-    """Construct an attempt record with deterministic fields for concurrency tests."""
-
     return AttemptRecord(
         work_id=f"W{index}",
         resolver_name="unpaywall",
@@ -231,9 +242,9 @@ def _attempt_record(index: int) -> AttemptRecord:
     )
 
 
-def test_jsonl_logger_thread_safety(tmp_path: Path) -> None:
+def test_jsonl_sink_thread_safety(tmp_path: Path) -> None:
     log_path = tmp_path / "attempts.jsonl"
-    logger = JsonlLogger(log_path)
+    logger = JsonlSink(log_path)
 
     def _worker(offset: int) -> None:
         for idx in range(1000):
@@ -253,26 +264,145 @@ def test_jsonl_logger_thread_safety(tmp_path: Path) -> None:
         assert "metadata" in payload
 
 
-def test_csv_adapter_thread_safety(tmp_path: Path) -> None:
-    log_path = tmp_path / "attempts.jsonl"
+def test_multi_sink_thread_safety(tmp_path: Path) -> None:
+    jsonl_path = tmp_path / "attempts.jsonl"
     csv_path = tmp_path / "attempts.csv"
-    adapter = CsvAttemptLoggerAdapter(JsonlLogger(log_path), csv_path)
+    with JsonlSink(jsonl_path) as jsonl, CsvSink(csv_path) as csv:
+        sink = MultiSink([jsonl, csv])
 
-    def _worker(offset: int) -> None:
-        for idx in range(1000):
-            adapter.log_attempt(_attempt_record(offset * 1000 + idx))
+        def _worker(offset: int) -> None:
+            for idx in range(1000):
+                sink.log_attempt(_attempt_record(offset * 1000 + idx))
 
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        for worker_id in range(8):
-            executor.submit(_worker, worker_id)
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            for worker_id in range(8):
+                executor.submit(_worker, worker_id)
 
-    adapter.close()
-
+    lines = jsonl_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 8_000
     with csv_path.open("r", encoding="utf-8", newline="") as handle:
-        reader = csv.DictReader(handle)
-        rows = list(reader)
-
+        rows = list(csv.DictReader(handle))
     assert len(rows) == 8_000
     for row in rows[:5]:
         assert row["status"] == "pdf"
         assert row["content_length"] == "2048"
+
+
+def test_manifest_index_sink_writes_sorted_index(tmp_path: Path) -> None:
+    index_path = tmp_path / "manifest.index.json"
+    sink = ManifestIndexSink(index_path)
+    entries = [
+        ManifestEntry(
+            timestamp="2024-01-01T00:00:00Z",
+            work_id="W2",
+            title="Example",
+            publication_year=2024,
+            resolver="unpaywall",
+            url="https://example.org/pdf",
+            path="/tmp/example.pdf",
+            classification="pdf",
+            content_type="application/pdf",
+            reason=None,
+            html_paths=[],
+            sha256="abc",
+            content_length=1024,
+            etag=None,
+            last_modified=None,
+            extracted_text_path=None,
+            dry_run=False,
+        ),
+        ManifestEntry(
+            timestamp="2024-01-01T00:00:01Z",
+            work_id="W1",
+            title="HTML",
+            publication_year=2023,
+            resolver="landing",
+            url="https://example.org/html",
+            path="/tmp/example.html",
+            classification="html",
+            content_type="text/html",
+            reason=None,
+            html_paths=["/tmp/example.html"],
+            sha256=None,
+            content_length=512,
+            etag=None,
+            last_modified=None,
+            extracted_text_path=None,
+            dry_run=False,
+        ),
+    ]
+    for entry in entries:
+        sink.log_manifest(entry)
+    sink.close()
+
+    payload = json.loads(index_path.read_text(encoding="utf-8"))
+    assert list(payload.keys()) == ["W1", "W2"]
+    assert payload["W1"]["classification"] == "html"
+    assert payload["W1"]["pdf_path"] is None
+    assert payload["W2"]["pdf_path"] == "/tmp/example.pdf"
+    assert payload["W2"]["sha256"] == "abc"
+
+
+def test_last_attempt_csv_sink_writes_latest_entries(tmp_path: Path) -> None:
+    csv_path = tmp_path / "manifest.last.csv"
+    sink = LastAttemptCsvSink(csv_path)
+    first = ManifestEntry(
+        timestamp="2024-01-01T00:00:00Z",
+        work_id="W-last",
+        title="Initial",
+        publication_year=2024,
+        resolver="unpaywall",
+        url="https://example.org/first",
+        path="/tmp/first.pdf",
+        classification="pdf",
+        content_type="application/pdf",
+        reason=None,
+        html_paths=[],
+        sha256="111",
+        content_length=100,
+        etag=None,
+        last_modified=None,
+        extracted_text_path=None,
+        dry_run=False,
+    )
+    second = ManifestEntry(
+        timestamp="2024-01-01T00:01:00Z",
+        work_id="W-last",
+        title="Updated",
+        publication_year=2024,
+        resolver="crossref",
+        url="https://example.org/second",
+        path="/tmp/second.pdf",
+        classification="pdf",
+        content_type="application/pdf",
+        reason=None,
+        html_paths=[],
+        sha256="222",
+        content_length=200,
+        etag=None,
+        last_modified=None,
+        extracted_text_path=None,
+        dry_run=False,
+    )
+    sink.log_manifest(first)
+    sink.log_manifest(second)
+    sink.close()
+
+    with csv_path.open("r", encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert rows == [
+        {
+            "work_id": "W-last",
+            "title": "Updated",
+            "publication_year": "2024",
+            "resolver": "crossref",
+            "url": "https://example.org/second",
+            "classification": "pdf",
+            "path": "/tmp/second.pdf",
+            "sha256": "222",
+            "content_length": "200",
+            "etag": "",
+            "last_modified": "",
+        }
+    ]

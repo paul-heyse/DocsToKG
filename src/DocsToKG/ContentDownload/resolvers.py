@@ -338,7 +338,7 @@ class AttemptRecord:
     resolver_wall_time_ms: Optional[float] = None
 
 
-class AttemptLogger(Protocol):
+class AttemptSink(Protocol):
     """Protocol for logging resolver attempts.
 
     Attributes:
@@ -351,9 +351,12 @@ class AttemptLogger(Protocol):
         ...     def log(self, record: AttemptRecord) -> None:
         ...         self.records.append(record)
         >>> collector = Collector()
-        >>> isinstance(collector, AttemptLogger)
+        >>> isinstance(collector, AttemptSink)
         True
     """
+
+    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
+        """Log a resolver attempt with optional timestamp override."""
 
     def log(self, record: AttemptRecord) -> None:
         """Log a resolver attempt.
@@ -2729,7 +2732,7 @@ class ResolverPipeline:
         resolvers: Sequence[Resolver],
         config: ResolverConfig,
         download_func: DownloadFunc,
-        logger: AttemptLogger,
+        logger: AttemptSink,
         metrics: Optional[ResolverMetrics] = None,
     ) -> None:
         """Create a resolver pipeline with ordering, download, and metric hooks.
@@ -2822,7 +2825,8 @@ class ResolverPipeline:
                 return
             wait = interval - elapsed
         if wait > 0:
-            _time.sleep(wait)
+            jitter = random.random() * 0.05
+            _time.sleep(wait + jitter)
             with self._host_lock:
                 self._last_host_hit[host] = _time.monotonic()
 
@@ -3058,7 +3062,7 @@ class ResolverPipeline:
 
         resolver = self._resolver_map.get(resolver_name)
         if resolver is None:
-            self.logger.log(
+            self.logger.log_attempt(
                 AttemptRecord(
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
@@ -3077,7 +3081,7 @@ class ResolverPipeline:
             return None
 
         if not self.config.is_enabled(resolver_name):
-            self.logger.log(
+            self.logger.log_attempt(
                 AttemptRecord(
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
@@ -3096,7 +3100,7 @@ class ResolverPipeline:
             return None
 
         if not resolver.is_enabled(self.config, artifact):
-            self.logger.log(
+            self.logger.log_attempt(
                 AttemptRecord(
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
@@ -3183,7 +3187,7 @@ class ResolverPipeline:
         """
 
         if result.is_event:
-            self.logger.log(
+            self.logger.log_attempt(
                 AttemptRecord(
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
@@ -3212,7 +3216,7 @@ class ResolverPipeline:
                 if not duplicate:
                     self._global_seen_urls.add(url)
             if duplicate:
-                self.logger.log(
+                self.logger.log_attempt(
                     AttemptRecord(
                         work_id=artifact.work_id,
                         resolver_name=resolver_name,
@@ -3231,7 +3235,7 @@ class ResolverPipeline:
                 self.metrics.record_skip(resolver_name, "duplicate-url-global")
                 return None
         if url in state.seen_urls:
-            self.logger.log(
+            self.logger.log_attempt(
                 AttemptRecord(
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
@@ -3260,7 +3264,7 @@ class ResolverPipeline:
                 self.config.get_timeout(resolver_name),
             )
             if not head_precheck_passed:
-                self.logger.log(
+                self.logger.log_attempt(
                     AttemptRecord(
                         work_id=artifact.work_id,
                         resolver_name=resolver_name,
@@ -3306,7 +3310,7 @@ class ResolverPipeline:
                 **kwargs,
             )
 
-        self.logger.log(
+        self.logger.log_attempt(
             AttemptRecord(
                 work_id=artifact.work_id,
                 resolver_name=resolver_name,
@@ -3372,7 +3376,7 @@ def clear_resolver_caches() -> None:
 
 
 __all__ = [
-    "AttemptLogger",
+    "AttemptSink",
     "AttemptRecord",
     "DownloadFunc",
     "DownloadOutcome",
