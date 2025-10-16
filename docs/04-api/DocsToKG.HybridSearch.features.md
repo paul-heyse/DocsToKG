@@ -2,9 +2,11 @@
 
 This reference documents the DocsToKG module ``DocsToKG.HybridSearch.features``.
 
+## 1. Overview
+
 Feature generation utilities for SPLADE weights and dense embeddings.
 
-## 1. Functions
+## 2. Functions
 
 ### `tokenize(text)`
 
@@ -115,7 +117,7 @@ vector: Vector to normalise to unit length.
 Returns:
 Normalised vector, or the original vector when zero-norm.
 
-## 2. Classes
+## 3. Classes
 
 ### `FeatureGenerator`
 

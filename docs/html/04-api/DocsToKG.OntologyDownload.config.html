@@ -78,8 +78,9 @@
              
   <section id="module-config">
 <h1>1. Module: config<a class="headerlink" href="#module-config" title="Link to this heading"></a></h1>
-<p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.config</span></code>.</p>
-<p>Ontology downloader configuration utilities.</p>
+<p>Configuration utilities previously exposed from <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.config</span></code>
+reside in <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.ontology_download</span></code> and are re-exported via the
+package facade.</p>
 <p>This module defines the Pydantic models and helpers that drive manifest schema
 validation, concurrency defaults, rate limit enforcement, and the CLI override
 surface introduced in the ontology download refactor. Configuration can be
@@ -323,7 +324,8 @@ config.level
 parser_timeout_sec: Maximum runtime allowed for ontology parsing.
 max_memory_mb: Memory ceiling allocated to validation routines.
 skip_reasoning_if_size_mb: Threshold above which reasoning is skipped.
-streaming_normalization_threshold_mb: File size threshold for streaming normalization.</p>
+streaming_normalization_threshold_mb: File size threshold for streaming normalization.
+max_concurrent_validators: Bounded thread pool size for validator execution (1-8).</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>

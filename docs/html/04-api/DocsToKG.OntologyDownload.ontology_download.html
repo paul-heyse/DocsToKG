@@ -79,9 +79,12 @@
   <section id="module-ontology-download">
 <h1>1. Module: ontology_download<a class="headerlink" href="#module-ontology-download" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.ontology_download</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Unified ontology downloader orchestrating settings, retries, and logging.</p>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="retry-with-backoff-func">
 <h3><code class="docutils literal notranslate"><span class="pre">retry_with_backoff(func)</span></code><a class="headerlink" href="#retry-with-backoff-func" title="Link to this heading"></a></h3>
 <p>Execute <code class="docutils literal notranslate"><span class="pre">func</span></code> with exponential backoff until it succeeds.</p>
@@ -145,6 +148,19 @@ SystemExit: If the current interpreter version is below the minimum.</p>
 value: Input value that may be <code class="docutils literal notranslate"><span class="pre">None</span></code>, a string, or an iterable of strings.</p>
 <p>Returns:
 List of strings suitable for downstream configuration processing.</p>
+</section>
+<section id="parse-rate-limit-to-rps-limit-str">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_rate_limit_to_rps(limit_str)</span></code><a class="headerlink" href="#parse-rate-limit-to-rps-limit-str" title="Link to this heading"></a></h3>
+<p>Convert a rate limit expression into requests-per-second.</p>
+<p>The accepted format is <code class="docutils literal notranslate"><span class="pre">&lt;value&gt;/&lt;unit&gt;</span></code> where <code class="docutils literal notranslate"><span class="pre">unit</span></code> is one of
+<code class="docutils literal notranslate"><span class="pre">second</span></code>, <code class="docutils literal notranslate"><span class="pre">minute</span></code>, or <code class="docutils literal notranslate"><span class="pre">hour</span></code> (including short aliases such as <code class="docutils literal notranslate"><span class="pre">s</span></code>
+or <code class="docutils literal notranslate"><span class="pre">min</span></code>). The function returns <code class="docutils literal notranslate"><span class="pre">None</span></code> when the value cannot be parsed.</p>
+<p>Args:
+limit_str: Rate limit expression in <code class="docutils literal notranslate"><span class="pre">value/unit</span></code> form.</p>
+<p>Returns:
+Optional[float]: Requests-per-second value when parsing succeeds.</p>
+<p>Raises:
+ValueError: If the numeric component cannot be converted to <code class="docutils literal notranslate"><span class="pre">float</span></code>.</p>
 </section>
 <section id="get-env-overrides">
 <h3><code class="docutils literal notranslate"><span class="pre">get_env_overrides()</span></code><a class="headerlink" href="#get-env-overrides" title="Link to this heading"></a></h3>
@@ -697,6 +713,14 @@ referencing any produced log files.</p>
 <p>Raises:
 None</p>
 </section>
+<section id="load-validator-plugins-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">_load_validator_plugins(logger)</span></code><a class="headerlink" href="#load-validator-plugins-logger" title="Link to this heading"></a></h3>
+<p>Discover validator plugins registered via entry points.</p>
+</section>
+<section id="run-validator-task-validator-request-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">_run_validator_task(validator,</span> <span class="pre">request,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#run-validator-task-validator-request-logger" title="Link to this heading"></a></h3>
+<p>Execute a single validator with exception guards.</p>
+</section>
 <section id="run-validators-requests-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">run_validators(requests,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#run-validators-requests-logger" title="Link to this heading"></a></h3>
 <p>Execute registered validators and aggregate their results.</p>
@@ -737,6 +761,46 @@ None</p>
 <p>Raises:
 ConfigurationError: If validation fails.</p>
 </section>
+<section id="parse-http-datetime-value">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_http_datetime(value)</span></code><a class="headerlink" href="#parse-http-datetime-value" title="Link to this heading"></a></h3>
+<p>Parse HTTP <code class="docutils literal notranslate"><span class="pre">Last-Modified</span></code> style timestamps into UTC datetimes.</p>
+<p>Args:
+value: Timestamp string from HTTP headers such as <code class="docutils literal notranslate"><span class="pre">Last-Modified</span></code>.</p>
+<p>Returns:
+Optional[datetime]: Normalized UTC datetime when parsing succeeds.</p>
+<p>Raises:
+None: Parsing failures are converted into a <code class="docutils literal notranslate"><span class="pre">None</span></code> return value.</p>
+</section>
+<section id="parse-iso-datetime-value">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_iso_datetime(value)</span></code><a class="headerlink" href="#parse-iso-datetime-value" title="Link to this heading"></a></h3>
+<p>Parse ISO-8601 timestamps into timezone-aware UTC datetimes.</p>
+<p>Args:
+value: ISO-8601 formatted timestamp string.</p>
+<p>Returns:
+Optional[datetime]: Normalized UTC datetime when parsing succeeds.</p>
+<p>Raises:
+None: Invalid values return <code class="docutils literal notranslate"><span class="pre">None</span></code> instead of raising.</p>
+</section>
+<section id="parse-version-timestamp-value">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_version_timestamp(value)</span></code><a class="headerlink" href="#parse-version-timestamp-value" title="Link to this heading"></a></h3>
+<p>Parse version strings or manifest timestamps into UTC datetimes.</p>
+<p>Args:
+value: Version identifier or timestamp string to normalize.</p>
+<p>Returns:
+Optional[datetime]: Parsed UTC datetime when the input matches supported formats.</p>
+<p>Raises:
+None: All parsing failures result in <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+</section>
+<section id="infer-version-timestamp-value">
+<h3><code class="docutils literal notranslate"><span class="pre">infer_version_timestamp(value)</span></code><a class="headerlink" href="#infer-version-timestamp-value" title="Link to this heading"></a></h3>
+<p>Infer a timestamp from resolver version identifiers.</p>
+<p>Args:
+value: Resolver version string containing date-like fragments.</p>
+<p>Returns:
+Optional[datetime]: Parsed UTC datetime when the value contains recoverable dates.</p>
+<p>Raises:
+None: Returns <code class="docutils literal notranslate"><span class="pre">None</span></code> instead of raising on unparseable inputs.</p>
+</section>
 <section id="coerce-datetime-value">
 <h3><code class="docutils literal notranslate"><span class="pre">_coerce_datetime(value)</span></code><a class="headerlink" href="#coerce-datetime-value" title="Link to this heading"></a></h3>
 <p>Return timezone-aware datetime parsed from HTTP or ISO timestamp.</p>
@@ -748,6 +812,10 @@ ConfigurationError: If validation fails.</p>
 <section id="populate-plan-metadata-planned-config-adapter">
 <h3><code class="docutils literal notranslate"><span class="pre">_populate_plan_metadata(planned,</span> <span class="pre">config,</span> <span class="pre">adapter)</span></code><a class="headerlink" href="#populate-plan-metadata-planned-config-adapter" title="Link to this heading"></a></h3>
 <p>Augment planned fetch with HTTP metadata when available.</p>
+</section>
+<section id="migrate-manifest-inplace-payload">
+<h3><code class="docutils literal notranslate"><span class="pre">_migrate_manifest_inplace(payload)</span></code><a class="headerlink" href="#migrate-manifest-inplace-payload" title="Link to this heading"></a></h3>
+<p>Upgrade manifests created with older schema versions in place.</p>
 </section>
 <section id="read-manifest-manifest-path">
 <h3><code class="docutils literal notranslate"><span class="pre">_read_manifest(manifest_path)</span></code><a class="headerlink" href="#read-manifest-manifest-path" title="Link to this heading"></a></h3>
@@ -812,17 +880,15 @@ ConfigurationError: If the plan’s license is not permitted.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">fetch_one(spec)</span></code><a class="headerlink" href="#fetch-one-spec" title="Link to this heading"></a></h3>
 <p>Fetch, validate, and persist a single ontology described by <em>spec</em>.</p>
 <p>Args:
-spec: Fetch specification outlining resolver selection and target formats.
-config: Optional resolved configuration supplying defaults and limits.
-correlation_id: Identifier used to correlate structured log entries.
-logger: Logger instance reused for download and validation telemetry.
-force: When True, ignore cached manifests and re-download artefacts.</p>
+spec: Ontology fetch specification describing sources and formats.
+config: Optional resolved configuration overriding global defaults.
+correlation_id: Correlation identifier for structured logging.
+logger: Optional logger to reuse instead of configuring a new one.
+force: When <code class="docutils literal notranslate"><span class="pre">True</span></code>, bypass local cache checks and redownload artifacts.</p>
 <p>Returns:
-FetchResult capturing download status, SHA-256 hashes, and manifest path.</p>
+FetchResult: Structured result containing manifest metadata and resolver attempts.</p>
 <p>Raises:
-ResolverError: If all resolvers fail to produce a viable FetchPlan.
-OntologyDownloadError: If download, extraction, or validation fails.
-ConfigurationError: If licence checks or manifest validation fail.</p>
+ResolverError: If all resolver candidates fail to retrieve the ontology.</p>
 </section>
 <section id="plan-one-spec">
 <h3><code class="docutils literal notranslate"><span class="pre">plan_one(spec)</span></code><a class="headerlink" href="#plan-one-spec" title="Link to this heading"></a></h3>
@@ -865,6 +931,14 @@ List of FetchResult entries corresponding to completed downloads.</p>
 <p>Raises:
 OntologyDownloadError: Propagated when downloads fail and the pipeline
 is configured to stop on error.</p>
+</section>
+<section id="safe-lock-component-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_safe_lock_component(value)</span></code><a class="headerlink" href="#safe-lock-component-value" title="Link to this heading"></a></h3>
+<p>Return a filesystem-safe token for lock filenames.</p>
+</section>
+<section id="version-lock-ontology-id-version">
+<h3><code class="docutils literal notranslate"><span class="pre">_version_lock(ontology_id,</span> <span class="pre">version)</span></code><a class="headerlink" href="#version-lock-ontology-id-version" title="Link to this heading"></a></h3>
+<p>Acquire an inter-process lock for a specific ontology version.</p>
 </section>
 <section id="validate-level-cls-value">
 <h3><code class="docutils literal notranslate"><span class="pre">validate_level(cls,</span> <span class="pre">value)</span></code><a class="headerlink" href="#validate-level-cls-value" title="Link to this heading"></a></h3>
@@ -1328,10 +1402,6 @@ Dictionary with boolean status, detail payload, and output paths.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_replace(match)</span></code><a class="headerlink" href="#replace-match" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
-<section id="iter-canonical-lines">
-<h3><code class="docutils literal notranslate"><span class="pre">_iter_canonical_lines()</span></code><a class="headerlink" href="#iter-canonical-lines" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
 <section id="flush-writer">
 <h3><code class="docutils literal notranslate"><span class="pre">_flush(writer)</span></code><a class="headerlink" href="#flush-writer" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
@@ -1339,6 +1409,10 @@ Dictionary with boolean status, detail payload, and output paths.</p>
 <section id="parse">
 <h3><code class="docutils literal notranslate"><span class="pre">_parse()</span></code><a class="headerlink" href="#parse" title="Link to this heading"></a></h3>
 <p>Parse the ontology with rdflib to populate the graph object.</p>
+</section>
+<section id="determine-max-workers">
+<h3><code class="docutils literal notranslate"><span class="pre">_determine_max_workers()</span></code><a class="headerlink" href="#determine-max-workers" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="id16">
 <h3><code class="docutils literal notranslate"><span class="pre">to_dict(self)</span></code><a class="headerlink" href="#id16" title="Link to this heading"></a></h3>
@@ -1365,6 +1439,10 @@ config: Fully resolved configuration containing defaults.
 logger: Logger adapter scoped to the current fetch request.</p>
 <p>Returns:
 Concrete plan containing download URL, headers, and metadata.</p>
+</section>
+<section id="add-candidate-candidate">
+<h3><code class="docutils literal notranslate"><span class="pre">_add_candidate(candidate)</span></code><a class="headerlink" href="#add-candidate-candidate" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="add-name">
 <h3><code class="docutils literal notranslate"><span class="pre">_add(name)</span></code><a class="headerlink" href="#add-name" title="Link to this heading"></a></h3>
@@ -1412,9 +1490,17 @@ List of representative ontology class names.</p>
 signum: Received signal number.
 frame: Current stack frame (unused).</p>
 </section>
+<section id="execute-candidate">
+<h3><code class="docutils literal notranslate"><span class="pre">_execute_candidate()</span></code><a class="headerlink" href="#execute-candidate" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="emit-text">
+<h3><code class="docutils literal notranslate"><span class="pre">_emit(text)</span></code><a class="headerlink" href="#emit-text" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="configerror">
 <h3><code class="docutils literal notranslate"><span class="pre">ConfigError</span></code><a class="headerlink" href="#configerror" title="Link to this heading"></a></h3>
 <p>Raised when ontology configuration files are invalid or inconsistent.</p>
@@ -1758,7 +1844,7 @@ expected_media_type: MIME type provided by the resolver for validation.</p>
 <div><blockquote>
 <div><blockquote>
 <div><p>from pathlib import Path
-from DocsToKG.OntologyDownload.config import DownloadConfiguration
+from DocsToKG.OntologyDownload import DownloadConfiguration
 downloader = StreamingDownloader(
 …     destination=Path(“/tmp/ontology.owl”),
 …     headers={},
@@ -1786,7 +1872,7 @@ config: Resolved configuration that supplies timeout thresholds.</p>
 <div><blockquote>
 <div><blockquote>
 <div><p>from pathlib import Path
-from DocsToKG.OntologyDownload.config import ResolvedConfig
+from DocsToKG.OntologyDownload import ResolvedConfig
 req = ValidationRequest(
 …     name=”rdflib”,
 …     file_path=Path(“ontology.owl”),

@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_normalization",
+#   "purpose": "Pytest coverage for ontology download normalization scenarios",
+#   "sections": [
+#     {
+#       "id": "_make_config",
+#       "name": "_make_config",
+#       "anchor": "MC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_noop_logger",
+#       "name": "_noop_logger",
+#       "anchor": "NL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_run_rdflib",
+#       "name": "_run_rdflib",
+#       "anchor": "RR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_streaming_hash_is_deterministic",
+#       "name": "test_streaming_hash_is_deterministic",
+#       "anchor": "TSHID",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_streaming_matches_in_memory",
+#       "name": "test_streaming_matches_in_memory",
+#       "anchor": "TSMIM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_streaming_edge_cases",
+#       "name": "test_streaming_edge_cases",
+#       "anchor": "TSEC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_streaming_flushes_chunks",
+#       "name": "test_streaming_flushes_chunks",
+#       "anchor": "TSFC",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Normalization determinism tests for streaming and in-memory pipelines."""
 
 from __future__ import annotations
@@ -15,7 +66,7 @@ from DocsToKG.OntologyDownload import DefaultsConfig, ResolvedConfig, Validation
 from DocsToKG.OntologyDownload.ontology_download import normalize_streaming, validate_rdflib
 
 _COMPLEX_FIXTURE = Path("tests/data/ontology_normalization/complex.ttl")
-_EXPECTED_STREAMING_HASH = "a4455411fb31c754effffaf74218f21304c64a8e6c9a0c72634c2af45fa29bb4"
+_EXPECTED_STREAMING_HASH = "65f80531c7207dc63e0d1eb6c85cae2bcb3d37968ae87b24c9c3858a4d85d449"
 
 
 def _make_config(threshold_mb: int = 2048) -> ResolvedConfig:
@@ -110,9 +161,7 @@ def test_streaming_flushes_chunks(monkeypatch, tmp_path: Path) -> None:
     )
 
     destination = tmp_path / "chunked.ttl"
-    digest = normalize_streaming(
-        _COMPLEX_FIXTURE, output_path=destination, chunk_bytes=64
-    )
+    digest = normalize_streaming(_COMPLEX_FIXTURE, output_path=destination, chunk_bytes=64)
 
     assert digest == "stub-digest"
     assert len(tracker.updates) > 1

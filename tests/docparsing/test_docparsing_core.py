@@ -1,16 +1,295 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.docparsing.test_docparsing_core",
+#   "purpose": "Pytest coverage for docparsing docparsing core scenarios",
+#   "sections": [
+#     {
+#       "id": "_requests_response",
+#       "name": "_RequestsResponse",
+#       "anchor": "REQU",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_dummy_tqdm",
+#       "name": "_DummyTqdm",
+#       "anchor": "DUMM",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_reset_env",
+#       "name": "_reset_env",
+#       "anchor": "RE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_detect_data_root_env",
+#       "name": "test_detect_data_root_env",
+#       "anchor": "TDDRE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_detect_data_root_scan",
+#       "name": "test_detect_data_root_scan",
+#       "anchor": "TDDRS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_detect_data_root_fallback",
+#       "name": "test_detect_data_root_fallback",
+#       "anchor": "TDDRF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_data_directories_created",
+#       "name": "test_data_directories_created",
+#       "anchor": "TDDC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_get_logger_idempotent",
+#       "name": "test_get_logger_idempotent",
+#       "anchor": "TGLI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_find_free_port_basic",
+#       "name": "test_find_free_port_basic",
+#       "anchor": "TFFPB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_find_free_port_fallback",
+#       "name": "test_find_free_port_fallback",
+#       "anchor": "TFFPF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_atomic_write_success",
+#       "name": "test_atomic_write_success",
+#       "anchor": "TAWS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_atomic_write_failure",
+#       "name": "test_atomic_write_failure",
+#       "anchor": "TAWF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_iter_doctags",
+#       "name": "test_iter_doctags",
+#       "anchor": "TID",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_iter_chunks",
+#       "name": "test_iter_chunks",
+#       "anchor": "TIC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_jsonl_load_and_save",
+#       "name": "test_jsonl_load_and_save",
+#       "anchor": "TJLAS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_jsonl_load_skip_invalid",
+#       "name": "test_jsonl_load_skip_invalid",
+#       "anchor": "TJLSI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_jsonl_save_validation_error",
+#       "name": "test_jsonl_save_validation_error",
+#       "anchor": "TJSVE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_batcher",
+#       "name": "test_batcher",
+#       "anchor": "TB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_manifest_append",
+#       "name": "test_manifest_append",
+#       "anchor": "TMA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "make_chunk_row",
+#       "name": "make_chunk_row",
+#       "anchor": "MCR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "make_vector_row",
+#       "name": "make_vector_row",
+#       "anchor": "MVR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_chunk_row_valid",
+#       "name": "test_chunk_row_valid",
+#       "anchor": "TCRV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_chunk_row_missing_field",
+#       "name": "test_chunk_row_missing_field",
+#       "anchor": "TCRMF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_chunk_row_invalid_num_tokens",
+#       "name": "test_chunk_row_invalid_num_tokens",
+#       "anchor": "TCRIN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_chunk_row_invalid_page_numbers",
+#       "name": "test_chunk_row_invalid_page_numbers",
+#       "anchor": "TCRIP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_provenance_invalid_engine",
+#       "name": "test_provenance_invalid_engine",
+#       "anchor": "TPIE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_vector_row_valid",
+#       "name": "test_vector_row_valid",
+#       "anchor": "TVRV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_vector_row_mismatched_terms",
+#       "name": "test_vector_row_mismatched_terms",
+#       "anchor": "TVRMT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_vector_row_negative_weights",
+#       "name": "test_vector_row_negative_weights",
+#       "anchor": "TVRNW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_dense_vector_dimension_mismatch",
+#       "name": "test_dense_vector_dimension_mismatch",
+#       "anchor": "TDVDM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_get_docling_version",
+#       "name": "test_get_docling_version",
+#       "anchor": "TGDV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_schema_version",
+#       "name": "test_validate_schema_version",
+#       "anchor": "TVSV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_chunk_row_invalid_schema_version",
+#       "name": "test_chunk_row_invalid_schema_version",
+#       "anchor": "TCRIS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_vector_row_invalid_schema_version",
+#       "name": "test_vector_row_invalid_schema_version",
+#       "anchor": "TVRIS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_load_jsonl",
+#       "name": "_load_jsonl",
+#       "anchor": "LJ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_chunk_golden_rows_validate",
+#       "name": "test_chunk_golden_rows_validate",
+#       "anchor": "TCGRV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_vector_golden_rows_validate",
+#       "name": "test_vector_golden_rows_validate",
+#       "anchor": "TVGRV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_set_spawn_or_warn_warns_on_incompatible_method",
+#       "name": "test_set_spawn_or_warn_warns_on_incompatible_method",
+#       "anchor": "TSSOW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_compute_relative_doc_id_handles_subdirectories",
+#       "name": "test_compute_relative_doc_id_handles_subdirectories",
+#       "anchor": "TCRDI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_derive_doc_id_and_output_path",
+#       "name": "test_derive_doc_id_and_output_path",
+#       "anchor": "TDDIA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_chunk_row_fields_unique",
+#       "name": "test_chunk_row_fields_unique",
+#       "anchor": "TCRFU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_qwen_embed_caches_llm",
+#       "name": "test_qwen_embed_caches_llm",
+#       "anchor": "TQECL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pdf_model_path_resolution_precedence",
+#       "name": "test_pdf_model_path_resolution_precedence",
+#       "anchor": "TPMPR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pdf_model_path_cli_normalization",
+#       "name": "test_pdf_model_path_cli_normalization",
+#       "anchor": "TPMPC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pdf_pipeline_mirrors_output_paths",
+#       "name": "test_pdf_pipeline_mirrors_output_paths",
+#       "anchor": "TPPMO",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Core DocParsing utility and schema validation tests."""
 
 from __future__ import annotations
 
 import argparse
 import json
-import logging
 import socket
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+
 
 class _RequestsResponse:
     headers = {"content-type": "application/json"}
@@ -21,13 +300,9 @@ class _RequestsResponse:
         return {"data": []}
 
 
-sys.modules.setdefault(
-    "requests", SimpleNamespace(get=lambda *args, **kwargs: _RequestsResponse())
-)
+sys.modules.setdefault("requests", SimpleNamespace(get=lambda *args, **kwargs: _RequestsResponse()))
 
-sys.modules.setdefault(
-    "tqdm", SimpleNamespace(tqdm=lambda *a, **kw: _DummyTqdm(*a, **kw))
-)
+sys.modules.setdefault("tqdm", SimpleNamespace(tqdm=lambda *a, **kw: _DummyTqdm(*a, **kw)))
 
 sys.modules.setdefault(
     "docling_core.transforms.chunker.base",
@@ -58,7 +333,9 @@ sys.modules.setdefault(
 )
 sys.modules.setdefault(
     "transformers",
-    SimpleNamespace(AutoTokenizer=SimpleNamespace(from_pretrained=lambda *a, **k: SimpleNamespace())),
+    SimpleNamespace(
+        AutoTokenizer=SimpleNamespace(from_pretrained=lambda *a, **k: SimpleNamespace())
+    ),
 )
 sys.modules.setdefault(
     "docling_core.transforms.serializer.base",
@@ -92,8 +369,8 @@ class _DummyTqdm:
         pass
 
 
-from DocsToKG.DocParsing import _common, schemas
-from DocsToKG.DocParsing.schemas import (
+from DocsToKG.DocParsing import _common, schemas  # noqa: E402
+from DocsToKG.DocParsing.schemas import (  # noqa: E402
     CHUNK_SCHEMA_VERSION,
     VECTOR_SCHEMA_VERSION,
     validate_chunk_row,
@@ -504,7 +781,9 @@ def test_qwen_embed_caches_llm(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     assert len(second) == 1
 
 
-def test_pdf_model_path_resolution_precedence(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_pdf_model_path_resolution_precedence(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     class DummyResponse:
         headers = {"content-type": "application/json"}
         text = "{}"
@@ -557,15 +836,15 @@ def test_pdf_model_path_cli_normalization(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert pipelines.resolve_pdf_model_path(str(local_dir)) == str(local_dir.resolve())
 
     tilde_path = str(Path("~") / "granite-model")
-    assert pipelines.resolve_pdf_model_path(tilde_path) == str(Path(tilde_path).expanduser().resolve())
+    assert pipelines.resolve_pdf_model_path(tilde_path) == str(
+        Path(tilde_path).expanduser().resolve()
+    )
 
     repo_id = "ibm-granite/granite-docling-258M"
     assert pipelines.resolve_pdf_model_path(repo_id) == repo_id
 
 
-def test_pdf_pipeline_mirrors_output_paths(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_pdf_pipeline_mirrors_output_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     class DummyResponse:
         headers = {"content-type": "application/json"}
         text = "{}"
@@ -667,6 +946,8 @@ def test_pdf_pipeline_mirrors_output_paths(
         served_model_names=None,
         model=str(model_dir),
         gpu_memory_utilization=0.1,
+        vlm_prompt="Convert this page to docling.",
+        vlm_stop=["</doctag>", "<|end_of_text|>"],
     )
 
     exit_code = pipelines.pdf_main(args)
@@ -707,12 +988,4 @@ def test_pdf_pipeline_mirrors_output_paths(
     }
 
 
-def test_deprecated_pdf_pipeline_warning(monkeypatch: pytest.MonkeyPatch) -> None:
-    import DocsToKG.DocParsing as docparse
-
-    legacy = sys.modules["DocsToKG.DocParsing.pdf_pipeline"]
-    setattr(legacy, "_warned", False)
-
-    with pytest.warns(DeprecationWarning):
-        _ = legacy.build_parser
-
+# Deprecated pdf_pipeline test removed - module no longer exists

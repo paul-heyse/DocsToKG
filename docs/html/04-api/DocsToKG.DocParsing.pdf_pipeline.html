@@ -79,135 +79,22 @@
   <section id="module-pdf-pipeline">
 <h1>1. Module: pdf_pipeline<a class="headerlink" href="#module-pdf-pipeline" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.pdf_pipeline</span></code>.</p>
-<p>PDF conversion pipeline with CUDA safety guarantees.</p>
-<p>This lightweight module exists primarily so test coverage can assert that the
-DocsToKG PDF conversion entrypoint enforces the <code class="docutils literal notranslate"><span class="pre">spawn</span></code> multiprocessing start
-method. The implementation keeps a close surface to the legacy script without
-depending on heavyweight optional libraries, allowing tests to monkeypatch
-behaviour as required.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Compatibility shims for the legacy <code class="docutils literal notranslate"><span class="pre">pdf_pipeline</span></code> module.</p>
+<p>The PDF conversion logic now lives in :mod:<code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.pipelines</span></code>.
+This module re-exports the historical surface so downstream tooling and tests
+can continue importing <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.pdf_pipeline</span></code> without changes.</p>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="tqdm-iterable">
-<h3><code class="docutils literal notranslate"><span class="pre">_tqdm(iterable)</span></code><a class="headerlink" href="#tqdm-iterable" title="Link to this heading"></a></h3>
-<p>Fallback progress iterator used when :mod:<code class="docutils literal notranslate"><span class="pre">tqdm</span></code> is unavailable.</p>
-<p>Args:
-iterable: Optional iterable passed to <code class="docutils literal notranslate"><span class="pre">tqdm</span></code>.
-**_kwargs: Additional keyword arguments ignored by the stub.</p>
-<p>Returns:
-The supplied iterable when provided; otherwise an empty list.</p>
-</section>
-<section id="parse-args">
-<h3><code class="docutils literal notranslate"><span class="pre">parse_args()</span></code><a class="headerlink" href="#parse-args" title="Link to this heading"></a></h3>
-<p>Return CLI arguments for the PDF conversion pipeline.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Namespace containing parsed CLI arguments.</p>
-<p>Raises:
-SystemExit: If the provided arguments fail standard argparse checks.</p>
-</section>
-<section id="ensure-vllm-args">
-<h3><code class="docutils literal notranslate"><span class="pre">ensure_vllm(_args)</span></code><a class="headerlink" href="#ensure-vllm-args" title="Link to this heading"></a></h3>
-<p>Start the legacy VLLM service if required for the pipeline.</p>
-<p>Args:
-_args: Parsed CLI arguments (unused but retained for compatibility).</p>
-<p>Returns:
-Tuple containing the preferred port, a server handle (when started),
-and a boolean indicating whether a new server boot occurred.</p>
-</section>
-<section id="stop-vllm-server">
-<h3><code class="docutils literal notranslate"><span class="pre">stop_vllm(server)</span></code><a class="headerlink" href="#stop-vllm-server" title="Link to this heading"></a></h3>
-<p>Stop a VLLM server when :func:<code class="docutils literal notranslate"><span class="pre">ensure_vllm</span></code> started one.</p>
-<p>Args:
-server: Optional server handle returned by :func:<code class="docutils literal notranslate"><span class="pre">ensure_vllm</span></code>.</p>
-<p>Returns:
-None</p>
-</section>
-<section id="list-pdfs-directory">
-<h3><code class="docutils literal notranslate"><span class="pre">list_pdfs(directory)</span></code><a class="headerlink" href="#list-pdfs-directory" title="Link to this heading"></a></h3>
-<p>Return sorted PDF paths under <code class="docutils literal notranslate"><span class="pre">directory</span></code>.</p>
-<p>Args:
-directory: Directory expected to contain PDF artefacts.</p>
-<p>Returns:
-Sorted list of PDF file paths present in <code class="docutils literal notranslate"><span class="pre">directory</span></code>.</p>
-</section>
-<section id="convert-one-task">
-<h3><code class="docutils literal notranslate"><span class="pre">convert_one(task)</span></code><a class="headerlink" href="#convert-one-task" title="Link to this heading"></a></h3>
-<p>Convert a single PDF artefact into DocTags output (stub).</p>
-<p>Args:
-task: Tuple containing the source PDF path and the target directory.</p>
-<p>Returns:
-Tuple pairing the original PDF path with a status string.</p>
-<p>Raises:
-OSError: If the destination directory cannot be created.</p>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="parse-args-argv">
+<h3><code class="docutils literal notranslate"><span class="pre">parse_args(argv)</span></code><a class="headerlink" href="#parse-args-argv" title="Link to this heading"></a></h3>
+<p>Return parsed CLI arguments for the PDF pipeline.</p>
 </section>
 <section id="main-args">
 <h3><code class="docutils literal notranslate"><span class="pre">main(args)</span></code><a class="headerlink" href="#main-args" title="Link to this heading"></a></h3>
-<p>Run the PDF conversion pipeline.</p>
-<p>Args:
-args: Parsed CLI arguments. When <code class="docutils literal notranslate"><span class="pre">None</span></code> the arguments are read from
-:data:<code class="docutils literal notranslate"><span class="pre">sys.argv</span></code>.</p>
-<p>Returns:
-Process exit code where <code class="docutils literal notranslate"><span class="pre">0</span></code> indicates success.</p>
-</section>
-<section id="start-vllm-self">
-<h3><code class="docutils literal notranslate"><span class="pre">start_vllm(self)</span></code><a class="headerlink" href="#start-vllm-self" title="Link to this heading"></a></h3>
-<p>Return a stubbed VLLM server handle while avoiding startup cost.</p>
-<p>Args:
-*_args: Ignored positional arguments.
-**_kwargs: Ignored keyword arguments.</p>
-<p>Returns:
-None</p>
-</section>
-<section id="wait-for-vllm-self">
-<h3><code class="docutils literal notranslate"><span class="pre">wait_for_vllm(self)</span></code><a class="headerlink" href="#wait-for-vllm-self" title="Link to this heading"></a></h3>
-<p>Report served model identifiers for validation routines.</p>
-<p>Args:
-*_args: Ignored positional arguments.
-**_kwargs: Ignored keyword arguments.</p>
-<p>Returns:
-Sequence containing mock model identifiers.</p>
-</section>
-<section id="validate-served-models-self">
-<h3><code class="docutils literal notranslate"><span class="pre">validate_served_models(self)</span></code><a class="headerlink" href="#validate-served-models-self" title="Link to this heading"></a></h3>
-<p>No-op validation stub executed after VLLM bootstrapping.</p>
-<p>Args:
-*_args: Ignored positional arguments.
-**_kwargs: Ignored keyword arguments.</p>
-<p>Returns:
-None</p>
-<p>Raises:
-None.</p>
-</section>
-<section id="manifest-append-self">
-<h3><code class="docutils literal notranslate"><span class="pre">manifest_append(self)</span></code><a class="headerlink" href="#manifest-append-self" title="Link to this heading"></a></h3>
-<p>Forward manifest writes to the shared helper during tests.</p>
-<p>Args:
-*args: Positional arguments passed to :func:<code class="docutils literal notranslate"><span class="pre">manifest_append</span></code>.
-**kwargs: Keyword arguments passed to :func:<code class="docutils literal notranslate"><span class="pre">manifest_append</span></code>.</p>
-<p>Returns:
-None</p>
-</section>
-</section>
-<section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
-<section id="legacymodule">
-<h3><code class="docutils literal notranslate"><span class="pre">_LegacyModule</span></code><a class="headerlink" href="#legacymodule" title="Link to this heading"></a></h3>
-<p>Mimic the legacy pdf_pipeline helper functions for test isolation.</p>
-<p>Tests monkeypatch this container to avoid starting heavyweight services
-such as VLLM while still exercising orchestration logic.</p>
-<p>Attributes:
-None: Instances expose stubbed methods only.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>legacy = _LegacyModule()
-legacy.start_vllm() is None
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
+<p>Invoke the refactored PDF pipeline using legacy entrypoints.</p>
 </section>
 </section>
 </section>

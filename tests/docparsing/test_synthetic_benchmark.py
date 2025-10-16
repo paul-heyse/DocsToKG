@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.docparsing.test_synthetic_benchmark",
+#   "purpose": "Pytest coverage for docparsing synthetic benchmark scenarios",
+#   "sections": [
+#     {
+#       "id": "test_simulate_embedding_benchmark_reports_speedup",
+#       "name": "test_simulate_embedding_benchmark_reports_speedup",
+#       "anchor": "TSEBR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_generate_synthetic_vectors_aligns_with_chunks",
+#       "name": "test_generate_synthetic_vectors_aligns_with_chunks",
+#       "anchor": "TGSVA",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Tests for synthetic benchmarking helpers."""
 
 from __future__ import annotations

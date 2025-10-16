@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.ContentDownload.resolvers``.
 
+## 1. Overview
+
 Content Download Resolver Orchestration
 
 This module centralises resolver configuration, provider registration,
@@ -31,35 +33,11 @@ Usage:
         config=config,
     )
 
-## 1. Functions
+## 2. Functions
 
-### `headers_cache_key(headers)`
+### `_fetch_semantic_scholar_data(session, config, doi)`
 
-Return a deterministic cache key for HTTP header dictionaries.
-
-Args:
-headers: Mapping of header names to values.
-
-Returns:
-Tuple of lowercase header names paired with their original values,
-sorted alphabetically for stable hashing.
-
-### `request_with_retries(session, method, url)`
-
-Proxy to :func:`DocsToKG.ContentDownload.network.request_with_retries`.
-
-Args:
-session: Requests session used to perform the HTTP call.
-method: HTTP method such as ``"GET"`` or ``"HEAD"``.
-url: Fully-qualified URL for the request.
-**kwargs: Additional parameters forwarded to the network layer helper.
-
-Returns:
-requests.Response: Response returned by the shared network helper.
-
-Notes:
-The indirection keeps resolver providers compatible with tests that patch the
-network-layer helper while avoiding circular imports during module initialisation.
+Return Semantic Scholar metadata for ``doi`` using configured headers.
 
 ### `_absolute_url(base, href)`
 
@@ -69,17 +47,38 @@ Resolve relative ``href`` values against ``base`` to obtain absolute URLs.
 
 Recursively collect HTTP(S) URLs from nested response payloads.
 
-### `_fetch_crossref_data(doi, mailto, timeout, headers_key)`
+### `find_pdf_via_meta(soup, base_url)`
 
-Retrieve Crossref metadata for ``doi`` with polite header caching.
+Return PDF URL declared via ``citation_pdf_url`` meta tags.
 
-### `_fetch_unpaywall_data(doi, email, timeout, headers_key)`
+Args:
+soup: Parsed HTML document to inspect for metadata tags.
+base_url: URL used to resolve relative PDF links.
 
-Fetch Unpaywall metadata for ``doi`` using polite caching.
+Returns:
+Optional[str]: Absolute PDF URL when one is advertised; otherwise ``None``.
 
-### `_fetch_semantic_scholar_data(doi, api_key, timeout, headers_key)`
+### `find_pdf_via_link(soup, base_url)`
 
-Fetch Semantic Scholar Graph API metadata for ``doi`` with caching.
+Return PDF URL referenced via ``<link rel="alternate" type="application/pdf">``.
+
+Args:
+soup: Parsed HTML document to inspect for ``<link>`` elements.
+base_url: URL used to resolve relative ``href`` attributes.
+
+Returns:
+Optional[str]: Absolute PDF URL if link metadata is present; otherwise ``None``.
+
+### `find_pdf_via_anchor(soup, base_url)`
+
+Return PDF URL inferred from anchor elements mentioning PDFs.
+
+Args:
+soup: Parsed HTML document to search for anchor tags referencing PDFs.
+base_url: URL used to resolve relative anchor targets.
+
+Returns:
+Optional[str]: Absolute PDF URL when an anchor appears to reference one.
 
 ### `default_resolvers()`
 
@@ -107,25 +106,6 @@ name: Argument name whose presence should be detected.
 
 Returns:
 bool: ``True`` when ``func`` accepts the argument or variable parameters.
-
-### `clear_resolver_caches()`
-
-Clear resolver-level HTTP caches to force fresh lookups.
-
-This utility resets the internal LRU caches used by the Unpaywall,
-Crossref, and Semantic Scholar resolvers. It should be called before
-executing resolver pipelines when deterministic behaviour across runs is
-required (for example, in unit tests or benchmarking scenarios).
-
-Args:
-None
-
-Returns:
-None
-
-### `__getattr__(name)`
-
-Return legacy exports while emitting :class:`DeprecationWarning`.
 
 ### `is_event(self)`
 
@@ -163,6 +143,17 @@ Validate configuration fields and apply defaults for missing values.
 
 Args:
 self: Configuration instance requiring validation.
+
+Returns:
+None
+
+### `log_attempt(self, record)`
+
+Log a resolver attempt with optional timestamp override.
+
+Args:
+record: Structured attempt event emitted by a resolver.
+timestamp: Override timestamp string for deterministic replay.
 
 Returns:
 None
@@ -282,6 +273,10 @@ Raises:
 None.
 
 ### `__init_subclass__(cls, register)`
+
+*No documentation available.*
+
+### `_request_json(self, session, method, url)`
 
 *No documentation available.*
 
@@ -657,6 +652,17 @@ artifact: Work artifact describing the document under resolution.
 Returns:
 Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
 
+### `_emit_attempt(self, record)`
+
+Invoke the configured logger while supporting legacy log-only adapters.
+
+Args:
+record: Attempt payload emitted by the pipeline.
+timestamp: Optional ISO timestamp forwarded to sinks that accept it.
+
+Returns:
+None
+
 ### `_respect_rate_limit(self, resolver_name)`
 
 Sleep as required to respect per-resolver rate limiting policies.
@@ -703,15 +709,15 @@ Boolean indicating whether the resolver should issue a HEAD request.
 
 ### `_head_precheck_url(self, session, url, timeout)`
 
-Issue a HEAD request to validate that ``url`` plausibly returns a PDF.
+Delegate to the shared network-layer preflight helper.
 
 Args:
-session: Requests session used for issuing the HEAD request.
-url: Candidate URL whose response should be inspected.
-timeout: Timeout budget for the preflight request.
+session: Requests session used to issue the HEAD preflight.
+url: Candidate URL that may host a downloadable document.
+timeout: Maximum duration in seconds to wait for the HEAD response.
 
 Returns:
-``True`` when the response appears to represent a PDF download.
+bool: ``True`` when the URL passes preflight checks, ``False`` otherwise.
 
 ### `run(self, session, artifact, context)`
 
@@ -805,7 +811,7 @@ start_index: Index in ``resolver_order`` where submission should resume.
 Returns:
 Updated index pointing to the next resolver candidate that has not been submitted.
 
-## 2. Classes
+## 3. Classes
 
 ### `ResolverResult`
 
@@ -840,7 +846,6 @@ doaj_api_key: API key for DOAJ resolver.
 resolver_timeouts: Resolver-specific timeout overrides.
 resolver_min_interval_s: Minimum interval between resolver _requests.
 domain_min_interval_s: Optional per-domain rate limits overriding resolver settings.
-resolver_rate_limits: Deprecated rate limit configuration retained for compat.
 enable_head_precheck: Toggle applying HEAD filtering before downloads.
 resolver_head_precheck: Per-resolver overrides for HEAD filtering behaviour.
 mailto: Contact email appended to polite headers and user agent string.
@@ -892,7 +897,7 @@ Examples:
 ...     elapsed_ms=120.5,
 ... )
 
-### `AttemptLogger`
+### `AttemptSink`
 
 Protocol for logging resolver attempts.
 
@@ -906,7 +911,7 @@ Examples:
 ...     def log(self, record: AttemptRecord) -> None:
 ...         self.records.append(record)
 >>> collector = Collector()
->>> isinstance(collector, AttemptLogger)
+>>> isinstance(collector, AttemptSink)
 True
 
 ### `DownloadOutcome`
@@ -998,6 +1003,26 @@ Examples:
 ...         return True
 ...     def iter_urls(self, session, config, artifact):
 ...         yield ResolverResult(url="https://example.org")
+
+### `ApiResolverBase`
+
+Shared helper for resolvers interacting with JSON-based HTTP APIs.
+
+Attributes:
+name: Resolver identifier used for logging and registration.
+
+Examples:
+>>> class ExampleApiResolver(ApiResolverBase):
+...     name = "example-api"
+...     def iter_urls(self, session, config, artifact):
+...         payload, result = self._request_json(
+...             session,
+...             "GET",
+...             "https://example.org/api",
+...             config=config,
+...         )
+...         if payload:
+...             yield result  # doctest: +SKIP
 
 ### `ArxivResolver`
 

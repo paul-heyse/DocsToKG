@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.docparsing.stubs",
+#   "purpose": "Pytest coverage for docparsing stubs scenarios",
+#   "sections": [
+#     {
+#       "id": "dependency_stubs",
+#       "name": "dependency_stubs",
+#       "anchor": "DS",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """DocParsing dependency stubs used by integration tests."""
 
 from __future__ import annotations

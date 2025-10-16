@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.DocParsing.EmbeddingV2``.
 
+## 1. Overview
+
 Hybrid Embedding Pipeline
 
 Generates BM25, SPLADE, and Qwen embeddings for DocsToKG chunk files while
@@ -25,37 +27,11 @@ Dependencies:
 - vllm (optional): Hosts the Qwen embedding model with pooling support.
 - tqdm: Surface user-friendly progress bars across pipeline phases.
 
-## 1. Functions
+## 2. Functions
 
-### `_expand_path(path)`
+### `_qwen_cache_key(cfg)`
 
-Return ``path`` expanded to an absolute :class:`Path`.
-
-Args:
-path: Candidate filesystem path supplied as string or :class:`Path`.
-
-Returns:
-Absolute path with user home and environment variables resolved.
-
-### `_resolve_hf_home()`
-
-Determine the HuggingFace cache directory respecting ``HF_HOME``.
-
-Args:
-None
-
-Returns:
-Absolute path to the HuggingFace cache directory.
-
-### `_resolve_model_root(hf_home)`
-
-Resolve DocsToKG model root with ``DOCSTOKG_MODEL_ROOT`` override.
-
-Args:
-hf_home: Base HuggingFace cache directory.
-
-Returns:
-Absolute path representing the DocsToKG model root.
+Return cache key tuple for Qwen LLM instances.
 
 ### `_resolve_qwen_dir(model_root)`
 
@@ -76,6 +52,14 @@ model_root: Base directory housing DocsToKG models.
 
 Returns:
 Absolute path to the SPLADE model directory.
+
+### `_derive_doc_id_and_output_path(chunk_file, chunks_root, vectors_root)`
+
+Return manifest doc_id and vector output path for a chunk artifact.
+
+### `_derive_doc_id_and_output_path(chunk_file, chunks_root, vectors_root)`
+
+Return manifest doc_id and vector output path for a chunk artifact.
 
 ### `_expand_optional(path)`
 
@@ -113,16 +97,6 @@ Validate that SPLADE optional dependencies are importable.
 ### `_ensure_qwen_dependencies()`
 
 Validate that Qwen/vLLM optional dependencies are importable.
-
-### `iter_chunk_files(d)`
-
-Enumerate chunked DocTags JSONL files in a directory.
-
-Args:
-d: Directory containing `*.chunks.jsonl` files.
-
-Returns:
-Sorted list of chunk file paths.
 
 ### `ensure_uuid(rows)`
 
@@ -241,7 +215,21 @@ Aggregated BM25 statistics for the supplied chunk corpus.
 Raises:
 ValueError: Propagated when chunk rows are missing required fields.
 
-### `process_chunk_file_vectors(chunk_file, stats, args, validator, logger)`
+### `iter_rows_in_batches(path, batch_size)`
+
+Iterate over JSONL rows in batches to reduce memory usage.
+
+Args:
+path: Path to JSONL file to read.
+batch_size: Number of rows to yield per batch.
+
+Returns:
+Iterator[List[dict]]: Lazy iterator producing batched chunk rows.
+
+Yields:
+Lists of row dictionaries, each containing up to batch_size items.
+
+### `process_chunk_file_vectors(chunk_file, out_path, stats, args, validator, logger)`
 
 Generate vectors for a single chunk file and persist them to disk.
 
@@ -258,12 +246,12 @@ Tuple of ``(vector_count, splade_nnz_list, qwen_norms)``.
 Raises:
 ValueError: Propagated if vector dimensions or norms fail validation.
 
-### `write_vectors(path, uuids, texts, splade_results, qwen_results, stats, args)`
+### `write_vectors(path_or_handle, uuids, texts, splade_results, qwen_results, stats, args)`
 
 Write validated vector rows to disk with schema enforcement.
 
 Args:
-path: Destination JSONL path for vector rows.
+path_or_handle: Destination JSONL path or file handle for vector rows.
 uuids: Sequence of chunk UUIDs aligned with the other inputs.
 texts: Chunk text bodies.
 splade_results: SPLADE token and weight pairs per chunk.
@@ -367,7 +355,7 @@ logger: Logger used to emit warnings and metrics.
 Returns:
 None
 
-## 2. Classes
+## 3. Classes
 
 ### `BM25Stats`
 

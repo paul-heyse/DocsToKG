@@ -79,6 +79,8 @@
   <section id="module-common">
 <h1>1. Module: _common<a class="headerlink" href="#module-common" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing._common</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>DocParsing Shared Utilities</p>
 <p>This module consolidates lightweight helpers that power multiple DocParsing
 pipeline stages. Utilities span path discovery, atomic file writes, JSONL
@@ -107,8 +109,33 @@ with common_util.atomic_write(chunks_dir / &quot;example.jsonl&quot;) as handle:
 </ul>
 <p>All helpers are safe to import in multiprocessing contexts and avoid heavy
 third-party dependencies beyond the standard library.</p>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="expand-path-path">
+<h3><code class="docutils literal notranslate"><span class="pre">expand_path(path)</span></code><a class="headerlink" href="#expand-path-path" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">path</span></code> expanded to an absolute :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code>.</p>
+<p>Args:
+path: Candidate filesystem path supplied as string or :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code>.</p>
+<p>Returns:
+Absolute path with user home components resolved.</p>
+</section>
+<section id="resolve-hf-home">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_hf_home()</span></code><a class="headerlink" href="#resolve-hf-home" title="Link to this heading"></a></h3>
+<p>Resolve the HuggingFace cache directory respecting <code class="docutils literal notranslate"><span class="pre">HF_HOME</span></code>.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Path: Absolute path to the HuggingFace cache directory.</p>
+</section>
+<section id="resolve-model-root-hf-home">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_model_root(hf_home)</span></code><a class="headerlink" href="#resolve-model-root-hf-home" title="Link to this heading"></a></h3>
+<p>Resolve the DocsToKG model root honoring <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_MODEL_ROOT</span></code>.</p>
+<p>Args:
+hf_home: Optional HuggingFace cache directory to treat as the base path.</p>
+<p>Returns:
+Path: Absolute directory where DocsToKG models should be stored.</p>
+</section>
 <section id="detect-data-root-start">
 <h3><code class="docutils literal notranslate"><span class="pre">detect_data_root(start)</span></code><a class="headerlink" href="#detect-data-root-start" title="Link to this heading"></a></h3>
 <p>Locate the DocsToKG Data directory via env var or ancestor scan.</p>
@@ -353,7 +380,7 @@ True</p>
 </section>
 <section id="iter-chunks-directory">
 <h3><code class="docutils literal notranslate"><span class="pre">iter_chunks(directory)</span></code><a class="headerlink" href="#iter-chunks-directory" title="Link to this heading"></a></h3>
-<p>Yield chunk JSONL files from <code class="docutils literal notranslate"><span class="pre">directory</span></code> (non-recursive).</p>
+<p>Yield chunk JSONL files from <code class="docutils literal notranslate"><span class="pre">directory</span></code> and all descendants.</p>
 <p>Args:
 directory: Directory containing chunk artifacts.</p>
 <p>Returns:
@@ -531,6 +558,20 @@ with acquire_lock(target):
 <h3><code class="docutils literal notranslate"><span class="pre">_pid_is_running(pid)</span></code><a class="headerlink" href="#pid-is-running-pid" title="Link to this heading"></a></h3>
 <p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> if a process with the given PID appears to be alive.</p>
 </section>
+<section id="set-spawn-or-warn-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">set_spawn_or_warn(logger)</span></code><a class="headerlink" href="#set-spawn-or-warn-logger" title="Link to this heading"></a></h3>
+<p>Ensure the multiprocessing start method is set to <code class="docutils literal notranslate"><span class="pre">spawn</span></code>.</p>
+<p>Args:
+logger: Optional logger that receives diagnostic messages about the start
+method configuration.</p>
+<p>Returns:
+None: The function mutates global multiprocessing state and logs warnings.</p>
+<p>This helper attempts to set the start method to <code class="docutils literal notranslate"><span class="pre">spawn</span></code> with <code class="docutils literal notranslate"><span class="pre">force=True</span></code>.
+If a <code class="docutils literal notranslate"><span class="pre">RuntimeError</span></code> occurs (meaning the method was already set), it checks
+if the current method is <code class="docutils literal notranslate"><span class="pre">spawn</span></code>. If not, it emits a warning about the
+potential CUDA safety risk, logging the current method so callers understand
+the degraded safety state.</p>
+</section>
 <section id="iter-self">
 <h3><code class="docutils literal notranslate"><span class="pre">__iter__(self)</span></code><a class="headerlink" href="#iter-self" title="Link to this heading"></a></h3>
 <p>Yield successive lists containing up to <code class="docutils literal notranslate"><span class="pre">batch_size</span></code> elements.</p>
@@ -549,7 +590,7 @@ JSON-formatted string containing canonical log fields and optional extras.</p>
 </section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="batcher">
 <h3><code class="docutils literal notranslate"><span class="pre">Batcher</span></code><a class="headerlink" href="#batcher" title="Link to this heading"></a></h3>
 <p>Yield fixed-size batches from an iterable.</p>

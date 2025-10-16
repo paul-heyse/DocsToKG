@@ -154,7 +154,7 @@ credentials (if required) can be stored in <code class="docutils literal notrans
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">validation</span></code></p></td>
 <td><p>mapping</p></td>
-<td><p>Validation timeouts and limits (<code class="docutils literal notranslate"><span class="pre">parser_timeout_sec</span></code>, <code class="docutils literal notranslate"><span class="pre">max_memory_mb</span></code>, <code class="docutils literal notranslate"><span class="pre">skip_reasoning_if_size_mb</span></code>).</p></td>
+<td><p>Validation timeouts and limits (<code class="docutils literal notranslate"><span class="pre">parser_timeout_sec</span></code>, <code class="docutils literal notranslate"><span class="pre">max_memory_mb</span></code>, <code class="docutils literal notranslate"><span class="pre">skip_reasoning_if_size_mb</span></code>, <code class="docutils literal notranslate"><span class="pre">streaming_normalization_threshold_mb</span></code>, <code class="docutils literal notranslate"><span class="pre">max_concurrent_validators</span></code>).</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">logging</span></code></p></td>
 <td><p>mapping</p></td>
@@ -195,6 +195,8 @@ credentials (if required) can be stored in <code class="docutils literal notrans
 <span class="w">    </span><span class="nt">parser_timeout_sec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
 <span class="w">    </span><span class="nt">max_memory_mb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span>
 <span class="w">    </span><span class="nt">skip_reasoning_if_size_mb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">500</span>
+<span class="w">    </span><span class="nt">streaming_normalization_threshold_mb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">    </span><span class="nt">max_concurrent_validators</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
 <span class="w">  </span><span class="nt">logging</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">level</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;INFO&quot;</span>
 <span class="w">    </span><span class="nt">max_log_size_mb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>

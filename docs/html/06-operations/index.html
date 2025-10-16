@@ -60,9 +60,10 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#operating-the-hybrid-search-api">4. Operating the Hybrid Search API</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#scheduling-automation">5. Scheduling &amp; Automation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#backups-recovery">6. Backups &amp; Recovery</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#incident-response">7. Incident Response</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-consolidation-checklist">5. Module Consolidation Checklist</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#scheduling-automation">6. Scheduling &amp; Automation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#backups-recovery">7. Backups &amp; Recovery</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#incident-response">8. Incident Response</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../07-reference/index.html">1. Technical Reference</a></li>
@@ -109,14 +110,25 @@
 <section id="content-acquisition">
 <h3>3.1 Content Acquisition<a class="headerlink" href="#content-acquisition" title="Link to this heading"></a></h3>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.download_pyalex_pdfs<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--api-key<span class="w"> </span><span class="nv">$PA_ALEX_KEY</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--output<span class="w"> </span>Data/PyalexRaw<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--max-records<span class="w"> </span><span class="m">1000</span>
+<span class="w">  </span>--topic<span class="w"> </span><span class="s2">&quot;knowledge graphs&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--year-start<span class="w"> </span><span class="m">2022</span><span class="w"> </span>--year-end<span class="w"> </span><span class="m">2024</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--out<span class="w"> </span>Data/PyalexRaw<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--manifest<span class="w"> </span>Logs/manifest.jsonl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--workers<span class="w"> </span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--domain-min-interval<span class="w"> </span>example.org<span class="o">=</span><span class="m">0</span>.75<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--staging
 </pre></div>
 </div>
 <ul class="simple">
-<li><p>Configure API keys via environment variables or <code class="docutils literal notranslate"><span class="pre">.env</span></code>.</p></li>
-<li><p>Resolving behaviour is customisable through modules in <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers</span></code>.</p></li>
+<li><p>Configure resolver credentials via environment variables (<code class="docutils literal notranslate"><span class="pre">UNPAYWALL_EMAIL</span></code>,
+<code class="docutils literal notranslate"><span class="pre">CORE_API_KEY</span></code>, <code class="docutils literal notranslate"><span class="pre">S2_API_KEY</span></code>, <code class="docutils literal notranslate"><span class="pre">DOAJ_API_KEY</span></code>) or <code class="docutils literal notranslate"><span class="pre">.envrc</span></code>.</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">--staging</span></code> to isolate each run under a timestamped directory with
+derived artifacts (<code class="docutils literal notranslate"><span class="pre">manifest.index.json</span></code>, <code class="docutils literal notranslate"><span class="pre">manifest.metrics.json</span></code>,
+<code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--log-format</span> <span class="pre">csv</span></code> keeps JSONL manifests while adding a consolidated
+<code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code> summary for fast auditing.</p></li>
+<li><p>Review <code class="docutils literal notranslate"><span class="pre">docs/content-download-migration.md</span></code> when upgrading existing
+automation to the new resolver stack and logging surfaces.</p></li>
 </ul>
 </section>
 <section id="document-parsing-embedding">
@@ -195,6 +207,10 @@ python<span class="w"> </span>src/DocsToKG/DocParsing/EmbeddingV2.py<span class=
 <ul class="simple">
 <li><p>Validate downloads with <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.OntologyDownload.cli</span> <span class="pre">validate</span> <span class="pre">&lt;id&gt;</span></code>.</p></li>
 <li><p>Maintain configuration under version control and rotate API credentials securely.</p></li>
+<li><p>Tune validation throughput with <code class="docutils literal notranslate"><span class="pre">defaults.validation.max_concurrent_validators</span></code>
+(1-8) and switch large ontologies to streaming normalization by lowering
+<code class="docutils literal notranslate"><span class="pre">defaults.validation.streaming_normalization_threshold_mb</span></code> when disk pressure
+is a concern.</p></li>
 </ul>
 </section>
 </section>
@@ -224,9 +240,13 @@ python<span class="w"> </span>src/DocsToKG/DocParsing/EmbeddingV2.py<span class=
 <section id="module-consolidation-checklist">
 <h2>5. Module Consolidation Checklist<a class="headerlink" href="#module-consolidation-checklist" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p>Review <code class="docutils literal notranslate"><span class="pre">docs/hybrid_search_module_migration.md</span></code> and update any automation that still imports from deprecated shims (<code class="docutils literal notranslate"><span class="pre">results</span></code>, <code class="docutils literal notranslate"><span class="pre">similarity</span></code>, <code class="docutils literal notranslate"><span class="pre">retrieval</span></code>, <code class="docutils literal notranslate"><span class="pre">schema</span></code>, <code class="docutils literal notranslate"><span class="pre">operations</span></code>, <code class="docutils literal notranslate"><span class="pre">tools</span></code>).</p></li>
-<li><p>Ensure CI workflows call <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.HybridSearch.validation</span></code> instead of legacy scripts.</p></li>
-<li><p>Watch for <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> in logs and resolve them before upgrading to DocsToKG v0.6.0.</p></li>
+<li><p>Review <code class="docutils literal notranslate"><span class="pre">docs/hybrid_search_module_migration.md</span></code> and update any automation that still
+imports from deprecated shims (<code class="docutils literal notranslate"><span class="pre">results</span></code>, <code class="docutils literal notranslate"><span class="pre">similarity</span></code>, <code class="docutils literal notranslate"><span class="pre">retrieval</span></code>, <code class="docutils literal notranslate"><span class="pre">schema</span></code>, <code class="docutils literal notranslate"><span class="pre">operations</span></code>,
+or <code class="docutils literal notranslate"><span class="pre">tools</span></code>).</p></li>
+<li><p>Ensure CI workflows call <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.HybridSearch.validation</span></code> instead of legacy
+scripts.</p></li>
+<li><p>Watch for <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> in logs and resolve them before upgrading to DocsToKG
+v0.6.0.</p></li>
 </ul>
 </section>
 <section id="scheduling-automation">

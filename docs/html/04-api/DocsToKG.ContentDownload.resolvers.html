@@ -79,6 +79,8 @@
   <section id="module-resolvers">
 <h1>1. Module: resolvers<a class="headerlink" href="#module-resolvers" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Content Download Resolver Orchestration</p>
 <p>This module centralises resolver configuration, provider registration,
 pipeline orchestration, and cache helpers for the DocsToKG content download
@@ -108,30 +110,12 @@ pipeline = resolvers.ResolverPipeline(
 )
 </pre></div>
 </div>
-<section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="headers-cache-key-headers">
-<h3><code class="docutils literal notranslate"><span class="pre">headers_cache_key(headers)</span></code><a class="headerlink" href="#headers-cache-key-headers" title="Link to this heading"></a></h3>
-<p>Return a deterministic cache key for HTTP header dictionaries.</p>
-<p>Args:
-headers: Mapping of header names to values.</p>
-<p>Returns:
-Tuple of lowercase header names paired with their original values,
-sorted alphabetically for stable hashing.</p>
 </section>
-<section id="request-with-retries-session-method-url">
-<h3><code class="docutils literal notranslate"><span class="pre">request_with_retries(session,</span> <span class="pre">method,</span> <span class="pre">url)</span></code><a class="headerlink" href="#request-with-retries-session-method-url" title="Link to this heading"></a></h3>
-<p>Proxy to :func:<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.network.request_with_retries</span></code>.</p>
-<p>Args:
-session: Requests session used to perform the HTTP call.
-method: HTTP method such as <code class="docutils literal notranslate"><span class="pre">&quot;GET&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;HEAD&quot;</span></code>.
-url: Fully-qualified URL for the request.
-**kwargs: Additional parameters forwarded to the network layer helper.</p>
-<p>Returns:
-requests.Response: Response returned by the shared network helper.</p>
-<p>Notes:
-The indirection keeps resolver providers compatible with tests that patch the
-network-layer helper while avoiding circular imports during module initialisation.</p>
+<section id="functions">
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="fetch-semantic-scholar-data-session-config-doi">
+<h3><code class="docutils literal notranslate"><span class="pre">_fetch_semantic_scholar_data(session,</span> <span class="pre">config,</span> <span class="pre">doi)</span></code><a class="headerlink" href="#fetch-semantic-scholar-data-session-config-doi" title="Link to this heading"></a></h3>
+<p>Return Semantic Scholar metadata for <code class="docutils literal notranslate"><span class="pre">doi</span></code> using configured headers.</p>
 </section>
 <section id="absolute-url-base-href">
 <h3><code class="docutils literal notranslate"><span class="pre">_absolute_url(base,</span> <span class="pre">href)</span></code><a class="headerlink" href="#absolute-url-base-href" title="Link to this heading"></a></h3>
@@ -141,17 +125,32 @@ network-layer helper while avoiding circular imports during module initialisatio
 <h3><code class="docutils literal notranslate"><span class="pre">_collect_candidate_urls(node,</span> <span class="pre">results)</span></code><a class="headerlink" href="#collect-candidate-urls-node-results" title="Link to this heading"></a></h3>
 <p>Recursively collect HTTP(S) URLs from nested response payloads.</p>
 </section>
-<section id="fetch-crossref-data-doi-mailto-timeout-headers-key">
-<h3><code class="docutils literal notranslate"><span class="pre">_fetch_crossref_data(doi,</span> <span class="pre">mailto,</span> <span class="pre">timeout,</span> <span class="pre">headers_key)</span></code><a class="headerlink" href="#fetch-crossref-data-doi-mailto-timeout-headers-key" title="Link to this heading"></a></h3>
-<p>Retrieve Crossref metadata for <code class="docutils literal notranslate"><span class="pre">doi</span></code> with polite header caching.</p>
+<section id="find-pdf-via-meta-soup-base-url">
+<h3><code class="docutils literal notranslate"><span class="pre">find_pdf_via_meta(soup,</span> <span class="pre">base_url)</span></code><a class="headerlink" href="#find-pdf-via-meta-soup-base-url" title="Link to this heading"></a></h3>
+<p>Return PDF URL declared via <code class="docutils literal notranslate"><span class="pre">citation_pdf_url</span></code> meta tags.</p>
+<p>Args:
+soup: Parsed HTML document to inspect for metadata tags.
+base_url: URL used to resolve relative PDF links.</p>
+<p>Returns:
+Optional[str]: Absolute PDF URL when one is advertised; otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
 </section>
-<section id="fetch-unpaywall-data-doi-email-timeout-headers-key">
-<h3><code class="docutils literal notranslate"><span class="pre">_fetch_unpaywall_data(doi,</span> <span class="pre">email,</span> <span class="pre">timeout,</span> <span class="pre">headers_key)</span></code><a class="headerlink" href="#fetch-unpaywall-data-doi-email-timeout-headers-key" title="Link to this heading"></a></h3>
-<p>Fetch Unpaywall metadata for <code class="docutils literal notranslate"><span class="pre">doi</span></code> using polite caching.</p>
+<section id="find-pdf-via-link-soup-base-url">
+<h3><code class="docutils literal notranslate"><span class="pre">find_pdf_via_link(soup,</span> <span class="pre">base_url)</span></code><a class="headerlink" href="#find-pdf-via-link-soup-base-url" title="Link to this heading"></a></h3>
+<p>Return PDF URL referenced via <code class="docutils literal notranslate"><span class="pre">&lt;link</span> <span class="pre">rel=&quot;alternate&quot;</span> <span class="pre">type=&quot;application/pdf&quot;&gt;</span></code>.</p>
+<p>Args:
+soup: Parsed HTML document to inspect for <code class="docutils literal notranslate"><span class="pre">&lt;link&gt;</span></code> elements.
+base_url: URL used to resolve relative <code class="docutils literal notranslate"><span class="pre">href</span></code> attributes.</p>
+<p>Returns:
+Optional[str]: Absolute PDF URL if link metadata is present; otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
 </section>
-<section id="fetch-semantic-scholar-data-doi-api-key-timeout-headers-key">
-<h3><code class="docutils literal notranslate"><span class="pre">_fetch_semantic_scholar_data(doi,</span> <span class="pre">api_key,</span> <span class="pre">timeout,</span> <span class="pre">headers_key)</span></code><a class="headerlink" href="#fetch-semantic-scholar-data-doi-api-key-timeout-headers-key" title="Link to this heading"></a></h3>
-<p>Fetch Semantic Scholar Graph API metadata for <code class="docutils literal notranslate"><span class="pre">doi</span></code> with caching.</p>
+<section id="find-pdf-via-anchor-soup-base-url">
+<h3><code class="docutils literal notranslate"><span class="pre">find_pdf_via_anchor(soup,</span> <span class="pre">base_url)</span></code><a class="headerlink" href="#find-pdf-via-anchor-soup-base-url" title="Link to this heading"></a></h3>
+<p>Return PDF URL inferred from anchor elements mentioning PDFs.</p>
+<p>Args:
+soup: Parsed HTML document to search for anchor tags referencing PDFs.
+base_url: URL used to resolve relative anchor targets.</p>
+<p>Returns:
+Optional[str]: Absolute PDF URL when an anchor appears to reference one.</p>
 </section>
 <section id="default-resolvers">
 <h3><code class="docutils literal notranslate"><span class="pre">default_resolvers()</span></code><a class="headerlink" href="#default-resolvers" title="Link to this heading"></a></h3>
@@ -180,22 +179,6 @@ func: Download function whose call signature should be inspected.
 name: Argument name whose presence should be detected.</p>
 <p>Returns:
 bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when <code class="docutils literal notranslate"><span class="pre">func</span></code> accepts the argument or variable parameters.</p>
-</section>
-<section id="clear-resolver-caches">
-<h3><code class="docutils literal notranslate"><span class="pre">clear_resolver_caches()</span></code><a class="headerlink" href="#clear-resolver-caches" title="Link to this heading"></a></h3>
-<p>Clear resolver-level HTTP caches to force fresh lookups.</p>
-<p>This utility resets the internal LRU caches used by the Unpaywall,
-Crossref, and Semantic Scholar resolvers. It should be called before
-executing resolver pipelines when deterministic behaviour across runs is
-required (for example, in unit tests or benchmarking scenarios).</p>
-<p>Args:
-None</p>
-<p>Returns:
-None</p>
-</section>
-<section id="getattr-name">
-<h3><code class="docutils literal notranslate"><span class="pre">__getattr__(name)</span></code><a class="headerlink" href="#getattr-name" title="Link to this heading"></a></h3>
-<p>Return legacy exports while emitting :class:<code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code>.</p>
 </section>
 <section id="is-event-self">
 <h3><code class="docutils literal notranslate"><span class="pre">is_event(self)</span></code><a class="headerlink" href="#is-event-self" title="Link to this heading"></a></h3>
@@ -226,6 +209,15 @@ bool: <code class="docutils literal notranslate"><span class="pre">True</span></
 <p>Validate configuration fields and apply defaults for missing values.</p>
 <p>Args:
 self: Configuration instance requiring validation.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="log-attempt-self-record">
+<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#log-attempt-self-record" title="Link to this heading"></a></h3>
+<p>Log a resolver attempt with optional timestamp override.</p>
+<p>Args:
+record: Structured attempt event emitted by a resolver.
+timestamp: Override timestamp string for deterministic replay.</p>
 <p>Returns:
 None</p>
 </section>
@@ -329,6 +321,10 @@ None.</p>
 </section>
 <section id="init-subclass-cls-register">
 <h3><code class="docutils literal notranslate"><span class="pre">__init_subclass__(cls,</span> <span class="pre">register)</span></code><a class="headerlink" href="#init-subclass-cls-register" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="request-json-self-session-method-url">
+<h3><code class="docutils literal notranslate"><span class="pre">_request_json(self,</span> <span class="pre">session,</span> <span class="pre">method,</span> <span class="pre">url)</span></code><a class="headerlink" href="#request-json-self-session-method-url" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 <section id="id1">
@@ -639,6 +635,15 @@ artifact: Work artifact describing the document under resolution.</p>
 <p>Returns:
 Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.</p>
 </section>
+<section id="emit-attempt-self-record">
+<h3><code class="docutils literal notranslate"><span class="pre">_emit_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#emit-attempt-self-record" title="Link to this heading"></a></h3>
+<p>Invoke the configured logger while supporting legacy log-only adapters.</p>
+<p>Args:
+record: Attempt payload emitted by the pipeline.
+timestamp: Optional ISO timestamp forwarded to sinks that accept it.</p>
+<p>Returns:
+None</p>
+</section>
 <section id="respect-rate-limit-self-resolver-name">
 <h3><code class="docutils literal notranslate"><span class="pre">_respect_rate_limit(self,</span> <span class="pre">resolver_name)</span></code><a class="headerlink" href="#respect-rate-limit-self-resolver-name" title="Link to this heading"></a></h3>
 <p>Sleep as required to respect per-resolver rate limiting policies.</p>
@@ -676,13 +681,13 @@ Boolean indicating whether the resolver should issue a HEAD request.</p>
 </section>
 <section id="head-precheck-url-self-session-url-timeout">
 <h3><code class="docutils literal notranslate"><span class="pre">_head_precheck_url(self,</span> <span class="pre">session,</span> <span class="pre">url,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#head-precheck-url-self-session-url-timeout" title="Link to this heading"></a></h3>
-<p>Issue a HEAD request to validate that <code class="docutils literal notranslate"><span class="pre">url</span></code> plausibly returns a PDF.</p>
+<p>Delegate to the shared network-layer preflight helper.</p>
 <p>Args:
-session: Requests session used for issuing the HEAD request.
-url: Candidate URL whose response should be inspected.
-timeout: Timeout budget for the preflight request.</p>
+session: Requests session used to issue the HEAD preflight.
+url: Candidate URL that may host a downloadable document.
+timeout: Maximum duration in seconds to wait for the HEAD response.</p>
 <p>Returns:
-<code class="docutils literal notranslate"><span class="pre">True</span></code> when the response appears to represent a PDF download.</p>
+bool: <code class="docutils literal notranslate"><span class="pre">True</span></code> when the URL passes preflight checks, <code class="docutils literal notranslate"><span class="pre">False</span></code> otherwise.</p>
 </section>
 <section id="run-self-session-artifact-context">
 <h3><code class="docutils literal notranslate"><span class="pre">run(self,</span> <span class="pre">session,</span> <span class="pre">artifact,</span> <span class="pre">context)</span></code><a class="headerlink" href="#run-self-session-artifact-context" title="Link to this heading"></a></h3>
@@ -764,7 +769,7 @@ Updated index pointing to the next resolver candidate that has not been submitte
 </section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="resolverresult">
 <h3><code class="docutils literal notranslate"><span class="pre">ResolverResult</span></code><a class="headerlink" href="#resolverresult" title="Link to this heading"></a></h3>
 <p>Either a candidate download URL or an informational resolver event.</p>
@@ -801,7 +806,6 @@ doaj_api_key: API key for DOAJ resolver.
 resolver_timeouts: Resolver-specific timeout overrides.
 resolver_min_interval_s: Minimum interval between resolver _requests.
 domain_min_interval_s: Optional per-domain rate limits overriding resolver settings.
-resolver_rate_limits: Deprecated rate limit configuration retained for compat.
 enable_head_precheck: Toggle applying HEAD filtering before downloads.
 resolver_head_precheck: Per-resolver overrides for HEAD filtering behaviour.
 mailto: Contact email appended to polite headers and user agent string.
@@ -861,8 +865,8 @@ dry_run: Flag indicating whether the attempt occurred in dry-run mode.</p>
 </div></blockquote>
 </div></blockquote>
 </section>
-<section id="attemptlogger">
-<h3><code class="docutils literal notranslate"><span class="pre">AttemptLogger</span></code><a class="headerlink" href="#attemptlogger" title="Link to this heading"></a></h3>
+<section id="attemptsink">
+<h3><code class="docutils literal notranslate"><span class="pre">AttemptSink</span></code><a class="headerlink" href="#attemptsink" title="Link to this heading"></a></h3>
 <p>Protocol for logging resolver attempts.</p>
 <p>Attributes:
 None: The protocol formalises the callable surface without storing state.</p>
@@ -876,7 +880,7 @@ None: The protocol formalises the callable surface without storing state.</p>
 …     def log(self, record: AttemptRecord) -&gt; None:
 …         self.records.append(record)
 collector = Collector()
-isinstance(collector, AttemptLogger)
+isinstance(collector, AttemptSink)
 True</p>
 </div></blockquote>
 </div></blockquote>
@@ -986,6 +990,30 @@ None: Subclasses inherit registration behaviour automatically.</p>
 …         return True
 …     def iter_urls(self, session, config, artifact):
 …         yield ResolverResult(url=”https://example.org”)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="apiresolverbase">
+<h3><code class="docutils literal notranslate"><span class="pre">ApiResolverBase</span></code><a class="headerlink" href="#apiresolverbase" title="Link to this heading"></a></h3>
+<p>Shared helper for resolvers interacting with JSON-based HTTP APIs.</p>
+<p>Attributes:
+name: Resolver identifier used for logging and registration.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>class ExampleApiResolver(ApiResolverBase):
+…     name = “example-api”
+…     def iter_urls(self, session, config, artifact):
+…         payload, result = self._request_json(
+…             session,
+…             “GET”,
+…             “https://example.org/api”,
+…             config=config,
+…         )
+…         if payload:
+…             yield result  # doctest: +SKIP</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>

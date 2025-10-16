@@ -76,10 +76,15 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-    <section id="module-retrieval">
+  <section id="module-retrieval">
 <h1>1. Module: retrieval<a class="headerlink" href="#module-retrieval" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.retrieval</span></code>.</p>
-<p><strong>Deprecated:</strong> <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.retrieval</span></code> is now a compatibility shim. Import the service entry points directly from <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service</span></code>. The shim re-exports the symbols below and emits a <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> when imported.</p>
+<blockquote>
+<div><p><strong>Deprecated:</strong> <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.retrieval</span></code> is now a thin shim that re-exports
+the public interface from <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service</span></code>. Import
+:class:<code class="docutils literal notranslate"><span class="pre">HybridSearchService</span></code>, :class:<code class="docutils literal notranslate"><span class="pre">HybridSearchAPI</span></code>, and supporting helpers from the
+service module directly. The shim emits a :class:<code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> on import.</p>
+</div></blockquote>
 <section id="re-exported-symbols">
 <h2>1. Re-exported symbols<a class="headerlink" href="#re-exported-symbols" title="Link to this heading"></a></h2>
 <table class="docutils align-default">
@@ -115,10 +120,25 @@
 </tr>
 </tbody>
 </table>
-<p>The service implementation remains unchanged—only the import location has moved. Update your code to reference the service module directly.</p>
+<p>The service implementation remains unchanged—only the import location has moved. Update
+integrations to import from <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service</span></code> to avoid future breakage.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>service = HybridSearchService(
+…     config_manager=config_manager,
+…     feature_generator=feature_generator,
+…     faiss_index=faiss_index,
+…     opensearch=opensearch,
+…     registry=registry
+… )
+results = service.search(request)</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 </section>
-
 
 
            </div>

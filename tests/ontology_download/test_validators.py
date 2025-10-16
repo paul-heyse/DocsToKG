@@ -1,3 +1,138 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_validators",
+#   "purpose": "Pytest coverage for ontology download validators scenarios",
+#   "sections": [
+#     {
+#       "id": "config",
+#       "name": "config",
+#       "anchor": "CONF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ttl_file",
+#       "name": "ttl_file",
+#       "anchor": "TF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "obo_file",
+#       "name": "obo_file",
+#       "anchor": "OF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "owl_file",
+#       "name": "owl_file",
+#       "anchor": "OF1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "make_request",
+#       "name": "make_request",
+#       "anchor": "MR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "xbrl_package",
+#       "name": "xbrl_package",
+#       "anchor": "XP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_rdflib_success",
+#       "name": "test_validate_rdflib_success",
+#       "anchor": "TVRS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_normalize_streaming_deterministic",
+#       "name": "test_normalize_streaming_deterministic",
+#       "anchor": "TNSD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_streaming_matches_in_memory",
+#       "name": "test_streaming_matches_in_memory",
+#       "anchor": "TSMIM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_normalize_streaming_edge_cases",
+#       "name": "test_normalize_streaming_edge_cases",
+#       "anchor": "TNSEC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_run_validators_respects_concurrency",
+#       "name": "test_run_validators_respects_concurrency",
+#       "anchor": "TRVRC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_run_validators_matches_sequential",
+#       "name": "test_run_validators_matches_sequential",
+#       "anchor": "TRVMS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_sort_triple_file_falls_back_without_sort",
+#       "name": "test_sort_triple_file_falls_back_without_sort",
+#       "anchor": "TSTFF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validator_plugin_loader_registers_and_warns",
+#       "name": "test_validator_plugin_loader_registers_and_warns",
+#       "anchor": "TVPLR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_pronto_success",
+#       "name": "test_validate_pronto_success",
+#       "anchor": "TVPS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_pronto_handles_exception",
+#       "name": "test_validate_pronto_handles_exception",
+#       "anchor": "TVPHE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_owlready2_success",
+#       "name": "test_validate_owlready2_success",
+#       "anchor": "TVOS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_robot_skips_when_missing",
+#       "name": "test_validate_robot_skips_when_missing",
+#       "anchor": "TVRSW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_arelle_with_stub",
+#       "name": "test_validate_arelle_with_stub",
+#       "anchor": "TVAWS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_owlready2_memory_error",
+#       "name": "test_validate_owlready2_memory_error",
+#       "anchor": "TVOME",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_noop_logger",
+#       "name": "_noop_logger",
+#       "anchor": "NL",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Ontology Validator Tests
 
@@ -37,16 +172,16 @@ pytest.importorskip("pydantic_settings")
 from DocsToKG.OntologyDownload import DefaultsConfig, ResolvedConfig, ValidationRequest
 from DocsToKG.OntologyDownload import ontology_download as download
 from DocsToKG.OntologyDownload.ontology_download import (
-    ValidatorSubprocessError,
-    normalize_streaming,
     ValidationResult,
+    ValidatorSubprocessError,
+    _sort_triple_file,
+    normalize_streaming,
     run_validators,
     validate_arelle,
     validate_owlready2,
     validate_pronto,
     validate_rdflib,
     validate_robot,
-    _sort_triple_file,
 )
 
 

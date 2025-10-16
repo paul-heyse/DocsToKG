@@ -1,3 +1,576 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.content_download.test_networking",
+#   "purpose": "Pytest coverage for content download networking scenarios",
+#   "sections": [
+#     {
+#       "id": "_helper_response",
+#       "name": "_HelperResponse",
+#       "anchor": "HELP",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_make_helper_response",
+#       "name": "_make_helper_response",
+#       "anchor": "MHR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_build_headers_empty_metadata",
+#       "name": "test_build_headers_empty_metadata",
+#       "anchor": "TBHEM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_build_headers_etag_only",
+#       "name": "test_build_headers_etag_only",
+#       "anchor": "TBHEO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_build_headers_last_modified_only",
+#       "name": "test_build_headers_last_modified_only",
+#       "anchor": "TBHLM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_build_headers_with_both_headers",
+#       "name": "test_build_headers_with_both_headers",
+#       "anchor": "TBHWB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_interpret_response_cached_returns_cached_result",
+#       "name": "test_interpret_response_cached_returns_cached_result",
+#       "anchor": "TIRCR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_interpret_response_cached_missing_metadata_raises",
+#       "name": "test_interpret_response_cached_missing_metadata_raises",
+#       "anchor": "TIRCM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_interpret_response_modified_returns_modified_result",
+#       "name": "test_interpret_response_modified_returns_modified_result",
+#       "anchor": "TIRMR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_interpret_response_modified_extracts_headers",
+#       "name": "test_interpret_response_modified_extracts_headers",
+#       "anchor": "TIRME",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_interpret_response_missing_metadata_lists_fields",
+#       "name": "test_interpret_response_missing_metadata_lists_fields",
+#       "anchor": "TIRMM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_build_headers_property",
+#       "name": "test_build_headers_property",
+#       "anchor": "TBHP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_interpret_response_cached_property",
+#       "name": "test_interpret_response_cached_property",
+#       "anchor": "TIRCP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_conditional_helper_rejects_negative_length",
+#       "name": "test_conditional_helper_rejects_negative_length",
+#       "anchor": "TCHRN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_interpret_response_requires_response_shape",
+#       "name": "test_interpret_response_requires_response_shape",
+#       "anchor": "TIRRR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_sequenced_handler",
+#       "name": "_SequencedHandler",
+#       "anchor": "SEQU",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "http_server",
+#       "name": "http_server",
+#       "anchor": "HS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_make_artifact",
+#       "name": "_make_artifact",
+#       "anchor": "MA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_download",
+#       "name": "_download",
+#       "anchor": "DOWN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_candidate_retries_on_transient_errors",
+#       "name": "test_download_candidate_retries_on_transient_errors",
+#       "anchor": "TDCRO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_retry_after_header_respected",
+#       "name": "test_retry_after_header_respected",
+#       "anchor": "TRAHR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_non_retryable_errors_do_not_retry",
+#       "name": "test_non_retryable_errors_do_not_retry",
+#       "anchor": "TNRED",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_candidate_avoids_per_request_head",
+#       "name": "test_download_candidate_avoids_per_request_head",
+#       "anchor": "TDCAP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_allows_pdf",
+#       "name": "test_head_precheck_allows_pdf",
+#       "anchor": "THPAP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_rejects_html",
+#       "name": "test_head_precheck_rejects_html",
+#       "anchor": "THPRH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_degrades_to_get_pdf",
+#       "name": "test_head_precheck_degrades_to_get_pdf",
+#       "anchor": "THPDT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_degrades_to_get_html",
+#       "name": "test_head_precheck_degrades_to_get_html",
+#       "anchor": "HPDT1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_returns_true_on_exception",
+#       "name": "test_head_precheck_returns_true_on_exception",
+#       "anchor": "THPRT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_conditional_request_build_headers_requires_complete_metadata",
+#       "name": "test_conditional_request_build_headers_requires_complete_metadata",
+#       "anchor": "TCRBH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_conditional_request_build_headers_accepts_complete_metadata",
+#       "name": "test_conditional_request_build_headers_accepts_complete_metadata",
+#       "anchor": "CRBH1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_retry_determinism_matches_request_with_retries",
+#       "name": "test_retry_determinism_matches_request_with_retries",
+#       "anchor": "TRDMR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_mock_response",
+#       "name": "_mock_response",
+#       "anchor": "MR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_successful_request_no_retries",
+#       "name": "test_successful_request_no_retries",
+#       "anchor": "TSRNR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_transient_503_with_exponential_backoff",
+#       "name": "test_transient_503_with_exponential_backoff",
+#       "anchor": "TT5WE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_parse_retry_after_header_integer",
+#       "name": "test_parse_retry_after_header_integer",
+#       "anchor": "TPRAH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_parse_retry_after_header_http_date",
+#       "name": "test_parse_retry_after_header_http_date",
+#       "anchor": "PRAH1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_parse_retry_after_header_invalid_date",
+#       "name": "test_parse_retry_after_header_invalid_date",
+#       "anchor": "PRAH2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_retry_after_header_overrides_backoff",
+#       "name": "test_retry_after_header_overrides_backoff",
+#       "anchor": "TRAHO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_request_exception_raises_after_retries",
+#       "name": "test_request_exception_raises_after_retries",
+#       "anchor": "TRERA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_timeout_retry_handling",
+#       "name": "test_timeout_retry_handling",
+#       "anchor": "TTRH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_connection_error_retry_handling",
+#       "name": "test_connection_error_retry_handling",
+#       "anchor": "TCERH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_timeout_raises_after_exhaustion",
+#       "name": "test_timeout_raises_after_exhaustion",
+#       "anchor": "TTRAE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_connection_error_raises_after_exhaustion",
+#       "name": "test_connection_error_raises_after_exhaustion",
+#       "anchor": "TCERA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_parse_retry_after_header_property",
+#       "name": "test_parse_retry_after_header_property",
+#       "anchor": "PRAH3",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_request_with_custom_retry_statuses",
+#       "name": "test_request_with_custom_retry_statuses",
+#       "anchor": "TRWCR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_request_returns_after_exhausting_single_attempt",
+#       "name": "test_request_returns_after_exhausting_single_attempt",
+#       "anchor": "TRRAE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_request_with_retries_rejects_negative_retries",
+#       "name": "test_request_with_retries_rejects_negative_retries",
+#       "anchor": "TRWRR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_request_with_retries_rejects_negative_backoff",
+#       "name": "test_request_with_retries_rejects_negative_backoff",
+#       "anchor": "RWRR1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_request_with_retries_requires_method_and_url",
+#       "name": "test_request_with_retries_requires_method_and_url",
+#       "anchor": "RWRR2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_request_with_retries_uses_method_fallback",
+#       "name": "test_request_with_retries_uses_method_fallback",
+#       "anchor": "TRWRU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_request_with_retries_errors_when_no_callable_available",
+#       "name": "test_request_with_retries_errors_when_no_callable_available",
+#       "anchor": "TRWRE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_retry_after_header_prefers_longer_delay",
+#       "name": "test_retry_after_header_prefers_longer_delay",
+#       "anchor": "TRAHP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_respect_retry_after_false_skips_header",
+#       "name": "test_respect_retry_after_false_skips_header",
+#       "anchor": "TRRAF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_parse_retry_after_header_naive_datetime",
+#       "name": "test_parse_retry_after_header_naive_datetime",
+#       "anchor": "PRAH4",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_parse_retry_after_header_handles_parse_errors",
+#       "name": "test_parse_retry_after_header_handles_parse_errors",
+#       "anchor": "PRAH5",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_parse_retry_after_header_returns_none_when_parser_returns_none",
+#       "name": "test_parse_retry_after_header_returns_none_when_parser_returns_none",
+#       "anchor": "PRAH6",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fake_response",
+#       "name": "FakeResponse",
+#       "anchor": "FAKE",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "make_artifact",
+#       "name": "make_artifact",
+#       "anchor": "MA1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stub_requests",
+#       "name": "stub_requests",
+#       "anchor": "SR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_successful_pdf_download_populates_metadata",
+#       "name": "test_successful_pdf_download_populates_metadata",
+#       "anchor": "TSPDP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cached_response_preserves_prior_metadata",
+#       "name": "test_cached_response_preserves_prior_metadata",
+#       "anchor": "TCRPP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_http_error_sets_metadata_to_none",
+#       "name": "test_http_error_sets_metadata_to_none",
+#       "anchor": "THESM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_html_download_with_text_extraction",
+#       "name": "test_html_download_with_text_extraction",
+#       "anchor": "THDWT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_dry_run_preserves_metadata_without_files",
+#       "name": "test_dry_run_preserves_metadata_without_files",
+#       "anchor": "TDRPM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_small_pdf_detected_as_corrupt",
+#       "name": "test_small_pdf_detected_as_corrupt",
+#       "anchor": "TSPDA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_html_tail_in_pdf_marks_corruption",
+#       "name": "test_html_tail_in_pdf_marks_corruption",
+#       "anchor": "THTIP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_build_manifest_entry_includes_download_metadata",
+#       "name": "test_build_manifest_entry_includes_download_metadata",
+#       "anchor": "TBMEI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_rfc5987_filename_suffix",
+#       "name": "test_rfc5987_filename_suffix",
+#       "anchor": "TRFS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_html_filename_suffix_from_disposition",
+#       "name": "test_html_filename_suffix_from_disposition",
+#       "anchor": "THFSF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_slugify_truncates_and_normalises",
+#       "name": "test_slugify_truncates_and_normalises",
+#       "anchor": "TSTAN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_classify_payload_variants",
+#       "name": "test_classify_payload_variants",
+#       "anchor": "TCPV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_collect_location_urls_dedupes_and_tracks_sources",
+#       "name": "test_collect_location_urls_dedupes_and_tracks_sources",
+#       "anchor": "TCLUD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_normalize_doi",
+#       "name": "test_normalize_doi",
+#       "anchor": "TND",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_normalize_pmid",
+#       "name": "test_normalize_pmid",
+#       "anchor": "TNP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_normalize_pmcid",
+#       "name": "test_normalize_pmcid",
+#       "anchor": "TNP1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_normalize_arxiv",
+#       "name": "test_normalize_arxiv",
+#       "anchor": "TNA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_normalize_doi_with_https_prefix",
+#       "name": "test_normalize_doi_with_https_prefix",
+#       "anchor": "TNDWH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_normalize_doi_without_prefix",
+#       "name": "test_normalize_doi_without_prefix",
+#       "anchor": "TNDWP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_normalize_doi_with_whitespace",
+#       "name": "test_normalize_doi_with_whitespace",
+#       "anchor": "TNDWW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_normalize_doi_none",
+#       "name": "test_normalize_doi_none",
+#       "anchor": "TNDN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_normalize_doi_prefix_variants",
+#       "name": "test_normalize_doi_prefix_variants",
+#       "anchor": "TNDPV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_normalize_pmcid_with_pmc_prefix",
+#       "name": "test_normalize_pmcid_with_pmc_prefix",
+#       "anchor": "TNPWP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_normalize_pmcid_without_prefix_adds_prefix",
+#       "name": "test_normalize_pmcid_without_prefix_adds_prefix",
+#       "anchor": "NPWP1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_normalize_pmcid_lowercase",
+#       "name": "test_normalize_pmcid_lowercase",
+#       "anchor": "TNPL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_strip_prefix_case_insensitive",
+#       "name": "test_strip_prefix_case_insensitive",
+#       "anchor": "TSPCI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_dedupe_preserves_order",
+#       "name": "test_dedupe_preserves_order",
+#       "anchor": "TDPO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_dedupe_filters_falsey_values",
+#       "name": "test_dedupe_filters_falsey_values",
+#       "anchor": "TDFFV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_dedupe_property",
+#       "name": "test_dedupe_property",
+#       "anchor": "TDP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_make_artifact",
+#       "name": "_make_artifact",
+#       "anchor": "MA2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_html_classification_overrides_misleading_content_type",
+#       "name": "test_html_classification_overrides_misleading_content_type",
+#       "anchor": "THCOM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_wayback_resolver_skips_unavailable_archives",
+#       "name": "test_wayback_resolver_skips_unavailable_archives",
+#       "anchor": "TWRSU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_manifest_and_attempts_single_success",
+#       "name": "test_manifest_and_attempts_single_success",
+#       "anchor": "TMAAS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_openalex_attempts_use_session_headers",
+#       "name": "test_openalex_attempts_use_session_headers",
+#       "anchor": "TOAUS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_retry_budget_honours_max_attempts",
+#       "name": "test_retry_budget_honours_max_attempts",
+#       "anchor": "TRBHM",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Consolidated content download networking tests."""
 
 from __future__ import annotations
@@ -158,9 +731,7 @@ if HAS_REQUESTS and HAS_PYALEX:
         assert outcome.last_modified == previous["last_modified"]
         assert not (artifact.pdf_dir / "conditional.pdf").exists()
 
-    def test_download_candidate_handles_incomplete_resume_metadata(
-        tmp_path: Path, caplog
-    ) -> None:
+    def test_download_candidate_handles_incomplete_resume_metadata(tmp_path: Path, caplog) -> None:
         artifact = _make_artifact(tmp_path)
         url = "https://example.org/test.pdf"
 
@@ -183,9 +754,9 @@ if HAS_REQUESTS and HAS_PYALEX:
                 return None
 
         class _Session:
-            def request(self, method: str, target: str, **kwargs: Any) -> _StreamingResponse:
+            def request(self, *, method: str, url: str, **kwargs: Any) -> _StreamingResponse:
                 assert method == "GET"
-                assert target == url
+                assert url == "https://example.org/test.pdf"
                 return _StreamingResponse()
 
         context = {
@@ -420,20 +991,34 @@ def test_interpret_response_missing_metadata_lists_fields() -> None:
 @given(
     etag=st.one_of(st.none(), st.text(min_size=1)),
     last_modified=st.one_of(st.none(), st.text(min_size=1)),
+    complete=st.booleans(),
 )
-def test_build_headers_property(etag: Optional[str], last_modified: Optional[str]) -> None:
-    helper = ConditionalRequestHelper(prior_etag=etag, prior_last_modified=last_modified)
+def test_build_headers_property(
+    etag: Optional[str], last_modified: Optional[str], complete: bool
+) -> None:
+    helper = ConditionalRequestHelper(
+        prior_etag=etag,
+        prior_last_modified=last_modified,
+        prior_sha256="sha" if complete else None,
+        prior_content_length=42 if complete else None,
+        prior_path="/tmp/cached.pdf" if complete else None,
+    )
     headers = helper.build_headers()
 
-    if etag:
-        assert headers["If-None-Match"] == etag
+    if etag or last_modified:
+        if complete:
+            if etag:
+                assert headers["If-None-Match"] == etag
+            else:
+                assert "If-None-Match" not in headers
+            if last_modified:
+                assert headers["If-Modified-Since"] == last_modified
+            else:
+                assert "If-Modified-Since" not in headers
+        else:
+            assert headers == {}
     else:
-        assert "If-None-Match" not in headers
-
-    if last_modified:
-        assert headers["If-Modified-Since"] == last_modified
-    else:
-        assert "If-Modified-Since" not in headers
+        assert headers == {}
 
 
 # ---- test_conditional_requests.py -----------------------------
@@ -2062,8 +2647,17 @@ def test_retry_budget_honours_max_attempts(tmp_path: Path) -> None:
         def __init__(self) -> None:
             self.records: List[Any] = []
 
-        def log(self, record) -> None:  # pragma: no cover - simple passthrough
+        def log_attempt(self, record, *, timestamp: Optional[str] = None) -> None:
             self.records.append(record)
+
+        def log_manifest(self, entry) -> None:  # pragma: no cover - noop
+            return None
+
+        def log_summary(self, summary) -> None:  # pragma: no cover - noop
+            return None
+
+        def close(self) -> None:  # pragma: no cover - noop
+            return None
 
     pipeline = ResolverPipeline(
         [StubResolver()],

@@ -1,4 +1,25 @@
 #!/usr/bin/env python3
+# === NAVMAP v1 ===
+# {
+#   "module": "docs.scripts.generate_api_docs",
+#   "purpose": "Documentation tooling for generate api docs workflows",
+#   "sections": [
+#     {
+#       "id": "api_doc_generator",
+#       "name": "APIDocGenerator",
+#       "anchor": "APID",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Automated API Documentation Generator
 
@@ -99,12 +120,15 @@ class APIDocGenerator:
         )
         lines.append("")
 
-        # Module description
+        section_index = 1
+
+        # Module overview
         if module_info.get("module_docstring"):
+            lines.append(f"## {section_index}. Overview")
+            section_index += 1
+            lines.append("")
             lines.append(module_info["module_docstring"])
             lines.append("")
-
-        section_index = 1
 
         # Functions section
         if module_info.get("functions"):

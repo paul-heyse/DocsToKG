@@ -1,4 +1,25 @@
 #!/usr/bin/env python3
+# === NAVMAP v1 ===
+# {
+#   "module": "docs.scripts.check_links",
+#   "purpose": "Documentation tooling for check links workflows",
+#   "sections": [
+#     {
+#       "id": "link_checker",
+#       "name": "LinkChecker",
+#       "anchor": "LINK",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Comprehensive Link Checker for Documentation
 

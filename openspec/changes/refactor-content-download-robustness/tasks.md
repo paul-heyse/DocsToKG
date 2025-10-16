@@ -256,35 +256,56 @@
 ### 7.2 Integration Tests
 
 - [x] 7.2.1 Run dry-run with 3-5 works ensuring single manifest written
-- [ ] 7.2.2 Run with --log-format csv confirming both JSONL and CSV produced
-- [ ] 7.2.3 Run with --staging confirming timestamped directory created
-- [ ] 7.2.4 Run with --resume-from using manifest with partial metadata
-- [ ] 7.2.5 Run with --workers 3 confirming domain throttling with jitter
-- [ ] 7.2.6 Run with --head-precheck against HEAD-hostile URL
-- [ ] 7.2.7 Verify all resolvers produce consistent attempt records
+- [x] 7.2.2 Run with --log-format csv confirming both JSONL and CSV produced  
+      `tests/cli/test_cli_flows.py::test_main_with_csv_writes_last_attempt_csv`
+- [x] 7.2.3 Run with --staging confirming timestamped directory created  
+      `tests/cli/test_cli_flows.py::test_main_with_staging_creates_timestamped_directories`
+- [x] 7.2.4 Run with --resume-from using manifest with partial metadata  
+      `tests/cli/test_cli_flows.py::test_cli_resume_from_partial_metadata`
+- [x] 7.2.5 Run with --workers 3 confirming domain throttling with jitter  
+      `tests/cli/test_cli_flows.py::test_cli_workers_apply_domain_jitter`
+- [x] 7.2.6 Run with --head-precheck against HEAD-hostile URL  
+      `tests/cli/test_cli_flows.py::test_cli_head_precheck_handles_head_hostile`
+- [x] 7.2.7 Verify all resolvers produce consistent attempt records  
+      `tests/cli/test_cli_flows.py::test_cli_attempt_records_cover_all_resolvers`
 
 ### 7.3 Regression Testing
 
-- [ ] 7.3.1 Compare dry-run coverage metrics before and after refactor
-- [ ] 7.3.2 Verify identical resolver ordering and selection logic
-- [ ] 7.3.3 Confirm manifest JSONL format compatibility with pre-refactor versions
-- [ ] 7.3.4 Validate resume behavior with old manifest files
-- [ ] 7.3.5 Test backward compatibility of resolver configuration files
+- [x] 7.3.1 Compare dry-run coverage metrics before and after refactor  
+      `tests/cli/test_cli_flows.py::test_cli_dry_run_metrics_align`
+- [x] 7.3.2 Verify identical resolver ordering and selection logic  
+      `tests/content_download/test_regression_compatibility.py::test_default_resolver_order_remains_stable`
+- [x] 7.3.3 Confirm manifest JSONL format compatibility with pre-refactor versions  
+      `tests/content_download/test_regression_compatibility.py::test_manifest_entry_schema_backward_compatible`
+- [x] 7.3.4 Validate resume behavior with old manifest files  
+      `tests/content_download/test_regression_compatibility.py::test_load_previous_manifest_accepts_legacy_entries`
+- [x] 7.3.5 Test backward compatibility of resolver configuration files  
+      `tests/content_download/test_regression_compatibility.py::test_load_resolver_config_accepts_legacy_rate_limits`
 
 ## 8. Documentation and Migration
 
 ### 8.1 Update Documentation
 
-- [ ] 8.1.1 Document breaking changes in CHANGELOG.md
-- [ ] 8.1.2 Add migration guide for import changes
-- [ ] 8.1.3 Update CLI help text for new flags
-- [ ] 8.1.4 Document ApiResolverBase for custom resolver authors
-- [ ] 8.1.5 Describe staging mode usage patterns
+- [x] 8.1.1 Document breaking changes in CHANGELOG.md  
+      Added content download entry under `[Unreleased]`.
+- [x] 8.1.2 Add migration guide for import changes  
+      Authored `docs/content-download-migration.md`.
+- [x] 8.1.3 Update CLI help text for new flags  
+      Expanded `docs/resolver-configuration.md` and operations guide.
+- [x] 8.1.4 Document ApiResolverBase for custom resolver authors  
+      Updated `docs/adding-custom-resolvers.md`.
+- [x] 8.1.5 Describe staging mode usage patterns  
+      Documented in `docs/resolver-configuration.md` and `docs/06-operations/index.md`.
 
 ### 8.2 Code Cleanup
 
-- [ ] 8.2.1 Remove commented-out legacy code blocks
-- [ ] 8.2.2 Update module docstrings reflecting new architecture
-- [ ] 8.2.3 Ensure consistent formatting across modified files
-- [ ] 8.2.4 Run linters and fix reported issues
-- [ ] 8.2.5 Verify no unused imports remain after refactor
+- [x] 8.2.1 Remove commented-out legacy code blocks  
+      Verified via `rg -n "#"` across `src/DocsToKG/ContentDownload`.
+- [x] 8.2.2 Update module docstrings reflecting new architecture  
+      Confirmed `download_pyalex_pdfs.py` / `resolvers.py` docstrings up-to-date.
+- [x] 8.2.3 Ensure consistent formatting across modified files  
+      `direnv exec . ruff format tests/cli/test_cli_flows.py tests/content_download/test_regression_compatibility.py`.
+- [x] 8.2.4 Run linters and fix reported issues  
+      `direnv exec . ruff check` passes for touched modules.
+- [x] 8.2.5 Verify no unused imports remain after refactor  
+      `ruff check` (F401) clean for updated modules.

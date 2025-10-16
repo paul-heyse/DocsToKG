@@ -30,10 +30,10 @@ auditing across the toolchain.
 * **Entry point**: `python -m DocsToKG.DocParsing.cli doctags`
 * **Output**: `Data/DocTagsFiles/<doc_id>.doctags`
 * **Highlights**:
-  - HTML and PDF pipelines use Docling as the default renderer.  PDF conversion
+  * HTML and PDF pipelines use Docling as the default renderer.  PDF conversion
     bootstraps a vLLM-backed visual language model for captioning and picture
     classification.
-  - Conversion metadata (parse engine, content hashes, warnings) flows into the
+  * Conversion metadata (parse engine, content hashes, warnings) flows into the
     manifest for provenance tracking.
 
 ### 2. Chunking & Coalescence
@@ -41,11 +41,11 @@ auditing across the toolchain.
 * **Entry point**: `python -m DocsToKG.DocParsing.cli chunk`
 * **Output**: `Data/ChunkedDocTagFiles/<relative_path>.chunks.jsonl` (mirrors the DocTags hierarchy)
 * **Highlights**:
-  - The hybrid chunker honors Docling structural annotations and only merges
+  * The hybrid chunker honors Docling structural annotations and only merges
     across sections when soft-boundary thresholds permit.
-  - Chunk rows embed `ProvenanceMetadata` (parse engine, Docling version, image
+  * Chunk rows embed `ProvenanceMetadata` (parse engine, Docling version, image
     flags) to preserve the source context of every span.
-  - Document identifiers mirror the relative path within the input directory so
+  * Document identifiers mirror the relative path within the input directory so
     nested hierarchies never collide on basename alone.
 
 ### 3. Embedding Generation
@@ -53,9 +53,9 @@ auditing across the toolchain.
 * **Entry point**: `python -m DocsToKG.DocParsing.cli embed`
 * **Output**: `Data/Embeddings/<relative_path>.vectors.jsonl` (mirrors the chunk directory layout)
 * **Highlights**:
-  - Streaming two-pass architecture bounds memory usage while collecting BM25
+  * Streaming two-pass architecture bounds memory usage while collecting BM25
     statistics.
-  - Extensive validation guards Qwen vector dimensions, SPLADE sparsity, and
+  * Extensive validation guards Qwen vector dimensions, SPLADE sparsity, and
     schema compatibility.
 
 ## Configuration
@@ -134,7 +134,7 @@ python -m DocsToKG.DocParsing.cli chunk \
 # 3) Generate embeddings with streaming batches
 python -m DocsToKG.DocParsing.cli embed \
   --chunks-dir Data/ChunkedDocTagFiles \
-  --vectors-dir Data/Embeddings \
+  --out-dir Data/Embeddings \
   --batch-size-qwen 24 \
   --batch-size-splade 256
 ```

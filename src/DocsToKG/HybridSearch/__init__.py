@@ -1,3 +1,15 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch",
+#   "purpose": "Package exports for the DocsToKG hybrid search subsystem",
+#   "sections": [
+#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
+#     {"id": "exports", "name": "Re-exports", "anchor": "exports", "kind": "api"},
+#     {"id": "package-setup", "name": "Package Setup", "anchor": "setup", "kind": "internal"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Hybrid Search Module for DocsToKG
 
@@ -41,6 +53,40 @@ from __future__ import annotations
 
 import sys
 
+# --- Globals ---
+
+__all__ = (
+    "ChunkIngestionPipeline",
+    "ChunkPayload",
+    "DocumentInput",
+    "FeatureGenerator",
+    "FaissIndexManager",
+    "HybridSearchAPI",
+    "HybridSearchConfig",
+    "HybridSearchConfigManager",
+    "HybridSearchRequest",
+    "HybridSearchResponse",
+    "HybridSearchResult",
+    "HybridSearchService",
+    "HybridSearchValidator",
+    "Observability",
+    "OpenSearchIndexTemplate",
+    "OpenSearchSchemaManager",
+    "PaginationCheckResult",
+    "ReciprocalRankFusion",
+    "ResultShaper",
+    "apply_mmr_diversification",
+    "build_stats_snapshot",
+    "restore_state",
+    "serialize_state",
+    "should_rebuild_index",
+    "verify_pagination",
+    "vector_uuid_to_faiss_int",
+)
+
+
+# --- Re-exports ---
+
 from .config import HybridSearchConfig, HybridSearchConfigManager
 from .features import FeatureGenerator
 from .ingest import ChunkIngestionPipeline
@@ -66,34 +112,8 @@ from .types import (
 from .validation import HybridSearchValidator
 from .vectorstore import FaissIndexManager, restore_state, serialize_state
 
-__all__ = [
-    "ChunkIngestionPipeline",
-    "HybridSearchAPI",
-    "FeatureGenerator",
-    "FaissIndexManager",
-    "HybridSearchConfig",
-    "HybridSearchConfigManager",
-    "HybridSearchRequest",
-    "HybridSearchResponse",
-    "HybridSearchResult",
-    "HybridSearchService",
-    "HybridSearchValidator",
-    "OpenSearchSchemaManager",
-    "OpenSearchIndexTemplate",
-    "ChunkPayload",
-    "DocumentInput",
-    "Observability",
-    "PaginationCheckResult",
-    "build_stats_snapshot",
-    "serialize_state",
-    "restore_state",
-    "verify_pagination",
-    "should_rebuild_index",
-    "vector_uuid_to_faiss_int",
-    "ReciprocalRankFusion",
-    "ResultShaper",
-    "apply_mmr_diversification",
-]
+
+# --- Package Setup ---
 
 _package = sys.modules[__name__]
 sys.modules.setdefault(__name__ + ".ids", sys.modules[__name__ + ".types"])

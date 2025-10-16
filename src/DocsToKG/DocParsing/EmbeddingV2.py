@@ -1,4 +1,211 @@
 #!/usr/bin/env python3
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.EmbeddingV2",
+#   "purpose": "Implements DocsToKG.DocParsing.EmbeddingV2 behaviors and helpers",
+#   "sections": [
+#     {
+#       "id": "_qwen_cache_key",
+#       "name": "_qwen_cache_key",
+#       "anchor": "QCK",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_resolve_qwen_dir",
+#       "name": "_resolve_qwen_dir",
+#       "anchor": "RQD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_resolve_splade_dir",
+#       "name": "_resolve_splade_dir",
+#       "anchor": "RSD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_derive_doc_id_and_output_path",
+#       "name": "_derive_doc_id_and_output_path",
+#       "anchor": "DDIAO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_derive_doc_id_and_output_path",
+#       "name": "_derive_doc_id_and_output_path",
+#       "anchor": "DIAO1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_expand_optional",
+#       "name": "_expand_optional",
+#       "anchor": "EO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_resolve_cli_path",
+#       "name": "_resolve_cli_path",
+#       "anchor": "RCP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_missing_splade_dependency_message",
+#       "name": "_missing_splade_dependency_message",
+#       "anchor": "MSDM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_missing_qwen_dependency_message",
+#       "name": "_missing_qwen_dependency_message",
+#       "anchor": "MQDM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_ensure_splade_dependencies",
+#       "name": "_ensure_splade_dependencies",
+#       "anchor": "ESD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_ensure_qwen_dependencies",
+#       "name": "_ensure_qwen_dependencies",
+#       "anchor": "EQD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure_uuid",
+#       "name": "ensure_uuid",
+#       "anchor": "EU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure_chunk_schema",
+#       "name": "ensure_chunk_schema",
+#       "anchor": "ECS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "tokens",
+#       "name": "tokens",
+#       "anchor": "TOKE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "bm25_stats",
+#       "name": "BM25Stats",
+#       "anchor": "BM25",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "bm25_stats_accumulator",
+#       "name": "BM25StatsAccumulator",
+#       "anchor": "BM251",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "print_bm25_summary",
+#       "name": "print_bm25_summary",
+#       "anchor": "PBS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "bm25_vector",
+#       "name": "bm25_vector",
+#       "anchor": "BV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "splade_cfg",
+#       "name": "SpladeCfg",
+#       "anchor": "SPLA",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "splade_encode",
+#       "name": "splade_encode",
+#       "anchor": "SE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_detect_splade_backend",
+#       "name": "_detect_splade_backend",
+#       "anchor": "DSB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_get_splade_encoder",
+#       "name": "_get_splade_encoder",
+#       "anchor": "GSE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_get_splade_backend_used",
+#       "name": "_get_splade_backend_used",
+#       "anchor": "GSBU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "splade_validator",
+#       "name": "SPLADEValidator",
+#       "anchor": "SPLA1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "qwen_cfg",
+#       "name": "QwenCfg",
+#       "anchor": "QWEN",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "qwen_embed",
+#       "name": "qwen_embed",
+#       "anchor": "QE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "process_pass_a",
+#       "name": "process_pass_a",
+#       "anchor": "PPA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter_rows_in_batches",
+#       "name": "iter_rows_in_batches",
+#       "anchor": "IRIB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "process_chunk_file_vectors",
+#       "name": "process_chunk_file_vectors",
+#       "anchor": "PCFV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write_vectors",
+#       "name": "write_vectors",
+#       "anchor": "WV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build_parser",
+#       "name": "build_parser",
+#       "anchor": "BP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse_args",
+#       "name": "parse_args",
+#       "anchor": "PA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Hybrid Embedding Pipeline
 
@@ -805,6 +1012,9 @@ def iter_rows_in_batches(path: Path, batch_size: int) -> Iterator[List[dict]]:
         path: Path to JSONL file to read.
         batch_size: Number of rows to yield per batch.
 
+    Returns:
+        Iterator[List[dict]]: Lazy iterator producing batched chunk rows.
+
     Yields:
         Lists of row dictionaries, each containing up to batch_size items.
     """
@@ -1284,7 +1494,7 @@ def main(args: argparse.Namespace | None = None) -> int:
             "extra_fields": {
                 "data_root": str(resolved_root),
                 "chunks_dir": str(chunks_dir),
-                "vectors_dir": str(out_dir),
+                "embeddings_dir": str(out_dir),
                 "splade_model_dir": str(splade_model_dir),
                 "qwen_model_dir": str(qwen_model_dir),
                 "offline": offline_mode,
@@ -1473,7 +1683,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         "[DONE] Saved vectors",
         extra={
             "extra_fields": {
-                "vectors_dir": str(out_dir),
+                "embeddings_dir": str(out_dir),
                 "processed_files": len(file_entries),
                 "skipped_files": skipped_files,
             }

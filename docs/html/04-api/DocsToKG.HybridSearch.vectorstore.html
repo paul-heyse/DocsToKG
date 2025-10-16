@@ -79,9 +79,12 @@
   <section id="module-vectorstore">
 <h1>1. Module: vectorstore<a class="headerlink" href="#module-vectorstore" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore</span></code>.</p>
-<p>Unified FAISS vector store and similarity utilities.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Unified FAISS vector store, GPU similarity utilities, and state helpers.</p>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="normalize-rows-matrix">
 <h3><code class="docutils literal notranslate"><span class="pre">normalize_rows(matrix)</span></code><a class="headerlink" href="#normalize-rows-matrix" title="Link to this heading"></a></h3>
 <p>L2-normalise each row of <code class="docutils literal notranslate"><span class="pre">matrix</span></code> in-place.</p>
@@ -179,6 +182,14 @@ int: Total number of stored vectors.</p>
 None</p>
 <p>Returns:
 DenseIndexConfig: Active dense index configuration.</p>
+</section>
+<section id="dim-self">
+<h3><code class="docutils literal notranslate"><span class="pre">dim(self)</span></code><a class="headerlink" href="#dim-self" title="Link to this heading"></a></h3>
+<p>Return the dimensionality of vectors stored in the FAISS index.</p>
+<p>Args:
+None</p>
+<p>Returns:
+int: Dimensionality of embeddings managed by the index.</p>
 </section>
 <section id="gpu-resources-self">
 <h3><code class="docutils literal notranslate"><span class="pre">gpu_resources(self)</span></code><a class="headerlink" href="#gpu-resources-self" title="Link to this heading"></a></h3>
@@ -407,7 +418,7 @@ linked FAISS build.</p>
 </section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="faisssearchresult">
 <h3><code class="docutils literal notranslate"><span class="pre">FaissSearchResult</span></code><a class="headerlink" href="#faisssearchresult" title="Link to this heading"></a></h3>
 <p>Dense search hit returned by FAISS.</p>

@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.test_html_extraction",
+#   "purpose": "Pytest coverage for html extraction scenarios",
+#   "sections": [
+#     {
+#       "id": "_fake_trafilatura",
+#       "name": "_FakeTrafilatura",
+#       "anchor": "FAKE",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "test_html_extraction_creates_text_file",
+#       "name": "test_html_extraction_creates_text_file",
+#       "anchor": "THECT",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 HTML Extraction Tests
 

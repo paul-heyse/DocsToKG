@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG",
+#   "purpose": "Package initialization for DocsToKG",
+#   "sections": [
+#     {
+#       "id": "ping",
+#       "name": "ping",
+#       "anchor": "PING",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 DocsToKG Main Package
 

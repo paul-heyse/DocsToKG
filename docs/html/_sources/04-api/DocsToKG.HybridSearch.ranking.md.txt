@@ -2,9 +2,11 @@
 
 This reference documents the DocsToKG module ``DocsToKG.HybridSearch.ranking``.
 
+## 1. Overview
+
 Ranking, fusion, and result shaping utilities for DocsToKG hybrid search.
 
-## 1. Functions
+## 2. Functions
 
 ### `apply_mmr_diversification(fused_candidates, fused_scores, lambda_param, top_k)`
 
@@ -61,7 +63,7 @@ and duplicate suppression.
 
 *No documentation available.*
 
-## 2. Classes
+## 3. Classes
 
 ### `ReciprocalRankFusion`
 

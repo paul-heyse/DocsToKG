@@ -1,11 +1,11 @@
-# Hybrid Search Module Migration Guide
+# 1. Hybrid Search Module Migration Guide
 
 The `consolidate-hybridsearch-modules` change collapses thin adapter modules into their
 functional homes while preserving backwards compatibility through explicit shims. This
 guide summarises the deprecated paths, the new module locations, and the removal timeline
 so downstream projects can update ahead of the DocsToKG v0.6.0 release.
 
-## Deprecated import paths
+## 1. Deprecated import paths
 
 | Deprecated path | Replacement | Notes |
 |-----------------|-------------|-------|
@@ -16,7 +16,7 @@ so downstream projects can update ahead of the DocsToKG v0.6.0 release.
 | `DocsToKG.HybridSearch.schema` | `DocsToKG.HybridSearch.storage` | Index templates share the storage module.
 | `DocsToKG.HybridSearch.tools.*` | `python -m DocsToKG.HybridSearch.validation` | Validation CLI consolidates all modes.
 
-## Module dependency graph
+## 2. Module dependency graph
 
 ```mermaid
 graph LR
@@ -41,12 +41,12 @@ graph LR
     service --> validation
 ```
 
-## Removal timeline
+## 3. Removal timeline
 
 - **DocsToKG v0.5.x** – Shims remain available and emit warnings.
 - **DocsToKG v0.6.0** – Deprecated modules will be removed. Update imports before upgrading.
 
-## Recommended actions
+## 4. Recommended actions
 
 1. Replace legacy imports with the new module locations shown above.
 2. Update CI workflows to invoke `python -m DocsToKG.HybridSearch.validation` instead of

@@ -79,9 +79,12 @@
   <section id="module-validation">
 <h1>1. Module: validation<a class="headerlink" href="#module-validation" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.validation</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Automated validation harness for the hybrid search stack.</p>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="load-dataset-path">
 <h3><code class="docutils literal notranslate"><span class="pre">load_dataset(path)</span></code><a class="headerlink" href="#load-dataset-path" title="Link to this heading"></a></h3>
 <p>Load a JSONL dataset describing documents and queries.</p>
@@ -100,6 +103,24 @@ json.JSONDecodeError: If any line contains invalid JSON.</p>
 dataset: Sequence of dataset entries containing vector metadata.</p>
 <p>Returns:
 Inferred embedding dimensionality, defaulting to 2560 when unknown.</p>
+</section>
+<section id="run-pytest-suites-mode-extra-args">
+<h3><code class="docutils literal notranslate"><span class="pre">run_pytest_suites(mode,</span> <span class="pre">extra_args)</span></code><a class="headerlink" href="#run-pytest-suites-mode-extra-args" title="Link to this heading"></a></h3>
+<p>Execute hybrid search pytest suites for the requested <code class="docutils literal notranslate"><span class="pre">mode</span></code>.</p>
+<p>Args:
+mode: Selector for which regression suites to invoke (synthetic, real, scale).
+extra_args: Additional pytest arguments forwarded from the CLI.</p>
+<p>Returns:
+int: Process return code from the invoked pytest command.</p>
+</section>
+<section id="run-real-vector-ci-output-dir-extra-args">
+<h3><code class="docutils literal notranslate"><span class="pre">run_real_vector_ci(output_dir,</span> <span class="pre">extra_args)</span></code><a class="headerlink" href="#run-real-vector-ci-output-dir-extra-args" title="Link to this heading"></a></h3>
+<p>Execute the real-vector CI regression suite and persist validation artifacts.</p>
+<p>Args:
+output_dir: Directory where validation artifacts should be written.
+extra_args: Additional pytest arguments appended to each command invocation.</p>
+<p>Returns:
+int: Non-zero exit code indicates regression failure; zero means success.</p>
 </section>
 <section id="main-argv">
 <h3><code class="docutils literal notranslate"><span class="pre">main(argv)</span></code><a class="headerlink" href="#main-argv" title="Link to this heading"></a></h3>
@@ -387,7 +408,7 @@ ValidationReport detailing stability mismatches.</p>
 </section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="hybridsearchvalidator">
 <h3><code class="docutils literal notranslate"><span class="pre">HybridSearchValidator</span></code><a class="headerlink" href="#hybridsearchvalidator" title="Link to this heading"></a></h3>
 <p>Execute validation sweeps and persist reports.</p>

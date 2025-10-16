@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "openspec.changes.archive.2025-10-15-refine-docparsing-implementation.documentation",
+#   "purpose": "Archived OpenSpec helper module openspec.changes.archive.2025_10_15_refine_docparsing_implementation.documentation",
+#   "sections": [
+#     {
+#       "id": "requirement_doc",
+#       "name": "RequirementDoc",
+#       "anchor": "REQU",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "load_requirement_docs",
+#       "name": "load_requirement_docs",
+#       "anchor": "LRD",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 DocsToKG DocParsing Refinement Requirement Registry.
 

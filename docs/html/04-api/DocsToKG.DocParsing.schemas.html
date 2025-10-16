@@ -79,6 +79,8 @@
   <section id="module-schemas">
 <h1>1. Module: schemas<a class="headerlink" href="#module-schemas" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.schemas</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>DocParsing Schema Definitions</p>
 <p>This module defines Pydantic models and helpers that validate chunk and vector
 payloads across the DocsToKG pipeline. By enforcing consistent schemas prior to
@@ -100,8 +102,9 @@ from DocsToKG.DocParsing import schemas</p>
 <li><p>pydantic (optional): Offers model validation when available; graceful fallbacks
 raise informative errors otherwise.</p></li>
 </ul>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="missing-pydantic-message">
 <h3><code class="docutils literal notranslate"><span class="pre">_missing_pydantic_message()</span></code><a class="headerlink" href="#missing-pydantic-message" title="Link to this heading"></a></h3>
 <p>Return a consistent optional dependency warning message.</p>
@@ -353,7 +356,7 @@ The original function without modification.</p>
 </section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="provenancemetadata">
 <h3><code class="docutils literal notranslate"><span class="pre">ProvenanceMetadata</span></code><a class="headerlink" href="#provenancemetadata" title="Link to this heading"></a></h3>
 <p>Stores provenance metadata extracted during chunk parsing.</p>

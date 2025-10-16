@@ -1,3 +1,72 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_optdeps",
+#   "purpose": "Pytest coverage for ontology download optdeps scenarios",
+#   "sections": [
+#     {
+#       "id": "_reset_caches",
+#       "name": "_reset_caches",
+#       "anchor": "RC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_fake_import",
+#       "name": "_fake_import",
+#       "anchor": "FI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_failing_import",
+#       "name": "_failing_import",
+#       "anchor": "FI1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_get_pystow_with_real_module",
+#       "name": "test_get_pystow_with_real_module",
+#       "anchor": "TGPWR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_get_pystow_fallback_when_missing",
+#       "name": "test_get_pystow_fallback_when_missing",
+#       "anchor": "TGPFW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pystow_fallback_respects_env_var",
+#       "name": "test_pystow_fallback_respects_env_var",
+#       "anchor": "TPFRE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_get_rdflib_with_real_module",
+#       "name": "test_get_rdflib_with_real_module",
+#       "anchor": "TGRWR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_rdflib_stub_parse_and_serialize",
+#       "name": "test_rdflib_stub_parse_and_serialize",
+#       "anchor": "TRSPA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pronto_stub_behaviour",
+#       "name": "test_pronto_stub_behaviour",
+#       "anchor": "TPSB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_owlready2_stub_load",
+#       "name": "test_owlready2_stub_load",
+#       "anchor": "TOSL",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Tests for optional dependency helpers."""
 
 from __future__ import annotations

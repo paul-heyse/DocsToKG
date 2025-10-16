@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "scripts.generate_config_schema",
+#   "purpose": "Utility script for generate config schema workflows",
+#   "sections": [
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Generate JSON Schema for ontology downloader configuration."""
 
 from __future__ import annotations

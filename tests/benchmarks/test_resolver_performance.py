@@ -1,3 +1,66 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.benchmarks.test_resolver_performance",
+#   "purpose": "Pytest coverage for benchmarks resolver performance scenarios",
+#   "sections": [
+#     {
+#       "id": "dummy_artifact",
+#       "name": "DummyArtifact",
+#       "anchor": "DUMM",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "null_logger",
+#       "name": "NullLogger",
+#       "anchor": "NULL",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "slow_resolver",
+#       "name": "SlowResolver",
+#       "anchor": "SLOW",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_html_outcome",
+#       "name": "_html_outcome",
+#       "anchor": "HO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_make_config",
+#       "name": "_make_config",
+#       "anchor": "MC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_sequential_vs_concurrent_execution",
+#       "name": "test_sequential_vs_concurrent_execution",
+#       "anchor": "TSVCE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_overhead_vs_savings",
+#       "name": "test_head_precheck_overhead_vs_savings",
+#       "anchor": "THPOV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_retry_backoff_timing",
+#       "name": "test_retry_backoff_timing",
+#       "anchor": "TRBT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_memory_usage_large_batch",
+#       "name": "test_memory_usage_large_batch",
+#       "anchor": "TMULB",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Benchmark-style tests verifying resolver performance characteristics."""
 
 from __future__ import annotations

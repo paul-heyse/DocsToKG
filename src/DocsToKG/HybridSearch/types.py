@@ -1,3 +1,15 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.types",
+#   "purpose": "Data contracts shared across hybrid search workflows",
+#   "sections": [
+#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
+#     {"id": "public-functions", "name": "Public Functions", "anchor": "api", "kind": "api"},
+#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Core typed structures for hybrid search components.
 
@@ -27,7 +39,26 @@ from typing import Any, Mapping, MutableMapping, Optional, Sequence, Tuple
 import numpy as np
 from numpy.typing import NDArray
 
+# --- Globals ---
+
+__all__ = (
+    "ChunkFeatures",
+    "ChunkPayload",
+    "DocumentInput",
+    "FusionCandidate",
+    "HybridSearchDiagnostics",
+    "HybridSearchRequest",
+    "HybridSearchResponse",
+    "HybridSearchResult",
+    "ValidationReport",
+    "ValidationSummary",
+    "vector_uuid_to_faiss_int",
+)
+
 _MASK_63_BITS = (1 << 63) - 1
+
+
+# --- Public Functions ---
 
 
 def vector_uuid_to_faiss_int(vector_id: str) -> int:
@@ -41,6 +72,9 @@ def vector_uuid_to_faiss_int(vector_id: str) -> int:
     """
 
     return uuid.UUID(vector_id).int & _MASK_63_BITS
+
+
+# --- Public Classes ---
 
 
 @dataclass(slots=True)
@@ -220,6 +254,7 @@ class HybridSearchResult:
     Attributes:
         doc_id: Source document identifier
         chunk_id: Chunk identifier within the document
+        vector_id: Identifier of the chunk's embedding in the FAISS index
         namespace: Logical grouping for search scoping
         score: Final fused similarity score
         fused_rank: Position in the final result ranking
@@ -243,6 +278,7 @@ class HybridSearchResult:
 
     doc_id: str
     chunk_id: str
+    vector_id: str
     namespace: str
     score: float
     fused_rank: int

@@ -1,11 +1,936 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.resolvers.test_resolvers_core",
+#   "purpose": "Pytest coverage for resolvers resolvers core scenarios",
+#   "sections": [
+#     {
+#       "id": "clear_cache_between_tests",
+#       "name": "clear_cache_between_tests",
+#       "anchor": "CCBT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dummy_api_resolver",
+#       "name": "DummyApiResolver",
+#       "anchor": "DUMM",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "test_api_resolver_base_error_handling",
+#       "name": "test_api_resolver_base_error_handling",
+#       "anchor": "TARBE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_landing_page_helpers_extract_expected_urls",
+#       "name": "test_landing_page_helpers_extract_expected_urls",
+#       "anchor": "TLPHE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_resolvers_use_shared_retry_helper",
+#       "name": "test_resolvers_use_shared_retry_helper",
+#       "anchor": "TRUSR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_legacy_resolver_rate_limits_rejected",
+#       "name": "test_legacy_resolver_rate_limits_rejected",
+#       "anchor": "TLRRL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_user_agent_includes_mailto",
+#       "name": "test_user_agent_includes_mailto",
+#       "anchor": "TUAIM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_resolver_toggle_defaults_single_source",
+#       "name": "test_resolver_toggle_defaults_single_source",
+#       "anchor": "TRTDS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_resolvers_apply_polite_headers_and_timeouts",
+#       "name": "test_resolvers_apply_polite_headers_and_timeouts",
+#       "anchor": "TRAPH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dummy_session",
+#       "name": "DummySession",
+#       "anchor": "DUMM1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "dummy_response",
+#       "name": "DummyResponse",
+#       "anchor": "DUMM2",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "list_logger",
+#       "name": "ListLogger",
+#       "anchor": "LIST",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "stub_resolver",
+#       "name": "StubResolver",
+#       "anchor": "STUB",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "build_artifact",
+#       "name": "build_artifact",
+#       "anchor": "BA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_classify_payload_detects_pdf_and_html",
+#       "name": "test_classify_payload_detects_pdf_and_html",
+#       "anchor": "TCPDP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_classify_payload_octet_stream_requires_sniff",
+#       "name": "test_classify_payload_octet_stream_requires_sniff",
+#       "anchor": "TCPOS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_classify_payload_octet_stream_with_pdf_signature",
+#       "name": "test_classify_payload_octet_stream_with_pdf_signature",
+#       "anchor": "CPOS1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_stops_on_first_success",
+#       "name": "test_pipeline_stops_on_first_success",
+#       "anchor": "TPSOF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_records_resolver_exception",
+#       "name": "test_pipeline_records_resolver_exception",
+#       "anchor": "TPRRE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_unpaywall_resolver_extracts_candidates",
+#       "name": "test_unpaywall_resolver_extracts_candidates",
+#       "anchor": "TUREC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_landing_page_resolver_meta_parsing",
+#       "name": "test_landing_page_resolver_meta_parsing",
+#       "anchor": "TLPRM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_allows_redirect",
+#       "name": "test_head_precheck_allows_redirect",
+#       "anchor": "THPAR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_integration_happy_path",
+#       "name": "test_cli_integration_happy_path",
+#       "anchor": "TCIHP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dummy_head_response",
+#       "name": "DummyHeadResponse",
+#       "anchor": "DUMM3",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "test_head_precheck_skips_html",
+#       "name": "test_head_precheck_skips_html",
+#       "anchor": "THPSH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_skips_zero_length",
+#       "name": "test_head_precheck_skips_zero_length",
+#       "anchor": "THPSZ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_skips_error_status",
+#       "name": "test_head_precheck_skips_error_status",
+#       "anchor": "THPSE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_allows_pdf",
+#       "name": "test_head_precheck_allows_pdf",
+#       "anchor": "THPAP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_allows_redirect_to_pdf",
+#       "name": "test_head_precheck_allows_redirect_to_pdf",
+#       "anchor": "HPAR1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_failure_allows_download",
+#       "name": "test_head_precheck_failure_allows_download",
+#       "anchor": "THPFA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_respects_global_disable",
+#       "name": "test_head_precheck_respects_global_disable",
+#       "anchor": "THPRG",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_resolver_override",
+#       "name": "test_head_precheck_resolver_override",
+#       "anchor": "THPRO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_callable_accepts_argument_handles_noncallable",
+#       "name": "test_callable_accepts_argument_handles_noncallable",
+#       "anchor": "TCAAH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_logs_missing_resolver",
+#       "name": "test_pipeline_logs_missing_resolver",
+#       "anchor": "TPLMR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_skips_disabled_resolver",
+#       "name": "test_pipeline_skips_disabled_resolver",
+#       "anchor": "TPSDR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_skips_not_applicable_resolver",
+#       "name": "test_pipeline_skips_not_applicable_resolver",
+#       "anchor": "TPSNA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_collect_resolver_results_handles_exception",
+#       "name": "test_collect_resolver_results_handles_exception",
+#       "anchor": "TCRRH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_records_event_and_skip_reason",
+#       "name": "test_pipeline_records_event_and_skip_reason",
+#       "anchor": "TPREA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_skips_duplicate_urls",
+#       "name": "test_pipeline_skips_duplicate_urls",
+#       "anchor": "TPSDU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_head_precheck_failure_skips_attempt",
+#       "name": "test_pipeline_head_precheck_failure_skips_attempt",
+#       "anchor": "TPHPF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_event_without_reason",
+#       "name": "test_pipeline_event_without_reason",
+#       "anchor": "TPEWR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_downloads_with_context_argument",
+#       "name": "test_pipeline_downloads_with_context_argument",
+#       "anchor": "TPDWC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_respects_max_attempts",
+#       "name": "test_pipeline_respects_max_attempts",
+#       "anchor": "TPRMA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_jitter_sleep_no_delay",
+#       "name": "test_pipeline_jitter_sleep_no_delay",
+#       "anchor": "TPJSN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_concurrent_skips_missing_resolver",
+#       "name": "test_pipeline_concurrent_skips_missing_resolver",
+#       "anchor": "TPCSM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_ignores_empty_url",
+#       "name": "test_pipeline_ignores_empty_url",
+#       "anchor": "TPIEU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_concurrent_execution",
+#       "name": "test_pipeline_concurrent_execution",
+#       "anchor": "TPCE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_global_deduplication_skips_repeat_urls",
+#       "name": "test_pipeline_global_deduplication_skips_repeat_urls",
+#       "anchor": "TPGDS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_domain_rate_limiting_enforces_interval",
+#       "name": "test_pipeline_domain_rate_limiting_enforces_interval",
+#       "anchor": "TPDRL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_domain_limit_includes_jitter_component",
+#       "name": "test_domain_limit_includes_jitter_component",
+#       "anchor": "TDLIJ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_stub_response",
+#       "name": "_StubResponse",
+#       "anchor": "STUB1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_artifact",
+#       "name": "_artifact",
+#       "anchor": "ARTI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_arxiv_resolver_skips_missing_identifier",
+#       "name": "test_arxiv_resolver_skips_missing_identifier",
+#       "anchor": "TARSM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_arxiv_resolver_strips_prefix",
+#       "name": "test_arxiv_resolver_strips_prefix",
+#       "anchor": "TARSP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_openalex_resolver_skip",
+#       "name": "test_openalex_resolver_skip",
+#       "anchor": "TORS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_openalex_resolver_dedupes",
+#       "name": "test_openalex_resolver_dedupes",
+#       "anchor": "TORD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_landing_page_resolver_meta_pattern",
+#       "name": "test_landing_page_resolver_meta_pattern",
+#       "anchor": "LPRM1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_landing_page_resolver_link_pattern",
+#       "name": "test_landing_page_resolver_link_pattern",
+#       "anchor": "TLPRL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_landing_page_resolver_anchor_pattern",
+#       "name": "test_landing_page_resolver_anchor_pattern",
+#       "anchor": "TLPRA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_landing_page_resolver_http_error",
+#       "name": "test_landing_page_resolver_http_error",
+#       "anchor": "TLPRH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_landing_page_resolver_request_errors",
+#       "name": "test_landing_page_resolver_request_errors",
+#       "anchor": "TLPRR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_core_resolver_http_error",
+#       "name": "test_core_resolver_http_error",
+#       "anchor": "TCRHE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_core_resolver_json_error",
+#       "name": "test_core_resolver_json_error",
+#       "anchor": "TCRJE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_core_resolver_emits_results",
+#       "name": "test_core_resolver_emits_results",
+#       "anchor": "TCRER",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_core_resolver_error_paths",
+#       "name": "test_core_resolver_error_paths",
+#       "anchor": "TCREP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_core_resolver_skips_when_no_doi",
+#       "name": "test_core_resolver_skips_when_no_doi",
+#       "anchor": "TCRSW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_core_resolver_is_enabled_requires_key",
+#       "name": "test_core_resolver_is_enabled_requires_key",
+#       "anchor": "TCRIE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_core_resolver_ignores_non_dict_hits",
+#       "name": "test_core_resolver_ignores_non_dict_hits",
+#       "anchor": "TCRIN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_crossref_resolver_http_error",
+#       "name": "test_crossref_resolver_http_error",
+#       "anchor": "CRHE1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_crossref_resolver_success",
+#       "name": "test_crossref_resolver_success",
+#       "anchor": "TCRS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_crossref_resolver_link_not_list",
+#       "name": "test_crossref_resolver_link_not_list",
+#       "anchor": "TCRLN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_crossref_resolver_skip_without_doi",
+#       "name": "test_crossref_resolver_skip_without_doi",
+#       "anchor": "CRSW1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_crossref_resolver_is_enabled",
+#       "name": "test_crossref_resolver_is_enabled",
+#       "anchor": "CRIE1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_crossref_resolver_session_success",
+#       "name": "test_crossref_resolver_session_success",
+#       "anchor": "TCRSS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_crossref_resolver_cached_request_error",
+#       "name": "test_crossref_resolver_cached_request_error",
+#       "anchor": "TCRCR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_crossref_resolver_session_errors",
+#       "name": "test_crossref_resolver_session_errors",
+#       "anchor": "TCRSE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_crossref_resolver_session_http_error",
+#       "name": "test_crossref_resolver_session_http_error",
+#       "anchor": "TCRSH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_crossref_resolver_session_json_error",
+#       "name": "test_crossref_resolver_session_json_error",
+#       "anchor": "TCRSJ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_crossref_resolver_uses_central_retry_logic",
+#       "name": "test_crossref_resolver_uses_central_retry_logic",
+#       "anchor": "TCRUC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_doaj_resolver_http_error",
+#       "name": "test_doaj_resolver_http_error",
+#       "anchor": "TDRHE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_doaj_resolver_emits_candidate",
+#       "name": "test_doaj_resolver_emits_candidate",
+#       "anchor": "TDREC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_doaj_resolver_json_error",
+#       "name": "test_doaj_resolver_json_error",
+#       "anchor": "TDRJE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_doaj_resolver_error_paths",
+#       "name": "test_doaj_resolver_error_paths",
+#       "anchor": "TDREP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_doaj_resolver_includes_api_key",
+#       "name": "test_doaj_resolver_includes_api_key",
+#       "anchor": "TDRIA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_doaj_resolver_skip_no_doi",
+#       "name": "test_doaj_resolver_skip_no_doi",
+#       "anchor": "TDRSN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_europe_pmc_resolver_http_error",
+#       "name": "test_europe_pmc_resolver_http_error",
+#       "anchor": "TEPRH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_europe_pmc_resolver_json_error",
+#       "name": "test_europe_pmc_resolver_json_error",
+#       "anchor": "TEPRJ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_europe_pmc_resolver_emits_pdf",
+#       "name": "test_europe_pmc_resolver_emits_pdf",
+#       "anchor": "TEPRE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_europe_pmc_resolver_error_paths",
+#       "name": "test_europe_pmc_resolver_error_paths",
+#       "anchor": "EPRE1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_hal_resolver_emits_urls",
+#       "name": "test_hal_resolver_emits_urls",
+#       "anchor": "THREU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_hal_resolver_json_error",
+#       "name": "test_hal_resolver_json_error",
+#       "anchor": "THRJE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_hal_resolver_error_paths",
+#       "name": "test_hal_resolver_error_paths",
+#       "anchor": "THREP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_hal_resolver_is_enabled",
+#       "name": "test_hal_resolver_is_enabled",
+#       "anchor": "THRIE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_hal_resolver_skip_no_doi",
+#       "name": "test_hal_resolver_skip_no_doi",
+#       "anchor": "THRSN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_openaire_resolver_emits_pdf",
+#       "name": "test_openaire_resolver_emits_pdf",
+#       "anchor": "TOREP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_openaire_resolver_json_error",
+#       "name": "test_openaire_resolver_json_error",
+#       "anchor": "TORJE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_openaire_resolver_fallback_json_load",
+#       "name": "test_openaire_resolver_fallback_json_load",
+#       "anchor": "TORFJ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_openaire_resolver_error_paths",
+#       "name": "test_openaire_resolver_error_paths",
+#       "anchor": "OREP1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_osf_resolver_emits_urls",
+#       "name": "test_osf_resolver_emits_urls",
+#       "anchor": "TOREU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_osf_resolver_json_error",
+#       "name": "test_osf_resolver_json_error",
+#       "anchor": "ORJE1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_osf_resolver_error_paths",
+#       "name": "test_osf_resolver_error_paths",
+#       "anchor": "OREP2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_osf_resolver_skip_no_doi",
+#       "name": "test_osf_resolver_skip_no_doi",
+#       "anchor": "TORSN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_unpaywall_resolver_cached_http_error",
+#       "name": "test_unpaywall_resolver_cached_http_error",
+#       "anchor": "TURCH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_unpaywall_resolver_cached_success",
+#       "name": "test_unpaywall_resolver_cached_success",
+#       "anchor": "TURCS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_unpaywall_resolver_session_errors",
+#       "name": "test_unpaywall_resolver_session_errors",
+#       "anchor": "TURSE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_unpaywall_resolver_session_json_error",
+#       "name": "test_unpaywall_resolver_session_json_error",
+#       "anchor": "TURSJ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_unpaywall_resolver_is_enabled",
+#       "name": "test_unpaywall_resolver_is_enabled",
+#       "anchor": "TURIE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_unpaywall_resolver_session_success",
+#       "name": "test_unpaywall_resolver_session_success",
+#       "anchor": "TURSS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_semantic_scholar_resolver_http_error",
+#       "name": "test_semantic_scholar_resolver_http_error",
+#       "anchor": "TSSRH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_semantic_scholar_resolver_errors",
+#       "name": "test_semantic_scholar_resolver_errors",
+#       "anchor": "TSSRE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_semantic_scholar_resolver_json_error",
+#       "name": "test_semantic_scholar_resolver_json_error",
+#       "anchor": "TSSRJ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_semantic_scholar_resolver_no_open_access",
+#       "name": "test_semantic_scholar_resolver_no_open_access",
+#       "anchor": "TSSRN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pmc_resolver_no_identifiers",
+#       "name": "test_pmc_resolver_no_identifiers",
+#       "anchor": "TPRNI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pmc_resolver_timeout_fallback",
+#       "name": "test_pmc_resolver_timeout_fallback",
+#       "anchor": "TPRTF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pmc_resolver_other_errors",
+#       "name": "test_pmc_resolver_other_errors",
+#       "anchor": "TPROE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pmc_resolver_success",
+#       "name": "test_pmc_resolver_success",
+#       "anchor": "TPRS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pmc_lookup_pmcids_success",
+#       "name": "test_pmc_lookup_pmcids_success",
+#       "anchor": "TPLPS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pmc_lookup_pmcids_handles_json_error",
+#       "name": "test_pmc_lookup_pmcids_handles_json_error",
+#       "anchor": "TPLPH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_wayback_resolver_handles_http_error",
+#       "name": "test_wayback_resolver_handles_http_error",
+#       "anchor": "TWRHH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_wayback_resolver_returns_archive",
+#       "name": "test_wayback_resolver_returns_archive",
+#       "anchor": "TWRRA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_wayback_resolver_json_error",
+#       "name": "test_wayback_resolver_json_error",
+#       "anchor": "TWRJE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_wayback_resolver_error_paths",
+#       "name": "test_wayback_resolver_error_paths",
+#       "anchor": "TWREP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_wayback_resolver_no_snapshot",
+#       "name": "test_wayback_resolver_no_snapshot",
+#       "anchor": "TWRNS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_zenodo_resolver_no_doi",
+#       "name": "test_zenodo_resolver_no_doi",
+#       "anchor": "TZRND",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_zenodo_resolver_errors",
+#       "name": "test_zenodo_resolver_errors",
+#       "anchor": "TZRE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_zenodo_resolver_http_error",
+#       "name": "test_zenodo_resolver_http_error",
+#       "anchor": "TZRHE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_zenodo_resolver_json_error",
+#       "name": "test_zenodo_resolver_json_error",
+#       "anchor": "TZRJE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_zenodo_resolver_emits_urls",
+#       "name": "test_zenodo_resolver_emits_urls",
+#       "anchor": "TZREU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_zenodo_resolver_is_enabled",
+#       "name": "test_zenodo_resolver_is_enabled",
+#       "anchor": "TZRIE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_zenodo_resolver_malformed_hits",
+#       "name": "test_zenodo_resolver_malformed_hits",
+#       "anchor": "TZRMH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "make_artifact",
+#       "name": "make_artifact",
+#       "anchor": "MA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build_config",
+#       "name": "build_config",
+#       "anchor": "BC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_unpaywall_resolver_success",
+#       "name": "test_unpaywall_resolver_success",
+#       "anchor": "TURS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_unpaywall_resolver_http_error",
+#       "name": "test_unpaywall_resolver_http_error",
+#       "anchor": "TURHE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_crossref_resolver_includes_mailto",
+#       "name": "test_crossref_resolver_includes_mailto",
+#       "anchor": "TCRIM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_crossref_resolver_handles_json_error",
+#       "name": "test_crossref_resolver_handles_json_error",
+#       "anchor": "TCRHJ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_landing_page_resolver_patterns",
+#       "name": "test_landing_page_resolver_patterns",
+#       "anchor": "TLPRP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_landing_page_resolver_http_error",
+#       "name": "test_landing_page_resolver_http_error",
+#       "anchor": "LPRH1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pmc_resolver_uses_id_converter",
+#       "name": "test_pmc_resolver_uses_id_converter",
+#       "anchor": "TPRUI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pmc_resolver_handles_request_error",
+#       "name": "test_pmc_resolver_handles_request_error",
+#       "anchor": "TPRHR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_europe_pmc_resolver_filters_pdf",
+#       "name": "test_europe_pmc_resolver_filters_pdf",
+#       "anchor": "TEPRF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_europe_pmc_resolver_http_error",
+#       "name": "test_europe_pmc_resolver_http_error",
+#       "anchor": "EPRH1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_openaire_resolver_collects_pdf_candidates",
+#       "name": "test_openaire_resolver_collects_pdf_candidates",
+#       "anchor": "TORCP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_hal_resolver_uses_file_fields",
+#       "name": "test_hal_resolver_uses_file_fields",
+#       "anchor": "THRUF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_osf_resolver_merges_download_links",
+#       "name": "test_osf_resolver_merges_download_links",
+#       "anchor": "TORMD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_core_resolver_success",
+#       "name": "test_core_resolver_success",
+#       "anchor": "TCRS1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_core_resolver_handles_failure",
+#       "name": "test_core_resolver_handles_failure",
+#       "anchor": "TCRHF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_doaj_resolver_filters_pdf",
+#       "name": "test_doaj_resolver_filters_pdf",
+#       "anchor": "TDRFP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_doaj_resolver_handles_error",
+#       "name": "test_doaj_resolver_handles_error",
+#       "anchor": "DRHE1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_semantic_scholar_resolver_handles_error",
+#       "name": "test_semantic_scholar_resolver_handles_error",
+#       "anchor": "SSRH1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_semantic_scholar_resolver_success",
+#       "name": "test_semantic_scholar_resolver_success",
+#       "anchor": "TSSRS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_wayback_resolver_success",
+#       "name": "test_wayback_resolver_success",
+#       "anchor": "TWRS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_wayback_resolver_handles_missing_snapshot",
+#       "name": "test_wayback_resolver_handles_missing_snapshot",
+#       "anchor": "TWRHM",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Consolidated resolver core tests."""
 
 from __future__ import annotations
 
-import importlib
 import json
 import sys
-import warnings
 from argparse import Namespace
 from dataclasses import replace
 from pathlib import Path
@@ -48,7 +973,6 @@ from DocsToKG.ContentDownload.resolvers import (
     UnpaywallResolver,
     WaybackResolver,
     ZenodoResolver,
-    clear_resolver_caches,
     find_pdf_via_anchor,
     find_pdf_via_link,
     find_pdf_via_meta,
@@ -70,15 +994,15 @@ pytest.importorskip("requests")
 # ---- test_resolver_caching.py -----------------------------
 @pytest.fixture(autouse=True)
 def clear_cache_between_tests():
-    clear_resolver_caches()
     yield
-    clear_resolver_caches()
 
 
 class DummyApiResolver(ApiResolverBase, register=False):
     name = "dummy_api"
 
-    def is_enabled(self, config: ResolverConfig, artifact: Any) -> bool:  # pragma: no cover - helper
+    def is_enabled(
+        self, config: ResolverConfig, artifact: Any
+    ) -> bool:  # pragma: no cover - helper
         return True
 
     def iter_urls(
@@ -225,6 +1149,7 @@ def test_landing_page_helpers_extract_expected_urls() -> None:
     )
     assert find_pdf_via_anchor(soup_anchor_text, base) is None
 
+
 # ---- test_resolver_caching.py -----------------------------
 def test_resolvers_use_shared_retry_helper(monkeypatch):
     calls: list[str] = []
@@ -233,9 +1158,7 @@ def test_resolvers_use_shared_retry_helper(monkeypatch):
         calls.append(url)
         if "unpaywall" in url:
             return _StubResponse(
-                json_data={
-                    "best_oa_location": {"url_for_pdf": "https://example.org/unpaywall.pdf"}
-                }
+                json_data={"best_oa_location": {"url_for_pdf": "https://example.org/unpaywall.pdf"}}
             )
         if "crossref" in url:
             return _StubResponse(
@@ -251,9 +1174,7 @@ def test_resolvers_use_shared_retry_helper(monkeypatch):
                 }
             )
         if "semanticscholar" in url:
-            return _StubResponse(
-                json_data={"openAccessPdf": {"url": "https://example.org/s2.pdf"}}
-            )
+            return _StubResponse(json_data={"openAccessPdf": {"url": "https://example.org/s2.pdf"}})
         raise AssertionError(f"unexpected URL {url}")
 
     monkeypatch.setattr(
@@ -290,11 +1211,6 @@ def test_resolvers_use_shared_retry_helper(monkeypatch):
         "https://api.semanticscholar.org/graph/v1/paper/DOI:10.1234/test",
     ]
 
-    clear_resolver_caches()
-    list(unpaywall.iter_urls(session, config, artifact))
-    assert calls[-1] == "https://api.unpaywall.org/v2/10.1234/test"
-
-
 # ---- test_resolver_config.py -----------------------------
 pytest.importorskip("requests")
 
@@ -303,9 +1219,7 @@ pytest.importorskip("pyalex")
 
 
 # ---- test_resolver_config.py -----------------------------
-def test_deprecated_resolver_rate_limits_warning(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_legacy_resolver_rate_limits_rejected(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text("{" '"resolver_rate_limits": {"unpaywall": 2.0}' "}")
     args = Namespace(
@@ -320,14 +1234,11 @@ def test_deprecated_resolver_rate_limits_warning(
         disable_resolver=[],
         enable_resolver=[],
         resolver_order=None,
-        log_jsonl=None,
         log_format="jsonl",
         resume_from=None,
     )
-    caplog.set_level("WARNING")
-    config = load_resolver_config(args, ["unpaywall"], None)
-    assert config.resolver_min_interval_s["unpaywall"] == 2.0
-    assert any("resolver_rate_limits deprecated" in record.message for record in caplog.records)
+    with pytest.raises(ValueError, match="resolver_rate_limits.*no longer supported"):
+        load_resolver_config(args, ["unpaywall"], None)
 
 
 # ---- test_resolver_config.py -----------------------------
@@ -344,7 +1255,6 @@ def test_user_agent_includes_mailto(tmp_path: Path) -> None:
         disable_resolver=[],
         enable_resolver=["openaire"],
         resolver_order=None,
-        log_jsonl=None,
         log_format="jsonl",
         resume_from=None,
     )
@@ -381,7 +1291,6 @@ def test_resolver_toggle_defaults_single_source(monkeypatch: pytest.MonkeyPatch)
         disable_resolver=[],
         enable_resolver=[],
         resolver_order=None,
-        log_jsonl=None,
         log_format="jsonl",
         resume_from=None,
     )
@@ -610,16 +1519,14 @@ def test_classify_payload_detects_pdf_and_html():
 def test_classify_payload_octet_stream_requires_sniff() -> None:
     data = b"binary data with no signature"
     assert (
-        classify_payload(data, "application/octet-stream", "https://example.com/file.pdf")
-        is None
+        classify_payload(data, "application/octet-stream", "https://example.com/file.pdf") is None
     )
 
 
 def test_classify_payload_octet_stream_with_pdf_signature() -> None:
     data = b"%PDF-1.7"
     assert (
-        classify_payload(data, "application/octet-stream", "https://example.com/file.pdf")
-        == "pdf"
+        classify_payload(data, "application/octet-stream", "https://example.com/file.pdf") == "pdf"
     )
 
 
@@ -3195,27 +4102,6 @@ def test_zenodo_resolver_malformed_hits(monkeypatch, tmp_path) -> None:
     results = list(ZenodoResolver().iter_urls(Mock(), config, artifact))
 
     assert results == []
-
-
-# ---- test_resolvers_namespace.py -----------------------------
-def test_legacy_time_alias_emits_deprecation_warning():
-    with warnings.catch_warnings(record=True) as captured:
-        warnings.simplefilter("always", DeprecationWarning)
-        module_time = resolvers.time  # type: ignore[attr-defined]
-
-    assert module_time is importlib.import_module("time")
-    assert any(w.category is DeprecationWarning for w in captured)
-
-
-# ---- test_resolvers_namespace.py -----------------------------
-def test_reloading_resolvers_preserves_deprecation_behaviour():
-    module = importlib.reload(resolvers)
-    with warnings.catch_warnings(record=True) as captured:
-        warnings.simplefilter("always", DeprecationWarning)
-        module.requests  # type: ignore[attr-defined]
-
-    assert any(w.category is DeprecationWarning for w in captured)
-
 
 # ---- test_resolvers_unit.py -----------------------------
 pytest.importorskip("pyalex")

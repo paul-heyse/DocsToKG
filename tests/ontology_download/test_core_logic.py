@@ -1,3 +1,90 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_core_logic",
+#   "purpose": "Pytest coverage for ontology download core logic scenarios",
+#   "sections": [
+#     {
+#       "id": "stub_requests_metadata",
+#       "name": "stub_requests_metadata",
+#       "anchor": "SRM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_make_plan",
+#       "name": "_make_plan",
+#       "anchor": "MP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_run_fetch",
+#       "name": "_run_fetch",
+#       "anchor": "RF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_populate_plan_metadata_uses_http_config",
+#       "name": "test_populate_plan_metadata_uses_http_config",
+#       "anchor": "TPPMU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_plan_all_rejects_disallowed_host",
+#       "name": "test_plan_all_rejects_disallowed_host",
+#       "anchor": "TPARD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_immediate_future",
+#       "name": "_ImmediateFuture",
+#       "anchor": "IMME",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "test_plan_all_honors_concurrent_plan_limit",
+#       "name": "test_plan_all_honors_concurrent_plan_limit",
+#       "anchor": "TPAHC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_plan_all_skips_failures_when_configured",
+#       "name": "test_plan_all_skips_failures_when_configured",
+#       "anchor": "TPASF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_plan_one_uses_fallback",
+#       "name": "test_plan_one_uses_fallback",
+#       "anchor": "TPOUF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_plan_one_respects_disabled_fallback",
+#       "name": "test_plan_one_respects_disabled_fallback",
+#       "anchor": "TPORD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_fetch_one_download_fallback",
+#       "name": "test_fetch_one_download_fallback",
+#       "anchor": "TFODF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_manifest_fingerprint_ignores_target_format_order",
+#       "name": "test_manifest_fingerprint_ignores_target_format_order",
+#       "anchor": "TMFIT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_manifest_fingerprint_changes_with_normalization_mode",
+#       "name": "test_manifest_fingerprint_changes_with_normalization_mode",
+#       "anchor": "TMFCW",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Core module behavior tests."""
 
 from __future__ import annotations

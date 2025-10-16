@@ -1,3 +1,66 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.test_cuda_safety",
+#   "purpose": "Pytest coverage for cuda safety scenarios",
+#   "sections": [
+#     {
+#       "id": "reset_start_method",
+#       "name": "reset_start_method",
+#       "anchor": "RSM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_dummy_future",
+#       "name": "_DummyFuture",
+#       "anchor": "DUMM",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_dummy_executor",
+#       "name": "_DummyExecutor",
+#       "anchor": "DUMM1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_dummy_as_completed",
+#       "name": "_dummy_as_completed",
+#       "anchor": "DAC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_dummy_tqdm",
+#       "name": "_DummyTqdm",
+#       "anchor": "DUMM2",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_stub_main_setup",
+#       "name": "_stub_main_setup",
+#       "anchor": "SMS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_import_pdf_module",
+#       "name": "_import_pdf_module",
+#       "anchor": "IPM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_spawn_enforced_on_main",
+#       "name": "test_spawn_enforced_on_main",
+#       "anchor": "TSEOM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_spawn_prevents_cuda_reinitialization",
+#       "name": "test_spawn_prevents_cuda_reinitialization",
+#       "anchor": "TSPCR",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Tests for CUDA safety guarantees in DocTags conversion scripts."""
 
 from __future__ import annotations

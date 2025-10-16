@@ -1,3 +1,60 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_utilities",
+#   "purpose": "Pytest coverage for ontology download utilities scenarios",
+#   "sections": [
+#     {
+#       "id": "test_parse_rate_limit_to_rps_formats",
+#       "name": "test_parse_rate_limit_to_rps_formats",
+#       "anchor": "TPRLT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_parse_rate_limit_to_rps_invalid",
+#       "name": "test_parse_rate_limit_to_rps_invalid",
+#       "anchor": "PRLT1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_directory_size_counts_all_files",
+#       "name": "test_directory_size_counts_all_files",
+#       "anchor": "TDSCA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_directory_size_handles_empty_directory",
+#       "name": "test_directory_size_handles_empty_directory",
+#       "anchor": "TDSHE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_parse_iso_datetime_normalizes_timezone",
+#       "name": "test_parse_iso_datetime_normalizes_timezone",
+#       "anchor": "TPIDN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_parse_http_datetime_handles_gmt_header",
+#       "name": "test_parse_http_datetime_handles_gmt_header",
+#       "anchor": "TPHDH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_parse_version_timestamp_variants",
+#       "name": "test_parse_version_timestamp_variants",
+#       "anchor": "TPVTV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_infer_version_timestamp_from_composite_strings",
+#       "name": "test_infer_version_timestamp_from_composite_strings",
+#       "anchor": "TIVTF",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 import datetime as dt
 from pathlib import Path
 
@@ -17,8 +74,13 @@ from DocsToKG.OntologyDownload.ontology_download import (
     "limit,expected",
     [
         ("5/second", 5.0),
+        ("0.5/sec", 0.5),
+        ("6/s", 6.0),
         ("120/minute", pytest.approx(2.0)),
+        ("90/min", pytest.approx(1.5)),
+        ("30/m", pytest.approx(0.5)),
         ("3600/hour", pytest.approx(1.0)),
+        ("7200/h", pytest.approx(2.0)),
     ],
 )
 def test_parse_rate_limit_to_rps_formats(limit, expected):
@@ -41,6 +103,12 @@ def test_directory_size_counts_all_files(tmp_path: Path) -> None:
 
     expected = 10 + 5 + 7
     assert _directory_size(base) == expected
+
+
+def test_directory_size_handles_empty_directory(tmp_path: Path) -> None:
+    empty_dir = tmp_path / "empty"
+    empty_dir.mkdir()
+    assert _directory_size(empty_dir) == 0
 
 
 def test_parse_iso_datetime_normalizes_timezone() -> None:

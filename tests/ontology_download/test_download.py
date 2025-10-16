@@ -1,3 +1,306 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_download",
+#   "purpose": "Pytest coverage for ontology download download scenarios",
+#   "sections": [
+#     {
+#       "id": "dummy_response",
+#       "name": "DummyResponse",
+#       "anchor": "DUMM",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "dummy_session",
+#       "name": "DummySession",
+#       "anchor": "DUMM1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "make_session",
+#       "name": "make_session",
+#       "anchor": "MS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "clear_token_buckets",
+#       "name": "clear_token_buckets",
+#       "anchor": "CTB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_stream_success",
+#       "name": "test_download_stream_success",
+#       "anchor": "TDSS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_stream_uses_cache_on_304",
+#       "name": "test_download_stream_uses_cache_on_304",
+#       "anchor": "TDSUC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_stream_resumes_from_partial",
+#       "name": "test_download_stream_resumes_from_partial",
+#       "anchor": "TDSRF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_stream_retries",
+#       "name": "test_download_stream_retries",
+#       "anchor": "TDSR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_stream_rate_limiting",
+#       "name": "test_download_stream_rate_limiting",
+#       "anchor": "TDSRL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_get_bucket_service_specific_rate",
+#       "name": "test_get_bucket_service_specific_rate",
+#       "anchor": "TGBSS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_get_bucket_without_service_uses_host_key",
+#       "name": "test_get_bucket_without_service_uses_host_key",
+#       "anchor": "TGBWS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_get_bucket_falls_back_to_host_limit",
+#       "name": "test_get_bucket_falls_back_to_host_limit",
+#       "anchor": "TGBFB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_get_bucket_independent_keys_for_services",
+#       "name": "test_get_bucket_independent_keys_for_services",
+#       "anchor": "TGBIK",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_check_success",
+#       "name": "test_head_check_success",
+#       "anchor": "THCS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_check_graceful_on_405",
+#       "name": "test_head_check_graceful_on_405",
+#       "anchor": "THCGO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_check_raises_on_oversized",
+#       "name": "test_head_check_raises_on_oversized",
+#       "anchor": "THCRO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_media_type_match",
+#       "name": "test_validate_media_type_match",
+#       "anchor": "TVMTM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_media_type_acceptable_variation",
+#       "name": "test_validate_media_type_acceptable_variation",
+#       "anchor": "TVMTA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_media_type_mismatch_logs_warning",
+#       "name": "test_validate_media_type_mismatch_logs_warning",
+#       "anchor": "VMTM1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_media_type_disabled",
+#       "name": "test_validate_media_type_disabled",
+#       "anchor": "TVMTD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_extract_zip_safe",
+#       "name": "test_extract_zip_safe",
+#       "anchor": "TEZS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_extract_zip_rejects_traversal",
+#       "name": "test_extract_zip_rejects_traversal",
+#       "anchor": "TEZRT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_extract_zip_rejects_absolute",
+#       "name": "test_extract_zip_rejects_absolute",
+#       "anchor": "TEZRA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_extract_zip_detects_compression_bomb",
+#       "name": "test_extract_zip_detects_compression_bomb",
+#       "anchor": "TEZDC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_make_tarfile",
+#       "name": "_make_tarfile",
+#       "anchor": "MT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_extract_tar_safe",
+#       "name": "test_extract_tar_safe",
+#       "anchor": "TETS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_extract_tar_rejects_traversal",
+#       "name": "test_extract_tar_rejects_traversal",
+#       "anchor": "TETRT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_extract_tar_rejects_absolute",
+#       "name": "test_extract_tar_rejects_absolute",
+#       "anchor": "TETRA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_extract_tar_rejects_symlink",
+#       "name": "test_extract_tar_rejects_symlink",
+#       "anchor": "TETRS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_extract_tar_detects_compression_bomb",
+#       "name": "test_extract_tar_detects_compression_bomb",
+#       "anchor": "TETDC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_stream_http_error",
+#       "name": "test_download_stream_http_error",
+#       "anchor": "TDSHE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_stream_no_space",
+#       "name": "test_download_stream_no_space",
+#       "anchor": "TDSNS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_stream_hash_mismatch_triggers_retry",
+#       "name": "test_download_stream_hash_mismatch_triggers_retry",
+#       "anchor": "TDSHM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_url_security_rejects_private_ip",
+#       "name": "test_validate_url_security_rejects_private_ip",
+#       "anchor": "TVUSR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_url_security_upgrades_http",
+#       "name": "test_validate_url_security_upgrades_http",
+#       "anchor": "TVUSU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_url_security_respects_allowlist",
+#       "name": "test_validate_url_security_respects_allowlist",
+#       "anchor": "VUSR1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_url_security_blocks_disallowed_host",
+#       "name": "test_validate_url_security_blocks_disallowed_host",
+#       "anchor": "TVUSB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_url_security_normalizes_idn",
+#       "name": "test_validate_url_security_normalizes_idn",
+#       "anchor": "TVUSN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_url_security_rejects_mixed_script_idn",
+#       "name": "test_validate_url_security_rejects_mixed_script_idn",
+#       "anchor": "VUSR2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_url_security_respects_wildcard_allowlist",
+#       "name": "test_validate_url_security_respects_wildcard_allowlist",
+#       "anchor": "VUSR3",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_ensure_license_allowed_normalizes_spdx",
+#       "name": "test_ensure_license_allowed_normalizes_spdx",
+#       "anchor": "TELAN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_sanitize_filename_removes_traversal",
+#       "name": "test_sanitize_filename_removes_traversal",
+#       "anchor": "TSFRT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_migrate_manifest_sets_default_version",
+#       "name": "test_migrate_manifest_sets_default_version",
+#       "anchor": "TMMSD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_migrate_manifest_upgrades_old_schema",
+#       "name": "test_migrate_manifest_upgrades_old_schema",
+#       "anchor": "TMMUO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_migrate_manifest_warns_unknown_version",
+#       "name": "test_migrate_manifest_warns_unknown_version",
+#       "anchor": "TMMWU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_read_manifest_applies_migration",
+#       "name": "test_read_manifest_applies_migration",
+#       "anchor": "TRMAM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_stream_rejects_large_content",
+#       "name": "test_download_stream_rejects_large_content",
+#       "anchor": "DSRL1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_version_lock_serializes_concurrent_writers",
+#       "name": "test_version_lock_serializes_concurrent_writers",
+#       "anchor": "TVLSC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_noop_logger",
+#       "name": "_noop_logger",
+#       "anchor": "NL",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Ontology Download Streaming Tests
 

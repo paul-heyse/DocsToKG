@@ -1,3 +1,228 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.cli",
+#   "purpose": "CLI entry points for DocsToKG.OntologyDownload.cli workflows",
+#   "sections": [
+#     {
+#       "id": "format_table",
+#       "name": "format_table",
+#       "anchor": "FT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format_plan_rows",
+#       "name": "format_plan_rows",
+#       "anchor": "FPR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format_results_table",
+#       "name": "format_results_table",
+#       "anchor": "FRT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format_validation_summary",
+#       "name": "format_validation_summary",
+#       "anchor": "FVS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_build_parser",
+#       "name": "_build_parser",
+#       "anchor": "BP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_parse_target_formats",
+#       "name": "_parse_target_formats",
+#       "anchor": "PTF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_parse_positive_int",
+#       "name": "_parse_positive_int",
+#       "anchor": "PPI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_parse_allowed_hosts",
+#       "name": "_parse_allowed_hosts",
+#       "anchor": "PAH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_normalize_plan_args",
+#       "name": "_normalize_plan_args",
+#       "anchor": "NPA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_parse_since_arg",
+#       "name": "_parse_since_arg",
+#       "anchor": "PSA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_parse_since",
+#       "name": "_parse_since",
+#       "anchor": "PS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_format_bytes",
+#       "name": "_format_bytes",
+#       "anchor": "FB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_apply_cli_overrides",
+#       "name": "_apply_cli_overrides",
+#       "anchor": "ACO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_results_to_dict",
+#       "name": "_results_to_dict",
+#       "anchor": "RTD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_compute_plan_diff",
+#       "name": "_compute_plan_diff",
+#       "anchor": "CPD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_format_plan_diff",
+#       "name": "_format_plan_diff",
+#       "anchor": "FPD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_plan_to_dict",
+#       "name": "_plan_to_dict",
+#       "anchor": "PTD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_infer_version_timestamp",
+#       "name": "_infer_version_timestamp",
+#       "anchor": "IVT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_resolve_version_metadata",
+#       "name": "_resolve_version_metadata",
+#       "anchor": "RVM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_ensure_manifest_path",
+#       "name": "_ensure_manifest_path",
+#       "anchor": "EMP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_load_manifest",
+#       "name": "_load_manifest",
+#       "anchor": "LM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_collect_version_metadata",
+#       "name": "_collect_version_metadata",
+#       "anchor": "CVM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_resolve_specs_from_args",
+#       "name": "_resolve_specs_from_args",
+#       "anchor": "RSFA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_handle_pull",
+#       "name": "_handle_pull",
+#       "anchor": "HP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_handle_plan",
+#       "name": "_handle_plan",
+#       "anchor": "HP1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_handle_plan_diff",
+#       "name": "_handle_plan_diff",
+#       "anchor": "HPD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_handle_prune",
+#       "name": "_handle_prune",
+#       "anchor": "HP2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_doctor_report",
+#       "name": "_doctor_report",
+#       "anchor": "DR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_print_doctor_report",
+#       "name": "_print_doctor_report",
+#       "anchor": "PDR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_handle_show",
+#       "name": "_handle_show",
+#       "anchor": "HS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_selected_validators",
+#       "name": "_selected_validators",
+#       "anchor": "SV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_handle_validate",
+#       "name": "_handle_validate",
+#       "anchor": "HV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_handle_init",
+#       "name": "_handle_init",
+#       "anchor": "HI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_handle_config_validate",
+#       "name": "_handle_config_validate",
+#       "anchor": "HCV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_normalize_argv",
+#       "name": "_normalize_argv",
+#       "anchor": "NA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Ontology downloader CLI entry points.
 
 The `ontofetch` command exposes planning, pull, validation, diagnostics, and
@@ -47,7 +272,6 @@ from .ontology_download import (
     get_manifest_schema,
     infer_version_timestamp,
     load_config,
-    infer_version_timestamp,
     parse_iso_datetime,
     parse_rate_limit_to_rps,
     parse_version_timestamp,
@@ -57,7 +281,6 @@ from .ontology_download import (
     setup_logging,
     validate_config,
     validate_manifest_dict,
-    _directory_size,
 )
 
 ONTOLOGY_DIR = LOCAL_ONTOLOGY_DIR
@@ -557,10 +780,6 @@ def _apply_cli_overrides(config: ResolvedConfig, args) -> None:
         config.defaults.http.allowed_hosts = existing
 
 
-_RATE_LIMIT_RE = re.compile(r"^([\d.]+)/(second|sec|s|minute|min|m|hour|h)$")
-
-
-
 def _results_to_dict(result: FetchResult) -> dict:
     """Convert a ``FetchResult`` instance into a JSON-friendly mapping.
 
@@ -677,32 +896,6 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
     if metadata.get("etag"):
         payload["etag"] = metadata["etag"]
     return payload
-
-
-def _directory_size_bytes(path: Path) -> int:
-    return _directory_size(path)
-
-
-def _directory_size_bytes(path: Path) -> int:
-    """Return the cumulative size of files within ``path``.
-
-    Args:
-        path: Directory whose contents should be measured.
-
-    Returns:
-        Total number of bytes encountered within the directory tree.
-    """
-
-    total = 0
-    for entry in path.rglob("*"):
-        try:
-            if entry.is_file():
-                total += entry.stat().st_size
-        except OSError:
-            continue
-    return total
-
-
 def _infer_version_timestamp(version: str) -> Optional[datetime]:
     """Attempt to derive a datetime from a version string.
 
@@ -713,7 +906,12 @@ def _infer_version_timestamp(version: str) -> Optional[datetime]:
         Datetime derived from the version string, or ``None`` when no format matches.
     """
 
-    candidates = [version, version.replace("_", "-"), version.replace("/", "-"), version.replace("_", "")] 
+    candidates = [
+        version,
+        version.replace("_", "-"),
+        version.replace("/", "-"),
+        version.replace("_", ""),
+    ]
     for candidate in candidates:
         parsed = parse_version_timestamp(candidate)
         if parsed is not None:

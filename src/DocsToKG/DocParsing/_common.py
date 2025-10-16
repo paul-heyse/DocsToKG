@@ -1,3 +1,174 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing._common",
+#   "purpose": "Shared utilities used across DocsToKG DocParsing pipelines",
+#   "sections": [
+#     {
+#       "id": "expand_path",
+#       "name": "expand_path",
+#       "anchor": "EP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve_hf_home",
+#       "name": "resolve_hf_home",
+#       "anchor": "RHH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve_model_root",
+#       "name": "resolve_model_root",
+#       "anchor": "RMR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "detect_data_root",
+#       "name": "detect_data_root",
+#       "anchor": "DDR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_ensure_dir",
+#       "name": "_ensure_dir",
+#       "anchor": "ED",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "data_doctags",
+#       "name": "data_doctags",
+#       "anchor": "DD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "data_chunks",
+#       "name": "data_chunks",
+#       "anchor": "DC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "data_vectors",
+#       "name": "data_vectors",
+#       "anchor": "DV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "data_manifests",
+#       "name": "data_manifests",
+#       "anchor": "DM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "data_pdfs",
+#       "name": "data_pdfs",
+#       "anchor": "DP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "data_html",
+#       "name": "data_html",
+#       "anchor": "DH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get_logger",
+#       "name": "get_logger",
+#       "anchor": "GL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find_free_port",
+#       "name": "find_free_port",
+#       "anchor": "FFP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "atomic_write",
+#       "name": "atomic_write",
+#       "anchor": "AW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter_doctags",
+#       "name": "iter_doctags",
+#       "anchor": "ID",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iter_chunks",
+#       "name": "iter_chunks",
+#       "anchor": "IC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "jsonl_load",
+#       "name": "jsonl_load",
+#       "anchor": "JL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "jsonl_save",
+#       "name": "jsonl_save",
+#       "anchor": "JS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "batcher",
+#       "name": "Batcher",
+#       "anchor": "BATC",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_manifest_filename",
+#       "name": "_manifest_filename",
+#       "anchor": "MF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest_append",
+#       "name": "manifest_append",
+#       "anchor": "MA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve_hash_algorithm",
+#       "name": "resolve_hash_algorithm",
+#       "anchor": "RHA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "compute_content_hash",
+#       "name": "compute_content_hash",
+#       "anchor": "CCH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load_manifest_index",
+#       "name": "load_manifest_index",
+#       "anchor": "LMI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "acquire_lock",
+#       "name": "acquire_lock",
+#       "anchor": "AL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_pid_is_running",
+#       "name": "_pid_is_running",
+#       "anchor": "PIR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "set_spawn_or_warn",
+#       "name": "set_spawn_or_warn",
+#       "anchor": "SSOW",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 DocParsing Shared Utilities
 
@@ -44,6 +215,8 @@ from typing import Callable, Dict, Iterable, Iterator, List, Optional, TextIO, T
 
 T = TypeVar("T")
 
+# --- Globals ---
+
 __all__ = [
     "detect_data_root",
     "data_doctags",
@@ -71,6 +244,8 @@ __all__ = [
     "set_spawn_or_warn",
 ]
 
+# --- Path Resolution ---
+
 
 def expand_path(path: str | Path) -> Path:
     """Return ``path`` expanded to an absolute :class:`Path`.
@@ -86,7 +261,14 @@ def expand_path(path: str | Path) -> Path:
 
 
 def resolve_hf_home() -> Path:
-    """Resolve the HuggingFace cache directory respecting ``HF_HOME``."""
+    """Resolve the HuggingFace cache directory respecting ``HF_HOME``.
+
+    Args:
+        None
+
+    Returns:
+        Path: Absolute path to the HuggingFace cache directory.
+    """
 
     env = os.getenv("HF_HOME")
     if env:
@@ -95,7 +277,14 @@ def resolve_hf_home() -> Path:
 
 
 def resolve_model_root(hf_home: Optional[Path] = None) -> Path:
-    """Resolve the DocsToKG model root honoring ``DOCSTOKG_MODEL_ROOT``."""
+    """Resolve the DocsToKG model root honoring ``DOCSTOKG_MODEL_ROOT``.
+
+    Args:
+        hf_home: Optional HuggingFace cache directory to treat as the base path.
+
+    Returns:
+        Path: Absolute directory where DocsToKG models should be stored.
+    """
 
     env = os.getenv("DOCSTOKG_MODEL_ROOT")
     if env:
@@ -275,6 +464,8 @@ def data_html(root: Optional[Path] = None) -> Path:
     return _ensure_dir(detect_data_root(root) / "HTML")
 
 
+# --- Logging and I/O Utilities ---
+
 def get_logger(name: str, level: str = "INFO") -> logging.Logger:
     """Get a structured JSON logger configured for console output.
 
@@ -404,6 +595,8 @@ def atomic_write(path: Path) -> Iterator[TextIO]:
         raise
 
 
+# --- Dataset Iterators ---
+
 def iter_doctags(directory: Path) -> Iterator[Path]:
     """Yield DocTags files within ``directory`` and subdirectories.
 
@@ -458,73 +651,7 @@ def iter_chunks(directory: Path) -> Iterator[Path]:
         yield path
 
 
-def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:
-    """Ensure the multiprocessing start method is set to ``spawn``.
-
-    Args:
-        logger: Optional logger used to emit diagnostic output.
-
-    The helper enforces CUDA safety guarantees by configuring the
-    ``spawn`` start method when possible. If another start method is
-    already active, the helper logs a warning describing the current
-    method so callers understand the degraded safety state.
-    """
-
-    import multiprocessing as mp
-
-    try:
-        mp.set_start_method("spawn", force=True)
-        if logger is not None:
-            logger.debug("Multiprocessing start method set to 'spawn'")
-        return
-    except RuntimeError:
-        current = mp.get_start_method(allow_none=True)
-        if current == "spawn":
-            if logger is not None:
-                logger.debug("Multiprocessing start method already 'spawn'")
-            return
-        message = "Multiprocessing start method is %s; CUDA workloads require 'spawn'." % (
-            current or "unset"
-        )
-        if logger is not None:
-            logger.warning(message)
-        else:
-            logging.getLogger(__name__).warning(message)
-
-
-def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:
-    """Ensure the multiprocessing start method is set to ``spawn``.
-
-    Args:
-        logger: Optional logger used to emit diagnostic output.
-
-    The helper enforces CUDA safety guarantees by configuring the
-    ``spawn`` start method when possible. If another start method is
-    already active, the helper logs a warning describing the current
-    method so callers understand the degraded safety state.
-    """
-
-    import multiprocessing as mp
-
-    try:
-        mp.set_start_method("spawn", force=True)
-        if logger is not None:
-            logger.debug("Multiprocessing start method set to 'spawn'")
-        return
-    except RuntimeError:
-        current = mp.get_start_method(allow_none=True)
-        if current == "spawn":
-            if logger is not None:
-                logger.debug("Multiprocessing start method already 'spawn'")
-            return
-        message = "Multiprocessing start method is %s; CUDA workloads require 'spawn'." % (
-            current or "unset"
-        )
-        if logger is not None:
-            logger.warning(message)
-        else:
-            logging.getLogger(__name__).warning(message)
-
+# --- JSONL Helpers ---
 
 def jsonl_load(path: Path, skip_invalid: bool = False, max_errors: int = 10) -> List[dict]:
     """Load a JSONL file into memory with optional error tolerance.
@@ -628,6 +755,8 @@ def jsonl_save(
         raise
 
 
+# --- Collection Utilities ---
+
 class Batcher(Iterable[List[T]]):
     """Yield fixed-size batches from an iterable.
 
@@ -674,9 +803,11 @@ class Batcher(Iterable[List[T]]):
             if len(batch) >= self._batch_size:
                 yield batch
                 batch = []
-        if batch:
-            yield batch
+    if batch:
+        yield batch
 
+
+# --- Manifest Utilities ---
 
 def _manifest_filename(stage: str) -> str:
     """Return manifest filename for a given stage."""
@@ -840,6 +971,8 @@ def load_manifest_index(stage: str, root: Optional[Path] = None) -> Dict[str, di
     return index
 
 
+# --- Concurrency Utilities ---
+
 @contextlib.contextmanager
 def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:
     """Acquire an advisory lock using ``.lock`` sentinel files.
@@ -905,6 +1038,13 @@ def _pid_is_running(pid: int) -> bool:
 
 def set_spawn_or_warn(logger: Optional[logging.Logger] = None) -> None:
     """Ensure the multiprocessing start method is set to ``spawn``.
+
+    Args:
+        logger: Optional logger that receives diagnostic messages about the start
+            method configuration.
+
+    Returns:
+        None: The function mutates global multiprocessing state and logs warnings.
 
     This helper attempts to set the start method to ``spawn`` with ``force=True``.
     If a ``RuntimeError`` occurs (meaning the method was already set), it checks

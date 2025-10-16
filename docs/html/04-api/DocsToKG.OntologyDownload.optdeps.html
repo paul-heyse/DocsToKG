@@ -79,302 +79,39 @@
   <section id="module-optdeps">
 <h1>1. Module: optdeps<a class="headerlink" href="#module-optdeps" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.optdeps</span></code>.</p>
-<p>Centralized optional dependency management with fallback stubs.</p>
-<p>The refactored ontology downloader relies on optional tooling for streaming
-normalization, diagnostics, and validator subprocesses. These helpers expose
-consistent access points that return either the real modules or lightweight
-stubs, ensuring features like ROBOT health checks, Pronto/Owlready2 validation,
-and filesystem abstractions work even in minimal test environments.</p>
-<p>Examples:
-&gt;&gt;&gt; from DocsToKG.OntologyDownload.optdeps import get_pystow
-&gt;&gt;&gt; pystow = get_pystow()
-&gt;&gt;&gt; cache_dir = pystow.join(“ontology-fetcher”, “cache”)
-&gt;&gt;&gt; cache_dir.as_posix()
-‘…/ontology-fetcher/cache’</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Optional dependency helpers for the ontology downloader.</p>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="create-stub-module-name-attrs">
-<h3><code class="docutils literal notranslate"><span class="pre">_create_stub_module(name,</span> <span class="pre">attrs)</span></code><a class="headerlink" href="#create-stub-module-name-attrs" title="Link to this heading"></a></h3>
-<p>Return a :class:<code class="docutils literal notranslate"><span class="pre">ModuleType</span></code> populated with <em>attrs</em>.</p>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="getattr-self-name">
+<h3><code class="docutils literal notranslate"><span class="pre">__getattr__(self,</span> <span class="pre">name)</span></code><a class="headerlink" href="#getattr-self-name" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
-<section id="import-module-name">
-<h3><code class="docutils literal notranslate"><span class="pre">_import_module(name)</span></code><a class="headerlink" href="#import-module-name" title="Link to this heading"></a></h3>
-<p>Import a module by name using :mod:<code class="docutils literal notranslate"><span class="pre">importlib</span></code>.</p>
-<p>The indirection makes it trivial to monkeypatch the import logic in unit
-tests without modifying global interpreter state.</p>
+<section id="setattr-self-name-value">
+<h3><code class="docutils literal notranslate"><span class="pre">__setattr__(self,</span> <span class="pre">name,</span> <span class="pre">value)</span></code><a class="headerlink" href="#setattr-self-name-value" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
-<section id="get-pystow">
-<h3><code class="docutils literal notranslate"><span class="pre">get_pystow()</span></code><a class="headerlink" href="#get-pystow" title="Link to this heading"></a></h3>
-<p>Return the real :mod:<code class="docutils literal notranslate"><span class="pre">pystow</span></code> module or a fallback stub.</p>
-<p>The helper caches the imported module so repeated calls do not incur
-additional import overhead.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Either the real :mod:<code class="docutils literal notranslate"><span class="pre">pystow</span></code> module or an instance of
-:class:<code class="docutils literal notranslate"><span class="pre">_PystowFallback</span></code> when :mod:<code class="docutils literal notranslate"><span class="pre">pystow</span></code> is not installed.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>pystow = get_pystow()
-cache_dir = pystow.join(“ontology-fetcher”, “cache”)
-isinstance(cache_dir, Path)
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-<section id="get-rdflib">
-<h3><code class="docutils literal notranslate"><span class="pre">get_rdflib()</span></code><a class="headerlink" href="#get-rdflib" title="Link to this heading"></a></h3>
-<p>Return the real :mod:<code class="docutils literal notranslate"><span class="pre">rdflib</span></code> module or a stub replacement.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Either the actual :mod:<code class="docutils literal notranslate"><span class="pre">rdflib</span></code> module or an instance of
-:class:<code class="docutils literal notranslate"><span class="pre">_StubRDFLib</span></code> when :mod:<code class="docutils literal notranslate"><span class="pre">rdflib</span></code> is missing.</p>
-</section>
-<section id="get-pronto">
-<h3><code class="docutils literal notranslate"><span class="pre">get_pronto()</span></code><a class="headerlink" href="#get-pronto" title="Link to this heading"></a></h3>
-<p>Return the real :mod:<code class="docutils literal notranslate"><span class="pre">pronto</span></code> module or a stub replacement.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Either the actual :mod:<code class="docutils literal notranslate"><span class="pre">pronto</span></code> module or a :class:<code class="docutils literal notranslate"><span class="pre">_StubPronto</span></code>
-instance when the dependency is unavailable.</p>
-</section>
-<section id="get-owlready2">
-<h3><code class="docutils literal notranslate"><span class="pre">get_owlready2()</span></code><a class="headerlink" href="#get-owlready2" title="Link to this heading"></a></h3>
-<p>Return the real :mod:<code class="docutils literal notranslate"><span class="pre">owlready2</span></code> module or a stub replacement.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Either the actual :mod:<code class="docutils literal notranslate"><span class="pre">owlready2</span></code> module or a :class:<code class="docutils literal notranslate"><span class="pre">_StubOwlready2</span></code>
-instance when the dependency import fails.</p>
-</section>
-<section id="join-self">
-<h3><code class="docutils literal notranslate"><span class="pre">join(self)</span></code><a class="headerlink" href="#join-self" title="Link to this heading"></a></h3>
-<p>Build a path relative to the fallback root directory.</p>
-<p>Args:
-*segments: Path segments appended to the root directory.</p>
-<p>Returns:
-Path object pointing to the requested cache location.</p>
-</section>
-<section id="parse-self-source-format">
-<h3><code class="docutils literal notranslate"><span class="pre">parse(self,</span> <span class="pre">source,</span> <span class="pre">format)</span></code><a class="headerlink" href="#parse-self-source-format" title="Link to this heading"></a></h3>
-<p>Record the source path for later inspection.</p>
-<p>Args:
-source: Path to the RDF document to parse.
-format: RDF serialization format. Ignored by the stub.</p>
-<p>Returns:
-None</p>
-<p>Raises:
-None.</p>
-</section>
-<section id="len-self">
-<h3><code class="docutils literal notranslate"><span class="pre">__len__(self)</span></code><a class="headerlink" href="#len-self" title="Link to this heading"></a></h3>
-<p>Return the number of recorded triples.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Integer representing the number of stored triples.</p>
-</section>
-<section id="serialize-self-destination-format">
-<h3><code class="docutils literal notranslate"><span class="pre">serialize(self,</span> <span class="pre">destination,</span> <span class="pre">format)</span></code><a class="headerlink" href="#serialize-self-destination-format" title="Link to this heading"></a></h3>
-<p>Write a stub serialization result or return inline output.</p>
-<p>Args:
-destination: Output path, file-like object, or <code class="docutils literal notranslate"><span class="pre">None</span></code> for inline output.
-format: Serialization format. Ignored by the stub.</p>
-<p>Returns:
-<code class="docutils literal notranslate"><span class="pre">None</span></code> for file destinations, or a string when <code class="docutils literal notranslate"><span class="pre">destination</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
-<p>Raises:
-None.</p>
-</section>
-<section id="terms-self">
-<h3><code class="docutils literal notranslate"><span class="pre">terms(self)</span></code><a class="headerlink" href="#terms-self" title="Link to this heading"></a></h3>
-<p>Yield placeholder ontology terms.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Iterable of deterministic term identifiers.</p>
-<p>Raises:
-None.</p>
-</section>
-<section id="dump-self-file-format">
-<h3><code class="docutils literal notranslate"><span class="pre">dump(self,</span> <span class="pre">file,</span> <span class="pre">format)</span></code><a class="headerlink" href="#dump-self-file-format" title="Link to this heading"></a></h3>
-<p>Write a stub ontology document to <code class="docutils literal notranslate"><span class="pre">file</span></code>.</p>
-<p>Args:
-file: Destination file path.
-format: Output format, either <code class="docutils literal notranslate"><span class="pre">obo</span></code> or <code class="docutils literal notranslate"><span class="pre">obojson</span></code>.</p>
-<p>Returns:
-None</p>
-<p>Raises:
-None.</p>
-</section>
-<section id="classes-self">
-<h3><code class="docutils literal notranslate"><span class="pre">classes(self)</span></code><a class="headerlink" href="#classes-self" title="Link to this heading"></a></h3>
-<p>Return a deterministic set of class identifiers.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Copy of the stubbed class list to mimic Owlready2 behaviour.</p>
-<p>Raises:
-None.</p>
-</section>
-<section id="load-self">
-<h3><code class="docutils literal notranslate"><span class="pre">load(self)</span></code><a class="headerlink" href="#load-self" title="Link to this heading"></a></h3>
-<p>Return a stub loaded ontology instance.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Fresh :class:<code class="docutils literal notranslate"><span class="pre">_StubLoadedOntology</span></code> mirroring Owlready2 semantics.</p>
-<p>Raises:
-None.</p>
-</section>
-<section id="get-ontology-iri">
-<h3><code class="docutils literal notranslate"><span class="pre">get_ontology(iri)</span></code><a class="headerlink" href="#get-ontology-iri" title="Link to this heading"></a></h3>
-<p>Return a stub ontology wrapper for the provided <code class="docutils literal notranslate"><span class="pre">iri</span></code>.</p>
-<p>Args:
-iri: Ontology IRI to associate with the returned wrapper.</p>
-<p>Returns:
-New :class:<code class="docutils literal notranslate"><span class="pre">_StubOntologyWrapper</span></code> bound to the supplied IRI.</p>
+<section id="dir-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__dir__(self)</span></code><a class="headerlink" href="#dir-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
-<section id="pystowfallback">
-<h3><code class="docutils literal notranslate"><span class="pre">_PystowFallback</span></code><a class="headerlink" href="#pystowfallback" title="Link to this heading"></a></h3>
-<p>Minimal <code class="docutils literal notranslate"><span class="pre">pystow</span></code> replacement used when the dependency is absent.</p>
-<p>The real :mod:<code class="docutils literal notranslate"><span class="pre">pystow</span></code> module exposes a :func:<code class="docutils literal notranslate"><span class="pre">join</span></code> helper used throughout
-the downloader. The fallback mirrors the behaviour closely enough for
-testing by honouring the <code class="docutils literal notranslate"><span class="pre">PYSTOW_HOME</span></code> environment variable and defaulting
-to <code class="docutils literal notranslate"><span class="pre">~/.data</span></code> when it is not defined.</p>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<section id="optdepsproxy">
+<h3><code class="docutils literal notranslate"><span class="pre">_OptDepsProxy</span></code><a class="headerlink" href="#optdepsproxy" title="Link to this heading"></a></h3>
+<p>Module proxy that forwards access to <code class="docutils literal notranslate"><span class="pre">ontology_download</span></code> internals.</p>
 <p>Attributes:
-_root: Root directory used to construct cache paths.</p>
+<strong>slots</strong>: Prevents accidental attribute assignment on the proxy type.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>
 <div><blockquote>
-<div><p>fallback = _PystowFallback()
-isinstance(fallback.join(“ontology”), Path)
+<div><p>proxy = _OptDepsProxy(‘DocsToKG.OntologyDownload.optdeps’)
+callable(proxy.get_rdflib)
 True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-<section id="stubgraph">
-<h3><code class="docutils literal notranslate"><span class="pre">_StubGraph</span></code><a class="headerlink" href="#stubgraph" title="Link to this heading"></a></h3>
-<p>Minimal :class:<code class="docutils literal notranslate"><span class="pre">rdflib.Graph</span></code> replacement used for testing.</p>
-<p>The stub captures the most common operations used in the downloader:
-<code class="docutils literal notranslate"><span class="pre">parse</span></code> to read a source file, <code class="docutils literal notranslate"><span class="pre">serialize</span></code> to write output, and
-<code class="docutils literal notranslate"><span class="pre">__len__</span></code> to introspect triple counts. Behaviour is intentionally simple
-but deterministic so tests can assert on the resulting files.</p>
-<p>Attributes:
-_source: Path of the last parsed RDF document.
-_triples: List of stub triples captured for serialization tests.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>graph = _StubGraph()
-graph.parse(“ontology.ttl”)
-len(graph)
-1</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-<section id="stubrdflib">
-<h3><code class="docutils literal notranslate"><span class="pre">_StubRDFLib</span></code><a class="headerlink" href="#stubrdflib" title="Link to this heading"></a></h3>
-<p>Stub module mirroring :mod:<code class="docutils literal notranslate"><span class="pre">rdflib</span></code> surface used in tests.</p>
-<p>Attributes:
-Graph: Replacement graph class mimicking <code class="docutils literal notranslate"><span class="pre">rdflib.Graph</span></code>.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>module = _StubRDFLib()
-isinstance(module.Graph(), _StubGraph)
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-<section id="stubontology">
-<h3><code class="docutils literal notranslate"><span class="pre">_StubOntology</span></code><a class="headerlink" href="#stubontology" title="Link to this heading"></a></h3>
-<p>Minimal :class:<code class="docutils literal notranslate"><span class="pre">pronto.Ontology</span></code> replacement.</p>
-<p>Attributes:
-_path: Filesystem path representing the ontology handle.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>ontology = _StubOntology(“example.obo”)
-list(ontology.terms())
-[‘TERM:0000001’, ‘TERM:0000002’]</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-<section id="stubpronto">
-<h3><code class="docutils literal notranslate"><span class="pre">_StubPronto</span></code><a class="headerlink" href="#stubpronto" title="Link to this heading"></a></h3>
-<p>Stub module mirroring :mod:<code class="docutils literal notranslate"><span class="pre">pronto</span></code> surface used in tests.</p>
-<p>Attributes:
-Ontology: Stub ontology class mirroring :mod:<code class="docutils literal notranslate"><span class="pre">pronto</span></code>.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>module = _StubPronto()
-isinstance(module.Ontology(“example.obo”), _StubOntology)
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-<section id="stubloadedontology">
-<h3><code class="docutils literal notranslate"><span class="pre">_StubLoadedOntology</span></code><a class="headerlink" href="#stubloadedontology" title="Link to this heading"></a></h3>
-<p>Stub object returned by :func:<code class="docutils literal notranslate"><span class="pre">owlready2.get_ontology().load()</span></code>.</p>
-<p>Attributes:
-_classes: Deterministic class list for unit tests.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>_StubLoadedOntology().classes()
-[‘Class1’, ‘Class2’, ‘Class3’]</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-<section id="stubontologywrapper">
-<h3><code class="docutils literal notranslate"><span class="pre">_StubOntologyWrapper</span></code><a class="headerlink" href="#stubontologywrapper" title="Link to this heading"></a></h3>
-<p>Stub ontology wrapper returned from <code class="docutils literal notranslate"><span class="pre">get_ontology</span></code>.</p>
-<p>Attributes:
-_iri: IRI associated with the stub ontology.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>wrapper = _StubOntologyWrapper(“https://example.org/onto”)
-isinstance(wrapper.load(), _StubLoadedOntology)
-True</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
-<section id="stubowlready2">
-<h3><code class="docutils literal notranslate"><span class="pre">_StubOwlready2</span></code><a class="headerlink" href="#stubowlready2" title="Link to this heading"></a></h3>
-<p>Stub module mirroring :mod:<code class="docutils literal notranslate"><span class="pre">owlready2</span></code> interface used in tests.</p>
-<p>Attributes:
-get_ontology: Callable returning stub ontology wrappers.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>module = _StubOwlready2()
-module.get_ontology(“https://example.org/onto”).load().classes()
-[‘Class1’, ‘Class2’, ‘Class3’]</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>

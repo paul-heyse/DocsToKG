@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload",
+#   "purpose": "Package initialization for DocsToKG.OntologyDownload",
+#   "sections": [
+#     {
+#       "id": "module-overview",
+#       "name": "module_overview",
+#       "anchor": "OVR",
+#       "kind": "infra"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Public API for the DocsToKG ontology downloader and resolver pipeline.
 
 This facade exposes the primary fetch utilities used by external callers to
@@ -19,48 +34,48 @@ from .ontology_download import (
     ConfigError,
     ConfigurationError,
     DefaultsConfig,
+    DownloadConfiguration,
     DownloadFailure,
     DownloadResult,
-    DownloadConfiguration,
     FetchResult,
     FetchSpec,
+    LoggingConfiguration,
     OntologyDownloadError,
     PlannedFetch,
-    ResolverCandidate,
     ResolvedConfig,
+    ResolverCandidate,
     ValidationConfig,
     ValidationRequest,
     ValidationResult,
-    LoggingConfiguration,
-    mask_sensitive_data,
     build_resolved_config,
-    get_env_overrides,
-    load_raw_yaml,
-    merge_defaults,
-    validate_config,
     download_stream,
     ensure_python_version,
     extract_archive_safe,
     fetch_all,
     fetch_one,
     generate_correlation_id,
+    get_env_overrides,
     get_manifest_schema,
     get_owlready2,
     get_pronto,
     get_pystow,
     get_rdflib,
+    infer_version_timestamp,
     load_config,
-    plan_all,
-    plan_one,
+    load_raw_yaml,
+    mask_sensitive_data,
+    merge_defaults,
     parse_http_datetime,
     parse_iso_datetime,
     parse_rate_limit_to_rps,
-    infer_version_timestamp,
     parse_version_timestamp,
+    plan_all,
+    plan_one,
     retry_with_backoff,
     run_validators,
     sanitize_filename,
     setup_logging,
+    validate_config,
     validate_manifest_dict,
     validate_url_security,
 )

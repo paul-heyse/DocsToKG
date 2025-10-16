@@ -1,3 +1,90 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.resolvers",
+#   "purpose": "Implements DocsToKG.OntologyDownload.resolvers behaviors and helpers",
+#   "sections": [
+#     {
+#       "id": "normalize_license_to_spdx",
+#       "name": "normalize_license_to_spdx",
+#       "anchor": "NLTS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_get_service_bucket",
+#       "name": "_get_service_bucket",
+#       "anchor": "GSB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetch_plan",
+#       "name": "FetchPlan",
+#       "anchor": "FETC",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "base_resolver",
+#       "name": "BaseResolver",
+#       "anchor": "BASE",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "obo_resolver",
+#       "name": "OBOResolver",
+#       "anchor": "OBOR",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ols_resolver",
+#       "name": "OLSResolver",
+#       "anchor": "OLSR",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "bio_portal_resolver",
+#       "name": "BioPortalResolver",
+#       "anchor": "BIOP",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "lov_resolver",
+#       "name": "LOVResolver",
+#       "anchor": "LOVR",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "skos_resolver",
+#       "name": "SKOSResolver",
+#       "anchor": "SKOS",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "xbrl_resolver",
+#       "name": "XBRLResolver",
+#       "anchor": "XBRL",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ontobee_resolver",
+#       "name": "OntobeeResolver",
+#       "anchor": "ONTO",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_load_resolver_plugins",
+#       "name": "_load_resolver_plugins",
+#       "anchor": "LRP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_load_resolver_plugins",
+#       "name": "_load_resolver_plugins",
+#       "anchor": "LRP1",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Ontology resolver implementations.
 
 This module defines the strategies that translate planner specifications into
@@ -25,7 +112,6 @@ except ModuleNotFoundError:  # pragma: no cover - provide actionable error for r
     get_owl_download = None  # type: ignore[assignment]
     get_rdf_download = None  # type: ignore[assignment]
 from bioregistry import get_obo_download, get_owl_download, get_rdf_download
-from importlib import metadata
 
 try:  # pragma: no cover - optional dependency shim
     from ols_client import OlsClient as _OlsClient
@@ -997,6 +1083,8 @@ __all__ = [
     "RESOLVERS",
     "normalize_license_to_spdx",
 ]
+
+
 def _load_resolver_plugins(logger: Optional[logging.Logger] = None) -> None:
     """Discover resolver plugins registered via Python entry points."""
 

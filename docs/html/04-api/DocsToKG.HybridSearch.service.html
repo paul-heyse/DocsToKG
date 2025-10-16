@@ -79,9 +79,41 @@
   <section id="module-service">
 <h1>1. Module: service<a class="headerlink" href="#module-service" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service</span></code>.</p>
-<p>Hybrid search service and synchronous HTTP-style API.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Hybrid search orchestration, pagination guards, and synchronous HTTP-style API.</p>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="build-stats-snapshot-faiss-index-opensearch-registry">
+<h3><code class="docutils literal notranslate"><span class="pre">build_stats_snapshot(faiss_index,</span> <span class="pre">opensearch,</span> <span class="pre">registry)</span></code><a class="headerlink" href="#build-stats-snapshot-faiss-index-opensearch-registry" title="Link to this heading"></a></h3>
+<p>Capture a lightweight snapshot of hybrid search storage metrics.</p>
+<p>Args:
+faiss_index: Dense vector index manager.
+opensearch: OpenSearch simulator representing lexical storage.
+registry: Chunk registry tracking vector-to-payload mappings.</p>
+<p>Returns:
+Mapping describing FAISS stats, OpenSearch stats, and chunk counts.</p>
+</section>
+<section id="verify-pagination-service-request">
+<h3><code class="docutils literal notranslate"><span class="pre">verify_pagination(service,</span> <span class="pre">request)</span></code><a class="headerlink" href="#verify-pagination-service-request" title="Link to this heading"></a></h3>
+<p>Ensure pagination cursors produce non-duplicated results.</p>
+<p>Args:
+service: Hybrid search service to execute paginated queries.
+request: Initial hybrid search request payload.</p>
+<p>Returns:
+PaginationCheckResult detailing encountered cursors and duplicates.</p>
+</section>
+<section id="should-rebuild-index-registry-deleted-since-snapshot-threshold">
+<h3><code class="docutils literal notranslate"><span class="pre">should_rebuild_index(registry,</span> <span class="pre">deleted_since_snapshot,</span> <span class="pre">threshold)</span></code><a class="headerlink" href="#should-rebuild-index-registry-deleted-since-snapshot-threshold" title="Link to this heading"></a></h3>
+<p>Heuristic to determine when FAISS should be rebuilt after deletions.</p>
+<p>Args:
+registry: Chunk registry reflecting current vector count.
+deleted_since_snapshot: Number of vectors deleted since the last snapshot.
+threshold: Fraction of deletions that triggers a rebuild.</p>
+<p>Returns:
+True when the proportion of deletions exceeds <code class="docutils literal notranslate"><span class="pre">threshold</span></code>.</p>
+</section>
 <section id="search-self-request">
 <h3><code class="docutils literal notranslate"><span class="pre">search(self,</span> <span class="pre">request)</span></code><a class="headerlink" href="#search-self-request" title="Link to this heading"></a></h3>
 <p>Execute a hybrid retrieval round trip for <code class="docutils literal notranslate"><span class="pre">request</span></code>.</p>
@@ -96,6 +128,10 @@ RequestValidationError: If <code class="docutils literal notranslate"><span clas
 </section>
 <section id="validate-request-self-request">
 <h3><code class="docutils literal notranslate"><span class="pre">_validate_request(self,</span> <span class="pre">request)</span></code><a class="headerlink" href="#validate-request-self-request" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="slice-from-cursor-self-results-cursor">
+<h3><code class="docutils literal notranslate"><span class="pre">_slice_from_cursor(self,</span> <span class="pre">results,</span> <span class="pre">cursor)</span></code><a class="headerlink" href="#slice-from-cursor-self-results-cursor" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 <section id="build-cursor-self-results-page-size">
@@ -140,7 +176,7 @@ tuple[int, Mapping[str, Any]]: HTTP status code and serialized response body.</p
 </section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="requestvalidationerror">
 <h3><code class="docutils literal notranslate"><span class="pre">RequestValidationError</span></code><a class="headerlink" href="#requestvalidationerror" title="Link to this heading"></a></h3>
 <p>Raised when the caller submits an invalid search request.</p>
@@ -215,6 +251,23 @@ _service: Underlying :class:<code class="docutils literal notranslate"><span cla
 status, body = api.post_hybrid_search({“query”: “example”})  # doctest: +SKIP
 status
 200</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="paginationcheckresult">
+<h3><code class="docutils literal notranslate"><span class="pre">PaginationCheckResult</span></code><a class="headerlink" href="#paginationcheckresult" title="Link to this heading"></a></h3>
+<p>Result of a pagination verification run.</p>
+<p>Attributes:
+cursor_chain: Sequence of pagination cursors encountered.
+duplicate_detected: True when duplicate results were observed.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>result = PaginationCheckResult(cursor_chain=[“cursor1”], duplicate_detected=False)
+result.duplicate_detected
+False</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>

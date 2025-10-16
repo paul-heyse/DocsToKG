@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "scripts.ontofetch_benchmark",
+#   "purpose": "Utility script for ontofetch benchmark workflows",
+#   "sections": [
+#     {
+#       "id": "benchmark",
+#       "name": "benchmark",
+#       "anchor": "BENC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Simple benchmarking harness for the ontology downloader."""
 
 from __future__ import annotations

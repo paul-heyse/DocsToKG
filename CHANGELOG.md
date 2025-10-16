@@ -4,7 +4,18 @@ All notable changes to DocsToKG are documented in this file.
 
 ## [Unreleased]
 
-_No unreleased changes._
+### Added
+- Integration tests for the content download CLI covering CSV logging, staging runs,
+  resume manifests with incomplete metadata, threaded execution with domain jitter,
+  and head-precheck degradation behaviour.
+- Regression safeguards that pin default resolver ordering, manifest entry schemas,
+  legacy resume parsing, and legacy resolver configuration inputs.
+
+### Documentation
+- Migration notes outlining the removal of deprecated content download shims,
+  new `ApiResolverBase` guidance for resolver authors, staging directory usage,
+  and updated CLI flag documentation.
+- CHANGELOG entry detailing the content download robustness refactor for downstream consumers.
 
 ## [0.2.0] - 2025-02-15
 

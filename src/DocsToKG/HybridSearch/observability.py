@@ -1,3 +1,14 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.observability",
+#   "purpose": "Observability helpers for hybrid search telemetry",
+#   "sections": [
+#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
+#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Lightweight observability primitives for ingestion and retrieval.
 
@@ -23,6 +34,19 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from threading import RLock
 from typing import Dict, Iterable, Iterator, Mapping, MutableMapping, Optional, Tuple
+
+# --- Globals ---
+
+__all__ = (
+    "CounterSample",
+    "HistogramSample",
+    "MetricsCollector",
+    "Observability",
+    "TraceRecorder",
+)
+
+
+# --- Public Classes ---
 
 
 @dataclass

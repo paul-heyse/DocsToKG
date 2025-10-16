@@ -1,3 +1,78 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.schemas",
+#   "purpose": "Defines schemas for DocsToKG.DocParsing.schemas",
+#   "sections": [
+#     {
+#       "id": "_missing_pydantic_message",
+#       "name": "_missing_pydantic_message",
+#       "anchor": "MPM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "provenance_metadata",
+#       "name": "ProvenanceMetadata",
+#       "anchor": "PROV",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "chunk_row",
+#       "name": "ChunkRow",
+#       "anchor": "CHUN",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "bm25_vector",
+#       "name": "BM25Vector",
+#       "anchor": "BM25",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "splade_vector",
+#       "name": "SPLADEVector",
+#       "anchor": "SPLA",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "dense_vector",
+#       "name": "DenseVector",
+#       "anchor": "DENS",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "vector_row",
+#       "name": "VectorRow",
+#       "anchor": "VECT",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validate_chunk_row",
+#       "name": "validate_chunk_row",
+#       "anchor": "VCR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate_vector_row",
+#       "name": "validate_vector_row",
+#       "anchor": "VVR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get_docling_version",
+#       "name": "get_docling_version",
+#       "anchor": "GDV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate_schema_version",
+#       "name": "validate_schema_version",
+#       "anchor": "VSV",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 DocParsing Schema Definitions
 

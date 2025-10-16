@@ -1,3 +1,114 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.content_download.test_atomic_writes",
+#   "purpose": "Pytest coverage for content download atomic writes scenarios",
+#   "sections": [
+#     {
+#       "id": "_stub_module",
+#       "name": "_stub_module",
+#       "anchor": "SM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dummy_tokenizer",
+#       "name": "DummyTokenizer",
+#       "anchor": "DUMM",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "dummy_hybrid_chunker",
+#       "name": "DummyHybridChunker",
+#       "anchor": "DUMM1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "configure_chunker_stubs",
+#       "name": "configure_chunker_stubs",
+#       "anchor": "CCS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "crashing_atomic_write",
+#       "name": "crashing_atomic_write",
+#       "anchor": "CAW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prepare_data_root",
+#       "name": "prepare_data_root",
+#       "anchor": "PDR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "chunker_args",
+#       "name": "chunker_args",
+#       "anchor": "CA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "embeddings_args",
+#       "name": "embeddings_args",
+#       "anchor": "EA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write_dummy_doctags",
+#       "name": "write_dummy_doctags",
+#       "anchor": "WDD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write_dummy_chunks",
+#       "name": "write_dummy_chunks",
+#       "anchor": "WDC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "configure_embeddings_stubs",
+#       "name": "configure_embeddings_stubs",
+#       "anchor": "CES",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_chunker_failure_leaves_no_partial_files",
+#       "name": "test_chunker_failure_leaves_no_partial_files",
+#       "anchor": "TCFLN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_embeddings_failure_cleans_temporary_files",
+#       "name": "test_embeddings_failure_cleans_temporary_files",
+#       "anchor": "TEFCT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_chunker_success_outputs_readable_file",
+#       "name": "test_chunker_success_outputs_readable_file",
+#       "anchor": "TCSOR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_chunker_promotes_image_metadata",
+#       "name": "test_chunker_promotes_image_metadata",
+#       "anchor": "TCPIM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_chunker_resume_after_failure",
+#       "name": "test_chunker_resume_after_failure",
+#       "anchor": "TCRAF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_chunker_concurrent_writes_isolated",
+#       "name": "test_chunker_concurrent_writes_isolated",
+#       "anchor": "TCCWI",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Atomic write behaviour tests for downloader and doc parsing pipelines."""
 
 from __future__ import annotations

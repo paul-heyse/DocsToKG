@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_integration",
+#   "purpose": "Pytest coverage for ontology download integration scenarios",
+#   "sections": [
+#     {
+#       "id": "patched_dirs",
+#       "name": "patched_dirs",
+#       "anchor": "PD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_stub_resolver",
+#       "name": "_StubResolver",
+#       "anchor": "STUB",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "stubbed_validators",
+#       "name": "stubbed_validators",
+#       "anchor": "SV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_fetch_all_writes_manifests",
+#       "name": "test_fetch_all_writes_manifests",
+#       "anchor": "TFAWM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_force_download_bypasses_manifest",
+#       "name": "test_force_download_bypasses_manifest",
+#       "anchor": "TFDBM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_multi_version_storage",
+#       "name": "test_multi_version_storage",
+#       "anchor": "TMVS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_fetch_all_logs_progress",
+#       "name": "test_fetch_all_logs_progress",
+#       "anchor": "TFALP",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Ontology Download Integration Tests
 
@@ -29,9 +80,8 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import DefaultsConfig, ResolvedConfig
+from DocsToKG.OntologyDownload import DefaultsConfig, ResolvedConfig, resolvers
 from DocsToKG.OntologyDownload import ontology_download as core
-from DocsToKG.OntologyDownload import resolvers
 
 
 @pytest.fixture()
@@ -56,7 +106,9 @@ def patched_dirs(monkeypatch, tmp_path):
         def finalize_version(self, ontology_id: str, version: str, base_dir: Path) -> None:
             pass
 
-        def set_latest_version(self, ontology_id: str, path: Path) -> None:  # pragma: no cover - not used
+        def set_latest_version(
+            self, ontology_id: str, path: Path
+        ) -> None:  # pragma: no cover - not used
             pass
 
     monkeypatch.setattr(core, "STORAGE", _StubStorage(), raising=False)

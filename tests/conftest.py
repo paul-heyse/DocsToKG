@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.conftest",
+#   "purpose": "Shared pytest fixtures for test suite",
+#   "sections": [
+#     {
+#       "id": "_install_pyalex_stub",
+#       "name": "_install_pyalex_stub",
+#       "anchor": "IPS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pytest_addoption",
+#       "name": "pytest_addoption",
+#       "anchor": "PA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pytest_configure",
+#       "name": "pytest_configure",
+#       "anchor": "PC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pytest_collection_modifyitems",
+#       "name": "pytest_collection_modifyitems",
+#       "anchor": "PCM",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Pytest Configuration
 

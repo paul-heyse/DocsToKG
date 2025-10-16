@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.test_stubs",
+#   "purpose": "Pytest coverage for stubs scenarios",
+#   "sections": [
+#     {
+#       "id": "test_promote_simple_namespace",
+#       "name": "TestPromoteSimpleNamespace",
+#       "anchor": "TEST",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "test_dependency_stubs",
+#       "name": "TestDependencyStubs",
+#       "anchor": "TEST1",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Tests for DocParsing test stub utilities."""
 
 import sys

@@ -1,3 +1,15 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.vectorstore",
+#   "purpose": "Vector store interfaces and similarity utilities for hybrid search",
+#   "sections": [
+#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
+#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"},
+#     {"id": "public-functions", "name": "Public Functions", "anchor": "api", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Unified FAISS vector store, GPU similarity utilities, and state helpers."""
 
 from __future__ import annotations
@@ -16,19 +28,22 @@ from .types import vector_uuid_to_faiss_int
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from .storage import ChunkRegistry
 
+# --- Globals ---
+
 logger = logging.getLogger(__name__)
 
-__all__ = [
+__all__ = (
+    "FaissIndexManager",
     "FaissSearchResult",
     "FaissVectorStore",
-    "FaissIndexManager",
     "cosine_against_corpus_gpu",
+    "cosine_batch",
     "max_inner_product",
     "normalize_rows",
     "pairwise_inner_products",
     "restore_state",
     "serialize_state",
-]
+)
 
 try:  # pragma: no cover - exercised via integration tests
     import faiss  # type: ignore
@@ -48,6 +63,8 @@ except Exception:  # pragma: no cover - dependency not present in test rig
     faiss = None  # type: ignore
     _FAISS_AVAILABLE = False
 
+
+# --- Public Classes ---
 
 @dataclass(slots=True)
 class FaissSearchResult:
@@ -861,6 +878,9 @@ class FaissVectorStore:
         return int(getattr(config, "device", 0))
 
 
+# --- Public Functions ---
+
+
 def normalize_rows(matrix: np.ndarray) -> np.ndarray:
     """L2-normalise each row of ``matrix`` in-place.
 
@@ -1050,6 +1070,8 @@ def restore_state(faiss_index: FaissVectorStore, payload: dict[str, object]) -> 
         raise ValueError("Missing FAISS payload")
     faiss_index.restore(base64.b64decode(encoded.encode("ascii")))
 
+
+# --- Compatibility ---
 
 # Backwards compatibility alias for legacy imports.
 FaissIndexManager = FaissVectorStore

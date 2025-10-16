@@ -1,3 +1,228 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.pipeline.test_execution",
+#   "purpose": "Pytest coverage for pipeline execution scenarios",
+#   "sections": [
+#     {
+#       "id": "recording_logger",
+#       "name": "RecordingLogger",
+#       "anchor": "RECO",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "dummy_artifact",
+#       "name": "DummyArtifact",
+#       "anchor": "DUMM",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "delay_resolver",
+#       "name": "DelayResolver",
+#       "anchor": "DELA",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "failing_resolver",
+#       "name": "FailingResolver",
+#       "anchor": "FAIL",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_make_artifact",
+#       "name": "_make_artifact",
+#       "anchor": "MA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_make_config",
+#       "name": "_make_config",
+#       "anchor": "MC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_html_outcome",
+#       "name": "_html_outcome",
+#       "anchor": "HO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_sequential_execution_when_max_concurrent_is_one",
+#       "name": "test_sequential_execution_when_max_concurrent_is_one",
+#       "anchor": "TSEWM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_concurrent_execution_with_three_workers",
+#       "name": "test_concurrent_execution_with_three_workers",
+#       "anchor": "TCEWT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_rate_limits_enforced_under_concurrency",
+#       "name": "test_rate_limits_enforced_under_concurrency",
+#       "anchor": "TRLEU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_early_stop_cancels_remaining_resolvers",
+#       "name": "test_early_stop_cancels_remaining_resolvers",
+#       "anchor": "TESCR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_resolver_failure_does_not_abort_concurrency",
+#       "name": "test_resolver_failure_does_not_abort_concurrency",
+#       "anchor": "TRFDN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_null_logger",
+#       "name": "_NullLogger",
+#       "anchor": "NULL",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "test_rate_limiting_with_parallel_workers",
+#       "name": "test_rate_limiting_with_parallel_workers",
+#       "anchor": "TRLWP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_slow_resolver",
+#       "name": "_SlowResolver",
+#       "anchor": "SLOW",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_memory_logger",
+#       "name": "_MemoryLogger",
+#       "anchor": "MEMO",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_stub_artifact",
+#       "name": "_StubArtifact",
+#       "anchor": "STUB",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_download_stub",
+#       "name": "_download_stub",
+#       "anchor": "DS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_concurrent_pipeline_reduces_wall_time",
+#       "name": "test_concurrent_pipeline_reduces_wall_time",
+#       "anchor": "TCPRW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "memory_logger",
+#       "name": "MemoryLogger",
+#       "anchor": "MEMO1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "stub_resolver",
+#       "name": "StubResolver",
+#       "anchor": "STUB1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "make_artifact",
+#       "name": "make_artifact",
+#       "anchor": "MA1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build_outcome",
+#       "name": "build_outcome",
+#       "anchor": "BO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_respects_custom_order",
+#       "name": "test_pipeline_respects_custom_order",
+#       "anchor": "TPRCO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_stops_after_max_attempts",
+#       "name": "test_pipeline_stops_after_max_attempts",
+#       "anchor": "TPSAM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_deduplicates_urls",
+#       "name": "test_pipeline_deduplicates_urls",
+#       "anchor": "TPDU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_collects_html_paths",
+#       "name": "test_pipeline_collects_html_paths",
+#       "anchor": "TPCHP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_rate_limit_enforced",
+#       "name": "test_pipeline_rate_limit_enforced",
+#       "anchor": "TPRLE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_openalex_resolver_executes_first",
+#       "name": "test_openalex_resolver_executes_first",
+#       "anchor": "TOREF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_openalex_respects_rate_limit",
+#       "name": "test_openalex_respects_rate_limit",
+#       "anchor": "TORRL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_records_failed_urls",
+#       "name": "test_pipeline_records_failed_urls",
+#       "anchor": "TPRFU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_make_artifact",
+#       "name": "_make_artifact",
+#       "anchor": "MA2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pipeline_executes_resolvers_in_expected_order",
+#       "name": "test_pipeline_executes_resolvers_in_expected_order",
+#       "anchor": "TPERI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_real_network_download",
+#       "name": "test_real_network_download",
+#       "anchor": "TRND",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_resolver_pipeline_downloads_pdf_end_to_end",
+#       "name": "test_resolver_pipeline_downloads_pdf_end_to_end",
+#       "anchor": "TRPDP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_candidate_marks_corrupt_without_eof",
+#       "name": "test_download_candidate_marks_corrupt_without_eof",
+#       "anchor": "TDCMC",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Consolidated pipeline execution tests."""
 
 from __future__ import annotations
@@ -343,6 +568,10 @@ class _MemoryLogger:
     def log(self, record):  # noqa: D401 - protocol implementation
         self.records.append(record)
 
+    def log_attempt(self, record, *, timestamp=None):
+        del timestamp
+        self.log(record)
+
 
 # ---- test_parallel_execution.py -----------------------------
 class _StubArtifact:
@@ -424,6 +653,10 @@ class MemoryLogger:
 
     def log(self, record: AttemptRecord) -> None:
         self.records.append(record)
+
+    def log_attempt(self, record: AttemptRecord, *, timestamp: str | None = None) -> None:
+        del timestamp
+        self.log(record)
 
 
 # ---- test_pipeline_behaviour.py -----------------------------
@@ -623,7 +856,7 @@ def test_pipeline_rate_limit_enforced(monkeypatch, tmp_path):
     config = ResolverConfig(
         resolver_order=["limited"],
         resolver_toggles={"limited": True},
-        resolver_rate_limits={"limited": 1.0},
+        resolver_min_interval_s={"limited": 1.0},
         enable_head_precheck=False,
     )
     pipeline = ResolverPipeline(

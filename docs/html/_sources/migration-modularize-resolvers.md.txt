@@ -13,7 +13,6 @@ that previously relied on the intermediate submodules (`.types`, `.pipeline`,
 | `from DocsToKG.ContentDownload.resolvers.pipeline import …` | `from DocsToKG.ContentDownload.resolvers import …` |
 | `from DocsToKG.ContentDownload.resolvers.providers import …` | `from DocsToKG.ContentDownload.resolvers import …` |
 | `from DocsToKG.ContentDownload.resolvers.headers import headers_cache_key` | `from DocsToKG.ContentDownload.resolvers import headers_cache_key` |
-| `from DocsToKG.ContentDownload.resolvers.cache import clear_resolver_caches` | `from DocsToKG.ContentDownload.resolvers import clear_resolver_caches` |
 
 All resolver-related dataclasses (`ResolverResult`, `AttemptRecord`, etc.),
 pipeline helpers, and provider implementations are now re-exported directly

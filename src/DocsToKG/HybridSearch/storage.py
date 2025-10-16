@@ -1,3 +1,15 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.storage",
+#   "purpose": "OpenSearch storage adapters for hybrid search",
+#   "sections": [
+#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
+#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"},
+#     {"id": "public-functions", "name": "Public Functions", "anchor": "api", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """OpenSearch simulators, schema templates, and chunk registry helpers."""
 
 from __future__ import annotations
@@ -8,21 +20,19 @@ from typing import Callable, Dict, List, Mapping, MutableMapping, Optional, Sequ
 from .config import ChunkingConfig
 from .types import ChunkPayload, vector_uuid_to_faiss_int
 
-__all__ = [
-    "ChunkRegistry",
-    "OpenSearchIndexTemplate",
-    "OpenSearchSchemaManager",
-    "OpenSearchSimulator",
-    "matches_filters",
-]
+# --- Globals ---
 
-__all__ = [
+__all__ = (
     "ChunkRegistry",
     "OpenSearchIndexTemplate",
     "OpenSearchSchemaManager",
     "OpenSearchSimulator",
     "matches_filters",
-]
+)
+
+
+# --- Public Classes ---
+
 
 @dataclass(slots=True)
 class OpenSearchIndexTemplate:
@@ -179,35 +189,6 @@ class OpenSearchSchemaManager:
         """
 
         return dict(self._templates)
-
-
-def matches_filters(chunk: ChunkPayload, filters: Mapping[str, object]) -> bool:
-    """Check whether a chunk satisfies OpenSearch-style filter conditions.
-
-    Args:
-        chunk: Chunk payload under evaluation.
-        filters: Mapping of filter names to expected values or lists.
-
-    Returns:
-        True if the chunk matches all supplied filters, False otherwise.
-    """
-    for key, expected in filters.items():
-        if key == "namespace":
-            if chunk.namespace != expected:
-                return False
-            continue
-        value = chunk.metadata.get(key)
-        if isinstance(expected, list):
-            if isinstance(value, list):
-                if not any(item in value for item in expected):
-                    return False
-            else:
-                if value not in expected:
-                    return False
-        else:
-            if value != expected:
-                return False
-    return True
 
 
 @dataclass(slots=True)
@@ -633,3 +614,36 @@ class OpenSearchSimulator:
             "document_count": float(len(self._chunks)),
             "avg_token_length": float(self._avg_length),
         }
+
+
+# --- Public Functions ---
+
+
+def matches_filters(chunk: ChunkPayload, filters: Mapping[str, object]) -> bool:
+    """Check whether a chunk satisfies OpenSearch-style filter conditions.
+
+    Args:
+        chunk: Chunk payload under evaluation.
+        filters: Mapping of filter names to expected values or lists.
+
+    Returns:
+        True if the chunk matches all supplied filters, False otherwise.
+    """
+
+    for key, expected in filters.items():
+        if key == "namespace":
+            if chunk.namespace != expected:
+                return False
+            continue
+        value = chunk.metadata.get(key)
+        if isinstance(expected, list):
+            if isinstance(value, list):
+                if not any(item in value for item in expected):
+                    return False
+            else:
+                if value not in expected:
+                    return False
+        else:
+            if value != expected:
+                return False
+    return True

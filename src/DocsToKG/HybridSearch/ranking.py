@@ -1,3 +1,15 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.ranking",
+#   "purpose": "Ranking and reranking helpers for hybrid search",
+#   "sections": [
+#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
+#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"},
+#     {"id": "public-functions", "name": "Public Functions", "anchor": "api", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Ranking, fusion, and result shaping utilities for DocsToKG hybrid search."""
 
 from __future__ import annotations
@@ -21,6 +33,17 @@ from .vectorstore import cosine_batch, pairwise_inner_products
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import faiss  # type: ignore
+
+# --- Globals ---
+
+__all__ = (
+    "ReciprocalRankFusion",
+    "ResultShaper",
+    "apply_mmr_diversification",
+)
+
+
+# --- Public Classes ---
 
 
 class ReciprocalRankFusion:
@@ -66,72 +89,6 @@ class ReciprocalRankFusion:
             contribution = 1.0 / (self._k0 + candidate.rank)
             scores[candidate.chunk.vector_id] += contribution
         return dict(scores)
-
-
-def apply_mmr_diversification(
-    fused_candidates: Sequence[FusionCandidate],
-    fused_scores: Mapping[str, float],
-    lambda_param: float,
-    top_k: int,
-    *,
-    device: int = 0,
-    resources: Optional["faiss.StandardGpuResources"] = None,
-) -> List[FusionCandidate]:
-    """Apply maximal marginal relevance to promote diversity.
-
-    Args:
-        fused_candidates: Ordered fusion candidates before diversification.
-        fused_scores: Precomputed fused scores for each candidate vector ID.
-        lambda_param: Balancing factor between relevance and diversity (0-1).
-        top_k: Maximum number of diversified candidates to retain.
-        device: GPU device identifier used for similarity computations.
-        resources: FAISS GPU resources used for pairwise similarity.
-
-    Returns:
-        List[FusionCandidate]: Diversified candidate list ordered by MMR score.
-
-    Raises:
-        ValueError: If ``lambda_param`` falls outside ``[0, 1]``.
-        RuntimeError: When GPU resources are not available for diversification.
-    """
-
-    if not 0.0 <= lambda_param <= 1.0:
-        raise ValueError("lambda_param must be within [0, 1]")
-    if not fused_candidates:
-        return []
-    if resources is None:
-        raise RuntimeError("GPU resources are required for MMR diversification")
-
-    embeddings = np.stack(
-        [
-            candidate.chunk.features.embedding.astype(np.float32, copy=False)
-            for candidate in fused_candidates
-        ]
-    )
-
-    candidate_indices = list(range(len(fused_candidates)))
-    selected_indices: List[int] = []
-    sims_all = pairwise_inner_products(embeddings, device=int(device), resources=resources)
-
-    while candidate_indices and len(selected_indices) < top_k:
-        best_idx: Optional[int] = None
-        best_score = float("-inf")
-        for idx in candidate_indices:
-            vector_id = fused_candidates[idx].chunk.vector_id
-            relevance = fused_scores.get(vector_id, 0.0)
-            diversity_penalty = (
-                float(sims_all[idx, selected_indices].max()) if selected_indices else 0.0
-            )
-            score = lambda_param * relevance - (1 - lambda_param) * diversity_penalty
-            if score > best_score:
-                best_idx = idx
-                best_score = score
-        if best_idx is None:
-            break
-        selected_indices.append(best_idx)
-        candidate_indices = [idx for idx in candidate_indices if idx != best_idx]
-
-    return [fused_candidates[idx] for idx in selected_indices]
 
 
 class ResultShaper:
@@ -233,6 +190,7 @@ class ResultShaper:
                 HybridSearchResult(
                     doc_id=chunk.doc_id,
                     chunk_id=chunk.chunk_id,
+                    vector_id=chunk.vector_id,
                     namespace=chunk.namespace,
                     score=fused_scores[chunk.vector_id],
                     fused_rank=rank,
@@ -291,4 +249,70 @@ class ResultShaper:
         return [chunk.text[: min(len(chunk.text), 200)]]
 
 
-__all__ = ["ReciprocalRankFusion", "apply_mmr_diversification", "ResultShaper"]
+# --- Public Functions ---
+
+
+def apply_mmr_diversification(
+    fused_candidates: Sequence[FusionCandidate],
+    fused_scores: Mapping[str, float],
+    lambda_param: float,
+    top_k: int,
+    *,
+    device: int = 0,
+    resources: Optional["faiss.StandardGpuResources"] = None,
+) -> List[FusionCandidate]:
+    """Apply maximal marginal relevance to promote diversity.
+
+    Args:
+        fused_candidates: Ordered fusion candidates before diversification.
+        fused_scores: Precomputed fused scores for each candidate vector ID.
+        lambda_param: Balancing factor between relevance and diversity (0-1).
+        top_k: Maximum number of diversified candidates to retain.
+        device: GPU device identifier used for similarity computations.
+        resources: FAISS GPU resources used for pairwise similarity.
+
+    Returns:
+        List[FusionCandidate]: Diversified candidate list ordered by MMR score.
+
+    Raises:
+        ValueError: If ``lambda_param`` falls outside ``[0, 1]``.
+        RuntimeError: When GPU resources are not available for diversification.
+    """
+
+    if not 0.0 <= lambda_param <= 1.0:
+        raise ValueError("lambda_param must be within [0, 1]")
+    if not fused_candidates:
+        return []
+    if resources is None:
+        raise RuntimeError("GPU resources are required for MMR diversification")
+
+    embeddings = np.stack(
+        [
+            candidate.chunk.features.embedding.astype(np.float32, copy=False)
+            for candidate in fused_candidates
+        ]
+    )
+
+    candidate_indices = list(range(len(fused_candidates)))
+    selected_indices: List[int] = []
+    sims_all = pairwise_inner_products(embeddings, device=int(device), resources=resources)
+
+    while candidate_indices and len(selected_indices) < top_k:
+        best_idx: Optional[int] = None
+        best_score = float("-inf")
+        for idx in candidate_indices:
+            vector_id = fused_candidates[idx].chunk.vector_id
+            relevance = fused_scores.get(vector_id, 0.0)
+            diversity_penalty = (
+                float(sims_all[idx, selected_indices].max()) if selected_indices else 0.0
+            )
+            score = lambda_param * relevance - (1 - lambda_param) * diversity_penalty
+            if score > best_score:
+                best_idx = idx
+                best_score = score
+        if best_idx is None:
+            break
+        selected_indices.append(best_idx)
+        candidate_indices = [idx for idx in candidate_indices if idx != best_idx]
+
+    return [fused_candidates[idx] for idx in selected_indices]

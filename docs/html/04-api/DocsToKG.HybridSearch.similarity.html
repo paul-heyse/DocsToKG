@@ -79,10 +79,11 @@
   <section id="module-similarity">
 <h1>1. Module: similarity<a class="headerlink" href="#module-similarity" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.similarity</span></code>.</p>
-<p><strong>Deprecated:</strong> <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.similarity</span></code> is a compatibility shim that forwards
-to <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore</span></code>. Import GPU similarity helpers from the
-vectorstore module to avoid removal in a future release. The shim re-exports the
-symbols below and emits a <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> when loaded.</p>
+<blockquote>
+<div><p><strong>Deprecated:</strong> <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.similarity</span></code> is a compatibility shim that now
+forwards to <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore</span></code>. The module re-exports the GPU
+similarity helpers listed below and emits a :class:<code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> when imported.</p>
+</div></blockquote>
 <section id="re-exported-symbols">
 <h2>1. Re-exported symbols<a class="headerlink" href="#re-exported-symbols" title="Link to this heading"></a></h2>
 <table class="docutils align-default">
@@ -106,7 +107,9 @@ symbols below and emits a <code class="docutils literal notranslate"><span class
 </tr>
 </tbody>
 </table>
-<p>Function signatures remain unchanged; update your imports to reference the vectorstore module directly.</p>
+<p>All function signatures remain unchanged. Update imports to reference the
+<code class="docutils literal notranslate"><span class="pre">vectorstore</span></code> module directly to avoid future breakage when the shim is
+removed.</p>
 </section>
 </section>
 

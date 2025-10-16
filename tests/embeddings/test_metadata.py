@@ -1,3 +1,114 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.embeddings.test_metadata",
+#   "purpose": "Pytest coverage for embeddings metadata scenarios",
+#   "sections": [
+#     {
+#       "id": "_install_minimal_stubs",
+#       "name": "_install_minimal_stubs",
+#       "anchor": "IMS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_process_pass_a_returns_stats_only",
+#       "name": "test_process_pass_a_returns_stats_only",
+#       "anchor": "TPPAR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_process_chunk_file_vectors_reads_texts",
+#       "name": "test_process_chunk_file_vectors_reads_texts",
+#       "anchor": "TPCFV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_path_overrides_take_precedence",
+#       "name": "test_cli_path_overrides_take_precedence",
+#       "anchor": "TCPOT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_offline_mode_requires_local_models",
+#       "name": "test_offline_mode_requires_local_models",
+#       "anchor": "TOMRL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_find_action",
+#       "name": "_find_action",
+#       "anchor": "FA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_splade_attn_help_text_describes_fallbacks",
+#       "name": "test_splade_attn_help_text_describes_fallbacks",
+#       "anchor": "TSAHT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_summary_manifest_includes_splade_backend_metadata",
+#       "name": "test_summary_manifest_includes_splade_backend_metadata",
+#       "anchor": "TSMIS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_model_dirs_follow_environment_defaults",
+#       "name": "test_model_dirs_follow_environment_defaults",
+#       "anchor": "TMDFE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_model_dirs_override_environment",
+#       "name": "test_cli_model_dirs_override_environment",
+#       "anchor": "TCMDO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_offline_requires_local_models",
+#       "name": "test_offline_requires_local_models",
+#       "anchor": "TORLM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_pass_a_rejects_incompatible_chunk_schema",
+#       "name": "test_pass_a_rejects_incompatible_chunk_schema",
+#       "anchor": "TPARI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_reload_embedding_module",
+#       "name": "_reload_embedding_module",
+#       "anchor": "REM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_dummy_bm25",
+#       "name": "_DummyBM25",
+#       "anchor": "DUMM",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_dummy_splade",
+#       "name": "_DummySPLADE",
+#       "anchor": "DUMM1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_dummy_dense",
+#       "name": "_DummyDense",
+#       "anchor": "DUMM2",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_dummy_vector_row",
+#       "name": "_DummyVectorRow",
+#       "anchor": "DUMM3",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Embedding pipeline metadata and configuration regression tests."""
 
 from __future__ import annotations

@@ -1,4 +1,31 @@
 #!/usr/bin/env python3
+# === NAVMAP v1 ===
+# {
+#   "module": "docs.scripts.generate_all_docs",
+#   "purpose": "Documentation tooling for generate all docs workflows",
+#   "sections": [
+#     {
+#       "id": "documentation_generator",
+#       "name": "DocumentationGenerator",
+#       "anchor": "DOCU",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_maybe_reexec_inside_venv",
+#       "name": "_maybe_reexec_inside_venv",
+#       "anchor": "MRIV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Master Documentation Generation Script
 

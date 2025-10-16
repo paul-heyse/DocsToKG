@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.ContentDownload.utils``.
 
+## 1. Overview
+
 Content Download Utility Helpers
 
 This module provides small string and identifier normalisation helpers shared
@@ -21,7 +23,7 @@ from DocsToKG.ContentDownload import utils
     doi = utils.normalize_doi("https://doi.org/10.1234/example")
     pmcid = utils.normalize_pmcid("PMC12345")
 
-## 1. Functions
+## 2. Functions
 
 ### `normalize_doi(doi)`
 

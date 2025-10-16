@@ -1,3 +1,246 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.pipelines",
+#   "purpose": "Implements DocsToKG.DocParsing.pipelines behaviors and helpers",
+#   "sections": [
+#     {
+#       "id": "_looks_like_filesystem_path",
+#       "name": "_looks_like_filesystem_path",
+#       "anchor": "LLFP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_expand_path",
+#       "name": "_expand_path",
+#       "anchor": "EP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve_hf_home",
+#       "name": "resolve_hf_home",
+#       "anchor": "RHH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve_model_root",
+#       "name": "resolve_model_root",
+#       "anchor": "RMR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve_pdf_model_path",
+#       "name": "resolve_pdf_model_path",
+#       "anchor": "RPMP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "add_data_root_option",
+#       "name": "add_data_root_option",
+#       "anchor": "ADRO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "add_resume_force_options",
+#       "name": "add_resume_force_options",
+#       "anchor": "ARFO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "prepare_data_root",
+#       "name": "prepare_data_root",
+#       "anchor": "PDR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve_pipeline_path",
+#       "name": "resolve_pipeline_path",
+#       "anchor": "RPP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_dedupe_preserve_order",
+#       "name": "_dedupe_preserve_order",
+#       "anchor": "DPO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_normalize_served_model_names",
+#       "name": "_normalize_served_model_names",
+#       "anchor": "NSMN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "detect_vllm_version",
+#       "name": "detect_vllm_version",
+#       "anchor": "DVV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate_served_models",
+#       "name": "validate_served_models",
+#       "anchor": "VSM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pdf_build_parser",
+#       "name": "pdf_build_parser",
+#       "anchor": "PBP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pdf_parse_args",
+#       "name": "pdf_parse_args",
+#       "anchor": "PPA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pdf_task",
+#       "name": "PdfTask",
+#       "anchor": "PDFT",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "pdf_conversion_result",
+#       "name": "PdfConversionResult",
+#       "anchor": "PDFC",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_normalize_status",
+#       "name": "_normalize_status",
+#       "anchor": "NS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_safe_float",
+#       "name": "_safe_float",
+#       "anchor": "SF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize_conversion_result",
+#       "name": "normalize_conversion_result",
+#       "anchor": "NCR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "port_is_free",
+#       "name": "port_is_free",
+#       "anchor": "PIF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "probe_models",
+#       "name": "probe_models",
+#       "anchor": "PM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "probe_metrics",
+#       "name": "probe_metrics",
+#       "anchor": "PM1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stream_logs",
+#       "name": "stream_logs",
+#       "anchor": "SL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "start_vllm",
+#       "name": "start_vllm",
+#       "anchor": "SV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "wait_for_vllm",
+#       "name": "wait_for_vllm",
+#       "anchor": "WFV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stop_vllm",
+#       "name": "stop_vllm",
+#       "anchor": "SV1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure_vllm",
+#       "name": "ensure_vllm",
+#       "anchor": "EV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "list_pdfs",
+#       "name": "list_pdfs",
+#       "anchor": "LP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pdf_convert_one",
+#       "name": "pdf_convert_one",
+#       "anchor": "PCO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "pdf_main",
+#       "name": "pdf_main",
+#       "anchor": "PM2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "html_build_parser",
+#       "name": "html_build_parser",
+#       "anchor": "HBP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "html_parse_args",
+#       "name": "html_parse_args",
+#       "anchor": "HPA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "html_task",
+#       "name": "HtmlTask",
+#       "anchor": "HTML",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "html_conversion_result",
+#       "name": "HtmlConversionResult",
+#       "anchor": "HTML1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_get_converter",
+#       "name": "_get_converter",
+#       "anchor": "GC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "list_htmls",
+#       "name": "list_htmls",
+#       "anchor": "LH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "html_convert_one",
+#       "name": "html_convert_one",
+#       "anchor": "HCO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "html_main",
+#       "name": "html_main",
+#       "anchor": "HM",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """DocParsing Pipeline Utilities
 
 This module hosts the PDF → DocTags conversion workflow _and_ shared helpers
@@ -53,11 +296,10 @@ from DocsToKG.DocParsing._common import (
     expand_path,
     find_free_port,
     get_logger,
-    resolve_model_root,
-    set_spawn_or_warn,
     load_manifest_index,
     manifest_append,
     resolve_hash_algorithm,
+    set_spawn_or_warn,
 )
 
 try:  # pragma: no cover - optional dependency
@@ -99,7 +341,14 @@ def _expand_path(path: str | Path) -> Path:
 
 
 def resolve_hf_home() -> Path:
-    """Resolve the HuggingFace cache directory respecting ``HF_HOME``."""
+    """Resolve the HuggingFace cache directory respecting ``HF_HOME``.
+
+    Args:
+        None
+
+    Returns:
+        Path: Absolute location of the HuggingFace cache directory.
+    """
 
     env = os.getenv("HF_HOME")
     if env:
@@ -108,7 +357,14 @@ def resolve_hf_home() -> Path:
 
 
 def resolve_model_root() -> Path:
-    """Resolve DocsToKG model root with environment override."""
+    """Resolve DocsToKG model root with environment override.
+
+    Args:
+        None
+
+    Returns:
+        Path: Absolute model root directory for DocsToKG artifacts.
+    """
 
     env = os.getenv("DOCSTOKG_MODEL_ROOT")
     if env:
@@ -117,7 +373,14 @@ def resolve_model_root() -> Path:
 
 
 def resolve_pdf_model_path(cli_value: str | None = None) -> str:
-    """Determine PDF model path using CLI and environment precedence."""
+    """Determine PDF model path using CLI and environment precedence.
+
+    Args:
+        cli_value: Optional CLI supplied path or model identifier.
+
+    Returns:
+        str: Absolute filesystem path or HuggingFace model identifier to use.
+    """
 
     if cli_value:
         if _looks_like_filesystem_path(cli_value):
@@ -451,6 +714,18 @@ def pdf_build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_GPU_MEMORY_UTILIZATION,
         help="Fraction of GPU memory the vLLM server may allocate",
     )
+    parser.add_argument(
+        "--vlm-prompt",
+        type=str,
+        default="Convert this page to docling.",
+        help="Prompt passed to the VLM for PDF pages",
+    )
+    parser.add_argument(
+        "--vlm-stop",
+        action="append",
+        default=["</doctag>", "<|end_of_text|>"],
+        help="Stop tokens for the VLM (repeatable)",
+    )
     add_resume_force_options(
         parser,
         resume_help="Skip PDFs whose DocTags already exist with matching content hash",
@@ -511,6 +786,8 @@ class PdfTask:
         output_path: Final DocTags artifact location.
         served_model_names: Collection of aliases configured for the vLLM server.
         inference_model: Primary model name used when issuing chat completions.
+        vlm_prompt: Prompt text passed to the VLM for PDF page conversion.
+        vlm_stop: Stop tokens used to terminate VLM generation.
 
     Examples:
         >>> task = PdfTask(
@@ -522,6 +799,8 @@ class PdfTask:
         ...     Path("/tmp/out/doc.doctags"),
         ...     ("granite-docling-258M",),
         ...     "granite-docling-258M",
+        ...     "Convert this page to docling.",
+        ...     ("</doctag>", "<|end_of_text|>"),
         ... )
         >>> task.doc_id
         'doc'
@@ -535,6 +814,8 @@ class PdfTask:
     output_path: Path
     served_model_names: Tuple[str, ...]
     inference_model: str
+    vlm_prompt: str
+    vlm_stop: Tuple[str, ...]
 
     def __getitem__(self, index: int) -> Path:
         """Provide tuple-like access for compatibility with legacy tests.
@@ -1074,9 +1355,9 @@ def pdf_convert_one(task: PdfTask) -> PdfConversionResult:
                 max_tokens=4096,  # <-- IMPORTANT for vLLM
                 skip_special_tokens=False,
                 temperature=0.1,
-                stop=["</doctag>", "<|end_of_text|>"],
+                stop=list(task.vlm_stop),
             ),
-            prompt="Convert this page to docling.",
+            prompt=task.vlm_prompt,
             timeout=120,
             scale=2.0,  # image scale for the request
             response_format=ResponseFormat.DOCTAGS,
@@ -1388,6 +1669,8 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                     output_path=out_path,
                     served_model_names=served_model_names,
                     inference_model=inference_model,
+                    vlm_prompt=str(args.vlm_prompt),
+                    vlm_stop=tuple(args.vlm_stop or []),
                 )
             )
 

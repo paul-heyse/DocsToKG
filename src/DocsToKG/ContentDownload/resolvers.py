@@ -1,3 +1,234 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.resolvers",
+#   "purpose": "Implements DocsToKG.ContentDownload.resolvers behaviors and helpers",
+#   "sections": [
+#     {
+#       "id": "resolver_result",
+#       "name": "ResolverResult",
+#       "anchor": "RESO",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolver_config",
+#       "name": "ResolverConfig",
+#       "anchor": "RESO1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "attempt_record",
+#       "name": "AttemptRecord",
+#       "anchor": "ATTE",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "attempt_sink",
+#       "name": "AttemptSink",
+#       "anchor": "ATTE1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "download_outcome",
+#       "name": "DownloadOutcome",
+#       "anchor": "DOWN",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "pipeline_result",
+#       "name": "PipelineResult",
+#       "anchor": "PIPE",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolver",
+#       "name": "Resolver",
+#       "anchor": "RESO2",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolver_metrics",
+#       "name": "ResolverMetrics",
+#       "anchor": "RESO3",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_fetch_semantic_scholar_data",
+#       "name": "_fetch_semantic_scholar_data",
+#       "anchor": "FSSD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolver_registry",
+#       "name": "ResolverRegistry",
+#       "anchor": "RESO4",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "registered_resolver",
+#       "name": "RegisteredResolver",
+#       "anchor": "REGI",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "api_resolver_base",
+#       "name": "ApiResolverBase",
+#       "anchor": "APIR",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_absolute_url",
+#       "name": "_absolute_url",
+#       "anchor": "AU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_collect_candidate_urls",
+#       "name": "_collect_candidate_urls",
+#       "anchor": "CCU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find_pdf_via_meta",
+#       "name": "find_pdf_via_meta",
+#       "anchor": "FPVM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find_pdf_via_link",
+#       "name": "find_pdf_via_link",
+#       "anchor": "FPVL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "find_pdf_via_anchor",
+#       "name": "find_pdf_via_anchor",
+#       "anchor": "FPVA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "arxiv_resolver",
+#       "name": "ArxivResolver",
+#       "anchor": "ARXI",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "core_resolver",
+#       "name": "CoreResolver",
+#       "anchor": "CORE",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "crossref_resolver",
+#       "name": "CrossrefResolver",
+#       "anchor": "CROS",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "doaj_resolver",
+#       "name": "DoajResolver",
+#       "anchor": "DOAJ",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "europe_pmc_resolver",
+#       "name": "EuropePmcResolver",
+#       "anchor": "EURO",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "figshare_resolver",
+#       "name": "FigshareResolver",
+#       "anchor": "FIGS",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "hal_resolver",
+#       "name": "HalResolver",
+#       "anchor": "HALR",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "landing_page_resolver",
+#       "name": "LandingPageResolver",
+#       "anchor": "LAND",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "open_aire_resolver",
+#       "name": "OpenAireResolver",
+#       "anchor": "OPEN",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "open_alex_resolver",
+#       "name": "OpenAlexResolver",
+#       "anchor": "OPEN1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "osf_resolver",
+#       "name": "OsfResolver",
+#       "anchor": "OSFR",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "pmc_resolver",
+#       "name": "PmcResolver",
+#       "anchor": "PMCR",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "semantic_scholar_resolver",
+#       "name": "SemanticScholarResolver",
+#       "anchor": "SEMA",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "unpaywall_resolver",
+#       "name": "UnpaywallResolver",
+#       "anchor": "UNPA",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "wayback_resolver",
+#       "name": "WaybackResolver",
+#       "anchor": "WAYB",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "zenodo_resolver",
+#       "name": "ZenodoResolver",
+#       "anchor": "ZENO",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "default_resolvers",
+#       "name": "default_resolvers",
+#       "anchor": "DR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_callable_accepts_argument",
+#       "name": "_callable_accepts_argument",
+#       "anchor": "CAA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_run_state",
+#       "name": "_RunState",
+#       "anchor": "RUNS",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolver_pipeline",
+#       "name": "ResolverPipeline",
+#       "anchor": "RESO5",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Content Download Resolver Orchestration
 
@@ -37,10 +268,11 @@ import random
 import re
 import threading
 import time as _time
+import warnings
 from collections import Counter, defaultdict
-from types import MappingProxyType
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -157,7 +389,6 @@ class ResolverConfig:
         resolver_timeouts: Resolver-specific timeout overrides.
         resolver_min_interval_s: Minimum interval between resolver _requests.
         domain_min_interval_s: Optional per-domain rate limits overriding resolver settings.
-        resolver_rate_limits: Deprecated rate limit configuration retained for compat.
         enable_head_precheck: Toggle applying HEAD filtering before downloads.
         resolver_head_precheck: Per-resolver overrides for HEAD filtering behaviour.
         mailto: Contact email appended to polite headers and user agent string.
@@ -192,7 +423,6 @@ class ResolverConfig:
     resolver_timeouts: Dict[str, float] = field(default_factory=dict)
     resolver_min_interval_s: Dict[str, float] = field(default_factory=dict)
     domain_min_interval_s: Dict[str, float] = field(default_factory=dict)
-    resolver_rate_limits: Dict[str, float] = field(default_factory=dict)
     enable_head_precheck: bool = True
     resolver_head_precheck: Dict[str, bool] = field(default_factory=dict)
     mailto: Optional[str] = None
@@ -265,10 +495,6 @@ class ResolverConfig:
                         name=resolver_name, value=interval
                     )
                 )
-
-        if self.resolver_rate_limits:
-            for name, value in self.resolver_rate_limits.items():
-                self.resolver_min_interval_s.setdefault(name, value)
 
         normalized_domain_limits: Dict[str, float] = {}
         for host, interval in self.domain_min_interval_s.items():
@@ -356,7 +582,15 @@ class AttemptSink(Protocol):
     """
 
     def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
-        """Log a resolver attempt with optional timestamp override."""
+        """Log a resolver attempt with optional timestamp override.
+
+        Args:
+            record: Structured attempt event emitted by a resolver.
+            timestamp: Override timestamp string for deterministic replay.
+
+        Returns:
+            None
+        """
 
     def log(self, record: AttemptRecord) -> None:
         """Log a resolver attempt.
@@ -576,6 +810,36 @@ class ResolverMetrics:
         }
 
 
+def _fetch_semantic_scholar_data(
+    session: _requests.Session,
+    config: ResolverConfig,
+    doi: str,
+) -> Dict[str, Any]:
+    """Return Semantic Scholar metadata for ``doi`` using configured headers."""
+
+    headers = dict(config.polite_headers)
+    if config.semantic_scholar_api_key:
+        headers["x-api-key"] = config.semantic_scholar_api_key
+    response = request_with_retries(
+        session,
+        "GET",
+        f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(doi)}",
+        params={"fields": "title,openAccessPdf"},
+        timeout=config.get_timeout("semantic_scholar"),
+        headers=headers,
+    )
+    try:
+        if response.status_code != 200:
+            error = _requests.HTTPError(
+                f"Semantic Scholar HTTPError: {response.status_code}"
+            )
+            error.response = response
+            raise error
+        return response.json()
+    finally:
+        response.close()
+
+
 DownloadFunc = Callable[..., DownloadOutcome]
 
 
@@ -656,7 +920,24 @@ class RegisteredResolver:
 
 
 class ApiResolverBase(RegisteredResolver, register=False):
-    """Shared helper for resolvers interacting with JSON-based HTTP APIs."""
+    """Shared helper for resolvers interacting with JSON-based HTTP APIs.
+
+    Attributes:
+        name: Resolver identifier used for logging and registration.
+
+    Examples:
+        >>> class ExampleApiResolver(ApiResolverBase):
+        ...     name = "example-api"
+        ...     def iter_urls(self, session, config, artifact):
+        ...         payload, result = self._request_json(
+        ...             session,
+        ...             \"GET\",
+        ...             \"https://example.org/api\",
+        ...             config=config,
+        ...         )
+        ...         if payload:
+        ...             yield result  # doctest: +SKIP
+    """
 
     def _request_json(
         self,
@@ -750,7 +1031,7 @@ class ApiResolverBase(RegisteredResolver, register=False):
                         http_status=response.status_code,
                         metadata={
                             "url": url,
-                            "error_detail": f"{self.name} API returned {response.status_code}",
+                            "error_detail": f"{getattr(self, 'api_display_name', self.name)} API returned {response.status_code}",
                         },
                     ),
                 )
@@ -771,7 +1052,9 @@ class ApiResolverBase(RegisteredResolver, register=False):
                 ),
             )
         finally:
-            response.close()
+            close = getattr(response, 'close', None)
+            if callable(close):
+                close()
 
         return data, None
 
@@ -786,6 +1069,10 @@ def _absolute_url(base: str, href: str) -> str:
     parsed = urlparse(href)
     if parsed.scheme and parsed.netloc:
         return href
+    base_parts = urlparse(base)
+    if base_parts.scheme and base_parts.netloc:
+        origin = f"{base_parts.scheme}://{base_parts.netloc}/"
+        return urljoin(origin, href)
     return urljoin(base, href)
 
 
@@ -803,7 +1090,15 @@ def _collect_candidate_urls(node: object, results: List[str]) -> None:
 
 
 def find_pdf_via_meta(soup: "BeautifulSoup", base_url: str) -> Optional[str]:
-    """Return PDF URL declared via ``citation_pdf_url`` meta tags."""
+    """Return PDF URL declared via ``citation_pdf_url`` meta tags.
+
+    Args:
+        soup: Parsed HTML document to inspect for metadata tags.
+        base_url: URL used to resolve relative PDF links.
+
+    Returns:
+        Optional[str]: Absolute PDF URL when one is advertised; otherwise ``None``.
+    """
 
     tag = soup.find("meta", attrs={"name": "citation_pdf_url"})
     if tag is None:
@@ -815,7 +1110,15 @@ def find_pdf_via_meta(soup: "BeautifulSoup", base_url: str) -> Optional[str]:
 
 
 def find_pdf_via_link(soup: "BeautifulSoup", base_url: str) -> Optional[str]:
-    """Return PDF URL referenced via ``<link rel="alternate" type="application/pdf">``."""
+    """Return PDF URL referenced via ``<link rel=\"alternate\" type=\"application/pdf\">``.
+
+    Args:
+        soup: Parsed HTML document to inspect for ``<link>`` elements.
+        base_url: URL used to resolve relative ``href`` attributes.
+
+    Returns:
+        Optional[str]: Absolute PDF URL if link metadata is present; otherwise ``None``.
+    """
 
     for link in soup.find_all("link"):
         rel = " ".join(link.get("rel") or []).lower()
@@ -827,7 +1130,15 @@ def find_pdf_via_link(soup: "BeautifulSoup", base_url: str) -> Optional[str]:
 
 
 def find_pdf_via_anchor(soup: "BeautifulSoup", base_url: str) -> Optional[str]:
-    """Return PDF URL inferred from anchor elements mentioning PDFs."""
+    """Return PDF URL inferred from anchor elements mentioning PDFs.
+
+    Args:
+        soup: Parsed HTML document to search for anchor tags referencing PDFs.
+        base_url: URL used to resolve relative anchor targets.
+
+    Returns:
+        Optional[str]: Absolute PDF URL when an anchor appears to reference one.
+    """
 
     for anchor in soup.find_all("a"):
         href = (anchor.get("href") or "").strip()
@@ -1172,6 +1483,7 @@ class DoajResolver(ApiResolverBase):
     """
 
     name = "doaj"
+    api_display_name = "DOAJ"
 
     def is_enabled(self, config: ResolverConfig, artifact: "WorkArtifact") -> bool:
         """Return ``True`` when resolver prerequisites are met for the artifact.
@@ -2142,18 +2454,8 @@ class SemanticScholarResolver(RegisteredResolver):
         if not doi:
             yield ResolverResult(url=None, event="skipped", event_reason="no-doi")
             return
-        headers = dict(config.polite_headers)
-        if config.semantic_scholar_api_key:
-            headers["x-api-key"] = config.semantic_scholar_api_key
         try:
-            response = request_with_retries(
-                session,
-                "GET",
-                f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(doi)}",
-                params={"fields": "title,openAccessPdf"},
-                timeout=config.get_timeout(self.name),
-                headers=headers,
-            )
+            data = _fetch_semantic_scholar_data(session, config, doi)
         except _requests.Timeout as exc:
             yield ResolverResult(
                 url=None,
@@ -2170,12 +2472,30 @@ class SemanticScholarResolver(RegisteredResolver):
                 metadata={"error": str(exc)},
             )
             return
+        except _requests.HTTPError as exc:
+            status = exc.response.status_code if getattr(exc, "response", None) else None
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="http-error",
+                http_status=status,
+                metadata={"error_detail": str(exc)},
+            )
+            return
         except _requests.RequestException as exc:
             yield ResolverResult(
                 url=None,
                 event="error",
                 event_reason="request-error",
                 metadata={"error": str(exc)},
+            )
+            return
+        except ValueError as exc:
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="json-error",
+                metadata={"error_detail": str(exc)},
             )
             return
         except Exception as exc:  # pragma: no cover - defensive
@@ -2187,52 +2507,6 @@ class SemanticScholarResolver(RegisteredResolver):
                 metadata={"error": str(exc), "error_type": type(exc).__name__},
             )
             return
-
-        try:
-            if response.status_code != 200:
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="http-error",
-                    http_status=response.status_code,
-                    metadata={
-                        "error_detail": f"Semantic Scholar HTTPError: {response.status_code}",
-                    },
-                )
-                return
-            data = response.json()
-        except ValueError as json_err:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="unexpected-error",
-                metadata={"error": str(exc), "error_type": type(exc).__name__},
-            )
-            return
-
-        try:
-            if response.status_code != 200:
-                yield ResolverResult(
-                    url=None,
-                    event="error",
-                    event_reason="http-error",
-                    http_status=response.status_code,
-                    metadata={
-                        "error_detail": f"Semantic Scholar HTTPError: {response.status_code}",
-                    },
-                )
-                return
-            data = response.json()
-        except ValueError as json_err:
-            yield ResolverResult(
-                url=None,
-                event="error",
-                event_reason="json-error",
-                metadata={"error_detail": str(json_err)},
-            )
-            return
-        finally:
-            response.close()
 
         open_access = (data.get("openAccessPdf") or {}) if isinstance(data, dict) else {}
         url = open_access.get("url") if isinstance(open_access, dict) else None
@@ -2362,7 +2636,9 @@ class UnpaywallResolver(RegisteredResolver):
             )
             return
         finally:
-            response.close()
+            close = getattr(response, 'close', None)
+            if callable(close):
+                close()
 
         candidates: List[Tuple[str, Dict[str, Any]]] = []
         best = (data or {}).get("best_oa_location") or {}
@@ -2764,6 +3040,35 @@ class ResolverPipeline:
             download_func, "head_precheck_passed"
         )
 
+    def _emit_attempt(
+        self,
+        record: AttemptRecord,
+        *,
+        timestamp: Optional[str] = None,
+    ) -> None:
+        """Invoke the configured logger while supporting legacy log-only adapters.
+
+        Args:
+            record: Attempt payload emitted by the pipeline.
+            timestamp: Optional ISO timestamp forwarded to sinks that accept it.
+
+        Returns:
+            None
+        """
+
+        log_attempt = getattr(self.logger, "log_attempt", None)
+        if callable(log_attempt):
+            if timestamp is not None:
+                log_attempt(record, timestamp=timestamp)
+            else:
+                log_attempt(record)
+            return
+        legacy_log = getattr(self.logger, "log", None)
+        if callable(legacy_log):
+            legacy_log(record)
+            return
+        raise AttributeError("ResolverPipeline logger must provide log_attempt() or log().")
+
     def _respect_rate_limit(self, resolver_name: str) -> None:
         """Sleep as required to respect per-resolver rate limiting policies.
 
@@ -2779,8 +3084,6 @@ class ResolverPipeline:
         """
 
         limit = self.config.resolver_min_interval_s.get(resolver_name)
-        if not limit:
-            limit = self.config.resolver_rate_limits.get(resolver_name)
         if not limit:
             return
         wait = 0.0
@@ -2864,7 +3167,16 @@ class ResolverPipeline:
         url: str,
         timeout: float,
     ) -> bool:
-        """Delegate to the shared network-layer preflight helper."""
+        """Delegate to the shared network-layer preflight helper.
+
+        Args:
+            session: Requests session used to issue the HEAD preflight.
+            url: Candidate URL that may host a downloadable document.
+            timeout: Maximum duration in seconds to wait for the HEAD response.
+
+        Returns:
+            bool: ``True`` when the URL passes preflight checks, ``False`` otherwise.
+        """
 
         return head_precheck(session, url, timeout)
 
@@ -3062,7 +3374,7 @@ class ResolverPipeline:
 
         resolver = self._resolver_map.get(resolver_name)
         if resolver is None:
-            self.logger.log_attempt(
+            self._emit_attempt(
                 AttemptRecord(
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
@@ -3081,7 +3393,7 @@ class ResolverPipeline:
             return None
 
         if not self.config.is_enabled(resolver_name):
-            self.logger.log_attempt(
+            self._emit_attempt(
                 AttemptRecord(
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
@@ -3100,7 +3412,7 @@ class ResolverPipeline:
             return None
 
         if not resolver.is_enabled(self.config, artifact):
-            self.logger.log_attempt(
+            self._emit_attempt(
                 AttemptRecord(
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
@@ -3187,7 +3499,7 @@ class ResolverPipeline:
         """
 
         if result.is_event:
-            self.logger.log_attempt(
+            self._emit_attempt(
                 AttemptRecord(
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
@@ -3216,7 +3528,7 @@ class ResolverPipeline:
                 if not duplicate:
                     self._global_seen_urls.add(url)
             if duplicate:
-                self.logger.log_attempt(
+                self._emit_attempt(
                     AttemptRecord(
                         work_id=artifact.work_id,
                         resolver_name=resolver_name,
@@ -3235,7 +3547,7 @@ class ResolverPipeline:
                 self.metrics.record_skip(resolver_name, "duplicate-url-global")
                 return None
         if url in state.seen_urls:
-            self.logger.log_attempt(
+            self._emit_attempt(
                 AttemptRecord(
                     work_id=artifact.work_id,
                     resolver_name=resolver_name,
@@ -3264,7 +3576,7 @@ class ResolverPipeline:
                 self.config.get_timeout(resolver_name),
             )
             if not head_precheck_passed:
-                self.logger.log_attempt(
+                self._emit_attempt(
                     AttemptRecord(
                         work_id=artifact.work_id,
                         resolver_name=resolver_name,
@@ -3310,7 +3622,7 @@ class ResolverPipeline:
                 **kwargs,
             )
 
-        self.logger.log_attempt(
+        self._emit_attempt(
             AttemptRecord(
                 work_id=artifact.work_id,
                 resolver_name=resolver_name,
@@ -3364,17 +3676,6 @@ class ResolverPipeline:
         return None
 
 
-def clear_resolver_caches() -> None:
-    """Clear resolver-level HTTP caches to force fresh lookups.
-
-    The resolver implementations now issue requests directly through the
-    shared retry helper and no longer maintain module-level caches. The
-    function remains for backward compatibility with existing call sites.
-    """
-
-    LOGGER.debug("clear_resolver_caches() is a no-op; caches removed")
-
-
 __all__ = [
     "AttemptSink",
     "AttemptRecord",
@@ -3392,7 +3693,6 @@ __all__ = [
     "DEFAULT_RESOLVER_ORDER",
     "DEFAULT_RESOLVER_TOGGLES",
     "default_resolvers",
-    "clear_resolver_caches",
     "ArxivResolver",
     "CoreResolver",
     "CrossrefResolver",

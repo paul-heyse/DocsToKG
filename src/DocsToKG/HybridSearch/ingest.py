@@ -1,3 +1,14 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.ingest",
+#   "purpose": "Ingestion pipelines feeding hybrid search storage",
+#   "sections": [
+#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
+#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Ingestion pipeline that materializes pre-computed chunk artifacts."""
 
 from __future__ import annotations
@@ -13,6 +24,21 @@ from .observability import Observability
 from .storage import ChunkRegistry, OpenSearchSimulator
 from .types import ChunkFeatures, ChunkPayload, DocumentInput
 from .vectorstore import FaissIndexManager
+
+# --- Globals ---
+
+__all__ = (
+    "ChunkIngestionPipeline",
+    "IngestError",
+    "IngestMetrics",
+    "RetryableIngestError",
+    "TRAINING_SAMPLE_RNG",
+)
+
+TRAINING_SAMPLE_RNG = np.random.default_rng(13)
+
+
+# --- Public Classes ---
 
 
 class IngestError(RuntimeError):
@@ -59,9 +85,6 @@ class IngestMetrics:
 
     chunks_upserted: int = 0
     chunks_deleted: int = 0
-
-
-TRAINING_SAMPLE_RNG = np.random.default_rng(13)
 
 
 class ChunkIngestionPipeline:

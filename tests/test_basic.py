@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.test_basic",
+#   "purpose": "Pytest coverage for basic scenarios",
+#   "sections": [
+#     {
+#       "id": "test_ping",
+#       "name": "test_ping",
+#       "anchor": "TP",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Package Sanity Check
 

@@ -107,6 +107,28 @@ or run <code class="docutils literal notranslate"><span class="pre">jq</span></c
 <code class="docutils literal notranslate"><span class="pre">trafilatura</span></code>).</p></li>
 </ul>
 </section>
+<section id="ontology-downloader-api-migration-harden-ontology-downloader-core">
+<h2>5. Ontology Downloader API Migration (<code class="docutils literal notranslate"><span class="pre">harden-ontology-downloader-core</span></code>)<a class="headerlink" href="#ontology-downloader-api-migration-harden-ontology-downloader-core" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Replace imports that referenced <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.core</span></code> (and other legacy
+module aliases such as <code class="docutils literal notranslate"><span class="pre">.config</span></code>, <code class="docutils literal notranslate"><span class="pre">.validators</span></code>, <code class="docutils literal notranslate"><span class="pre">.download</span></code>) with
+<code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.OntologyDownload</span> <span class="pre">import</span> <span class="pre">...</span></code> using the exported names listed in
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.__all__</span></code>. Direct module consumers should import
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.ontology_download</span></code> or <code class="docutils literal notranslate"><span class="pre">.cli</span></code> explicitly.</p></li>
+<li><p>Audit repositories with <code class="docutils literal notranslate"><span class="pre">rg</span> <span class="pre">&quot;DocsToKG.OntologyDownload&quot;</span> <span class="pre">--glob</span> <span class="pre">'*.py'</span></code> and
+replace matches in-place. Imports like <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.OntologyDownload.core</span> <span class="pre">import</span> <span class="pre">plan_all</span></code> become <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.OntologyDownload</span> <span class="pre">import</span> <span class="pre">plan_all</span></code>.</p></li>
+<li><p>Remove <code class="docutils literal notranslate"><span class="pre">__all__</span></code> shims or manual alias dictionaries that mirrored the
+deleted module map; the package facade now exposes the complete surface area.</p></li>
+<li><p>Update custom tooling that parsed rate limit strings, directory sizes, or version
+timestamps to call the shared helpers <code class="docutils literal notranslate"><span class="pre">parse_rate_limit_to_rps</span></code>, <code class="docutils literal notranslate"><span class="pre">_directory_size</span></code>,
+<code class="docutils literal notranslate"><span class="pre">parse_iso_datetime</span></code>, and <code class="docutils literal notranslate"><span class="pre">parse_version_timestamp</span></code> from the core module.</p></li>
+<li><p>Configurations that relied on planning to warn (but proceed) for disallowed hosts now
+receive a <code class="docutils literal notranslate"><span class="pre">ConfigError</span></code> during planning; adjust allowlists before upgrading.</p></li>
+<li><p>When bumping manifests, reuse <code class="docutils literal notranslate"><span class="pre">_migrate_manifest_inplace</span></code> to upgrade payloads
+in place. The helper preserves schema version <code class="docutils literal notranslate"><span class="pre">1.0</span></code> today and provides the
+hook for future <code class="docutils literal notranslate"><span class="pre">1.x</span></code> → <code class="docutils literal notranslate"><span class="pre">2.0</span></code> migrations without rewriting consumer code.</p></li>
+</ul>
+</section>
 </section>
 
 

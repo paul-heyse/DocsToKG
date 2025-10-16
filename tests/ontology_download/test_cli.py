@@ -1,3 +1,102 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_cli",
+#   "purpose": "Pytest coverage for ontology download cli scenarios",
+#   "sections": [
+#     {
+#       "id": "stub_logger",
+#       "name": "stub_logger",
+#       "anchor": "SL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_default_config",
+#       "name": "_default_config",
+#       "anchor": "DC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_planned_fetch",
+#       "name": "_planned_fetch",
+#       "anchor": "PF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_pull_json_output",
+#       "name": "test_cli_pull_json_output",
+#       "anchor": "TCPJO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_pull_table_output",
+#       "name": "test_cli_pull_table_output",
+#       "anchor": "TCPTO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_pull_dry_run",
+#       "name": "test_cli_pull_dry_run",
+#       "anchor": "TCPDR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_pull_concurrency_and_hosts",
+#       "name": "test_cli_pull_concurrency_and_hosts",
+#       "anchor": "TCPCA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_plan_json_output",
+#       "name": "test_cli_plan_json_output",
+#       "anchor": "CPJO1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_plan_since_passed_to_plan_all",
+#       "name": "test_cli_plan_since_passed_to_plan_all",
+#       "anchor": "TCPSP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_plan_concurrency_override",
+#       "name": "test_cli_plan_concurrency_override",
+#       "anchor": "TCPCO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_plan_diff_outputs",
+#       "name": "test_cli_plan_diff_outputs",
+#       "anchor": "TCPDO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_prune_dry_run_json",
+#       "name": "test_cli_prune_dry_run_json",
+#       "anchor": "CPDR1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_prune_updates_latest_marker",
+#       "name": "test_cli_prune_updates_latest_marker",
+#       "anchor": "TCPUL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_plan_serializes_enriched_metadata",
+#       "name": "test_cli_plan_serializes_enriched_metadata",
+#       "anchor": "TCPSE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_doctor_reports_diagnostics",
+#       "name": "test_cli_doctor_reports_diagnostics",
+#       "anchor": "TCDRD",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Integration tests for the ontology downloader CLI."""
 
 from __future__ import annotations
@@ -5,9 +104,8 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List
-
 from types import SimpleNamespace
+from typing import Dict, List
 
 import pytest
 
@@ -19,10 +117,10 @@ from DocsToKG.OntologyDownload import (
     FetchResult,
     FetchSpec,
     PlannedFetch,
-    ResolverCandidate,
     ResolvedConfig,
+    ResolverCandidate,
+    cli,
 )
-from DocsToKG.OntologyDownload import cli
 from DocsToKG.OntologyDownload.resolvers import FetchPlan
 
 
@@ -330,7 +428,7 @@ def test_cli_plan_serializes_enriched_metadata(monkeypatch, stub_logger, capsys)
     plan.metadata = {
         "last_modified": "Tue, 01 Aug 2023 00:00:00 GMT",
         "content_length": 4096,
-        "etag": "\"abc123\"",
+        "etag": '"abc123"',
     }
     monkeypatch.setattr(cli, "plan_all", lambda specs, *, config=None, since=None: [plan])
     monkeypatch.setattr(cli, "setup_logging", lambda *_, **__: stub_logger)
@@ -343,7 +441,7 @@ def test_cli_plan_serializes_enriched_metadata(monkeypatch, stub_logger, capsys)
     payload = json.loads(capsys.readouterr().out)
     assert payload[0]["last_modified"] == "Tue, 01 Aug 2023 00:00:00 GMT"
     assert payload[0]["content_length"] == 4096
-    assert payload[0]["etag"] == "\"abc123\""
+    assert payload[0]["etag"] == '"abc123"'
 
 
 def test_cli_doctor_reports_diagnostics(monkeypatch, stub_logger, tmp_path, capsys):
@@ -412,7 +510,9 @@ def test_cli_doctor_reports_diagnostics(monkeypatch, stub_logger, tmp_path, caps
         "disk_usage",
         lambda path: SimpleNamespace(total=10_000_000_000, used=4_000_000_000, free=6_000_000_000),
     )
-    monkeypatch.setattr(cli.shutil, "which", lambda name: "/usr/bin/robot" if name == "robot" else None)
+    monkeypatch.setattr(
+        cli.shutil, "which", lambda name: "/usr/bin/robot" if name == "robot" else None
+    )
     monkeypatch.setattr(
         cli.subprocess,
         "run",

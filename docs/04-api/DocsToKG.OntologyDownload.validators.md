@@ -1,5 +1,9 @@
 # 1. Module: validators
 
+This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.validators``.
+
+## 1. Overview
+
 The standalone module ``DocsToKG.OntologyDownload.validators`` has been retired. The
 validation pipeline now lives in ``DocsToKG.OntologyDownload.ontology_download`` and
 is exposed through the consolidated ``DocsToKG.OntologyDownload`` facade.
@@ -39,7 +43,7 @@ custom = "my_package.validators:validate_custom"
 After installation the validator participates in ``run_validators`` alongside
 the built-in adapters.
 
-## 1. Functions
+## 2. Functions
 
 ### `_log_memory(logger, validator, event)`
 

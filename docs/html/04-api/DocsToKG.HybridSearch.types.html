@@ -79,6 +79,8 @@
   <section id="module-types">
 <h1>1. Module: types<a class="headerlink" href="#module-types" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.types</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Core typed structures for hybrid search components.</p>
 <p>This module defines the fundamental data structures used throughout the DocsToKG
 hybrid search system, including document inputs, chunk features, search requests,
@@ -93,8 +95,9 @@ methods, enabling seamless hybrid search capabilities across the platform.</p>
 <li><p>Comprehensive validation and error handling</p></li>
 <li><p>Support for both lexical and semantic search modalities</p></li>
 </ul>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="vector-uuid-to-faiss-int-vector-id">
 <h3><code class="docutils literal notranslate"><span class="pre">vector_uuid_to_faiss_int(vector_id)</span></code><a class="headerlink" href="#vector-uuid-to-faiss-int-vector-id" title="Link to this heading"></a></h3>
 <p>Return the FAISS-compatible integer identifier for a vector UUID.</p>
@@ -133,7 +136,7 @@ True if all reports passed, False otherwise</p>
 </section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="documentinput">
 <h3><code class="docutils literal notranslate"><span class="pre">DocumentInput</span></code><a class="headerlink" href="#documentinput" title="Link to this heading"></a></h3>
 <p>Pre-computed chunk and vector artifacts for a document.</p>
@@ -262,6 +265,7 @@ from all retrieval methods used in the search.</p>
 <p>Attributes:
 doc_id: Source document identifier
 chunk_id: Chunk identifier within the document
+vector_id: Identifier of the chunk’s embedding in the FAISS index
 namespace: Logical grouping for search scoping
 score: Final fused similarity score
 fused_rank: Position in the final result ranking

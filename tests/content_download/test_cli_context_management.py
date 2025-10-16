@@ -1,3 +1,60 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.content_download.test_cli_context_management",
+#   "purpose": "Pytest coverage for content download cli context management scenarios",
+#   "sections": [
+#     {
+#       "id": "_recording_sink",
+#       "name": "_RecordingSink",
+#       "anchor": "RECO",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_recording_last_attempt_sink",
+#       "name": "_RecordingLastAttemptSink",
+#       "anchor": "RECO1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_recording_csv_sink",
+#       "name": "_RecordingCsvSink",
+#       "anchor": "RECO2",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_recording_index_sink",
+#       "name": "_RecordingIndexSink",
+#       "anchor": "RECO3",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_base_args",
+#       "name": "_base_args",
+#       "anchor": "BA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_single_work",
+#       "name": "_single_work",
+#       "anchor": "SW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_main_closes_sinks_when_pipeline_raises",
+#       "name": "test_main_closes_sinks_when_pipeline_raises",
+#       "anchor": "TMCSW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_main_with_csv_releases_attempt_files",
+#       "name": "test_main_with_csv_releases_attempt_files",
+#       "anchor": "TMWCR",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -95,7 +152,9 @@ def test_main_closes_sinks_when_pipeline_raises(monkeypatch, tmp_path):
 
     monkeypatch.setattr(downloader, "process_one_work", boom)
     monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
-    monkeypatch.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter([_single_work()]))
+    monkeypatch.setattr(
+        downloader, "iterate_openalex", lambda *args, **kwargs: iter([_single_work()])
+    )
     monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda topic: topic)
 
     argv = _base_args(tmp_path)
@@ -112,7 +171,9 @@ def test_main_closes_sinks_when_pipeline_raises(monkeypatch, tmp_path):
 
 def test_main_with_csv_releases_attempt_files(monkeypatch, tmp_path):
     monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
-    monkeypatch.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter([_single_work()]))
+    monkeypatch.setattr(
+        downloader, "iterate_openalex", lambda *args, **kwargs: iter([_single_work()])
+    )
     monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda topic: topic)
 
     pdf_dir = tmp_path / "out" / "pdfs"

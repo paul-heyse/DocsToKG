@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.serializers",
+#   "purpose": "Serialization helpers for DocsToKG DocParsing pipelines",
+#   "sections": [
+#     {
+#       "id": "caption_plus_annotation_picture_serializer",
+#       "name": "CaptionPlusAnnotationPictureSerializer",
+#       "anchor": "CAPT",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "rich_serializer_provider",
+#       "name": "RichSerializerProvider",
+#       "anchor": "RICH",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 DocParsing Rich Serializers
 
@@ -47,10 +68,14 @@ from docling_core.types.doc.document import (
 from docling_core.types.doc.document import DoclingDocument as _Doc
 from typing_extensions import override
 
+# --- Globals ---
+
 __all__ = [
     "CaptionPlusAnnotationPictureSerializer",
     "RichSerializerProvider",
 ]
+
+# --- Public API ---
 
 
 class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):

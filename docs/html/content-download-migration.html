@@ -1,0 +1,166 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Content Download Migration Guide &mdash; DocsToKG 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/css/custom.css" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=8d563738"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            DocsToKG
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="01-overview/index.html">1. Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02-setup/index.html">1. Setup Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="03-architecture/index.html">1. Architecture Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="04-api/index.html">1. API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="05-development/index.html">1. Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="06-operations/index.html">1. Operations Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="07-reference/index.html">1. Technical Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DocsToKG</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Content Download Migration Guide</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/content-download-migration.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="content-download-migration-guide">
+<h1>Content Download Migration Guide<a class="headerlink" href="#content-download-migration-guide" title="Link to this heading"></a></h1>
+<p>This brief guide helps downstream consumers migrate to the refactored content
+download pipeline introduced in the <code class="docutils literal notranslate"><span class="pre">refactor-content-download-robustness</span></code>
+change set.</p>
+<section id="removed-compatibility-shims">
+<h2>Removed Compatibility Shims<a class="headerlink" href="#removed-compatibility-shims" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.time</span></code> and
+<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.requests</span></code> were deleted. Import these
+modules directly from the standard library / requests package.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.resolvers.request_with_retries</span></code> proxy was removed.
+Use <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">DocsToKG.ContentDownload.network</span> <span class="pre">import</span> <span class="pre">request_with_retries</span></code>.</p></li>
+<li><p>Deprecated module aliases (<code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.results</span></code>, <code class="docutils literal notranslate"><span class="pre">.similarity</span></code>,
+<code class="docutils literal notranslate"><span class="pre">.retrieval</span></code>, <code class="docutils literal notranslate"><span class="pre">.operations</span></code>, <code class="docutils literal notranslate"><span class="pre">.schema</span></code>) are no longer available; import the
+consolidated modules (<code class="docutils literal notranslate"><span class="pre">ranking</span></code>, <code class="docutils literal notranslate"><span class="pre">vectorstore</span></code>, <code class="docutils literal notranslate"><span class="pre">service</span></code>, <code class="docutils literal notranslate"><span class="pre">storage</span></code>)
+instead.</p></li>
+</ul>
+</section>
+<section id="resolver-implementations">
+<h2>Resolver Implementations<a class="headerlink" href="#resolver-implementations" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>New resolvers should inherit from <code class="docutils literal notranslate"><span class="pre">ApiResolverBase</span></code> to leverage shared error
+handling via <code class="docutils literal notranslate"><span class="pre">_request_json()</span></code>.</p></li>
+<li><p>Session-less resolver branches and cached <code class="docutils literal notranslate"><span class="pre">_fetch_*</span></code> helpers were removed –
+every resolver must use the provided <code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> instance and the
+shared network helpers.</p></li>
+</ul>
+</section>
+<section id="cli-behaviour-changes">
+<h2>CLI Behaviour Changes<a class="headerlink" href="#cli-behaviour-changes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">--staging</span></code> to create timestamped run directories with separate <code class="docutils literal notranslate"><span class="pre">PDF/</span></code>
+and <code class="docutils literal notranslate"><span class="pre">HTML/</span></code> folders plus <code class="docutils literal notranslate"><span class="pre">manifest.jsonl</span></code>, <code class="docutils literal notranslate"><span class="pre">manifest.index.json</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">manifest.metrics.json</span></code> sidecars.</p></li>
+<li><p>The CLI always writes JSONL manifests. When <code class="docutils literal notranslate"><span class="pre">--log-format</span> <span class="pre">csv</span></code> is supplied
+it additionally produces <code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code> summarising the latest attempt
+per work.</p></li>
+<li><p>Domain-level throttling (<code class="docutils literal notranslate"><span class="pre">--domain-min-interval</span></code>) and global URL deduplication
+(<code class="docutils literal notranslate"><span class="pre">--global-url-dedup</span></code>) now apply across worker threads.</p></li>
+<li><p>Resume runs tolerate manifests with incomplete metadata; partial entries no
+longer raise errors and conditional requests fall back to full downloads when
+required fields are missing.</p></li>
+</ul>
+</section>
+<section id="manifest-consumers">
+<h2>Manifest Consumers<a class="headerlink" href="#manifest-consumers" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Manifest entries maintain their historical schema. New sidecar files
+(<code class="docutils literal notranslate"><span class="pre">.index.json</span></code>, <code class="docutils literal notranslate"><span class="pre">.metrics.json</span></code>, <code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code>) provide faster lookup
+surfaces for resumption tools and operational dashboards.</p></li>
+<li><p>HTTP corruption heuristics now record whether HEAD prechecks succeeded via
+the <code class="docutils literal notranslate"><span class="pre">head_precheck_passed</span></code> manifest flag.</p></li>
+</ul>
+<p>Update any automation, dashboards, or imports to reflect these changes before
+upgrading to DocsToKG 0.3.0.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, DocsToKG Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

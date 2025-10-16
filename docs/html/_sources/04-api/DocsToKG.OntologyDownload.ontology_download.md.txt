@@ -2,9 +2,11 @@
 
 This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.ontology_download``.
 
+## 1. Overview
+
 Unified ontology downloader orchestrating settings, retries, and logging.
 
-## 1. Functions
+## 2. Functions
 
 ### `retry_with_backoff(func)`
 
@@ -84,6 +86,23 @@ value: Input value that may be ``None``, a string, or an iterable of strings.
 
 Returns:
 List of strings suitable for downstream configuration processing.
+
+### `parse_rate_limit_to_rps(limit_str)`
+
+Convert a rate limit expression into requests-per-second.
+
+The accepted format is ``<value>/<unit>`` where ``unit`` is one of
+``second``, ``minute``, or ``hour`` (including short aliases such as ``s``
+or ``min``). The function returns ``None`` when the value cannot be parsed.
+
+Args:
+limit_str: Rate limit expression in ``value/unit`` form.
+
+Returns:
+Optional[float]: Requests-per-second value when parsing succeeds.
+
+Raises:
+ValueError: If the numeric component cannot be converted to ``float``.
 
 ### `get_env_overrides()`
 
@@ -762,6 +781,14 @@ referencing any produced log files.
 Raises:
 None
 
+### `_load_validator_plugins(logger)`
+
+Discover validator plugins registered via entry points.
+
+### `_run_validator_task(validator, request, logger)`
+
+Execute a single validator with exception guards.
+
 ### `run_validators(requests, logger)`
 
 Execute registered validators and aggregate their results.
@@ -811,6 +838,58 @@ None
 Raises:
 ConfigurationError: If validation fails.
 
+### `parse_http_datetime(value)`
+
+Parse HTTP ``Last-Modified`` style timestamps into UTC datetimes.
+
+Args:
+value: Timestamp string from HTTP headers such as ``Last-Modified``.
+
+Returns:
+Optional[datetime]: Normalized UTC datetime when parsing succeeds.
+
+Raises:
+None: Parsing failures are converted into a ``None`` return value.
+
+### `parse_iso_datetime(value)`
+
+Parse ISO-8601 timestamps into timezone-aware UTC datetimes.
+
+Args:
+value: ISO-8601 formatted timestamp string.
+
+Returns:
+Optional[datetime]: Normalized UTC datetime when parsing succeeds.
+
+Raises:
+None: Invalid values return ``None`` instead of raising.
+
+### `parse_version_timestamp(value)`
+
+Parse version strings or manifest timestamps into UTC datetimes.
+
+Args:
+value: Version identifier or timestamp string to normalize.
+
+Returns:
+Optional[datetime]: Parsed UTC datetime when the input matches supported formats.
+
+Raises:
+None: All parsing failures result in ``None``.
+
+### `infer_version_timestamp(value)`
+
+Infer a timestamp from resolver version identifiers.
+
+Args:
+value: Resolver version string containing date-like fragments.
+
+Returns:
+Optional[datetime]: Parsed UTC datetime when the value contains recoverable dates.
+
+Raises:
+None: Returns ``None`` instead of raising on unparseable inputs.
+
 ### `_coerce_datetime(value)`
 
 Return timezone-aware datetime parsed from HTTP or ISO timestamp.
@@ -822,6 +901,10 @@ Return canonical ISO8601 string for HTTP timestamp headers.
 ### `_populate_plan_metadata(planned, config, adapter)`
 
 Augment planned fetch with HTTP metadata when available.
+
+### `_migrate_manifest_inplace(payload)`
+
+Upgrade manifests created with older schema versions in place.
 
 ### `_read_manifest(manifest_path)`
 
@@ -896,19 +979,17 @@ ConfigurationError: If the plan's license is not permitted.
 Fetch, validate, and persist a single ontology described by *spec*.
 
 Args:
-spec: Fetch specification outlining resolver selection and target formats.
-config: Optional resolved configuration supplying defaults and limits.
-correlation_id: Identifier used to correlate structured log entries.
-logger: Logger instance reused for download and validation telemetry.
-force: When True, ignore cached manifests and re-download artefacts.
+spec: Ontology fetch specification describing sources and formats.
+config: Optional resolved configuration overriding global defaults.
+correlation_id: Correlation identifier for structured logging.
+logger: Optional logger to reuse instead of configuring a new one.
+force: When ``True``, bypass local cache checks and redownload artifacts.
 
 Returns:
-FetchResult capturing download status, SHA-256 hashes, and manifest path.
+FetchResult: Structured result containing manifest metadata and resolver attempts.
 
 Raises:
-ResolverError: If all resolvers fail to produce a viable FetchPlan.
-OntologyDownloadError: If download, extraction, or validation fails.
-ConfigurationError: If licence checks or manifest validation fail.
+ResolverError: If all resolver candidates fail to retrieve the ontology.
 
 ### `plan_one(spec)`
 
@@ -960,6 +1041,14 @@ List of FetchResult entries corresponding to completed downloads.
 Raises:
 OntologyDownloadError: Propagated when downloads fail and the pipeline
 is configured to stop on error.
+
+### `_safe_lock_component(value)`
+
+Return a filesystem-safe token for lock filenames.
+
+### `_version_lock(ontology_id, version)`
+
+Acquire an inter-process lock for a specific ontology version.
 
 ### `validate_level(cls, value)`
 
@@ -1535,10 +1624,6 @@ Dictionary with boolean status, detail payload, and output paths.
 
 *No documentation available.*
 
-### `_iter_canonical_lines()`
-
-*No documentation available.*
-
 ### `_flush(writer)`
 
 *No documentation available.*
@@ -1546,6 +1631,10 @@ Dictionary with boolean status, detail payload, and output paths.
 ### `_parse()`
 
 Parse the ontology with rdflib to populate the graph object.
+
+### `_determine_max_workers()`
+
+*No documentation available.*
 
 ### `to_dict(self)`
 
@@ -1578,6 +1667,10 @@ logger: Logger adapter scoped to the current fetch request.
 
 Returns:
 Concrete plan containing download URL, headers, and metadata.
+
+### `_add_candidate(candidate)`
+
+*No documentation available.*
 
 ### `_add(name)`
 
@@ -1635,7 +1728,15 @@ Args:
 signum: Received signal number.
 frame: Current stack frame (unused).
 
-## 2. Classes
+### `_execute_candidate()`
+
+*No documentation available.*
+
+### `_emit(text)`
+
+*No documentation available.*
+
+## 3. Classes
 
 ### `ConfigError`
 
@@ -1913,7 +2014,7 @@ expected_media_type: MIME type provided by the resolver for validation.
 
 Examples:
 >>> from pathlib import Path
->>> from DocsToKG.OntologyDownload.config import DownloadConfiguration
+>>> from DocsToKG.OntologyDownload import DownloadConfiguration
 >>> downloader = StreamingDownloader(
 ...     destination=Path("/tmp/ontology.owl"),
 ...     headers={},
@@ -1937,7 +2038,7 @@ config: Resolved configuration that supplies timeout thresholds.
 
 Examples:
 >>> from pathlib import Path
->>> from DocsToKG.OntologyDownload.config import ResolvedConfig
+>>> from DocsToKG.OntologyDownload import ResolvedConfig
 >>> req = ValidationRequest(
 ...     name="rdflib",
 ...     file_path=Path("ontology.owl"),

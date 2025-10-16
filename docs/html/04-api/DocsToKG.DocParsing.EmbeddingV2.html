@@ -79,6 +79,8 @@
   <section id="module-embeddingv2">
 <h1>1. Module: EmbeddingV2<a class="headerlink" href="#module-embeddingv2" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.EmbeddingV2</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Hybrid Embedding Pipeline</p>
 <p>Generates BM25, SPLADE, and Qwen embeddings for DocsToKG chunk files while
 maintaining manifest entries, UUID hygiene, and data quality metrics. The
@@ -101,31 +103,12 @@ python -m DocsToKG.DocParsing.EmbeddingV2 –resume</p>
 <li><p>vllm (optional): Hosts the Qwen embedding model with pooling support.</p></li>
 <li><p>tqdm: Surface user-friendly progress bars across pipeline phases.</p></li>
 </ul>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
-<section id="expand-path-path">
-<h3><code class="docutils literal notranslate"><span class="pre">_expand_path(path)</span></code><a class="headerlink" href="#expand-path-path" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">path</span></code> expanded to an absolute :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code>.</p>
-<p>Args:
-path: Candidate filesystem path supplied as string or :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code>.</p>
-<p>Returns:
-Absolute path with user home and environment variables resolved.</p>
-</section>
-<section id="resolve-hf-home">
-<h3><code class="docutils literal notranslate"><span class="pre">_resolve_hf_home()</span></code><a class="headerlink" href="#resolve-hf-home" title="Link to this heading"></a></h3>
-<p>Determine the HuggingFace cache directory respecting <code class="docutils literal notranslate"><span class="pre">HF_HOME</span></code>.</p>
-<p>Args:
-None</p>
-<p>Returns:
-Absolute path to the HuggingFace cache directory.</p>
-</section>
-<section id="resolve-model-root-hf-home">
-<h3><code class="docutils literal notranslate"><span class="pre">_resolve_model_root(hf_home)</span></code><a class="headerlink" href="#resolve-model-root-hf-home" title="Link to this heading"></a></h3>
-<p>Resolve DocsToKG model root with <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_MODEL_ROOT</span></code> override.</p>
-<p>Args:
-hf_home: Base HuggingFace cache directory.</p>
-<p>Returns:
-Absolute path representing the DocsToKG model root.</p>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="qwen-cache-key-cfg">
+<h3><code class="docutils literal notranslate"><span class="pre">_qwen_cache_key(cfg)</span></code><a class="headerlink" href="#qwen-cache-key-cfg" title="Link to this heading"></a></h3>
+<p>Return cache key tuple for Qwen LLM instances.</p>
 </section>
 <section id="resolve-qwen-dir-model-root">
 <h3><code class="docutils literal notranslate"><span class="pre">_resolve_qwen_dir(model_root)</span></code><a class="headerlink" href="#resolve-qwen-dir-model-root" title="Link to this heading"></a></h3>
@@ -142,6 +125,14 @@ Absolute path to the Qwen embedding model directory.</p>
 model_root: Base directory housing DocsToKG models.</p>
 <p>Returns:
 Absolute path to the SPLADE model directory.</p>
+</section>
+<section id="derive-doc-id-and-output-path-chunk-file-chunks-root-vectors-root">
+<h3><code class="docutils literal notranslate"><span class="pre">_derive_doc_id_and_output_path(chunk_file,</span> <span class="pre">chunks_root,</span> <span class="pre">vectors_root)</span></code><a class="headerlink" href="#derive-doc-id-and-output-path-chunk-file-chunks-root-vectors-root" title="Link to this heading"></a></h3>
+<p>Return manifest doc_id and vector output path for a chunk artifact.</p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">_derive_doc_id_and_output_path(chunk_file,</span> <span class="pre">chunks_root,</span> <span class="pre">vectors_root)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Return manifest doc_id and vector output path for a chunk artifact.</p>
 </section>
 <section id="expand-optional-path">
 <h3><code class="docutils literal notranslate"><span class="pre">_expand_optional(path)</span></code><a class="headerlink" href="#expand-optional-path" title="Link to this heading"></a></h3>
@@ -175,14 +166,6 @@ Absolute path derived from <code class="docutils literal notranslate"><span clas
 <section id="ensure-qwen-dependencies">
 <h3><code class="docutils literal notranslate"><span class="pre">_ensure_qwen_dependencies()</span></code><a class="headerlink" href="#ensure-qwen-dependencies" title="Link to this heading"></a></h3>
 <p>Validate that Qwen/vLLM optional dependencies are importable.</p>
-</section>
-<section id="iter-chunk-files-d">
-<h3><code class="docutils literal notranslate"><span class="pre">iter_chunk_files(d)</span></code><a class="headerlink" href="#iter-chunk-files-d" title="Link to this heading"></a></h3>
-<p>Enumerate chunked DocTags JSONL files in a directory.</p>
-<p>Args:
-d: Directory containing <code class="docutils literal notranslate"><span class="pre">*.chunks.jsonl</span></code> files.</p>
-<p>Returns:
-Sorted list of chunk file paths.</p>
 </section>
 <section id="ensure-uuid-rows">
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_uuid(rows)</span></code><a class="headerlink" href="#ensure-uuid-rows" title="Link to this heading"></a></h3>
@@ -280,8 +263,19 @@ Aggregated BM25 statistics for the supplied chunk corpus.</p>
 <p>Raises:
 ValueError: Propagated when chunk rows are missing required fields.</p>
 </section>
-<section id="process-chunk-file-vectors-chunk-file-stats-args-validator-logger">
-<h3><code class="docutils literal notranslate"><span class="pre">process_chunk_file_vectors(chunk_file,</span> <span class="pre">stats,</span> <span class="pre">args,</span> <span class="pre">validator,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#process-chunk-file-vectors-chunk-file-stats-args-validator-logger" title="Link to this heading"></a></h3>
+<section id="iter-rows-in-batches-path-batch-size">
+<h3><code class="docutils literal notranslate"><span class="pre">iter_rows_in_batches(path,</span> <span class="pre">batch_size)</span></code><a class="headerlink" href="#iter-rows-in-batches-path-batch-size" title="Link to this heading"></a></h3>
+<p>Iterate over JSONL rows in batches to reduce memory usage.</p>
+<p>Args:
+path: Path to JSONL file to read.
+batch_size: Number of rows to yield per batch.</p>
+<p>Returns:
+Iterator[List[dict]]: Lazy iterator producing batched chunk rows.</p>
+<p>Yields:
+Lists of row dictionaries, each containing up to batch_size items.</p>
+</section>
+<section id="process-chunk-file-vectors-chunk-file-out-path-stats-args-validator-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">process_chunk_file_vectors(chunk_file,</span> <span class="pre">out_path,</span> <span class="pre">stats,</span> <span class="pre">args,</span> <span class="pre">validator,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#process-chunk-file-vectors-chunk-file-out-path-stats-args-validator-logger" title="Link to this heading"></a></h3>
 <p>Generate vectors for a single chunk file and persist them to disk.</p>
 <p>Args:
 chunk_file: Chunk JSONL file to process.
@@ -294,11 +288,11 @@ Tuple of <code class="docutils literal notranslate"><span class="pre">(vector_co
 <p>Raises:
 ValueError: Propagated if vector dimensions or norms fail validation.</p>
 </section>
-<section id="write-vectors-path-uuids-texts-splade-results-qwen-results-stats-args">
-<h3><code class="docutils literal notranslate"><span class="pre">write_vectors(path,</span> <span class="pre">uuids,</span> <span class="pre">texts,</span> <span class="pre">splade_results,</span> <span class="pre">qwen_results,</span> <span class="pre">stats,</span> <span class="pre">args)</span></code><a class="headerlink" href="#write-vectors-path-uuids-texts-splade-results-qwen-results-stats-args" title="Link to this heading"></a></h3>
+<section id="write-vectors-path-or-handle-uuids-texts-splade-results-qwen-results-stats-args">
+<h3><code class="docutils literal notranslate"><span class="pre">write_vectors(path_or_handle,</span> <span class="pre">uuids,</span> <span class="pre">texts,</span> <span class="pre">splade_results,</span> <span class="pre">qwen_results,</span> <span class="pre">stats,</span> <span class="pre">args)</span></code><a class="headerlink" href="#write-vectors-path-or-handle-uuids-texts-splade-results-qwen-results-stats-args" title="Link to this heading"></a></h3>
 <p>Write validated vector rows to disk with schema enforcement.</p>
 <p>Args:
-path: Destination JSONL path for vector rows.
+path_or_handle: Destination JSONL path or file handle for vector rows.
 uuids: Sequence of chunk UUIDs aligned with the other inputs.
 texts: Chunk text bodies.
 splade_results: SPLADE token and weight pairs per chunk.
@@ -384,7 +378,7 @@ None</p>
 </section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="bm25stats">
 <h3><code class="docutils literal notranslate"><span class="pre">BM25Stats</span></code><a class="headerlink" href="#bm25stats" title="Link to this heading"></a></h3>
 <p>Corpus-wide statistics required for BM25 weighting.</p>

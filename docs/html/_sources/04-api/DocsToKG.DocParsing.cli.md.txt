@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.DocParsing.cli``.
 
+## 1. Overview
+
 Unified DocParsing command-line interface.
 
 This module consolidates the individual DocParsing CLIs into a single entry
@@ -14,7 +16,7 @@ Available commands:
     - embed:     Generate BM25, SPLADE, and dense vectors for chunks.
     - doctags:   Convert HTML/PDF corpora into DocTags.
 
-## 1. Functions
+## 2. Functions
 
 ### `_run_chunk(argv)`
 
@@ -120,7 +122,7 @@ argv: Optional argument vector supplied for testing.
 Returns:
 Process exit code returned by the DocTags conversion pipeline.
 
-## 2. Classes
+## 3. Classes
 
 ### `_Command`
 

@@ -1,3 +1,78 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.cli",
+#   "purpose": "CLI entry points for DocsToKG.DocParsing.cli workflows",
+#   "sections": [
+#     {
+#       "id": "_run_chunk",
+#       "name": "_run_chunk",
+#       "anchor": "RC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_run_embed",
+#       "name": "_run_embed",
+#       "anchor": "RE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_build_doctags_parser",
+#       "name": "_build_doctags_parser",
+#       "anchor": "BDP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_detect_mode",
+#       "name": "_detect_mode",
+#       "anchor": "DM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_merge_args",
+#       "name": "_merge_args",
+#       "anchor": "MA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_run_doctags",
+#       "name": "_run_doctags",
+#       "anchor": "RD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_command",
+#       "name": "_Command",
+#       "anchor": "COMM",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "chunk",
+#       "name": "chunk",
+#       "anchor": "CHUN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "embed",
+#       "name": "embed",
+#       "anchor": "EMBE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "doctags",
+#       "name": "doctags",
+#       "anchor": "DOCT",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Unified DocParsing command-line interface.
 

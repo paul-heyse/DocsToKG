@@ -91,3 +91,41 @@ python -m DocsToKG.ContentDownload.download_pyalex_pdfs \
 
 Domain-level limits complement existing resolver-level throttles and are
 particularly helpful when multiple providers resolve to the same host.
+
+## 5. Staging Mode and Derived Logs
+
+Long-running harvests benefit from isolated output folders and richer manifest
+artifacts. The downloader exposes a `--staging` flag that creates a timestamped
+run directory containing all artifacts for that invocation:
+
+```bash
+python -m DocsToKG.ContentDownload.download_pyalex_pdfs \
+    --topic "graph embeddings" \
+    --year-start 2022 --year-end 2024 \
+    --out ./runs \
+    --staging
+```
+
+With staging enabled the CLI writes:
+
+- `runs/YYYYMMDD_HHMM/PDF/` for downloaded PDFs
+- `runs/YYYYMMDD_HHMM/HTML/` for captured HTML fallbacks
+- `runs/YYYYMMDD_HHMM/manifest.jsonl` for manifest records
+- `runs/YYYYMMDD_HHMM/manifest.index.json` for a work → artifact summary
+- `runs/YYYYMMDD_HHMM/manifest.metrics.json` for aggregate resolver metrics
+
+When `--log-format csv` is supplied the downloader still emits JSONL manifests
+and additionally produces a `manifest.last.csv` file that captures the latest
+manifest record per work for rapid auditing:
+
+```bash
+python -m DocsToKG.ContentDownload.download_pyalex_pdfs \
+    --topic "graph embeddings" \
+    --year-start 2022 --year-end 2024 \
+    --out ./runs \
+    --manifest ./runs/manifest.jsonl \
+    --log-format csv
+```
+
+The CSV header follows the manifest schema (`work_id`, `resolver`, `classification`,
+`sha256`, etc.) enabling downstream tooling to consume it without parsing JSONL.

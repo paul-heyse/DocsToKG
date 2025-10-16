@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing",
+#   "purpose": "Package initialization for DocsToKG.DocParsing",
+#   "sections": [
+#     {
+#       "id": "module-overview",
+#       "name": "module_overview",
+#       "anchor": "OVR",
+#       "kind": "infra"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """High-level facade exposing CLI entry points for DocsToKG DocParsing."""
 
 from __future__ import annotations

@@ -158,6 +158,36 @@ exceptions.</p></li>
 <li><p>Use <code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code> for outbound HTTP to benefit from retry policies
 and structured logging.</p></li>
 </ul>
+<p>For JSON APIs the recommended base class is <code class="docutils literal notranslate"><span class="pre">ApiResolverBase</span></code>, which wraps
+<code class="docutils literal notranslate"><span class="pre">request_with_retries</span></code> and emits structured error events automatically. Subclass
+it to reduce boilerplate:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">DocsToKG.ContentDownload.resolvers</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApiResolverBase</span><span class="p">,</span> <span class="n">ResolverResult</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">MyApiResolver</span><span class="p">(</span><span class="n">ApiResolverBase</span><span class="p">):</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;my_api&quot;</span>
+    <span class="n">endpoint</span> <span class="o">=</span> <span class="s2">&quot;https://example.org/api&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">iter_urls</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">session</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">artifact</span><span class="p">):</span>
+        <span class="n">data</span><span class="p">,</span> <span class="n">error</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request_json</span><span class="p">(</span>
+            <span class="n">session</span><span class="p">,</span>
+            <span class="s2">&quot;GET&quot;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">endpoint</span><span class="p">,</span>
+            <span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span>
+            <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;doi&quot;</span><span class="p">:</span> <span class="n">artifact</span><span class="o">.</span><span class="n">doi</span><span class="p">},</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">error</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="n">error</span>
+            <span class="k">return</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;files&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">yield</span> <span class="n">ResolverResult</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;download_url&quot;</span><span class="p">])</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">_request_json()</span></code> handles timeouts, connection errors, HTTP status checks, and
+invalid JSON responses by yielding a <code class="docutils literal notranslate"><span class="pre">ResolverResult</span></code> with a diagnostic event
+reason (<code class="docutils literal notranslate"><span class="pre">http-error</span></code>, <code class="docutils literal notranslate"><span class="pre">timeout</span></code>, <code class="docutils literal notranslate"><span class="pre">json-error</span></code>, etc.). The helper also enforces
+the configured polite headers and timeout values so individual resolvers no
+longer implement this logic.</p>
 </section>
 <section id="register-the-resolver">
 <h2>2. Register the Resolver<a class="headerlink" href="#register-the-resolver" title="Link to this heading"></a></h2>

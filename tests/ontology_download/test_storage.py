@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_storage",
+#   "purpose": "Pytest coverage for ontology download storage scenarios",
+#   "sections": [
+#     {
+#       "id": "test_fsspec_storage_roundtrip",
+#       "name": "test_fsspec_storage_roundtrip",
+#       "anchor": "TFSR",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Storage backend tests."""
 
 from __future__ import annotations

@@ -78,11 +78,10 @@
              
   <section id="module-operations">
 <h1>1. Module: operations<a class="headerlink" href="#module-operations" title="Link to this heading"></a></h1>
-
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.operations</span></code>.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p><strong>Deprecated:</strong> <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.operations</span></code> is a compatibility shim retained for one release cycle. Import helpers directly from their consolidated modules:</p>
+<blockquote>
+<div><p><strong>Deprecated:</strong> <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.operations</span></code> is a compatibility shim retained for
+one release cycle. Import helpers directly from their consolidated modules:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service.build_stats_snapshot</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.service.verify_pagination</span></code></p></li>
@@ -90,8 +89,10 @@
 <li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore.serialize_state</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.vectorstore.restore_state</span></code></p></li>
 </ul>
-</div>
-<p>The shim re-exports these callables and emits a <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> at import time to help downstream users migrate to the new module structure introduced in the <code class="docutils literal notranslate"><span class="pre">consolidate-hybridsearch-modules</span></code> change.</p>
+</div></blockquote>
+<p>The shim re-exports these callables and emits a <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> at import time to
+help downstream users migrate to the new module structure introduced in the
+<code class="docutils literal notranslate"><span class="pre">consolidate-hybridsearch-modules</span></code> change.</p>
 <section id="re-exported-symbols">
 <h2>1. Re-exported symbols<a class="headerlink" href="#re-exported-symbols" title="Link to this heading"></a></h2>
 <table class="docutils align-default">
@@ -121,29 +122,8 @@
 </tr>
 </tbody>
 </table>
-<p>All functionality remains unchanged; only import paths differ. New development should target the consolidated modules directly.</p>
-</section>
-</section>
-
-<section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
-<section id="paginationcheckresult">
-<h3><code class="docutils literal notranslate"><span class="pre">PaginationCheckResult</span></code><a class="headerlink" href="#paginationcheckresult" title="Link to this heading"></a></h3>
-<p>Result of a pagination verification run.</p>
-<p>Attributes:
-cursor_chain: Sequence of pagination cursors encountered.
-duplicate_detected: True when duplicate results were observed.</p>
-<p>Examples:</p>
-<blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>result = PaginationCheckResult(cursor_chain=[“cursor1”], duplicate_detected=False)
-result.duplicate_detected
-False</p>
-</div></blockquote>
-</div></blockquote>
-</div></blockquote>
-</section>
+<p>All functionality remains unchanged; only import paths differ. New development should
+target the consolidated modules directly.</p>
 </section>
 </section>
 

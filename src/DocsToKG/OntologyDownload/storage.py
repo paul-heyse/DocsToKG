@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.storage",
+#   "purpose": "Implements DocsToKG.OntologyDownload.storage behaviors and helpers",
+#   "sections": [
+#     {
+#       "id": "get_storage_backend",
+#       "name": "get_storage_backend",
+#       "anchor": "GSB",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Storage backend facade for the ontology downloader."""
 
 from __future__ import annotations
@@ -18,7 +33,14 @@ __all__ = [
 
 
 def get_storage_backend() -> StorageBackend:
-    """Return the active storage backend and sync the core facade."""
+    """Return the active storage backend and sync the core facade.
+
+    Args:
+        None
+
+    Returns:
+        StorageBackend: Instance implementing storage operations for ontology artifacts.
+    """
 
     backend = _core.get_storage_backend()
     _core.STORAGE = backend

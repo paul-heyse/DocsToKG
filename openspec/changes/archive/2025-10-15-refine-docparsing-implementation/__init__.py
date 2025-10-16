@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "openspec.changes.archive.2025-10-15-refine-docparsing-implementation",
+#   "purpose": "Archived OpenSpec helper module openspec.changes.archive.2025_10_15_refine_docparsing_implementation",
+#   "sections": [
+#     {
+#       "id": "module-overview",
+#       "name": "module_overview",
+#       "anchor": "OVR",
+#       "kind": "infra"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 DocsToKG DocParsing Refinement Documentation Package.
 

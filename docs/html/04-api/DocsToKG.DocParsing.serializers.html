@@ -79,6 +79,8 @@
   <section id="module-serializers">
 <h1>1. Module: serializers<a class="headerlink" href="#module-serializers" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.serializers</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>DocParsing Rich Serializers</p>
 <p>This module extends Docling serializers to capture captions, classifications,
 and molecular annotations when generating DocTags. It provides picture and
@@ -101,8 +103,9 @@ serializer = provider.get_serializer(doc)  # doctest: +SKIP
 <li><p>docling_core: Supplies Docling data structures and base serializer classes.</p></li>
 <li><p>typing_extensions.override: Ensures subclass overrides remain explicit.</p></li>
 </ul>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="serialize-self">
 <h3><code class="docutils literal notranslate"><span class="pre">serialize(self)</span></code><a class="headerlink" href="#serialize-self" title="Link to this heading"></a></h3>
 <p>Render picture metadata into Markdown-friendly text.</p>
@@ -124,7 +127,7 @@ Chunking serializer configured with Markdown enrichments.</p>
 </section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="captionplusannotationpictureserializer">
 <h3><code class="docutils literal notranslate"><span class="pre">CaptionPlusAnnotationPictureSerializer</span></code><a class="headerlink" href="#captionplusannotationpictureserializer" title="Link to this heading"></a></h3>
 <p>Serialize picture items with captions and rich annotation metadata.</p>

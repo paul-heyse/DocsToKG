@@ -1,3 +1,66 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.network",
+#   "purpose": "Implements DocsToKG.ContentDownload.network behaviors and helpers",
+#   "sections": [
+#     {
+#       "id": "create_session",
+#       "name": "create_session",
+#       "anchor": "CS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse_retry_after_header",
+#       "name": "parse_retry_after_header",
+#       "anchor": "PRAH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "request_with_retries",
+#       "name": "request_with_retries",
+#       "anchor": "RWR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_looks_like_pdf",
+#       "name": "_looks_like_pdf",
+#       "anchor": "LLP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_head_precheck_via_get",
+#       "name": "_head_precheck_via_get",
+#       "anchor": "HPVG",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "head_precheck",
+#       "name": "head_precheck",
+#       "anchor": "HP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "cached_result",
+#       "name": "CachedResult",
+#       "anchor": "CACH",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "modified_result",
+#       "name": "ModifiedResult",
+#       "anchor": "MODI",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "conditional_request_helper",
+#       "name": "ConditionalRequestHelper",
+#       "anchor": "COND",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Unified Network Utilities
 
@@ -198,10 +261,22 @@ def request_with_retries(
     else:
         retry_statuses = set(retry_statuses)
 
-    request_func = getattr(session, "request", None)
-    if not callable(request_func):
-        fallback = getattr(session, method.lower(), None)
-        if not callable(fallback):
+    method_func = getattr(session, method.lower(), None)
+    if callable(method_func):
+
+        def request_func(
+            *,
+            method: str,
+            url: str,
+            **call_kwargs: Any,
+        ) -> requests.Response:
+            """Invoke the method-specific session helper when available."""
+
+            return method_func(url, **call_kwargs)
+
+    else:
+        request_attr = getattr(session, "request", None)
+        if not callable(request_attr):
             raise AttributeError(
                 f"Session object of type {type(session)!r} lacks 'request' and '{method.lower()}' callables"
             )
@@ -212,18 +287,9 @@ def request_with_retries(
             url: str,
             **call_kwargs: Any,
         ) -> requests.Response:
-            """Invoke the fallback HTTP method when ``Session.request`` is unavailable.
+            """Fallback to :meth:`requests.Session.request` when helpers are unavailable."""
 
-            Args:
-                method: HTTP method name forwarded for logging parity.
-                url: Target URL for the request.
-                **call_kwargs: Keyword arguments forwarded to the fallback request callable.
-
-            Returns:
-                requests.Response: Response returned by the fallback HTTP method.
-            """
-
-            return fallback(url, **call_kwargs)
+            return request_attr(method=method, url=url, **call_kwargs)
 
     last_exception: Optional[Exception] = None
 
@@ -529,6 +595,8 @@ class ConditionalRequestHelper:
         """
 
         headers: dict[str, str] = {}
+        if self.prior_etag:
+            headers["If-None-Match"] = self.prior_etag
         if self.prior_etag or self.prior_last_modified:
             missing: list[str] = []
             if not self.prior_sha256:

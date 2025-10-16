@@ -79,6 +79,8 @@
   <section id="module-download-pyalex-pdfs">
 <h1>1. Module: download_pyalex_pdfs<a class="headerlink" href="#module-download-pyalex-pdfs" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.download_pyalex_pdfs</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>OpenAlex PDF Downloader CLI</p>
 <p>This module implements the command-line interface responsible for downloading
 open-access PDFs referenced by OpenAlex works. It combines resolver discovery,
@@ -110,8 +112,9 @@ conditional caching, and shared utilities.</p></li>
 python -m DocsToKG.ContentDownload.download_pyalex_pdfs <br />
 –topic “knowledge graphs” –year-start 2020 –year-end 2023 <br />
 –out ./pdfs –resolver-config download_config.yaml</p>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="utc-timestamp">
 <h3><code class="docutils literal notranslate"><span class="pre">_utc_timestamp()</span></code><a class="headerlink" href="#utc-timestamp" title="Link to this heading"></a></h3>
 <p>Return the current time as an ISO 8601 UTC timestamp.</p>
@@ -125,21 +128,6 @@ Timestamp string formatted with a trailing <code class="docutils literal notrans
 path: Path to the candidate PDF file.</p>
 <p>Returns:
 <code class="docutils literal notranslate"><span class="pre">True</span></code> if the file ends with <code class="docutils literal notranslate"><span class="pre">%%EOF</span></code>; <code class="docutils literal notranslate"><span class="pre">False</span></code> otherwise.</p>
-</section>
-<section id="head-precheck-candidate-session-url-timeout">
-<h3><code class="docutils literal notranslate"><span class="pre">_head_precheck_candidate(session,</span> <span class="pre">url,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#head-precheck-candidate-session-url-timeout" title="Link to this heading"></a></h3>
-<p>Evaluate whether <code class="docutils literal notranslate"><span class="pre">url</span></code> is likely to return a PDF payload.</p>
-<p>The helper performs a single HEAD request with a tight timeout budget
-to avoid fetching large payloads unnecessarily. Tests rely on this
-behaviour to ensure dry-run execution does not trigger streaming
-downloads.</p>
-<p>Args:
-session: HTTP session used for the outbound HEAD request.
-url: Candidate download URL that should be validated.
-timeout: Per-request timeout budget, in seconds.</p>
-<p>Returns:
-<code class="docutils literal notranslate"><span class="pre">True</span></code> when the HEAD response suggests the URL returns a PDF;
-<code class="docutils literal notranslate"><span class="pre">False</span></code> when the response clearly indicates HTML or a missing file.</p>
 </section>
 <section id="slugify-text-keep">
 <h3><code class="docutils literal notranslate"><span class="pre">slugify(text,</span> <span class="pre">keep)</span></code><a class="headerlink" href="#slugify-text-keep" title="Link to this heading"></a></h3>
@@ -378,13 +366,17 @@ Parsed configuration mapping.</p>
 <p>Raises:
 RuntimeError: If YAML parsing is requested but PyYAML is unavailable.</p>
 </section>
+<section id="seed-resolver-toggle-defaults-config-resolver-names">
+<h3><code class="docutils literal notranslate"><span class="pre">_seed_resolver_toggle_defaults(config,</span> <span class="pre">resolver_names)</span></code><a class="headerlink" href="#seed-resolver-toggle-defaults-config-resolver-names" title="Link to this heading"></a></h3>
+<p>Ensure resolver toggles include defaults for every known resolver.</p>
+</section>
 <section id="apply-config-overrides-config-data-resolver-names">
 <h3><code class="docutils literal notranslate"><span class="pre">apply_config_overrides(config,</span> <span class="pre">data,</span> <span class="pre">resolver_names)</span></code><a class="headerlink" href="#apply-config-overrides-config-data-resolver-names" title="Link to this heading"></a></h3>
 <p>Apply overrides from configuration data onto a ResolverConfig.</p>
 <p>Args:
 config: Resolver configuration object to mutate.
 data: Mapping loaded from a configuration file.
-resolver_names: Known resolver names to seed toggle defaults.</p>
+resolver_names: Known resolver names. Defaults are applied after overrides.</p>
 <p>Returns:
 None</p>
 </section>
@@ -447,130 +439,336 @@ None</p>
 <p>Returns:
 None</p>
 </section>
-<section id="write-self-payload">
-<h3><code class="docutils literal notranslate"><span class="pre">_write(self,</span> <span class="pre">payload)</span></code><a class="headerlink" href="#write-self-payload" title="Link to this heading"></a></h3>
-<p>Append a JSON record to the log file ensuring timestamps are present.</p>
-<p>Args:
-payload: JSON-serializable mapping to write.</p>
-<p>Returns:
-None</p>
-</section>
 <section id="log-attempt-self-record">
 <h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#log-attempt-self-record" title="Link to this heading"></a></h3>
-<p>Record a resolver attempt entry.</p>
+<p>Log a resolver attempt.</p>
 <p>Args:
-record: Attempt metadata captured from the resolver pipeline.
-timestamp: Optional override timestamp (ISO format).</p>
-<p>Returns:
-None</p>
-</section>
-<section id="log-self-record">
-<h3><code class="docutils literal notranslate"><span class="pre">log(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#log-self-record" title="Link to this heading"></a></h3>
-<p>Compatibility shim mapping to :meth:<code class="docutils literal notranslate"><span class="pre">log_attempt</span></code>.</p>
-<p>Args:
-record: Attempt record to forward to :meth:<code class="docutils literal notranslate"><span class="pre">log_attempt</span></code>.</p>
+record: Structured attempt telemetry emitted by a resolver.
+timestamp: Optional ISO8601 timestamp override for deterministic runs.</p>
 <p>Returns:
 None</p>
 </section>
 <section id="log-manifest-self-entry">
 <h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#log-manifest-self-entry" title="Link to this heading"></a></h3>
-<p>Persist a manifest entry to the JSONL log.</p>
+<p>Persist a manifest entry.</p>
 <p>Args:
-entry: Manifest entry to write.</p>
+entry: Manifest record describing the resolved document.</p>
 <p>Returns:
 None</p>
 </section>
 <section id="log-summary-self-summary">
 <h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#log-summary-self-summary" title="Link to this heading"></a></h3>
-<p>Write a summary record to the log.</p>
+<p>Record summary metrics for the run.</p>
 <p>Args:
-summary: Mapping containing summary metrics.</p>
+summary: Mapping containing aggregated counters and timings.</p>
 <p>Returns:
 None</p>
 </section>
 <section id="close-self">
 <h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#close-self" title="Link to this heading"></a></h3>
-<p>Close the underlying file handle.</p>
+<p>Release any underlying resources.</p>
 <p>Args:
-self: Logger instance managing the JSONL file descriptor.</p>
+None</p>
 <p>Returns:
 None</p>
 </section>
-<section id="enter-self">
-<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#enter-self" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">self</span></code> when used as a context manager.</p>
+<section id="log-self-record">
+<h3><code class="docutils literal notranslate"><span class="pre">log(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#log-self-record" title="Link to this heading"></a></h3>
+<p>Compatibility alias delegating to :meth:<code class="docutils literal notranslate"><span class="pre">log_attempt</span></code>.</p>
 <p>Args:
-None</p>
+record: Attempt record to forward to :meth:<code class="docutils literal notranslate"><span class="pre">log_attempt</span></code>.</p>
 <p>Returns:
-Logger instance configured for context-managed usage.</p>
+None</p>
 </section>
-<section id="exit-self-exc-type-exc-tb">
-<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#exit-self-exc-type-exc-tb" title="Link to this heading"></a></h3>
-<p>Close the file handle on context manager exit.</p>
-<p>Args:
-exc_type: Exception type raised within the context, if any.
-exc: Exception instance raised within the context.
-tb: Traceback associated with <code class="docutils literal notranslate"><span class="pre">exc</span></code>.</p>
-<p>Returns:
-None</p>
+<section id="write-self-payload">
+<h3><code class="docutils literal notranslate"><span class="pre">_write(self,</span> <span class="pre">payload)</span></code><a class="headerlink" href="#write-self-payload" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="id1">
 <h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
-<p>Write an attempt record to both JSONL and CSV outputs.</p>
+<p>Persist a resolver attempt record to the JSONL file.</p>
+<p>Args:
+record: Attempt metadata describing the resolver execution outcome.
+timestamp: Optional override timestamp applied to the JSONL payload.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id2">
+<h3><code class="docutils literal notranslate"><span class="pre">log(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<p>Forward compatibility shim invoking :meth:<code class="docutils literal notranslate"><span class="pre">log_attempt</span></code>.</p>
 <p>Args:
 record: Attempt record to persist.</p>
 <p>Returns:
 None</p>
 </section>
-<section id="id2">
-<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
-<p>Forward manifest entries to the JSONL logger.</p>
-<p>Args:
-entry: Manifest entry to forward.</p>
-<p>Returns:
-None</p>
-</section>
 <section id="id3">
-<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
-<p>Forward summary entries to the JSONL logger.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<p>Persist a manifest entry describing a resolved document.</p>
 <p>Args:
-summary: Summary mapping to forward.</p>
+entry: Manifest metadata to append to the JSONL log.</p>
 <p>Returns:
 None</p>
 </section>
 <section id="id4">
-<h3><code class="docutils literal notranslate"><span class="pre">log(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
-<p>Compatibility shim mapping to :meth:<code class="docutils literal notranslate"><span class="pre">log_attempt</span></code>.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<p>Persist aggregated run metrics to the JSONL file.</p>
 <p>Args:
-record: Attempt record to log.</p>
+summary: Dictionary of summary statistics such as totals and timings.</p>
 <p>Returns:
 None</p>
 </section>
 <section id="id5">
 <h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
-<p>Close both the JSONL logger and the CSV file handle.</p>
+<p>Flush and close the underlying JSONL file handle.</p>
 <p>Args:
-self: Adapter instance coordinating CSV and JSONL streams.</p>
+None</p>
 <p>Returns:
 None</p>
+</section>
+<section id="enter-self">
+<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#enter-self" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="exit-self-exc-type-exc-tb">
+<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#exit-self-exc-type-exc-tb" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="id6">
-<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
-<p>Return <code class="docutils literal notranslate"><span class="pre">self</span></code> when used as a context manager.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
+<p>Append a resolver attempt row to the CSV file.</p>
 <p>Args:
-None</p>
+record: Attempt metadata describing the resolver execution.
+timestamp: Optional override timestamp applied to the CSV row.</p>
 <p>Returns:
-Adapter instance configured for context-managed usage.</p>
+None</p>
 </section>
 <section id="id7">
-<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
-<p>Close the CSV file handle on context manager exit.</p>
+<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
+<p>Ignore manifest entries; CSV sink only records attempt rows.</p>
 <p>Args:
-exc_type: Exception type raised within the context, if any.
-exc: Exception instance raised within the context.
-tb: Traceback associated with <code class="docutils literal notranslate"><span class="pre">exc</span></code>.</p>
+entry: Manifest metadata supplied by the pipeline.</p>
 <p>Returns:
 None</p>
+</section>
+<section id="id8">
+<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
+<p>Ignore summary metrics; CSV sink only records attempt rows.</p>
+<p>Args:
+summary: Mapping of summary metrics (unused).</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id9">
+<h3><code class="docutils literal notranslate"><span class="pre">log(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id9" title="Link to this heading"></a></h3>
+<p>Forward to :meth:<code class="docutils literal notranslate"><span class="pre">log_attempt</span></code> for compatibility with <code class="docutils literal notranslate"><span class="pre">AttemptSink</span></code>.</p>
+<p>Args:
+record: Attempt record to serialize.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id10">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id10" title="Link to this heading"></a></h3>
+<p>Flush and close the CSV file handle.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id11">
+<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#id11" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id12">
+<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#id12" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id13">
+<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id13" title="Link to this heading"></a></h3>
+<p>Send the attempt to both the base logger and the CSV sink.</p>
+<p>Args:
+record: Attempt record to mirror to both sinks.
+timestamp: Optional timestamp to apply to the mirrored record.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id14">
+<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id14" title="Link to this heading"></a></h3>
+<p>Forward manifest entries to both the base logger and CSV sink.</p>
+<p>Args:
+entry: Manifest record describing the resolved document.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id15">
+<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id15" title="Link to this heading"></a></h3>
+<p>Forward summary telemetry to both adapters.</p>
+<p>Args:
+summary: Mapping of summary metrics to forward.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id16">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id16" title="Link to this heading"></a></h3>
+<p>Close the base logger and CSV sink, propagating base errors.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+<p>Raises:
+BaseException: Re-raises any error encountered when closing the base logger.</p>
+</section>
+<section id="id17">
+<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id17" title="Link to this heading"></a></h3>
+<p>Forward a resolver attempt to all registered sinks.</p>
+<p>Args:
+record: Attempt metadata to broadcast.
+timestamp: Optional shared timestamp passed to each sink.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id18">
+<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id18" title="Link to this heading"></a></h3>
+<p>Forward a manifest entry to all registered sinks.</p>
+<p>Args:
+entry: Manifest record to broadcast.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id19">
+<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id19" title="Link to this heading"></a></h3>
+<p>Forward summary telemetry to all registered sinks.</p>
+<p>Args:
+summary: Mapping of aggregated metrics to broadcast.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id20">
+<h3><code class="docutils literal notranslate"><span class="pre">log(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id20" title="Link to this heading"></a></h3>
+<p>Forward attempts to :meth:<code class="docutils literal notranslate"><span class="pre">log_attempt</span></code> for compatibility.</p>
+<p>Args:
+record: Attempt record to broadcast.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id21">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id21" title="Link to this heading"></a></h3>
+<p>Close all sinks, propagating the first raised exception.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+<p>Raises:
+BaseException: Re-raises the first error encountered when closing delegates.</p>
+</section>
+<section id="id22">
+<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#id22" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id23">
+<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#id23" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id24">
+<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id24" title="Link to this heading"></a></h3>
+<p>Ignore attempt telemetry; only manifests are indexed.</p>
+<p>Args:
+record: Attempt record supplied by the pipeline.
+timestamp: Optional timestamp provided by the caller.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id25">
+<h3><code class="docutils literal notranslate"><span class="pre">log(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id25" title="Link to this heading"></a></h3>
+<p>Compatibility shim deferring to :meth:<code class="docutils literal notranslate"><span class="pre">log_attempt</span></code>.</p>
+<p>Args:
+record: Attempt record supplied by the pipeline.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id26">
+<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id26" title="Link to this heading"></a></h3>
+<p>Persist manifest metadata for inclusion in the JSON index.</p>
+<p>Newly received manifest entries replace any existing payload stored under
+the same <code class="docutils literal notranslate"><span class="pre">work_id</span></code> so downstream tools can rely on deterministic output.</p>
+<p>Args:
+entry: Manifest record describing a resolved document.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id27">
+<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id27" title="Link to this heading"></a></h3>
+<p>Ignore summary telemetry; manifests only are indexed.</p>
+<p>Args:
+summary: Mapping of summary metrics supplied by the pipeline.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id28">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id28" title="Link to this heading"></a></h3>
+<p>Write the manifest index to disk if not already closed.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id29">
+<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#id29" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id30">
+<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#id30" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id31">
+<h3><code class="docutils literal notranslate"><span class="pre">log_attempt(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id31" title="Link to this heading"></a></h3>
+<p>Ignore attempt telemetry; only manifest rows are retained.</p>
+<p>Args:
+record: Attempt record supplied by the pipeline.
+timestamp: Optional timestamp associated with the attempt.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id32">
+<h3><code class="docutils literal notranslate"><span class="pre">log(self,</span> <span class="pre">record)</span></code><a class="headerlink" href="#id32" title="Link to this heading"></a></h3>
+<p>Forward compatibility shim deferring to :meth:<code class="docutils literal notranslate"><span class="pre">log_attempt</span></code>.</p>
+<p>Args:
+record: Attempt record supplied by the pipeline.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id33">
+<h3><code class="docutils literal notranslate"><span class="pre">log_manifest(self,</span> <span class="pre">entry)</span></code><a class="headerlink" href="#id33" title="Link to this heading"></a></h3>
+<p>Record the manifest entry so the latest attempt is written at close.</p>
+<p>The sink keeps only the most recent entry for each <code class="docutils literal notranslate"><span class="pre">work_id</span></code> so that
+duplicate retries collapse into a single CSV row.</p>
+<p>Args:
+entry: Manifest record describing the resolved document.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id34">
+<h3><code class="docutils literal notranslate"><span class="pre">log_summary(self,</span> <span class="pre">summary)</span></code><a class="headerlink" href="#id34" title="Link to this heading"></a></h3>
+<p>Ignore summary telemetry; output only includes manifest rows.</p>
+<p>Args:
+summary: Mapping of summary metrics supplied by the pipeline.</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id35">
+<h3><code class="docutils literal notranslate"><span class="pre">close(self)</span></code><a class="headerlink" href="#id35" title="Link to this heading"></a></h3>
+<p>Write the consolidated manifest CSV to disk when invoked.</p>
+<p>Args:
+None</p>
+<p>Returns:
+None</p>
+</section>
+<section id="id36">
+<h3><code class="docutils literal notranslate"><span class="pre">__enter__(self)</span></code><a class="headerlink" href="#id36" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
+</section>
+<section id="id37">
+<h3><code class="docutils literal notranslate"><span class="pre">__exit__(self,</span> <span class="pre">exc_type,</span> <span class="pre">exc,</span> <span class="pre">tb)</span></code><a class="headerlink" href="#id37" title="Link to this heading"></a></h3>
+<p><em>No documentation available.</em></p>
 </section>
 <section id="post-init-self">
 <h3><code class="docutils literal notranslate"><span class="pre">__post_init__(self)</span></code><a class="headerlink" href="#post-init-self" title="Link to this heading"></a></h3>
@@ -588,11 +786,12 @@ loc: Location dictionary as returned by OpenAlex (may be None).</p>
 </section>
 <section id="session-factory">
 <h3><code class="docutils literal notranslate"><span class="pre">_session_factory()</span></code><a class="headerlink" href="#session-factory" title="Link to this heading"></a></h3>
-<p>Build a fresh requests session configured with polite headers.</p>
-</section>
-<section id="id8">
-<h3><code class="docutils literal notranslate"><span class="pre">_session_factory()</span></code><a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
-<p>Build a fresh requests session configured with polite headers.</p>
+<p>Return a new :class:<code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> using the run’s polite headers.</p>
+<p>The factory is invoked by worker threads to obtain an isolated session
+that inherits the resolver configuration’s polite identification
+headers. Creating sessions through this helper ensures each worker
+reuses the shared retry configuration while keeping connection pools
+thread-local.</p>
 </section>
 <section id="record-result-res">
 <h3><code class="docutils literal notranslate"><span class="pre">_record_result(res)</span></code><a class="headerlink" href="#record-result-res" title="Link to this heading"></a></h3>
@@ -608,7 +807,7 @@ loc: Location dictionary as returned by OpenAlex (may be None).</p>
 </section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="manifestentry">
 <h3><code class="docutils literal notranslate"><span class="pre">ManifestEntry</span></code><a class="headerlink" href="#manifestentry" title="Link to this heading"></a></h3>
 <p>Structured record capturing the outcome of a resolver attempt.</p>
@@ -651,48 +850,135 @@ dry_run: Flag indicating whether the download was simulated.</p>
 </div></blockquote>
 </div></blockquote>
 </section>
-<section id="jsonllogger">
-<h3><code class="docutils literal notranslate"><span class="pre">JsonlLogger</span></code><a class="headerlink" href="#jsonllogger" title="Link to this heading"></a></h3>
-<p>Structured logger that emits attempt, manifest, and summary JSONL records.</p>
+<section id="attemptsink">
+<h3><code class="docutils literal notranslate"><span class="pre">AttemptSink</span></code><a class="headerlink" href="#attemptsink" title="Link to this heading"></a></h3>
+<p>Protocol implemented by logging sinks that consume download telemetry.</p>
 <p>Attributes:
-_path: Destination JSONL log path.
-_file: Underlying file handle used for writes.</p>
+log_attempt: Callable accepting an :class:<code class="docutils literal notranslate"><span class="pre">AttemptRecord</span></code> plus optional timestamp.
+log_manifest: Callable that receives :class:<code class="docutils literal notranslate"><span class="pre">ManifestEntry</span></code> objects for storage.
+log_summary: Callable that ingests aggregate metrics collected during a run.
+close: Callable that finalises resources owned by the sink.
+log: Compatibility alias that forwards to :meth:<code class="docutils literal notranslate"><span class="pre">log_attempt</span></code>.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>
 <div><blockquote>
-<div><p>logger = JsonlLogger(Path(“logs/attempts.jsonl”))
-logger.log_summary({“processed”: 10})
-logger.close()</p>
+<div><p>class Collector:
+…     def log_attempt(self, record, *, timestamp=None):
+…         …  # doctest: +SKIP
+…     def log_manifest(self, entry):
+…         …  # doctest: +SKIP
+…     def log_summary(self, summary):
+…         …  # doctest: +SKIP
+…     def close(self):
+…         …  # doctest: +SKIP
+…     def log(self, record):
+…         self.log_attempt(record)
+isinstance(Collector(), AttemptSink)  # doctest: +SKIP
+True</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>
-<p>The logger serialises records outside a thread lock and performs atomic
-writes under the lock, ensuring well-formed output even when multiple
-threads share the instance. It also implements the context manager protocol
-for deterministic resource cleanup.</p>
+</section>
+<section id="jsonlsink">
+<h3><code class="docutils literal notranslate"><span class="pre">JsonlSink</span></code><a class="headerlink" href="#jsonlsink" title="Link to this heading"></a></h3>
+<p>Thread-safe sink that streams attempt, manifest, and summary events to JSONL files.</p>
+<p>Attributes:
+_path: Destination JSONL file path.
+_file: Lazily opened file handle pointing at <code class="docutils literal notranslate"><span class="pre">_path</span></code>.
+_lock: Mutex used to serialize concurrent writes.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>sink = JsonlSink(Path(‘/tmp/attempts.jsonl’))  # doctest: +SKIP
+sink.log_summary({‘attempts’: 1})  # doctest: +SKIP
+sink.close()  # doctest: +SKIP</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="csvsink">
+<h3><code class="docutils literal notranslate"><span class="pre">CsvSink</span></code><a class="headerlink" href="#csvsink" title="Link to this heading"></a></h3>
+<p>Lightweight sink that mirrors attempt records into a CSV for spreadsheet review.</p>
+<p>Attributes:
+_file: Open CSV file handle for appending attempts.
+_writer: :class:<code class="docutils literal notranslate"><span class="pre">csv.DictWriter</span></code> configured with attempt headers.
+_lock: Mutex guarding concurrent writes.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>sink = CsvSink(Path(‘/tmp/attempts.csv’))  # doctest: +SKIP
+sink.log_summary({‘attempts’: 1})  # doctest: +SKIP
+sink.close()  # doctest: +SKIP</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 <section id="csvattemptloggeradapter">
 <h3><code class="docutils literal notranslate"><span class="pre">CsvAttemptLoggerAdapter</span></code><a class="headerlink" href="#csvattemptloggeradapter" title="Link to this heading"></a></h3>
-<p>Adapter that mirrors attempt records to CSV for backward compatibility.</p>
+<p>Adapter that mirrors JSONL logging into a CSV sink for compatibility.</p>
 <p>Attributes:
-_logger: Underlying :class:<code class="docutils literal notranslate"><span class="pre">JsonlLogger</span></code> instance.
-_file: CSV file handle used for writing.
-_writer: <code class="docutils literal notranslate"><span class="pre">csv.DictWriter</span></code> writing to :attr:<code class="docutils literal notranslate"><span class="pre">_file</span></code>.</p>
+_base_logger: Primary sink that receives mirrored logging calls.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>
 <div><blockquote>
-<div><p>adapter = CsvAttemptLoggerAdapter(JsonlLogger(Path(“attempts.jsonl”)), Path(“attempts.csv”))
-adapter.log_attempt(AttemptRecord(work_id=”W1”, resolver_name=”unpaywall”, resolver_order=1,
-…                                   url=”https://example”, status=”pdf”, http_status=200,
-…                                   content_type=”application/pdf”, elapsed_ms=120.0))
-adapter.close()</p>
+<div><p>adapter = CsvAttemptLoggerAdapter(JsonlSink(Path(‘/tmp/a.jsonl’)), Path(‘/tmp/a.csv’))  # doctest: +SKIP
+adapter.close()  # doctest: +SKIP</p>
 </div></blockquote>
 </div></blockquote>
 </div></blockquote>
-<p>CSV writes are protected by a lock to ensure rows remain well formed when
-multiple worker threads log through the same adapter instance.</p>
+</section>
+<section id="multisink">
+<h3><code class="docutils literal notranslate"><span class="pre">MultiSink</span></code><a class="headerlink" href="#multisink" title="Link to this heading"></a></h3>
+<p>Composite sink that fans out logging calls to multiple sinks.</p>
+<p>Attributes:
+_sinks: Sequence of sink instances that receive mirrored events.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>sink = MultiSink([JsonlSink(Path(‘/tmp/a.jsonl’))])  # doctest: +SKIP
+sink.close()  # doctest: +SKIP</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="manifestindexsink">
+<h3><code class="docutils literal notranslate"><span class="pre">ManifestIndexSink</span></code><a class="headerlink" href="#manifestindexsink" title="Link to this heading"></a></h3>
+<p>Sink that accumulates manifest entries into a JSON index.</p>
+<p>Attributes:
+_path: Filesystem destination for the generated JSON index.
+_index: In-memory mapping from work IDs to manifest payloads.
+_closed: Flag guarding idempotent close operations.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>sink = ManifestIndexSink(Path(‘/tmp/manifests.json’))  # doctest: +SKIP
+sink.close()  # doctest: +SKIP</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+</section>
+<section id="lastattemptcsvsink">
+<h3><code class="docutils literal notranslate"><span class="pre">LastAttemptCsvSink</span></code><a class="headerlink" href="#lastattemptcsvsink" title="Link to this heading"></a></h3>
+<p>Sink that writes one manifest row per work to a CSV on close.</p>
+<p>Attributes:
+_path: Filesystem destination for the aggregated CSV.
+_entries: Mapping of work IDs to their most recent manifest entry.
+_closed: Flag guarding idempotent close operations.</p>
+<p>Examples:</p>
+<blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>sink = LastAttemptCsvSink(Path(‘/tmp/last_attempt.csv’))  # doctest: +SKIP
+sink.close()  # doctest: +SKIP</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
 </section>
 <section id="workartifact">
 <h3><code class="docutils literal notranslate"><span class="pre">WorkArtifact</span></code><a class="headerlink" href="#workartifact" title="Link to this heading"></a></h3>

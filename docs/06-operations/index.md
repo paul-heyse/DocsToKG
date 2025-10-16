@@ -15,13 +15,24 @@ This guide covers day-two operations for DocsToKG, including ingestion jobs, sea
 
 ```bash
 python -m DocsToKG.ContentDownload.download_pyalex_pdfs \
-  --api-key $PA_ALEX_KEY \
-  --output Data/PyalexRaw \
-  --max-records 1000
+  --topic "knowledge graphs" \
+  --year-start 2022 --year-end 2024 \
+  --out Data/PyalexRaw \
+  --manifest Logs/manifest.jsonl \
+  --workers 3 \
+  --domain-min-interval example.org=0.75 \
+  --staging
 ```
 
-- Configure API keys via environment variables or `.env`.
-- Resolving behaviour is customisable through modules in `DocsToKG.ContentDownload.resolvers`.
+- Configure resolver credentials via environment variables (`UNPAYWALL_EMAIL`,
+  `CORE_API_KEY`, `S2_API_KEY`, `DOAJ_API_KEY`) or `.envrc`.
+- Use `--staging` to isolate each run under a timestamped directory with
+  derived artifacts (`manifest.index.json`, `manifest.metrics.json`,
+  `manifest.last.csv`).
+- `--log-format csv` keeps JSONL manifests while adding a consolidated
+  `manifest.last.csv` summary for fast auditing.
+- Review `docs/content-download-migration.md` when upgrading existing
+  automation to the new resolver stack and logging surfaces.
 
 ### 3.2 Document Parsing & Embedding
 

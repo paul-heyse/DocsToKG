@@ -1,3 +1,186 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_config",
+#   "purpose": "Pytest coverage for ontology download config scenarios",
+#   "sections": [
+#     {
+#       "id": "test_merge_defaults_creates_fetch_spec",
+#       "name": "test_merge_defaults_creates_fetch_spec",
+#       "anchor": "TMDCF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_logging_config_defaults",
+#       "name": "test_logging_config_defaults",
+#       "anchor": "TLCD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_logging_config_validates_level",
+#       "name": "test_logging_config_validates_level",
+#       "anchor": "TLCVL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_logging_config_case_insensitive_level",
+#       "name": "test_logging_config_case_insensitive_level",
+#       "anchor": "TLCCI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_logging_config_validates_positive_values",
+#       "name": "test_logging_config_validates_positive_values",
+#       "anchor": "TLCVP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validation_config_timeout_bounds",
+#       "name": "test_validation_config_timeout_bounds",
+#       "anchor": "TVCTB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_config_rate_limit_formats",
+#       "name": "test_download_config_rate_limit_formats",
+#       "anchor": "TDCRL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_config_service_rate_limits",
+#       "name": "test_download_config_service_rate_limits",
+#       "anchor": "TDCSR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_config_invalid_rate_limit",
+#       "name": "test_download_config_invalid_rate_limit",
+#       "anchor": "TDCIR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_config_allowed_hosts",
+#       "name": "test_download_config_allowed_hosts",
+#       "anchor": "TDCAH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_config_defaults_include_service_limits",
+#       "name": "test_download_config_defaults_include_service_limits",
+#       "anchor": "TDCDI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_config_normalizes_allowed_hosts",
+#       "name": "test_download_config_normalizes_allowed_hosts",
+#       "anchor": "TDCNA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_config_polite_headers_defaults",
+#       "name": "test_download_config_polite_headers_defaults",
+#       "anchor": "TDCPH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_config_polite_headers_custom_values",
+#       "name": "test_download_config_polite_headers_custom_values",
+#       "anchor": "DCPH1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_defaults_config_pydantic",
+#       "name": "test_defaults_config_pydantic",
+#       "anchor": "TDCP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_defaults_config_json_schema",
+#       "name": "test_defaults_config_json_schema",
+#       "anchor": "TDCJS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_defaults_config_prefer_source_validation",
+#       "name": "test_defaults_config_prefer_source_validation",
+#       "anchor": "TDCPS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_env_override_applies_settings",
+#       "name": "test_env_override_applies_settings",
+#       "anchor": "TEOAS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_get_env_overrides_backwards_compatible",
+#       "name": "test_get_env_overrides_backwards_compatible",
+#       "anchor": "TGEOB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_load_config_parses_defaults",
+#       "name": "test_load_config_parses_defaults",
+#       "anchor": "TLCPD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_config_rejects_missing_id",
+#       "name": "test_validate_config_rejects_missing_id",
+#       "anchor": "TVCRM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_config_unknown_key",
+#       "name": "test_validate_config_unknown_key",
+#       "anchor": "TVCUK",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validate_config_rejects_non_mapping_extras",
+#       "name": "test_validate_config_rejects_non_mapping_extras",
+#       "anchor": "TVCRN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_load_raw_yaml_missing_file_exits",
+#       "name": "test_load_raw_yaml_missing_file_exits",
+#       "anchor": "TLRYM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_load_config_invalid_yaml",
+#       "name": "test_load_config_invalid_yaml",
+#       "anchor": "TLCIY",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_fetch_one_rejects_disallowed_license",
+#       "name": "test_fetch_one_rejects_disallowed_license",
+#       "anchor": "TFORD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_fetch_one_unknown_resolver",
+#       "name": "test_fetch_one_unknown_resolver",
+#       "anchor": "TFOUR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_fetch_one_download_error",
+#       "name": "test_fetch_one_download_error",
+#       "anchor": "TFODE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_noop_logger",
+#       "name": "_noop_logger",
+#       "anchor": "NL",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Tests for ontology downloader configuration models and helpers."""
 
 from __future__ import annotations
@@ -29,10 +212,10 @@ from DocsToKG.OntologyDownload import (
     load_config,
     load_raw_yaml,
     merge_defaults,
+    resolvers,
     validate_config,
 )
 from DocsToKG.OntologyDownload import ontology_download as core
-from DocsToKG.OntologyDownload import resolvers
 
 
 def test_merge_defaults_creates_fetch_spec() -> None:

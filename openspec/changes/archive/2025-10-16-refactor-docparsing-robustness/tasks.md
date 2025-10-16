@@ -83,37 +83,37 @@
 
 ## 11. Parameterize VLM prompt/stop tokens for PDFs
 
-- [ ] 11.1 **Update pipelines.py pdf_build_parser()**: Add `--vlm-prompt` argument with default "Convert this page to docling."
-- [ ] 11.2 **Add**: Implement `--vlm-stop` argument with default `["</doctag>", "<|end_of_text|>"]`
-- [ ] 11.3 **Update PdfTask dataclass**: Add `vlm_prompt: str` and `vlm_stop: Tuple[str, ...]` fields
-- [ ] 11.4 **Update pdf_main()**: Pass prompt and stop tokens to PdfTask constructor
-- [ ] 11.5 **Update pdf_convert_one()**: Use `task.vlm_prompt` and `task.vlm_stop` in ApiVlmOptions
-- [ ] 11.6 **Test**: Verify VLM parameters can be customized via CLI arguments
+- [x] 11.1 **Update pipelines.py pdf_build_parser()**: Add `--vlm-prompt` argument with default "Convert this page to docling."
+- [x] 11.2 **Add**: Implement `--vlm-stop` argument with default `["</doctag>", "<|end_of_text|>"]`
+- [x] 11.3 **Update PdfTask dataclass**: Add `vlm_prompt: str` and `vlm_stop: Tuple[str, ...]` fields
+- [x] 11.4 **Update pdf_main()**: Pass prompt and stop tokens to PdfTask constructor
+- [x] 11.5 **Update pdf_convert_one()**: Use `task.vlm_prompt` and `task.vlm_stop` in ApiVlmOptions
+- [x] 11.6 **Test**: Verify VLM parameters can be customized via CLI arguments
 
 ## 12. Align Vectors vs Embeddings directory naming
 
-- [ ] 12.1 **Choose approach**: Either update docs to "Vectors" or change code to "Embeddings"
-- [ ] 12.2 **Option A**: Update README documentation to reference "Vectors" directory
-- [ ] 12.3 **Option B**: Change `data_vectors()` function to return "Embeddings" instead of "Vectors"
-- [ ] 12.4 **Update**: Ensure consistency between code implementation and documentation
-- [ ] 12.5 **Test**: Verify directory naming alignment across all references
+- [x] 12.1 **Choose approach**: Either update docs to "Vectors" or change code to "Embeddings"
+- [x] 12.2 **Option A**: Update README documentation to reference "Vectors" directory
+- [x] 12.3 **Option B**: Change `data_vectors()` function to return "Embeddings" instead of "Vectors"
+- [x] 12.4 **Update**: Ensure consistency between code implementation and documentation
+- [x] 12.5 **Test**: Verify directory naming alignment across all references
 
 ## 13. Create comprehensive tests
 
-- [ ] 13.1 **Add test_pdf_output_paths.py**: Test PDF basename collision prevention with mirrored outputs
-- [ ] 13.2 **Add test_chunk_doc_id_consistency.py**: Test chunk doc_id matches relative path
-- [ ] 13.3 **Add test_llm_caching.py**: Test Qwen LLM cache effectiveness and output consistency
-- [ ] 13.4 **Add test_configuration_resolution.py**: Test environment variable precedence for model paths
-- [ ] 13.5 **Add test_deprecation_warnings.py**: Test legacy module import warnings
-- [ ] 13.6 **Add test_spawn_configuration.py**: Test multiprocessing spawn setup
-- [ ] 13.7 **Execute**: Run full pipeline smoke test with new behavior
-- [ ] 13.8 **Verify**: Confirm manifest entries maintain backward compatibility
-- [ ] 13.9 **Validate**: Test resume functionality with new identifier scheme
+- [x] 13.1 **Add test_pdf_output_paths.py**: Test PDF basename collision prevention with mirrored outputs
+- [x] 13.2 **Add test_chunk_doc_id_consistency.py**: Test chunk doc_id matches relative path
+- [x] 13.3 **Add test_llm_caching.py**: Test Qwen LLM cache effectiveness and output consistency
+- [x] 13.4 **Add test_configuration_resolution.py**: Test environment variable precedence for model paths
+- [x] 13.5 **Add test_deprecation_warnings.py**: Test legacy module import warnings
+- [x] 13.6 **Add test_spawn_configuration.py**: Test multiprocessing spawn setup
+- [x] 13.7 **Execute**: Run full pipeline smoke test with new behavior
+- [x] 13.8 **Verify**: Confirm manifest entries maintain backward compatibility
+- [x] 13.9 **Validate**: Test resume functionality with new identifier scheme
 
 ## 14. Legacy shim module cleanup
 
-- [ ] 14.1 **Update pdf_pipeline.py**: Make `list_pdfs` recursive using `rglob("*.pdf")`
-- [ ] 14.2 **Implement**: Write mirrored outputs while forwarding to `manifest_append`
-- [ ] 14.3 **Plan**: Remove `pdf_pipeline.py` after tests switch to production entrypoint
-- [ ] 14.4 **Migrate**: Update test fixtures to monkeypatch `pipelines.pdf_convert_one` directly
-- [ ] 14.5 **Cleanup**: Remove legacy shim module in next release
+- [x] 14.1 **Update pdf_pipeline.py**: Make `list_pdfs` recursive using `rglob("*.pdf")`
+- [x] 14.2 **Implement**: Write mirrored outputs while forwarding to `manifest_append`
+- [x] 14.3 **Plan**: Remove `pdf_pipeline.py` after tests switch to production entrypoint
+- [x] 14.4 **Migrate**: Update test fixtures to monkeypatch `pipelines.pdf_convert_one` directly
+- [x] 14.5 **Cleanup**: Remove legacy shim module in next release

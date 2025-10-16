@@ -1,4 +1,25 @@
 #!/usr/bin/env python3
+# === NAVMAP v1 ===
+# {
+#   "module": "docs.scripts.validate_code_annotations",
+#   "purpose": "Documentation tooling for validate code annotations workflows",
+#   "sections": [
+#     {
+#       "id": "code_annotation_validator",
+#       "name": "CodeAnnotationValidator",
+#       "anchor": "CODE",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Code Annotation Validation Script
 

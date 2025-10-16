@@ -1,7 +1,51 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.content_download.test_network_unit",
+#   "purpose": "Pytest coverage for content download network unit scenarios",
+#   "sections": [
+#     {
+#       "id": "_dummy_response",
+#       "name": "_DummyResponse",
+#       "anchor": "DUMM",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_session_for_response",
+#       "name": "_session_for_response",
+#       "anchor": "SFR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_accepts_pdf_content",
+#       "name": "test_head_precheck_accepts_pdf_content",
+#       "anchor": "THPAP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_rejects_html_payload",
+#       "name": "test_head_precheck_rejects_html_payload",
+#       "anchor": "THPRH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_precheck_degrades_to_get",
+#       "name": "test_head_precheck_degrades_to_get",
+#       "anchor": "THPDT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_conditional_request_helper_requires_complete_metadata",
+#       "name": "test_conditional_request_helper_requires_complete_metadata",
+#       "anchor": "TCRHR",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 from __future__ import annotations
 
 from typing import Dict
-
 from unittest.mock import Mock
 
 from DocsToKG.ContentDownload.network import (
@@ -57,6 +101,7 @@ def test_head_precheck_degrades_to_get(monkeypatch):
         if method == "HEAD":
             return head_response
         assert method == "GET"
+
         class _Stream:
             status_code = get_response.status_code
             headers = get_response.headers
@@ -75,7 +120,9 @@ def test_head_precheck_degrades_to_get(monkeypatch):
 
         return _Stream()
 
-    monkeypatch.setattr("DocsToKG.ContentDownload.network.request_with_retries", _request_with_retries)
+    monkeypatch.setattr(
+        "DocsToKG.ContentDownload.network.request_with_retries", _request_with_retries
+    )
 
     session = Mock()
     assert head_precheck(session, "https://example.org/pdf", timeout=3.0)

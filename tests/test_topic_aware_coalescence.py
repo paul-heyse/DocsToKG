@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.test_topic_aware_coalescence",
+#   "purpose": "Pytest coverage for topic aware coalescence scenarios",
+#   "sections": [
+#     {
+#       "id": "_dummy_tokenizer",
+#       "name": "_DummyTokenizer",
+#       "anchor": "DUMM",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "test_is_structural_boundary_detects_headings",
+#       "name": "test_is_structural_boundary_detects_headings",
+#       "anchor": "TISBD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_is_structural_boundary_detects_captions",
+#       "name": "test_is_structural_boundary_detects_captions",
+#       "anchor": "ISBD1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_is_structural_boundary_handles_non_markers",
+#       "name": "test_is_structural_boundary_handles_non_markers",
+#       "anchor": "TISBH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_topic_aware_coalescence_respects_section_boundaries",
+#       "name": "test_topic_aware_coalescence_respects_section_boundaries",
+#       "anchor": "TTACR",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 from pathlib import Path
 
 import pytest

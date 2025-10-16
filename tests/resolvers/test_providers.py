@@ -1,3 +1,126 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.resolvers.test_providers",
+#   "purpose": "Pytest coverage for resolvers providers scenarios",
+#   "sections": [
+#     {
+#       "id": "load_fixture",
+#       "name": "load_fixture",
+#       "anchor": "LF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "make_artifact",
+#       "name": "make_artifact",
+#       "anchor": "MA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_figshare_resolver_success",
+#       "name": "test_figshare_resolver_success",
+#       "anchor": "TFRS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_figshare_resolver_filters_non_pdf_files",
+#       "name": "test_figshare_resolver_filters_non_pdf_files",
+#       "anchor": "TFRFN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_figshare_resolver_multiple_pdfs",
+#       "name": "test_figshare_resolver_multiple_pdfs",
+#       "anchor": "TFRMP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_figshare_resolver_no_matches",
+#       "name": "test_figshare_resolver_no_matches",
+#       "anchor": "TFRNM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_figshare_resolver_http_error",
+#       "name": "test_figshare_resolver_http_error",
+#       "anchor": "TFRHE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_figshare_resolver_json_error",
+#       "name": "test_figshare_resolver_json_error",
+#       "anchor": "TFRJE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_figshare_resolver_network_error",
+#       "name": "test_figshare_resolver_network_error",
+#       "anchor": "TFRNE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_figshare_resolver_disabled_without_doi",
+#       "name": "test_figshare_resolver_disabled_without_doi",
+#       "anchor": "TFRDW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load_fixture",
+#       "name": "load_fixture",
+#       "anchor": "LF1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "make_artifact",
+#       "name": "make_artifact",
+#       "anchor": "MA1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_zenodo_resolver_success",
+#       "name": "test_zenodo_resolver_success",
+#       "anchor": "TZRS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_zenodo_resolver_filters_non_pdf_files",
+#       "name": "test_zenodo_resolver_filters_non_pdf_files",
+#       "anchor": "TZRFN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_zenodo_resolver_no_matches",
+#       "name": "test_zenodo_resolver_no_matches",
+#       "anchor": "TZRNM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_zenodo_resolver_http_error",
+#       "name": "test_zenodo_resolver_http_error",
+#       "anchor": "TZRHE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_zenodo_resolver_json_error",
+#       "name": "test_zenodo_resolver_json_error",
+#       "anchor": "TZRJE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_zenodo_resolver_network_error",
+#       "name": "test_zenodo_resolver_network_error",
+#       "anchor": "TZRNE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_zenodo_resolver_disabled_without_doi",
+#       "name": "test_zenodo_resolver_disabled_without_doi",
+#       "anchor": "TZRDW",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Consolidated provider-specific resolver tests."""
 
 from __future__ import annotations

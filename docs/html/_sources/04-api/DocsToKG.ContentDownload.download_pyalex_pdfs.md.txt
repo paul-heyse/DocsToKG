@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.ContentDownload.download_pyalex_pdfs``.
 
+## 1. Overview
+
 OpenAlex PDF Downloader CLI
 
 This module implements the command-line interface responsible for downloading
@@ -34,7 +36,7 @@ Usage:
         --topic "knowledge graphs" --year-start 2020 --year-end 2023 \
         --out ./pdfs --resolver-config download_config.yaml
 
-## 1. Functions
+## 2. Functions
 
 ### `_utc_timestamp()`
 
@@ -52,24 +54,6 @@ path: Path to the candidate PDF file.
 
 Returns:
 ``True`` if the file ends with ``%%EOF``; ``False`` otherwise.
-
-### `_head_precheck_candidate(session, url, timeout)`
-
-Evaluate whether ``url`` is likely to return a PDF payload.
-
-The helper performs a single HEAD request with a tight timeout budget
-to avoid fetching large payloads unnecessarily. Tests rely on this
-behaviour to ensure dry-run execution does not trigger streaming
-downloads.
-
-Args:
-session: HTTP session used for the outbound HEAD request.
-url: Candidate download URL that should be validated.
-timeout: Per-request timeout budget, in seconds.
-
-Returns:
-``True`` when the HEAD response suggests the URL returns a PDF;
-``False`` when the response clearly indicates HTML or a missing file.
 
 ### `slugify(text, keep)`
 
@@ -346,6 +330,10 @@ Parsed configuration mapping.
 Raises:
 RuntimeError: If YAML parsing is requested but PyYAML is unavailable.
 
+### `_seed_resolver_toggle_defaults(config, resolver_names)`
+
+Ensure resolver toggles include defaults for every known resolver.
+
 ### `apply_config_overrides(config, data, resolver_names)`
 
 Apply overrides from configuration data onto a ResolverConfig.
@@ -353,7 +341,7 @@ Apply overrides from configuration data onto a ResolverConfig.
 Args:
 config: Resolver configuration object to mutate.
 data: Mapping loaded from a configuration file.
-resolver_names: Known resolver names to seed toggle defaults.
+resolver_names: Known resolver names. Defaults are applied after overrides.
 
 Returns:
 None
@@ -429,30 +417,50 @@ None
 Returns:
 None
 
-### `_write(self, payload)`
+### `log_attempt(self, record)`
 
-Append a JSON record to the log file ensuring timestamps are present.
+Log a resolver attempt.
 
 Args:
-payload: JSON-serializable mapping to write.
+record: Structured attempt telemetry emitted by a resolver.
+timestamp: Optional ISO8601 timestamp override for deterministic runs.
 
 Returns:
 None
 
-### `log_attempt(self, record)`
+### `log_manifest(self, entry)`
 
-Record a resolver attempt entry.
+Persist a manifest entry.
 
 Args:
-record: Attempt metadata captured from the resolver pipeline.
-timestamp: Optional override timestamp (ISO format).
+entry: Manifest record describing the resolved document.
+
+Returns:
+None
+
+### `log_summary(self, summary)`
+
+Record summary metrics for the run.
+
+Args:
+summary: Mapping containing aggregated counters and timings.
+
+Returns:
+None
+
+### `close(self)`
+
+Release any underlying resources.
+
+Args:
+None
 
 Returns:
 None
 
 ### `log(self, record)`
 
-Compatibility shim mapping to :meth:`log_attempt`.
+Compatibility alias delegating to :meth:`log_attempt`.
 
 Args:
 record: Attempt record to forward to :meth:`log_attempt`.
@@ -460,61 +468,24 @@ record: Attempt record to forward to :meth:`log_attempt`.
 Returns:
 None
 
-### `log_manifest(self, entry)`
+### `_write(self, payload)`
 
-Persist a manifest entry to the JSONL log.
-
-Args:
-entry: Manifest entry to write.
-
-Returns:
-None
-
-### `log_summary(self, summary)`
-
-Write a summary record to the log.
-
-Args:
-summary: Mapping containing summary metrics.
-
-Returns:
-None
-
-### `close(self)`
-
-Close the underlying file handle.
-
-Args:
-self: Logger instance managing the JSONL file descriptor.
-
-Returns:
-None
-
-### `__enter__(self)`
-
-Return ``self`` when used as a context manager.
-
-Args:
-None
-
-Returns:
-Logger instance configured for context-managed usage.
-
-### `__exit__(self, exc_type, exc, tb)`
-
-Close the file handle on context manager exit.
-
-Args:
-exc_type: Exception type raised within the context, if any.
-exc: Exception instance raised within the context.
-tb: Traceback associated with ``exc``.
-
-Returns:
-None
+*No documentation available.*
 
 ### `log_attempt(self, record)`
 
-Write an attempt record to both JSONL and CSV outputs.
+Persist a resolver attempt record to the JSONL file.
+
+Args:
+record: Attempt metadata describing the resolver execution outcome.
+timestamp: Optional override timestamp applied to the JSONL payload.
+
+Returns:
+None
+
+### `log(self, record)`
+
+Forward compatibility shim invoking :meth:`log_attempt`.
 
 Args:
 record: Attempt record to persist.
@@ -524,65 +495,330 @@ None
 
 ### `log_manifest(self, entry)`
 
-Forward manifest entries to the JSONL logger.
+Persist a manifest entry describing a resolved document.
 
 Args:
-entry: Manifest entry to forward.
+entry: Manifest metadata to append to the JSONL log.
 
 Returns:
 None
 
 ### `log_summary(self, summary)`
 
-Forward summary entries to the JSONL logger.
+Persist aggregated run metrics to the JSONL file.
 
 Args:
-summary: Summary mapping to forward.
-
-Returns:
-None
-
-### `log(self, record)`
-
-Compatibility shim mapping to :meth:`log_attempt`.
-
-Args:
-record: Attempt record to log.
+summary: Dictionary of summary statistics such as totals and timings.
 
 Returns:
 None
 
 ### `close(self)`
 
-Close both the JSONL logger and the CSV file handle.
+Flush and close the underlying JSONL file handle.
 
 Args:
-self: Adapter instance coordinating CSV and JSONL streams.
+None
 
 Returns:
 None
 
 ### `__enter__(self)`
 
-Return ``self`` when used as a context manager.
-
-Args:
-None
-
-Returns:
-Adapter instance configured for context-managed usage.
+*No documentation available.*
 
 ### `__exit__(self, exc_type, exc, tb)`
 
-Close the CSV file handle on context manager exit.
+*No documentation available.*
+
+### `log_attempt(self, record)`
+
+Append a resolver attempt row to the CSV file.
 
 Args:
-exc_type: Exception type raised within the context, if any.
-exc: Exception instance raised within the context.
-tb: Traceback associated with ``exc``.
+record: Attempt metadata describing the resolver execution.
+timestamp: Optional override timestamp applied to the CSV row.
 
 Returns:
 None
+
+### `log_manifest(self, entry)`
+
+Ignore manifest entries; CSV sink only records attempt rows.
+
+Args:
+entry: Manifest metadata supplied by the pipeline.
+
+Returns:
+None
+
+### `log_summary(self, summary)`
+
+Ignore summary metrics; CSV sink only records attempt rows.
+
+Args:
+summary: Mapping of summary metrics (unused).
+
+Returns:
+None
+
+### `log(self, record)`
+
+Forward to :meth:`log_attempt` for compatibility with ``AttemptSink``.
+
+Args:
+record: Attempt record to serialize.
+
+Returns:
+None
+
+### `close(self)`
+
+Flush and close the CSV file handle.
+
+Args:
+None
+
+Returns:
+None
+
+### `__enter__(self)`
+
+*No documentation available.*
+
+### `__exit__(self, exc_type, exc, tb)`
+
+*No documentation available.*
+
+### `log_attempt(self, record)`
+
+Send the attempt to both the base logger and the CSV sink.
+
+Args:
+record: Attempt record to mirror to both sinks.
+timestamp: Optional timestamp to apply to the mirrored record.
+
+Returns:
+None
+
+### `log_manifest(self, entry)`
+
+Forward manifest entries to both the base logger and CSV sink.
+
+Args:
+entry: Manifest record describing the resolved document.
+
+Returns:
+None
+
+### `log_summary(self, summary)`
+
+Forward summary telemetry to both adapters.
+
+Args:
+summary: Mapping of summary metrics to forward.
+
+Returns:
+None
+
+### `close(self)`
+
+Close the base logger and CSV sink, propagating base errors.
+
+Args:
+None
+
+Returns:
+None
+
+Raises:
+BaseException: Re-raises any error encountered when closing the base logger.
+
+### `log_attempt(self, record)`
+
+Forward a resolver attempt to all registered sinks.
+
+Args:
+record: Attempt metadata to broadcast.
+timestamp: Optional shared timestamp passed to each sink.
+
+Returns:
+None
+
+### `log_manifest(self, entry)`
+
+Forward a manifest entry to all registered sinks.
+
+Args:
+entry: Manifest record to broadcast.
+
+Returns:
+None
+
+### `log_summary(self, summary)`
+
+Forward summary telemetry to all registered sinks.
+
+Args:
+summary: Mapping of aggregated metrics to broadcast.
+
+Returns:
+None
+
+### `log(self, record)`
+
+Forward attempts to :meth:`log_attempt` for compatibility.
+
+Args:
+record: Attempt record to broadcast.
+
+Returns:
+None
+
+### `close(self)`
+
+Close all sinks, propagating the first raised exception.
+
+Args:
+None
+
+Returns:
+None
+
+Raises:
+BaseException: Re-raises the first error encountered when closing delegates.
+
+### `__enter__(self)`
+
+*No documentation available.*
+
+### `__exit__(self, exc_type, exc, tb)`
+
+*No documentation available.*
+
+### `log_attempt(self, record)`
+
+Ignore attempt telemetry; only manifests are indexed.
+
+Args:
+record: Attempt record supplied by the pipeline.
+timestamp: Optional timestamp provided by the caller.
+
+Returns:
+None
+
+### `log(self, record)`
+
+Compatibility shim deferring to :meth:`log_attempt`.
+
+Args:
+record: Attempt record supplied by the pipeline.
+
+Returns:
+None
+
+### `log_manifest(self, entry)`
+
+Persist manifest metadata for inclusion in the JSON index.
+
+Newly received manifest entries replace any existing payload stored under
+the same ``work_id`` so downstream tools can rely on deterministic output.
+
+Args:
+entry: Manifest record describing a resolved document.
+
+Returns:
+None
+
+### `log_summary(self, summary)`
+
+Ignore summary telemetry; manifests only are indexed.
+
+Args:
+summary: Mapping of summary metrics supplied by the pipeline.
+
+Returns:
+None
+
+### `close(self)`
+
+Write the manifest index to disk if not already closed.
+
+Args:
+None
+
+Returns:
+None
+
+### `__enter__(self)`
+
+*No documentation available.*
+
+### `__exit__(self, exc_type, exc, tb)`
+
+*No documentation available.*
+
+### `log_attempt(self, record)`
+
+Ignore attempt telemetry; only manifest rows are retained.
+
+Args:
+record: Attempt record supplied by the pipeline.
+timestamp: Optional timestamp associated with the attempt.
+
+Returns:
+None
+
+### `log(self, record)`
+
+Forward compatibility shim deferring to :meth:`log_attempt`.
+
+Args:
+record: Attempt record supplied by the pipeline.
+
+Returns:
+None
+
+### `log_manifest(self, entry)`
+
+Record the manifest entry so the latest attempt is written at close.
+
+The sink keeps only the most recent entry for each ``work_id`` so that
+duplicate retries collapse into a single CSV row.
+
+Args:
+entry: Manifest record describing the resolved document.
+
+Returns:
+None
+
+### `log_summary(self, summary)`
+
+Ignore summary telemetry; output only includes manifest rows.
+
+Args:
+summary: Mapping of summary metrics supplied by the pipeline.
+
+Returns:
+None
+
+### `close(self)`
+
+Write the consolidated manifest CSV to disk when invoked.
+
+Args:
+None
+
+Returns:
+None
+
+### `__enter__(self)`
+
+*No documentation available.*
+
+### `__exit__(self, exc_type, exc, tb)`
+
+*No documentation available.*
 
 ### `__post_init__(self)`
 
@@ -603,11 +839,13 @@ loc: Location dictionary as returned by OpenAlex (may be None).
 
 ### `_session_factory()`
 
-Build a fresh requests session configured with polite headers.
+Return a new :class:`requests.Session` using the run's polite headers.
 
-### `_session_factory()`
-
-Build a fresh requests session configured with polite headers.
+The factory is invoked by worker threads to obtain an isolated session
+that inherits the resolver configuration's polite identification
+headers. Creating sessions through this helper ensures each worker
+reuses the shared retry configuration while keeping connection pools
+thread-local.
 
 ### `_record_result(res)`
 
@@ -621,7 +859,7 @@ Submit a work item to the executor for asynchronous processing.
 
 Process a single work item within a worker-managed session.
 
-## 2. Classes
+## 3. Classes
 
 ### `ManifestEntry`
 
@@ -661,42 +899,107 @@ Examples:
 ...     dry_run=False,
 ... )
 
-### `JsonlLogger`
+### `AttemptSink`
 
-Structured logger that emits attempt, manifest, and summary JSONL records.
+Protocol implemented by logging sinks that consume download telemetry.
 
 Attributes:
-_path: Destination JSONL log path.
-_file: Underlying file handle used for writes.
+log_attempt: Callable accepting an :class:`AttemptRecord` plus optional timestamp.
+log_manifest: Callable that receives :class:`ManifestEntry` objects for storage.
+log_summary: Callable that ingests aggregate metrics collected during a run.
+close: Callable that finalises resources owned by the sink.
+log: Compatibility alias that forwards to :meth:`log_attempt`.
 
 Examples:
->>> logger = JsonlLogger(Path("logs/attempts.jsonl"))
->>> logger.log_summary({"processed": 10})
->>> logger.close()
+>>> class Collector:
+...     def log_attempt(self, record, *, timestamp=None):
+...         ...  # doctest: +SKIP
+...     def log_manifest(self, entry):
+...         ...  # doctest: +SKIP
+...     def log_summary(self, summary):
+...         ...  # doctest: +SKIP
+...     def close(self):
+...         ...  # doctest: +SKIP
+...     def log(self, record):
+...         self.log_attempt(record)
+>>> isinstance(Collector(), AttemptSink)  # doctest: +SKIP
+True
 
-The logger serialises records outside a thread lock and performs atomic
-writes under the lock, ensuring well-formed output even when multiple
-threads share the instance. It also implements the context manager protocol
-for deterministic resource cleanup.
+### `JsonlSink`
+
+Thread-safe sink that streams attempt, manifest, and summary events to JSONL files.
+
+Attributes:
+_path: Destination JSONL file path.
+_file: Lazily opened file handle pointing at ``_path``.
+_lock: Mutex used to serialize concurrent writes.
+
+Examples:
+>>> sink = JsonlSink(Path('/tmp/attempts.jsonl'))  # doctest: +SKIP
+>>> sink.log_summary({'attempts': 1})  # doctest: +SKIP
+>>> sink.close()  # doctest: +SKIP
+
+### `CsvSink`
+
+Lightweight sink that mirrors attempt records into a CSV for spreadsheet review.
+
+Attributes:
+_file: Open CSV file handle for appending attempts.
+_writer: :class:`csv.DictWriter` configured with attempt headers.
+_lock: Mutex guarding concurrent writes.
+
+Examples:
+>>> sink = CsvSink(Path('/tmp/attempts.csv'))  # doctest: +SKIP
+>>> sink.log_summary({'attempts': 1})  # doctest: +SKIP
+>>> sink.close()  # doctest: +SKIP
 
 ### `CsvAttemptLoggerAdapter`
 
-Adapter that mirrors attempt records to CSV for backward compatibility.
+Adapter that mirrors JSONL logging into a CSV sink for compatibility.
 
 Attributes:
-_logger: Underlying :class:`JsonlLogger` instance.
-_file: CSV file handle used for writing.
-_writer: ``csv.DictWriter`` writing to :attr:`_file`.
+_base_logger: Primary sink that receives mirrored logging calls.
 
 Examples:
->>> adapter = CsvAttemptLoggerAdapter(JsonlLogger(Path("attempts.jsonl")), Path("attempts.csv"))
->>> adapter.log_attempt(AttemptRecord(work_id="W1", resolver_name="unpaywall", resolver_order=1,
-...                                   url="https://example", status="pdf", http_status=200,
-...                                   content_type="application/pdf", elapsed_ms=120.0))
->>> adapter.close()
+>>> adapter = CsvAttemptLoggerAdapter(JsonlSink(Path('/tmp/a.jsonl')), Path('/tmp/a.csv'))  # doctest: +SKIP
+>>> adapter.close()  # doctest: +SKIP
 
-CSV writes are protected by a lock to ensure rows remain well formed when
-multiple worker threads log through the same adapter instance.
+### `MultiSink`
+
+Composite sink that fans out logging calls to multiple sinks.
+
+Attributes:
+_sinks: Sequence of sink instances that receive mirrored events.
+
+Examples:
+>>> sink = MultiSink([JsonlSink(Path('/tmp/a.jsonl'))])  # doctest: +SKIP
+>>> sink.close()  # doctest: +SKIP
+
+### `ManifestIndexSink`
+
+Sink that accumulates manifest entries into a JSON index.
+
+Attributes:
+_path: Filesystem destination for the generated JSON index.
+_index: In-memory mapping from work IDs to manifest payloads.
+_closed: Flag guarding idempotent close operations.
+
+Examples:
+>>> sink = ManifestIndexSink(Path('/tmp/manifests.json'))  # doctest: +SKIP
+>>> sink.close()  # doctest: +SKIP
+
+### `LastAttemptCsvSink`
+
+Sink that writes one manifest row per work to a CSV on close.
+
+Attributes:
+_path: Filesystem destination for the aggregated CSV.
+_entries: Mapping of work IDs to their most recent manifest entry.
+_closed: Flag guarding idempotent close operations.
+
+Examples:
+>>> sink = LastAttemptCsvSink(Path('/tmp/last_attempt.csv'))  # doctest: +SKIP
+>>> sink.close()  # doctest: +SKIP
 
 ### `WorkArtifact`
 

@@ -83,6 +83,39 @@ Key requirements:
 - Use `request_with_retries` for outbound HTTP to benefit from retry policies
   and structured logging.
 
+For JSON APIs the recommended base class is `ApiResolverBase`, which wraps
+`request_with_retries` and emits structured error events automatically. Subclass
+it to reduce boilerplate:
+
+```python
+from DocsToKG.ContentDownload.resolvers import ApiResolverBase, ResolverResult
+
+
+class MyApiResolver(ApiResolverBase):
+    name = "my_api"
+    endpoint = "https://example.org/api"
+
+    def iter_urls(self, session, config, artifact):
+        data, error = self._request_json(
+            session,
+            "GET",
+            self.endpoint,
+            config=config,
+            params={"doi": artifact.doi},
+        )
+        if error:
+            yield error
+            return
+        for item in data.get("files", []):
+            yield ResolverResult(url=item["download_url"])
+```
+
+`_request_json()` handles timeouts, connection errors, HTTP status checks, and
+invalid JSON responses by yielding a `ResolverResult` with a diagnostic event
+reason (`http-error`, `timeout`, `json-error`, etc.). The helper also enforces
+the configured polite headers and timeout values so individual resolvers no
+longer implement this logic.
+
 ## 2. Register the Resolver
 
 If the class lives outside `resolvers.py`, ensure it is imported somewhere

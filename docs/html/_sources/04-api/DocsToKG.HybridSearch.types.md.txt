@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.HybridSearch.types``.
 
+## 1. Overview
+
 Core typed structures for hybrid search components.
 
 This module defines the fundamental data structures used throughout the DocsToKG
@@ -18,7 +20,7 @@ Key Features:
 - Comprehensive validation and error handling
 - Support for both lexical and semantic search modalities
 
-## 1. Functions
+## 2. Functions
 
 ### `vector_uuid_to_faiss_int(vector_id)`
 
@@ -58,7 +60,7 @@ None
 Returns:
 True if all reports passed, False otherwise
 
-## 2. Classes
+## 3. Classes
 
 ### `DocumentInput`
 
@@ -178,6 +180,7 @@ from all retrieval methods used in the search.
 Attributes:
 doc_id: Source document identifier
 chunk_id: Chunk identifier within the document
+vector_id: Identifier of the chunk's embedding in the FAISS index
 namespace: Logical grouping for search scoping
 score: Final fused similarity score
 fused_rank: Position in the final result ranking

@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.docparsing.test_docstrings",
+#   "purpose": "Pytest coverage for docparsing docstrings scenarios",
+#   "sections": [
+#     {
+#       "id": "_iter_python_modules",
+#       "name": "_iter_python_modules",
+#       "anchor": "IPM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_iter_defs",
+#       "name": "_iter_defs",
+#       "anchor": "ID",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_module_and_definitions_have_docstrings",
+#       "name": "test_module_and_definitions_have_docstrings",
+#       "anchor": "TMADH",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 from __future__ import annotations
 
 import ast

@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.DocParsing._common``.
 
+## 1. Overview
+
 DocParsing Shared Utilities
 
 This module consolidates lightweight helpers that power multiple DocParsing
@@ -31,7 +33,37 @@ Dependencies:
 All helpers are safe to import in multiprocessing contexts and avoid heavy
 third-party dependencies beyond the standard library.
 
-## 1. Functions
+## 2. Functions
+
+### `expand_path(path)`
+
+Return ``path`` expanded to an absolute :class:`Path`.
+
+Args:
+path: Candidate filesystem path supplied as string or :class:`Path`.
+
+Returns:
+Absolute path with user home components resolved.
+
+### `resolve_hf_home()`
+
+Resolve the HuggingFace cache directory respecting ``HF_HOME``.
+
+Args:
+None
+
+Returns:
+Path: Absolute path to the HuggingFace cache directory.
+
+### `resolve_model_root(hf_home)`
+
+Resolve the DocsToKG model root honoring ``DOCSTOKG_MODEL_ROOT``.
+
+Args:
+hf_home: Optional HuggingFace cache directory to treat as the base path.
+
+Returns:
+Path: Absolute directory where DocsToKG models should be stored.
 
 ### `detect_data_root(start)`
 
@@ -240,7 +272,7 @@ True
 
 ### `iter_chunks(directory)`
 
-Yield chunk JSONL files from ``directory`` (non-recursive).
+Yield chunk JSONL files from ``directory`` and all descendants.
 
 Args:
 directory: Directory containing chunk artifacts.
@@ -407,6 +439,23 @@ Examples:
 
 Return ``True`` if a process with the given PID appears to be alive.
 
+### `set_spawn_or_warn(logger)`
+
+Ensure the multiprocessing start method is set to ``spawn``.
+
+Args:
+logger: Optional logger that receives diagnostic messages about the start
+method configuration.
+
+Returns:
+None: The function mutates global multiprocessing state and logs warnings.
+
+This helper attempts to set the start method to ``spawn`` with ``force=True``.
+If a ``RuntimeError`` occurs (meaning the method was already set), it checks
+if the current method is ``spawn``. If not, it emits a warning about the
+potential CUDA safety risk, logging the current method so callers understand
+the degraded safety state.
+
 ### `__iter__(self)`
 
 Yield successive lists containing up to ``batch_size`` elements.
@@ -427,7 +476,7 @@ record: Logging record produced by the DocParsing pipeline.
 Returns:
 JSON-formatted string containing canonical log fields and optional extras.
 
-## 2. Classes
+## 3. Classes
 
 ### `Batcher`
 

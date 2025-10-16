@@ -1,3 +1,102 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_download_concurrency",
+#   "purpose": "Pytest coverage for ontology download download concurrency scenarios",
+#   "sections": [
+#     {
+#       "id": "_test_http_server",
+#       "name": "_TestHTTPServer",
+#       "anchor": "TEST",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_request_handler",
+#       "name": "_RequestHandler",
+#       "anchor": "REQU",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "http_server",
+#       "name": "http_server",
+#       "anchor": "HS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_make_http_config",
+#       "name": "_make_http_config",
+#       "anchor": "MHC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_allow_localhost",
+#       "name": "_allow_localhost",
+#       "anchor": "AL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_download",
+#       "name": "_download",
+#       "anchor": "DOWN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_retry_after_transient_error",
+#       "name": "test_retry_after_transient_error",
+#       "anchor": "TRATE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_mismatch_logs_warning",
+#       "name": "test_head_mismatch_logs_warning",
+#       "anchor": "THMLW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_conditional_requests_return_cached",
+#       "name": "test_conditional_requests_return_cached",
+#       "anchor": "TCRRC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_partial_content_resume",
+#       "name": "test_partial_content_resume",
+#       "anchor": "TPCR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_etag_change_triggers_full_download",
+#       "name": "test_etag_change_triggers_full_download",
+#       "anchor": "TECTF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_token_bucket_limits_same_service",
+#       "name": "test_token_bucket_limits_same_service",
+#       "anchor": "TTBLS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_token_bucket_allows_parallel_services",
+#       "name": "test_token_bucket_allows_parallel_services",
+#       "anchor": "TTBAP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_results_to_dict_contains_expected_fields",
+#       "name": "test_cli_results_to_dict_contains_expected_fields",
+#       "anchor": "TCRTD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_results_table_includes_status_and_sha",
+#       "name": "test_cli_results_table_includes_status_and_sha",
+#       "anchor": "TCRTI",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Integration tests exercising streaming downloader concurrency and retries."""
 
 from __future__ import annotations

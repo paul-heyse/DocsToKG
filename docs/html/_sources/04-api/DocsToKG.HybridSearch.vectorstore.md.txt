@@ -2,9 +2,11 @@
 
 This reference documents the DocsToKG module ``DocsToKG.HybridSearch.vectorstore``.
 
-Unified FAISS vector store and similarity utilities.
+## 1. Overview
 
-## 1. Functions
+Unified FAISS vector store, GPU similarity utilities, and state helpers.
+
+## 2. Functions
 
 ### `normalize_rows(matrix)`
 
@@ -126,6 +128,16 @@ None
 
 Returns:
 DenseIndexConfig: Active dense index configuration.
+
+### `dim(self)`
+
+Return the dimensionality of vectors stored in the FAISS index.
+
+Args:
+None
+
+Returns:
+int: Dimensionality of embeddings managed by the index.
 
 ### `gpu_resources(self)`
 
@@ -394,7 +406,7 @@ linked FAISS build.
 
 *No documentation available.*
 
-## 2. Classes
+## 3. Classes
 
 ### `FaissSearchResult`
 

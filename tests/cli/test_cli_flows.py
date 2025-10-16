@@ -1,3 +1,138 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.cli.test_cli_flows",
+#   "purpose": "Pytest coverage for cli cli flows scenarios",
+#   "sections": [
+#     {
+#       "id": "download_modules",
+#       "name": "download_modules",
+#       "anchor": "DM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_read_resolver_config_yaml_requires_pyyaml",
+#       "name": "test_read_resolver_config_yaml_requires_pyyaml",
+#       "anchor": "TRRCY",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_load_resolver_config_applies_mailto",
+#       "name": "test_load_resolver_config_applies_mailto",
+#       "anchor": "TLRCA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_main_writes_manifest_and_sets_mailto",
+#       "name": "test_main_writes_manifest_and_sets_mailto",
+#       "anchor": "TMWMA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_main_with_csv_writes_last_attempt_csv",
+#       "name": "test_main_with_csv_writes_last_attempt_csv",
+#       "anchor": "TMWCW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_main_with_staging_creates_timestamped_directories",
+#       "name": "test_main_with_staging_creates_timestamped_directories",
+#       "anchor": "TMWSC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_main_dry_run_skips_writing_files",
+#       "name": "test_main_dry_run_skips_writing_files",
+#       "anchor": "TMDRS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_main_requires_topic_or_topic_id",
+#       "name": "test_main_requires_topic_or_topic_id",
+#       "anchor": "TMRTO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_flag_propagation_and_metrics_export",
+#       "name": "test_cli_flag_propagation_and_metrics_export",
+#       "anchor": "TCFPA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_download_candidate_dry_run_does_not_create_files",
+#       "name": "test_download_candidate_dry_run_does_not_create_files",
+#       "anchor": "TDCDR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_process_one_work_logs_manifest_in_dry_run",
+#       "name": "test_process_one_work_logs_manifest_in_dry_run",
+#       "anchor": "TPOWL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_noop_pipeline",
+#       "name": "_NoopPipeline",
+#       "anchor": "NOOP",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "test_resume_skips_completed_work",
+#       "name": "test_resume_skips_completed_work",
+#       "anchor": "TRSCW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_resume_from_partial_metadata",
+#       "name": "test_cli_resume_from_partial_metadata",
+#       "anchor": "TCRFP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_workers_apply_domain_jitter",
+#       "name": "test_cli_workers_apply_domain_jitter",
+#       "anchor": "TCWAD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_head_precheck_handles_head_hostile",
+#       "name": "test_cli_head_precheck_handles_head_hostile",
+#       "anchor": "TCHPH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_attempt_records_cover_all_resolvers",
+#       "name": "test_cli_attempt_records_cover_all_resolvers",
+#       "anchor": "TCARC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cli_dry_run_metrics_align",
+#       "name": "test_cli_dry_run_metrics_align",
+#       "anchor": "TCDRM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_envrc_configures_virtualenv_and_pythonpath",
+#       "name": "test_envrc_configures_virtualenv_and_pythonpath",
+#       "anchor": "TECVA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_bootstrap_script_installs_project",
+#       "name": "test_bootstrap_script_installs_project",
+#       "anchor": "TBSIP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_documentation_mentions_bootstrap_and_direnv",
+#       "name": "test_documentation_mentions_bootstrap_and_direnv",
+#       "anchor": "TDMBA",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """CLI, dry-run, resume, and environment validation for OpenAlex downloads."""
 
 from __future__ import annotations
@@ -5,10 +140,11 @@ from __future__ import annotations
 import csv
 import json
 import os
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Dict
+from typing import Any, Dict, List
 
 import pytest
 
@@ -306,9 +442,7 @@ def test_main_with_csv_writes_last_attempt_csv(download_modules, monkeypatch, tm
     ]
 
 
-def test_main_with_staging_creates_timestamped_directories(
-    download_modules, monkeypatch, tmp_path
-):
+def test_main_with_staging_creates_timestamped_directories(download_modules, monkeypatch, tmp_path):
     downloader = download_modules.downloader
     resolvers = download_modules.resolvers
 
@@ -507,7 +641,6 @@ def test_main_dry_run_skips_writing_files(download_modules, monkeypatch, tmp_pat
     manifest_rows = [entry for entry in entries if entry.get("record_type") == "manifest"]
     assert len(manifest_rows) == 3
     assert all(row["dry_run"] is True for row in manifest_rows)
-
 
 
 def test_main_requires_topic_or_topic_id(download_modules, monkeypatch):
@@ -766,6 +899,595 @@ def test_resume_skips_completed_work(download_modules, tmp_path):
     assert manifest["work_id"] == "W-RESUME"
     assert manifest["classification"] == "skipped"
     assert manifest["dry_run"] is False
+
+
+def test_cli_resume_from_partial_metadata(download_modules, monkeypatch, tmp_path):
+    downloader = download_modules.downloader
+    resolvers = download_modules.resolvers
+
+    previous_manifest = tmp_path / "resume_manifest.jsonl"
+    previous_entry = {
+        "record_type": "manifest",
+        "timestamp": "2024-05-01T00:00:00Z",
+        "work_id": "WPARTIAL",
+        "title": "Partial Record",
+        "publication_year": 2024,
+        "resolver": "stub",
+        "url": "https://oa.example/partial.pdf",
+        "classification": "miss",
+        "path": None,
+        "sha256": None,
+        "content_length": None,
+        "etag": 'W/"resume-metadata"',
+        "last_modified": None,
+        "dry_run": False,
+    }
+    previous_manifest.write_text(json.dumps(previous_entry) + "\n", encoding="utf-8")
+
+    work = {
+        "id": "https://openalex.org/WPARTIAL",
+        "title": previous_entry["title"],
+        "publication_year": previous_entry["publication_year"],
+        "ids": {"doi": "10.1000/resume"},
+        "open_access": {"oa_url": None},
+        "best_oa_location": {"pdf_url": previous_entry["url"]},
+        "primary_location": {},
+        "locations": [],
+    }
+
+    contexts: List[Dict[str, Any]] = []
+
+    monkeypatch.setattr(downloader, "iterate_openalex", lambda *args, **kwargs: iter([work]))
+    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
+
+    class RecordingPipeline:
+        def __init__(self, *_, logger=None, metrics=None, **kwargs):
+            self.logger = logger
+            self.metrics = metrics
+
+        def run(self, session, artifact, context=None):
+            assert context is not None
+            contexts.append(context)
+            pdf_path = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
+            pdf_path.parent.mkdir(parents=True, exist_ok=True)
+            pdf_path.write_bytes(b"%PDF-1.4\n%%EOF")
+            outcome = resolvers.DownloadOutcome(
+                classification="pdf",
+                path=str(pdf_path),
+                http_status=200,
+                content_type="application/pdf",
+                elapsed_ms=5.0,
+                error=None,
+            )
+            self.logger.log_attempt(
+                resolvers.AttemptRecord(
+                    work_id=artifact.work_id,
+                    resolver_name="stub",
+                    resolver_order=1,
+                    url=previous_entry["url"],
+                    status=outcome.classification,
+                    http_status=outcome.http_status,
+                    content_type=outcome.content_type,
+                    elapsed_ms=outcome.elapsed_ms,
+                    dry_run=False,
+                )
+            )
+            self.metrics.record_attempt("stub", outcome)
+            return resolvers.PipelineResult(
+                success=True,
+                resolver_name="stub",
+                url=previous_entry["url"],
+                outcome=outcome,
+                html_paths=[],
+                failed_urls=[],
+            )
+
+    monkeypatch.setattr(downloader, "ResolverPipeline", RecordingPipeline)
+
+    manifest_path = tmp_path / "manifest.jsonl"
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "download_pyalex_pdfs.py",
+            "--topic",
+            "resume test",
+            "--year-start",
+            "2024",
+            "--year-end",
+            "2024",
+            "--out",
+            str(out_dir),
+            "--manifest",
+            str(manifest_path),
+            "--resume-from",
+            str(previous_manifest),
+        ],
+    )
+
+    downloader.main()
+
+    assert contexts, "expected pipeline context to be captured"
+    previous_map = contexts[0]["previous"]
+    assert previous_entry["url"] in previous_map
+    assert previous_map[previous_entry["url"]]["etag"] == previous_entry["etag"]
+    assert previous_map[previous_entry["url"]]["sha256"] is None
+
+    new_entries = [
+        json.loads(line) for line in manifest_path.read_text(encoding="utf-8").strip().splitlines()
+    ]
+    manifest_records = [entry for entry in new_entries if entry.get("record_type") == "manifest"]
+    assert any(record.get("resolver") == "stub" for record in manifest_records)
+
+
+def test_cli_workers_apply_domain_jitter(download_modules, monkeypatch, tmp_path):
+    downloader = download_modules.downloader
+    resolvers = download_modules.resolvers
+
+    works = [
+        {
+            "id": f"https://openalex.org/WJITTER{i}",
+            "title": f"Jitter Work {i}",
+            "publication_year": 2024,
+            "ids": {"doi": f"10.1000/jitter{i}"},
+            "open_access": {"oa_url": None},
+            "best_oa_location": {"pdf_url": f"https://example.org/work{i}.pdf"},
+            "primary_location": {},
+            "locations": [],
+        }
+        for i in range(2)
+    ]
+
+    monkeypatch.setattr(downloader, "iterate_openalex", lambda *a, **k: iter(works))
+    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    monkeypatch.setattr(downloader, "default_resolvers", lambda: [SimpleNamespace(name="stub")])
+
+    sleep_calls: List[float] = []
+
+    def fake_sleep(duration: float) -> None:
+        sleep_calls.append(duration)
+
+    monotonic_values = iter([0.0, 0.02, 0.02])
+
+    def fake_monotonic() -> float:
+        nonlocal monotonic_values
+        try:
+            return next(monotonic_values)
+        except StopIteration:
+            return 0.02
+
+    monkeypatch.setattr(resolvers._time, "sleep", fake_sleep)
+    monkeypatch.setattr(resolvers._time, "monotonic", fake_monotonic)
+    monkeypatch.setattr(resolvers.random, "random", lambda: 0.5)
+
+    executor_meta: Dict[str, Any] = {}
+
+    class RecordingExecutor:
+        def __init__(self, max_workers: int):
+            executor_meta["max_workers"] = max_workers
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def submit(self, fn):
+            result = fn()
+            return SimpleNamespace(result=lambda: result)
+
+    monkeypatch.setattr(downloader, "ThreadPoolExecutor", RecordingExecutor)
+    monkeypatch.setattr(downloader, "as_completed", lambda futures: futures)
+
+    class DummyThrottle:
+        def __init__(self, config):
+            self.config = config
+            self._host_lock = resolvers.threading.Lock()
+            self._last_host_hit = defaultdict(float)
+
+    class RecordingPipeline:
+        def __init__(self, *, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **_):
+            self.config = config
+            self.logger = logger
+            self.metrics = metrics
+            self._throttle = DummyThrottle(config)
+
+        def run(self, session, artifact, context=None):
+            resolvers.ResolverPipeline._respect_domain_limit(
+                self._throttle, "https://example.org/resource.pdf"
+            )
+            pdf_path = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
+            pdf_path.parent.mkdir(parents=True, exist_ok=True)
+            pdf_path.write_bytes(b"%PDF-1.4\n%%EOF")
+            outcome = resolvers.DownloadOutcome(
+                classification="pdf",
+                path=str(pdf_path),
+                http_status=200,
+                content_type="application/pdf",
+                elapsed_ms=5.0,
+                error=None,
+            )
+            self.logger.log_attempt(
+                resolvers.AttemptRecord(
+                    work_id=artifact.work_id,
+                    resolver_name="stub",
+                    resolver_order=1,
+                    url="https://example.org/resource.pdf",
+                    status="pdf",
+                    http_status=200,
+                    content_type="application/pdf",
+                    elapsed_ms=5.0,
+                    dry_run=False,
+                )
+            )
+            self.metrics.record_attempt("stub", outcome)
+            return resolvers.PipelineResult(
+                success=True,
+                resolver_name="stub",
+                url="https://example.org/resource.pdf",
+                outcome=outcome,
+                html_paths=[],
+                failed_urls=[],
+            )
+
+    monkeypatch.setattr(downloader, "ResolverPipeline", RecordingPipeline)
+
+    manifest_path = tmp_path / "manifest.jsonl"
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "download_pyalex_pdfs.py",
+            "--topic",
+            "jitter",
+            "--year-start",
+            "2024",
+            "--year-end",
+            "2024",
+            "--out",
+            str(out_dir),
+            "--manifest",
+            str(manifest_path),
+            "--workers",
+            "3",
+            "--domain-min-interval",
+            "example.org=0.1",
+        ],
+    )
+
+    downloader.main()
+
+    assert executor_meta["max_workers"] == 3
+    assert len(sleep_calls) == 1
+    expected_wait = 0.1 - 0.02 + 0.5 * 0.05
+    assert sleep_calls[0] == pytest.approx(expected_wait)
+
+
+def test_cli_head_precheck_handles_head_hostile(download_modules, monkeypatch, tmp_path):
+    downloader = download_modules.downloader
+    resolvers = download_modules.resolvers
+    from DocsToKG.ContentDownload import network as network_module
+
+    work = {
+        "id": "https://openalex.org/WHEAD",
+        "title": "Head Hostile",
+        "publication_year": 2024,
+        "ids": {"doi": "10.1000/head"},
+        "open_access": {"oa_url": None},
+        "best_oa_location": {"pdf_url": "https://example.org/hostile.pdf"},
+        "primary_location": {},
+        "locations": [],
+    }
+
+    monkeypatch.setattr(downloader, "iterate_openalex", lambda *a, **k: iter([work]))
+    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
+
+    head_calls: List[str] = []
+
+    class _HeadResponse:
+        status_code = 405
+        headers: Dict[str, str] = {}
+
+        def close(self) -> None:
+            return None
+
+    class _StreamResponse:
+        def __init__(self) -> None:
+            self.status_code = 200
+            self.headers = {"Content-Type": "application/pdf"}
+            self.closed = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            self.close()
+
+        def iter_content(self, chunk_size: int = 1024):
+            yield b"%PDF"
+
+        def close(self) -> None:
+            self.closed = True
+
+    responses = [_HeadResponse(), _StreamResponse()]
+
+    def fake_request(session, method, url, **kwargs):
+        head_calls.append(method)
+        return responses.pop(0)
+
+    monkeypatch.setattr(network_module, "request_with_retries", fake_request)
+
+    class RecordingPipeline:
+        def __init__(self, *_, logger=None, metrics=None, **kwargs):
+            self.logger = logger
+            self.metrics = metrics
+
+        def run(self, session, artifact, context=None):
+            passed = network_module.head_precheck(session, artifact.pdf_urls[0], timeout=3.0)
+            assert passed is True
+            pdf_path = artifact.pdf_dir / f"{artifact.base_stem}.pdf"
+            pdf_path.parent.mkdir(parents=True, exist_ok=True)
+            pdf_path.write_bytes(b"%PDF-1.4\n%%EOF")
+            outcome = resolvers.DownloadOutcome(
+                classification="pdf",
+                path=str(pdf_path),
+                http_status=200,
+                content_type="application/pdf",
+                elapsed_ms=4.0,
+                error=None,
+            )
+            self.logger.log_attempt(
+                resolvers.AttemptRecord(
+                    work_id=artifact.work_id,
+                    resolver_name="stub",
+                    resolver_order=1,
+                    url=artifact.pdf_urls[0],
+                    status="pdf",
+                    http_status=200,
+                    content_type="application/pdf",
+                    elapsed_ms=4.0,
+                    dry_run=False,
+                )
+            )
+            self.metrics.record_attempt("stub", outcome)
+            return resolvers.PipelineResult(
+                success=True,
+                resolver_name="stub",
+                url=artifact.pdf_urls[0],
+                outcome=outcome,
+                html_paths=[],
+                failed_urls=[],
+            )
+
+    monkeypatch.setattr(downloader, "ResolverPipeline", RecordingPipeline)
+
+    manifest_path = tmp_path / "manifest.jsonl"
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "download_pyalex_pdfs.py",
+            "--topic",
+            "head hostile",
+            "--year-start",
+            "2024",
+            "--year-end",
+            "2024",
+            "--out",
+            str(out_dir),
+            "--manifest",
+            str(manifest_path),
+        ],
+    )
+
+    downloader.main()
+
+    assert head_calls == ["HEAD", "GET"]
+
+
+def test_cli_attempt_records_cover_all_resolvers(download_modules, monkeypatch, tmp_path):
+    downloader = download_modules.downloader
+    resolvers = download_modules.resolvers
+
+    works = [
+        {
+            "id": "https://openalex.org/WATTEMPT",
+            "title": "Attempt Coverage",
+            "publication_year": 2024,
+            "ids": {"doi": "10.1000/attempt"},
+            "open_access": {"oa_url": None},
+            "best_oa_location": {"pdf_url": "https://example.org/coverage.pdf"},
+            "primary_location": {},
+            "locations": [],
+        }
+    ]
+
+    resolver_order = ["alpha", "beta", "gamma"]
+
+    class StubResolver:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+    monkeypatch.setattr(downloader, "iterate_openalex", lambda *a, **k: iter(works))
+    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    monkeypatch.setattr(
+        downloader, "default_resolvers", lambda: [StubResolver(name) for name in resolver_order]
+    )
+
+    class RecordingPipeline:
+        def __init__(self, *, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **_):
+            self.resolvers = resolvers or []
+            self.logger = logger
+            self.metrics = metrics
+
+        def run(self, session, artifact, context=None):
+            for order, resolver in enumerate(self.resolvers, start=1):
+                self.logger.log_attempt(
+                    resolvers.AttemptRecord(
+                        work_id=artifact.work_id,
+                        resolver_name=resolver.name,
+                        resolver_order=order,
+                        url=f"https://example.org/{resolver.name}.pdf",
+                        status="skipped" if order < len(self.resolvers) else "pdf",
+                        http_status=200,
+                        content_type="application/pdf",
+                        elapsed_ms=order * 1.0,
+                        dry_run=False,
+                    )
+                )
+            outcome = resolvers.DownloadOutcome(
+                classification="pdf",
+                path=str(artifact.pdf_dir / f"{artifact.base_stem}.pdf"),
+                http_status=200,
+                content_type="application/pdf",
+                elapsed_ms=10.0,
+                error=None,
+            )
+            self.logger.log_manifest(
+                downloader.build_manifest_entry(
+                    artifact,
+                    resolver="gamma",
+                    url="https://example.org/gamma.pdf",
+                    outcome=outcome,
+                    html_paths=[],
+                    dry_run=False,
+                )
+            )
+            self.metrics.record_attempt("gamma", outcome)
+            return resolvers.PipelineResult(
+                success=True,
+                resolver_name="gamma",
+                url="https://example.org/gamma.pdf",
+                outcome=outcome,
+                html_paths=[],
+                failed_urls=[],
+            )
+
+    monkeypatch.setattr(downloader, "ResolverPipeline", RecordingPipeline)
+
+    manifest_path = tmp_path / "manifest.jsonl"
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "download_pyalex_pdfs.py",
+            "--topic",
+            "attempt records",
+            "--year-start",
+            "2024",
+            "--year-end",
+            "2024",
+            "--out",
+            str(out_dir),
+            "--manifest",
+            str(manifest_path),
+        ],
+    )
+
+    downloader.main()
+
+    entries = [
+        json.loads(line) for line in manifest_path.read_text(encoding="utf-8").strip().splitlines()
+    ]
+    attempt_entries = [entry for entry in entries if entry.get("record_type") == "attempt"]
+    assert [entry["resolver_name"] for entry in attempt_entries] == resolver_order
+    assert [entry["resolver_order"] for entry in attempt_entries] == [1, 2, 3]
+
+
+def test_cli_dry_run_metrics_align(download_modules, monkeypatch, tmp_path):
+    downloader = download_modules.downloader
+    resolvers = download_modules.resolvers
+
+    works = [
+        {
+            "id": f"https://openalex.org/WDRY{i}",
+            "title": f"Dry Run {i}",
+            "publication_year": 2024,
+            "ids": {"doi": f"10.1000/dry{i}"},
+            "open_access": {"oa_url": None},
+            "best_oa_location": {"pdf_url": f"https://example.org/dry{i}.pdf"},
+            "primary_location": {},
+            "locations": [],
+        }
+        for i in range(2)
+    ]
+
+    monkeypatch.setattr(downloader, "iterate_openalex", lambda *a, **k: iter(works))
+    monkeypatch.setattr(downloader, "resolve_topic_id_if_needed", lambda value, *_: value)
+    monkeypatch.setattr(downloader, "default_resolvers", lambda: [])
+
+    class RecordingPipeline:
+        def __init__(self, *_, logger=None, metrics=None, **kwargs):
+            self.logger = logger
+            self.metrics = metrics
+
+        def run(self, session, artifact, context=None):
+            assert context and context.get("dry_run") is True
+            outcome = resolvers.DownloadOutcome(
+                classification="pdf",
+                path=None,
+                http_status=200,
+                content_type="application/pdf",
+                elapsed_ms=2.0,
+                error=None,
+            )
+            self.metrics.record_attempt("stub", outcome)
+            return resolvers.PipelineResult(
+                success=True,
+                resolver_name="stub",
+                url="https://example.org/dry.pdf",
+                outcome=outcome,
+                html_paths=[],
+                failed_urls=[],
+            )
+
+    monkeypatch.setattr(downloader, "ResolverPipeline", RecordingPipeline)
+
+    manifest_path = tmp_path / "manifest.jsonl"
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "download_pyalex_pdfs.py",
+            "--topic",
+            "dry metrics",
+            "--year-start",
+            "2024",
+            "--year-end",
+            "2024",
+            "--out",
+            str(out_dir),
+            "--manifest",
+            str(manifest_path),
+            "--dry-run",
+        ],
+    )
+
+    downloader.main()
+
+    lines = manifest_path.read_text(encoding="utf-8").strip().splitlines()
+    records = [json.loads(line) for line in lines]
+    manifest_rows = [record for record in records if record.get("record_type") == "manifest"]
+    assert len(manifest_rows) == len(works)
+    assert all(row["dry_run"] is True for row in manifest_rows)
+
+    metrics_path = manifest_path.with_suffix(".metrics.json")
+    metrics_doc = json.loads(metrics_path.read_text(encoding="utf-8"))
+    assert metrics_doc["processed"] == len(works)
+    assert metrics_doc["saved"] == len(works)
+    assert metrics_doc["resolvers"]["attempts"]["stub"] == len(works)
 
 
 def test_envrc_configures_virtualenv_and_pythonpath() -> None:

@@ -1,3 +1,72 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.docparsing.test_cli_and_tripwires",
+#   "purpose": "Pytest coverage for docparsing cli and tripwires scenarios",
+#   "sections": [
+#     {
+#       "id": "_token_counting_stub",
+#       "name": "_TokenCountingStub",
+#       "anchor": "TOKE",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_make_rec",
+#       "name": "_make_rec",
+#       "anchor": "MR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_reload_cli_modules",
+#       "name": "_reload_cli_modules",
+#       "anchor": "RCM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_chunk_and_embed_cli_with_dependency_stubs",
+#       "name": "test_chunk_and_embed_cli_with_dependency_stubs",
+#       "anchor": "TCAEC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_scripts_respect_data_root",
+#       "name": "test_scripts_respect_data_root",
+#       "anchor": "TSRDR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_load_jsonl",
+#       "name": "_load_jsonl",
+#       "anchor": "LJ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_golden_chunk_count_and_hash",
+#       "name": "test_golden_chunk_count_and_hash",
+#       "anchor": "TGCCA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_golden_vectors_hashes",
+#       "name": "test_golden_vectors_hashes",
+#       "anchor": "TGVH",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_coalesce_small_runs_idempotent",
+#       "name": "test_coalesce_small_runs_idempotent",
+#       "anchor": "TCSRI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_coalesce_small_runs_handles_unicode",
+#       "name": "test_coalesce_small_runs_handles_unicode",
+#       "anchor": "TCSRH",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """DocParsing CLI, path resolution, and trip-wire regression tests."""
 
 from __future__ import annotations
@@ -173,7 +242,7 @@ def test_scripts_respect_data_root(tmp_path: Path) -> None:
     expected = {
         "DocTagsFiles",
         "ChunkedDocTagFiles",
-        "Vectors",
+        "Embeddings",
         "HTML",
         "PDFs",
     }

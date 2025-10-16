@@ -1,4 +1,25 @@
 #!/usr/bin/env python3
+# === NAVMAP v1 ===
+# {
+#   "module": "docs.scripts.build_docs",
+#   "purpose": "Documentation tooling for build docs workflows",
+#   "sections": [
+#     {
+#       "id": "docs_builder",
+#       "name": "DocsBuilder",
+#       "anchor": "DOCS",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Documentation Build Script
 

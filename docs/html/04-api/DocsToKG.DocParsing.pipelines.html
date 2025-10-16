@@ -79,6 +79,8 @@
   <section id="module-pipelines">
 <h1>1. Module: pipelines<a class="headerlink" href="#module-pipelines" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.pipelines</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>DocParsing Pipeline Utilities</p>
 <p>This module hosts the PDF → DocTags conversion workflow <em>and</em> shared helpers
 used by other DocParsing pipelines. It coordinates vLLM server lifecycle,
@@ -101,8 +103,41 @@ args = parser.parse_args([&quot;--data-root&quot;, &quot;/datasets/Data&quot;])
 exit_code = pipelines.pdf_main(args)
 </pre></div>
 </div>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="looks-like-filesystem-path-candidate">
+<h3><code class="docutils literal notranslate"><span class="pre">_looks_like_filesystem_path(candidate)</span></code><a class="headerlink" href="#looks-like-filesystem-path-candidate" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when <code class="docutils literal notranslate"><span class="pre">candidate</span></code> appears to reference a local path.</p>
+</section>
+<section id="expand-path-path">
+<h3><code class="docutils literal notranslate"><span class="pre">_expand_path(path)</span></code><a class="headerlink" href="#expand-path-path" title="Link to this heading"></a></h3>
+<p>Expand a filesystem path to an absolute :class:<code class="docutils literal notranslate"><span class="pre">Path</span></code>.</p>
+</section>
+<section id="resolve-hf-home">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_hf_home()</span></code><a class="headerlink" href="#resolve-hf-home" title="Link to this heading"></a></h3>
+<p>Resolve the HuggingFace cache directory respecting <code class="docutils literal notranslate"><span class="pre">HF_HOME</span></code>.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Path: Absolute location of the HuggingFace cache directory.</p>
+</section>
+<section id="resolve-model-root">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_model_root()</span></code><a class="headerlink" href="#resolve-model-root" title="Link to this heading"></a></h3>
+<p>Resolve DocsToKG model root with environment override.</p>
+<p>Args:
+None</p>
+<p>Returns:
+Path: Absolute model root directory for DocsToKG artifacts.</p>
+</section>
+<section id="resolve-pdf-model-path-cli-value">
+<h3><code class="docutils literal notranslate"><span class="pre">resolve_pdf_model_path(cli_value)</span></code><a class="headerlink" href="#resolve-pdf-model-path-cli-value" title="Link to this heading"></a></h3>
+<p>Determine PDF model path using CLI and environment precedence.</p>
+<p>Args:
+cli_value: Optional CLI supplied path or model identifier.</p>
+<p>Returns:
+str: Absolute filesystem path or HuggingFace model identifier to use.</p>
+</section>
 <section id="add-data-root-option-parser">
 <h3><code class="docutils literal notranslate"><span class="pre">add_data_root_option(parser)</span></code><a class="headerlink" href="#add-data-root-option-parser" title="Link to this heading"></a></h3>
 <p>Attach the shared <code class="docutils literal notranslate"><span class="pre">--data-root</span></code> option to a CLI parser.</p>
@@ -492,7 +527,7 @@ IndexError: If <code class="docutils literal notranslate"><span class="pre">inde
 </section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="pdftask">
 <h3><code class="docutils literal notranslate"><span class="pre">PdfTask</span></code><a class="headerlink" href="#pdftask" title="Link to this heading"></a></h3>
 <p>Work item representing a single PDF conversion request.</p>
@@ -504,7 +539,9 @@ input_hash: Content hash representing the PDF for change detection.
 doc_id: Identifier derived from the PDF path for manifest entries.
 output_path: Final DocTags artifact location.
 served_model_names: Collection of aliases configured for the vLLM server.
-inference_model: Primary model name used when issuing chat completions.</p>
+inference_model: Primary model name used when issuing chat completions.
+vlm_prompt: Prompt text passed to the VLM for PDF page conversion.
+vlm_stop: Stop tokens used to terminate VLM generation.</p>
 <p>Examples:</p>
 <blockquote>
 <div><blockquote>
@@ -518,6 +555,8 @@ inference_model: Primary model name used when issuing chat completions.</p>
 …     Path(“/tmp/out/doc.doctags”),
 …     (“granite-docling-258M”,),
 …     “granite-docling-258M”,
+…     “Convert this page to docling.”,
+…     (”</doctag>”, “&lt;|end_of_text|&gt;”),
 … )
 task.doc_id
 ‘doc’</p>

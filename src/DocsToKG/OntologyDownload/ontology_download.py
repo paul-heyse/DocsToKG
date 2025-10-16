@@ -1,3 +1,780 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.ontology_download",
+#   "purpose": "Implements DocsToKG.OntologyDownload.ontology_download behaviors and helpers",
+#   "sections": [
+#     {
+#       "id": "retry_with_backoff",
+#       "name": "retry_with_backoff",
+#       "anchor": "RWB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sanitize_filename",
+#       "name": "sanitize_filename",
+#       "anchor": "SF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "generate_correlation_id",
+#       "name": "generate_correlation_id",
+#       "anchor": "GCI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "mask_sensitive_data",
+#       "name": "mask_sensitive_data",
+#       "anchor": "MSD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "config_error",
+#       "name": "ConfigError",
+#       "anchor": "CONF",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "ensure_python_version",
+#       "name": "ensure_python_version",
+#       "anchor": "EPV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_coerce_sequence",
+#       "name": "_coerce_sequence",
+#       "anchor": "CS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "logging_configuration",
+#       "name": "LoggingConfiguration",
+#       "anchor": "LOGG",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validation_config",
+#       "name": "ValidationConfig",
+#       "anchor": "VALI",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "parse_rate_limit_to_rps",
+#       "name": "parse_rate_limit_to_rps",
+#       "anchor": "PRLTR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "download_configuration",
+#       "name": "DownloadConfiguration",
+#       "anchor": "DOWN",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "defaults_config",
+#       "name": "DefaultsConfig",
+#       "anchor": "DEFA",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolved_config",
+#       "name": "ResolvedConfig",
+#       "anchor": "RESO",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "environment_overrides",
+#       "name": "EnvironmentOverrides",
+#       "anchor": "ENVI",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get_env_overrides",
+#       "name": "get_env_overrides",
+#       "anchor": "GEO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_apply_env_overrides",
+#       "name": "_apply_env_overrides",
+#       "anchor": "AEO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_make_fetch_spec",
+#       "name": "_make_fetch_spec",
+#       "anchor": "MFS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "merge_defaults",
+#       "name": "merge_defaults",
+#       "anchor": "MD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build_resolved_config",
+#       "name": "build_resolved_config",
+#       "anchor": "BRC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_validate_schema",
+#       "name": "_validate_schema",
+#       "anchor": "VS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load_raw_yaml",
+#       "name": "load_raw_yaml",
+#       "anchor": "LRY",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load_config",
+#       "name": "load_config",
+#       "anchor": "LC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate_config",
+#       "name": "validate_config",
+#       "anchor": "VC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "json_formatter",
+#       "name": "JSONFormatter",
+#       "anchor": "JSON",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_compress_old_log",
+#       "name": "_compress_old_log",
+#       "anchor": "COL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_cleanup_logs",
+#       "name": "_cleanup_logs",
+#       "anchor": "CL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "setup_logging",
+#       "name": "setup_logging",
+#       "anchor": "SL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_create_stub_module",
+#       "name": "_create_stub_module",
+#       "anchor": "CSM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_create_stub_bnode",
+#       "name": "_create_stub_bnode",
+#       "anchor": "CSB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_create_stub_literal",
+#       "name": "_create_stub_literal",
+#       "anchor": "CSL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_create_stub_uri",
+#       "name": "_create_stub_uri",
+#       "anchor": "CSU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_stub_namespace",
+#       "name": "_StubNamespace",
+#       "anchor": "STUB",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_stub_namespace_manager",
+#       "name": "_StubNamespaceManager",
+#       "anchor": "STUB1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_import_module",
+#       "name": "_import_module",
+#       "anchor": "IM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_create_pystow_stub",
+#       "name": "_create_pystow_stub",
+#       "anchor": "CPS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_stub_graph",
+#       "name": "_StubGraph",
+#       "anchor": "STUB2",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_create_rdflib_stub",
+#       "name": "_create_rdflib_stub",
+#       "anchor": "CRS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_create_pronto_stub",
+#       "name": "_create_pronto_stub",
+#       "anchor": "CPS1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_create_owlready_stub",
+#       "name": "_create_owlready_stub",
+#       "anchor": "COS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get_pystow",
+#       "name": "get_pystow",
+#       "anchor": "GP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get_rdflib",
+#       "name": "get_rdflib",
+#       "anchor": "GR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get_pronto",
+#       "name": "get_pronto",
+#       "anchor": "GP1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get_owlready2",
+#       "name": "get_owlready2",
+#       "anchor": "GO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "storage_backend",
+#       "name": "StorageBackend",
+#       "anchor": "STOR",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_safe_identifiers",
+#       "name": "_safe_identifiers",
+#       "anchor": "SI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_directory_size",
+#       "name": "_directory_size",
+#       "anchor": "DS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "local_storage_backend",
+#       "name": "LocalStorageBackend",
+#       "anchor": "LOCA",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "fsspec_storage_backend",
+#       "name": "FsspecStorageBackend",
+#       "anchor": "FSSP",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "get_storage_backend",
+#       "name": "get_storage_backend",
+#       "anchor": "GSB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_log_download_memory",
+#       "name": "_log_download_memory",
+#       "anchor": "LDM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "download_result",
+#       "name": "DownloadResult",
+#       "anchor": "DOWN1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "download_failure",
+#       "name": "DownloadFailure",
+#       "anchor": "DOWN2",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "token_bucket",
+#       "name": "TokenBucket",
+#       "anchor": "TOKE",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_is_retryable_status",
+#       "name": "_is_retryable_status",
+#       "anchor": "IRS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_enforce_idn_safety",
+#       "name": "_enforce_idn_safety",
+#       "anchor": "EIS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_rebuild_netloc",
+#       "name": "_rebuild_netloc",
+#       "anchor": "RN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate_url_security",
+#       "name": "validate_url_security",
+#       "anchor": "VUS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sha256_file",
+#       "name": "sha256_file",
+#       "anchor": "SF1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_validate_member_path",
+#       "name": "_validate_member_path",
+#       "anchor": "VMP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_check_compression_ratio",
+#       "name": "_check_compression_ratio",
+#       "anchor": "CCR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract_zip_safe",
+#       "name": "extract_zip_safe",
+#       "anchor": "EZS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract_tar_safe",
+#       "name": "extract_tar_safe",
+#       "anchor": "ETS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract_archive_safe",
+#       "name": "extract_archive_safe",
+#       "anchor": "EAS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "streaming_downloader",
+#       "name": "StreamingDownloader",
+#       "anchor": "STRE",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_get_bucket",
+#       "name": "_get_bucket",
+#       "anchor": "GB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "download_stream",
+#       "name": "download_stream",
+#       "anchor": "DS1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validation_request",
+#       "name": "ValidationRequest",
+#       "anchor": "VALI1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validation_result",
+#       "name": "ValidationResult",
+#       "anchor": "VALI2",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validation_timeout",
+#       "name": "ValidationTimeout",
+#       "anchor": "VALI3",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_log_validation_memory",
+#       "name": "_log_validation_memory",
+#       "anchor": "LVM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_write_validation_json",
+#       "name": "_write_validation_json",
+#       "anchor": "WVJ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_python_merge_sort",
+#       "name": "_python_merge_sort",
+#       "anchor": "PMS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_term_to_string",
+#       "name": "_term_to_string",
+#       "anchor": "TTS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_canonicalize_turtle",
+#       "name": "_canonicalize_turtle",
+#       "anchor": "CT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_canonicalize_blank_nodes_line",
+#       "name": "_canonicalize_blank_nodes_line",
+#       "anchor": "CBNL",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_sort_triple_file",
+#       "name": "_sort_triple_file",
+#       "anchor": "STF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize_streaming",
+#       "name": "normalize_streaming",
+#       "anchor": "NS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validator_subprocess_error",
+#       "name": "ValidatorSubprocessError",
+#       "anchor": "VALI4",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_worker_pronto",
+#       "name": "_worker_pronto",
+#       "anchor": "WP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_worker_owlready2",
+#       "name": "_worker_owlready2",
+#       "anchor": "WO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_run_validator_subprocess",
+#       "name": "_run_validator_subprocess",
+#       "anchor": "RVS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_run_with_timeout",
+#       "name": "_run_with_timeout",
+#       "anchor": "RWT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_prepare_xbrl_package",
+#       "name": "_prepare_xbrl_package",
+#       "anchor": "PXP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate_rdflib",
+#       "name": "validate_rdflib",
+#       "anchor": "VR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate_pronto",
+#       "name": "validate_pronto",
+#       "anchor": "VP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate_owlready2",
+#       "name": "validate_owlready2",
+#       "anchor": "VO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate_robot",
+#       "name": "validate_robot",
+#       "anchor": "VR1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate_arelle",
+#       "name": "validate_arelle",
+#       "anchor": "VA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_load_validator_plugins",
+#       "name": "_load_validator_plugins",
+#       "anchor": "LVP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_run_validator_task",
+#       "name": "_run_validator_task",
+#       "anchor": "RVT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "run_validators",
+#       "name": "run_validators",
+#       "anchor": "RV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_run_worker_cli",
+#       "name": "_run_worker_cli",
+#       "anchor": "RWC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "get_manifest_schema",
+#       "name": "get_manifest_schema",
+#       "anchor": "GMS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "validate_manifest_dict",
+#       "name": "validate_manifest_dict",
+#       "anchor": "VMD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ontology_download_error",
+#       "name": "OntologyDownloadError",
+#       "anchor": "ONTO",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolver_error",
+#       "name": "ResolverError",
+#       "anchor": "RESO1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validation_error",
+#       "name": "ValidationError",
+#       "anchor": "VALI5",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "configuration_error",
+#       "name": "ConfigurationError",
+#       "anchor": "CONF1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "fetch_spec",
+#       "name": "FetchSpec",
+#       "anchor": "FETC",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "fetch_result",
+#       "name": "FetchResult",
+#       "anchor": "FETC1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "manifest",
+#       "name": "Manifest",
+#       "anchor": "MANI",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolver",
+#       "name": "Resolver",
+#       "anchor": "RESO2",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "resolver_candidate",
+#       "name": "ResolverCandidate",
+#       "anchor": "RESO3",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "planned_fetch",
+#       "name": "PlannedFetch",
+#       "anchor": "PLAN",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "parse_http_datetime",
+#       "name": "parse_http_datetime",
+#       "anchor": "PHD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse_iso_datetime",
+#       "name": "parse_iso_datetime",
+#       "anchor": "PID",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse_version_timestamp",
+#       "name": "parse_version_timestamp",
+#       "anchor": "PVT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "infer_version_timestamp",
+#       "name": "infer_version_timestamp",
+#       "anchor": "IVT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_coerce_datetime",
+#       "name": "_coerce_datetime",
+#       "anchor": "CD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_normalize_timestamp",
+#       "name": "_normalize_timestamp",
+#       "anchor": "NT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_populate_plan_metadata",
+#       "name": "_populate_plan_metadata",
+#       "anchor": "PPM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_migrate_manifest_inplace",
+#       "name": "_migrate_manifest_inplace",
+#       "anchor": "MMI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_read_manifest",
+#       "name": "_read_manifest",
+#       "anchor": "RM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_validate_manifest",
+#       "name": "_validate_manifest",
+#       "anchor": "VM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_parse_last_modified",
+#       "name": "_parse_last_modified",
+#       "anchor": "PLM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_fetch_last_modified",
+#       "name": "_fetch_last_modified",
+#       "anchor": "FLM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_write_manifest",
+#       "name": "_write_manifest",
+#       "anchor": "WM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_build_destination",
+#       "name": "_build_destination",
+#       "anchor": "BD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_ensure_license_allowed",
+#       "name": "_ensure_license_allowed",
+#       "anchor": "ELA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_resolver_candidates",
+#       "name": "_resolver_candidates",
+#       "anchor": "RC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_resolve_plan_with_fallback",
+#       "name": "_resolve_plan_with_fallback",
+#       "anchor": "RPWF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetch_one",
+#       "name": "fetch_one",
+#       "anchor": "FO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plan_one",
+#       "name": "plan_one",
+#       "anchor": "PO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "plan_all",
+#       "name": "plan_all",
+#       "anchor": "PA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "fetch_all",
+#       "name": "fetch_all",
+#       "anchor": "FA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_safe_lock_component",
+#       "name": "_safe_lock_component",
+#       "anchor": "SLC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_version_lock",
+#       "name": "_version_lock",
+#       "anchor": "VL",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Unified ontology downloader orchestrating settings, retries, and logging."""
 
 # ruff: noqa: E402
@@ -363,12 +1140,29 @@ class ValidationConfig(BaseModel):
 _RATE_LIMIT_PATTERN = re.compile(r"^([\d.]+)/(second|sec|s|minute|min|m|hour|h)$")
 
 
-def parse_rate_limit_to_rps(limit_str: Optional[str]) -> Optional[float]:
-    """Convert a rate limit expression into requests-per-second."""
+def parse_rate_limit_to_rps(limit_str: str) -> Optional[float]:
+    """Convert a rate limit expression into requests-per-second.
 
-    if not limit_str:
+    The accepted format is ``<value>/<unit>`` where ``unit`` is one of
+    ``second``, ``minute``, or ``hour`` (including short aliases such as ``s``
+    or ``min``). The function returns ``None`` when the value cannot be parsed.
+
+    Args:
+        limit_str: Rate limit expression in ``value/unit`` form.
+
+    Returns:
+        Optional[float]: Requests-per-second value when parsing succeeds.
+
+    Raises:
+        ValueError: If the numeric component cannot be converted to ``float``.
+    """
+
+    if not isinstance(limit_str, str):
         return None
-    match = _RATE_LIMIT_PATTERN.match(limit_str)
+    candidate = limit_str.strip()
+    if not candidate:
+        return None
+    match = _RATE_LIMIT_PATTERN.match(candidate)
     if not match:
         return None
     value = float(match.group(1))
@@ -491,6 +1285,8 @@ class DownloadConfiguration(BaseModel):
         """
 
         limit_str = self.rate_limits.get(service)
+        if limit_str is None:
+            return None
         return parse_rate_limit_to_rps(limit_str)
 
     def normalized_allowed_hosts(self) -> Optional[Tuple[Set[str], Set[str]]]:
@@ -3467,20 +4263,9 @@ def download_stream(
 
 
 # --- Validation utilities ---
-import argparse
-import contextlib
-from contextlib import contextmanager
-import heapq
 import logging
-import platform
 import re
-import subprocess
-import tempfile
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
-from itertools import islice
-from typing import BinaryIO, Iterator
 
 rdflib = get_rdflib()
 pronto = get_pronto()
@@ -4549,7 +5334,9 @@ def run_validators(
                 results[request.name] = future.result()
             except Exception as exc:  # pragma: no cover - defensive guard
                 payload = {"ok": False, "error": str(exc)}
-                _write_validation_json(request.validation_dir / f"{request.name}_parse.json", payload)
+                _write_validation_json(
+                    request.validation_dir / f"{request.name}_parse.json", payload
+                )
                 logger.error(
                     "validator crashed",
                     extra={
@@ -5078,7 +5865,17 @@ class PlannedFetch:
 
 
 def parse_http_datetime(value: Optional[str]) -> Optional[datetime]:
-    """Parse HTTP ``Last-Modified`` style timestamps into UTC datetimes."""
+    """Parse HTTP ``Last-Modified`` style timestamps into UTC datetimes.
+
+    Args:
+        value: Timestamp string from HTTP headers such as ``Last-Modified``.
+
+    Returns:
+        Optional[datetime]: Normalized UTC datetime when parsing succeeds.
+
+    Raises:
+        None: Parsing failures are converted into a ``None`` return value.
+    """
 
     if not value:
         return None
@@ -5092,7 +5889,17 @@ def parse_http_datetime(value: Optional[str]) -> Optional[datetime]:
 
 
 def parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
-    """Parse ISO-8601 timestamps into timezone-aware UTC datetimes."""
+    """Parse ISO-8601 timestamps into timezone-aware UTC datetimes.
+
+    Args:
+        value: ISO-8601 formatted timestamp string.
+
+    Returns:
+        Optional[datetime]: Normalized UTC datetime when parsing succeeds.
+
+    Raises:
+        None: Invalid values return ``None`` instead of raising.
+    """
 
     if not value or not isinstance(value, str):
         return None
@@ -5110,7 +5917,17 @@ def parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
 
 
 def parse_version_timestamp(value: Optional[str]) -> Optional[datetime]:
-    """Parse version strings or manifest timestamps into UTC datetimes."""
+    """Parse version strings or manifest timestamps into UTC datetimes.
+
+    Args:
+        value: Version identifier or timestamp string to normalize.
+
+    Returns:
+        Optional[datetime]: Parsed UTC datetime when the input matches supported formats.
+
+    Raises:
+        None: All parsing failures result in ``None``.
+    """
 
     if not value or not isinstance(value, str):
         return None
@@ -5158,7 +5975,17 @@ def parse_version_timestamp(value: Optional[str]) -> Optional[datetime]:
 
 
 def infer_version_timestamp(value: Optional[str]) -> Optional[datetime]:
-    """Infer a timestamp from resolver version identifiers."""
+    """Infer a timestamp from resolver version identifiers.
+
+    Args:
+        value: Resolver version string containing date-like fragments.
+
+    Returns:
+        Optional[datetime]: Parsed UTC datetime when the value contains recoverable dates.
+
+    Raises:
+        None: Returns ``None`` instead of raising on unparseable inputs.
+    """
 
     if not value:
         return None
@@ -5660,7 +6487,21 @@ def fetch_one(
     logger: Optional[logging.Logger] = None,
     force: bool = False,
 ) -> FetchResult:
-    """Fetch, validate, and persist a single ontology described by *spec*."""
+    """Fetch, validate, and persist a single ontology described by *spec*.
+
+    Args:
+        spec: Ontology fetch specification describing sources and formats.
+        config: Optional resolved configuration overriding global defaults.
+        correlation_id: Correlation identifier for structured logging.
+        logger: Optional logger to reuse instead of configuring a new one.
+        force: When ``True``, bypass local cache checks and redownload artifacts.
+
+    Returns:
+        FetchResult: Structured result containing manifest metadata and resolver attempts.
+
+    Raises:
+        ResolverError: If all resolver candidates fail to retrieve the ontology.
+    """
 
     ensure_python_version()
     active_config = config or ResolvedConfig.from_defaults()
@@ -5742,9 +6583,7 @@ def fetch_one(
                     },
                 )
 
-                pending_secure_url = validate_url_security(
-                    candidate.plan.url, download_config
-                )
+                pending_secure_url = validate_url_security(candidate.plan.url, download_config)
                 result = download_stream(
                     url=pending_secure_url,
                     destination=pending_destination,
@@ -5886,9 +6725,7 @@ def fetch_one(
                     fingerprint=fingerprint,
                     etag=result.etag,
                     last_modified=result.last_modified,
-                    downloaded_at=datetime.now(timezone.utc)
-                    .isoformat()
-                    .replace("+00:00", "Z"),
+                    downloaded_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                     target_formats=effective_spec.target_formats,
                     validation=validation_results,
                     artifacts=artifacts,
@@ -5942,9 +6779,7 @@ def fetch_one(
                     },
                 )
                 continue
-            raise OntologyDownloadError(
-                f"Download failed for '{pending_spec.id}': {exc}"
-            ) from exc
+            raise OntologyDownloadError(f"Download failed for '{pending_spec.id}': {exc}") from exc
         except Exception as exc:
             last_error = exc
             attempt_record.update({"status": "error", "error": str(exc)})
@@ -5955,9 +6790,7 @@ def fetch_one(
         raise OntologyDownloadError(f"All resolver candidates failed for '{spec.id}'")
     if isinstance(last_error, ConfigurationError):
         raise last_error
-    raise OntologyDownloadError(
-        f"Download failed for '{spec.id}': {last_error}"
-    ) from last_error
+    raise OntologyDownloadError(f"Download failed for '{spec.id}': {last_error}") from last_error
 
 
 def plan_one(
@@ -6300,6 +7133,8 @@ __all__ = [
     "get_manifest_schema",
     "validate_manifest_dict",
 ]
+
+
 def _safe_lock_component(value: str) -> str:
     """Return a filesystem-safe token for lock filenames."""
 
@@ -6314,7 +7149,9 @@ def _version_lock(ontology_id: str, version: str) -> Iterator[None]:
 
     lock_dir = CACHE_DIR / "locks"
     lock_dir.mkdir(parents=True, exist_ok=True)
-    lock_path = lock_dir / f"{_safe_lock_component(ontology_id)}__{_safe_lock_component(version)}.lock"
+    lock_path = (
+        lock_dir / f"{_safe_lock_component(ontology_id)}__{_safe_lock_component(version)}.lock"
+    )
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+b") as handle:
         handle.seek(0, os.SEEK_END)

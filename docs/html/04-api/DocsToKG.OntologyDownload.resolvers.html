@@ -79,14 +79,17 @@
   <section id="module-resolvers">
 <h1>1. Module: resolvers<a class="headerlink" href="#module-resolvers" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.resolvers</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Ontology resolver implementations.</p>
 <p>This module defines the strategies that translate planner specifications into
 actionable fetch plans. Each resolver applies polite headers, unified retry
 logic, SPDX-normalized licensing, and service-specific rate limits while
 participating in the automatic fallback chains described in the ontology
 download refactor. New resolvers can be registered through the <code class="docutils literal notranslate"><span class="pre">RESOLVERS</span></code> map.</p>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="normalize-license-to-spdx-value">
 <h3><code class="docutils literal notranslate"><span class="pre">normalize_license_to_spdx(value)</span></code><a class="headerlink" href="#normalize-license-to-spdx-value" title="Link to this heading"></a></h3>
 <p>Normalize common license strings to canonical SPDX identifiers.</p>
@@ -101,6 +104,14 @@ cleaned original value or <code class="docutils literal notranslate"><span class
 <section id="get-service-bucket-service-config">
 <h3><code class="docutils literal notranslate"><span class="pre">_get_service_bucket(service,</span> <span class="pre">config)</span></code><a class="headerlink" href="#get-service-bucket-service-config" title="Link to this heading"></a></h3>
 <p>Return a token bucket for resolver API requests respecting rate limits.</p>
+</section>
+<section id="load-resolver-plugins-logger">
+<h3><code class="docutils literal notranslate"><span class="pre">_load_resolver_plugins(logger)</span></code><a class="headerlink" href="#load-resolver-plugins-logger" title="Link to this heading"></a></h3>
+<p>Discover resolver plugins registered via Python entry points.</p>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">_load_resolver_plugins(logger)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<p>Discover resolver plugins registered via Python entry points.</p>
 </section>
 <section id="execute-with-retry-self-func">
 <h3><code class="docutils literal notranslate"><span class="pre">_execute_with_retry(self,</span> <span class="pre">func)</span></code><a class="headerlink" href="#execute-with-retry-self-func" title="Link to this heading"></a></h3>
@@ -167,8 +178,8 @@ FetchPlan pointing to the preferred download URL.</p>
 <p>Raises:
 ConfigError: If no download URL can be derived.</p>
 </section>
-<section id="id1">
-<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<section id="id2">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
 <p>Discover download locations via the OLS API.</p>
 <p>Args:
 spec: Fetch specification containing ontology identifiers and extras.
@@ -187,8 +198,8 @@ self: Resolver instance requesting the API key.</p>
 <p>Returns:
 Optional[str]: API key string stripped of whitespace, or <code class="docutils literal notranslate"><span class="pre">None</span></code> when missing.</p>
 </section>
-<section id="id2">
-<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<section id="id3">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
 <p>Resolve BioPortal download URLs and authorization headers.</p>
 <p>Args:
 spec: Fetch specification with optional API extras like acronyms.
@@ -207,8 +218,8 @@ ConfigError: If authentication fails or no download link is available.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">_iter_dicts(payload)</span></code><a class="headerlink" href="#iter-dicts-payload" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
-<section id="id3">
-<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<section id="id4">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
 <p>Discover download metadata from the LOV API.</p>
 <p>Args:
 spec: Fetch specification providing ontology identifier and extras.
@@ -219,8 +230,8 @@ FetchPlan describing the resolved download URL and metadata.</p>
 <p>Raises:
 ConfigError: If required metadata is missing or the LOV API fails.</p>
 </section>
-<section id="id4">
-<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<section id="id5">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
 <p>Return a fetch plan for explicitly provided SKOS URLs.</p>
 <p>Args:
 spec: Fetch specification containing the <code class="docutils literal notranslate"><span class="pre">extras.url</span></code> field.
@@ -231,8 +242,8 @@ FetchPlan with the provided URL and appropriate media type.</p>
 <p>Raises:
 ConfigError: If the specification omits the required URL.</p>
 </section>
-<section id="id5">
-<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
+<section id="id6">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
 <p>Return a fetch plan for XBRL ZIP archives provided via extras.</p>
 <p>Args:
 spec: Fetch specification containing the upstream download URL.
@@ -243,8 +254,8 @@ FetchPlan referencing the specified ZIP archive.</p>
 <p>Raises:
 ConfigError: If the specification omits the required URL.</p>
 </section>
-<section id="id6">
-<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
+<section id="id7">
+<h3><code class="docutils literal notranslate"><span class="pre">plan(self,</span> <span class="pre">spec,</span> <span class="pre">config,</span> <span class="pre">logger)</span></code><a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
 <p>Return a fetch plan pointing to Ontobee-managed PURLs.</p>
 <p>Args:
 spec: Fetch specification describing the ontology identifier and preferred formats.
@@ -269,7 +280,7 @@ ConfigError: If the ontology identifier is invalid.</p>
 </section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="fetchplan">
 <h3><code class="docutils literal notranslate"><span class="pre">FetchPlan</span></code><a class="headerlink" href="#fetchplan" title="Link to this heading"></a></h3>
 <p>Concrete plan output from a resolver.</p>

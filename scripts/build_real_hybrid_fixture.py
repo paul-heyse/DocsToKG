@@ -1,4 +1,121 @@
 #!/usr/bin/env python3
+# === NAVMAP v1 ===
+# {
+#   "module": "scripts.build_real_hybrid_fixture",
+#   "purpose": "Utility script for build real hybrid fixture workflows",
+#   "sections": [
+#     {
+#       "id": "fixture_document",
+#       "name": "FixtureDocument",
+#       "anchor": "FIXT",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_parse_namespaces",
+#       "name": "_parse_namespaces",
+#       "anchor": "PN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse_args",
+#       "name": "parse_args",
+#       "anchor": "PA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "list_candidate_docs",
+#       "name": "list_candidate_docs",
+#       "anchor": "LCD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load_jsonl",
+#       "name": "load_jsonl",
+#       "anchor": "LJ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write_jsonl",
+#       "name": "write_jsonl",
+#       "anchor": "WJ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sha256_digest",
+#       "name": "sha256_digest",
+#       "anchor": "SD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "repo_relative",
+#       "name": "repo_relative",
+#       "anchor": "RR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "clean_chunk_records",
+#       "name": "clean_chunk_records",
+#       "anchor": "CCR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "derive_title",
+#       "name": "derive_title",
+#       "anchor": "DT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "derive_query",
+#       "name": "derive_query",
+#       "anchor": "DQ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build_fixture_document",
+#       "name": "build_fixture_document",
+#       "anchor": "BFD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write_manifest",
+#       "name": "write_manifest",
+#       "anchor": "WM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write_queries",
+#       "name": "write_queries",
+#       "anchor": "WQ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write_dataset_jsonl",
+#       "name": "write_dataset_jsonl",
+#       "anchor": "WDJ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write_readme",
+#       "name": "write_readme",
+#       "anchor": "WR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure_output_dir",
+#       "name": "ensure_output_dir",
+#       "anchor": "EOD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Real Vector Fixture Builder
 

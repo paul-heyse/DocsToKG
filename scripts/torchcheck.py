@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "scripts.torchcheck",
+#   "purpose": "Utility script for torchcheck workflows",
+#   "sections": [
+#     {
+#       "id": "module-overview",
+#       "name": "module_overview",
+#       "anchor": "OVR",
+#       "kind": "infra"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Torch Environment Diagnostics
 

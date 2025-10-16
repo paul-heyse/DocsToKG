@@ -1,3 +1,15 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.service",
+#   "purpose": "Hybrid search orchestration, API facade, and pagination utilities",
+#   "sections": [
+#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
+#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"},
+#     {"id": "public-functions", "name": "Public Functions", "anchor": "api", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Hybrid search orchestration, pagination guards, and synchronous HTTP-style API."""
 
 from __future__ import annotations
@@ -19,8 +31,25 @@ from .types import (
     FusionCandidate,
     HybridSearchRequest,
     HybridSearchResponse,
+    HybridSearchResult,
 )
 from .vectorstore import FaissIndexManager, FaissSearchResult
+
+# --- Globals ---
+
+__all__ = (
+    "ChannelResults",
+    "HybridSearchAPI",
+    "HybridSearchService",
+    "PaginationCheckResult",
+    "RequestValidationError",
+    "build_stats_snapshot",
+    "should_rebuild_index",
+    "verify_pagination",
+)
+
+
+# --- Public Classes ---
 
 
 class RequestValidationError(ValueError):
@@ -193,7 +222,9 @@ class HybridSearchService:
             self._observability.metrics.observe(
                 "hybrid_search_timings_total_ms", timings["fusion_ms"]
             )
-            next_cursor = self._build_cursor(shaped, request.page_size)
+            paged_results = self._slice_from_cursor(shaped, request.cursor)
+            next_cursor = self._build_cursor(paged_results, request.page_size)
+            page_results = paged_results[: request.page_size]
             self._observability.logger.info(
                 "hybrid-search",
                 extra={
@@ -206,7 +237,7 @@ class HybridSearchService:
                 },
             )
             return HybridSearchResponse(
-                results=shaped[: request.page_size],
+                results=page_results,
                 next_cursor=next_cursor,
                 total_candidates=len(unique_candidates),
                 timings_ms=timings,
@@ -220,7 +251,30 @@ class HybridSearchService:
         if request.page_size > 1000:
             raise RequestValidationError("page_size exceeds maximum")
 
-    def _build_cursor(self, results: Sequence[ChunkPayload], page_size: int) -> Optional[str]:
+    def _slice_from_cursor(
+        self, results: Sequence[HybridSearchResult], cursor: Optional[str]
+    ) -> List[HybridSearchResult]:
+        if not cursor:
+            return list(results)
+        try:
+            vector_id, rank_str = cursor.rsplit(":", 1)
+            target_rank = int(rank_str)
+        except (ValueError, TypeError):
+            return list(results)
+
+        sliced: List[HybridSearchResult] = []
+        skipping = True
+        for result in results:
+            if skipping:
+                if result.vector_id == vector_id and result.fused_rank == target_rank:
+                    skipping = False
+                continue
+            sliced.append(result)
+        if skipping:
+            return list(results)
+        return sliced
+
+    def _build_cursor(self, results: Sequence[HybridSearchResult], page_size: int) -> Optional[str]:
         if len(results) <= page_size:
             return None
         last = results[page_size - 1]
@@ -469,6 +523,9 @@ class PaginationCheckResult:
     duplicate_detected: bool
 
 
+# --- Public Functions ---
+
+
 def build_stats_snapshot(
     faiss_index: FaissIndexManager,
     opensearch: OpenSearchSimulator,
@@ -556,15 +613,3 @@ def should_rebuild_index(
     if total == 0:
         return False
     return deleted_since_snapshot / total >= threshold
-
-
-__all__ = [
-    "ChannelResults",
-    "PaginationCheckResult",
-    "HybridSearchAPI",
-    "HybridSearchService",
-    "RequestValidationError",
-    "build_stats_snapshot",
-    "should_rebuild_index",
-    "verify_pagination",
-]

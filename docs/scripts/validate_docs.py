@@ -1,4 +1,25 @@
 #!/usr/bin/env python3
+# === NAVMAP v1 ===
+# {
+#   "module": "docs.scripts.validate_docs",
+#   "purpose": "Documentation tooling for validate docs workflows",
+#   "sections": [
+#     {
+#       "id": "documentation_validator",
+#       "name": "DocumentationValidator",
+#       "anchor": "DOCU",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Documentation Validation Script
 

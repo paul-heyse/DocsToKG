@@ -1,3 +1,270 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.hybrid_search.test_suite",
+#   "purpose": "Pytest coverage for hybrid search suite scenarios",
+#   "sections": [
+#     {
+#       "id": "_build_config",
+#       "name": "_build_config",
+#       "anchor": "BC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dataset",
+#       "name": "dataset",
+#       "anchor": "DATA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stack",
+#       "name": "stack",
+#       "anchor": "STAC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_to_documents",
+#       "name": "_to_documents",
+#       "anchor": "TD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_write_document_artifacts",
+#       "name": "_write_document_artifacts",
+#       "anchor": "WDA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_hybrid_retrieval_end_to_end",
+#       "name": "test_hybrid_retrieval_end_to_end",
+#       "anchor": "THRET",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_reingest_updates_dense_and_sparse_channels",
+#       "name": "test_reingest_updates_dense_and_sparse_channels",
+#       "anchor": "TRUDA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_validation_harness_reports",
+#       "name": "test_validation_harness_reports",
+#       "anchor": "TVHR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_schema_manager_bootstrap_and_registration",
+#       "name": "test_schema_manager_bootstrap_and_registration",
+#       "anchor": "TSMBA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_api_post_hybrid_search_success_and_validation",
+#       "name": "test_api_post_hybrid_search_success_and_validation",
+#       "anchor": "TAPHS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_operations_snapshot_and_restore_roundtrip",
+#       "name": "test_operations_snapshot_and_restore_roundtrip",
+#       "anchor": "TOSAR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_ingest_missing_vector_raises",
+#       "name": "test_ingest_missing_vector_raises",
+#       "anchor": "TIMVR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_faiss_index_uses_registry_bridge",
+#       "name": "test_faiss_index_uses_registry_bridge",
+#       "anchor": "TFIUR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_build_config",
+#       "name": "_build_config",
+#       "anchor": "BC1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "real_dataset",
+#       "name": "real_dataset",
+#       "anchor": "RD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_to_documents",
+#       "name": "_to_documents",
+#       "anchor": "TD1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "stack",
+#       "name": "stack",
+#       "anchor": "STAC1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_real_fixture_ingest_and_search",
+#       "name": "test_real_fixture_ingest_and_search",
+#       "anchor": "TRFIA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_real_fixture_reingest_and_reports",
+#       "name": "test_real_fixture_reingest_and_reports",
+#       "anchor": "TRFRA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_real_fixture_api_roundtrip",
+#       "name": "test_real_fixture_api_roundtrip",
+#       "anchor": "TRFAR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_remove_ids_cpu_fallback",
+#       "name": "test_remove_ids_cpu_fallback",
+#       "anchor": "TRICF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "scale_dataset",
+#       "name": "scale_dataset",
+#       "anchor": "SD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_build_config",
+#       "name": "_build_config",
+#       "anchor": "BC2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "scale_stack",
+#       "name": "scale_stack",
+#       "anchor": "SS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_hybrid_scale_suite",
+#       "name": "test_hybrid_scale_suite",
+#       "anchor": "THSS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_toy_data",
+#       "name": "_toy_data",
+#       "anchor": "TD2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_target_device",
+#       "name": "_target_device",
+#       "anchor": "TD3",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_make_id_resolver",
+#       "name": "_make_id_resolver",
+#       "anchor": "MIR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_emit_vectors",
+#       "name": "_emit_vectors",
+#       "anchor": "EV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_assert_gpu_index",
+#       "name": "_assert_gpu_index",
+#       "anchor": "AGI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_gpu_flat_end_to_end",
+#       "name": "test_gpu_flat_end_to_end",
+#       "anchor": "TGFET",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_gpu_ivf_flat_build_and_search",
+#       "name": "test_gpu_ivf_flat_build_and_search",
+#       "anchor": "TGIFB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_gpu_ivfpq_build_and_search",
+#       "name": "test_gpu_ivfpq_build_and_search",
+#       "anchor": "TGIBA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_gpu_cosine_against_corpus",
+#       "name": "test_gpu_cosine_against_corpus",
+#       "anchor": "TGCAC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_gpu_clone_strict_coarse_quantizer",
+#       "name": "test_gpu_clone_strict_coarse_quantizer",
+#       "anchor": "TGCSC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_gpu_near_duplicate_detection_filters_duplicates",
+#       "name": "test_gpu_near_duplicate_detection_filters_duplicates",
+#       "anchor": "TGNDD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_gpu_nprobe_applied_during_search",
+#       "name": "test_gpu_nprobe_applied_during_search",
+#       "anchor": "TGNAD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_gpu_similarity_uses_supplied_device",
+#       "name": "test_gpu_similarity_uses_supplied_device",
+#       "anchor": "TGSUS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_operations_shim_emits_warning_and_reexports",
+#       "name": "test_operations_shim_emits_warning_and_reexports",
+#       "anchor": "TOSEW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_results_shim_emits_warning_and_reexports",
+#       "name": "test_results_shim_emits_warning_and_reexports",
+#       "anchor": "TRSEW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_similarity_shim_emits_warning_and_reexports",
+#       "name": "test_similarity_shim_emits_warning_and_reexports",
+#       "anchor": "TSSEW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_retrieval_shim_emits_warning_and_reexports",
+#       "name": "test_retrieval_shim_emits_warning_and_reexports",
+#       "anchor": "RSEW1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_schema_shim_emits_warning_and_reexports",
+#       "name": "test_schema_shim_emits_warning_and_reexports",
+#       "anchor": "SSEW1",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Consolidated hybrid search test suite."""
 
 from __future__ import annotations
@@ -1141,8 +1408,7 @@ def test_operations_shim_emits_warning_and_reexports() -> None:
         module = importlib.import_module(module_name)
 
     assert any(
-        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning
-        for w in caught
+        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning for w in caught
     ), "Importing the shim should emit a deprecation warning"
     assert module.serialize_state is serialize_state
     assert module.restore_state is restore_state
@@ -1158,8 +1424,7 @@ def test_results_shim_emits_warning_and_reexports() -> None:
         module = importlib.import_module(module_name)
 
     assert any(
-        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning
-        for w in caught
+        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning for w in caught
     ), "Importing the shim should emit a deprecation warning"
     assert module.ResultShaper is ResultShaper
 
@@ -1173,8 +1438,7 @@ def test_similarity_shim_emits_warning_and_reexports() -> None:
         module = importlib.import_module(module_name)
 
     assert any(
-        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning
-        for w in caught
+        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning for w in caught
     ), "Importing the shim should emit a deprecation warning"
     assert module.normalize_rows is normalize_rows
     assert module.cosine_against_corpus_gpu is cosine_against_corpus_gpu
@@ -1191,8 +1455,7 @@ def test_retrieval_shim_emits_warning_and_reexports() -> None:
         module = importlib.import_module(module_name)
 
     assert any(
-        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning
-        for w in caught
+        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning for w in caught
     ), "Importing the shim should emit a deprecation warning"
     assert module.HybridSearchService is HybridSearchService
     assert module.HybridSearchAPI is HybridSearchAPI
@@ -1210,8 +1473,7 @@ def test_schema_shim_emits_warning_and_reexports() -> None:
         module = importlib.import_module(module_name)
 
     assert any(
-        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning
-        for w in caught
+        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning for w in caught
     ), "Importing the shim should emit a deprecation warning"
     assert module.OpenSearchSchemaManager is OpenSearchSchemaManager
     assert module.OpenSearchIndexTemplate is OpenSearchIndexTemplate

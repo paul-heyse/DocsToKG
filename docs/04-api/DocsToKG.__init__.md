@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.__init__``.
 
+## 1. Overview
+
 DocsToKG Main Package
 
 This package provides the core functionality for DocsToKG (Document to Knowledge Graph),
@@ -30,7 +32,7 @@ Usage:
 
 For detailed API documentation, see the docs/04-api/ directory.
 
-## 1. Functions
+## 2. Functions
 
 ### `ping()`
 

@@ -1,3 +1,72 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "docs.examples.document_processor",
+#   "purpose": "Example workflow for document processor",
+#   "sections": [
+#     {
+#       "id": "processing_config",
+#       "name": "ProcessingConfig",
+#       "anchor": "PROC",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "entity",
+#       "name": "Entity",
+#       "anchor": "ENTI",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "processing_result",
+#       "name": "ProcessingResult",
+#       "anchor": "PROC1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "document_processor",
+#       "name": "DocumentProcessor",
+#       "anchor": "DOCU",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "example_usage",
+#       "name": "example_usage",
+#       "anchor": "EU",
+#       "kind": "async-function"
+#     },
+#     {
+#       "id": "document_processing_error",
+#       "name": "DocumentProcessingError",
+#       "anchor": "DOCU1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "configuration_error",
+#       "name": "ConfigurationError",
+#       "anchor": "CONF",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "document_not_found_error",
+#       "name": "DocumentNotFoundError",
+#       "anchor": "DOCU2",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validation_error",
+#       "name": "ValidationError",
+#       "anchor": "VALI",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "model_load_error",
+#       "name": "ModelLoadError",
+#       "anchor": "MODE",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Document Processing Service - Example Implementation
 

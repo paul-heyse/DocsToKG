@@ -1,3 +1,78 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.logging.test_outputs",
+#   "purpose": "Pytest coverage for logging outputs scenarios",
+#   "sections": [
+#     {
+#       "id": "test_jsonl_sink_attempt_records_include_wall_time",
+#       "name": "test_jsonl_sink_attempt_records_include_wall_time",
+#       "anchor": "TJSAR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_multi_sink_synchronizes_timestamps",
+#       "name": "test_multi_sink_synchronizes_timestamps",
+#       "anchor": "TMSST",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_csv_sink_close_closes_file",
+#       "name": "test_csv_sink_close_closes_file",
+#       "anchor": "TCSCC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_csv_adapter_close_closes_file",
+#       "name": "test_csv_adapter_close_closes_file",
+#       "anchor": "TCACC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_jsonl_sink_writes_valid_records",
+#       "name": "test_jsonl_sink_writes_valid_records",
+#       "anchor": "TJSWV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_export_attempts_csv",
+#       "name": "test_export_attempts_csv",
+#       "anchor": "TEAC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_attempt_record",
+#       "name": "_attempt_record",
+#       "anchor": "AR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_jsonl_sink_thread_safety",
+#       "name": "test_jsonl_sink_thread_safety",
+#       "anchor": "TJSTS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_multi_sink_thread_safety",
+#       "name": "test_multi_sink_thread_safety",
+#       "anchor": "TMSTS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_manifest_index_sink_writes_sorted_index",
+#       "name": "test_manifest_index_sink_writes_sorted_index",
+#       "anchor": "TMISW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_last_attempt_csv_sink_writes_latest_entries",
+#       "name": "test_last_attempt_csv_sink_writes_latest_entries",
+#       "anchor": "TLACS",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 import csv
 import json
 from concurrent.futures import ThreadPoolExecutor
@@ -9,7 +84,9 @@ pytest.importorskip("requests")
 pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload.download_pyalex_pdfs import (  # noqa: E402
+    CsvAttemptLoggerAdapter,
     CsvSink,
+    JsonlLogger,
     JsonlSink,
     LastAttemptCsvSink,
     ManifestEntry,

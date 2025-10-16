@@ -1,3 +1,14 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.config",
+#   "purpose": "Hybrid search configuration models and file-backed manager",
+#   "sections": [
+#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
+#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Configuration models and manager for hybrid search.
 
@@ -13,6 +24,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
 from typing import Any, Dict, Literal, Optional
+
+# --- Globals ---
+
+__all__ = (
+    "ChunkingConfig",
+    "DenseIndexConfig",
+    "FusionConfig",
+    "HybridSearchConfig",
+    "HybridSearchConfigManager",
+    "RetrievalConfig",
+)
+
+
+# --- Public Classes ---
 
 
 @dataclass(frozen=True)

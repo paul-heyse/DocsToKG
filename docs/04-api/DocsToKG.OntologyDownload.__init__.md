@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.__init__``.
 
+## 1. Overview
+
 Public API for the DocsToKG ontology downloader and resolver pipeline.
 
 This facade exposes the primary fetch utilities used by external callers to

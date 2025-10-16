@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.DocParsing.pipelines``.
 
+## 1. Overview
+
 DocParsing Pipeline Utilities
 
 This module hosts the PDF → DocTags conversion workflow _and_ shared helpers
@@ -25,7 +27,45 @@ Usage:
     args = parser.parse_args(["--data-root", "/datasets/Data"])
     exit_code = pipelines.pdf_main(args)
 
-## 1. Functions
+## 2. Functions
+
+### `_looks_like_filesystem_path(candidate)`
+
+Return ``True`` when ``candidate`` appears to reference a local path.
+
+### `_expand_path(path)`
+
+Expand a filesystem path to an absolute :class:`Path`.
+
+### `resolve_hf_home()`
+
+Resolve the HuggingFace cache directory respecting ``HF_HOME``.
+
+Args:
+None
+
+Returns:
+Path: Absolute location of the HuggingFace cache directory.
+
+### `resolve_model_root()`
+
+Resolve DocsToKG model root with environment override.
+
+Args:
+None
+
+Returns:
+Path: Absolute model root directory for DocsToKG artifacts.
+
+### `resolve_pdf_model_path(cli_value)`
+
+Determine PDF model path using CLI and environment precedence.
+
+Args:
+cli_value: Optional CLI supplied path or model identifier.
+
+Returns:
+str: Absolute filesystem path or HuggingFace model identifier to use.
 
 ### `add_data_root_option(parser)`
 
@@ -456,7 +496,7 @@ PDF path when ``index`` is ``0``.
 Raises:
 IndexError: If ``index`` is not ``0``.
 
-## 2. Classes
+## 3. Classes
 
 ### `PdfTask`
 
@@ -471,6 +511,8 @@ doc_id: Identifier derived from the PDF path for manifest entries.
 output_path: Final DocTags artifact location.
 served_model_names: Collection of aliases configured for the vLLM server.
 inference_model: Primary model name used when issuing chat completions.
+vlm_prompt: Prompt text passed to the VLM for PDF page conversion.
+vlm_stop: Stop tokens used to terminate VLM generation.
 
 Examples:
 >>> task = PdfTask(
@@ -482,6 +524,8 @@ Examples:
 ...     Path("/tmp/out/doc.doctags"),
 ...     ("granite-docling-258M",),
 ...     "granite-docling-258M",
+...     "Convert this page to docling.",
+...     ("</doctag>", "<|end_of_text|>"),
 ... )
 >>> task.doc_id
 'doc'

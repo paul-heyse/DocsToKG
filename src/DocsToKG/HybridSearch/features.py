@@ -1,3 +1,15 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.features",
+#   "purpose": "Feature extraction utilities for hybrid search pipelines",
+#   "sections": [
+#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
+#     {"id": "public-functions", "name": "Public Functions", "anchor": "api", "kind": "api"},
+#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Feature generation utilities for SPLADE weights and dense embeddings."""
 
 from __future__ import annotations
@@ -12,7 +24,19 @@ from numpy.typing import NDArray
 
 from .types import ChunkFeatures
 
+# --- Globals ---
+
+__all__ = (
+    "FeatureGenerator",
+    "sliding_window",
+    "tokenize",
+    "tokenize_with_spans",
+)
+
 _TOKEN_PATTERN = re.compile(r"[\w']+")
+
+
+# --- Public Functions ---
 
 
 def tokenize(text: str) -> List[str]:
@@ -78,6 +102,9 @@ def sliding_window(tokens: Sequence[str], window: int, overlap: int) -> Iterator
         end = min(len(tokens), start + window)
         yield list(tokens[start:end])
         start += step
+
+
+# --- Public Classes ---
 
 
 class FeatureGenerator:

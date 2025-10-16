@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.DocParsing.serializers``.
 
+## 1. Overview
+
 DocParsing Rich Serializers
 
 This module extends Docling serializers to capture captions, classifications,
@@ -24,7 +26,7 @@ Dependencies:
 - docling_core: Supplies Docling data structures and base serializer classes.
 - typing_extensions.override: Ensures subclass overrides remain explicit.
 
-## 1. Functions
+## 2. Functions
 
 ### `serialize(self)`
 
@@ -49,7 +51,7 @@ doc: Docling document to serialize into DocTags-compatible chunks.
 Returns:
 Chunking serializer configured with Markdown enrichments.
 
-## 2. Classes
+## 3. Classes
 
 ### `CaptionPlusAnnotationPictureSerializer`
 

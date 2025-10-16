@@ -1,3 +1,78 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.conftest",
+#   "purpose": "Shared pytest fixtures for ontology download",
+#   "sections": [
+#     {
+#       "id": "_stub_requests_module",
+#       "name": "_StubRequestsModule",
+#       "anchor": "STUB",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_request_exception",
+#       "name": "_RequestException",
+#       "anchor": "REQU",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_http_error",
+#       "name": "_HTTPError",
+#       "anchor": "HTTP",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_timeout",
+#       "name": "_Timeout",
+#       "anchor": "TIME",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_connection_error",
+#       "name": "_ConnectionError",
+#       "anchor": "CONN",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_ssl_error",
+#       "name": "_SSLError",
+#       "anchor": "SSLE",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_stub_session",
+#       "name": "_StubSession",
+#       "anchor": "STUB1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_stub_response",
+#       "name": "_StubResponse",
+#       "anchor": "STUB2",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_placeholder_client",
+#       "name": "_PlaceholderClient",
+#       "anchor": "PLAC",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_reset_build_destination",
+#       "name": "_reset_build_destination",
+#       "anchor": "RBD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_ontology_env",
+#       "name": "_ontology_env",
+#       "anchor": "OE",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Ontology Test Environment Stubs
 

@@ -1,3 +1,18 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.OntologyDownload.optdeps",
+#   "purpose": "Implements DocsToKG.OntologyDownload.optdeps behaviors and helpers",
+#   "sections": [
+#     {
+#       "id": "_opt_deps_proxy",
+#       "name": "_OptDepsProxy",
+#       "anchor": "OPTD",
+#       "kind": "class"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Optional dependency helpers for the ontology downloader."""
 
 from __future__ import annotations
@@ -29,7 +44,16 @@ _MUTABLE_EXPORTS = {
 
 
 class _OptDepsProxy(ModuleType):
-    """Module proxy that forwards access to ``ontology_download`` internals."""
+    """Module proxy that forwards access to ``ontology_download`` internals.
+
+    Attributes:
+        __slots__: Prevents accidental attribute assignment on the proxy type.
+
+    Examples:
+        >>> proxy = _OptDepsProxy('DocsToKG.OntologyDownload.optdeps')
+        >>> callable(proxy.get_rdflib)
+        True
+    """
 
     __slots__ = ()
 
@@ -51,9 +75,11 @@ class _OptDepsProxy(ModuleType):
 
 
 _proxy = _OptDepsProxy(__name__)
-_proxy.__dict__.update({
-    "__doc__": __doc__,
-    "__all__": tuple(_FORWARD_EXPORTS),
-})
+_proxy.__dict__.update(
+    {
+        "__doc__": __doc__,
+        "__all__": tuple(_FORWARD_EXPORTS),
+    }
+)
 # Register the proxy so future imports receive the forwarding module.
 sys.modules[__name__] = _proxy

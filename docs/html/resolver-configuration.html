@@ -155,6 +155,40 @@ seconds per domain:</p>
 <p>Domain-level limits complement existing resolver-level throttles and are
 particularly helpful when multiple providers resolve to the same host.</p>
 </section>
+<section id="staging-mode-and-derived-logs">
+<h2>5. Staging Mode and Derived Logs<a class="headerlink" href="#staging-mode-and-derived-logs" title="Link to this heading"></a></h2>
+<p>Long-running harvests benefit from isolated output folders and richer manifest
+artifacts. The downloader exposes a <code class="docutils literal notranslate"><span class="pre">--staging</span></code> flag that creates a timestamped
+run directory containing all artifacts for that invocation:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.download_pyalex_pdfs<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--topic<span class="w"> </span><span class="s2">&quot;graph embeddings&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--year-start<span class="w"> </span><span class="m">2022</span><span class="w"> </span>--year-end<span class="w"> </span><span class="m">2024</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--out<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--staging
+</pre></div>
+</div>
+<p>With staging enabled the CLI writes:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">runs/YYYYMMDD_HHMM/PDF/</span></code> for downloaded PDFs</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">runs/YYYYMMDD_HHMM/HTML/</span></code> for captured HTML fallbacks</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">runs/YYYYMMDD_HHMM/manifest.jsonl</span></code> for manifest records</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">runs/YYYYMMDD_HHMM/manifest.index.json</span></code> for a work → artifact summary</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">runs/YYYYMMDD_HHMM/manifest.metrics.json</span></code> for aggregate resolver metrics</p></li>
+</ul>
+<p>When <code class="docutils literal notranslate"><span class="pre">--log-format</span> <span class="pre">csv</span></code> is supplied the downloader still emits JSONL manifests
+and additionally produces a <code class="docutils literal notranslate"><span class="pre">manifest.last.csv</span></code> file that captures the latest
+manifest record per work for rapid auditing:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>DocsToKG.ContentDownload.download_pyalex_pdfs<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--topic<span class="w"> </span><span class="s2">&quot;graph embeddings&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--year-start<span class="w"> </span><span class="m">2022</span><span class="w"> </span>--year-end<span class="w"> </span><span class="m">2024</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--out<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--manifest<span class="w"> </span>./runs/manifest.jsonl<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--log-format<span class="w"> </span>csv
+</pre></div>
+</div>
+<p>The CSV header follows the manifest schema (<code class="docutils literal notranslate"><span class="pre">work_id</span></code>, <code class="docutils literal notranslate"><span class="pre">resolver</span></code>, <code class="docutils literal notranslate"><span class="pre">classification</span></code>,
+<code class="docutils literal notranslate"><span class="pre">sha256</span></code>, etc.) enabling downstream tooling to consume it without parsing JSONL.</p>
+</section>
 </section>
 
 

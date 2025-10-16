@@ -2,9 +2,11 @@
 
 This reference documents the DocsToKG module ``DocsToKG.HybridSearch.validation``.
 
+## 1. Overview
+
 Automated validation harness for the hybrid search stack.
 
-## 1. Functions
+## 2. Functions
 
 ### `load_dataset(path)`
 
@@ -30,21 +32,37 @@ dataset: Sequence of dataset entries containing vector metadata.
 Returns:
 Inferred embedding dimensionality, defaulting to 2560 when unknown.
 
+### `run_pytest_suites(mode, extra_args)`
+
+Execute hybrid search pytest suites for the requested ``mode``.
+
+Args:
+mode: Selector for which regression suites to invoke (synthetic, real, scale).
+extra_args: Additional pytest arguments forwarded from the CLI.
+
+Returns:
+int: Process return code from the invoked pytest command.
+
+### `run_real_vector_ci(output_dir, extra_args)`
+
+Execute the real-vector CI regression suite and persist validation artifacts.
+
+Args:
+output_dir: Directory where validation artifacts should be written.
+extra_args: Additional pytest arguments appended to each command invocation.
+
+Returns:
+int: Non-zero exit code indicates regression failure; zero means success.
+
 ### `main(argv)`
 
-CLI entrypoint for running hybrid search validation suites and consolidated
-pytest workflows.
+CLI entrypoint for running hybrid search validation suites.
 
 Args:
 argv: Optional list of command-line arguments overriding `sys.argv`.
 
 Returns:
 None
-
-Notes:
-- ``--mode`` selects between ``basic`` and ``scale`` validation sweeps.
-- ``--run-tests`` forwards to the hybrid search pytest suites (``synthetic``, ``real``, ``scale``, ``all``).
-- ``--run-real-ci`` executes the real-vector regression harness and stores artifacts under ``--output-dir``.
 
 ### `run(self, dataset, output_root)`
 
@@ -382,7 +400,7 @@ query_sample_size: Number of queries to sample for stability checks.
 Returns:
 ValidationReport detailing stability mismatches.
 
-## 2. Classes
+## 3. Classes
 
 ### `HybridSearchValidator`
 

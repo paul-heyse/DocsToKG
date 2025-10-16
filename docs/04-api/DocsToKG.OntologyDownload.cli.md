@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.cli``.
 
+## 1. Overview
+
 Ontology downloader CLI entry points.
 
 The `ontofetch` command exposes planning, pull, validation, diagnostics, and
@@ -11,7 +13,7 @@ outputs, prune historical versions, and run comprehensive `doctor` diagnostics
 without editing configuration files. JSON output modes support automation while
 rich ASCII tables summarise resolver fallback chains and validator results.
 
-## 1. Functions
+## 2. Functions
 
 ### `format_table(headers, rows)`
 
@@ -137,26 +139,6 @@ num: Byte count to format.
 Returns:
 String describing the size using binary units.
 
-### `_directory_size(path)`
-
-Return the cumulative size of files under ``path``.
-
-Args:
-path: Directory whose contents should be measured.
-
-Returns:
-Total number of bytes for regular files within the directory.
-
-### `_parse_version_timestamp(value)`
-
-Parse version or manifest timestamps into UTC datetimes.
-
-Args:
-value: Timestamp string sourced from manifests or version metadata.
-
-Returns:
-Normalized UTC datetime, or ``None`` when parsing fails.
-
 ### `_apply_cli_overrides(config, args)`
 
 Mutate resolved configuration based on CLI override arguments.
@@ -164,16 +146,6 @@ Mutate resolved configuration based on CLI override arguments.
 Args:
 config: Resolved configuration subject to mutation.
 args: Parsed CLI namespace containing override values.
-
-### `_rate_limit_to_rps(value)`
-
-Convert rate limit string into a requests-per-second float.
-
-Args:
-value: Rate limit expression in ``<amount>/<unit>`` form.
-
-Returns:
-Requests-per-second value when parsing succeeds, otherwise ``None``.
 
 ### `_results_to_dict(result)`
 
@@ -203,48 +175,6 @@ plan: Planned fetch data produced by :func:`plan_one` or :func:`plan_all`.
 Returns:
 Mapping containing resolver metadata and planned download details suitable
 for serialization.
-
-### `_parse_iso_datetime(value)`
-
-Parse ISO formatted date strings into timezone-aware datetimes.
-
-### `_parse_http_datetime(value)`
-
-Parse HTTP header datetime strings into timezone-aware datetimes.
-
-Args:
-value: Value sourced from an HTTP ``Date`` or ``Last-Modified`` header.
-
-Returns:
-Datetime in UTC when parsing succeeds, otherwise ``None``.
-
-### `_extract_response_metadata(response)`
-
-Return structured metadata from an HTTP response.
-
-Args:
-response: HTTP response obtained from a requests call.
-
-Returns:
-Mapping containing detected headers such as last-modified, etag, and content length.
-
-### `_collect_plan_metadata(plans, config)`
-
-Augment planned fetches with remote metadata via HEAD requests.
-
-Args:
-plans: Planned fetch objects awaiting metadata enrichment.
-config: Resolved configuration providing HTTP headers and timeouts.
-
-### `_directory_size_bytes(path)`
-
-Return the cumulative size of files within ``path``.
-
-Args:
-path: Directory whose contents should be measured.
-
-Returns:
-Total number of bytes encountered within the directory tree.
 
 ### `_infer_version_timestamp(version)`
 
@@ -293,14 +223,6 @@ ontology_id: Identifier of the ontology to inspect.
 
 Returns:
 List of metadata dictionaries ordered by most recent timestamp first.
-
-### `_update_latest_symlink(ontology_id, target)`
-
-Ensure latest marker references the provided target directory.
-
-Args:
-ontology_id: Ontology identifier whose ``latest`` link should be updated.
-target: Directory containing the version to mark as latest.
 
 ### `_resolve_specs_from_args(args, base_config)`
 

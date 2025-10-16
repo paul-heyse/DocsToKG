@@ -79,6 +79,8 @@
   <section id="module-doclinghybridchunkerpipelinewithmin">
 <h1>1. Module: DoclingHybridChunkerPipelineWithMin<a class="headerlink" href="#module-doclinghybridchunkerpipelinewithmin" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Docling Hybrid Chunker with Minimum Token Coalescence</p>
 <p>Transforms DocTags documents into chunked records with topic-aware coalescence.
 The module exposes a CLI (<code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin</span></code>)
@@ -110,8 +112,18 @@ adjustments to ``--min-tokens`` so chunk sizes remain compatible with the
 embedding stage.
 </pre></div>
 </div>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="compute-relative-doc-id-path-root">
+<h3><code class="docutils literal notranslate"><span class="pre">compute_relative_doc_id(path,</span> <span class="pre">root)</span></code><a class="headerlink" href="#compute-relative-doc-id-path-root" title="Link to this heading"></a></h3>
+<p>Return POSIX-style relative identifier for a document path.</p>
+<p>Args:
+path: Absolute path to the document on disk.
+root: Root directory that anchors relative identifiers.</p>
+<p>Returns:
+str: POSIX-style relative path suitable for manifest IDs.</p>
+</section>
 <section id="read-utf8-p">
 <h3><code class="docutils literal notranslate"><span class="pre">read_utf8(p)</span></code><a class="headerlink" href="#read-utf8-p" title="Link to this heading"></a></h3>
 <p>Load text from disk using UTF-8 with replacement for invalid bytes.</p>
@@ -238,7 +250,7 @@ True if the chunk length is less than <code class="docutils literal notranslate"
 </section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="rec">
 <h3><code class="docutils literal notranslate"><span class="pre">Rec</span></code><a class="headerlink" href="#rec" title="Link to this heading"></a></h3>
 <p>Intermediate record tracking chunk text and provenance.</p>

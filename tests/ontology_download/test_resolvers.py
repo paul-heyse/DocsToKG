@@ -1,3 +1,168 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_resolvers",
+#   "purpose": "Pytest coverage for ontology download resolvers scenarios",
+#   "sections": [
+#     {
+#       "id": "resolved_config",
+#       "name": "resolved_config",
+#       "anchor": "RC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load_cassette",
+#       "name": "load_cassette",
+#       "anchor": "LC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_obo_resolver_prefers_requested_format",
+#       "name": "test_obo_resolver_prefers_requested_format",
+#       "anchor": "TORPR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_obo_resolver_contract",
+#       "name": "test_obo_resolver_contract",
+#       "anchor": "TORC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_ols_resolver_uses_download_link",
+#       "name": "test_ols_resolver_uses_download_link",
+#       "anchor": "TORUD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_ols_resolver_contract",
+#       "name": "test_ols_resolver_contract",
+#       "anchor": "TORC1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_ols_resolver_applies_polite_headers",
+#       "name": "test_ols_resolver_applies_polite_headers",
+#       "anchor": "TORAP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_bioportal_resolver_includes_api_key",
+#       "name": "test_bioportal_resolver_includes_api_key",
+#       "anchor": "TBRIA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_bioportal_resolver_contract",
+#       "name": "test_bioportal_resolver_contract",
+#       "anchor": "TBRC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_bioportal_resolver_applies_polite_headers",
+#       "name": "test_bioportal_resolver_applies_polite_headers",
+#       "anchor": "TBRAP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_lov_resolver_contract",
+#       "name": "test_lov_resolver_contract",
+#       "anchor": "TLRC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_skos_resolver_requires_url",
+#       "name": "test_skos_resolver_requires_url",
+#       "anchor": "TSRRU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_xbrl_resolver_success",
+#       "name": "test_xbrl_resolver_success",
+#       "anchor": "TXRS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_bioportal_resolver_auth_error",
+#       "name": "test_bioportal_resolver_auth_error",
+#       "anchor": "TBRAE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_ols_resolver_timeout_retry",
+#       "name": "test_ols_resolver_timeout_retry",
+#       "anchor": "TORTR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_ontobee_resolver_contract",
+#       "name": "test_ontobee_resolver_contract",
+#       "anchor": "TORC2",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_resolver_uses_service_rate_limit",
+#       "name": "test_resolver_uses_service_rate_limit",
+#       "anchor": "TRUSR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_lov_resolver_respects_timeout_and_rate_limit",
+#       "name": "test_lov_resolver_respects_timeout_and_rate_limit",
+#       "anchor": "TLRRT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_normalize_license_to_spdx_variants",
+#       "name": "test_normalize_license_to_spdx_variants",
+#       "anchor": "TNLTS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_lov_resolver_parses_metadata",
+#       "name": "test_lov_resolver_parses_metadata",
+#       "anchor": "TLRPM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_lov_resolver_requires_uri",
+#       "name": "test_lov_resolver_requires_uri",
+#       "anchor": "TLRRU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_ontobee_resolver_prefers_format",
+#       "name": "test_ontobee_resolver_prefers_format",
+#       "anchor": "TORPF",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_ontobee_resolver_validates_identifier",
+#       "name": "test_ontobee_resolver_validates_identifier",
+#       "anchor": "TORVI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_resolver_registry_includes_new_entries",
+#       "name": "test_resolver_registry_includes_new_entries",
+#       "anchor": "TRRIN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_resolver_fallback_chain_on_failure",
+#       "name": "test_resolver_fallback_chain_on_failure",
+#       "anchor": "TRFCO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_resolver_plugin_loader_registers_and_warns",
+#       "name": "test_resolver_plugin_loader_registers_and_warns",
+#       "anchor": "TRPLR",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Ontology resolver tests validating resolver contracts."""
 
 import json
@@ -11,9 +176,14 @@ import requests
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
-from DocsToKG.OntologyDownload import ConfigError, DefaultsConfig, FetchSpec, ResolvedConfig
+from DocsToKG.OntologyDownload import (
+    ConfigError,
+    DefaultsConfig,
+    FetchSpec,
+    ResolvedConfig,
+    resolvers,
+)
 from DocsToKG.OntologyDownload import ontology_download as core
-from DocsToKG.OntologyDownload import resolvers
 
 
 @pytest.fixture()

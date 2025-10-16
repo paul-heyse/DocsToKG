@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.HybridSearch.__init__``.
 
+## 1. Overview
+
 Hybrid Search Module for DocsToKG
 
 This module provides comprehensive hybrid search capabilities for DocsToKG,

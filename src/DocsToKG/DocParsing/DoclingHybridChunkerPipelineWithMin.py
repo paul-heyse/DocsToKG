@@ -1,4 +1,85 @@
 #!/usr/bin/env python3
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin",
+#   "purpose": "CLI entry points for DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin workflows",
+#   "sections": [
+#     {
+#       "id": "compute_relative_doc_id",
+#       "name": "compute_relative_doc_id",
+#       "anchor": "CRDI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "read_utf8",
+#       "name": "read_utf8",
+#       "anchor": "RU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build_doc",
+#       "name": "build_doc",
+#       "anchor": "BD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "extract_refs_and_pages",
+#       "name": "extract_refs_and_pages",
+#       "anchor": "ERAP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "summarize_image_metadata",
+#       "name": "summarize_image_metadata",
+#       "anchor": "SIM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "rec",
+#       "name": "Rec",
+#       "anchor": "REC",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "merge_rec",
+#       "name": "merge_rec",
+#       "anchor": "MR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "is_structural_boundary",
+#       "name": "is_structural_boundary",
+#       "anchor": "ISB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "coalesce_small_runs",
+#       "name": "coalesce_small_runs",
+#       "anchor": "CSR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build_parser",
+#       "name": "build_parser",
+#       "anchor": "BP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "parse_args",
+#       "name": "parse_args",
+#       "anchor": "PA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Docling Hybrid Chunker with Minimum Token Coalescence
 
@@ -88,7 +169,15 @@ _LOGGER = get_logger(__name__)
 
 # ---------- Helpers ----------
 def compute_relative_doc_id(path: Path, root: Path) -> str:
-    """Return POSIX-style relative identifier for a document path."""
+    """Return POSIX-style relative identifier for a document path.
+
+    Args:
+        path: Absolute path to the document on disk.
+        root: Root directory that anchors relative identifiers.
+
+    Returns:
+        str: POSIX-style relative path suitable for manifest IDs.
+    """
 
     return path.relative_to(root).as_posix()
 

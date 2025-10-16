@@ -79,6 +79,8 @@
   <section id="module-cli">
 <h1>1. Module: cli<a class="headerlink" href="#module-cli" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.OntologyDownload.cli</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Ontology downloader CLI entry points.</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">ontofetch</span></code> command exposes planning, pull, validation, diagnostics, and
 storage management workflows described in the ontology download refactor.
@@ -86,8 +88,9 @@ Operators can override concurrency and host allowlists from the CLI, diff plan
 outputs, prune historical versions, and run comprehensive <code class="docutils literal notranslate"><span class="pre">doctor</span></code> diagnostics
 without editing configuration files. JSON output modes support automation while
 rich ASCII tables summarise resolver fallback chains and validator results.</p>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="format-table-headers-rows">
 <h3><code class="docutils literal notranslate"><span class="pre">format_table(headers,</span> <span class="pre">rows)</span></code><a class="headerlink" href="#format-table-headers-rows" title="Link to this heading"></a></h3>
 <p>Render a padded ASCII table.</p>
@@ -187,36 +190,12 @@ num: Byte count to format.</p>
 <p>Returns:
 String describing the size using binary units.</p>
 </section>
-<section id="directory-size-path">
-<h3><code class="docutils literal notranslate"><span class="pre">_directory_size(path)</span></code><a class="headerlink" href="#directory-size-path" title="Link to this heading"></a></h3>
-<p>Return the cumulative size of files under <code class="docutils literal notranslate"><span class="pre">path</span></code>.</p>
-<p>Args:
-path: Directory whose contents should be measured.</p>
-<p>Returns:
-Total number of bytes for regular files within the directory.</p>
-</section>
-<section id="parse-version-timestamp-value">
-<h3><code class="docutils literal notranslate"><span class="pre">_parse_version_timestamp(value)</span></code><a class="headerlink" href="#parse-version-timestamp-value" title="Link to this heading"></a></h3>
-<p>Parse version or manifest timestamps into UTC datetimes.</p>
-<p>Args:
-value: Timestamp string sourced from manifests or version metadata.</p>
-<p>Returns:
-Normalized UTC datetime, or <code class="docutils literal notranslate"><span class="pre">None</span></code> when parsing fails.</p>
-</section>
 <section id="apply-cli-overrides-config-args">
 <h3><code class="docutils literal notranslate"><span class="pre">_apply_cli_overrides(config,</span> <span class="pre">args)</span></code><a class="headerlink" href="#apply-cli-overrides-config-args" title="Link to this heading"></a></h3>
 <p>Mutate resolved configuration based on CLI override arguments.</p>
 <p>Args:
 config: Resolved configuration subject to mutation.
 args: Parsed CLI namespace containing override values.</p>
-</section>
-<section id="rate-limit-to-rps-value">
-<h3><code class="docutils literal notranslate"><span class="pre">_rate_limit_to_rps(value)</span></code><a class="headerlink" href="#rate-limit-to-rps-value" title="Link to this heading"></a></h3>
-<p>Convert rate limit string into a requests-per-second float.</p>
-<p>Args:
-value: Rate limit expression in <code class="docutils literal notranslate"><span class="pre">&lt;amount&gt;/&lt;unit&gt;</span></code> form.</p>
-<p>Returns:
-Requests-per-second value when parsing succeeds, otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
 </section>
 <section id="results-to-dict-result">
 <h3><code class="docutils literal notranslate"><span class="pre">_results_to_dict(result)</span></code><a class="headerlink" href="#results-to-dict-result" title="Link to this heading"></a></h3>
@@ -242,41 +221,6 @@ plan: Planned fetch data produced by :func:<code class="docutils literal notrans
 <p>Returns:
 Mapping containing resolver metadata and planned download details suitable
 for serialization.</p>
-</section>
-<section id="parse-iso-datetime-value">
-<h3><code class="docutils literal notranslate"><span class="pre">_parse_iso_datetime(value)</span></code><a class="headerlink" href="#parse-iso-datetime-value" title="Link to this heading"></a></h3>
-<p>Parse ISO formatted date strings into timezone-aware datetimes.</p>
-</section>
-<section id="parse-http-datetime-value">
-<h3><code class="docutils literal notranslate"><span class="pre">_parse_http_datetime(value)</span></code><a class="headerlink" href="#parse-http-datetime-value" title="Link to this heading"></a></h3>
-<p>Parse HTTP header datetime strings into timezone-aware datetimes.</p>
-<p>Args:
-value: Value sourced from an HTTP <code class="docutils literal notranslate"><span class="pre">Date</span></code> or <code class="docutils literal notranslate"><span class="pre">Last-Modified</span></code> header.</p>
-<p>Returns:
-Datetime in UTC when parsing succeeds, otherwise <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
-</section>
-<section id="extract-response-metadata-response">
-<h3><code class="docutils literal notranslate"><span class="pre">_extract_response_metadata(response)</span></code><a class="headerlink" href="#extract-response-metadata-response" title="Link to this heading"></a></h3>
-<p>Return structured metadata from an HTTP response.</p>
-<p>Args:
-response: HTTP response obtained from a requests call.</p>
-<p>Returns:
-Mapping containing detected headers such as last-modified, etag, and content length.</p>
-</section>
-<section id="collect-plan-metadata-plans-config">
-<h3><code class="docutils literal notranslate"><span class="pre">_collect_plan_metadata(plans,</span> <span class="pre">config)</span></code><a class="headerlink" href="#collect-plan-metadata-plans-config" title="Link to this heading"></a></h3>
-<p>Augment planned fetches with remote metadata via HEAD requests.</p>
-<p>Args:
-plans: Planned fetch objects awaiting metadata enrichment.
-config: Resolved configuration providing HTTP headers and timeouts.</p>
-</section>
-<section id="directory-size-bytes-path">
-<h3><code class="docutils literal notranslate"><span class="pre">_directory_size_bytes(path)</span></code><a class="headerlink" href="#directory-size-bytes-path" title="Link to this heading"></a></h3>
-<p>Return the cumulative size of files within <code class="docutils literal notranslate"><span class="pre">path</span></code>.</p>
-<p>Args:
-path: Directory whose contents should be measured.</p>
-<p>Returns:
-Total number of bytes encountered within the directory tree.</p>
 </section>
 <section id="infer-version-timestamp-version">
 <h3><code class="docutils literal notranslate"><span class="pre">_infer_version_timestamp(version)</span></code><a class="headerlink" href="#infer-version-timestamp-version" title="Link to this heading"></a></h3>
@@ -316,13 +260,6 @@ Dictionary representation of the manifest contents.</p>
 ontology_id: Identifier of the ontology to inspect.</p>
 <p>Returns:
 List of metadata dictionaries ordered by most recent timestamp first.</p>
-</section>
-<section id="update-latest-symlink-ontology-id-target">
-<h3><code class="docutils literal notranslate"><span class="pre">_update_latest_symlink(ontology_id,</span> <span class="pre">target)</span></code><a class="headerlink" href="#update-latest-symlink-ontology-id-target" title="Link to this heading"></a></h3>
-<p>Ensure latest marker references the provided target directory.</p>
-<p>Args:
-ontology_id: Ontology identifier whose <code class="docutils literal notranslate"><span class="pre">latest</span></code> link should be updated.
-target: Directory containing the version to mark as latest.</p>
 </section>
 <section id="resolve-specs-from-args-args-base-config">
 <h3><code class="docutils literal notranslate"><span class="pre">_resolve_specs_from_args(args,</span> <span class="pre">base_config)</span></code><a class="headerlink" href="#resolve-specs-from-args-args-base-config" title="Link to this heading"></a></h3>

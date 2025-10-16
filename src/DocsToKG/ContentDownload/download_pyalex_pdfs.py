@@ -1,4 +1,235 @@
 #!/usr/bin/env python3
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.download_pyalex_pdfs",
+#   "purpose": "Implements DocsToKG.ContentDownload.download_pyalex_pdfs behaviors and helpers",
+#   "sections": [
+#     {
+#       "id": "_utc_timestamp",
+#       "name": "_utc_timestamp",
+#       "anchor": "UT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_has_pdf_eof",
+#       "name": "_has_pdf_eof",
+#       "anchor": "HPE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "slugify",
+#       "name": "slugify",
+#       "anchor": "SLUG",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure_dir",
+#       "name": "ensure_dir",
+#       "anchor": "ED",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_parse_domain_interval",
+#       "name": "_parse_domain_interval",
+#       "anchor": "PDI",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_make_session",
+#       "name": "_make_session",
+#       "anchor": "MS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "manifest_entry",
+#       "name": "ManifestEntry",
+#       "anchor": "MANI",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "attempt_sink",
+#       "name": "AttemptSink",
+#       "anchor": "ATTE",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "jsonl_sink",
+#       "name": "JsonlSink",
+#       "anchor": "JSON",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "csv_sink",
+#       "name": "CsvSink",
+#       "anchor": "CSVS",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "csv_attempt_logger_adapter",
+#       "name": "CsvAttemptLoggerAdapter",
+#       "anchor": "CSVA",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "multi_sink",
+#       "name": "MultiSink",
+#       "anchor": "MULT",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "manifest_index_sink",
+#       "name": "ManifestIndexSink",
+#       "anchor": "MANI1",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "last_attempt_csv_sink",
+#       "name": "LastAttemptCsvSink",
+#       "anchor": "LAST",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "load_previous_manifest",
+#       "name": "load_previous_manifest",
+#       "anchor": "LPM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build_manifest_entry",
+#       "name": "build_manifest_entry",
+#       "anchor": "BME",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "classify_payload",
+#       "name": "classify_payload",
+#       "anchor": "CP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_extract_filename_from_disposition",
+#       "name": "_extract_filename_from_disposition",
+#       "anchor": "EFFD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_infer_suffix",
+#       "name": "_infer_suffix",
+#       "anchor": "IS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_update_tail_buffer",
+#       "name": "_update_tail_buffer",
+#       "anchor": "UTB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "work_artifact",
+#       "name": "WorkArtifact",
+#       "anchor": "WORK",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "download_state",
+#       "name": "DownloadState",
+#       "anchor": "DOWN",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_build_download_outcome",
+#       "name": "_build_download_outcome",
+#       "anchor": "BDO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_normalize_pmid",
+#       "name": "_normalize_pmid",
+#       "anchor": "NP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_normalize_arxiv",
+#       "name": "_normalize_arxiv",
+#       "anchor": "NA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_collect_location_urls",
+#       "name": "_collect_location_urls",
+#       "anchor": "CLU",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build_query",
+#       "name": "build_query",
+#       "anchor": "BQ",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "resolve_topic_id_if_needed",
+#       "name": "resolve_topic_id_if_needed",
+#       "anchor": "RTIIN",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "create_artifact",
+#       "name": "create_artifact",
+#       "anchor": "CA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "download_candidate",
+#       "name": "download_candidate",
+#       "anchor": "DC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "read_resolver_config",
+#       "name": "read_resolver_config",
+#       "anchor": "RRC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_seed_resolver_toggle_defaults",
+#       "name": "_seed_resolver_toggle_defaults",
+#       "anchor": "SRTD",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "apply_config_overrides",
+#       "name": "apply_config_overrides",
+#       "anchor": "ACO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "load_resolver_config",
+#       "name": "load_resolver_config",
+#       "anchor": "LRC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "iterate_openalex",
+#       "name": "iterate_openalex",
+#       "anchor": "IO",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "process_one_work",
+#       "name": "process_one_work",
+#       "anchor": "POW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 OpenAlex PDF Downloader CLI
 
@@ -50,7 +281,18 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Protocol, Sequence, Set, Tuple, runtime_checkable
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Protocol,
+    Sequence,
+    Set,
+    Tuple,
+    runtime_checkable,
+)
 from urllib.parse import unquote, urlsplit
 
 import requests
@@ -74,7 +316,6 @@ ResolverMetrics = resolvers.ResolverMetrics
 DownloadOutcome = resolvers.DownloadOutcome
 AttemptRecord = resolvers.AttemptRecord
 default_resolvers = resolvers.default_resolvers
-clear_resolver_caches = resolvers.clear_resolver_caches
 
 MAX_SNIFF_BYTES = 64 * 1024
 LOGGER = logging.getLogger("DocsToKG.ContentDownload")
@@ -266,29 +507,106 @@ class ManifestEntry:
 
 @runtime_checkable
 class AttemptSink(Protocol):
-    """Protocol implemented by logging sinks that consume download telemetry."""
+    """Protocol implemented by logging sinks that consume download telemetry.
+
+    Attributes:
+        log_attempt: Callable accepting an :class:`AttemptRecord` plus optional timestamp.
+        log_manifest: Callable that receives :class:`ManifestEntry` objects for storage.
+        log_summary: Callable that ingests aggregate metrics collected during a run.
+        close: Callable that finalises resources owned by the sink.
+        log: Compatibility alias that forwards to :meth:`log_attempt`.
+
+    Examples:
+        >>> class Collector:
+        ...     def log_attempt(self, record, *, timestamp=None):
+        ...         ...  # doctest: +SKIP
+        ...     def log_manifest(self, entry):
+        ...         ...  # doctest: +SKIP
+        ...     def log_summary(self, summary):
+        ...         ...  # doctest: +SKIP
+        ...     def close(self):
+        ...         ...  # doctest: +SKIP
+        ...     def log(self, record):
+        ...         self.log_attempt(record)
+        >>> isinstance(Collector(), AttemptSink)  # doctest: +SKIP
+        True
+    """
 
     def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
-        """Log a resolver attempt."""
+        """Log a resolver attempt.
+
+        Args:
+            record: Structured attempt telemetry emitted by a resolver.
+            timestamp: Optional ISO8601 timestamp override for deterministic runs.
+
+        Returns:
+            None
+        """
 
     def log_manifest(self, entry: ManifestEntry) -> None:
-        """Persist a manifest entry."""
+        """Persist a manifest entry.
+
+        Args:
+            entry: Manifest record describing the resolved document.
+
+        Returns:
+            None
+        """
 
     def log_summary(self, summary: Dict[str, Any]) -> None:
-        """Record summary metrics for the run."""
+        """Record summary metrics for the run.
+
+        Args:
+            summary: Mapping containing aggregated counters and timings.
+
+        Returns:
+            None
+        """
 
     def close(self) -> None:
-        """Release any underlying resources."""
+        """Release any underlying resources.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
 
     def log(self, record: AttemptRecord) -> None:
-        """Compatibility alias delegating to :meth:`log_attempt`."""
+        """Compatibility alias delegating to :meth:`log_attempt`.
+
+        Args:
+            record: Attempt record to forward to :meth:`log_attempt`.
+
+        Returns:
+            None
+        """
 
 
 class JsonlSink:
-    """Structured sink that emits attempt, manifest, and summary JSONL records."""
+    """Thread-safe sink that streams attempt, manifest, and summary events to JSONL files.
+
+    Attributes:
+        _path: Destination JSONL file path.
+        _file: Lazily opened file handle pointing at ``_path``.
+        _lock: Mutex used to serialize concurrent writes.
+
+    Examples:
+        >>> sink = JsonlSink(Path('/tmp/attempts.jsonl'))  # doctest: +SKIP
+        >>> sink.log_summary({'attempts': 1})  # doctest: +SKIP
+        >>> sink.close()  # doctest: +SKIP
+    """
 
     def __init__(self, path: Path) -> None:
-        """Create a sink backed by the given JSONL file path."""
+        """Create a sink backed by the given JSONL file path.
+
+        Args:
+            path: Destination JSONL file that will receive telemetry records.
+
+        Returns:
+            None
+        """
 
         self._path = path
         ensure_dir(path.parent)
@@ -297,13 +615,22 @@ class JsonlSink:
 
     def _write(self, payload: Dict[str, Any]) -> None:
         payload.setdefault("timestamp", _utc_timestamp())
-        line = json.dumps(payload, sort_keys=True) + "
-"
+        line = json.dumps(payload, sort_keys=True) + "\n"
         with self._lock:
             self._file.write(line)
             self._file.flush()
 
     def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
+        """Persist a resolver attempt record to the JSONL file.
+
+        Args:
+            record: Attempt metadata describing the resolver execution outcome.
+            timestamp: Optional override timestamp applied to the JSONL payload.
+
+        Returns:
+            None
+        """
+
         ts = timestamp or _utc_timestamp()
         self._write(
             {
@@ -327,9 +654,27 @@ class JsonlSink:
         )
 
     def log(self, record: AttemptRecord) -> None:
+        """Forward compatibility shim invoking :meth:`log_attempt`.
+
+        Args:
+            record: Attempt record to persist.
+
+        Returns:
+            None
+        """
+
         self.log_attempt(record)
 
     def log_manifest(self, entry: ManifestEntry) -> None:
+        """Persist a manifest entry describing a resolved document.
+
+        Args:
+            entry: Manifest metadata to append to the JSONL log.
+
+        Returns:
+            None
+        """
+
         self._write(
             {
                 "record_type": "manifest",
@@ -354,6 +699,15 @@ class JsonlSink:
         )
 
     def log_summary(self, summary: Dict[str, Any]) -> None:
+        """Persist aggregated run metrics to the JSONL file.
+
+        Args:
+            summary: Dictionary of summary statistics such as totals and timings.
+
+        Returns:
+            None
+        """
+
         payload = {
             "record_type": "summary",
             "timestamp": _utc_timestamp(),
@@ -362,6 +716,15 @@ class JsonlSink:
         self._write(payload)
 
     def close(self) -> None:
+        """Flush and close the underlying JSONL file handle.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         with self._lock:
             if not self._file.closed:
                 self._file.close()
@@ -373,8 +736,22 @@ class JsonlSink:
         self.close()
 
 
+JsonlLogger = JsonlSink  # Backwards compatibility alias from the previous name.
+
+
 class CsvSink:
-    """CSV sink mirroring attempt records for reviewers that prefer spreadsheets."""
+    """Lightweight sink that mirrors attempt records into a CSV for spreadsheet review.
+
+    Attributes:
+        _file: Open CSV file handle for appending attempts.
+        _writer: :class:`csv.DictWriter` configured with attempt headers.
+        _lock: Mutex guarding concurrent writes.
+
+    Examples:
+        >>> sink = CsvSink(Path('/tmp/attempts.csv'))  # doctest: +SKIP
+        >>> sink.log_summary({'attempts': 1})  # doctest: +SKIP
+        >>> sink.close()  # doctest: +SKIP
+    """
 
     HEADER = [
         "timestamp",
@@ -395,6 +772,15 @@ class CsvSink:
     ]
 
     def __init__(self, path: Path) -> None:
+        """Initialize the CSV sink and ensure headers exist.
+
+        Args:
+            path: Destination CSV file used to store attempt records.
+
+        Returns:
+            None
+        """
+
         ensure_dir(path.parent)
         exists = path.exists()
         self._file = path.open("a", newline="", encoding="utf-8")
@@ -404,6 +790,16 @@ class CsvSink:
             self._writer.writeheader()
 
     def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
+        """Append a resolver attempt row to the CSV file.
+
+        Args:
+            record: Attempt metadata describing the resolver execution.
+            timestamp: Optional override timestamp applied to the CSV row.
+
+        Returns:
+            None
+        """
+
         ts = timestamp or _utc_timestamp()
         row = {
             "timestamp": ts,
@@ -427,16 +823,51 @@ class CsvSink:
             self._file.flush()
 
     def log_manifest(self, entry: ManifestEntry) -> None:
-        # CSV sink mirrors attempt records only; manifest entries remain JSONL-only.
+        """Ignore manifest entries; CSV sink only records attempt rows.
+
+        Args:
+            entry: Manifest metadata supplied by the pipeline.
+
+        Returns:
+            None
+        """
+
         return None
 
     def log_summary(self, summary: Dict[str, Any]) -> None:
+        """Ignore summary metrics; CSV sink only records attempt rows.
+
+        Args:
+            summary: Mapping of summary metrics (unused).
+
+        Returns:
+            None
+        """
+
         return None
 
     def log(self, record: AttemptRecord) -> None:
+        """Forward to :meth:`log_attempt` for compatibility with ``AttemptSink``.
+
+        Args:
+            record: Attempt record to serialize.
+
+        Returns:
+            None
+        """
+
         self.log_attempt(record)
 
     def close(self) -> None:
+        """Flush and close the CSV file handle.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         with self._lock:
             if not self._file.closed:
                 self._file.close()
@@ -448,29 +879,182 @@ class CsvSink:
         self.close()
 
 
+class CsvAttemptLoggerAdapter(CsvSink):
+    """Adapter that mirrors JSONL logging into a CSV sink for compatibility.
+
+    Attributes:
+        _base_logger: Primary sink that receives mirrored logging calls.
+
+    Examples:
+        >>> adapter = CsvAttemptLoggerAdapter(JsonlSink(Path('/tmp/a.jsonl')), Path('/tmp/a.csv'))  # doctest: +SKIP
+        >>> adapter.close()  # doctest: +SKIP
+    """
+
+    def __init__(self, base_logger: AttemptSink, path: Path) -> None:
+        """Create a CSV adapter that delegates attempts to ``base_logger``.
+
+        Args:
+            base_logger: Primary sink that should receive mirrored events.
+            path: Destination CSV file used by the adapter.
+
+        Returns:
+            None
+        """
+
+        super().__init__(path)
+        self._base_logger = base_logger
+
+    def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
+        """Send the attempt to both the base logger and the CSV sink.
+
+        Args:
+            record: Attempt record to mirror to both sinks.
+            timestamp: Optional timestamp to apply to the mirrored record.
+
+        Returns:
+            None
+        """
+
+        ts = timestamp or _utc_timestamp()
+        self._base_logger.log_attempt(record, timestamp=ts)
+        super().log_attempt(record, timestamp=ts)
+
+    def log_manifest(self, entry: ManifestEntry) -> None:
+        """Forward manifest entries to both the base logger and CSV sink.
+
+        Args:
+            entry: Manifest record describing the resolved document.
+
+        Returns:
+            None
+        """
+
+        self._base_logger.log_manifest(entry)
+
+    def log_summary(self, summary: Dict[str, Any]) -> None:
+        """Forward summary telemetry to both adapters.
+
+        Args:
+            summary: Mapping of summary metrics to forward.
+
+        Returns:
+            None
+        """
+
+        self._base_logger.log_summary(summary)
+
+    def close(self) -> None:
+        """Close the base logger and CSV sink, propagating base errors.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            BaseException: Re-raises any error encountered when closing the base logger.
+        """
+
+        base_error: BaseException | None = None
+        try:
+            self._base_logger.close()
+        except BaseException as exc:  # pragma: no cover - defensive aggregation
+            base_error = exc
+        super().close()
+        if base_error is not None:
+            raise base_error
+
+
 class MultiSink:
-    """Composite sink that fans out logging calls to multiple sinks."""
+    """Composite sink that fans out logging calls to multiple sinks.
+
+    Attributes:
+        _sinks: Sequence of sink instances that receive mirrored events.
+
+    Examples:
+        >>> sink = MultiSink([JsonlSink(Path('/tmp/a.jsonl'))])  # doctest: +SKIP
+        >>> sink.close()  # doctest: +SKIP
+    """
 
     def __init__(self, sinks: Iterable[AttemptSink]):
+        """Instantiate the composite sink with a collection of delegates.
+
+        Args:
+            sinks: Iterable of sink objects implementing ``AttemptSink``.
+
+        Returns:
+            None
+        """
+
         self._sinks = list(sinks)
 
     def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
+        """Forward a resolver attempt to all registered sinks.
+
+        Args:
+            record: Attempt metadata to broadcast.
+            timestamp: Optional shared timestamp passed to each sink.
+
+        Returns:
+            None
+        """
+
         ts = timestamp or _utc_timestamp()
         for sink in self._sinks:
             sink.log_attempt(record, timestamp=ts)
 
     def log_manifest(self, entry: ManifestEntry) -> None:
+        """Forward a manifest entry to all registered sinks.
+
+        Args:
+            entry: Manifest record to broadcast.
+
+        Returns:
+            None
+        """
+
         for sink in self._sinks:
             sink.log_manifest(entry)
 
     def log_summary(self, summary: Dict[str, Any]) -> None:
+        """Forward summary telemetry to all registered sinks.
+
+        Args:
+            summary: Mapping of aggregated metrics to broadcast.
+
+        Returns:
+            None
+        """
+
         for sink in self._sinks:
             sink.log_summary(summary)
 
     def log(self, record: AttemptRecord) -> None:
+        """Forward attempts to :meth:`log_attempt` for compatibility.
+
+        Args:
+            record: Attempt record to broadcast.
+
+        Returns:
+            None
+        """
+
         self.log_attempt(record)
 
     def close(self) -> None:
+        """Close all sinks, propagating the first raised exception.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            BaseException: Re-raises the first error encountered when closing delegates.
+        """
+
         errors: List[BaseException] = []
         for sink in self._sinks:
             try:
@@ -491,20 +1075,70 @@ class MultiSink:
 
 
 class ManifestIndexSink:
-    """Sink that accumulates manifest entries into a JSON index."""
+    """Sink that accumulates manifest entries into a JSON index.
+
+    Attributes:
+        _path: Filesystem destination for the generated JSON index.
+        _index: In-memory mapping from work IDs to manifest payloads.
+        _closed: Flag guarding idempotent close operations.
+
+    Examples:
+        >>> sink = ManifestIndexSink(Path('/tmp/manifests.json'))  # doctest: +SKIP
+        >>> sink.close()  # doctest: +SKIP
+    """
 
     def __init__(self, path: Path) -> None:
+        """Initialize the sink with the on-disk index location.
+
+        Args:
+            path: JSON file that will receive manifest projections.
+
+        Returns:
+            None
+        """
+
         self._path = path
         self._index: Dict[str, Dict[str, Optional[str]]] = {}
         self._closed = False
 
     def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
+        """Ignore attempt telemetry; only manifests are indexed.
+
+        Args:
+            record: Attempt record supplied by the pipeline.
+            timestamp: Optional timestamp provided by the caller.
+
+        Returns:
+            None
+        """
+
         return None
 
     def log(self, record: AttemptRecord) -> None:
+        """Compatibility shim deferring to :meth:`log_attempt`.
+
+        Args:
+            record: Attempt record supplied by the pipeline.
+
+        Returns:
+            None
+        """
+
         return None
 
     def log_manifest(self, entry: ManifestEntry) -> None:
+        """Persist manifest metadata for inclusion in the JSON index.
+
+        Newly received manifest entries replace any existing payload stored under
+        the same ``work_id`` so downstream tools can rely on deterministic output.
+
+        Args:
+            entry: Manifest record describing a resolved document.
+
+        Returns:
+            None
+        """
+
         payload: Dict[str, Optional[str]] = {
             "classification": entry.classification,
             "pdf_path": None,
@@ -519,16 +1153,36 @@ class ManifestIndexSink:
         self._index[entry.work_id] = payload
 
     def log_summary(self, summary: Dict[str, Any]) -> None:
+        """Ignore summary telemetry; manifests only are indexed.
+
+        Args:
+            summary: Mapping of summary metrics supplied by the pipeline.
+
+        Returns:
+            None
+        """
+
         return None
 
     def close(self) -> None:
+        """Write the manifest index to disk if not already closed.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         if self._closed:
             return
         self._closed = True
         ensure_dir(self._path.parent)
         serializable = {k: v for k, v in sorted(self._index.items(), key=lambda item: item[0])}
         try:
-            self._path.write_text(json.dumps(serializable, indent=2, sort_keys=True), encoding="utf-8")
+            self._path.write_text(
+                json.dumps(serializable, indent=2, sort_keys=True), encoding="utf-8"
+            )
         except OSError as exc:
             LOGGER.warning("Failed to write manifest index %s: %s", self._path, exc)
 
@@ -540,7 +1194,17 @@ class ManifestIndexSink:
 
 
 class LastAttemptCsvSink:
-    """Sink that writes one manifest row per work to a CSV on close."""
+    """Sink that writes one manifest row per work to a CSV on close.
+
+    Attributes:
+        _path: Filesystem destination for the aggregated CSV.
+        _entries: Mapping of work IDs to their most recent manifest entry.
+        _closed: Flag guarding idempotent close operations.
+
+    Examples:
+        >>> sink = LastAttemptCsvSink(Path('/tmp/last_attempt.csv'))  # doctest: +SKIP
+        >>> sink.close()  # doctest: +SKIP
+    """
 
     HEADER = [
         "work_id",
@@ -557,23 +1221,81 @@ class LastAttemptCsvSink:
     ]
 
     def __init__(self, path: Path) -> None:
+        """Prepare the sink and reset internal manifest state.
+
+        Args:
+            path: Destination CSV path for the final consolidated manifest.
+
+        Returns:
+            None
+        """
+
         self._path = path
         self._entries: Dict[str, ManifestEntry] = {}
         self._closed = False
 
     def log_attempt(self, record: AttemptRecord, *, timestamp: Optional[str] = None) -> None:
+        """Ignore attempt telemetry; only manifest rows are retained.
+
+        Args:
+            record: Attempt record supplied by the pipeline.
+            timestamp: Optional timestamp associated with the attempt.
+
+        Returns:
+            None
+        """
+
         return None
 
     def log(self, record: AttemptRecord) -> None:
+        """Forward compatibility shim deferring to :meth:`log_attempt`.
+
+        Args:
+            record: Attempt record supplied by the pipeline.
+
+        Returns:
+            None
+        """
+
         return None
 
     def log_manifest(self, entry: ManifestEntry) -> None:
+        """Record the manifest entry so the latest attempt is written at close.
+
+        The sink keeps only the most recent entry for each ``work_id`` so that
+        duplicate retries collapse into a single CSV row.
+
+        Args:
+            entry: Manifest record describing the resolved document.
+
+        Returns:
+            None
+        """
+
         self._entries[entry.work_id] = entry
 
     def log_summary(self, summary: Dict[str, Any]) -> None:
+        """Ignore summary telemetry; output only includes manifest rows.
+
+        Args:
+            summary: Mapping of summary metrics supplied by the pipeline.
+
+        Returns:
+            None
+        """
+
         return None
 
     def close(self) -> None:
+        """Write the consolidated manifest CSV to disk when invoked.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         if self._closed:
             return
         self._closed = True
@@ -1532,9 +2254,7 @@ def read_resolver_config(path: Path) -> Dict[str, Any]:
         return yaml.safe_load(text) or {}
 
 
-def _seed_resolver_toggle_defaults(
-    config: ResolverConfig, resolver_names: Sequence[str]
-) -> None:
+def _seed_resolver_toggle_defaults(config: ResolverConfig, resolver_names: Sequence[str]) -> None:
     """Ensure resolver toggles include defaults for every known resolver."""
 
     for name in resolver_names:
@@ -1575,12 +2295,11 @@ def apply_config_overrides(
         if field_name in data and data[field_name] is not None:
             setattr(config, field_name, data[field_name])
 
-    if "resolver_rate_limits" in data and "resolver_min_interval_s" not in data:
-        LOGGER.warning(
-            "resolver_rate_limits deprecated, use resolver_min_interval_s",
+    if "resolver_rate_limits" in data:
+        raise ValueError(
+            "resolver_rate_limits is no longer supported. "
+            "Rename entries to resolver_min_interval_s."
         )
-        legacy_limits = data.get("resolver_rate_limits") or {}
-        config.resolver_min_interval_s.update(legacy_limits)
 
     # Resolver toggle defaults are applied once after all overrides via
     # ``_seed_resolver_toggle_defaults`` to ensure a single source of truth.
@@ -1919,16 +2638,11 @@ def main() -> None:
         "--manifest",
         type=Path,
         default=None,
-        help="Path to manifest JSONL log (replaces deprecated --log-path).",
+        help="Path to manifest JSONL log.",
     )
     parser.add_argument(
-        "--log-path",
-        dest="log_jsonl",
-        type=Path,
-        default=None,
-        help=argparse.SUPPRESS,
+        "--mailto", type=str, default=None, help="Email for the OpenAlex polite pool."
     )
-    parser.add_argument("--mailto", type=str, default=None, help="Email for the OpenAlex polite pool.")
     parser.add_argument("--per-page", type=int, default=200, help="Results per page (1-200).")
     parser.add_argument("--max", type=int, default=None, help="Maximum works to process.")
     parser.add_argument("--oa-only", action="store_true", help="Only consider open-access works.")
@@ -1952,14 +2666,18 @@ def main() -> None:
     resolver_group.add_argument(
         "--unpaywall-email", type=str, default=None, help="Override Unpaywall email credential."
     )
-    resolver_group.add_argument("--core-api-key", type=str, default=None, help="CORE API key override.")
+    resolver_group.add_argument(
+        "--core-api-key", type=str, default=None, help="CORE API key override."
+    )
     resolver_group.add_argument(
         "--semantic-scholar-api-key",
         type=str,
         default=None,
         help="Semantic Scholar Graph API key override.",
     )
-    resolver_group.add_argument("--doaj-api-key", type=str, default=None, help="DOAJ API key override.")
+    resolver_group.add_argument(
+        "--doaj-api-key", type=str, default=None, help="DOAJ API key override."
+    )
     resolver_group.add_argument(
         "--disable-resolver",
         action="append",
@@ -2099,7 +2817,7 @@ def main() -> None:
     )
 
     base_pdf_dir = args.out
-    manifest_override = args.manifest or args.log_jsonl
+    manifest_override = args.manifest
     if args.staging:
         run_dir = base_pdf_dir / datetime.now(UTC).strftime("%Y%m%d_%H%M")
         pdf_dir = run_dir / "PDF"
@@ -2108,7 +2826,7 @@ def main() -> None:
         if args.html_out:
             LOGGER.info("Staging mode overrides --html-out; using %s", html_dir)
         if manifest_override:
-            LOGGER.info("Staging mode overrides --manifest/--log-path; writing to %s", manifest_path)
+            LOGGER.info("Staging mode overrides --manifest; writing to %s", manifest_path)
     else:
         pdf_dir = base_pdf_dir
         html_dir = args.html_out or (pdf_dir.parent / "HTML")
@@ -2132,7 +2850,10 @@ def main() -> None:
             name for name in resolver_names if name not in resolver_order_override
         )
 
-    config = load_resolver_config(args, resolver_names, resolver_order_override)
+    try:
+        config = load_resolver_config(args, resolver_names, resolver_order_override)
+    except ValueError as exc:
+        parser.error(str(exc))
 
     if manifest_path.suffix != ".jsonl":
         manifest_path = manifest_path.with_suffix(".jsonl")
@@ -2154,8 +2875,6 @@ def main() -> None:
         index_path = manifest_path.with_suffix(".index.json")
         index_sink = stack.enter_context(ManifestIndexSink(index_path))
         sinks.append(index_sink)
-        base_logger = stack.enter_context(JsonlLogger(manifest_path))
-        attempt_logger: Any = base_logger
         if csv_path:
             csv_sink = stack.enter_context(CsvSink(csv_path))
             sinks.append(csv_sink)
@@ -2166,9 +2885,6 @@ def main() -> None:
         attempt_logger: AttemptSink = jsonl_sink if len(sinks) == 1 else MultiSink(sinks)
 
         resume_lookup, resume_completed = load_previous_manifest(args.resume_from)
-        if args.resume_from:
-            clear_resolver_caches()
-
         metrics = ResolverMetrics()
         pipeline = ResolverPipeline(
             resolvers=resolver_instances,

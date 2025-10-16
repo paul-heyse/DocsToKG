@@ -403,7 +403,80 @@ def safe_document_processing(document_id: str) -> Optional[ProcessingResult]:
     """
 ```
 
-## 16. Integration with Auto-Generation
+## 16. NAVMAP Navigation Headers
+
+Navigation maps (NAVMAPs) provide a lightweight, machine-readable table of contents at
+the top of a file. They help AI agents, documentation tooling, and maintainers locate
+key regions quickly without scanning the full source.
+
+**When to include a NAVMAP**
+
+- Required for Python modules, notebooks, Markdown specs, and config files longer than ~150 lines
+- Optional for smaller files when multiple logical sections exist
+- Omit NAVMAPs from auto-generated artifacts (schema migrations, protobuf outputs)
+
+**Placement and comment style**
+
+- Place at the very top of the file, before imports or module docstrings
+- Precede with the file’s single-line comment token (`#`, `//`, `;`, etc.)
+- Keep opening and closing sentinels on their own lines:
+  - `# === NAVMAP v1 ===`
+  - `# === /NAVMAP ===`
+- Indent the JSON body by two spaces to aid readability
+
+**Required JSON members**
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `module` | string | Canonical dotted path or identifier for the file (`package.module`, `docs/spec`, etc.) |
+| `purpose` | string | Short sentence (≤120 chars) summarising why the file exists |
+| `sections` | array<object> | Ordered description of major regions in the file |
+
+**Section object schema**
+
+- `id` (string, required): kebab-case or snake_case identifier used for automation
+- `name` (string, required): Human-friendly section title
+- `anchor` (string, required): 2-5 character anchor tag used in inline references and headings
+- `kind` (string, required): Category keyword (`constants`, `infra`, `api`, `handlers`, `tests`, `docs`, etc.)
+- `start_line` (integer, optional): 1-based line number where the section begins
+- `end_line` (integer, optional): 1-based line number where the section ends (inclusive)
+- `exports` (array<string>, optional): Public symbols defined in this section
+- `notes` (string, optional): Additional context for downstream tooling
+
+**Authoring guidelines**
+
+- Keep `sections` ordered as the reader encounters them in the file
+- Ensure anchors are unique within a file and, where possible, stable across revisions
+- Update `start_line`/`end_line` only when relevant to downstream consumers; omit if unstable
+- When sections are nested, list the parent first and use `notes` to describe substructure
+- If a file is deprecated, add `"notes": "DEPRECATED"` at the module level and keep the NAVMAP in place
+
+**Validation rules**
+
+- JSON must be valid and fit on a single logical block (no blank lines inside)
+- Maximum NAVMAP length is 1200 characters; break large modules into more focused sections if longer
+- Failing validation blocks CI in `docs/scripts/validate_docs.py`
+
+**Example**
+
+```
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.service",
+#   "purpose": "Coordinate hybrid retrieval, ranking, and pagination surfaces",
+#   "sections": [
+#     {"id": "imports", "name": "Imports", "anchor": "IMP", "kind": "constants"},
+#     {"id": "api", "name": "Service API", "anchor": "API", "kind": "api",
+#      "exports": ["HybridSearchService", "HybridSearchAPI"]},
+#     {"id": "ops", "name": "Operational Helpers", "anchor": "OPS", "kind": "infra",
+#      "exports": ["build_stats_snapshot", "verify_pagination"]},
+#     {"id": "responses", "name": "Response Helpers", "anchor": "RSP", "kind": "helpers"}
+#   ]
+# }
+# === /NAVMAP ===
+```
+
+## 17. Integration with Auto-Generation
 
 These annotation standards are designed to work seamlessly with:
 
@@ -425,7 +498,7 @@ These annotation standards are designed to work seamlessly with:
 - Enables requirement extraction from docstrings
 - Supports automated testing and validation
 
-## 17. Validation
+## 18. Validation
 
 All new code must pass documentation validation:
 
@@ -440,6 +513,6 @@ python docs/scripts/generate_api_docs.py
 python docs/scripts/build_docs.py --format html
 ```
 
-## 18. Examples
+## 19. Examples
 
 See the `docs/examples/` directory for complete code examples showing proper annotation patterns for different scenarios.

@@ -76,10 +76,14 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-    <section id="module-schema">
+  <section id="module-schema">
 <h1>1. Module: schema<a class="headerlink" href="#module-schema" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.schema</span></code>.</p>
-<p><strong>Deprecated:</strong> <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.schema</span></code> is a compatibility shim that forwards to <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.storage</span></code>. Import schema helpers from the storage module to avoid future breakage. The shim emits a <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> when loaded.</p>
+<blockquote>
+<div><p><strong>Deprecated:</strong> <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.schema</span></code> is a compatibility shim that re-exports
+OpenSearch schema utilities from <code class="docutils literal notranslate"><span class="pre">DocsToKG.HybridSearch.storage</span></code>. The shim emits a
+:class:<code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> on import to guide migrations.</p>
+</div></blockquote>
 <section id="re-exported-symbols">
 <h2>1. Re-exported symbols<a class="headerlink" href="#re-exported-symbols" title="Link to this heading"></a></h2>
 <table class="docutils align-default">
@@ -97,10 +101,10 @@
 </tr>
 </tbody>
 </table>
-<p>The schema API is unchanged; only the import location moved.</p>
+<p>The underlying schema management API is unchanged. Update imports to reference the
+<code class="docutils literal notranslate"><span class="pre">storage</span></code> module to ensure compatibility once the shim is removed.</p>
 </section>
 </section>
-
 
 
            </div>

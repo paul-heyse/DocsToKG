@@ -1,3 +1,42 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.docparsing.synthetic",
+#   "purpose": "Pytest coverage for docparsing synthetic scenarios",
+#   "sections": [
+#     {
+#       "id": "synthetic_benchmark_result",
+#       "name": "SyntheticBenchmarkResult",
+#       "anchor": "SYNT",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "generate_synthetic_chunks",
+#       "name": "generate_synthetic_chunks",
+#       "anchor": "GSC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "generate_synthetic_vectors",
+#       "name": "generate_synthetic_vectors",
+#       "anchor": "GSV",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "simulate_embedding_benchmark",
+#       "name": "simulate_embedding_benchmark",
+#       "anchor": "SEB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "format_benchmark_summary",
+#       "name": "format_benchmark_summary",
+#       "anchor": "FBS",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Synthetic data factories and benchmarking primitives for DocParsing tests."""
 
 from __future__ import annotations

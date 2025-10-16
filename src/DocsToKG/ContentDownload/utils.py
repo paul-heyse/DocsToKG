@@ -1,3 +1,36 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.ContentDownload.utils",
+#   "purpose": "Utility helpers for DocsToKG.ContentDownload.utils",
+#   "sections": [
+#     {
+#       "id": "normalize_doi",
+#       "name": "normalize_doi",
+#       "anchor": "ND",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "normalize_pmcid",
+#       "name": "normalize_pmcid",
+#       "anchor": "NP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "strip_prefix",
+#       "name": "strip_prefix",
+#       "anchor": "SP",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "dedupe",
+#       "name": "dedupe",
+#       "anchor": "DEDU",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Content Download Utility Helpers
 

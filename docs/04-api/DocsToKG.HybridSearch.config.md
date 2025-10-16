@@ -2,13 +2,15 @@
 
 This reference documents the DocsToKG module ``DocsToKG.HybridSearch.config``.
 
+## 1. Overview
+
 Configuration models and manager for hybrid search.
 
 This module provides comprehensive configuration management for DocsToKG's
 hybrid search capabilities, including chunking, indexing, fusion, and
 retrieval parameters with thread-safe configuration management.
 
-## 1. Functions
+## 2. Functions
 
 ### `from_dict(payload)`
 
@@ -72,7 +74,7 @@ Dictionary representation suitable for :class:`HybridSearchConfig.from_dict`.
 Raises:
 ValueError: If PyYAML is unavailable or the content does not define a mapping.
 
-## 2. Classes
+## 3. Classes
 
 ### `ChunkingConfig`
 

@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.HybridSearch.observability``.
 
+## 1. Overview
+
 Lightweight observability primitives for ingestion and retrieval.
 
 This module provides comprehensive observability and monitoring capabilities
@@ -16,7 +18,7 @@ The observability system supports:
 - Performance monitoring and alerting
 - Structured logging integration
 
-## 1. Functions
+## 2. Functions
 
 ### `increment(self, name, amount)`
 
@@ -120,7 +122,7 @@ None
 Returns:
 Dictionary containing lists of counter and histogram samples.
 
-## 2. Classes
+## 3. Classes
 
 ### `CounterSample`
 

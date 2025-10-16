@@ -1,4 +1,25 @@
 #!/usr/bin/env python3
+# === NAVMAP v1 ===
+# {
+#   "module": "scripts.calibrate_tokenizers",
+#   "purpose": "Utility script for calibrate tokenizers workflows",
+#   "sections": [
+#     {
+#       "id": "_load_sample_texts",
+#       "name": "_load_sample_texts",
+#       "anchor": "LST",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Calibrate tokenizer discrepancies between BERT and Qwen models."""
 
 from __future__ import annotations

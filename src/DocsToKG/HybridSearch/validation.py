@@ -1,3 +1,16 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "DocsToKG.HybridSearch.validation",
+#   "purpose": "Validation harness for DocsToKG hybrid search",
+#   "sections": [
+#     {"id": "globals", "name": "Globals", "anchor": "globals", "kind": "infra"},
+#     {"id": "public-classes", "name": "Public Classes", "anchor": "classes", "kind": "api"},
+#     {"id": "public-functions", "name": "Public Functions", "anchor": "api", "kind": "api"},
+#     {"id": "entry-points", "name": "Module Entry Points", "anchor": "entry", "kind": "infra"}
+#   ]
+# }
+# === /NAVMAP ===
+
 """Automated validation harness for the hybrid search stack."""
 
 from __future__ import annotations
@@ -15,8 +28,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Dict, List, Mapping, Optional, Sequence
 
-import faiss  # type: ignore
 import numpy as np
+
+import faiss  # type: ignore
 
 from .config import HybridSearchConfigManager
 from .features import FeatureGenerator
@@ -36,57 +50,19 @@ from .vectorstore import FaissIndexManager, pairwise_inner_products
 from .vectorstore import restore_state as vectorstore_restore_state
 from .vectorstore import serialize_state as vectorstore_serialize_state
 
+# --- Globals ---
 
-def load_dataset(path: Path) -> List[Mapping[str, object]]:
-    """Load a JSONL dataset describing documents and queries.
-
-    Args:
-        path: Path to a JSONL file containing dataset entries.
-
-    Returns:
-        List of parsed dataset rows suitable for validation routines.
-
-    Raises:
-        FileNotFoundError: If the dataset file does not exist.
-        json.JSONDecodeError: If any line contains invalid JSON.
-    """
-
-    lines = path.read_text(encoding="utf-8").splitlines()
-    dataset: List[Mapping[str, object]] = []
-    for line in lines:
-        if not line.strip():
-            continue
-        dataset.append(json.loads(line))
-    return dataset
-
-
-def infer_embedding_dim(dataset: Sequence[Mapping[str, object]]) -> int:
-    """Infer dense embedding dimensionality from dataset vector artifacts.
-
-    Args:
-        dataset: Sequence of dataset entries containing vector metadata.
-
-    Returns:
-        Inferred embedding dimensionality, defaulting to 2560 when unknown.
-    """
-
-    for entry in dataset:
-        document = entry.get("document", {})
-        vector_file = document.get("vector_file")
-        if not vector_file:
-            continue
-        path = Path(str(vector_file))
-        if not path.exists():
-            continue
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            payload = json.loads(line)
-            vector = payload.get("Qwen3-4B", {}).get("vector")
-            if isinstance(vector, list) and vector:
-                return len(vector)
-    return 2560
-
+__all__ = (
+    "BASIC_DENSE_SELF_HIT_THRESHOLD",
+    "BASIC_SPARSE_RELEVANCE_THRESHOLD",
+    "DEFAULT_SCALE_THRESHOLDS",
+    "HybridSearchValidator",
+    "infer_embedding_dim",
+    "load_dataset",
+    "main",
+    "run_pytest_suites",
+    "run_real_vector_ci",
+)
 
 DEFAULT_SCALE_THRESHOLDS: Dict[str, float] = {
     "dense_self_hit": 0.99,
@@ -106,60 +82,7 @@ BASIC_DENSE_SELF_HIT_THRESHOLD = 0.99
 BASIC_SPARSE_RELEVANCE_THRESHOLD = 0.90
 
 
-def run_pytest_suites(mode: str, extra_args: Sequence[str]) -> int:
-    """Execute hybrid search pytest suites for the requested ``mode``."""
-
-    if mode == "synthetic":
-        pytest_args: list[str] = []
-    elif mode == "real":
-        pytest_args = ["--real-vectors", "-m", "real_vectors and not scale_vectors"]
-    elif mode == "scale":
-        pytest_args = ["--real-vectors", "--scale-vectors", "-m", "scale_vectors"]
-    else:
-        pytest_args = ["--real-vectors", "--scale-vectors"]
-
-    command = [sys.executable, "-m", "pytest", *pytest_args, *extra_args]
-    return subprocess.call(command)
-
-
-def run_real_vector_ci(output_dir: Path, extra_args: Sequence[str]) -> int:
-    """Execute the real-vector CI regression suite and persist validation artifacts."""
-
-    resolved = output_dir.expanduser().resolve()
-    if resolved.exists():
-        shutil.rmtree(resolved)
-    resolved.mkdir(parents=True, exist_ok=True)
-    os.environ["REAL_VECTOR_REPORT_DIR"] = str(resolved)
-
-    commands = [
-        [
-            sys.executable,
-            "-m",
-            "pytest",
-            "--real-vectors",
-            "tests/test_hybrid_search_real_vectors.py",
-        ],
-        [
-            sys.executable,
-            "-m",
-            "pytest",
-            "--real-vectors",
-            "--scale-vectors",
-            "tests/test_hybrid_search_scale.py",
-        ],
-    ]
-
-    for base_command in commands:
-        result = subprocess.call([*base_command, *extra_args])
-        if result != 0:
-            print(
-                f"Real-vector regression suite failed. Check artifacts in {resolved}",
-                file=sys.stderr,
-            )
-            return result
-
-    print(f"Real-vector validation artifacts stored in {resolved}")
-    return 0
+# --- Public Classes ---
 
 
 class HybridSearchValidator:
@@ -1187,9 +1110,7 @@ class HybridSearchValidator:
                 details={"error": "no queries available"},
             )
 
-        snapshot = vectorstore_serialize_state(
-            self._ingestion.faiss_index, self._registry
-        )
+        snapshot = vectorstore_serialize_state(self._ingestion.faiss_index, self._registry)
 
         baseline_results: List[List[tuple[str, float]]] = []
         for _, query_payload in sampled_pairs:
@@ -1526,6 +1447,134 @@ class HybridSearchValidator:
         passed = repeat_mismatches == 0 and churn_failures == 0
         return ValidationReport(name="scale_stability", passed=passed, details=details)
 
+
+# --- Public Functions ---
+
+
+def load_dataset(path: Path) -> List[Mapping[str, object]]:
+    """Load a JSONL dataset describing documents and queries.
+
+    Args:
+        path: Path to a JSONL file containing dataset entries.
+
+    Returns:
+        List of parsed dataset rows suitable for validation routines.
+
+    Raises:
+        FileNotFoundError: If the dataset file does not exist.
+        json.JSONDecodeError: If any line contains invalid JSON.
+    """
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    dataset: List[Mapping[str, object]] = []
+    for line in lines:
+        if not line.strip():
+            continue
+        dataset.append(json.loads(line))
+    return dataset
+
+
+def infer_embedding_dim(dataset: Sequence[Mapping[str, object]]) -> int:
+    """Infer dense embedding dimensionality from dataset vector artifacts.
+
+    Args:
+        dataset: Sequence of dataset entries containing vector metadata.
+
+    Returns:
+        Inferred embedding dimensionality, defaulting to 2560 when unknown.
+    """
+
+    for entry in dataset:
+        document = entry.get("document", {})
+        vector_file = document.get("vector_file")
+        if not vector_file:
+            continue
+        path = Path(str(vector_file))
+        if not path.exists():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            payload = json.loads(line)
+            vector = payload.get("Qwen3-4B", {}).get("vector")
+            if isinstance(vector, list) and vector:
+                return len(vector)
+    return 2560
+
+
+def run_pytest_suites(mode: str, extra_args: Sequence[str]) -> int:
+    """Execute hybrid search pytest suites for the requested ``mode``.
+
+    Args:
+        mode: Selector for which regression suites to invoke (synthetic, real, scale).
+        extra_args: Additional pytest arguments forwarded from the CLI.
+
+    Returns:
+        int: Process return code from the invoked pytest command.
+    """
+
+    if mode == "synthetic":
+        pytest_args: list[str] = []
+    elif mode == "real":
+        pytest_args = ["--real-vectors", "-m", "real_vectors and not scale_vectors"]
+    elif mode == "scale":
+        pytest_args = ["--real-vectors", "--scale-vectors", "-m", "scale_vectors"]
+    else:
+        pytest_args = ["--real-vectors", "--scale-vectors"]
+
+    command = [sys.executable, "-m", "pytest", *pytest_args, *extra_args]
+    return subprocess.call(command)
+
+
+def run_real_vector_ci(output_dir: Path, extra_args: Sequence[str]) -> int:
+    """Execute the real-vector CI regression suite and persist validation artifacts.
+
+    Args:
+        output_dir: Directory where validation artifacts should be written.
+        extra_args: Additional pytest arguments appended to each command invocation.
+
+    Returns:
+        int: Non-zero exit code indicates regression failure; zero means success.
+    """
+
+    resolved = output_dir.expanduser().resolve()
+    if resolved.exists():
+        shutil.rmtree(resolved)
+    resolved.mkdir(parents=True, exist_ok=True)
+    os.environ["REAL_VECTOR_REPORT_DIR"] = str(resolved)
+
+    commands = [
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "--real-vectors",
+            "tests/test_hybrid_search_real_vectors.py",
+        ],
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "--real-vectors",
+            "--scale-vectors",
+            "tests/test_hybrid_search_scale.py",
+        ],
+    ]
+
+    for base_command in commands:
+        result = subprocess.call([*base_command, *extra_args])
+        if result != 0:
+            print(
+                f"Real-vector regression suite failed. Check artifacts in {resolved}",
+                file=sys.stderr,
+            )
+            return result
+
+    print(f"Real-vector validation artifacts stored in {resolved}")
+    return 0
+
+
+# --- Module Entry Points ---
 
 def main(argv: Optional[Sequence[str]] = None) -> None:
     """CLI entrypoint for running hybrid search validation suites.

@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.ContentDownload.network``.
 
+## 1. Overview
+
 Unified Network Utilities
 
 This module consolidates HTTP retry helpers, conditional request utilities, and
@@ -41,7 +43,7 @@ Returns:
 Raises:
     None.
 
-## 1. Functions
+## 2. Functions
 
 ### `create_session(headers)`
 
@@ -116,6 +118,34 @@ Raises:
 ValueError: If ``max_retries`` or ``backoff_factor`` are invalid or ``url``/``method`` are empty.
 requests.RequestException: If all retry attempts fail due to network errors or the session raises an exception.
 
+### `_looks_like_pdf(headers)`
+
+Return ``True`` when response headers suggest a PDF payload.
+
+### `_head_precheck_via_get(session, url, timeout)`
+
+Fallback GET probe for providers that reject HEAD requests.
+
+### `head_precheck(session, url, timeout)`
+
+Issue a lightweight request to determine whether ``url`` returns a PDF.
+
+The helper primarily relies on a HEAD request capped to a short timeout.
+Some providers respond with ``405`` or ``501`` for HEAD requests; in those
+cases a secondary streaming GET probe is issued that reads at most one
+chunk to infer the payload type without downloading the entire resource.
+
+Args:
+session: HTTP session used for outbound requests.
+url: Candidate download URL.
+timeout: Maximum time budget in seconds for the probe.
+
+Returns:
+``True`` when the response appears to represent a binary payload such as
+a PDF. ``False`` when the response clearly corresponds to HTML or an
+error status. Any network exception results in ``True`` to avoid
+blocking legitimate downloads.
+
 ### `build_headers(self)`
 
 Generate conditional request headers from cached metadata.
@@ -155,7 +185,7 @@ url: Target URL for the request.
 Returns:
 requests.Response: Response returned by the fallback HTTP method.
 
-## 2. Classes
+## 3. Classes
 
 ### `CachedResult`
 

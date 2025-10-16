@@ -1,3 +1,30 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.test_property_based",
+#   "purpose": "Pytest coverage for property based scenarios",
+#   "sections": [
+#     {
+#       "id": "test_conditional_request_helper_build_headers",
+#       "name": "test_conditional_request_helper_build_headers",
+#       "anchor": "TCRHB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_request_with_retries_backoff_sequence",
+#       "name": "test_request_with_retries_backoff_sequence",
+#       "anchor": "TRWRB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_dedupe_preserves_first_occurrence",
+#       "name": "test_dedupe_preserves_first_occurrence",
+#       "anchor": "TDPFO",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Property-based tests covering retry logic and conditional helpers."""
 
 from __future__ import annotations

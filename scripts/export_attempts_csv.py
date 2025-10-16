@@ -1,4 +1,37 @@
 #!/usr/bin/env python3
+# === NAVMAP v1 ===
+# {
+#   "module": "scripts.export_attempts_csv",
+#   "purpose": "Utility script for export attempts csv workflows",
+#   "sections": [
+#     {
+#       "id": "_iter_attempt_records",
+#       "name": "_iter_attempt_records",
+#       "anchor": "IAR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "export_attempts_jsonl_to_csv",
+#       "name": "export_attempts_jsonl_to_csv",
+#       "anchor": "EAJTC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_parse_args",
+#       "name": "_parse_args",
+#       "anchor": "PA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "MAIN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Convert ContentDownload JSONL attempt logs into the legacy CSV format."""
 
 from __future__ import annotations

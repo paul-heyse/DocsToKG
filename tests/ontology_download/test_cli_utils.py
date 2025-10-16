@@ -1,3 +1,54 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_cli_utils",
+#   "purpose": "Pytest coverage for ontology download cli utils scenarios",
+#   "sections": [
+#     {
+#       "id": "test_format_table_basic",
+#       "name": "test_format_table_basic",
+#       "anchor": "TFTB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_format_table_column_alignment",
+#       "name": "test_format_table_column_alignment",
+#       "anchor": "TFTCA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_format_table_empty_rows",
+#       "name": "test_format_table_empty_rows",
+#       "anchor": "TFTER",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_format_validation_summary_success",
+#       "name": "test_format_validation_summary_success",
+#       "anchor": "TFVSS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_format_validation_summary_error",
+#       "name": "test_format_validation_summary_error",
+#       "anchor": "TFVSE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_format_validation_summary_multiple",
+#       "name": "test_format_validation_summary_multiple",
+#       "anchor": "TFVSM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_format_validation_summary_non_dict_details",
+#       "name": "test_format_validation_summary_non_dict_details",
+#       "anchor": "TFVSN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Tests for CLI formatting utilities."""
 
 from __future__ import annotations

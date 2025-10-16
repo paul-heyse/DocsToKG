@@ -1,3 +1,108 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_download_server",
+#   "purpose": "Pytest coverage for ontology download download server scenarios",
+#   "sections": [
+#     {
+#       "id": "_server_state",
+#       "name": "_ServerState",
+#       "anchor": "SERV",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_stateful_server",
+#       "name": "_StatefulServer",
+#       "anchor": "STAT",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "_handler",
+#       "name": "_Handler",
+#       "anchor": "HAND",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "http_server",
+#       "name": "http_server",
+#       "anchor": "HS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_reset_token_buckets",
+#       "name": "_reset_token_buckets",
+#       "anchor": "RTB",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_allow_local_addresses",
+#       "name": "_allow_local_addresses",
+#       "anchor": "ALA",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_download_to_tmp",
+#       "name": "_download_to_tmp",
+#       "anchor": "DTT",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "_stub_logger",
+#       "name": "_StubLogger",
+#       "anchor": "STUB",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "test_flaky_server_retry",
+#       "name": "test_flaky_server_retry",
+#       "anchor": "TFSR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_error_endpoint_raises",
+#       "name": "test_error_endpoint_raises",
+#       "anchor": "TEER",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_head_mismatch_logs_warning",
+#       "name": "test_head_mismatch_logs_warning",
+#       "anchor": "THMLW",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_cache_hit_uses_304",
+#       "name": "test_cache_hit_uses_304",
+#       "anchor": "TCHU3",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_partial_resume_handles_range",
+#       "name": "test_partial_resume_handles_range",
+#       "anchor": "TPRHR",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_etag_flip_updates_etag",
+#       "name": "test_etag_flip_updates_etag",
+#       "anchor": "TEFUE",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_token_bucket_limits_concurrency",
+#       "name": "test_token_bucket_limits_concurrency",
+#       "anchor": "TTBLC",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_concurrent_hosts_do_not_block",
+#       "name": "test_concurrent_hosts_do_not_block",
+#       "anchor": "TCHDN",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """Integration tests exercising the streaming downloader against a local server."""
 
 from __future__ import annotations

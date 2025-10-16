@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.DocParsing.schemas``.
 
+## 1. Overview
+
 DocParsing Schema Definitions
 
 This module defines Pydantic models and helpers that validate chunk and vector
@@ -23,7 +25,7 @@ Dependencies:
 - pydantic (optional): Offers model validation when available; graceful fallbacks
   raise informative errors otherwise.
 
-## 1. Functions
+## 2. Functions
 
 ### `_missing_pydantic_message()`
 
@@ -308,7 +310,7 @@ func: Function being decorated.
 Returns:
 The original function without modification.
 
-## 2. Classes
+## 3. Classes
 
 ### `ProvenanceMetadata`
 

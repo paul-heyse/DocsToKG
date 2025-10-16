@@ -2,9 +2,11 @@
 
 This reference documents the DocsToKG module ``DocsToKG.HybridSearch.ingest``.
 
+## 1. Overview
+
 Ingestion pipeline that materializes pre-computed chunk artifacts.
 
-## 1. Functions
+## 2. Functions
 
 ### `metrics(self)`
 
@@ -133,7 +135,7 @@ Raises:
 IngestError: If the artifact file is missing.
 json.JSONDecodeError: If any JSON line cannot be parsed.
 
-## 2. Classes
+## 3. Classes
 
 ### `IngestError`
 

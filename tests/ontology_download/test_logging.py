@@ -1,3 +1,24 @@
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.ontology_download.test_logging",
+#   "purpose": "Pytest coverage for ontology download logging scenarios",
+#   "sections": [
+#     {
+#       "id": "test_mask_sensitive_data_masks_tokens",
+#       "name": "test_mask_sensitive_data_masks_tokens",
+#       "anchor": "TMSDM",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_setup_logging_emits_structured_json",
+#       "name": "test_setup_logging_emits_structured_json",
+#       "anchor": "TSLES",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
+
 """
 Ontology Logging Tests
 

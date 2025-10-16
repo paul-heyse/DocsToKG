@@ -1,6 +1,31 @@
-from __future__ import annotations
+# === NAVMAP v1 ===
+# {
+#   "module": "tests.content_download.test_classification_unit",
+#   "purpose": "Pytest coverage for content download classification unit scenarios",
+#   "sections": [
+#     {
+#       "id": "test_classify_payload_octet_stream_requires_sniff",
+#       "name": "test_classify_payload_octet_stream_requires_sniff",
+#       "anchor": "TCPOS",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_classify_payload_octet_stream_pdf_signature",
+#       "name": "test_classify_payload_octet_stream_pdf_signature",
+#       "anchor": "CPOS1",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "test_build_download_outcome_respects_head_flag",
+#       "name": "test_build_download_outcome_respects_head_flag",
+#       "anchor": "TBDOR",
+#       "kind": "function"
+#     }
+#   ]
+# }
+# === /NAVMAP ===
 
-from pathlib import Path
+from __future__ import annotations
 
 from types import SimpleNamespace
 
@@ -10,13 +35,20 @@ from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
 
 def test_classify_payload_octet_stream_requires_sniff():
     payload = b"binary without signature"
-    assert downloader.classify_payload(payload, "application/octet-stream", "https://example.org/file.pdf") is None
+    assert (
+        downloader.classify_payload(
+            payload, "application/octet-stream", "https://example.org/file.pdf"
+        )
+        is None
+    )
 
 
 def test_classify_payload_octet_stream_pdf_signature():
     payload = b"%PDF-1.5"
     assert (
-        downloader.classify_payload(payload, "application/octet-stream", "https://example.org/file.pdf")
+        downloader.classify_payload(
+            payload, "application/octet-stream", "https://example.org/file.pdf"
+        )
         == "pdf"
     )
 

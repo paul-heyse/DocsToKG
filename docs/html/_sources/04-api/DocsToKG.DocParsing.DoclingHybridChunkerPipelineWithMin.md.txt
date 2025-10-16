@@ -2,6 +2,8 @@
 
 This reference documents the DocsToKG module ``DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin``.
 
+## 1. Overview
+
 Docling Hybrid Chunker with Minimum Token Coalescence
 
 Transforms DocTags documents into chunked records with topic-aware coalescence.
@@ -34,7 +36,18 @@ Tokenizer Alignment:
     adjustments to ``--min-tokens`` so chunk sizes remain compatible with the
     embedding stage.
 
-## 1. Functions
+## 2. Functions
+
+### `compute_relative_doc_id(path, root)`
+
+Return POSIX-style relative identifier for a document path.
+
+Args:
+path: Absolute path to the document on disk.
+root: Root directory that anchors relative identifiers.
+
+Returns:
+str: POSIX-style relative path suitable for manifest IDs.
 
 ### `read_utf8(p)`
 
@@ -181,7 +194,7 @@ idx: Index of the chunk under evaluation.
 Returns:
 True if the chunk length is less than `min_tokens`, else False.
 
-## 2. Classes
+## 3. Classes
 
 ### `Rec`
 

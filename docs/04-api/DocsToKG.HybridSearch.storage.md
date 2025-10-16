@@ -2,9 +2,11 @@
 
 This reference documents the DocsToKG module ``DocsToKG.HybridSearch.storage``.
 
-In-memory storage simulators for OpenSearch and chunk registry.
+## 1. Overview
 
-## 1. Functions
+OpenSearch simulators, schema templates, and chunk registry helpers.
+
+## 2. Functions
 
 ### `matches_filters(chunk, filters)`
 
@@ -307,7 +309,7 @@ None
 Returns:
 Mapping containing document count and average token length.
 
-## 2. Classes
+## 3. Classes
 
 ### `OpenSearchIndexTemplate`
 

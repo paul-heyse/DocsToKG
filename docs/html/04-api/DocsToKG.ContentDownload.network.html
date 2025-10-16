@@ -79,6 +79,8 @@
   <section id="module-network">
 <h1>1. Module: network<a class="headerlink" href="#module-network" title="Link to this heading"></a></h1>
 <p>This reference documents the DocsToKG module <code class="docutils literal notranslate"><span class="pre">DocsToKG.ContentDownload.network</span></code>.</p>
+<section id="overview">
+<h2>1. Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Unified Network Utilities</p>
 <p>This module consolidates HTTP retry helpers, conditional request utilities, and
 session construction logic into a single import surface. Historically these
@@ -113,8 +115,9 @@ None.</p>
 None.</p>
 <p>Raises:
 None.</p>
+</section>
 <section id="functions">
-<h2>1. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<h2>2. Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
 <section id="create-session-headers">
 <h3><code class="docutils literal notranslate"><span class="pre">create_session(headers)</span></code><a class="headerlink" href="#create-session-headers" title="Link to this heading"></a></h3>
 <p>Return a <code class="docutils literal notranslate"><span class="pre">requests.Session</span></code> configured for DocsToKG network requests.</p>
@@ -188,6 +191,31 @@ response when streaming content.</p>
 ValueError: If <code class="docutils literal notranslate"><span class="pre">max_retries</span></code> or <code class="docutils literal notranslate"><span class="pre">backoff_factor</span></code> are invalid or <code class="docutils literal notranslate"><span class="pre">url</span></code>/<code class="docutils literal notranslate"><span class="pre">method</span></code> are empty.
 requests.RequestException: If all retry attempts fail due to network errors or the session raises an exception.</p>
 </section>
+<section id="looks-like-pdf-headers">
+<h3><code class="docutils literal notranslate"><span class="pre">_looks_like_pdf(headers)</span></code><a class="headerlink" href="#looks-like-pdf-headers" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when response headers suggest a PDF payload.</p>
+</section>
+<section id="head-precheck-via-get-session-url-timeout">
+<h3><code class="docutils literal notranslate"><span class="pre">_head_precheck_via_get(session,</span> <span class="pre">url,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#head-precheck-via-get-session-url-timeout" title="Link to this heading"></a></h3>
+<p>Fallback GET probe for providers that reject HEAD requests.</p>
+</section>
+<section id="head-precheck-session-url-timeout">
+<h3><code class="docutils literal notranslate"><span class="pre">head_precheck(session,</span> <span class="pre">url,</span> <span class="pre">timeout)</span></code><a class="headerlink" href="#head-precheck-session-url-timeout" title="Link to this heading"></a></h3>
+<p>Issue a lightweight request to determine whether <code class="docutils literal notranslate"><span class="pre">url</span></code> returns a PDF.</p>
+<p>The helper primarily relies on a HEAD request capped to a short timeout.
+Some providers respond with <code class="docutils literal notranslate"><span class="pre">405</span></code> or <code class="docutils literal notranslate"><span class="pre">501</span></code> for HEAD requests; in those
+cases a secondary streaming GET probe is issued that reads at most one
+chunk to infer the payload type without downloading the entire resource.</p>
+<p>Args:
+session: HTTP session used for outbound requests.
+url: Candidate download URL.
+timeout: Maximum time budget in seconds for the probe.</p>
+<p>Returns:
+<code class="docutils literal notranslate"><span class="pre">True</span></code> when the response appears to represent a binary payload such as
+a PDF. <code class="docutils literal notranslate"><span class="pre">False</span></code> when the response clearly corresponds to HTML or an
+error status. Any network exception results in <code class="docutils literal notranslate"><span class="pre">True</span></code> to avoid
+blocking legitimate downloads.</p>
+</section>
 <section id="build-headers-self">
 <h3><code class="docutils literal notranslate"><span class="pre">build_headers(self)</span></code><a class="headerlink" href="#build-headers-self" title="Link to this heading"></a></h3>
 <p>Generate conditional request headers from cached metadata.</p>
@@ -222,7 +250,7 @@ requests.Response: Response returned by the fallback HTTP method.</p>
 </section>
 </section>
 <section id="classes">
-<h2>2. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<h2>3. Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
 <section id="cachedresult">
 <h3><code class="docutils literal notranslate"><span class="pre">CachedResult</span></code><a class="headerlink" href="#cachedresult" title="Link to this heading"></a></h3>
 <p>Represents an HTTP 304 response resolved via cached metadata.</p>
