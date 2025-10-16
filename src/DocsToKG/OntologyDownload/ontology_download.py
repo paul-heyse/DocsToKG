@@ -4,18 +4,24 @@
 
 from __future__ import annotations
 
+import argparse
+import contextlib
 import gzip
+import heapq
 
 # --- Foundation utilities ---
 import importlib
 import json
 import logging
 import os
+import platform
 import random
 import re
 import shutil
 import stat
+import subprocess
 import sys
+import tempfile
 import time
 import uuid
 
@@ -29,19 +35,24 @@ try:  # pragma: no cover - platform specific availability
 except ImportError:  # pragma: no cover - non-windows
     msvcrt = None  # type: ignore[assignment]
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeoutError
+from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from importlib import metadata
+from itertools import islice
 from logging.handlers import RotatingFileHandler
 from pathlib import Path, PurePosixPath
 from types import ModuleType
 from typing import (
     Any,
+    BinaryIO,
     Callable,
     Dict,
     Iterable,
+    Iterator,
     List,
     Mapping,
     MutableMapping,
@@ -686,9 +697,6 @@ class ResolvedConfig(BaseModel):
         "validate_assignment": True,
         "arbitrary_types_allowed": True,
     }
-
-
-ResolvedConfig.model_rebuild()
 
 
 class EnvironmentOverrides(BaseSettings):
@@ -1407,7 +1415,7 @@ class _StubGraph:
             None.
         """
 
-        self._triples: List[str] = []
+        self._triples: List[Tuple[str, str, str]] = []
         self._last_text = "# Stub TTL output\n"
         self.namespace_manager = _StubNamespaceManager()
 
@@ -1428,11 +1436,36 @@ class _StubGraph:
 
         text = Path(source).read_text()
         self._last_text = text
-        self._triples = [
-            line.strip()
-            for line in text.splitlines()
-            if line.strip() and not line.strip().startswith("#")
-        ]
+        triples: List[Tuple[str, str, str]] = []
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("@prefix"):
+                try:
+                    _, remainder = line.split(None, 1)
+                except ValueError:
+                    continue
+                parts = [segment.strip() for segment in remainder.split(None, 2)]
+                if len(parts) >= 2:
+                    prefix = parts[0].rstrip(":")
+                    namespace = parts[1].strip("<>")
+                    namespace = namespace.rstrip(".")
+                    self.namespace_manager.bind(prefix, namespace)
+                remaining = parts[2] if len(parts) == 3 else ""
+                line = remaining.strip()
+                if not line:
+                    continue
+            if line.endswith("."):
+                line = line[:-1].strip()
+            if not line:
+                continue
+            pieces = line.split(None, 2)
+            if len(pieces) < 3:
+                continue
+            subject, predicate, obj = pieces
+            triples.append((subject, predicate, obj))
+        self._triples = triples
         return self
 
     def serialize(
@@ -2472,6 +2505,8 @@ def _enforce_idn_safety(host: str) -> None:
     scripts = set()
     for char in host:
         if ord(char) < 128:
+            if char.isalpha():
+                scripts.add("LATIN")
             continue
 
         category = unicodedata.category(char)
@@ -2538,14 +2573,9 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
 
     parsed = urlparse(url)
     logger = logging.getLogger("DocsToKG.OntologyDownload")
-    if parsed.scheme == "http":
-        logger.warning(
-            "upgrading http url to https",
-            extra={"stage": "download", "original_url": url},
-        )
-        parsed = parsed._replace(scheme="https")
-    if parsed.scheme != "https":
-        raise ConfigError("Only HTTPS URLs are allowed for ontology downloads")
+    scheme = parsed.scheme.lower()
+    if scheme not in {"http", "https"}:
+        raise ConfigError("Only HTTP(S) URLs are allowed for ontology downloads")
 
     host = parsed.hostname
     if not host:
@@ -2568,27 +2598,53 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
     parsed = parsed._replace(netloc=_rebuild_netloc(parsed, ascii_host))
 
     allowed = http_config.normalized_allowed_hosts() if http_config else None
+    allow_private = False
     if allowed:
         exact, suffixes = allowed
-        if ascii_host not in exact and not any(
+        if ascii_host in exact or any(
             ascii_host == suffix or ascii_host.endswith(f".{suffix}") for suffix in suffixes
         ):
+            allow_private = True
+        else:
             raise ConfigError(f"Host {host} not in allowlist")
+
+    if scheme == "http":
+        if allow_private:
+            logger.warning(
+                "allowing http url for explicit allowlist host",
+                extra={"stage": "download", "original_url": url},
+            )
+        else:
+            logger.warning(
+                "upgrading http url to https",
+                extra={"stage": "download", "original_url": url},
+            )
+            parsed = parsed._replace(scheme="https")
+            scheme = "https"
+
+    if scheme != "https" and not allow_private:
+        raise ConfigError("Only HTTPS URLs are allowed for ontology downloads")
 
     if is_ip:
         address = ipaddress.ip_address(ascii_host)
-        if address.is_private or address.is_loopback or address.is_reserved or address.is_multicast:
+        if not allow_private and (
+            address.is_private or address.is_loopback or address.is_reserved or address.is_multicast
+        ):
             raise ConfigError(f"Refusing to download from private address {host}")
         return urlunparse(parsed)
 
     try:
         infos = socket.getaddrinfo(ascii_host, None)
     except socket.gaierror as exc:
-        raise ConfigError(f"Unable to resolve hostname {host}") from exc
+        logger.warning(
+            "dns resolution failed",
+            extra={"stage": "download", "hostname": host, "error": str(exc)},
+        )
+        return urlunparse(parsed)
 
     for info in infos:
         candidate_ip = ipaddress.ip_address(info[4][0])
-        if (
+        if not allow_private and (
             candidate_ip.is_private
             or candidate_ip.is_loopback
             or candidate_ip.is_reserved
@@ -4580,7 +4636,7 @@ MANIFEST_JSON_SCHEMA: Dict[str, Any] = {
         "url": {
             "type": "string",
             "format": "uri",
-            "pattern": r"^https://",
+            "pattern": r"^https?://",
         },
         "filename": {"type": "string", "minLength": 1},
         "version": {"type": ["string", "null"]},
@@ -4786,6 +4842,9 @@ class FetchResult:
     sha256: str
     manifest_path: Path
     artifacts: Sequence[str]
+
+
+ResolvedConfig.model_rebuild()
 
 
 @dataclass(slots=True)
@@ -5167,8 +5226,14 @@ def _populate_plan_metadata(
 ) -> PlannedFetch:
     """Augment planned fetch with HTTP metadata when available."""
 
+    if not isinstance(planned.metadata, dict):
+        planned.metadata = dict(planned.metadata)
+    metadata = planned.metadata
+
     if planned.plan.content_length is not None and planned.size is None:
         planned.size = planned.plan.content_length
+    if planned.plan.content_length is not None:
+        metadata.setdefault("content_length", planned.plan.content_length)
     if planned.plan.last_modified and not planned.last_modified:
         normalized = _normalize_timestamp(planned.plan.last_modified)
         planned.last_modified = normalized
@@ -5180,6 +5245,7 @@ def _populate_plan_metadata(
         planned.last_modified_at = _coerce_datetime(normalized)
         if normalized:
             planned.plan.last_modified = normalized
+            metadata.setdefault("last_modified", normalized)
 
     needs_size = planned.size is None
     needs_last_modified = planned.last_modified is None
@@ -5270,6 +5336,7 @@ def _populate_plan_metadata(
         planned.last_modified = normalized or last_modified_value
         planned.last_modified_at = _coerce_datetime(normalized or last_modified_value)
         planned.plan.last_modified = normalized or last_modified_value
+        metadata["last_modified"] = planned.plan.last_modified
 
     if planned.size is None:
         content_length_value = headers_map.get("Content-Length") or headers_map.get(
@@ -5283,6 +5350,11 @@ def _populate_plan_metadata(
             if parsed_length is not None:
                 planned.size = parsed_length
                 planned.plan.content_length = parsed_length
+                metadata["content_length"] = parsed_length
+
+    etag = headers_map.get("ETag") or headers_map.get("etag")
+    if etag:
+        metadata["etag"] = etag
 
     return planned
 
@@ -5348,8 +5420,8 @@ def _validate_manifest(manifest: Manifest) -> None:
         value = getattr(manifest, field_name)
         if value in {None, ""}:
             raise ConfigurationError(f"Manifest field '{field_name}' must be populated")
-    if not manifest.url.startswith("https://"):
-        raise ConfigurationError("Manifest URL must use https scheme")
+    if not manifest.url.startswith(("https://", "http://")):
+        raise ConfigurationError("Manifest URL must use http or https scheme")
     if not isinstance(manifest.schema_version, str):
         raise ConfigurationError("Manifest schema_version must be a string")
     if not isinstance(manifest.validation, dict):
@@ -6019,6 +6091,10 @@ def plan_all(
                         "error": str(exc),
                     },
                 )
+                if isinstance(exc, (ConfigError, ConfigurationError)):
+                    for pending in futures:
+                        pending.cancel()
+                    raise
                 if not active_config.defaults.continue_on_error:
                     for pending in futures:
                         pending.cancel()

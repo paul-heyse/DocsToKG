@@ -37,7 +37,6 @@ import random
 import re
 import threading
 import time as _time
-import warnings
 from collections import Counter, defaultdict
 from types import MappingProxyType
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
@@ -2178,6 +2177,28 @@ class SemanticScholarResolver(RegisteredResolver):
             return
         except Exception as exc:  # pragma: no cover - defensive
             LOGGER.exception("Unexpected Semantic Scholar resolver error")
+            yield ResolverResult(
+                url=None,
+                event="error",
+                event_reason="unexpected-error",
+                metadata={"error": str(exc), "error_type": type(exc).__name__},
+            )
+            return
+
+        try:
+            if response.status_code != 200:
+                yield ResolverResult(
+                    url=None,
+                    event="error",
+                    event_reason="http-error",
+                    http_status=response.status_code,
+                    metadata={
+                        "error_detail": f"Semantic Scholar HTTPError: {response.status_code}",
+                    },
+                )
+                return
+            data = response.json()
+        except ValueError as json_err:
             yield ResolverResult(
                 url=None,
                 event="error",

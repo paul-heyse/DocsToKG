@@ -2151,6 +2151,10 @@ def main() -> None:
             headers. Creating sessions through this helper ensures each worker
             reuses the shared retry configuration while keeping connection pools
             thread-local.
+            """Create a session seeded with the resolver polite header defaults.
+
+            Returns:
+                requests.Session: Fresh session for resolver download attempts.
             """
 
             return _make_session(config.polite_headers)

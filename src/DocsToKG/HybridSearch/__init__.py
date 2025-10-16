@@ -45,7 +45,7 @@ from .config import HybridSearchConfig, HybridSearchConfigManager
 from .features import FeatureGenerator
 from .ingest import ChunkIngestionPipeline
 from .observability import Observability
-from .ranking import ReciprocalRankFusion, apply_mmr_diversification
+from .ranking import ReciprocalRankFusion, ResultShaper, apply_mmr_diversification
 from .service import (
     HybridSearchAPI,
     HybridSearchService,
@@ -91,10 +91,10 @@ __all__ = [
     "should_rebuild_index",
     "vector_uuid_to_faiss_int",
     "ReciprocalRankFusion",
+    "ResultShaper",
     "apply_mmr_diversification",
 ]
 
 _package = sys.modules[__name__]
 sys.modules.setdefault(__name__ + ".ids", sys.modules[__name__ + ".types"])
-sys.modules.setdefault(__name__ + ".schema", sys.modules[__name__ + ".storage"])
 sys.modules.setdefault(__name__ + ".similarity_gpu", sys.modules[__name__ + ".vectorstore"])

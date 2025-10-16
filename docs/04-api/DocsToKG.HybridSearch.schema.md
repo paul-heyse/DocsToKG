@@ -2,81 +2,16 @@
 
 This reference documents the DocsToKG module ``DocsToKG.HybridSearch.schema``.
 
-OpenSearch schema management for hybrid chunk documents.
+> **Deprecated:** ``DocsToKG.HybridSearch.schema`` is a compatibility shim that re-exports
+> OpenSearch schema utilities from ``DocsToKG.HybridSearch.storage``. The shim emits a
+> :class:`DeprecationWarning` on import to guide migrations.
 
-## 1. Functions
+## 1. Re-exported symbols
 
-### `asdict(self)`
+| Symbol | New home |
+| ------ | -------- |
+| ``OpenSearchIndexTemplate`` | ``DocsToKG.HybridSearch.storage`` |
+| ``OpenSearchSchemaManager`` | ``DocsToKG.HybridSearch.storage`` |
 
-Convert the template to a serializable dictionary payload.
-
-Args:
-None
-
-Returns:
-Dictionary representation suitable for persistence or logging.
-
-### `bootstrap_template(self, namespace, chunking)`
-
-Create and register an index template for a namespace.
-
-Args:
-namespace: Namespace identifier the template should serve.
-chunking: Optional chunking configuration override.
-
-Returns:
-Newly created `OpenSearchIndexTemplate` instance.
-
-### `get_template(self, namespace)`
-
-Retrieve a registered template for the given namespace.
-
-Args:
-namespace: Namespace identifier to look up.
-
-Returns:
-Matching `OpenSearchIndexTemplate`, or None if not registered.
-
-### `list_templates(self)`
-
-Return a copy of all registered templates by namespace.
-
-Args:
-None
-
-Returns:
-Mapping from namespace to `OpenSearchIndexTemplate`.
-
-## 2. Classes
-
-### `OpenSearchIndexTemplate`
-
-Representation of an OpenSearch index template body.
-
-Attributes:
-name: Template name stored in OpenSearch.
-namespace: Namespace served by the template.
-body: Raw OpenSearch template body.
-chunking: Chunking configuration used to parameterize the template.
-
-Examples:
->>> template = OpenSearchIndexTemplate(
-...     name="hybrid-chunks-research",
-...     namespace="research",
-...     body={"settings": {}},
-...     chunking=ChunkingConfig(),
-... )
->>> template.namespace
-'research'
-
-### `OpenSearchSchemaManager`
-
-Bootstrap and track index templates per namespace.
-
-Attributes:
-_templates: Mapping of namespace identifiers to index templates.
-
-Examples:
->>> manager = OpenSearchSchemaManager()
->>> manager.bootstrap_template("research")
-OpenSearchIndexTemplate(name='hybrid-chunks-research', namespace='research', ...)
+The underlying schema management API is unchanged. Update imports to reference the
+``storage`` module to ensure compatibility once the shim is removed.

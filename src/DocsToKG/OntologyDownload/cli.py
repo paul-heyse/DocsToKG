@@ -42,8 +42,10 @@ from .ontology_download import (
     PlannedFetch,
     ResolvedConfig,
     ValidationRequest,
+    _directory_size,
     fetch_all,
     get_manifest_schema,
+    infer_version_timestamp,
     load_config,
     infer_version_timestamp,
     parse_iso_datetime,
@@ -464,23 +466,7 @@ def _normalize_plan_args(args: Sequence[str]) -> List[str]:
         Updated argument list with explicit subcommands injected as needed.
     """
 
-    tokens = list(args)
-    try:
-        index = tokens.index("plan")
-    except ValueError:
-        return tokens
-
-    if index + 1 >= len(tokens):
-        return tokens + ["run"]
-
-    next_token = tokens[index + 1]
-    if next_token in {"run", "diff"}:
-        return tokens
-
-    if next_token.startswith("-"):
-        return tokens[: index + 1] + ["run", *tokens[index + 1 :]]
-
-    return tokens[: index + 1] + ["run", *tokens[index + 1 :]]
+    return list(args)
 
 
 def _parse_since_arg(value: str) -> datetime:

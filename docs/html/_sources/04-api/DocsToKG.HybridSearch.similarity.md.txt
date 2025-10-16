@@ -1,70 +1,20 @@
 # 1. Module: similarity
 
-This reference documents the DocsToKG module ``DocsToKG.HybridSearch.vectorstore``.
+This reference documents the DocsToKG module ``DocsToKG.HybridSearch.similarity``.
 
-GPU-accelerated cosine similarity helpers for HybridSearch.
+> **Deprecated:** ``DocsToKG.HybridSearch.similarity`` is a compatibility shim that now
+> forwards to ``DocsToKG.HybridSearch.vectorstore``. The module re-exports the GPU
+> similarity helpers listed below and emits a :class:`DeprecationWarning` when imported.
 
-## 1. Functions
+## 1. Re-exported symbols
 
-### `normalize_rows(matrix)`
+| Symbol | New home |
+| ------ | -------- |
+| ``normalize_rows`` | ``DocsToKG.HybridSearch.vectorstore`` |
+| ``cosine_against_corpus_gpu`` | ``DocsToKG.HybridSearch.vectorstore`` |
+| ``pairwise_inner_products`` | ``DocsToKG.HybridSearch.vectorstore`` |
+| ``max_inner_product`` | ``DocsToKG.HybridSearch.vectorstore`` |
 
-Normalise rows in-place for cosine similarity operations.
-
-Args:
-matrix: Contiguous ``float32`` array whose rows will be normalised.
-
-Returns:
-The same array instance with each row scaled to unit length.
-
-Raises:
-TypeError: If ``matrix`` is not a contiguous ``float32`` array.
-
-### `cosine_against_corpus_gpu(query, corpus)`
-
-Compute cosine similarities between a query vector and a corpus on GPU.
-
-Args:
-query: 1D or 2D array containing the query vector(s).
-corpus: 2D array of candidate vectors to compare against ``query``.
-device: GPU device ordinal passed to FAISS.
-resources: Initialised FAISS GPU resources object.
-
-Returns:
-``float32`` matrix of cosine similarities shaped ``(len(query), len(corpus))``.
-
-Raises:
-RuntimeError: If GPU resources are not provided.
-ValueError: If ``query`` and ``corpus`` dimensions are incompatible.
-
-### `pairwise_inner_products(a, b)`
-
-Return pairwise cosine similarities between rows of ``a`` and ``b`` on GPU.
-
-Args:
-a: Matrix holding the first set of vectors to compare.
-b: Optional matrix of comparison vectors; defaults to ``a`` when omitted.
-device: GPU device ordinal supplied to FAISS.
-resources: Initialised FAISS GPU resources object.
-
-Returns:
-``float32`` matrix of cosine similarities.
-
-Raises:
-RuntimeError: If GPU resources are not provided.
-ValueError: When ``a`` and ``b`` have mismatching dimensionality.
-
-### `max_inner_product(target, corpus)`
-
-Return the maximum cosine similarity between ``target`` and rows in ``corpus``.
-
-Args:
-target: Vector whose similarity to the corpus is evaluated.
-corpus: Matrix containing comparison vectors.
-device: GPU device ordinal supplied to FAISS.
-resources: Initialised FAISS GPU resources object.
-
-Returns:
-Maximum cosine similarity value as a ``float``. Returns ``-inf`` for an empty corpus.
-
-Raises:
-RuntimeError: If GPU resources are not provided.
+All function signatures remain unchanged. Update imports to reference the
+``vectorstore`` module directly to avoid future breakage when the shim is
+removed.

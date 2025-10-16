@@ -10,6 +10,46 @@ logic, SPDX-normalized licensing, and service-specific rate limits while
 participating in the automatic fallback chains described in the ontology
 download refactor. New resolvers can be registered through the ``RESOLVERS`` map.
 
+### Plugin registration example
+
+Third parties can expose additional resolvers without modifying DocsToKG by
+publishing an entry point under the ``docstokg.ontofetch.resolver`` group. A
+minimal resolver plugin looks like:
+
+```python
+from DocsToKG.OntologyDownload.resolvers import BaseResolver, FetchPlan
+
+
+class MyResolver(BaseResolver):
+    NAME = "my-resolver"
+
+    def plan(self, spec, config, logger):
+        return FetchPlan(
+            url="https://example.org/custom.owl",
+            headers={},
+            filename_hint="custom.owl",
+            version="2024-01-01",
+            license="CC-BY",
+            media_type="application/rdf+xml",
+            service=self.NAME,
+        )
+
+
+RESOLVER_ENTRY_POINTS = {
+    "my_resolver": "my_package.resolvers:MyResolver",
+}
+```
+
+Add the entry point to ``pyproject.toml``:
+
+```toml
+[project.entry-points."docstokg.ontofetch.resolver"]
+my_resolver = "my_package.resolvers:MyResolver"
+```
+
+Installing the package makes ``MyResolver`` available via the standard
+``plan_all`` fallback chain.
+
 ## 1. Functions
 
 ### `normalize_license_to_spdx(value)`
