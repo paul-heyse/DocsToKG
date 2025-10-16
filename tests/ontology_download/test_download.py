@@ -1006,6 +1006,7 @@ def test_validate_url_security_rejects_private_ip():
 
 
 def test_validate_url_security_upgrades_http(monkeypatch):
+    io_safe_mod._DNS_CACHE.clear()
     monkeypatch.setattr(
         io_safe_mod.socket,
         "getaddrinfo",
@@ -1016,6 +1017,7 @@ def test_validate_url_security_upgrades_http(monkeypatch):
 
 
 def test_validate_url_security_respects_allowlist(monkeypatch):
+    io_safe_mod._DNS_CACHE.clear()
     looked_up = {}
 
     def fake_getaddrinfo(host, *_args, **_kwargs):
@@ -1039,6 +1041,7 @@ def test_validate_url_security_blocks_disallowed_host():
 
 
 def test_validate_url_security_normalizes_idn(monkeypatch):
+    io_safe_mod._DNS_CACHE.clear()
     looked_up = {}
 
     def fake_getaddrinfo(host, *_args, **_kwargs):
@@ -1060,6 +1063,7 @@ def test_validate_url_security_rejects_mixed_script_idn():
 
 
 def test_validate_url_security_respects_wildcard_allowlist(monkeypatch):
+    io_safe_mod._DNS_CACHE.clear()
     def fake_getaddrinfo(host, *_args, **_kwargs):
         return [(None, None, None, None, ("93.184.216.34", 0))]
 
@@ -1069,6 +1073,65 @@ def test_validate_url_security_respects_wildcard_allowlist(monkeypatch):
     secure_url = download.validate_url_security("https://sub.example.org/ontology.owl", config)
 
     assert secure_url.startswith("https://sub.example.org")
+
+
+def test_validate_url_security_rejects_userinfo() -> None:
+    with pytest.raises(ConfigError):
+        download.validate_url_security("https://user:secret@example.org/resource.owl")
+
+
+def test_validate_url_security_enforces_default_ports() -> None:
+    with pytest.raises(ConfigError):
+        download.validate_url_security("https://example.org:8443/ontology.owl")
+
+
+def test_validate_url_security_allows_configured_port(monkeypatch):
+    io_safe_mod._DNS_CACHE.clear()
+
+    monkeypatch.setattr(
+        io_safe_mod.socket,
+        "getaddrinfo",
+        lambda host, *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 0))],
+    )
+
+    config = DownloadConfiguration(allowed_ports=[8443])
+    secure_url = download.validate_url_security("https://example.org:8443/ontology.owl", config)
+
+    assert secure_url.startswith("https://example.org:8443")
+
+
+def test_validate_url_security_allows_host_specific_port(monkeypatch):
+    io_safe_mod._DNS_CACHE.clear()
+
+    monkeypatch.setattr(
+        io_safe_mod.socket,
+        "getaddrinfo",
+        lambda host, *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 0))],
+    )
+
+    config = DownloadConfiguration(allowed_hosts=["example.org:8443"])
+    secure_url = download.validate_url_security("https://example.org:8443/ontology.owl", config)
+
+    assert secure_url.startswith("https://example.org:8443")
+
+
+def test_validate_url_security_dns_lookup_cached(monkeypatch):
+    io_safe_mod._DNS_CACHE.clear()
+    calls = {"count": 0}
+
+    def fake_getaddrinfo(host, *_args, **_kwargs):
+        calls["count"] += 1
+        return [(None, None, None, None, ("93.184.216.34", 0))]
+
+    monkeypatch.setattr(io_safe_mod.socket, "getaddrinfo", fake_getaddrinfo)
+
+    config = DownloadConfiguration()
+    url = "https://example.org/ontology.owl"
+
+    download.validate_url_security(url, config)
+    download.validate_url_security(url, config)
+
+    assert calls["count"] == 1
 
 
 def test_ensure_license_allowed_normalizes_spdx() -> None:

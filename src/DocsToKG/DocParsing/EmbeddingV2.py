@@ -961,6 +961,8 @@ class QwenEmbeddingQueue:
     """Serialize Qwen embedding requests across worker threads."""
 
     def __init__(self, cfg: QwenCfg, *, maxsize: int = 8):
+        """Initialise a bounded request queue and background worker."""
+
         self._cfg = cfg
         self._queue: "queue.Queue[tuple[List[str], int, Future[List[List[float]]]] | None]" = queue.Queue(
             maxsize=max(1, maxsize)
@@ -970,6 +972,8 @@ class QwenEmbeddingQueue:
         self._thread.start()
 
     def _worker(self) -> None:
+        """Consume enqueued embedding requests until shutdown is signalled."""
+
         while True:
             item = self._queue.get()
             if item is None:
@@ -1010,6 +1014,8 @@ class EmbeddingProcessingError(RuntimeError):
     """Wrap exceptions raised during per-file embedding with timing metadata."""
 
     def __init__(self, original: Exception, duration: float) -> None:
+        """Record the triggering exception and elapsed duration in seconds."""
+
         super().__init__(str(original))
         self.original = original
         self.duration = duration
@@ -1870,6 +1876,8 @@ def main(args: argparse.Namespace | None = None) -> int:
             args.qwen_queue = None
 
         def _process_entry(entry: Tuple[Path, Path, str, str]) -> Tuple[int, List[int], List[float], float]:
+            """Encode vectors for a chunk file and report per-file metrics."""
+
             chunk_path, vectors_path, input_hash, doc_id = entry
             start = time.perf_counter()
             try:

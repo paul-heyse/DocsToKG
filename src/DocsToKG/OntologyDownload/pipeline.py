@@ -68,6 +68,9 @@ from .validation_core import ValidationRequest, ValidationResult, run_validators
 
 MANIFEST_SCHEMA_VERSION = "1.0"
 
+_SUPPORTED_CHECKSUM_ALGORITHMS = {"md5", "sha1", "sha256", "sha512"}
+_CHECKSUM_HEX_RE = re.compile(r"^[0-9a-f]{32,128}$")
+
 MANIFEST_JSON_SCHEMA: Dict[str, Any] = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "DocsToKG Ontology Manifest",
@@ -148,6 +151,152 @@ MANIFEST_JSON_SCHEMA: Dict[str, Any] = {
     },
     "additionalProperties": True,
 }
+
+
+def _normalize_algorithm(algorithm: Optional[str], *, context: str) -> str:
+    candidate = (algorithm or "sha256").strip().lower()
+    if candidate not in _SUPPORTED_CHECKSUM_ALGORITHMS:
+        raise ConfigError(f"{context}: unsupported checksum algorithm '{candidate}'")
+    return candidate
+
+
+def _normalize_checksum(algorithm: str, value: str, *, context: str) -> Tuple[str, str]:
+    normalized_algorithm = _normalize_algorithm(algorithm, context=context)
+    if not isinstance(value, str):
+        raise ConfigError(f"{context}: checksum value must be a string")
+    checksum = value.strip().lower()
+    if not _CHECKSUM_HEX_RE.fullmatch(checksum):
+        raise ConfigError(f"{context}: checksum must be a hexadecimal digest")
+    return normalized_algorithm, checksum
+
+
+def _checksum_from_extras(extras: Mapping[str, object], *, context: str) -> Tuple[Optional[str], Optional[str]]:
+    payload = extras.get("checksum") if isinstance(extras, Mapping) else None
+    if payload is None:
+        return None, None
+    if isinstance(payload, str):
+        return _normalize_checksum("sha256", payload, context=context)
+    if isinstance(payload, Mapping):
+        algorithm = payload.get("algorithm", "sha256")
+        value = payload.get("value")
+        if not isinstance(algorithm, str):
+            raise ConfigError(f"{context}: checksum algorithm must be a string")
+        if not isinstance(value, str):
+            raise ConfigError(f"{context}: checksum value must be a string")
+        return _normalize_checksum(algorithm, value, context=context)
+    raise ConfigError(f"{context}: checksum must be provided as a string or mapping")
+
+
+def _checksum_url_from_extras(extras: Mapping[str, object], *, context: str) -> Tuple[Optional[str], Optional[str]]:
+    payload = extras.get("checksum_url") if isinstance(extras, Mapping) else None
+    if payload is None:
+        return None, None
+    if isinstance(payload, str):
+        url = payload.strip()
+        if not url:
+            raise ConfigError(f"{context}: checksum_url must not be empty")
+        return url, None
+    if isinstance(payload, Mapping):
+        url_value = payload.get("url")
+        algorithm_value = payload.get("algorithm")
+        if not isinstance(url_value, str) or not url_value.strip():
+            raise ConfigError(f"{context}: checksum_url must include a non-empty 'url'")
+        algorithm = None
+        if algorithm_value is not None:
+            if not isinstance(algorithm_value, str):
+                raise ConfigError(f"{context}: checksum_url algorithm must be a string when provided")
+            algorithm = _normalize_algorithm(algorithm_value, context=context)
+        return url_value.strip(), algorithm
+    raise ConfigError(f"{context}: checksum_url must be provided as a string or mapping")
+
+
+def _extract_checksum_from_text(text: str, *, context: str) -> str:
+    match = re.search(r"[0-9a-fA-F]{32,128}", text)
+    if not match:
+        raise OntologyDownloadError(f"Unable to parse checksum from {context}")
+    return match.group(0).lower()
+
+
+def _fetch_checksum_from_url(
+    *,
+    url: str,
+    algorithm: str,
+    http_config: DownloadConfiguration,
+    logger: logging.Logger,
+) -> str:
+    secure_url = validate_url_security(url, http_config)
+    try:
+        response = requests.get(secure_url, timeout=http_config.timeout_sec)
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        raise OntologyDownloadError(f"Failed to fetch checksum from {secure_url}: {exc}") from exc
+    digest = _extract_checksum_from_text(response.text, context=secure_url)
+    logger.info(
+        "fetched checksum",
+        extra={
+            "stage": "download",
+            "checksum_url": secure_url,
+            "algorithm": algorithm,
+        },
+    )
+    return digest
+
+
+def _resolve_expected_checksum(
+    *,
+    spec: FetchSpec,
+    plan: FetchPlan,
+    download_config: DownloadConfiguration,
+    logger: logging.Logger,
+) -> Optional[str]:
+    """Determine the expected checksum string passed to the downloader."""
+
+    context = f"ontology '{spec.id}'"
+    plan_checksum: Optional[Tuple[str, str]] = None
+    if plan.checksum:
+        algorithm = plan.checksum_algorithm or "sha256"
+        plan_checksum = _normalize_checksum(algorithm, plan.checksum, context=f"{context} resolver checksum")
+
+    spec_checksum = _checksum_from_extras(spec.extras, context=context)
+    if spec_checksum[1] is not None and plan_checksum is not None and spec_checksum[1] != plan_checksum[1]:
+        raise ConfigError(f"{context}: conflicting checksum values between resolver and specification extras")
+
+    algorithm: Optional[str] = None
+    value: Optional[str] = None
+    if plan_checksum is not None:
+        algorithm, value = plan_checksum
+    if spec_checksum[1] is not None:
+        algorithm, value = spec_checksum
+
+    checksum_url_source: Optional[Tuple[str, Optional[str]]] = None
+    if plan.checksum_url:
+        checksum_url_source = (plan.checksum_url, plan.checksum_algorithm)
+    else:
+        url_from_extras = _checksum_url_from_extras(spec.extras, context=context)
+        if url_from_extras[0]:
+            checksum_url_source = url_from_extras
+
+    if value is None and checksum_url_source:
+        raw_url, url_algorithm = checksum_url_source
+        normalized_algorithm = _normalize_algorithm(url_algorithm or algorithm or "sha256", context=context)
+        value = _fetch_checksum_from_url(
+            url=raw_url,
+            algorithm=normalized_algorithm,
+            http_config=download_config,
+            logger=logger,
+        )
+        algorithm = normalized_algorithm
+
+    if value is None or algorithm is None:
+        return None
+
+    normalized_algorithm, normalized_value = _normalize_checksum(algorithm, value, context=context)
+    checksum_string = f"{normalized_algorithm}:{normalized_value}"
+    logger.info(
+        "using expected checksum",
+        extra={"stage": "download", "checksum": checksum_string, "ontology_id": spec.id},
+    )
+    return checksum_string
 
 Draft202012Validator.check_schema(MANIFEST_JSON_SCHEMA)
 _MANIFEST_VALIDATOR = Draft202012Validator(MANIFEST_JSON_SCHEMA)
@@ -1221,6 +1370,34 @@ def _write_manifest(manifest_path: Path, manifest: Manifest) -> None:
     manifest_path.write_text(manifest.to_json())
 
 
+def _append_index_entry(ontology_dir: Path, entry: Dict[str, Any]) -> None:
+    """Append or update the ontology-level ``index.json`` with ``entry``."""
+
+    index_path = ontology_dir / "index.json"
+    try:
+        existing = json.loads(index_path.read_text())
+        if not isinstance(existing, list):
+            existing = []
+    except FileNotFoundError:
+        existing = []
+    except json.JSONDecodeError:
+        existing = []
+
+    filtered: List[Dict[str, Any]] = []
+    for item in existing:
+        if not isinstance(item, dict):
+            continue
+        same_version = item.get("version") == entry.get("version")
+        same_hash = item.get("sha256") == entry.get("sha256")
+        if same_version and same_hash:
+            continue
+        filtered.append(item)
+
+    filtered.insert(0, entry)
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index_path.write_text(json.dumps(filtered, indent=2, sort_keys=True))
+
+
 def _build_destination(
     spec: FetchSpec, plan: FetchPlan, config: ResolvedConfig
 ) -> Tuple[Path, str, Path]:
@@ -1477,6 +1654,12 @@ def fetch_one(
                 )
 
                 pending_secure_url = validate_url_security(candidate.plan.url, download_config)
+                expected_hash = _resolve_expected_checksum(
+                    spec=pending_spec,
+                    plan=candidate.plan,
+                    download_config=download_config,
+                    logger=adapter,
+                )
                 result = download_stream(
                     url=pending_secure_url,
                     destination=pending_destination,
@@ -1487,7 +1670,11 @@ def fetch_one(
                     logger=adapter,
                     expected_media_type=candidate.plan.media_type,
                     service=candidate.plan.service,
+                    expected_hash=expected_hash,
                 )
+
+                if expected_hash:
+                    attempt_record["expected_checksum"] = expected_hash
 
                 effective_spec = pending_spec
                 destination = pending_destination
@@ -1608,6 +1795,21 @@ def fetch_one(
                     resolver_attempts=resolver_attempts,
                 )
                 _write_manifest(manifest_path, manifest)
+                index_entry = {
+                    "version": manifest.version,
+                    "downloaded_at": manifest.downloaded_at,
+                    "sha256": manifest.sha256,
+                    "normalized_sha256": manifest.normalized_sha256,
+                    "etag": manifest.etag,
+                    "size": destination.stat().st_size if destination.exists() else None,
+                    "source_url": manifest.url,
+                    "content_type": manifest.content_type,
+                    "content_length": manifest.content_length,
+                    "status": manifest.status,
+                }
+                if expected_hash:
+                    index_entry["expected_checksum"] = expected_hash
+                _append_index_entry(base_dir.parent, index_entry)
                 STORAGE.finalize_version(effective_spec.id, version, base_dir)
 
                 adapter.info(

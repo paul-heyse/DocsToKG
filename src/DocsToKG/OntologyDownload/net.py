@@ -38,6 +38,7 @@ def retry_with_backoff(
     backoff_base: float = 0.5,
     jitter: float = 0.5,
     callback: Optional[Callable[[int, BaseException, float], None]] = None,
+    retry_after: Optional[Callable[[BaseException], Optional[float]]] = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> T:
     """Execute ``func`` with exponential backoff until it succeeds."""
@@ -54,6 +55,14 @@ def retry_with_backoff(
             if attempt >= max_attempts or not retryable(exc):
                 raise
             delay = backoff_base * (2 ** (attempt - 1))
+            if retry_after is not None:
+                try:
+                    hint = retry_after(exc)
+                except Exception:  # pragma: no cover - defensive against callbacks
+                    hint = None
+                else:
+                    if hint is not None:
+                        delay = max(hint, 0.0)
             if jitter > 0:
                 delay += random.uniform(0.0, jitter)
             if callback is not None:
@@ -624,6 +633,7 @@ def download_stream(
     logger: logging.Logger,
     expected_media_type: Optional[str] = None,
     service: Optional[str] = None,
+    expected_hash: Optional[str] = None,
 ) -> DownloadResult:
     """Download ontology content with HEAD validation, rate limiting, caching, retries, and hash checks.
 
@@ -637,6 +647,7 @@ def download_stream(
         logger: Logger adapter for structured download telemetry.
         expected_media_type: Expected Content-Type for validation, if known.
         service: Logical service identifier for per-service rate limiting.
+        expected_hash: Optional ``<algorithm>:<hex>`` string enforcing a known hash.
 
     Returns:
         DownloadResult describing the final artifact and metadata.
@@ -690,7 +701,7 @@ def download_stream(
                 secure_url,
                 path=cache_dir,
                 fname=safe_name,
-                known_hash=None,
+                known_hash=expected_hash,
                 downloader=downloader,
                 progressbar=False,
             )

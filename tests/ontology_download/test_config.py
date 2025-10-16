@@ -340,10 +340,11 @@ def test_download_config_normalizes_allowed_hosts() -> None:
 
     normalized = config.normalized_allowed_hosts()
     assert normalized is not None
-    exact, suffixes = normalized
+    exact, suffixes, ports = normalized
     assert "example.org" in exact
     assert "example.com" in suffixes
     assert "xn--mnchen-3ya.example.org" in exact
+    assert ports == {}
 
 
 def test_download_config_polite_headers_defaults() -> None:
@@ -358,6 +359,24 @@ def test_download_config_polite_headers_defaults() -> None:
     assert headers["User-Agent"].startswith("DocsToKG-OntologyDownloader/1.0")
     assert headers["X-Request-ID"].startswith("corr123-20240101T000000Z")
     assert "From" not in headers
+
+
+def test_download_config_parses_allowed_host_ports() -> None:
+    config = DownloadConfiguration(allowed_hosts=["example.org:8443"])
+
+    normalized = config.normalized_allowed_hosts()
+    assert normalized is not None
+    exact, suffixes, ports = normalized
+    assert "example.org" in exact
+    assert not suffixes
+    assert ports["example.org"] == {8443}
+
+
+def test_download_config_rejects_wildcard_port_usage() -> None:
+    config = DownloadConfiguration(allowed_hosts=["*.example.org:8443"])
+
+    with pytest.raises(ValueError):
+        config.normalized_allowed_hosts()
 
 
 def test_download_config_polite_headers_custom_values() -> None:

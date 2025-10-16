@@ -246,7 +246,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import functools
 import os
 import random
 import shutil
@@ -353,9 +352,12 @@ def _http_session() -> requests.Session:
         session = requests.Session()
         retry = Retry(
             total=5,
+            read=5,
+            connect=5,
             backoff_factor=0.5,
-            status_forcelist=(429, 502, 503, 504),
-            allowed_methods=("GET", "POST"),
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=("GET", "HEAD"),
+            raise_on_status=False,
         )
         adapter = HTTPAdapter(max_retries=retry)
         session.mount("http://", adapter)
@@ -910,8 +912,13 @@ def probe_models(
         represented by `(None, <error>, None)`.
     """
     url = f"http://127.0.0.1:{port}/v1/models"
+    session = _http_session()
+    if isinstance(timeout, (int, float)):
+        request_timeout: Tuple[float, float] = (DEFAULT_HTTP_TIMEOUT[0], float(timeout))
+    else:
+        request_timeout = timeout  # pragma: no cover - custom caller override
     try:
-        r = requests.get(url, timeout=timeout)
+        r = session.get(url, timeout=request_timeout)
         raw = r.text
         if r.headers.get("content-type", "").startswith("application/json"):
             try:
@@ -927,7 +934,7 @@ def probe_models(
                 if mid:
                     names.append(mid)
         return names if names else [], raw, r.status_code
-    except Exception as e:
+    except requests.RequestException as e:
         return None, str(e), None
 
 
@@ -943,10 +950,15 @@ def probe_metrics(port: int, timeout=2.5) -> Tuple[bool, Optional[int]]:
         endpoint responds with HTTP 200.
     """
     url = f"http://127.0.0.1:{port}/metrics"
+    session = _http_session()
+    if isinstance(timeout, (int, float)):
+        request_timeout: Tuple[float, float] = (DEFAULT_HTTP_TIMEOUT[0], float(timeout))
+    else:
+        request_timeout = timeout  # pragma: no cover - custom caller override
     try:
-        r = requests.get(url, timeout=timeout)
+        r = session.get(url, timeout=request_timeout)
         return (r.status_code == 200), r.status_code
-    except Exception:
+    except requests.RequestException:
         return (False, None)
 
 
@@ -1046,29 +1058,20 @@ def wait_for_vllm(port: int, proc: sp.Popen, timeout_s: int = WAIT_TIMEOUT_S) ->
         RuntimeError: If the server exits prematurely or fails to become ready
             within the allotted timeout.
     """
-    _LOGGER.info(
-        "Probing vLLM",
-        extra={"extra_fields": {"port": port, "timeout_s": timeout_s}},
-    )
-    t0 = time.time()
+    log_event(_LOGGER, "info", "Probing vLLM", port=port, timeout_s=timeout_s)
+    start = time.time()
+    attempt = 0
     with tqdm(total=timeout_s, unit="s", desc="vLLM warmup", leave=True) as bar:
         while True:
-            # If vLLM crashed, stop early and print the last lines
+            attempt += 1
             if proc.poll() is not None:
+                tail_text = ""
                 try:
                     tail_lines = list(getattr(proc, "_log_tail", []))
                     leftover = proc.stdout.read() or ""
                     combined_tail = tail_lines[-50:]
                     tail_text = "\n".join(combined_tail) if combined_tail else leftover[-800:]
-                    _LOGGER.error(
-                        "vLLM exited while waiting",
-                        extra={
-                            "extra_fields": {
-                                "port": port,
-                                "tail": tail_text,
-                            }
-                        },
-                    )
+                    log_event(_LOGGER, "error", "vLLM exited while waiting", port=port, tail=tail_text)
                 finally:
                     message = (
                         f"vLLM exited early with code {proc.returncode}. "
@@ -1078,23 +1081,36 @@ def wait_for_vllm(port: int, proc: sp.Popen, timeout_s: int = WAIT_TIMEOUT_S) ->
                         "or insufficient GPU memory."
                     )
                     raise RuntimeError(message)
+
             names, raw, status = probe_models(port)
-            if status == 200:
-                _LOGGER.info(
-                    "vLLM models available",
-                    extra={
-                        "extra_fields": {
-                            "port": port,
-                            "models": names,
-                        }
-                    },
+            if status == 200 and names:
+                log_event(_LOGGER, "info", "vLLM models available", port=port, models=names)
+                if bar.n < timeout_s:
+                    bar.update(timeout_s - bar.n)
+                return names
+            if status == 200 and not names and (attempt == 1 or attempt % 5 == 0):
+                log_event(_LOGGER, "info", "vLLM HTTP up; waiting for models", port=port)
+            if status and status >= 400 and (attempt == 1 or attempt % 5 == 0):
+                preview = (raw or "")[:200]
+                log_event(
+                    _LOGGER,
+                    "warning",
+                    "vLLM model probe returned error",
+                    port=port,
+                    status=status,
+                    response_preview=preview,
                 )
-                return names or []
-            # (…keep your existing logging, metrics probe, and tqdm update…)
-            if int(time.time() - t0) >= timeout_s:
+
+            elapsed = time.time() - start
+            if elapsed >= timeout_s:
                 raise RuntimeError(f"Timed out waiting for vLLM on port {port}")
-            time.sleep(1)
-            bar.update(1)
+
+            remaining = timeout_s - elapsed
+            base_sleep = min(1.0 + 0.2 * attempt, 2.5)
+            interval = min(remaining, base_sleep + random.uniform(0.2, 0.6))
+            interval = max(0.2, interval)
+            time.sleep(interval)
+            bar.update(min(interval, remaining))
 
 
 def stop_vllm(proc: Optional[sp.Popen], own: bool, grace=10):

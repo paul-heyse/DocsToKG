@@ -369,6 +369,294 @@ def _merge_args(parser: argparse.ArgumentParser, overrides: Dict[str, Any]) -> a
     return base
 
 
+# --- Planning Helpers ---
+
+
+def _preview_list(items: Sequence[str], limit: int = 5) -> List[str]:
+    preview = list(items[:limit])
+    if len(items) > limit:
+        preview.append(f"... (+{len(items) - limit} more)")
+    return preview
+
+
+def _plan_doctags(argv: Sequence[str]) -> Dict[str, Any]:
+    parser = _build_doctags_parser()
+    args = parser.parse_args(argv)
+    resolved_root = detect_data_root(args.data_root) if args.data_root else detect_data_root()
+
+    html_default_in = data_html(resolved_root)
+    pdf_default_in = data_pdfs(resolved_root)
+    doctags_default_out = data_doctags(resolved_root)
+
+    mode = args.mode
+    notes: List[str] = []
+    if args.in_dir is not None:
+        input_dir = args.in_dir.expanduser().resolve()
+        if mode == "auto":
+            try:
+                mode = _detect_mode(input_dir)
+            except ValueError as exc:
+                notes.append(str(exc))
+    else:
+        if mode == "auto":
+            html_present = _directory_contains_suffixes(html_default_in, _HTML_SUFFIXES)
+            pdf_present = _directory_contains_suffixes(pdf_default_in, _PDF_SUFFIXES)
+            if html_present and not pdf_present:
+                mode = "html"
+            elif pdf_present and not html_present:
+                mode = "pdf"
+            else:
+                notes.append("Unable to auto-detect mode: specify --mode or --input explicitly")
+                mode = "html"
+        input_dir = html_default_in if mode == "html" else pdf_default_in
+
+    output_dir = (
+        args.out_dir.expanduser().resolve()
+        if args.out_dir is not None
+        else doctags_default_out
+    )
+
+    if not Path(input_dir).exists():  # type: ignore[arg-type]
+        notes.append(f"Input directory missing: {input_dir}")
+        files: List[Path] = []
+        manifest_index: Dict[str, dict] = {}
+    else:
+        if mode == "html":
+            files = pipeline_backend.list_htmls(input_dir)
+            manifest_stage = "doctags-html"
+        else:
+            files = pipeline_backend.list_pdfs(input_dir)
+            manifest_stage = "doctags-pdf"
+        manifest_index = load_manifest_index(manifest_stage, resolved_root) if args.resume else {}
+
+    to_process: List[str] = []
+    skipped: List[str] = []
+    for path in files:
+        rel_path = path.relative_to(input_dir)
+        doc_id = rel_path.as_posix()
+        out_path = (output_dir / rel_path).with_suffix(".doctags")
+        input_hash = compute_content_hash(path)
+        manifest_entry = manifest_index.get(doc_id)
+        skip = should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force)
+        if mode == "html" and skip and getattr(args, "overwrite", False):
+            skip = False
+        if skip:
+            skipped.append(doc_id)
+        else:
+            to_process.append(doc_id)
+
+    return {
+        "stage": "doctags",
+        "mode": mode,
+        "input_dir": str(input_dir),
+        "output_dir": str(output_dir),
+        "total": len(files),
+        "process": to_process,
+        "skip": skipped,
+        "notes": notes,
+    }
+
+
+def _plan_chunk(argv: Sequence[str]) -> Dict[str, Any]:
+    try:
+        from DocsToKG.DocParsing.DoclingHybridChunkerPipelineWithMin import build_parser as chunk_build_parser  # pylint: disable=import-error
+    except ModuleNotFoundError as exc:
+        return {
+            "stage": "chunk",
+            "input_dir": None,
+            "output_dir": None,
+            "total": 0,
+            "process": [],
+            "skip": [],
+            "notes": [f"Chunk plan unavailable ({exc})"],
+        }
+
+    parser = chunk_build_parser()
+    args = parser.parse_args(argv)
+    resolved_root = pipeline_backend.prepare_data_root(args.data_root, detect_data_root())
+    data_root_overridden = args.data_root is not None
+
+    in_dir = pipeline_backend.resolve_pipeline_path(
+        cli_value=args.in_dir,
+        default_path=args.in_dir or data_doctags(resolved_root),
+        resolved_data_root=resolved_root,
+        data_root_overridden=data_root_overridden,
+        resolver=data_doctags,
+    ).resolve()
+
+    out_dir = pipeline_backend.resolve_pipeline_path(
+        cli_value=args.out_dir,
+        default_path=args.out_dir or data_chunks(resolved_root),
+        resolved_data_root=resolved_root,
+        data_root_overridden=data_root_overridden,
+        resolver=data_chunks,
+    ).resolve()
+
+    notes: List[str] = []
+    if not in_dir.exists():
+        notes.append(f"DocTags directory missing: {in_dir}")
+        files: List[Path] = []
+    else:
+        files = list(iter_doctags(in_dir))
+
+    manifest_index = load_manifest_index("chunks", resolved_root) if args.resume else {}
+    to_process: List[str] = []
+    skipped: List[str] = []
+
+    for path in files:
+        doc_id = compute_relative_doc_id(path, in_dir)
+        relative_target = Path(doc_id)
+        out_path = (out_dir / relative_target).with_suffix(".chunks.jsonl")
+        input_hash = compute_content_hash(path)
+        manifest_entry = manifest_index.get(doc_id)
+        if should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force):
+            skipped.append(doc_id)
+        else:
+            to_process.append(doc_id)
+
+    return {
+        "stage": "chunk",
+        "input_dir": str(in_dir),
+        "output_dir": str(out_dir),
+        "total": len(files),
+        "process": to_process,
+        "skip": skipped,
+        "notes": notes,
+    }
+
+
+def _plan_embed(argv: Sequence[str]) -> Dict[str, Any]:
+    try:
+        from DocsToKG.DocParsing.EmbeddingV2 import build_parser as embed_build_parser  # pylint: disable=import-error
+    except ModuleNotFoundError as exc:
+        return {
+            "stage": "embed",
+            "operation": "unknown",
+            "chunks_dir": None,
+            "vectors_dir": None,
+            "total": 0,
+            "process": [],
+            "skip": [],
+            "notes": [f"Embed plan unavailable ({exc})"],
+        }
+
+    parser = embed_build_parser()
+    args = parser.parse_args(argv)
+    resolved_root = pipeline_backend.prepare_data_root(args.data_root, detect_data_root())
+    data_root_overridden = args.data_root is not None
+
+    chunks_dir = pipeline_backend.resolve_pipeline_path(
+        cli_value=args.chunks_dir,
+        default_path=args.chunks_dir or data_chunks(resolved_root),
+        resolved_data_root=resolved_root,
+        data_root_overridden=data_root_overridden,
+        resolver=data_chunks,
+    ).resolve()
+
+    vectors_dir = pipeline_backend.resolve_pipeline_path(
+        cli_value=args.out_dir,
+        default_path=args.out_dir or data_vectors(resolved_root),
+        resolved_data_root=resolved_root,
+        data_root_overridden=data_root_overridden,
+        resolver=data_vectors,
+    ).resolve()
+
+    notes: List[str] = []
+    if not chunks_dir.exists():
+        notes.append(f"Chunk directory missing: {chunks_dir}")
+        files: List[Path] = []
+    else:
+        files = list(iter_chunks(chunks_dir))
+
+    manifest_index = load_manifest_index("embeddings", resolved_root) if args.resume else {}
+
+    if args.validate_only:
+        validate: List[str] = []
+        missing: List[str] = []
+        for chunk_path in files:
+            doc_id, vector_path = derive_doc_id_and_vectors_path(chunk_path, chunks_dir, vectors_dir)
+            if vector_path.exists():
+                validate.append(doc_id)
+            else:
+                missing.append(doc_id)
+        return {
+            "stage": "embed",
+            "operation": "validate",
+            "chunks_dir": str(chunks_dir),
+            "vectors_dir": str(vectors_dir),
+            "total": len(files),
+            "process": validate,
+            "skip": missing,
+            "notes": notes,
+        }
+
+    to_process: List[str] = []
+    skipped: List[str] = []
+    for chunk_path in files:
+        doc_id, vector_path = derive_doc_id_and_vectors_path(chunk_path, chunks_dir, vectors_dir)
+        input_hash = compute_content_hash(chunk_path)
+        manifest_entry = manifest_index.get(doc_id)
+        if should_skip_output(vector_path, manifest_entry, input_hash, args.resume, args.force):
+            skipped.append(doc_id)
+        else:
+            to_process.append(doc_id)
+
+    return {
+        "stage": "embed",
+        "operation": "generate",
+        "chunks_dir": str(chunks_dir),
+        "vectors_dir": str(vectors_dir),
+        "total": len(files),
+        "process": to_process,
+        "skip": skipped,
+        "notes": notes,
+    }
+
+
+def _display_plan(plans: Sequence[Dict[str, Any]]) -> None:
+    print("docparse all plan")
+    for entry in plans:
+        stage = entry.get("stage", "unknown")
+        notes = entry.get("notes", [])
+        if stage == "doctags":
+            print(
+                f"- doctags (mode={entry.get('mode')}): process {len(entry.get('process', []))} / {entry.get('total', 0)}"
+            )
+            print("  input:", entry.get("input_dir"))
+            print("  output:", entry.get("output_dir"))
+            if entry.get("process"):
+                print("  process preview:", ", ".join(_preview_list(entry["process"])))
+            if entry.get("skip"):
+                print("  skip preview:", ", ".join(_preview_list(entry["skip"])))
+        elif stage == "chunk":
+            print(
+                f"- chunk: process {len(entry.get('process', []))} / {entry.get('total', 0)}"
+            )
+            print("  input:", entry.get("input_dir"))
+            print("  output:", entry.get("output_dir"))
+            if entry.get("process"):
+                print("  process preview:", ", ".join(_preview_list(entry["process"])))
+            if entry.get("skip"):
+                print("  skip preview:", ", ".join(_preview_list(entry["skip"])))
+        elif stage == "embed":
+            operation = entry.get("operation", "generate")
+            label = "validate" if operation == "validate" else "process"
+            items = entry.get("process", [])
+            print(
+                f"- embed ({operation}): {label} {len(items)} / {entry.get('total', 0)}"
+            )
+            print("  chunks:", entry.get("chunks_dir"))
+            print("  vectors:", entry.get("vectors_dir"))
+            if items:
+                print("  preview:", ", ".join(_preview_list(items)))
+            skipped = entry.get("skip")
+            if skipped:
+                print("  skip preview:", ", ".join(_preview_list(skipped)))
+        if notes:
+            print("  notes:", "; ".join(notes))
+    print()
+
+
 def _run_doctags(argv: Sequence[str]) -> int:
     """Execute the DocTags conversion subcommand.
 
@@ -778,6 +1066,11 @@ def _run_all(argv: Sequence[str]) -> int:
         force_help="Force reprocessing at every stage even if outputs exist",
     )
     parser.add_argument(
+        "--plan",
+        action="store_true",
+        help="Print the planned documents for each stage and exit without running.",
+    )
+    parser.add_argument(
         "--mode",
         choices=["auto", "html", "pdf"],
         default="auto",
@@ -881,14 +1174,6 @@ def _run_all(argv: Sequence[str]) -> int:
     if args.overwrite:
         doctags_args.append("--overwrite")
 
-    exit_code = _run_doctags(doctags_args)
-    if exit_code != 0:
-        logger.error(
-            "DocTags stage failed",
-            extra={"extra_fields": {"exit_code": exit_code}},
-        )
-        return exit_code
-
     chunk_args: List[str] = []
     if args.data_root:
         chunk_args.extend(["--data-root", str(args.data_root)])
@@ -909,14 +1194,6 @@ def _run_all(argv: Sequence[str]) -> int:
     if args.structural_markers:
         chunk_args.extend(["--structural-markers", str(args.structural_markers)])
 
-    exit_code = _run_chunk(chunk_args)
-    if exit_code != 0:
-        logger.error(
-            "Chunk stage failed",
-            extra={"extra_fields": {"exit_code": exit_code}},
-        )
-        return exit_code
-
     embed_args: List[str] = []
     if args.data_root:
         embed_args.extend(["--data-root", str(args.data_root)])
@@ -936,6 +1213,71 @@ def _run_all(argv: Sequence[str]) -> int:
         embed_args.extend(
             ["--splade-zero-pct-warn-threshold", str(args.splade_zero_pct_warn_threshold)]
         )
+
+    if args.plan:
+        plans: List[Dict[str, Any]] = []
+        try:
+            plans.append(_plan_doctags(doctags_args))
+        except Exception as exc:  # pragma: no cover - plan path should handle gracefully
+            plans.append(
+                {
+                    "stage": "doctags",
+                    "mode": args.mode,
+                    "input_dir": None,
+                    "output_dir": None,
+                    "total": 0,
+                    "process": [],
+                    "skip": [],
+                    "notes": [f"DocTags plan unavailable ({exc})"],
+                }
+            )
+        try:
+            plans.append(_plan_chunk(chunk_args))
+        except Exception as exc:  # pragma: no cover
+            plans.append(
+                {
+                    "stage": "chunk",
+                    "input_dir": None,
+                    "output_dir": None,
+                    "total": 0,
+                    "process": [],
+                    "skip": [],
+                    "notes": [f"Chunk plan unavailable ({exc})"],
+                }
+            )
+        try:
+            plans.append(_plan_embed(embed_args))
+        except Exception as exc:  # pragma: no cover
+            plans.append(
+                {
+                    "stage": "embed",
+                    "operation": "unknown",
+                    "chunks_dir": None,
+                    "vectors_dir": None,
+                    "total": 0,
+                    "process": [],
+                    "skip": [],
+                    "notes": [f"Embed plan unavailable ({exc})"],
+                }
+            )
+        _display_plan(plans)
+        return 0
+
+    exit_code = _run_doctags(doctags_args)
+    if exit_code != 0:
+        logger.error(
+            "DocTags stage failed",
+            extra={"extra_fields": {"exit_code": exit_code}},
+        )
+        return exit_code
+
+    exit_code = _run_chunk(chunk_args)
+    if exit_code != 0:
+        logger.error(
+            "Chunk stage failed",
+            extra={"extra_fields": {"exit_code": exit_code}},
+        )
+        return exit_code
 
     exit_code = _run_embed(embed_args)
     if exit_code != 0:

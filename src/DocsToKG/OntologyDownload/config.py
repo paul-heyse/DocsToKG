@@ -113,6 +113,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import re
 import sys
@@ -271,6 +272,7 @@ class DownloadConfiguration(BaseModel):
         }
     )
     allowed_hosts: Optional[List[str]] = Field(default=None)
+    allowed_ports: Optional[List[int]] = Field(default=None)
     polite_headers: Dict[str, str] = Field(
         default_factory=lambda: {
             "User-Agent": "DocsToKG-OntologyDownloader/1.0 (+https://github.com/allenai/DocsToKG)",
@@ -294,6 +296,20 @@ class DownloadConfiguration(BaseModel):
                 )
         return value
 
+    @field_validator("allowed_ports")
+    @classmethod
+    def validate_allowed_ports(cls, value: Optional[List[int]]) -> Optional[List[int]]:
+        if value is None:
+            return None
+        normalized: List[int] = []
+        for port in value:
+            if not isinstance(port, int):
+                raise ValueError("allowed_ports entries must be integers")
+            if port < 1 or port > 65535:
+                raise ValueError("allowed_ports values must be between 1 and 65535")
+            normalized.append(port)
+        return normalized
+
     def rate_limit_per_second(self) -> float:
         """Return the configured per-host rate limit in requests per second."""
 
@@ -310,42 +326,88 @@ class DownloadConfiguration(BaseModel):
             return None
         return parse_rate_limit_to_rps(limit_str)
 
-    def normalized_allowed_hosts(self) -> Optional[Tuple[Set[str], Set[str]]]:
-        """Split allowed host list into exact domains and wildcard suffixes."""
+    def allowed_port_set(self) -> Set[int]:
+        """Return the union of default ports and user-configured allowances."""
+
+        ports: Set[int] = {80, 443}
+        if self.allowed_ports:
+            ports.update(self.allowed_ports)
+        return ports
+
+    def normalized_allowed_hosts(self) -> Optional[Tuple[Set[str], Set[str], Dict[str, Set[int]]]]:
+        """Split allowed host list into exact domains, wildcard suffixes, and per-host port allowances."""
 
         if not self.allowed_hosts:
             return None
 
         exact: Set[str] = set()
         suffixes: Set[str] = set()
+        host_ports: Dict[str, Set[int]] = {}
 
         for entry in self.allowed_hosts:
             candidate = entry.strip()
             if not candidate:
                 continue
 
+            port: Optional[int] = None
+            working = candidate
+            if working.startswith("["):
+                end_bracket = working.find("]")
+                if end_bracket == -1:
+                    raise ValueError(f"Invalid IPv6 host '{entry}' in allowlist")
+                literal = working[1:end_bracket]
+                remainder = working[end_bracket + 1 :]
+                if remainder:
+                    if not remainder.startswith(":"):
+                        raise ValueError(f"Invalid IPv6 host '{entry}' in allowlist")
+                    port_str = remainder[1:]
+                    if not port_str.isdigit():
+                        raise ValueError(f"Invalid port in allowlist entry: {entry}")
+                    port = int(port_str)
+                working = literal
+            elif ":" in working and working.count(":") == 1:
+                host_candidate, maybe_port = working.rsplit(":", 1)
+                if maybe_port.isdigit():
+                    port_value = int(maybe_port)
+                    if port_value < 1 or port_value > 65535:
+                        raise ValueError(f"Invalid port in allowlist entry: {entry}")
+                    port = port_value
+                    working = host_candidate
+                else:
+                    raise ValueError(f"Invalid port in allowlist entry: {entry}")
+
             wildcard = False
-            if candidate.startswith("*."):
+            if working.startswith("*."):
                 wildcard = True
-                candidate = candidate[2:]
-            elif candidate.startswith("."):
+                working = working[2:]
+            elif working.startswith("."):
                 wildcard = True
-                candidate = candidate[1:]
+                working = working[1:]
 
             try:
-                normalized = candidate.encode("idna").decode("ascii").lower()
-            except UnicodeError as exc:
-                raise ValueError(f"Invalid hostname in allowlist: {entry}") from exc
+                ipaddress.ip_address(working)
+            except ValueError:
+                try:
+                    normalized = working.encode("idna").decode("ascii").lower()
+                except UnicodeError as exc:
+                    raise ValueError(f"Invalid hostname in allowlist: {entry}") from exc
+            else:
+                normalized = working.lower()
+
+            if wildcard and port is not None:
+                raise ValueError("Wildcard allowlist entries cannot specify ports")
 
             if wildcard:
                 suffixes.add(normalized)
             else:
                 exact.add(normalized)
+                if port is not None:
+                    host_ports.setdefault(normalized, set()).add(port)
 
-        if not exact and not suffixes:
+        if not exact and not suffixes and not host_ports:
             return None
 
-        return exact, suffixes
+        return exact, suffixes, host_ports
 
     def polite_http_headers(
         self,

@@ -79,6 +79,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import warnings
 from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import RLock
@@ -102,6 +103,7 @@ __all__ = (
     "FaissVectorStore",
     "FaissIndexManager",
     "ManagedFaissAdapter",
+    "AdapterStats",
     "FaissSearchResult",
     "cosine_against_corpus_gpu",
     "cosine_batch",
@@ -150,6 +152,20 @@ class FaissSearchResult:
 
     vector_id: str
     score: float
+
+
+@dataclass(frozen=True)
+class AdapterStats:
+    """Snapshot of runtime characteristics for a managed FAISS adapter."""
+
+    device: int
+    ntotal: int
+    index_description: str
+    nprobe: int
+    multi_gpu_mode: str
+    replicated: bool
+    fp16_enabled: bool
+    resources: Optional["faiss.StandardGpuResources"]
 
 
 class FaissVectorStore(DenseVectorStore):
@@ -224,8 +240,11 @@ class FaissVectorStore(DenseVectorStore):
         self._expected_ntotal = int(getattr(config, "expected_ntotal", 0))
         self._rebuild_delete_threshold = int(getattr(config, "rebuild_delete_threshold", 10000))
         self._force_64bit_ids = bool(getattr(config, "force_64bit_ids", False))
+        self._replication_enabled = bool(getattr(config, "enable_replication", True))
+        self._reserve_memory_enabled = bool(getattr(config, "enable_reserve_memory", True))
         self._replicated = False
         self._gpu_resources: Optional["faiss.StandardGpuResources"] = None
+        self._pinned_buffers: list[object] = []
         self.init_gpu()
         self._lock = RLock()
         self._index = self._create_index()
@@ -233,6 +252,7 @@ class FaissVectorStore(DenseVectorStore):
             raise RuntimeError(
                 f"HybridSearch initialised with dim={dim} but created index expects {self._dim}"
             )
+        self._emit_gpu_state("bootstrap", level="info")
         self._id_resolver: Optional[Callable[[int], Optional[str]]] = None
         self._remove_fallbacks = 0
         self._tombstones: set[int] = set()
@@ -303,6 +323,22 @@ class FaissVectorStore(DenseVectorStore):
         """
         return int(getattr(self._config, "device", self._device))
 
+    @property
+    def adapter_stats(self) -> AdapterStats:
+        """Return a read-only snapshot of adapter state."""
+
+        index_desc = self._describe_index(getattr(self, "_index", None))
+        return AdapterStats(
+            device=self.device,
+            ntotal=self.ntotal,
+            index_description=index_desc,
+            nprobe=self._current_nprobe_value(),
+            multi_gpu_mode=str(self._multi_gpu_mode),
+            replicated=bool(self._replicated),
+            fp16_enabled=bool(getattr(self._config, "flat_use_fp16", False)),
+            resources=self._gpu_resources,
+        )
+
     def set_id_resolver(self, resolver: Callable[[int], Optional[str]]) -> None:
         """Register a callback that maps FAISS internal ids to external ids.
 
@@ -336,11 +372,16 @@ class FaissVectorStore(DenseVectorStore):
         with self._observability.trace("faiss_train", samples=str(len(vectors))):
             self._observability.metrics.increment("faiss_train_calls", amount=1.0)
             matrix = np.stack([self._ensure_dim(vec) for vec in vectors]).astype(np.float32)
-            faiss.normalize_L2(matrix)
-            nlist = int(getattr(self._config, "nlist", 1024))
-            factor = max(1, int(getattr(self._config, "ivf_train_factor", 8)))
-            ntrain = min(matrix.shape[0], nlist * factor)
-            self._index.train(matrix[:ntrain])
+            matrix = self._as_pinned(np.ascontiguousarray(matrix, dtype=np.float32))
+            try:
+                faiss.normalize_L2(matrix)
+                nlist = int(getattr(self._config, "nlist", 1024))
+                factor = max(1, int(getattr(self._config, "ivf_train_factor", 8)))
+                ntrain = min(matrix.shape[0], nlist * factor)
+                self._index.train(matrix[:ntrain])
+            finally:
+                self._release_pinned_buffers()
+        self._update_gpu_metrics()
 
     def needs_training(self) -> bool:
         """Return ``True`` when the current FAISS index still requires training.
@@ -380,32 +421,37 @@ class FaissVectorStore(DenseVectorStore):
             matrix = np.ascontiguousarray(
                 np.stack([self._ensure_dim(vec) for vec in vectors]), dtype=np.float32
             )
+            matrix = self._as_pinned(matrix)
             faiss.normalize_L2(matrix)
-            with self._lock:
-                self._flush_pending_deletes(force=False)
-                if self._supports_remove_ids is None:
-                    self._supports_remove_ids = self._probe_remove_support()
-                if self._supports_remove_ids:
-                    self.remove_ids(faiss_ids, force_flush=True)
-                else:
-                    existing_ids = self._lookup_existing_ids(faiss_ids)
-                    if existing_ids.size:
-                        self.remove_ids(existing_ids, force_flush=True)
-                base = self._index.index if hasattr(self._index, "index") else self._index
-                train_target = base
-                if hasattr(faiss, "downcast_index"):
-                    try:
-                        train_target = faiss.downcast_index(base)
-                    except Exception:
-                        train_target = base
-                if hasattr(train_target, "is_trained") and not getattr(train_target, "is_trained"):
-                    nlist = int(getattr(self._config, "nlist", 1024))
-                    factor = max(1, int(getattr(self._config, "ivf_train_factor", 8)))
-                    ntrain = min(matrix.shape[0], nlist * factor)
-                    train_target.train(matrix[:ntrain])
-                self._index.add_with_ids(matrix, faiss_ids)
-                self._dirty_deletes = 0
-                self._needs_rebuild = False
+            try:
+                with self._lock:
+                    self._flush_pending_deletes(force=False)
+                    if self._supports_remove_ids is None:
+                        self._supports_remove_ids = self._probe_remove_support()
+                    if self._supports_remove_ids:
+                        self.remove_ids(faiss_ids, force_flush=True)
+                    else:
+                        existing_ids = self._lookup_existing_ids(faiss_ids)
+                        if existing_ids.size:
+                            self.remove_ids(existing_ids, force_flush=True)
+                    base = self._index.index if hasattr(self._index, "index") else self._index
+                    train_target = base
+                    if hasattr(faiss, "downcast_index"):
+                        try:
+                            train_target = faiss.downcast_index(base)
+                        except Exception:
+                            train_target = base
+                    if hasattr(train_target, "is_trained") and not getattr(train_target, "is_trained"):
+                        nlist = int(getattr(self._config, "nlist", 1024))
+                        factor = max(1, int(getattr(self._config, "ivf_train_factor", 8)))
+                        ntrain = min(matrix.shape[0], nlist * factor)
+                        train_target.train(matrix[:ntrain])
+                    self._index.add_with_ids(matrix, faiss_ids)
+                    self._dirty_deletes = 0
+                    self._needs_rebuild = False
+            finally:
+                self._release_pinned_buffers()
+            self._update_gpu_metrics()
 
     def remove(self, vector_ids: Sequence[str]) -> None:
         """Remove vectors from the index using application-level identifiers.
@@ -424,6 +470,7 @@ class FaissVectorStore(DenseVectorStore):
             self._observability.metrics.increment("faiss_remove_vectors", amount=float(count))
             with self._lock:
                 self.remove_ids(ids, force_flush=True)
+        self._update_gpu_metrics()
 
     def remove_ids(self, ids: np.ndarray, *, force_flush: bool = False) -> int:
         """Remove vectors using FAISS internal ids.
@@ -441,6 +488,7 @@ class FaissVectorStore(DenseVectorStore):
                 return 0
         self._remove_ids(ids64)
         self._flush_pending_deletes(force=force_flush)
+        self._update_gpu_metrics()
         return int(ids64.size)
 
     def add_batch(
@@ -501,14 +549,18 @@ class FaissVectorStore(DenseVectorStore):
 
         vector = self._ensure_dim(query)
         matrix = np.ascontiguousarray(vector.reshape(1, -1), dtype=np.float32)
+        matrix = self._as_pinned(matrix)
         faiss.normalize_L2(matrix)
-        with self._observability.trace("faiss_search", top_k=str(top_k)):
-            self._observability.metrics.increment("faiss_search_queries", amount=1.0)
-            distances, indices = self._search_matrix(matrix, top_k)
-        results = self._resolve_search_results(distances, indices)
-        row = results[0] if results else []
-        self._observability.metrics.observe("faiss_search_results", float(len(row)))
-        return row
+        try:
+            with self._observability.trace("faiss_search", top_k=str(top_k)):
+                self._observability.metrics.increment("faiss_search_queries", amount=1.0)
+                distances, indices = self._search_matrix(matrix, top_k)
+            results = self._resolve_search_results(distances, indices)
+            row = results[0] if results else []
+            self._observability.metrics.observe("faiss_search_results", float(len(row)))
+            return row
+        finally:
+            self._release_pinned_buffers()
 
     def search_many(self, queries: np.ndarray, top_k: int) -> List[List[FaissSearchResult]]:
         """Search the index for multiple queries in a single FAISS call."""
@@ -521,23 +573,181 @@ class FaissVectorStore(DenseVectorStore):
         matrix = np.atleast_2d(np.ascontiguousarray(queries, dtype=np.float32))
         if matrix.shape[1] != self._dim:
             raise ValueError(f"Query dimensionality {matrix.shape[1]} != index dim {self._dim}")
+        matrix = self._as_pinned(matrix)
         faiss.normalize_L2(matrix)
         batch = matrix.shape[0]
-        with self._observability.trace("faiss_search_batch", batch=str(batch), top_k=str(top_k)):
-            self._observability.metrics.increment("faiss_search_queries", amount=float(batch))
-            distances, indices = self._search_matrix(matrix, top_k)
-        results = self._resolve_search_results(distances, indices)
-        self._observability.metrics.observe(
-            "faiss_search_results",
-            float(sum(len(row) for row in results)),
-        )
-        return results
+        try:
+            with self._observability.trace("faiss_search_batch", batch=str(batch), top_k=str(top_k)):
+                self._observability.metrics.increment("faiss_search_queries", amount=float(batch))
+                distances, indices = self._search_matrix(matrix, top_k)
+            results = self._resolve_search_results(distances, indices)
+            self._observability.metrics.observe(
+                "faiss_search_results",
+                float(sum(len(row) for row in results)),
+            )
+            return results
+        finally:
+            self._release_pinned_buffers()
+
+    def range_search(
+        self,
+        query: np.ndarray,
+        min_score: float,
+        *,
+        limit: Optional[int] = None,
+    ) -> List[FaissSearchResult]:
+        """Return all vectors scoring above ``min_score`` for ``query``."""
+
+        vector = self._ensure_dim(query)
+        matrix = np.ascontiguousarray(vector.reshape(1, -1), dtype=np.float32)
+        matrix = self._as_pinned(matrix)
+        faiss.normalize_L2(matrix)
+        threshold = float(min_score)
+        results: List[FaissSearchResult] = []
+        try:
+            with self._observability.trace(
+                "faiss_range_search",
+                threshold=f"{threshold:.6f}",
+                limit="*" if limit is None else str(int(limit)),
+            ):
+                self._observability.metrics.increment("faiss_range_queries", amount=1.0)
+                pairs: List[tuple[float, int]]
+                try:
+                    with self._lock:
+                        self._flush_pending_deletes(force=False)
+                        self._set_nprobe()
+                        if not hasattr(self._index, "range_search"):
+                            raise AttributeError("range_search unsupported by index")
+                        lims, distances, labels = self._index.range_search(matrix, threshold)
+                except Exception:
+                    fallback_k = limit or max(32, min(self.ntotal, 2048))
+                    distances, indices = self._search_matrix(matrix, int(fallback_k))
+                    raw_pairs = zip(distances[0], indices[0])
+                    pairs = [
+                        (float(score), int(internal_id))
+                        for score, internal_id in raw_pairs
+                        if internal_id != -1 and float(score) >= threshold
+                    ]
+                else:
+                    start = int(lims[0])
+                    end = int(lims[1])
+                    pairs = [
+                        (float(distances[i]), int(labels[i]))
+                        for i in range(start, end)
+                        if labels[i] != -1 and float(distances[i]) >= threshold
+                    ]
+                pairs.sort(key=lambda item: item[0], reverse=True)
+                if limit is not None:
+                    pairs = pairs[: int(limit)]
+                for score, internal_id in pairs:
+                    vector_id = self._resolve_vector_id(int(internal_id))
+                    if vector_id is None:
+                        continue
+                    results.append(FaissSearchResult(vector_id=vector_id, score=float(score)))
+                self._observability.metrics.observe("faiss_range_results", float(len(results)))
+            return results
+        finally:
+            self._release_pinned_buffers()
 
     def _search_matrix(self, matrix: np.ndarray, top_k: int) -> tuple[np.ndarray, np.ndarray]:
         with self._lock:
             self._flush_pending_deletes(force=False)
             self._set_nprobe()
             return self._index.search(matrix, int(top_k))
+
+    def _as_pinned(self, array: np.ndarray, *, threshold_bytes: int = 1_048_576) -> np.ndarray:
+        """Return a pinned-memory view of ``array`` when practical."""
+
+        if not bool(getattr(self._config, "use_pinned_memory", True)):
+            return array
+        if array.nbytes < threshold_bytes:
+            return array
+        try:
+            import torch
+        except Exception:
+            return array
+        if not torch.cuda.is_available():
+            return array
+        dtype_map = {
+            np.float32: torch.float32,
+            np.float16: torch.float16,
+            np.int32: torch.int32,
+            np.int64: torch.int64,
+        }
+        torch_dtype = dtype_map.get(array.dtype.type)
+        if torch_dtype is None:
+            return array
+        tensor = torch.empty(tuple(array.shape), dtype=torch_dtype, pin_memory=True)
+        source = torch.as_tensor(array, dtype=torch_dtype)
+        tensor.copy_(source)
+        self._pinned_buffers.append(tensor)
+        return tensor.numpy()
+
+    def _release_pinned_buffers(self) -> None:
+        if self._pinned_buffers:
+            self._pinned_buffers.clear()
+
+    def _current_nprobe_value(self) -> int:
+        index = getattr(self, "_index", None)
+        candidates = []
+        if index is not None:
+            candidates.append(index)
+            base = getattr(index, "index", None)
+            if base is not None:
+                candidates.append(base)
+        for candidate in candidates:
+            value = getattr(candidate, "nprobe", None)
+            if value is not None:
+                try:
+                    return int(value)
+                except Exception:
+                    continue
+        return int(getattr(self._config, "nprobe", 0))
+
+    def _update_gpu_metrics(self) -> None:
+        stats = self.adapter_stats()
+        self._observability.metrics.set_gauge("faiss_ntotal", float(stats.ntotal))
+        self._observability.metrics.set_gauge("faiss_nprobe_effective", float(stats.nprobe))
+        resources = stats.resources
+        if resources is None or not hasattr(resources, "getMemoryInfo"):
+            return
+        try:
+            free, total = resources.getMemoryInfo(int(stats.device))
+        except Exception:
+            logger.debug("Unable to fetch GPU memory info", exc_info=True)
+            return
+        self._observability.metrics.set_gauge("faiss_gpu_mem_free_bytes", float(free))
+        self._observability.metrics.set_gauge("faiss_gpu_mem_total_bytes", float(total))
+        self._observability.metrics.set_gauge("faiss_gpu_bytes", float(max(0.0, total - free)))
+
+    def _emit_gpu_state(self, action: str, *, level: str = "debug") -> None:
+        self._update_gpu_metrics()
+        stats = self.adapter_stats()
+        payload = {
+            "action": action,
+            "device": stats.device,
+            "index": stats.index_description,
+            "replicated": stats.replicated,
+            "multi_gpu_mode": stats.multi_gpu_mode,
+            "fp16_enabled": stats.fp16_enabled,
+            "indices_32_bit": bool(self._indices_32_bit and not self._force_64bit_ids),
+            "nprobe": stats.nprobe,
+            "ntotal": stats.ntotal,
+        }
+        log_fn = (
+            self._observability.logger.info
+            if level == "info"
+            else self._observability.logger.debug
+        )
+        log_fn("faiss-gpu-state", extra={"event": payload})
+
+    def _describe_index(self, index: Optional["faiss.Index"]) -> str:
+        if index is None:
+            return "uninitialised"
+        try:
+            return faiss.describe_index(index)
+        except Exception:
+            return type(index).__name__
 
     def _resolve_search_results(
         self, distances: np.ndarray, indices: np.ndarray
@@ -650,6 +860,7 @@ class FaissVectorStore(DenseVectorStore):
                 self._needs_rebuild = False
                 self._set_nprobe()
             self._observability.metrics.increment("faiss_restore_calls", amount=1.0)
+        self._emit_gpu_state("restore", level="info")
 
     def set_nprobe(
         self,
@@ -681,6 +892,7 @@ class FaissVectorStore(DenseVectorStore):
             with self._lock:
                 self._set_nprobe()
         self._observability.metrics.set_gauge("faiss_nprobe", float(target))
+        self._emit_gpu_state("set_nprobe")
         return target
 
     def stats(self) -> dict[str, float | str]:
@@ -836,6 +1048,9 @@ class FaissVectorStore(DenseVectorStore):
             RuntimeError: If sharding is requested but unsupported by the
                 linked FAISS build.
         """
+        self._replicated = False
+        if not self._replication_enabled:
+            return index
         if not hasattr(faiss, "index_cpu_to_all_gpus") or not hasattr(faiss, "index_cpu_to_gpu"):
             return index
         if shard and hasattr(faiss, "index_cpu_to_all_gpus_knn"):
@@ -898,6 +1113,8 @@ class FaissVectorStore(DenseVectorStore):
     def _maybe_reserve_memory(self, index: "faiss.Index") -> None:
         expected = self._expected_ntotal
         if expected <= 0:
+            return
+        if not self._reserve_memory_enabled:
             return
         base = index.index if hasattr(index, "index") else index
         if hasattr(faiss, "downcast_index"):
@@ -1437,12 +1654,18 @@ def serialize_state(faiss_index: FaissVectorStore, registry: "ChunkRegistry") ->
     }
 
 
-def restore_state(faiss_index: FaissVectorStore, payload: dict[str, object]) -> None:
+def restore_state(
+    faiss_index: FaissVectorStore,
+    payload: dict[str, object],
+    *,
+    allow_legacy: bool = False,
+) -> None:
     """Restore the vector store from a payload produced by :func:`serialize_state`.
 
     Args:
         faiss_index: Vector store receiving the restored state.
         payload: Mapping with ``faiss`` (base64) and registry vector ids.
+        allow_legacy: Permit payloads missing ``meta`` (emits a warning).
 
     Returns:
         None
@@ -1454,12 +1677,15 @@ def restore_state(faiss_index: FaissVectorStore, payload: dict[str, object]) -> 
     if not isinstance(encoded, str):
         raise ValueError("Missing FAISS payload")
     meta = payload.get("meta")
-    meta_mapping: Optional[Mapping[str, object]]
-    if isinstance(meta, Mapping):
-        meta_mapping = dict(meta)
-    else:
-        meta_mapping = None
-    faiss_index.restore(base64.b64decode(encoded.encode("ascii")), meta=meta_mapping)
+    if not isinstance(meta, Mapping):
+        if not allow_legacy:
+            raise ValueError("FAISS snapshot payload missing 'meta'")
+        logger.warning(
+            "restore_state: legacy payload without 'meta'; defaults will be applied"
+        )
+        faiss_index.restore(base64.b64decode(encoded.encode("ascii")), meta=None)
+        return
+    faiss_index.restore(base64.b64decode(encoded.encode("ascii")), meta=dict(meta))
 
 
 # Backwards compatibility alias for downstream imports.
@@ -1533,16 +1759,16 @@ class ManagedFaissAdapter(DenseVectorStore):
         """
         self._inner.add_batch(vectors, vector_ids, batch_size=batch_size)
 
-    def set_nprobe(
+    def range_search(
         self,
-        nprobe: int,
+        query: np.ndarray,
+        min_score: float,
         *,
-        clamp_min: int = 1,
-        clamp_max: Optional[int] = None,
-    ) -> int:
-        """Tune ``nprobe`` while clamping to a safe range."""
+        limit: Optional[int] = None,
+    ) -> List[FaissSearchResult]:
+        """Delegate range search to the managed store."""
 
-        return self._inner.set_nprobe(nprobe, clamp_min=clamp_min, clamp_max=clamp_max)
+        return self._inner.range_search(query, min_score, limit=limit)
 
     def remove(self, vector_ids: Sequence[str]) -> None:
         """Remove vectors corresponding to ``vector_ids`` from the index."""
@@ -1574,6 +1800,12 @@ class ManagedFaissAdapter(DenseVectorStore):
         return self._inner.device
 
     @property
+    def adapter_stats(self) -> AdapterStats:
+        """Return a read-only snapshot of adapter state."""
+
+        return self._inner.adapter_stats
+
+    @property
     def gpu_resources(self):
         """Return GPU resources backing the managed index."""
 
@@ -1589,3 +1821,8 @@ class ManagedFaissAdapter(DenseVectorStore):
         """Trigger inner index rebuild when required by FAISS heuristics."""
 
         return self._inner.rebuild_if_needed()
+
+    def stats(self) -> Mapping[str, float | str]:
+        """Expose diagnostic statistics from the managed store."""
+
+        return self._inner.stats()

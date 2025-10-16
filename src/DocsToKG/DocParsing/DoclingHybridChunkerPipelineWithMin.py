@@ -936,15 +936,6 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         default=DEFAULT_SERIALIZER_PROVIDER,
         help=(
-            "Serializer provider in 'module:Class' format used to build DocTags. "
-            f"Default: {DEFAULT_SERIALIZER_PROVIDER}."
-        ),
-    )
-    parser.add_argument(
-        "--serializer-provider",
-        type=str,
-        default=DEFAULT_SERIALIZER_PROVIDER,
-        help=(
             "Import path (module:Class) for the serializer provider used to build Docling chunkers "
             f"(default: {DEFAULT_SERIALIZER_PROVIDER})."
         ),

@@ -21,7 +21,7 @@ from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from itertools import islice
 from pathlib import Path
-from typing import Any, BinaryIO, Callable, Dict, Iterable, Iterator, List, MutableMapping, Optional
+from typing import Any, BinaryIO, Callable, Dict, Iterable, Iterator, List, MutableMapping, Optional, Tuple, Union
 
 from .config import ResolvedConfig
 from .net import log_memory_usage
@@ -295,7 +295,8 @@ def normalize_streaming(
     *,
     graph=None,
     chunk_bytes: int = 1 << 20,
-) -> str:
+    return_header_hash: bool = False,
+) -> Union[str, Tuple[str, str]]:
     """Normalize ontologies using streaming canonical Turtle serialization.
 
     The streaming path serializes triples to a temporary file, leverages the
@@ -309,9 +310,11 @@ def normalize_streaming(
         output_path: Optional destination for the normalized Turtle document.
         graph: Optional pre-loaded RDF graph re-used instead of reparsing.
         chunk_bytes: Threshold controlling how frequently buffered bytes are flushed.
+        return_header_hash: When True, also return the hash of Turtle prefix directives.
 
     Returns:
-        SHA-256 hex digest of the canonical Turtle content.
+        SHA-256 hex digest of the canonical Turtle content, and optionally the hash
+        of the serialized prefix header when ``return_header_hash`` is True.
     """
 
     graph_obj = graph if graph is not None else rdflib.Graph()
@@ -336,6 +339,8 @@ def normalize_streaming(
     for key in sorted(prefix_map):
         label = f"{key}:" if key else ":"
         prefix_lines.append(f"@prefix {label} <{prefix_map[key]}> .\n")
+
+    header_hash = hashlib.sha256("".join(prefix_lines).encode("utf-8")).hexdigest()
 
     chunk_limit = max(1, int(chunk_bytes))
     buffer = bytearray()
@@ -401,7 +406,10 @@ def normalize_streaming(
 
             _flush(writer)
 
-    return sha256.hexdigest()
+    content_hash = sha256.hexdigest()
+    if return_header_hash:
+        return content_hash, header_hash
+    return content_hash
 
 
 class ValidatorSubprocessError(RuntimeError):

@@ -94,7 +94,7 @@ import logging
 from importlib import metadata
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
 
 import requests
 
@@ -129,6 +129,10 @@ from .plugins import ensure_resolver_plugins
 
 OlsClient = _OlsClient
 pystow = get_pystow()
+
+
+_CHECKSUM_HEX_RE = re.compile(r"^[0-9a-fA-F]{32,128}$")
+_SUPPORTED_CHECKSUM_ALGORITHMS = {"md5", "sha1", "sha256", "sha512"}
 
 
 # --- Public Functions ---
@@ -184,10 +188,68 @@ def normalize_license_to_spdx(value: Optional[str]) -> Optional[str]:
 
 
 # --- Private Helpers ---
-@dataclass(slots=True)
+
+
+def _parse_checksum_extra(value: object, *, context: str) -> Tuple[str, str]:
+    """Normalize checksum extras to ``(algorithm, value)`` tuples."""
+
+    if isinstance(value, str):
+        checksum = value.strip().lower()
+        if not _CHECKSUM_HEX_RE.fullmatch(checksum):
+            raise UserConfigError(f"{context} checksum must be a hex string")
+        return "sha256", checksum
+
+    if isinstance(value, Mapping):
+        algorithm_raw = value.get("algorithm", "sha256")
+        checksum_raw = value.get("value")
+        if not isinstance(algorithm_raw, str):
+            raise UserConfigError(f"{context} checksum algorithm must be a string")
+        if not isinstance(checksum_raw, str):
+            raise UserConfigError(f"{context} checksum value must be a string")
+        algorithm = algorithm_raw.strip().lower()
+        checksum = checksum_raw.strip().lower()
+        if algorithm not in _SUPPORTED_CHECKSUM_ALGORITHMS:
+            raise UserConfigError(f"{context} checksum algorithm '{algorithm}' is not supported")
+        if not _CHECKSUM_HEX_RE.fullmatch(checksum):
+            raise UserConfigError(f"{context} checksum must be a hex string")
+        return algorithm, checksum
+
+    raise UserConfigError(f"{context} checksum must be a string or mapping")
+
+
+def _parse_checksum_url_extra(value: object, *, context: str) -> Tuple[str, Optional[str]]:
+    """Normalize checksum URL extras to ``(url, algorithm)`` tuples."""
+
+    if isinstance(value, str):
+        url = value.strip()
+        if not url:
+            raise UserConfigError(f"{context} checksum_url must not be empty")
+        return url, None
+
+    if isinstance(value, Mapping):
+        url_value = value.get("url")
+        algorithm_value = value.get("algorithm")
+        if not isinstance(url_value, str) or not url_value.strip():
+            raise UserConfigError(f"{context} checksum_url must include a non-empty 'url'")
+        algorithm = None
+        if algorithm_value is not None:
+            if not isinstance(algorithm_value, str):
+                raise UserConfigError(f"{context} checksum_url algorithm must be a string when provided")
+            candidate = algorithm_value.strip().lower()
+            if candidate not in _SUPPORTED_CHECKSUM_ALGORITHMS:
+                raise UserConfigError(
+                    f"{context} checksum_url algorithm '{candidate}' is not supported"
+                )
+            algorithm = candidate
+        return url_value.strip(), algorithm
+
+    raise UserConfigError(f"{context} checksum_url must be a string or mapping")
+
+
 # --- Public Classes ---
 
 
+@dataclass(slots=True)
 class FetchPlan:
     """Concrete plan output from a resolver.
 
@@ -199,6 +261,9 @@ class FetchPlan:
         license: License reported for the ontology.
         media_type: MIME type of the artifact when known.
         service: Logical service identifier used for rate limiting.
+        checksum: Optional checksum value supplied by resolver.
+        checksum_algorithm: Hash algorithm associated with ``checksum``.
+        checksum_url: URL where a checksum file can be retrieved when provided.
 
     Examples:
         >>> plan = FetchPlan(
@@ -223,6 +288,9 @@ class FetchPlan:
     service: Optional[str] = None
     last_modified: Optional[str] = None
     content_length: Optional[int] = None
+    checksum: Optional[str] = None
+    checksum_algorithm: Optional[str] = None
+    checksum_url: Optional[str] = None
 
 
 class BaseResolver:
@@ -386,6 +454,9 @@ class BaseResolver:
         service: Optional[str] = None,
         last_modified: Optional[str] = None,
         content_length: Optional[int] = None,
+        checksum: Optional[str] = None,
+        checksum_algorithm: Optional[str] = None,
+        checksum_url: Optional[str] = None,
     ) -> FetchPlan:
         """Construct a ``FetchPlan`` from resolver components.
 
@@ -413,6 +484,9 @@ class BaseResolver:
             service=service,
             last_modified=last_modified,
             content_length=content_length,
+            checksum=checksum,
+            checksum_algorithm=checksum_algorithm,
+            checksum_url=checksum_url,
         )
 
 
@@ -931,6 +1005,26 @@ class DirectResolver(BaseResolver):
         if version is not None and not isinstance(version, str):
             raise UserConfigError("direct resolver expects 'extras.version' to be a string")
 
+        checksum_algorithm: Optional[str] = None
+        checksum_value: Optional[str] = None
+        checksum_url: Optional[str] = None
+
+        if "checksum" in extras:
+            checksum_algorithm, checksum_value = _parse_checksum_extra(
+                extras["checksum"], context="direct resolver extras.checksum"
+            )
+
+        if "checksum_url" in extras:
+            checksum_url, checksum_url_algorithm = _parse_checksum_url_extra(
+                extras["checksum_url"], context="direct resolver extras.checksum_url"
+            )
+            if checksum_url_algorithm and checksum_algorithm and checksum_algorithm != checksum_url_algorithm:
+                raise UserConfigError(
+                    "direct resolver checksum algorithm mismatch between checksum and checksum_url"
+                )
+            if checksum_url_algorithm:
+                checksum_algorithm = checksum_url_algorithm
+
         logger.info(
             "resolved download url",
             extra={
@@ -948,6 +1042,9 @@ class DirectResolver(BaseResolver):
             version=version,
             license=license_hint,
             service="direct",
+            checksum=checksum_value,
+            checksum_algorithm=checksum_algorithm,
+            checksum_url=checksum_url,
         )
 
 

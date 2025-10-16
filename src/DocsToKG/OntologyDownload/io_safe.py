@@ -92,11 +92,12 @@ import shutil
 import socket
 import stat
 import tarfile
+import time
 import unicodedata
 import uuid
 import zipfile
 from pathlib import Path, PurePosixPath
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set, Tuple
 from urllib.parse import ParseResult, urlparse, urlunparse
 
 from .config import ConfigError, DownloadConfiguration
@@ -111,6 +112,10 @@ __all__ = [
     "extract_tar_safe",
     "extract_archive_safe",
 ]
+
+
+_DNS_CACHE: Dict[str, Tuple[float, List[Tuple]]] = {}
+_DNS_CACHE_TTL = 120.0
 
 
 def sanitize_filename(filename: str) -> str:
@@ -212,19 +217,26 @@ def _enforce_idn_safety(host: str) -> None:
 def _rebuild_netloc(parsed: ParseResult, ascii_host: str) -> str:
     """Reconstruct URL netloc with a normalized hostname."""
 
-    auth = ""
-    if parsed.username:
-        auth = parsed.username
-        if parsed.password:
-            auth = f"{auth}:{parsed.password}"
-        auth = f"{auth}@"
-
     host_component = ascii_host
     if ":" in host_component and not host_component.startswith("["):
         host_component = f"[{host_component}]"
 
     port = f":{parsed.port}" if parsed.port else ""
-    return f"{auth}{host_component}{port}"
+    return f"{host_component}{port}"
+
+
+def _cached_getaddrinfo(host: str) -> List[Tuple]:
+    """Resolve *host* using a short-lived cache to avoid repeated DNS lookups."""
+
+    now = time.monotonic()
+    cached = _DNS_CACHE.get(host)
+    if cached is not None:
+        timestamp, results = cached
+        if now - timestamp <= _DNS_CACHE_TTL:
+            return results
+    results = socket.getaddrinfo(host, None)
+    _DNS_CACHE[host] = (now, results)
+    return results
 
 
 def validate_url_security(url: str, http_config: Optional[DownloadConfiguration] = None) -> str:
@@ -232,6 +244,9 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
 
     parsed = urlparse(url)
     logger = logging.getLogger("DocsToKG.OntologyDownload")
+    if parsed.username or parsed.password:
+        raise ConfigError("Credentials in URLs are not allowed")
+
     scheme = parsed.scheme.lower()
     if scheme not in {"http", "https"}:
         raise ConfigError("Only HTTP(S) URLs are allowed for ontology downloads")
@@ -256,12 +271,19 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
 
     parsed = parsed._replace(netloc=_rebuild_netloc(parsed, ascii_host))
 
-    allowed = http_config.normalized_allowed_hosts() if http_config else None
+    allowed_exact: Set[str] = set()
+    allowed_suffixes: Set[str] = set()
+    allowed_host_ports: Dict[str, Set[int]] = {}
+    allowed_port_set = http_config.allowed_port_set() if http_config else {80, 443}
+    if http_config:
+        normalized = http_config.normalized_allowed_hosts()
+        if normalized:
+            allowed_exact, allowed_suffixes, allowed_host_ports = normalized
+
     allow_private = False
-    if allowed:
-        exact, suffixes = allowed
-        if ascii_host in exact or any(
-            ascii_host == suffix or ascii_host.endswith(f".{suffix}") for suffix in suffixes
+    if allowed_exact or allowed_suffixes:
+        if ascii_host in allowed_exact or any(
+            ascii_host == suffix or ascii_host.endswith(f".{suffix}") for suffix in allowed_suffixes
         ):
             allow_private = True
         else:
@@ -284,6 +306,14 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
     if scheme != "https" and not allow_private:
         raise ConfigError("Only HTTPS URLs are allowed for ontology downloads")
 
+    port = parsed.port
+    if port is None:
+        port = 80 if scheme == "http" else 443
+
+    host_port_allowances = allowed_host_ports.get(ascii_host, set())
+    if port not in allowed_port_set and port not in host_port_allowances:
+        raise ConfigError(f"Port {port} is not permitted for ontology downloads")
+
     if is_ip:
         address = ipaddress.ip_address(ascii_host)
         if not allow_private and (
@@ -293,7 +323,7 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
         return urlunparse(parsed)
 
     try:
-        infos = socket.getaddrinfo(ascii_host, None)
+        infos = _cached_getaddrinfo(ascii_host)
     except socket.gaierror as exc:
         logger.warning(
             "dns resolution failed",
