@@ -52,6 +52,9 @@ __all__ = [
     "data_manifests",
     "data_pdfs",
     "data_html",
+    "expand_path",
+    "resolve_hf_home",
+    "resolve_model_root",
     "find_free_port",
     "atomic_write",
     "iter_doctags",
@@ -67,6 +70,38 @@ __all__ = [
     "acquire_lock",
     "set_spawn_or_warn",
 ]
+
+
+def expand_path(path: str | Path) -> Path:
+    """Return ``path`` expanded to an absolute :class:`Path`.
+
+    Args:
+        path: Candidate filesystem path supplied as string or :class:`Path`.
+
+    Returns:
+        Absolute path with user home components resolved.
+    """
+
+    return Path(path).expanduser().resolve()
+
+
+def resolve_hf_home() -> Path:
+    """Resolve the HuggingFace cache directory respecting ``HF_HOME``."""
+
+    env = os.getenv("HF_HOME")
+    if env:
+        return expand_path(env)
+    return expand_path(Path.home() / ".cache" / "huggingface")
+
+
+def resolve_model_root(hf_home: Optional[Path] = None) -> Path:
+    """Resolve the DocsToKG model root honoring ``DOCSTOKG_MODEL_ROOT``."""
+
+    env = os.getenv("DOCSTOKG_MODEL_ROOT")
+    if env:
+        return expand_path(env)
+    base = hf_home if hf_home is not None else resolve_hf_home()
+    return expand_path(base)
 
 
 def detect_data_root(start: Optional[Path] = None) -> Path:
