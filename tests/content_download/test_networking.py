@@ -788,6 +788,91 @@ if HAS_REQUESTS and HAS_PYALEX:
         assert outcome.classification == "pdf"
         assert "resume-metadata-incomplete" in caplog.text
 
+    def test_download_candidate_respects_max_bytes_header(tmp_path: Path) -> None:
+        artifact = _make_artifact(tmp_path)
+        url = "https://example.org/big.html"
+
+        class _Response:
+            def __init__(self) -> None:
+                self.status_code = 200
+                self.headers = {
+                    "Content-Type": "text/html; charset=utf-8",
+                    "Content-Length": str(5 * 1024 * 1024),
+                }
+
+            def __enter__(self) -> "_Response":
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> None:
+                self.close()
+
+            def iter_content(self, chunk_size: int = 1024):
+                yield b"<html><body>large</body></html>"
+
+            def close(self) -> None:
+                return None
+
+        class _Session:
+            def request(self, *, method: str, url: str, **kwargs: Any) -> _Response:
+                assert method == "GET"
+                return _Response()
+
+        outcome = download_candidate(
+            _Session(),
+            artifact,
+            url,
+            referer=None,
+            timeout=5.0,
+            context={"max_bytes": 10_000, "previous": {}},
+        )
+
+        assert outcome.classification == "html_too_large"
+        assert outcome.path is None
+        assert outcome.error and "max_bytes" in outcome.error
+
+    def test_download_candidate_respects_max_bytes_streaming(tmp_path: Path) -> None:
+        artifact = _make_artifact(tmp_path)
+        pdf_dir = artifact.pdf_dir
+        pdf_dir.mkdir(parents=True, exist_ok=True)
+
+        class _StreamingResponse:
+            def __init__(self) -> None:
+                self.status_code = 200
+                self.headers = {"Content-Type": "application/pdf"}
+
+            def __enter__(self) -> "_StreamingResponse":
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> None:
+                self.close()
+
+            def iter_content(self, chunk_size: int = 1024):
+                chunks = [b"%PDF-1.4\n", b"0" * 80, b"0" * 80, b"%%EOF"]
+                for chunk in chunks:
+                    yield chunk
+
+            def close(self) -> None:
+                return None
+
+        class _Session:
+            def request(self, *, method: str, url: str, **kwargs: Any) -> _StreamingResponse:
+                assert method == "GET"
+                return _StreamingResponse()
+
+        outcome = download_candidate(
+            _Session(),
+            artifact,
+            "https://example.org/big.pdf",
+            referer=None,
+            timeout=5.0,
+            context={"max_bytes": 100, "previous": {}},
+        )
+
+        assert outcome.classification == "payload_too_large"
+        assert outcome.path is None
+        assert outcome.error and "max_bytes" in outcome.error
+        assert not any(pdf_dir.glob("*.pdf"))
+
     def test_build_download_outcome_accepts_small_pdf_with_head_pass(tmp_path: Path) -> None:
         artifact = _make_artifact(tmp_path)
         pdf_path = artifact.pdf_dir / "tiny.pdf"
@@ -2636,6 +2721,7 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
         extract_html_text=False,
         previous_lookup={},
         resume_completed=set(),
+        max_bytes=None,
     )
 
     logger.close()

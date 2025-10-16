@@ -121,7 +121,7 @@ import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 # Third-party imports
 from docling_core.transforms.chunker.base import BaseChunk
@@ -151,6 +151,7 @@ __all__ = (
 from DocsToKG.DocParsing._common import (
     atomic_write,
     compute_content_hash,
+    compute_relative_doc_id,
     data_chunks,
     data_doctags,
     detect_data_root,
@@ -175,6 +176,75 @@ from DocsToKG.DocParsing.schemas import (
 from DocsToKG.DocParsing.serializers import RichSerializerProvider
 
 SOFT_BARRIER_MARGIN = 64
+DEFAULT_HEADING_MARKERS: Tuple[str, ...] = ("#",)
+DEFAULT_CAPTION_MARKERS: Tuple[str, ...] = (
+    "Figure caption:",
+    "Table:",
+    "Picture description:",
+    "<!-- image -->",
+)
+
+
+def _dedupe_preserve_order(markers: Sequence[str]) -> Tuple[str, ...]:
+    """Return a tuple with duplicates removed while preserving original order."""
+
+    seen: set[str] = set()
+    ordered: List[str] = []
+    for marker in markers:
+        if marker not in seen:
+            seen.add(marker)
+            ordered.append(marker)
+    return tuple(ordered)
+
+
+def _ensure_str_list(value: object, label: str) -> List[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"Expected a list of strings for '{label}'")
+    return [item for item in value if item]
+
+
+def _load_structural_marker_config(path: Path) -> Tuple[List[str], List[str]]:
+    """Load custom heading and caption markers from a YAML or JSON file."""
+
+    raw = path.read_text(encoding="utf-8")
+    suffix = path.suffix.lower()
+    data: object
+    if suffix in {".yaml", ".yml"}:
+        try:
+            import yaml
+        except ImportError as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError(
+                "Loading YAML heading markers requires the 'PyYAML' package"
+            ) from exc
+        data = yaml.safe_load(raw) or {}
+    else:
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            try:
+                import yaml
+            except ImportError as exc:  # pragma: no cover - optional dependency
+                raise ValueError(
+                    f"Unable to parse heading markers file {path}: not valid JSON."
+                ) from exc
+            data = yaml.safe_load(raw) or {}
+
+    if isinstance(data, list):
+        headings = _ensure_str_list(data, "headings")
+        captions: List[str] = []
+    elif isinstance(data, dict):
+        headings = _ensure_str_list(data.get("headings"), "headings")
+        captions = _ensure_str_list(data.get("captions"), "captions")
+    else:
+        raise ValueError(
+            f"Unsupported heading markers format in {path}: expected list or mapping."
+        )
+
+    return headings, captions
 
 # --- Defaults ---
 
@@ -188,20 +258,6 @@ _LOGGER = get_logger(__name__)
 
 
 # --- Public Functions ---
-
-def compute_relative_doc_id(path: Path, root: Path) -> str:
-    """Return POSIX-style relative identifier for a document path.
-
-    Args:
-        path: Absolute path to the document on disk.
-        root: Root directory that anchors relative identifiers.
-
-    Returns:
-        str: POSIX-style relative path suitable for manifest IDs.
-    """
-
-    return path.relative_to(root).as_posix()
-
 
 def read_utf8(p: Path) -> str:
     """Load text from disk using UTF-8 with replacement for invalid bytes.
@@ -307,7 +363,7 @@ def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, i
 # --- Public Classes ---
 
 
-@dataclass
+@dataclass(slots=True)
 class Rec:
     """Intermediate record tracking chunk text and provenance.
 
@@ -363,11 +419,17 @@ def merge_rec(a: Rec, b: Rec, tokenizer: HuggingFaceTokenizer) -> Rec:
 
 # --- Topic-aware boundary detection ---
 
-def is_structural_boundary(rec: Rec) -> bool:
+def is_structural_boundary(
+    rec: Rec,
+    heading_markers: Optional[Sequence[str]] = None,
+    caption_markers: Optional[Sequence[str]] = None,
+) -> bool:
     """Detect whether a chunk begins with a structural heading or caption marker.
 
     Args:
         rec: Chunk record to inspect.
+        heading_markers: Optional prefixes treated as section headings.
+        caption_markers: Optional prefixes treated as caption markers.
 
     Returns:
         ``True`` when ``rec.text`` starts with a heading indicator (``#``) or a
@@ -381,16 +443,12 @@ def is_structural_boundary(rec: Rec) -> bool:
     """
 
     text = rec.text.lstrip()
-    if text.startswith("#"):
+    heading_prefixes = tuple(heading_markers) if heading_markers else DEFAULT_HEADING_MARKERS
+    if any(text.startswith(marker) for marker in heading_prefixes):
         return True
 
-    caption_markers = (
-        "Figure caption:",
-        "Table:",
-        "Picture description:",
-        "<!-- image -->",
-    )
-    return any(text.startswith(marker) for marker in caption_markers)
+    caption_prefixes = tuple(caption_markers) if caption_markers else DEFAULT_CAPTION_MARKERS
+    return any(text.startswith(marker) for marker in caption_prefixes)
 
 
 # --- Smart coalescence of SMALL-RUNS (< min_tokens) ---
@@ -400,6 +458,9 @@ def coalesce_small_runs(
     tokenizer: HuggingFaceTokenizer,
     min_tokens: int = 256,
     max_tokens: int = 512,
+    soft_barrier_margin: int = SOFT_BARRIER_MARGIN,
+    heading_markers: Optional[Sequence[str]] = None,
+    caption_markers: Optional[Sequence[str]] = None,
 ) -> List[Rec]:
     """Merge contiguous short chunks until they satisfy minimum token thresholds.
 
@@ -408,6 +469,9 @@ def coalesce_small_runs(
         tokenizer: Tokenizer used to recompute token counts for merged chunks.
         min_tokens: Target minimum tokens per chunk after coalescing.
         max_tokens: Hard ceiling to avoid producing overly large chunks.
+        soft_barrier_margin: Margin applied when respecting structural boundaries.
+        heading_markers: Optional heading prefixes treated as structural boundaries.
+        caption_markers: Optional caption prefixes treated as structural boundaries.
 
     Returns:
         New list of records where small runs are merged while preserving order.
@@ -423,6 +487,11 @@ def coalesce_small_runs(
     """
     out: List[Rec] = []
     i, N = 0, len(records)
+    margin = max(0, soft_barrier_margin)
+    heading_prefixes = tuple(heading_markers) if heading_markers is not None else DEFAULT_HEADING_MARKERS
+    caption_prefixes = (
+        tuple(caption_markers) if caption_markers is not None else DEFAULT_CAPTION_MARKERS
+    )
 
     def is_small(idx: int) -> bool:
         """Return True when the chunk at `idx` is below the minimum token threshold.
@@ -456,9 +525,14 @@ def coalesce_small_runs(
             while k < e and g.n_tok < min_tokens:
                 next_rec = records[k]
                 combined_size = g.n_tok + next_rec.n_tok
-                threshold = max_tokens - SOFT_BARRIER_MARGIN
+                threshold = max_tokens - margin
 
-                if is_structural_boundary(next_rec) and combined_size > threshold:
+                if (
+                    is_structural_boundary(
+                        next_rec, heading_markers=heading_prefixes, caption_markers=caption_prefixes
+                    )
+                    and combined_size > threshold
+                ):
                     _LOGGER.debug(
                         "Soft barrier at chunk %s: boundary detected, combined size %s > %s",
                         k,
@@ -491,11 +565,16 @@ def coalesce_small_runs(
 
         if trailing_small:
             tail = groups[-1]
-            threshold = max_tokens - SOFT_BARRIER_MARGIN
+            threshold = max_tokens - margin
 
             if len(groups) >= 2:
                 combined_size = groups[-2].n_tok + tail.n_tok
-                if is_structural_boundary(tail) and combined_size > threshold:
+                if (
+                    is_structural_boundary(
+                        tail, heading_markers=heading_prefixes, caption_markers=caption_prefixes
+                    )
+                    and combined_size > threshold
+                ):
                     _LOGGER.debug(
                         "Soft barrier prevented intra-run merge: combined size %s > %s",
                         combined_size,
@@ -524,7 +603,12 @@ def coalesce_small_runs(
 
             if left_can:
                 combined_size = out[-1].n_tok + tail.n_tok
-                if is_structural_boundary(tail) and combined_size > threshold:
+                if (
+                    is_structural_boundary(
+                        tail, heading_markers=heading_prefixes, caption_markers=caption_prefixes
+                    )
+                    and combined_size > threshold
+                ):
                     _LOGGER.debug(
                         "Soft barrier prevented left merge: combined size %s > %s",
                         combined_size,
@@ -543,7 +627,12 @@ def coalesce_small_runs(
 
             if right_can:
                 combined_size = records[e].n_tok + tail.n_tok
-                if is_structural_boundary(tail) and combined_size > threshold:
+                if (
+                    is_structural_boundary(
+                        tail, heading_markers=heading_prefixes, caption_markers=caption_prefixes
+                    )
+                    and combined_size > threshold
+                ):
                     _LOGGER.debug(
                         "Soft barrier prevented right merge: combined size %s > %s",
                         combined_size,
@@ -601,6 +690,21 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         default="Qwen/Qwen3-Embedding-4B",
         help="HuggingFace tokenizer model (default aligns with dense embedder)",
+    )
+    parser.add_argument(
+        "--soft-barrier-margin",
+        type=int,
+        default=SOFT_BARRIER_MARGIN,
+        help="Token margin applied when respecting structural boundaries (default: 64).",
+    )
+    parser.add_argument(
+        "--heading-markers",
+        type=Path,
+        default=None,
+        help=(
+            "Optional YAML/JSON file listing additional heading prefixes "
+            "(and optionally caption prefixes) to treat as structural boundaries."
+        ),
     )
     add_resume_force_options(
         parser,
@@ -674,6 +778,27 @@ def main(args: argparse.Namespace | None = None) -> int:
         resolver=data_chunks,
     )
 
+    heading_markers: Tuple[str, ...] = DEFAULT_HEADING_MARKERS
+    caption_markers: Tuple[str, ...] = DEFAULT_CAPTION_MARKERS
+    custom_heading_markers: List[str] = []
+    custom_caption_markers: List[str] = []
+    if getattr(args, "heading_markers", None) is not None:
+        markers_path = args.heading_markers.expanduser().resolve()
+        if not markers_path.exists():
+            raise FileNotFoundError(f"Heading markers file not found: {markers_path}")
+        extra_headings, extra_captions = _load_structural_marker_config(markers_path)
+        custom_heading_markers = extra_headings
+        custom_caption_markers = extra_captions
+        if extra_headings:
+            heading_markers = _dedupe_preserve_order(
+                (*heading_markers, *tuple(extra_headings))
+            )
+        if extra_captions:
+            caption_markers = _dedupe_preserve_order(
+                (*caption_markers, *tuple(extra_captions))
+            )
+        args.heading_markers = markers_path
+
     logger.info(
         "Chunking configuration",
         extra={
@@ -683,6 +808,9 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "output_dir": str(out_dir),
                 "min_tokens": args.min_tokens,
                 "max_tokens": args.max_tokens,
+                "soft_barrier_margin": args.soft_barrier_margin,
+                "custom_heading_markers": custom_heading_markers,
+                "custom_caption_markers": custom_caption_markers,
             }
         },
     )
@@ -800,6 +928,9 @@ def main(args: argparse.Namespace | None = None) -> int:
                 tokenizer=tokenizer,
                 min_tokens=args.min_tokens,
                 max_tokens=args.max_tokens,
+                soft_barrier_margin=args.soft_barrier_margin,
+                heading_markers=heading_markers,
+                caption_markers=caption_markers,
             )
 
             # Stage 4: write JSONL with schema validation

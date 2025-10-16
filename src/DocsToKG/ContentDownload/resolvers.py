@@ -79,6 +79,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import random
 import re
 import threading
@@ -569,6 +570,15 @@ class ResolverMetrics:
     html: Counter = field(default_factory=Counter)
     skips: Counter = field(default_factory=Counter)
     failures: Counter = field(default_factory=Counter)
+    latency_ms: defaultdict[str, List[float]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
+    status_counts: defaultdict[str, Counter] = field(
+        default_factory=lambda: defaultdict(Counter)
+    )
+    error_reasons: defaultdict[str, Counter] = field(
+        default_factory=lambda: defaultdict(Counter)
+    )
     _lock: Lock = field(default_factory=Lock, repr=False, compare=False)
 
     def record_attempt(self, resolver_name: str, outcome: DownloadOutcome) -> None:
@@ -589,6 +599,21 @@ class ResolverMetrics:
                 self.html[resolver_name] += 1
             if outcome.is_pdf:
                 self.successes[resolver_name] += 1
+            classification_key = (
+                classification.value if isinstance(classification, Classification) else str(outcome.classification)
+            )
+            if classification_key:
+                self.status_counts[resolver_name][classification_key] += 1
+            if outcome.elapsed_ms is not None:
+                self.latency_ms[resolver_name].append(float(outcome.elapsed_ms))
+            reason = outcome.error
+            if not reason and classification_key and classification_key not in {
+                Classification.PDF.value,
+                Classification.PDF_UNKNOWN.value,
+            }:
+                reason = classification_key
+            if reason:
+                self.error_reasons[resolver_name][reason] += 1
 
     def record_skip(self, resolver_name: str, reason: str) -> None:
         """Record a skip event for a resolver with a reason tag.
@@ -634,13 +659,56 @@ class ResolverMetrics:
             1
         """
 
+        def _percentile(sorted_values: List[float], percentile: float) -> float:
+            if not sorted_values:
+                return 0.0
+            if len(sorted_values) == 1:
+                return sorted_values[0]
+            k = (len(sorted_values) - 1) * (percentile / 100.0)
+            f = math.floor(k)
+            c = math.ceil(k)
+            if f == c:
+                return sorted_values[int(k)]
+            d0 = sorted_values[f] * (c - k)
+            d1 = sorted_values[c] * (k - f)
+            return d0 + d1
+
         with self._lock:
+            latency_summary: Dict[str, Dict[str, float]] = {}
+            for resolver_name, samples in self.latency_ms.items():
+                if not samples:
+                    continue
+                ordered = sorted(samples)
+                count = len(samples)
+                total = sum(samples)
+                latency_summary[resolver_name] = {
+                    "count": count,
+                    "mean_ms": total / count,
+                    "min_ms": ordered[0],
+                    "p50_ms": _percentile(ordered, 50.0),
+                    "p95_ms": _percentile(ordered, 95.0),
+                    "max_ms": ordered[-1],
+                }
+
+            status_summary = {resolver: dict(counter) for resolver, counter in self.status_counts.items() if counter}
+            reason_summary = {
+                resolver: [
+                    {"reason": reason, "count": count}
+                    for reason, count in counter.most_common(5)
+                ]
+                for resolver, counter in self.error_reasons.items()
+                if counter
+            }
+
             return {
                 "attempts": dict(self.attempts),
                 "successes": dict(self.successes),
                 "html": dict(self.html),
                 "skips": dict(self.skips),
                 "failures": dict(self.failures),
+                "latency_ms": latency_summary,
+                "status_counts": status_summary,
+                "error_reasons": reason_summary,
             }
 
 
