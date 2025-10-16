@@ -8,9 +8,6 @@ deterministic fingerprints.
 
 from __future__ import annotations
 
-import importlib
-import sys
-
 from .ontology_download import (
     CACHE_DIR,
     CONFIG_DIR,
@@ -20,15 +17,27 @@ from .ontology_download import (
     RDF_MIME_ALIASES,
     STORAGE,
     ConfigError,
+    ConfigurationError,
+    DefaultsConfig,
     DownloadFailure,
     DownloadResult,
+    DownloadConfiguration,
     FetchResult,
     FetchSpec,
     OntologyDownloadError,
     PlannedFetch,
+    ResolverCandidate,
     ResolvedConfig,
+    ValidationConfig,
     ValidationRequest,
     ValidationResult,
+    LoggingConfiguration,
+    mask_sensitive_data,
+    build_resolved_config,
+    get_env_overrides,
+    load_raw_yaml,
+    merge_defaults,
+    validate_config,
     download_stream,
     ensure_python_version,
     extract_archive_safe,
@@ -43,6 +52,10 @@ from .ontology_download import (
     load_config,
     plan_all,
     plan_one,
+    parse_http_datetime,
+    parse_iso_datetime,
+    parse_rate_limit_to_rps,
+    parse_version_timestamp,
     retry_with_backoff,
     run_validators,
     sanitize_filename,
@@ -60,8 +73,19 @@ __all__ = [
     "OntologyDownloadError",
     "ValidationRequest",
     "ValidationResult",
+    "ResolverCandidate",
     "ResolvedConfig",
     "ConfigError",
+    "ConfigurationError",
+    "DefaultsConfig",
+    "DownloadConfiguration",
+    "ValidationConfig",
+    "LoggingConfiguration",
+    "build_resolved_config",
+    "get_env_overrides",
+    "load_raw_yaml",
+    "merge_defaults",
+    "validate_config",
     "CACHE_DIR",
     "CONFIG_DIR",
     "LOG_DIR",
@@ -78,45 +102,20 @@ __all__ = [
     "validate_manifest_dict",
     "validate_url_security",
     "run_validators",
+    "parse_iso_datetime",
+    "parse_http_datetime",
+    "parse_version_timestamp",
     "setup_logging",
     "load_config",
     "ensure_python_version",
     "retry_with_backoff",
     "sanitize_filename",
     "generate_correlation_id",
+    "parse_rate_limit_to_rps",
     "get_pystow",
     "get_rdflib",
     "get_pronto",
     "get_owlready2",
     "get_manifest_schema",
+    "mask_sensitive_data",
 ]
-
-_LEGACY_MODULE_MAP = {
-    ".core": ".ontology_download",
-    ".config": ".ontology_download",
-    ".validators": ".ontology_download",
-    ".download": ".ontology_download",
-    ".storage": ".ontology_download",
-    ".optdeps": ".ontology_download",
-    ".utils": ".ontology_download",
-    ".logging_config": ".ontology_download",
-    ".validator_workers": ".ontology_download",
-    ".foundation": ".ontology_download",
-    ".infrastructure": ".ontology_download",
-    ".network": ".ontology_download",
-    ".pipeline": ".ontology_download",
-    ".settings": ".ontology_download",
-    ".validation": ".ontology_download",
-    ".cli_utils": ".cli",
-}
-
-_package = sys.modules[__name__]
-
-for legacy_suffix, target_suffix in _LEGACY_MODULE_MAP.items():
-    legacy_name = __name__ + legacy_suffix
-    target_name = __name__ + target_suffix
-    module = sys.modules.get(legacy_name)
-    if module is None:
-        module = importlib.import_module(target_name)
-        sys.modules.setdefault(legacy_name, module)
-    setattr(_package, legacy_suffix.lstrip("."), module)

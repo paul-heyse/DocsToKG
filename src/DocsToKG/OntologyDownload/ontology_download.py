@@ -18,11 +18,22 @@ import stat
 import sys
 import time
 import uuid
-from concurrent.futures import as_completed
+
+try:  # pragma: no cover - platform specific availability
+    import fcntl  # type: ignore
+except ImportError:  # pragma: no cover - windows
+    fcntl = None  # type: ignore[assignment]
+
+try:  # pragma: no cover - platform specific availability
+    import msvcrt  # type: ignore
+except ImportError:  # pragma: no cover - non-windows
+    msvcrt = None  # type: ignore[assignment]
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
+from importlib import metadata
 from logging.handlers import RotatingFileHandler
 from pathlib import Path, PurePosixPath
 from types import ModuleType
@@ -325,6 +336,12 @@ class ValidationConfig(BaseModel):
         ge=1,
         description="Normalize using streaming pipeline when ontology exceeds this size in MB",
     )
+    max_concurrent_validators: int = Field(
+        default=2,
+        ge=1,
+        le=8,
+        description="Maximum number of validators executed in parallel",
+    )
 
     model_config = {
         "frozen": False,
@@ -333,6 +350,25 @@ class ValidationConfig(BaseModel):
 
 
 _RATE_LIMIT_PATTERN = re.compile(r"^([\d.]+)/(second|sec|s|minute|min|m|hour|h)$")
+
+
+def parse_rate_limit_to_rps(limit_str: Optional[str]) -> Optional[float]:
+    """Convert a rate limit expression into requests-per-second."""
+
+    if not limit_str:
+        return None
+    match = _RATE_LIMIT_PATTERN.match(limit_str)
+    if not match:
+        return None
+    value = float(match.group(1))
+    unit = match.group(2)
+    if unit in {"second", "sec", "s"}:
+        return value
+    if unit in {"minute", "min", "m"}:
+        return value / 60.0
+    if unit in {"hour", "h"}:
+        return value / 3600.0
+    return None
 
 
 class DownloadConfiguration(BaseModel):
@@ -425,18 +461,10 @@ class DownloadConfiguration(BaseModel):
             ValueError: If the configured rate limit string is invalid.
         """
 
-        match = _RATE_LIMIT_PATTERN.match(self.per_host_rate_limit)
-        if not match:
+        parsed = parse_rate_limit_to_rps(self.per_host_rate_limit)
+        if parsed is None:
             raise ValueError(f"Invalid rate limit format: {self.per_host_rate_limit}")
-        value = float(match.group(1))
-        unit = match.group(2)
-        if unit in {"second", "sec", "s"}:
-            return value
-        if unit in {"minute", "min", "m"}:
-            return value / 60.0
-        if unit in {"hour", "h"}:
-            return value / 3600.0
-        raise ValueError(f"Unknown rate limit unit: {unit}")
+        return parsed
 
     def parse_service_rate_limit(self, service: str) -> Optional[float]:
         """Parse a per-service rate limit to requests per second.
@@ -452,20 +480,7 @@ class DownloadConfiguration(BaseModel):
         """
 
         limit_str = self.rate_limits.get(service)
-        if not limit_str:
-            return None
-        match = _RATE_LIMIT_PATTERN.match(limit_str)
-        if not match:
-            return None
-        value = float(match.group(1))
-        unit = match.group(2)
-        if unit in {"second", "sec", "s"}:
-            return value
-        if unit in {"minute", "min", "m"}:
-            return value / 60.0
-        if unit in {"hour", "h"}:
-            return value / 3600.0
-        return None
+        return parse_rate_limit_to_rps(limit_str)
 
     def normalized_allowed_hosts(self) -> Optional[Tuple[Set[str], Set[str]]]:
         """Return allowlist entries normalized to lowercase punycode labels.
@@ -2850,7 +2865,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
 
     Examples:
         >>> from pathlib import Path
-        >>> from DocsToKG.OntologyDownload.config import DownloadConfiguration
+        >>> from DocsToKG.OntologyDownload import DownloadConfiguration
         >>> downloader = StreamingDownloader(
         ...     destination=Path("/tmp/ontology.owl"),
         ...     headers={},
@@ -3398,6 +3413,7 @@ def download_stream(
 # --- Validation utilities ---
 import argparse
 import contextlib
+from contextlib import contextmanager
 import heapq
 import logging
 import platform
@@ -3428,7 +3444,7 @@ class ValidationRequest:
 
     Examples:
         >>> from pathlib import Path
-        >>> from DocsToKG.OntologyDownload.config import ResolvedConfig
+        >>> from DocsToKG.OntologyDownload import ResolvedConfig
         >>> req = ValidationRequest(
         ...     name="rdflib",
         ...     file_path=Path("ontology.owl"),
@@ -3742,36 +3758,10 @@ def normalize_streaming(
         key = prefix or ""
         prefix_map[key] = str(namespace)
 
-    try:
-        triples = list(graph_obj)
-    except Exception as exc:  # pragma: no cover - stub graphs are not iterable
-        raise AttributeError("graph is not iterable") from exc
-
-    def _iter_canonical_lines():
-        for key in sorted(prefix_map):
-            label = f"{key}:" if key else ":"
-            yield f"@prefix {label} <{prefix_map[key]}> .\n"
-
-        ordered = sorted(
-            ((s, p, o) for s, p, o in triples),
-            key=lambda item: (
-                _term_to_string(item[0], namespace_manager),
-                _term_to_string(item[1], namespace_manager),
-                _term_to_string(item[2], namespace_manager),
-            ),
-        )
-
-        if prefix_map and ordered:
-            yield "\n"
-
-        bnode_map: Dict[str, str] = {}
-        for subject, predicate, obj in ordered:
-            line = (
-                f"{_term_to_string(subject, namespace_manager)} "
-                f"{_term_to_string(predicate, namespace_manager)} "
-                f"{_term_to_string(obj, namespace_manager)} ."
-            )
-            yield _canonicalize_blank_nodes_line(line, bnode_map) + "\n"
+    prefix_lines = []
+    for key in sorted(prefix_map):
+        label = f"{key}:" if key else ":"
+        prefix_lines.append(f"@prefix {label} <{prefix_map[key]}> .\n")
 
     chunk_limit = max(1, int(chunk_bytes))
     buffer = bytearray()
@@ -3785,23 +3775,57 @@ def normalize_streaming(
             writer.write(buffer)
         buffer.clear()
 
-    with contextlib.ExitStack() as stack:
-        writer: Optional[BinaryIO] = None
-        if output_path is not None:
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            writer = stack.enter_context(output_path.open("wb"))
+    with tempfile.TemporaryDirectory(prefix="ontology-stream-") as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        unsorted_path = tmp_path / "triples.unsorted"
+        with unsorted_path.open("w", encoding="utf-8", newline="\n") as handle:
+            for subject, predicate, obj in graph_obj:
+                line = (
+                    f"{_term_to_string(subject, namespace_manager)} "
+                    f"{_term_to_string(predicate, namespace_manager)} "
+                    f"{_term_to_string(obj, namespace_manager)} ."
+                )
+                handle.write(line + "\n")
 
-        wrote_any = False
-        for text in _iter_canonical_lines():
-            buffer.extend(text.encode("utf-8"))
-            wrote_any = True
-            if len(buffer) >= chunk_limit:
-                _flush(writer)
+        sorted_path = tmp_path / "triples.sorted"
+        _sort_triple_file(unsorted_path, sorted_path)
 
-        if not wrote_any and output_path is not None:
-            output_path.write_text("", encoding="utf-8")
+        with contextlib.ExitStack() as stack:
+            writer: Optional[BinaryIO] = None
+            if output_path is not None:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                writer = stack.enter_context(output_path.open("wb"))
 
-        _flush(writer)
+            def _emit(text: str) -> None:
+                buffer.extend(text.encode("utf-8"))
+                if len(buffer) >= chunk_limit:
+                    _flush(writer)
+
+            wrote_any = False
+            for line in prefix_lines:
+                _emit(line)
+                wrote_any = True
+
+            bnode_map: Dict[str, str] = {}
+            blank_line_pending = bool(prefix_lines)
+
+            with sorted_path.open("r", encoding="utf-8") as reader:
+                for raw_line in reader:
+                    line = raw_line.rstrip("\n")
+                    if not line:
+                        continue
+                    if blank_line_pending:
+                        _emit("\n")
+                        blank_line_pending = False
+                    canonical_line = _canonicalize_blank_nodes_line(line, bnode_map) + "\n"
+                    _emit(canonical_line)
+                    wrote_any = True
+
+            if not wrote_any and writer is not None:
+                writer.truncate(0)
+                writer.flush()
+
+            _flush(writer)
 
     return sha256.hexdigest()
 
@@ -4375,6 +4399,62 @@ VALIDATORS = {
 }
 
 
+def _load_validator_plugins(logger: Optional[logging.Logger] = None) -> None:
+    """Discover validator plugins registered via entry points."""
+
+    logger = logger or logging.getLogger(__name__)
+    try:
+        entry_points = metadata.entry_points()
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning(
+            "validator plugin discovery failed",
+            extra={"stage": "init", "error": str(exc)},
+        )
+        return
+
+    for entry in entry_points.select(group="docstokg.ontofetch.validator"):
+        try:
+            handler = entry.load()
+            if not callable(handler):
+                raise TypeError("validator plugin must be callable")
+            VALIDATORS[entry.name] = handler
+            logger.info(
+                "validator plugin registered",
+                extra={"stage": "init", "validator": entry.name},
+            )
+        except Exception as exc:  # pragma: no cover - plugin faults
+            logger.warning(
+                "validator plugin failed",
+                extra={"stage": "init", "validator": entry.name, "error": str(exc)},
+            )
+
+
+_load_validator_plugins()
+
+
+def _run_validator_task(
+    validator: Callable[[ValidationRequest, logging.Logger], ValidationResult],
+    request: ValidationRequest,
+    logger: logging.Logger,
+) -> ValidationResult:
+    """Execute a single validator with exception guards."""
+
+    try:
+        return validator(request, logger)
+    except Exception as exc:  # pylint: disable=broad-except
+        payload = {"ok": False, "error": str(exc)}
+        _write_validation_json(request.validation_dir / f"{request.name}_parse.json", payload)
+        logger.error(
+            "validator crashed",
+            extra={
+                "stage": "validate",
+                "validator": request.name,
+                "error": payload.get("error"),
+            },
+        )
+        return ValidationResult(ok=False, details=payload, output_files=[])
+
+
 def run_validators(
     requests: Iterable[ValidationRequest], logger: logging.Logger
 ) -> Dict[str, ValidationResult]:
@@ -4387,25 +4467,50 @@ def run_validators(
     Returns:
         Mapping from validator name to the corresponding ValidationResult.
     """
+
+    request_list = list(requests)
+    if not request_list:
+        return {}
+
+    def _determine_max_workers() -> int:
+        for request in request_list:
+            validation_config = getattr(request.config.defaults, "validation", None)
+            if validation_config is not None and hasattr(
+                validation_config, "max_concurrent_validators"
+            ):
+                value = int(validation_config.max_concurrent_validators)
+                return max(1, min(8, value))
+        return 2
+
+    max_workers = _determine_max_workers()
     results: Dict[str, ValidationResult] = {}
-    for request in requests:
-        validator = VALIDATORS.get(request.name)
-        if not validator:
-            continue
-        try:
-            results[request.name] = validator(request, logger)
-        except Exception as exc:  # pylint: disable=broad-except
-            payload = {"ok": False, "error": str(exc)}
-            _write_validation_json(request.validation_dir / f"{request.name}_parse.json", payload)
-            logger.error(
-                "validator crashed",
-                extra={
-                    "stage": "validate",
-                    "validator": request.name,
-                    "error": payload.get("error"),
-                },
-            )
-            results[request.name] = ValidationResult(ok=False, details=payload, output_files=[])
+    futures: Dict[Any, ValidationRequest] = {}
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for request in request_list:
+            validator = VALIDATORS.get(request.name)
+            if not validator:
+                continue
+            future = executor.submit(_run_validator_task, validator, request, logger)
+            futures[future] = request
+
+        for future in as_completed(futures):
+            request = futures[future]
+            try:
+                results[request.name] = future.result()
+            except Exception as exc:  # pragma: no cover - defensive guard
+                payload = {"ok": False, "error": str(exc)}
+                _write_validation_json(request.validation_dir / f"{request.name}_parse.json", payload)
+                logger.error(
+                    "validator crashed",
+                    extra={
+                        "stage": "validate",
+                        "validator": request.name,
+                        "error": payload.get("error"),
+                    },
+                )
+                results[request.name] = ValidationResult(ok=False, details=payload, output_files=[])
+
     return results
 
 
@@ -4920,23 +5025,65 @@ class PlannedFetch:
     size: Optional[int] = None
 
 
-def _coerce_datetime(value: Optional[str]) -> Optional[datetime]:
-    """Return timezone-aware datetime parsed from HTTP or ISO timestamp."""
+def parse_http_datetime(value: Optional[str]) -> Optional[datetime]:
+    """Parse HTTP ``Last-Modified`` style timestamps into UTC datetimes."""
 
     if not value:
         return None
     try:
         parsed = parsedate_to_datetime(value)
     except (TypeError, ValueError, IndexError):
-        try:
-            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except ValueError:
-            return None
+        return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    else:
-        parsed = parsed.astimezone(timezone.utc)
-    return parsed
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
+    """Parse ISO-8601 timestamps into timezone-aware UTC datetimes."""
+
+    if not value or not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    candidate = text.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def parse_version_timestamp(value: Optional[str]) -> Optional[datetime]:
+    """Parse version strings or manifest timestamps into UTC datetimes."""
+
+    parsed = parse_iso_datetime(value)
+    if parsed is not None:
+        return parsed
+    if not value or not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    for fmt in ("%Y-%m-%d", "%Y%m%d", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            naive = datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+        return naive.replace(tzinfo=timezone.utc)
+    return None
+
+
+def _coerce_datetime(value: Optional[str]) -> Optional[datetime]:
+    """Return timezone-aware datetime parsed from HTTP or ISO timestamp."""
+
+    parsed = parse_http_datetime(value)
+    if parsed is not None:
+        return parsed
+    return parse_iso_datetime(value)
 
 
 def _normalize_timestamp(value: Optional[str]) -> Optional[str]:
@@ -4975,7 +5122,7 @@ def _populate_plan_metadata(
         return planned
 
     try:
-        validate_url_security(planned.plan.url, config.defaults.http.allowed_hosts)
+        validate_url_security(planned.plan.url, config.defaults.http)
     except ConfigError as exc:
         adapter.warning(
             "metadata probe skipped",
@@ -5074,6 +5221,23 @@ def _populate_plan_metadata(
     return planned
 
 
+def _migrate_manifest_inplace(payload: dict) -> None:
+    """Upgrade manifests created with older schema versions in place."""
+
+    version = str(payload.get("schema_version", "") or "")
+    if version in {"", "1.0"}:
+        payload.setdefault("schema_version", "1.0")
+        return
+    if version == "0.9":
+        payload["schema_version"] = "1.0"
+        payload.setdefault("resolver_attempts", [])
+        return
+    logging.getLogger(__name__).warning(
+        "unknown manifest schema version",
+        extra={"stage": "manifest", "schema_version": version},
+    )
+
+
 def _read_manifest(manifest_path: Path) -> Optional[dict]:
     """Return previously recorded manifest data if a valid JSON file exists.
 
@@ -5089,6 +5253,7 @@ def _read_manifest(manifest_path: Path) -> Optional[dict]:
         payload = json.loads(manifest_path.read_text())
     except json.JSONDecodeError:
         return None
+    _migrate_manifest_inplace(payload)
     validate_manifest_dict(payload, source=manifest_path)
     return payload
 
@@ -5357,23 +5522,7 @@ def fetch_one(
     logger: Optional[logging.Logger] = None,
     force: bool = False,
 ) -> FetchResult:
-    """Fetch, validate, and persist a single ontology described by *spec*.
-
-    Args:
-        spec: Fetch specification outlining resolver selection and target formats.
-        config: Optional resolved configuration supplying defaults and limits.
-        correlation_id: Identifier used to correlate structured log entries.
-        logger: Logger instance reused for download and validation telemetry.
-        force: When True, ignore cached manifests and re-download artefacts.
-
-    Returns:
-        FetchResult capturing download status, SHA-256 hashes, and manifest path.
-
-    Raises:
-        ResolverError: If all resolvers fail to produce a viable FetchPlan.
-        OntologyDownloadError: If download, extraction, or validation fails.
-        ConfigurationError: If licence checks or manifest validation fail.
-    """
+    """Fetch, validate, and persist a single ontology described by *spec*."""
 
     ensure_python_version()
     active_config = config or ResolvedConfig.from_defaults()
@@ -5394,14 +5543,6 @@ def fetch_one(
     candidate_list = list(candidates) or [primary]
 
     resolver_attempts: List[Dict[str, object]] = []
-    selected_candidate: Optional[ResolverCandidate] = None
-    effective_spec: Optional[FetchSpec] = None
-    destination: Optional[Path] = None
-    version: Optional[str] = None
-    base_dir: Optional[Path] = None
-    manifest_path: Optional[Path] = None
-    secure_url: Optional[str] = None
-    result: Optional[DownloadResult] = None
     last_error: Optional[Exception] = None
 
     for attempt_number, candidate in enumerate(candidate_list, start=1):
@@ -5430,7 +5571,7 @@ def fetch_one(
                 },
             )
             attempt_record.update({"status": "rejected", "error": str(exc)})
-            resolver_attempts.append(attempt_record)
+            resolver_attempts.append(dict(attempt_record))
             last_error = exc
             continue
 
@@ -5439,44 +5580,209 @@ def fetch_one(
         else:
             adapter.extra.pop("service", None)
 
-        pending_destination, pending_version, pending_base_dir = _build_destination(
-            pending_spec, candidate.plan, active_config
-        )
-        pending_manifest_path = pending_base_dir / "manifest.json"
-
-        previous_manifest = None
-        if not force:
-            STORAGE.ensure_local_version(pending_spec.id, pending_version)
-            previous_manifest = _read_manifest(pending_manifest_path)
-
-        adapter.info(
-            "downloading",
-            extra={
-                "stage": "download",
-                "url": candidate.plan.url,
-                "destination": str(pending_destination),
-                "version": pending_version,
-                "resolver": candidate.resolver,
-                "attempt": attempt_number,
-            },
-        )
-
-        pending_secure_url = validate_url_security(candidate.plan.url, download_config)
-        try:
-            result = download_stream(
-                url=pending_secure_url,
-                destination=pending_destination,
-                headers=candidate.plan.headers,
-                previous_manifest=previous_manifest,
-                http_config=download_config,
-                cache_dir=CACHE_DIR,
-                logger=adapter,
-                expected_media_type=candidate.plan.media_type,
-                service=candidate.plan.service,
+        def _execute_candidate() -> FetchResult:
+            pending_destination, pending_version, pending_base_dir = _build_destination(
+                pending_spec, candidate.plan, active_config
             )
+            pending_manifest_path = pending_base_dir / "manifest.json"
+
+            with _version_lock(pending_spec.id, pending_version):
+                previous_manifest = None
+                if not force:
+                    STORAGE.ensure_local_version(pending_spec.id, pending_version)
+                    previous_manifest = _read_manifest(pending_manifest_path)
+
+                adapter.info(
+                    "downloading",
+                    extra={
+                        "stage": "download",
+                        "url": candidate.plan.url,
+                        "destination": str(pending_destination),
+                        "version": pending_version,
+                        "resolver": candidate.resolver,
+                        "attempt": attempt_number,
+                    },
+                )
+
+                pending_secure_url = validate_url_security(
+                    candidate.plan.url, download_config
+                )
+                result = download_stream(
+                    url=pending_secure_url,
+                    destination=pending_destination,
+                    headers=candidate.plan.headers,
+                    previous_manifest=previous_manifest,
+                    http_config=download_config,
+                    cache_dir=CACHE_DIR,
+                    logger=adapter,
+                    expected_media_type=candidate.plan.media_type,
+                    service=candidate.plan.service,
+                )
+
+                effective_spec = pending_spec
+                destination = pending_destination
+                version = pending_version
+                base_dir = pending_base_dir
+                manifest_path = pending_manifest_path
+                secure_url = pending_secure_url
+                plan = candidate.plan
+
+                normalized_dir = base_dir / "normalized"
+                validation_dir = base_dir / "validation"
+                validation_requests: List[ValidationRequest] = [
+                    ValidationRequest(
+                        name="rdflib",
+                        file_path=destination,
+                        normalized_dir=normalized_dir,
+                        validation_dir=validation_dir,
+                        config=active_config,
+                    ),
+                    ValidationRequest(
+                        name="pronto",
+                        file_path=destination,
+                        normalized_dir=normalized_dir,
+                        validation_dir=validation_dir,
+                        config=active_config,
+                    ),
+                    ValidationRequest(
+                        name="owlready2",
+                        file_path=destination,
+                        normalized_dir=normalized_dir,
+                        validation_dir=validation_dir,
+                        config=active_config,
+                    ),
+                    ValidationRequest(
+                        name="robot",
+                        file_path=destination,
+                        normalized_dir=normalized_dir,
+                        validation_dir=validation_dir,
+                        config=active_config,
+                    ),
+                    ValidationRequest(
+                        name="arelle",
+                        file_path=destination,
+                        normalized_dir=normalized_dir,
+                        validation_dir=validation_dir,
+                        config=active_config,
+                    ),
+                ]
+
+                media_type = (plan.media_type or "").strip().lower()
+                if media_type and media_type not in RDF_MIME_ALIASES:
+                    validation_requests = [
+                        request
+                        for request in validation_requests
+                        if request.name not in {"rdflib", "robot"}
+                    ]
+                    adapter.info(
+                        "skipping rdf validators",
+                        extra={
+                            "stage": "validate",
+                            "media_type": media_type,
+                            "validator": "rdf",
+                        },
+                    )
+
+                artifacts = [str(destination)]
+                if plan.media_type == "application/zip" or destination.suffix.lower() == ".zip":
+                    extraction_dir = destination.parent / f"{destination.stem}_extracted"
+                    try:
+                        extracted_paths = extract_archive_safe(
+                            destination, extraction_dir, logger=adapter
+                        )
+                        artifacts.extend(str(path) for path in extracted_paths)
+                    except ConfigError as exc:
+                        adapter.error(
+                            "zip extraction failed",
+                            extra={"stage": "extract", "error": str(exc)},
+                        )
+                        if not active_config.defaults.continue_on_error:
+                            raise OntologyDownloadError(
+                                f"Extraction failed for '{effective_spec.id}': {exc}"
+                            ) from exc
+
+                validation_results = run_validators(validation_requests, adapter)
+
+                normalized_hash = None
+                normalization_mode = "none"
+                rdflib_result = validation_results.get("rdflib")
+                if rdflib_result and isinstance(rdflib_result.details, dict):
+                    maybe_hash = rdflib_result.details.get("normalized_sha256")
+                    if isinstance(maybe_hash, str):
+                        normalized_hash = maybe_hash
+                    maybe_mode = rdflib_result.details.get("normalization_mode")
+                    if isinstance(maybe_mode, str):
+                        normalization_mode = maybe_mode
+
+                target_formats_sorted = ",".join(sorted(effective_spec.target_formats))
+
+                fingerprint_components = [
+                    MANIFEST_SCHEMA_VERSION,
+                    effective_spec.id,
+                    effective_spec.resolver,
+                    version,
+                    result.sha256,
+                    normalized_hash or "",
+                    secure_url,
+                    target_formats_sorted,
+                    normalization_mode,
+                ]
+                fingerprint = hashlib.sha256(
+                    "|".join(fingerprint_components).encode("utf-8")
+                ).hexdigest()
+
+                attempt_record["status"] = "success"
+                resolver_attempts.append(dict(attempt_record))
+
+                manifest = Manifest(
+                    schema_version=MANIFEST_SCHEMA_VERSION,
+                    id=effective_spec.id,
+                    resolver=effective_spec.resolver,
+                    url=secure_url,
+                    filename=destination.name,
+                    version=version,
+                    license=plan.license,
+                    status=result.status,
+                    sha256=result.sha256,
+                    normalized_sha256=normalized_hash,
+                    fingerprint=fingerprint,
+                    etag=result.etag,
+                    last_modified=result.last_modified,
+                    downloaded_at=datetime.now(timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z"),
+                    target_formats=effective_spec.target_formats,
+                    validation=validation_results,
+                    artifacts=artifacts,
+                    resolver_attempts=resolver_attempts,
+                )
+                _write_manifest(manifest_path, manifest)
+                STORAGE.finalize_version(effective_spec.id, version, base_dir)
+
+                adapter.info(
+                    "fetch complete",
+                    extra={
+                        "stage": "complete",
+                        "status": result.status,
+                        "sha256": result.sha256,
+                        "manifest": str(manifest_path),
+                    },
+                )
+
+                return FetchResult(
+                    spec=effective_spec,
+                    local_path=destination,
+                    status=result.status,
+                    sha256=result.sha256,
+                    manifest_path=manifest_path,
+                    artifacts=artifacts,
+                )
+
+        try:
+            return _execute_candidate()
         except ConfigError as exc:
             attempt_record.update({"status": "failed", "error": str(exc)})
-            resolver_attempts.append(attempt_record)
+            resolver_attempts.append(dict(attempt_record))
             adapter.warning(
                 "download attempt failed",
                 extra={
@@ -5498,175 +5804,22 @@ def fetch_one(
                     },
                 )
                 continue
-            raise OntologyDownloadError(f"Download failed for '{pending_spec.id}': {exc}") from exc
+            raise OntologyDownloadError(
+                f"Download failed for '{pending_spec.id}': {exc}"
+            ) from exc
+        except Exception as exc:
+            last_error = exc
+            attempt_record.update({"status": "error", "error": str(exc)})
+            resolver_attempts.append(dict(attempt_record))
+            raise
 
-        attempt_record["status"] = "success"
-        resolver_attempts.append(attempt_record)
-        selected_candidate = candidate
-        effective_spec = pending_spec
-        destination = pending_destination
-        version = pending_version
-        base_dir = pending_base_dir
-        manifest_path = pending_manifest_path
-        secure_url = pending_secure_url
-        break
-
-    if result is None or selected_candidate is None or effective_spec is None:
-        if last_error is None:
-            raise OntologyDownloadError(f"All resolver candidates failed for '{spec.id}'")
-        if isinstance(last_error, ConfigurationError):
-            raise last_error
-        raise OntologyDownloadError(
-            f"Download failed for '{spec.id}': {last_error}"
-        ) from last_error
-
-    assert destination is not None
-    assert version is not None
-    assert base_dir is not None
-    assert manifest_path is not None
-    assert secure_url is not None
-
-    plan = selected_candidate.plan
-
-    normalized_dir = base_dir / "normalized"
-    validation_dir = base_dir / "validation"
-    validation_requests: List[ValidationRequest] = [
-        ValidationRequest(
-            name="rdflib",
-            file_path=destination,
-            normalized_dir=normalized_dir,
-            validation_dir=validation_dir,
-            config=active_config,
-        ),
-        ValidationRequest(
-            name="pronto",
-            file_path=destination,
-            normalized_dir=normalized_dir,
-            validation_dir=validation_dir,
-            config=active_config,
-        ),
-        ValidationRequest(
-            name="owlready2",
-            file_path=destination,
-            normalized_dir=normalized_dir,
-            validation_dir=validation_dir,
-            config=active_config,
-        ),
-        ValidationRequest(
-            name="robot",
-            file_path=destination,
-            normalized_dir=normalized_dir,
-            validation_dir=validation_dir,
-            config=active_config,
-        ),
-        ValidationRequest(
-            name="arelle",
-            file_path=destination,
-            normalized_dir=normalized_dir,
-            validation_dir=validation_dir,
-            config=active_config,
-        ),
-    ]
-
-    media_type = (plan.media_type or "").strip().lower()
-    if media_type and media_type not in RDF_MIME_ALIASES:
-        validation_requests = [
-            request for request in validation_requests if request.name not in {"rdflib", "robot"}
-        ]
-        adapter.info(
-            "skipping rdf validators",
-            extra={
-                "stage": "validate",
-                "media_type": media_type,
-                "validator": "rdf",
-            },
-        )
-
-    artifacts = [str(destination)]
-    if plan.media_type == "application/zip" or destination.suffix.lower() == ".zip":
-        extraction_dir = destination.parent / f"{destination.stem}_extracted"
-        try:
-            extracted_paths = extract_archive_safe(destination, extraction_dir, logger=adapter)
-            artifacts.extend(str(path) for path in extracted_paths)
-        except ConfigError as exc:
-            adapter.error(
-                "zip extraction failed",
-                extra={"stage": "extract", "error": str(exc)},
-            )
-            if not active_config.defaults.continue_on_error:
-                raise OntologyDownloadError(
-                    f"Extraction failed for '{effective_spec.id}': {exc}"
-                ) from exc
-
-    validation_results = run_validators(validation_requests, adapter)
-
-    normalized_hash = None
-    normalization_mode = "none"
-    rdflib_result = validation_results.get("rdflib")
-    if rdflib_result and isinstance(rdflib_result.details, dict):
-        maybe_hash = rdflib_result.details.get("normalized_sha256")
-        if isinstance(maybe_hash, str):
-            normalized_hash = maybe_hash
-        maybe_mode = rdflib_result.details.get("normalization_mode")
-        if isinstance(maybe_mode, str):
-            normalization_mode = maybe_mode
-
-    target_formats_sorted = ",".join(sorted(effective_spec.target_formats))
-
-    fingerprint_components = [
-        MANIFEST_SCHEMA_VERSION,
-        effective_spec.id,
-        effective_spec.resolver,
-        version,
-        result.sha256,
-        normalized_hash or "",
-        secure_url,
-        target_formats_sorted,
-        normalization_mode,
-    ]
-    fingerprint = hashlib.sha256("|".join(fingerprint_components).encode("utf-8")).hexdigest()
-
-    manifest = Manifest(
-        schema_version=MANIFEST_SCHEMA_VERSION,
-        id=effective_spec.id,
-        resolver=effective_spec.resolver,
-        url=secure_url,
-        filename=destination.name,
-        version=version,
-        license=plan.license,
-        status=result.status,
-        sha256=result.sha256,
-        normalized_sha256=normalized_hash,
-        fingerprint=fingerprint,
-        etag=result.etag,
-        last_modified=result.last_modified,
-        downloaded_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        target_formats=effective_spec.target_formats,
-        validation=validation_results,
-        artifacts=artifacts,
-        resolver_attempts=resolver_attempts,
-    )
-    _write_manifest(manifest_path, manifest)
-    STORAGE.finalize_version(effective_spec.id, version, base_dir)
-
-    adapter.info(
-        "fetch complete",
-        extra={
-            "stage": "complete",
-            "status": result.status,
-            "sha256": result.sha256,
-            "manifest": str(manifest_path),
-        },
-    )
-
-    return FetchResult(
-        spec=effective_spec,
-        local_path=destination,
-        status=result.status,
-        sha256=result.sha256,
-        manifest_path=manifest_path,
-        artifacts=artifacts,
-    )
+    if last_error is None:
+        raise OntologyDownloadError(f"All resolver candidates failed for '{spec.id}'")
+    if isinstance(last_error, ConfigurationError):
+        raise last_error
+    raise OntologyDownloadError(
+        f"Download failed for '{spec.id}': {last_error}"
+    ) from last_error
 
 
 def plan_one(
@@ -6005,3 +6158,42 @@ __all__ = [
     "get_manifest_schema",
     "validate_manifest_dict",
 ]
+def _safe_lock_component(value: str) -> str:
+    """Return a filesystem-safe token for lock filenames."""
+
+    sanitized = re.sub(r"[^A-Za-z0-9._-]", "_", value)
+    sanitized = sanitized.strip("._") or "lock"
+    return sanitized
+
+
+@contextmanager
+def _version_lock(ontology_id: str, version: str) -> Iterator[None]:
+    """Acquire an inter-process lock for a specific ontology version."""
+
+    lock_dir = CACHE_DIR / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / f"{_safe_lock_component(ontology_id)}__{_safe_lock_component(version)}.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+b") as handle:
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(b"0")
+            handle.flush()
+
+        if fcntl is not None:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        elif msvcrt is not None:
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        else:  # pragma: no cover - fallback when no locking backend available
+            yield
+            return
+
+        try:
+            yield
+        finally:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            elif msvcrt is not None:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)

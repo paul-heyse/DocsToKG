@@ -19,7 +19,6 @@ import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
@@ -46,12 +45,16 @@ from .ontology_download import (
     fetch_all,
     get_manifest_schema,
     load_config,
+    parse_iso_datetime,
+    parse_rate_limit_to_rps,
+    parse_version_timestamp,
     plan_all,
     run_validators,
     sanitize_filename,
     setup_logging,
     validate_config,
     validate_manifest_dict,
+    _directory_size,
 )
 
 ONTOLOGY_DIR = LOCAL_ONTOLOGY_DIR
@@ -543,60 +546,8 @@ def _format_bytes(num: int) -> str:
     return f"{value:.1f} PB"
 
 
-def _directory_size(path: Path) -> int:
-    """Return the cumulative size of files under ``path``.
-
-    Args:
-        path: Directory whose contents should be measured.
-
-    Returns:
-        Total number of bytes for regular files within the directory.
-    """
-
-    if not path.exists():
-        return 0
-    total = 0
-    for entry in path.rglob("*"):
-        if entry.is_symlink() or not entry.is_file():
-            continue
-        try:
-            total += entry.stat().st_size
-        except OSError:  # pragma: no cover - filesystem race conditions
-            continue
-    return total
-
-
-def _parse_version_timestamp(value: Optional[str]) -> Optional[datetime]:
-    """Parse version or manifest timestamps into UTC datetimes.
-
-    Args:
-        value: Timestamp string sourced from manifests or version metadata.
-
-    Returns:
-        Normalized UTC datetime, or ``None`` when parsing fails.
-    """
-
-    if not value or not isinstance(value, str):
-        return None
-    text = value.strip()
-    if not text:
-        return None
-    candidates = [text, text.replace("Z", "+00:00")]
-    for candidate in candidates:
-        try:
-            parsed = datetime.fromisoformat(candidate)
-        except ValueError:
-            continue
-        if parsed.tzinfo is None:
-            return parsed.replace(tzinfo=timezone.utc)
-        return parsed.astimezone(timezone.utc)
-    for fmt in ("%Y-%m-%d", "%Y%m%d", "%Y-%m-%dT%H:%M:%S"):
-        try:
-            parsed = datetime.strptime(text, fmt)
-        except ValueError:
-            continue
-        return parsed.replace(tzinfo=timezone.utc)
-    return None
+def _directory_size_bytes(path: Path) -> int:
+    return _directory_size(path)
 
 
 def _apply_cli_overrides(config: ResolvedConfig, args) -> None:
@@ -626,29 +577,6 @@ def _apply_cli_overrides(config: ResolvedConfig, args) -> None:
 
 _RATE_LIMIT_RE = re.compile(r"^([\d.]+)/(second|sec|s|minute|min|m|hour|h)$")
 
-
-def _rate_limit_to_rps(value: str) -> Optional[float]:
-    """Convert rate limit string into a requests-per-second float.
-
-    Args:
-        value: Rate limit expression in ``<amount>/<unit>`` form.
-
-    Returns:
-        Requests-per-second value when parsing succeeds, otherwise ``None``.
-    """
-
-    match = _RATE_LIMIT_RE.match(value)
-    if not match:
-        return None
-    amount = float(match.group(1))
-    unit = match.group(2)
-    if unit in {"second", "sec", "s"}:
-        return amount
-    if unit in {"minute", "min", "m"}:
-        return amount / 60.0
-    if unit in {"hour", "h"}:
-        return amount / 3600.0
-    return None
 
 
 def _results_to_dict(result: FetchResult) -> dict:
@@ -769,118 +697,8 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
     return payload
 
 
-def _parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
-    """Parse ISO formatted date strings into timezone-aware datetimes."""
-
-    if not value:
-        return None
-    text = value.strip()
-    if not text:
-        return None
-    if text.endswith("Z"):
-        text = text[:-1] + "+00:00"
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    else:
-        parsed = parsed.astimezone(timezone.utc)
-    return parsed
-
-
-def _parse_http_datetime(value: Optional[str]) -> Optional[datetime]:
-    """Parse HTTP header datetime strings into timezone-aware datetimes.
-
-    Args:
-        value: Value sourced from an HTTP ``Date`` or ``Last-Modified`` header.
-
-    Returns:
-        Datetime in UTC when parsing succeeds, otherwise ``None``.
-    """
-
-    if not value:
-        return None
-    try:
-        parsed = parsedate_to_datetime(value)
-    except (TypeError, ValueError):
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    else:
-        parsed = parsed.astimezone(timezone.utc)
-    return parsed
-
-
-def _extract_response_metadata(response: requests.Response) -> Dict[str, object]:
-    """Return structured metadata from an HTTP response.
-
-    Args:
-        response: HTTP response obtained from a requests call.
-
-    Returns:
-        Mapping containing detected headers such as last-modified, etag, and content length.
-    """
-
-    metadata: Dict[str, object] = {}
-    last_modified = response.headers.get("Last-Modified")
-    parsed_last_modified = _parse_http_datetime(last_modified)
-    if parsed_last_modified:
-        metadata["last_modified"] = parsed_last_modified.isoformat()
-    etag = response.headers.get("ETag")
-    if etag:
-        metadata["etag"] = etag
-    content_length = response.headers.get("Content-Length")
-    if content_length:
-        try:
-            metadata["content_length"] = int(content_length)
-        except ValueError:
-            pass
-    return metadata
-
-
-def _collect_plan_metadata(plans: Sequence[PlannedFetch], config: ResolvedConfig) -> None:
-    """Augment planned fetches with remote metadata via HEAD requests.
-
-    Args:
-        plans: Planned fetch objects awaiting metadata enrichment.
-        config: Resolved configuration providing HTTP headers and timeouts.
-    """
-
-    if not plans:
-        return
-
-    headers = config.defaults.http.polite_http_headers()
-    timeout = max(1, config.defaults.http.timeout_sec)
-
-    for plan in plans:
-        metadata: Dict[str, object] = {}
-        response: Optional[requests.Response] = None
-        try:
-            response = requests.head(
-                plan.plan.url,
-                headers=headers,
-                timeout=timeout,
-                allow_redirects=True,
-            )
-            if response.status_code == 405:
-                response.close()
-                response = requests.get(
-                    plan.plan.url,
-                    headers=headers,
-                    timeout=timeout,
-                    allow_redirects=True,
-                    stream=True,
-                )
-            metadata.update(_extract_response_metadata(response))
-        except requests.RequestException as exc:  # pragma: no cover - network variability
-            metadata.setdefault("metadata_error", str(exc))
-        finally:
-            if response is not None:
-                response.close()
-        if metadata:
-            plan.metadata.update(metadata)
+def _directory_size_bytes(path: Path) -> int:
+    return _directory_size(path)
 
 
 def _directory_size_bytes(path: Path) -> int:
@@ -913,14 +731,12 @@ def _infer_version_timestamp(version: str) -> Optional[datetime]:
         Datetime derived from the version string, or ``None`` when no format matches.
     """
 
-    candidates = [version, version.replace("_", "-"), version.replace("/", "-")]
-    formats = [
-        "%Y-%m-%d",
-        "%Y%m%d",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y%m%dT%H%M%S",
-        "%Y-%m-%d-%H-%M-%S",
-    ]
+    candidates = [version, version.replace("_", "-"), version.replace("/", "-"), version.replace("_", "")] 
+    for candidate in candidates:
+        parsed = parse_version_timestamp(candidate)
+        if parsed is not None:
+            return parsed
+    formats = ["%Y%m%dT%H%M%S", "%Y-%m-%d-%H-%M-%S"]
     for candidate in candidates:
         for fmt in formats:
             try:
@@ -945,7 +761,7 @@ def _resolve_version_metadata(
         except json.JSONDecodeError:
             manifest = {}
         else:
-            timestamp = _parse_iso_datetime(manifest.get("downloaded_at"))
+            timestamp = parse_iso_datetime(manifest.get("downloaded_at"))
     if timestamp is None:
         timestamp = _infer_version_timestamp(version)
     if timestamp is None:
@@ -1022,19 +838,15 @@ def _collect_version_metadata(ontology_id: str) -> List[Dict[str, object]]:
                 manifest_data = json.loads(manifest_path.read_text())
             except json.JSONDecodeError:
                 manifest_data = {}
-            timestamp = _parse_iso_datetime((manifest_data or {}).get("downloaded_at"))
+            timestamp = parse_iso_datetime((manifest_data or {}).get("downloaded_at"))
             if timestamp is None:
-                timestamp = _parse_iso_datetime((manifest_data or {}).get("last_modified"))
+                timestamp = parse_iso_datetime((manifest_data or {}).get("last_modified"))
         if timestamp is None:
             if manifest_path.exists():
                 timestamp = datetime.fromtimestamp(manifest_path.stat().st_mtime, tz=timezone.utc)
             elif version_dir.exists():
                 timestamp = datetime.fromtimestamp(version_dir.stat().st_mtime, tz=timezone.utc)
-        size = 0
-        if version_dir.exists():
-            for path in version_dir.rglob("*"):
-                if path.is_file():
-                    size += path.stat().st_size
+        size = _directory_size_bytes(version_dir)
         metadata.append(
             {
                 "id": ontology_id,
@@ -1050,40 +862,6 @@ def _collect_version_metadata(ontology_id: str) -> List[Dict[str, object]]:
         reverse=True,
     )
     return metadata
-
-
-def _update_latest_symlink(ontology_id: str, target: Path) -> None:
-    """Ensure latest marker references the provided target directory.
-
-    Args:
-        ontology_id: Ontology identifier whose ``latest`` link should be updated.
-        target: Directory containing the version to mark as latest.
-    """
-
-    safe_id = sanitize_filename(ontology_id)
-    base_dir = LOCAL_ONTOLOGY_DIR / safe_id
-    base_dir.mkdir(parents=True, exist_ok=True)
-    latest_link = base_dir / "latest"
-    if not target.exists():
-        return
-    try:
-        if latest_link.is_symlink() or latest_link.exists():
-            if latest_link.is_dir() and not latest_link.is_symlink():
-                shutil.rmtree(latest_link)
-            else:
-                latest_link.unlink()
-    except OSError:
-        if latest_link.exists() and latest_link.is_dir():
-            shutil.rmtree(latest_link, ignore_errors=True)
-        elif latest_link.exists() or latest_link.is_symlink():
-            try:
-                latest_link.unlink()
-            except OSError:
-                pass
-    try:
-        latest_link.symlink_to(target, target_is_directory=True)
-    except OSError:
-        latest_link.write_text(str(target))
 
 
 def _resolve_specs_from_args(
@@ -1164,7 +942,6 @@ def _handle_plan(args, base_config: Optional[ResolvedConfig]) -> List[PlannedFet
     since = _parse_since(getattr(args, "since", None))
     config, specs = _resolve_specs_from_args(args, base_config)
     plans = plan_all(specs, config=config, since=since)
-    _collect_plan_metadata(plans, config)
     return plans
 
 
@@ -1184,7 +961,6 @@ def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, 
     since = _parse_since(getattr(args, "since", None))
     config, specs = _resolve_specs_from_args(args, base_config, allow_empty=True)
     plans = plan_all(specs, config=config, since=since)
-    _collect_plan_metadata(plans, config)
     current_payload = [_plan_to_dict(plan) for plan in plans]
     diff = _compute_plan_diff(baseline_payload, current_payload)
     diff["baseline"] = str(baseline_path)
@@ -1237,7 +1013,7 @@ def _handle_prune(args, logger) -> Dict[str, object]:
                         },
                     )
         if not args.dry_run and retained:
-            _update_latest_symlink(ontology_id, retained[0]["path"])
+            STORAGE.set_latest_version(ontology_id, retained[0]["path"])
         total_reclaimed += reclaimed
         if args.dry_run:
             total_deleted += len(to_remove)
@@ -1372,7 +1148,7 @@ def _doctor_report() -> Dict[str, object]:
                 invalid: Dict[str, str] = {}
                 for service, limit in configured.items():
                     text_value = str(limit)
-                    rps = _rate_limit_to_rps(text_value)
+                    rps = parse_rate_limit_to_rps(text_value)
                     if rps is None:
                         invalid[service] = text_value
                     else:
