@@ -39,6 +39,9 @@ All notable changes to DocsToKG are documented in this file.
   ``DocsToKG.ContentDownload.resolvers`` emit deprecation warnings. Removal is
   scheduled for the 2025.12 minor release (see
   `openspec/changes/enhance-content-download-reliability/notes/deprecation-removal-plan.md`).
+- ``DocsToKG.HybridSearch.operations`` and ``DocsToKG.HybridSearch.tools`` now emit
+  deprecation warnings and direct users to the consolidated service/vectorstore
+  modules and the unified ``DocsToKG.HybridSearch.validation`` CLI entry point.
 
 ### Fixed
 - Tests cover HEAD pre-check redirects, resolver concurrency error isolation, and configuration validation edge cases.

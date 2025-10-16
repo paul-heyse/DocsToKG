@@ -32,13 +32,19 @@ Inferred embedding dimensionality, defaulting to 2560 when unknown.
 
 ### `main(argv)`
 
-CLI entrypoint for running hybrid search validation suites.
+CLI entrypoint for running hybrid search validation suites and consolidated
+pytest workflows.
 
 Args:
 argv: Optional list of command-line arguments overriding `sys.argv`.
 
 Returns:
 None
+
+Notes:
+- ``--mode`` selects between ``basic`` and ``scale`` validation sweeps.
+- ``--run-tests`` forwards to the hybrid search pytest suites (``synthetic``, ``real``, ``scale``, ``all``).
+- ``--run-real-ci`` executes the real-vector regression harness and stores artifacts under ``--output-dir``.
 
 ### `run(self, dataset, output_root)`
 
