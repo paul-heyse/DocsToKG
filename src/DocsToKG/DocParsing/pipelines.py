@@ -90,6 +90,8 @@ def _looks_like_filesystem_path(candidate: str) -> bool:
     if alt and alt not in prefixes:
         prefixes.append(alt)
     return any(candidate.startswith(prefix) for prefix in prefixes)
+
+
 def _expand_path(path: str | Path) -> Path:
     """Expand a filesystem path to an absolute :class:`Path`."""
 
@@ -126,17 +128,6 @@ def resolve_pdf_model_path(cli_value: str | None = None) -> str:
         return str(expand_path(env_model))
     model_root = resolve_model_root()
     return str(expand_path(model_root / PDF_MODEL_SUBDIR))
-        return cli_value
-    env_model = os.getenv("DOCLING_PDF_MODEL")
-    if env_model:
-        return str(_expand_path(env_model))
-    model_root_env = os.getenv("DOCSTOKG_MODEL_ROOT")
-    if model_root_env:
-        return str((_expand_path(model_root_env) / PDF_MODEL_SUBDIR).resolve())
-    hf_home_env = os.getenv("HF_HOME")
-    if hf_home_env:
-        return str((_expand_path(hf_home_env) / PDF_MODEL_SUBDIR).resolve())
-    return str((Path.home().expanduser() / ".cache" / "huggingface" / PDF_MODEL_SUBDIR).resolve())
 
 
 # -------- Paths --------
@@ -167,8 +158,7 @@ def add_data_root_option(parser: argparse.ArgumentParser) -> None:
         type=Path,
         default=None,
         help=(
-            "Override DocsToKG Data directory. Defaults to auto-detection or "
-            "$DOCSTOKG_DATA_ROOT."
+            "Override DocsToKG Data directory. Defaults to auto-detection or $DOCSTOKG_DATA_ROOT."
         ),
     )
 
@@ -416,8 +406,7 @@ def pdf_build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help=(
-            "Override DocsToKG Data directory. Defaults to auto-detection or "
-            "$DOCSTOKG_DATA_ROOT."
+            "Override DocsToKG Data directory. Defaults to auto-detection or $DOCSTOKG_DATA_ROOT."
         ),
     )
     parser.add_argument(
@@ -1539,8 +1528,7 @@ def html_build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help=(
-            "Override DocsToKG Data directory. Defaults to auto-detection or "
-            "$DOCSTOKG_DATA_ROOT."
+            "Override DocsToKG Data directory. Defaults to auto-detection or $DOCSTOKG_DATA_ROOT."
         ),
     )
     parser.add_argument(

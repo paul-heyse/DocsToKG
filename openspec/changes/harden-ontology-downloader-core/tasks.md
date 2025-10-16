@@ -2,25 +2,25 @@
 
 ## 1. Legacy Cleanup & Consolidation
 
-- [x] 1.1 **Remove legacy module import aliases**
-  - [x] 1.1.1 Delete the `_LEGACY_MODULE_MAP` dictionary and its associated loop in `src/DocsToKG/OntologyDownload/__init__.py`
-  - [x] 1.1.2 Scan the entire codebase for imports using legacy paths: `rg "from DocsToKG.OntologyDownload\.(core|config|validators|download|storage|optdeps|utils|logging_config|validator_workers|foundation|infrastructure|network|pipeline|settings|validation|cli_utils)" --files-with-matches`
-  - [x] 1.1.3 Update all found imports to use the public API symbols from `DocsToKG.OntologyDownload.__all__` or `.ontology_download`/`.cli` directly
+- [ ] 1.1 **Remove legacy module import aliases**
+  - [ ] 1.1.1 Delete the `_LEGACY_MODULE_MAP` dictionary and its associated loop in `src/DocsToKG/OntologyDownload/__init__.py`
+  - [ ] 1.1.2 Scan the entire codebase for imports using legacy paths: `rg "from DocsToKG.OntologyDownload\.(core|config|validators|download|storage|optdeps|utils|logging_config|validator_workers|foundation|infrastructure|network|pipeline|settings|validation|cli_utils)" --files-with-matches`
+  - [ ] 1.1.3 Update all found imports to use the public API symbols from `DocsToKG.OntologyDownload.__all__` or `.ontology_download`/`.cli` directly
   - [ ] 1.1.4 Run full test suite to verify no import errors remain
-  - [x] 1.1.5 Update CHANGELOG.md with breaking change notice and migration instructions
+  - [ ] 1.1.5 Update CHANGELOG.md with breaking change notice and migration instructions
 
-- [x] 1.2 **Unify rate-limit pattern utilities**
-  - [x] 1.2.1 Keep the `_RATE_LIMIT_PATTERN` regex in `ontology_download.py` as the single source of truth
-  - [x] 1.2.2 Remove `_RATE_LIMIT_RE` from `cli.py`
-  - [x] 1.2.3 Extract a small helper function `parse_rate_limit_to_rps(limit_str: str) -> Optional[float]` in the core module
-  - [x] 1.2.4 Update `cli.py` to import and use this shared helper in `_rate_limit_to_rps`
-  - [x] 1.2.5 Add unit tests verifying rate limit parsing for various formats
+- [ ] 1.2 **Unify rate-limit pattern utilities**
+  - [ ] 1.2.1 Keep the `_RATE_LIMIT_PATTERN` regex in `ontology_download.py` as the single source of truth
+  - [ ] 1.2.2 Remove `_RATE_LIMIT_RE` from `cli.py`
+  - [ ] 1.2.3 Extract a small helper function `parse_rate_limit_to_rps(limit_str: str) -> Optional[float]` in the core module
+  - [ ] 1.2.4 Update `cli.py` to import and use this shared helper in `_rate_limit_to_rps`
+  - [ ] 1.2.5 Add unit tests verifying rate limit parsing for various formats
 
-- [x] 1.3 **Unify directory size utilities**
-  - [x] 1.3.1 Keep the `_directory_size` function in `ontology_download.py` as canonical
-  - [x] 1.3.2 Remove `_directory_size` and `_directory_size_bytes` duplicates from `cli.py`
-  - [x] 1.3.3 Update all callsites in `cli.py` to import and use the core implementation
-  - [x] 1.3.4 Add unit tests with temporary directories to verify consistent behavior
+- [ ] 1.3 **Unify directory size utilities**
+  - [ ] 1.3.1 Keep the `_directory_size` function in `ontology_download.py` as canonical
+  - [ ] 1.3.2 Remove `_directory_size` and `_directory_size_bytes` duplicates from `cli.py`
+  - [ ] 1.3.3 Update all callsites in `cli.py` to import and use the core implementation
+  - [ ] 1.3.4 Add unit tests with temporary directories to verify consistent behavior
 
 - [x] 1.4 **Unify datetime parsing utilities**
   - [x] 1.4.1 Consolidate `_parse_iso_datetime`, `_parse_http_datetime`, `_parse_version_timestamp` from CLI with core's `_coerce_datetime`, `_normalize_timestamp`, `_parse_last_modified`
