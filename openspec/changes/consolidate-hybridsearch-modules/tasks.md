@@ -16,6 +16,8 @@
 - [x] 2.4 Update `__init__.py` to export `ResultShaper` from `.ranking` module path
 - [x] 2.5 Convert `results.py` to deprecation shim: retain file with re-export statement `from .ranking import ResultShaper  # noqa: F401` and emit `DeprecationWarning` with migration guidance
 - [ ] 2.6 Run test suite targeting `tests/hybrid_search/test_ranking*.py` to verify no behavioral regressions
+      Attempted `.venv/bin/python -m pytest tests/hybrid_search/test_suite.py -k ranking` but collection fails because `numpy`
+      is unavailable in the execution environment after partial bootstrap. 【a83029†L1-L19】
 - [x] 2.7 Update any test imports from `.results` to `.ranking` module path
 
 ## 3. Integrate similarity.py into vectorstore.py
@@ -29,7 +31,11 @@
 - [x] 3.7 Update `__init__.py` to avoid exporting similarity functions directly (they remain internal to vectorstore unless explicitly needed)
 - [x] 3.8 Convert `similarity.py` to deprecation shim with re-exports and `DeprecationWarning` emission
 - [ ] 3.9 Run GPU-enabled tests (`tests/hybrid_search/test_vectorstore*.py`) to confirm similarity computations remain bit-exact
+      Attempted `.venv/bin/python -m pytest tests/hybrid_search/test_suite.py -k vectorstore`; collection halts due to missing
+      `numpy` dependency. 【4e2db8†L1-L19】
 - [ ] 3.10 Verify no performance degradation in benchmarks that exercise similarity operations
+      Unable to execute benchmarks in this container—GPU dependencies could not be installed (see bootstrap failure) and
+      real-vector datasets are unavailable.
 
 ## 4. Distribute operations.py functions
 
@@ -43,6 +49,8 @@
 - [x] 4.8 Update `__init__.py` to export service-level ops from `.service` and state ops from `.vectorstore`
 - [x] 4.9 Convert `operations.py` to deprecation shim with conditional re-exports routing to appropriate modules
 - [ ] 4.10 Run operational tests (`tests/hybrid_search/test_operations*.py` or equivalent validation harness) to confirm no regressions
+      Attempted `.venv/bin/python -m pytest tests/hybrid_search/test_suite.py -k operations`; collection aborts because `numpy`
+      is not installed. 【a821d3†L1-L19】
 
 ## 5. Merge schema.py with storage.py
 
@@ -53,6 +61,8 @@
 - [x] 5.5 Update `__init__.py` to ensure `OpenSearchSchemaManager` and `OpenSearchIndexTemplate` are exported from `.storage`
 - [x] 5.6 Convert `schema.py` to deprecation shim if it existed as a separate file
 - [ ] 5.7 Run storage-related tests to verify template management and namespace isolation remain functional
+      Attempted `.venv/bin/python -m pytest tests/hybrid_search/test_suite.py -k storage`, which fails during import with
+      `ModuleNotFoundError: numpy`. 【ab7172†L1-L19】
 
 ## 6. Eliminate retrieval.py by consolidating into service.py
 
@@ -62,6 +72,8 @@
 - [x] 6.4 Update `__init__.py` to ensure all previously exported symbols from `retrieval` are now sourced from `service`
 - [x] 6.5 Convert `retrieval.py` to minimal deprecation shim re-exporting from `service` with `DeprecationWarning`
 - [ ] 6.6 Run full integration test suite to verify end-to-end search request flow remains unchanged
+      Attempted `.venv/bin/python -m pytest tests/hybrid_search/test_suite.py` but the suite cannot start without `numpy` in the
+      environment. 【223d11†L1-L19】
 
 ## 7. Retire Tools directory and consolidate CLI entry points
 
@@ -75,6 +87,8 @@
 - [x] 7.8 Delete `HybridSearch/tools/run_real_vector_ci.py` after migration completion
 - [x] 7.9 Remove `tools/` directory entirely once all files are deleted
 - [ ] 7.10 Run CI pipeline locally or in test environment to confirm validation entry points function correctly
+      CLI smoke test via `.venv/bin/python -m DocsToKG.HybridSearch.validation --help` fails immediately because `numpy` is
+      unavailable; CI emulation is blocked until dependencies can be installed. 【6d8f80†L1-L9】
 
 ## 8. Update public interface and maintain backward compatibility
 
@@ -96,6 +110,7 @@
       Adjusted hybrid search stack fixture to use the public `FaissIndexManager.dim` property instead of touching the private `_dim` attribute.
 - [x] 9.4 Add tests specifically validating deprecation warnings are emitted when using old import paths
 - [ ] 9.5 Run full test suite with coverage analysis to ensure no coverage gaps introduced by consolidation
+      Coverage execution not attempted: even focused pytest runs fail due to missing `numpy`, so coverage tooling cannot run.
 - [x] 9.6 Update test utilities or fixtures that may have hardcoded module paths  
       Normalised all fixture imports to consolidated modules and added explicit shim warning assertions to guard against regressions.
 
@@ -112,13 +127,24 @@
 ## 11. Validation and quality assurance
 
 - [ ] 11.1 Run complete test suite on CPU-only environment to verify non-GPU functionality unaffected
+      Blocked: pytest collection fails on import because the bootstrap step cannot install `numpy` (see above command logs).
 - [ ] 11.2 Run GPU-enabled test suite to confirm device/resource threading through ranking and vectorstore unchanged
+      Blocked: environment lacks CUDA drivers and the bootstrap script cannot fetch NVIDIA-hosted wheels due to SSL issues. 【a26ec9†L1-L109】
 - [ ] 11.3 Execute validation harness (`python -m DocsToKG.HybridSearch.validation --mode scale`) against realistic dataset
+      Attempted `.venv/bin/python -m DocsToKG.HybridSearch.validation --mode scale`; import fails with `ModuleNotFoundError:
+      numpy`. 【e8b215†L1-L9】
 - [ ] 11.4 Perform static type checking with mypy or equivalent to catch any import-related type inference issues
-- [ ] 11.5 Run linting tools to ensure code style consistency maintained across consolidated modules
+      `mypy src/DocsToKG/HybridSearch` reports numerous missing dependency stubs and pre-existing typing issues across ingest and
+      validation modules; remediation deferred pending restored environment. 【8f464a†L1-L11】【db2312†L1-L46】
+- [x] 11.5 Run linting tools to ensure code style consistency maintained across consolidated modules
+      Reordered validation imports to satisfy ruff import-sorting rules; `ruff check` now passes for the touched modules. 【4f3ad8†L1-L2】
 - [ ] 11.6 Execute performance benchmarks comparing pre-consolidation and post-consolidation timing for search operations
+      Deferred: performance fixtures require GPU-enabled datasets that cannot be provisioned in this sandbox.
 - [ ] 11.7 Verify no memory leaks or GPU resource leaks introduced by module reorganization using memory profiling tools
-- [ ] 11.8 Conduct code review focusing on dependency arrows to ensure unidirectional flow preserved
+      Deferred pending access to GPU profiling infrastructure (CUDA stack installation is blocked). 【a26ec9†L1-L109】
+- [x] 11.8 Conduct code review focusing on dependency arrows to ensure unidirectional flow preserved
+      Manually audited `HybridSearch` module imports to confirm the consolidated structure retains the service → vectorstore →
+      storage layering with no new cycles introduced.
 
 ## 12. Deployment and communication
 
@@ -127,4 +153,6 @@
 - [x] 12.3 Create migration guide document for external users detailing old-to-new import mappings
 - [x] 12.4 Schedule deprecation removal for subsequent release (e.g., if current is v0.5.0, plan removal for v0.6.0)
 - [ ] 12.5 Announce changes in project communication channels with links to migration documentation
+      Pending coordination with project maintainers; no automated channel available from this environment.
 - [ ] 12.6 Tag release with appropriate version number following semantic versioning conventions
+      Pending repository maintainer action once validation tasks complete.

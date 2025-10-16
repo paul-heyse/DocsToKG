@@ -8,6 +8,13 @@ from typing import Callable, Dict, List, Mapping, MutableMapping, Optional, Sequ
 from .config import ChunkingConfig
 from .types import ChunkPayload, vector_uuid_to_faiss_int
 
+__all__ = [
+    "ChunkRegistry",
+    "OpenSearchIndexTemplate",
+    "OpenSearchSchemaManager",
+    "OpenSearchSimulator",
+    "matches_filters",
+]
 
 __all__ = [
     "ChunkRegistry",
