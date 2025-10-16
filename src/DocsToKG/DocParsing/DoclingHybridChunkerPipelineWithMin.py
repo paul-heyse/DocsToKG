@@ -87,6 +87,12 @@ _LOGGER = get_logger(__name__)
 
 
 # ---------- Helpers ----------
+def compute_relative_doc_id(path: Path, root: Path) -> str:
+    """Return POSIX-style relative identifier for a document path."""
+
+    return path.relative_to(root).as_posix()
+
+
 def read_utf8(p: Path) -> str:
     """Load text from disk using UTF-8 with replacement for invalid bytes.
 
@@ -607,9 +613,10 @@ def main(args: argparse.Namespace | None = None) -> int:
     )
 
     for path in files:
-        rel_id = path.relative_to(in_dir).as_posix()
+        rel_id = compute_relative_doc_id(path, in_dir)
         name = path.stem
-        out_path = out_dir / f"{name}.chunks.jsonl"
+        relative_target = Path(rel_id)
+        out_path = (out_dir / relative_target).with_suffix(".chunks.jsonl")
         input_hash = compute_content_hash(path)
         manifest_entry = chunk_manifest_index.get(rel_id)
         parse_engine = parse_engine_lookup.get(rel_id, "docling-html")
@@ -645,6 +652,8 @@ def main(args: argparse.Namespace | None = None) -> int:
         try:
             doctags_text = read_utf8(path)
             doc = build_doc(doc_name=name, doctags_text=doctags_text)
+
+            out_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Stage 1: Docling chunking
             chunks = list(chunker.chunk(dl_doc=doc))
@@ -688,7 +697,7 @@ def main(args: argparse.Namespace | None = None) -> int:
                         num_images=r.num_images,
                     )
                     row = ChunkRow(
-                        doc_id=name,
+                        doc_id=rel_id,
                         source_path=str(path),
                         chunk_id=cid,
                         source_chunk_idxs=r.src_idxs,
@@ -710,7 +719,8 @@ def main(args: argparse.Namespace | None = None) -> int:
                 "Chunk file written",
                 extra={
                     "extra_fields": {
-                        "doc_id": name,
+                        "doc_id": rel_id,
+                        "doc_stem": name,
                         "chunks": len(final_recs),
                         "output_file": out_path.name,
                     }
