@@ -384,6 +384,7 @@ text: Extracted text for the chunk.
 doc_items_refs: References to downstream document item metadata.
 page_nos: List of 1-based page numbers touched by the chunk.
 schema_version: Version identifier for the chunk schema.
+start_offset: Character offset of the chunk text within the source document.
 provenance: Optional provenance metadata describing parsing context.
 uuid: Optional stable identifier for the chunk.
 has_image_captions: Optional duplicate of provenance flag for convenience.

@@ -16,13 +16,13 @@ import subprocess
 import sys
 import tempfile
 import zipfile
-from importlib import metadata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from itertools import islice
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     BinaryIO,
     Callable,
@@ -34,11 +34,11 @@ from typing import (
     Optional,
     Tuple,
     Union,
-    TYPE_CHECKING,
 )
 
 from . import plugins as _plugins
 from .io import log_memory_usage
+from .settings import ResolvedConfig, get_owlready2, get_pronto, get_rdflib
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from .plugins import ResolverPlugin, ValidatorPlugin
@@ -84,7 +84,6 @@ def load_validator_plugins(
     _plugins._VALIDATOR_PLUGINS_LOADED = _VALIDATOR_PLUGINS_LOADED
     _plugins.load_validator_plugins(registry, logger=logger, reload=reload)
     _VALIDATOR_PLUGINS_LOADED = _plugins._VALIDATOR_PLUGINS_LOADED
-from .settings import ResolvedConfig, get_owlready2, get_pronto, get_rdflib
 
 rdflib = get_rdflib()
 pronto = get_pronto()
@@ -468,7 +467,6 @@ def normalize_streaming(
     if return_header_hash:
         return content_hash, header_hash
     return content_hash
-
 
 
 def ensure_validator_plugins(

@@ -30,9 +30,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from DocsToKG.ContentDownload import cli as downloader
-from DocsToKG.ContentDownload.core import Classification, ReasonCode
-from DocsToKG.ContentDownload.core import classify_payload
-from DocsToKG.ContentDownload.core import WorkArtifact
+from DocsToKG.ContentDownload.core import Classification, ReasonCode, WorkArtifact, classify_payload
 
 # --- Test Cases ---
 

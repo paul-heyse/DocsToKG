@@ -21,7 +21,7 @@ This guide summarises the key operational updates introduced by the
 - ``--workers``: controls parallel worker count (default ``1``).
 - ``--dry-run``: measures resolver coverage without writing files.
 - ``--resume-from``: skips works already logged in an existing manifest JSONL.
-- ``--extract-html-text``: extracts plaintext from HTML fallbacks (requires
+- ``--extract-text=html``: extracts plaintext from HTML fallbacks (requires
   ``trafilatura``).
 
 ## 5. Ontology Downloader API Migration (``harden-ontology-downloader-core``)

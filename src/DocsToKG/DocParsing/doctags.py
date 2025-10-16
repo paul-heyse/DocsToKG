@@ -269,9 +269,20 @@ import time
 import types
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, fields
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Deque, Dict, Iterable, List, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    ClassVar,
+    Deque,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+)
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -281,8 +292,9 @@ from urllib3.util.retry import Retry
 from DocsToKG.DocParsing.core import (
     PDF_MODEL_SUBDIR,
     CLIOption,
-    build_subcommand,
+    StageConfigBase,
     acquire_lock,
+    build_subcommand,
     compute_content_hash,
     data_doctags,
     data_html,
@@ -303,7 +315,6 @@ from DocsToKG.DocParsing.core import (
     resolve_model_root,
     resolve_pdf_model_path,
     resolve_pipeline_path,
-    StageConfigBase,
     set_spawn_or_warn,
     should_skip_output,
 )
@@ -369,6 +380,7 @@ class DoctagsCfg(StageConfigBase):
     input: Path = DEFAULT_INPUT
     output: Path = DEFAULT_OUTPUT
     workers: int = DEFAULT_WORKERS
+    port: int = PREFERRED_PORT
     model: Optional[str] = None
     served_model_names: Tuple[str, ...] = DEFAULT_SERVED_MODEL_NAMES
     gpu_memory_utilization: float = DEFAULT_GPU_MEMORY_UTILIZATION
@@ -386,6 +398,7 @@ class DoctagsCfg(StageConfigBase):
         "input": "DOCSTOKG_DOCTAGS_INPUT",
         "output": "DOCSTOKG_DOCTAGS_OUTPUT",
         "workers": "DOCSTOKG_DOCTAGS_WORKERS",
+        "port": "DOCSTOKG_DOCTAGS_PORT",
         "model": "DOCSTOKG_DOCTAGS_MODEL",
         "served_model_names": "DOCSTOKG_DOCTAGS_SERVED_MODELS",
         "gpu_memory_utilization": "DOCSTOKG_DOCTAGS_GPU_MEMORY_UTILIZATION",
@@ -406,6 +419,7 @@ class DoctagsCfg(StageConfigBase):
         "input": StageConfigBase._coerce_path,
         "output": StageConfigBase._coerce_path,
         "workers": StageConfigBase._coerce_int,
+        "port": StageConfigBase._coerce_int,
         "model": StageConfigBase._coerce_str,
         "served_model_names": StageConfigBase._coerce_str_tuple,
         "gpu_memory_utilization": StageConfigBase._coerce_float,
@@ -479,21 +493,26 @@ class DoctagsCfg(StageConfigBase):
             self.vlm_stop = ("</doctag>", "<|end_of_text|>")
 
     from_sources = from_args
+
+
 PROFILE_PRESETS: Dict[str, Dict[str, Any]] = {
     "cpu-small": {
         "workers": 1,
         "gpu_memory_utilization": 0.0,
         "vllm_wait_timeout": 180,
+        "port": PREFERRED_PORT + 2,
     },
     "gpu-default": {
         "workers": DEFAULT_WORKERS,
         "gpu_memory_utilization": DEFAULT_GPU_MEMORY_UTILIZATION,
         "vllm_wait_timeout": WAIT_TIMEOUT_S,
+        "port": PREFERRED_PORT,
     },
     "gpu-max": {
         "workers": max(1, (os.cpu_count() or 16) - 2),
         "gpu_memory_utilization": min(0.9, DEFAULT_GPU_MEMORY_UTILIZATION + 0.15),
         "vllm_wait_timeout": WAIT_TIMEOUT_S * 2,
+        "port": PREFERRED_PORT + 4,
     },
 }
 
@@ -521,9 +540,26 @@ PDF_CLI_OPTIONS: Tuple[CLIOption, ...] = (
             "help": "Logging verbosity for console output (default: %(default)s).",
         },
     ),
-    CLIOption(("--input",), {"type": Path, "default": DEFAULT_INPUT, "help": "Folder with PDFs (recurses)."}),
-    CLIOption(("--output",), {"type": Path, "default": DEFAULT_OUTPUT, "help": "Folder for Doctags output."}),
-    CLIOption(("--workers",), {"type": int, "default": DEFAULT_WORKERS, "help": "Parallel workers for PDF conversion"}),
+    CLIOption(
+        ("--input",),
+        {"type": Path, "default": DEFAULT_INPUT, "help": "Folder with PDFs (recurses)."},
+    ),
+    CLIOption(
+        ("--output",),
+        {"type": Path, "default": DEFAULT_OUTPUT, "help": "Folder for Doctags output."},
+    ),
+    CLIOption(
+        ("--workers",),
+        {"type": int, "default": DEFAULT_WORKERS, "help": "Parallel workers for PDF conversion"},
+    ),
+    CLIOption(
+        ("--port",),
+        {
+            "type": int,
+            "default": PREFERRED_PORT,
+            "help": f"vLLM HTTP port to use (default: {PREFERRED_PORT}).",
+        },
+    ),
     CLIOption(
         ("--model",),
         {
@@ -547,11 +583,19 @@ PDF_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     ),
     CLIOption(
         ("--gpu-memory-utilization",),
-        {"type": float, "default": DEFAULT_GPU_MEMORY_UTILIZATION, "help": "Fraction of GPU memory the vLLM server may allocate"},
+        {
+            "type": float,
+            "default": DEFAULT_GPU_MEMORY_UTILIZATION,
+            "help": "Fraction of GPU memory the vLLM server may allocate",
+        },
     ),
     CLIOption(
         ("--vlm-prompt",),
-        {"type": str, "default": "Convert this page to docling.", "help": "Prompt passed to the VLM for PDF pages"},
+        {
+            "type": str,
+            "default": "Convert this page to docling.",
+            "help": "Prompt passed to the VLM for PDF pages",
+        },
     ),
     CLIOption(
         ("--vlm-stop",),
@@ -563,9 +607,14 @@ PDF_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     ),
     CLIOption(
         ("--vllm-wait-timeout",),
-        {"type": int, "default": WAIT_TIMEOUT_S, "help": "Seconds to wait for vLLM server readiness (default: %(default)s)."},
+        {
+            "type": int,
+            "default": WAIT_TIMEOUT_S,
+            "help": "Seconds to wait for vLLM server readiness (default: %(default)s).",
+        },
     ),
 )
+
 
 def ensure_docling_dependencies() -> None:
     """Validate that required Docling packages are installed."""
@@ -758,7 +807,7 @@ def detect_vllm_version() -> str:
         return "unknown"
 
     version = getattr(vllm, "__version__", "unknown")
-    logger.info(
+    _LOGGER.info(
         "Detected vLLM package",
         extra={"extra_fields": {"version": version}},
     )
@@ -1059,7 +1108,7 @@ def stream_logs(proc: sp.Popen, prefix: str = "[vLLM] ", tail: Optional[Deque[st
             continue
         if tail is not None:
             tail.append(s)
-        logger.info(
+        _LOGGER.info(
             "vLLM stdout",
             extra={
                 "extra_fields": {
@@ -1257,7 +1306,7 @@ def ensure_vllm(
     names, raw, status = probe_models(preferred)
     if status == 200:
         validate_served_models(names, served_model_names)
-        logger.info(
+        _LOGGER.info(
             "Reusing vLLM",
             extra={
                 "extra_fields": {
@@ -1484,15 +1533,18 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
     if profile:
         config_snapshot.setdefault("profile", profile)
 
-    if profile and defaults:
-        logger = get_logger(__name__, level=str(cfg.log_level))
-        logger.info(
-            "Applying profile",
-            extra={"extra_fields": {"profile": profile, **{k: str(v) for k, v in defaults.items()}}},
-        )
-
     log_level = cfg.log_level
     logger = get_logger(__name__, level=str(log_level))
+    if profile and defaults:
+        logger.info(
+            "Applying profile",
+            extra={
+                "extra_fields": {
+                    "profile": profile,
+                    **{key: defaults[key] for key in sorted(defaults)},
+                }
+            },
+        )
     set_spawn_or_warn(logger)
     import multiprocessing as mp
 
@@ -1554,6 +1606,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
             "gpu_memory_utilization": gpu_memory_utilization,
             "served_model_names": list(served_model_names),
             "workers": int(cfg.workers),
+            "port": int(cfg.port),
             "resume": bool(cfg.resume),
             "force": bool(cfg.force),
             "vllm_wait_timeout": int(cfg.vllm_wait_timeout),
@@ -1584,6 +1637,8 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
                 "gpu_memory_utilization": gpu_memory_utilization,
                 "vllm_version": vllm_version,
                 "vllm_wait_timeout": int(cfg.vllm_wait_timeout),
+                "port": int(cfg.port),
+                "profile": profile,
             }
         },
     )
@@ -1595,11 +1650,11 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
 
     preflight_start = time.perf_counter()
     port, proc, owns = ensure_vllm(
-        PREFERRED_PORT,
+        int(cfg.port),
         model_path,
         served_model_names,
         gpu_memory_utilization,
-        wait_timeout_s=int(getattr(args, "vllm_wait_timeout", WAIT_TIMEOUT_S)),
+        wait_timeout_s=int(cfg.vllm_wait_timeout),
     )
     metrics_healthy, metrics_status = probe_metrics(port)
     manifest_log_success(
@@ -1636,9 +1691,7 @@ def pdf_main(args: argparse.Namespace | None = None) -> int:
             )
             return 0
 
-        manifest_index = (
-            load_manifest_index(MANIFEST_STAGE, resolved_root) if cfg.resume else {}
-        )
+        manifest_index = load_manifest_index(MANIFEST_STAGE, resolved_root) if cfg.resume else {}
 
         workers = max(1, int(cfg.workers))
         logger.info(
@@ -1815,13 +1868,25 @@ HTML_CLI_OPTIONS: Tuple[CLIOption, ...] = (
             "help": "Logging verbosity for console output (default: %(default)s).",
         },
     ),
-    CLIOption(("--input",), {"type": Path, "default": HTML_DEFAULT_INPUT_DIR, "help": "Folder with HTML files (recurses)"}),
-    CLIOption(("--output",), {"type": Path, "default": HTML_DEFAULT_OUTPUT_DIR, "help": "Destination for .doctags"}),
+    CLIOption(
+        ("--input",),
+        {
+            "type": Path,
+            "default": HTML_DEFAULT_INPUT_DIR,
+            "help": "Folder with HTML files (recurses)",
+        },
+    ),
+    CLIOption(
+        ("--output",),
+        {"type": Path, "default": HTML_DEFAULT_OUTPUT_DIR, "help": "Destination for .doctags"},
+    ),
     CLIOption(
         ("--workers",),
         {"type": int, "default": HTML_DEFAULT_WORKERS, "help": "Parallel workers"},
     ),
-    CLIOption(("--overwrite",), {"action": "store_true", "help": "Overwrite existing .doctags files"}),
+    CLIOption(
+        ("--overwrite",), {"action": "store_true", "help": "Overwrite existing .doctags files"}
+    ),
 )
 
 if TYPE_CHECKING:
@@ -2161,14 +2226,10 @@ def html_main(args: argparse.Namespace | None = None) -> int:
 
     files = list_htmls(input_dir)
     if not files:
-        logger.warning(
-            "No HTML files found", extra={"extra_fields": {"input_dir": str(input_dir)}}
-        )
+        logger.warning("No HTML files found", extra={"extra_fields": {"input_dir": str(input_dir)}})
         return 0
 
-    manifest_index = (
-        load_manifest_index(HTML_MANIFEST_STAGE, resolved_root) if cfg.resume else {}
-    )
+    manifest_index = load_manifest_index(HTML_MANIFEST_STAGE, resolved_root) if cfg.resume else {}
 
     tasks: List[HtmlTask] = []
     ok = fail = skip = 0

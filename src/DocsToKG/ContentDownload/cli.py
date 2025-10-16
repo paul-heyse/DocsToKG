@@ -174,8 +174,6 @@ import requests
 from pyalex import Topics, Works
 from pyalex import config as oa_config
 
-import DocsToKG.ContentDownload.pipeline as resolvers
-
 from DocsToKG.ContentDownload.core import (
     DEFAULT_MIN_PDF_BYTES,
     DEFAULT_SNIFF_BYTES,
@@ -184,9 +182,9 @@ from DocsToKG.ContentDownload.core import (
     Classification,
     ReasonCode,
     WorkArtifact,
+    _infer_suffix,
     atomic_write,
     atomic_write_text,
-    _infer_suffix,
     classify_payload,
     dedupe,
     has_pdf_eof,
@@ -197,17 +195,8 @@ from DocsToKG.ContentDownload.core import (
     tail_contains_html,
     update_tail_buffer,
 )
-from DocsToKG.ContentDownload.pipeline import (
-    AttemptRecord,
-    DownloadOutcome,
-    ResolverConfig,
-    ResolverMetrics,
-    ResolverPipeline,
-    apply_config_overrides,
-    default_resolvers,
-    load_resolver_config,
-    read_resolver_config,
-)
+from DocsToKG.ContentDownload.core import normalize_arxiv as _normalize_arxiv
+from DocsToKG.ContentDownload.core import normalize_pmid as _normalize_pmid
 from DocsToKG.ContentDownload.networking import (
     CachedResult,
     ConditionalRequestHelper,
@@ -217,6 +206,16 @@ from DocsToKG.ContentDownload.networking import (
     head_precheck,
     parse_retry_after_header,
     request_with_retries,
+)
+from DocsToKG.ContentDownload.pipeline import (
+    AttemptRecord,
+    DownloadOutcome,
+    ResolverMetrics,
+    ResolverPipeline,
+    apply_config_overrides,
+    default_resolvers,
+    load_resolver_config,
+    read_resolver_config,
 )
 from DocsToKG.ContentDownload.telemetry import (
     MANIFEST_SCHEMA_VERSION,
@@ -234,8 +233,6 @@ from DocsToKG.ContentDownload.telemetry import (
     load_manifest_url_index,
     load_previous_manifest,
 )
-from DocsToKG.ContentDownload.core import normalize_arxiv as _normalize_arxiv
-from DocsToKG.ContentDownload.core import normalize_pmid as _normalize_pmid
 
 # --- Globals ---
 __all__ = (
@@ -292,6 +289,7 @@ def ensure_dir(path: Path) -> None:
         OSError: If the directory cannot be created because of permissions.
     """
     path.mkdir(parents=True, exist_ok=True)
+
 
 @dataclass
 class DownloadOptions:
@@ -578,7 +576,9 @@ def _parse_domain_token_bucket(value: str) -> Tuple[str, Dict[str, float]]:
     """Parse ``DOMAIN=RPS[:capacity=X]`` specifications into bucket configs."""
 
     if "=" not in value:
-        raise argparse.ArgumentTypeError("domain token bucket must use the format domain=rate[:capacity=N]")
+        raise argparse.ArgumentTypeError(
+            "domain token bucket must use the format domain=rate[:capacity=N]"
+        )
     domain, spec = value.split("=", 1)
     domain = domain.strip().lower()
     if not domain:
@@ -594,7 +594,9 @@ def _parse_domain_token_bucket(value: str) -> Tuple[str, Dict[str, float]]:
             try:
                 value_float = float(raw)
             except ValueError as exc:
-                raise argparse.ArgumentTypeError(f"invalid numeric value '{raw}' in token bucket spec") from exc
+                raise argparse.ArgumentTypeError(
+                    f"invalid numeric value '{raw}' in token bucket spec"
+                ) from exc
             if key in {"rate", "rps", "rate_per_second"}:
                 rate = value_float
             elif key in {"capacity", "burst"}:
@@ -1354,12 +1356,12 @@ def download_candidate(
                 )
                 elapsed_limit = (time.monotonic() - start) * 1000.0
                 policy_triggered = (
-                    policy_max_bytes is not None and max_bytes is not None and max_bytes == policy_max_bytes
+                    policy_max_bytes is not None
+                    and max_bytes is not None
+                    and max_bytes == policy_max_bytes
                 )
                 reason_code = (
-                    ReasonCode.DOMAIN_MAX_BYTES
-                    if policy_triggered
-                    else ReasonCode.MAX_BYTES_STREAM
+                    ReasonCode.DOMAIN_MAX_BYTES if policy_triggered else ReasonCode.MAX_BYTES_STREAM
                 )
                 reason_detail = (
                     f"download exceeded domain max_bytes {policy_max_bytes}"

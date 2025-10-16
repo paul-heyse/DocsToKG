@@ -125,4 +125,3 @@ def load_validator_plugins(
                 extra={"stage": "init", "validator": entry.name, "error": str(exc)},
             )
     _VALIDATOR_PLUGINS_LOADED = True
-

@@ -265,7 +265,13 @@ def test_main_writes_manifest_and_sets_mailto(download_modules, monkeypatch, tmp
 
     class StubPipeline:
         def __init__(
-            self, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **kwargs
+            self,
+            resolvers=None,
+            config=None,
+            download_func=None,
+            logger=None,
+            metrics=None,
+            **kwargs,
         ):
             self.logger = logger
             self.metrics = metrics
@@ -390,8 +396,8 @@ def test_main_with_csv_writes_last_attempt_csv(download_modules, monkeypatch, tm
 
         def run(self, session, artifact, context=None):
             self.logger.log_attempt(
-                    resolvers.AttemptRecord(
-                        run_id=self.run_id,
+                resolvers.AttemptRecord(
+                    run_id=self.run_id,
                     work_id=artifact.work_id,
                     resolver_name="openalex",
                     resolver_order=1,
@@ -998,7 +1004,6 @@ def test_cli_resume_from_partial_metadata(download_modules, monkeypatch, tmp_pat
             self.logger = logger
             self.metrics = metrics
             self.run_id = kwargs.get("run_id")
-            self.run_id = kwargs.get("run_id")
 
         def run(self, session, artifact, context=None):
             assert context is not None
@@ -1014,21 +1019,23 @@ def test_cli_resume_from_partial_metadata(download_modules, monkeypatch, tmp_pat
                 elapsed_ms=5.0,
                 error=None,
             )
+            if self.logger is not None:
                 self.logger.log_attempt(
                     resolvers.AttemptRecord(
                         run_id=self.run_id,
-                    work_id=artifact.work_id,
-                    resolver_name="stub",
-                    resolver_order=1,
-                    url=previous_entry["url"],
-                    status=outcome.classification.value,
-                    http_status=outcome.http_status,
-                    content_type=outcome.content_type,
-                    elapsed_ms=outcome.elapsed_ms,
-                    dry_run=False,
+                        work_id=artifact.work_id,
+                        resolver_name="stub",
+                        resolver_order=1,
+                        url=previous_entry["url"],
+                        status=outcome.classification.value,
+                        http_status=outcome.http_status,
+                        content_type=outcome.content_type,
+                        elapsed_ms=outcome.elapsed_ms,
+                        dry_run=False,
+                    )
                 )
-            )
-            self.metrics.record_attempt("stub", outcome)
+            if self.metrics is not None:
+                self.metrics.record_attempt("stub", outcome)
             return resolvers.PipelineResult(
                 success=True,
                 resolver_name="stub",
@@ -1160,6 +1167,7 @@ def test_cli_workers_apply_domain_jitter(download_modules, monkeypatch, tmp_path
                     )
                     self._host_buckets[host] = bucket
                 return bucket
+
     class RecordingPipeline:
         def __init__(
             self, *, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **_

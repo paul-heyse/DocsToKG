@@ -84,6 +84,10 @@ None
 
 Infer image annotation flags, counts, confidences, and structured metadata.
 
+### `_extract_chunk_start(chunk)`
+
+Best-effort extraction of the chunk's starting character offset.
+
 ### `_chunk_worker_initializer(cfg)`
 
 Initialise worker-local tokenizer and chunker state for multiprocessing.
@@ -205,6 +209,10 @@ Normalise paths, casing, and defaults after all inputs are merged.
 Collect numeric confidence scores from metadata sources.
 
 ### `_normalise_meta(payload, doc_item)`
+
+*No documentation available.*
+
+### `_collect(source)`
 
 *No documentation available.*
 

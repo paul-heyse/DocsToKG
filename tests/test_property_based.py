@@ -36,11 +36,11 @@ import requests
 from hypothesis import given
 from hypothesis import strategies as st
 
+from DocsToKG.ContentDownload.core import dedupe
 from DocsToKG.ContentDownload.networking import (
     ConditionalRequestHelper,
     request_with_retries,
 )
-from DocsToKG.ContentDownload.core import dedupe
 
 
 @given(

@@ -137,6 +137,14 @@ ValueError: If any port is not an integer or falls outside the TCP range 1-65535
 
 Return the configured per-host rate limit in requests per second.
 
+### `max_download_bytes(self)`
+
+Return the maximum allowed download payload size in bytes.
+
+### `max_uncompressed_bytes(self)`
+
+Return the maximum allowed uncompressed archive size in bytes.
+
 ### `parse_service_rate_limit(self, service)`
 
 Return service-specific rate limits expressed as requests per second.

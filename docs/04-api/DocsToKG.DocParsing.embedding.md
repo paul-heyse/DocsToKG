@@ -92,16 +92,18 @@ Backward-compatible shim that delegates to core.ensure_qwen_dependencies.
 
 ### `ensure_uuid(rows)`
 
-Populate missing chunk UUIDs in-place using deterministic UUIDv5 derivation.
+Validate or assign deterministic chunk UUIDs based on content offsets.
 
 Args:
-rows: Chunk dictionaries that should include a `uuid` key.
+rows: Chunk dictionaries to normalise. Each row may include ``start_offset``
+(preferred); when absent the legacy UUID derivation is applied.
 
 Returns:
-True when at least one UUID was newly assigned; otherwise False. UUIDs are
-derived from a namespace, doc ID, source chunk indices, and the first 16 hex
-characters of the chunk text SHA-1 digest. If deterministic generation fails,
-a UUID4 is assigned as a fallback.
+``True`` when at least one UUID was added or corrected; otherwise ``False``.
+
+### `_legacy_chunk_uuid(doc_id, source_chunk_idxs, text_value)`
+
+Derive the historical UUID used before deterministic start offsets.
 
 ### `ensure_chunk_schema(rows, source)`
 

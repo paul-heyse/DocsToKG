@@ -104,12 +104,18 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple, TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Protocol, Tuple
 
 import requests
 
 from .errors import ResolverError, UserConfigError
-from .io import RDF_MIME_FORMAT_LABELS, get_bucket, retry_with_backoff, validate_url_security
+from .io import (
+    RDF_MIME_FORMAT_LABELS,
+    get_bucket,
+    is_retryable_error,
+    retry_with_backoff,
+    validate_url_security,
+)
 from .plugins import ensure_resolver_plugins
 from .settings import DownloadConfiguration, ResolvedConfig, get_pystow
 
@@ -360,7 +366,7 @@ class BaseResolver:
         backoff_base = config.defaults.http.backoff_factor
 
         def _retryable(exc: Exception) -> bool:
-            return isinstance(exc, (requests.Timeout, requests.ConnectionError))
+            return is_retryable_error(exc)
 
         def _on_retry(attempt: int, exc: Exception, sleep_time: float) -> None:
             logger.warning(
@@ -370,6 +376,7 @@ class BaseResolver:
                     "resolver": name,
                     "attempt": attempt,
                     "sleep_sec": sleep_time,
+                    "error": str(exc),
                 },
             )
 
@@ -809,7 +816,11 @@ class SKOSResolver(BaseResolver):
             "resolved download url",
             extra={"stage": "plan", "resolver": "skos", "ontology_id": spec.id, "url": url},
         )
-        default_media = spec.extras.get("media_type") if isinstance(spec.extras.get("media_type"), str) else "application/rdf+xml"
+        default_media = (
+            spec.extras.get("media_type")
+            if isinstance(spec.extras.get("media_type"), str)
+            else "application/rdf+xml"
+        )
         media_type, download_headers = self._negotiate_media_type(
             spec=spec,
             default=default_media,
@@ -877,7 +888,9 @@ class DirectResolver(BaseResolver):
             "resolved download url",
             extra={"stage": "plan", "resolver": "direct", "ontology_id": spec.id, "url": url},
         )
-        default_media = extras.get("media_type") if isinstance(extras.get("media_type"), str) else None
+        default_media = (
+            extras.get("media_type") if isinstance(extras.get("media_type"), str) else None
+        )
         media_type, download_headers = self._negotiate_media_type(
             spec=spec,
             default=default_media,

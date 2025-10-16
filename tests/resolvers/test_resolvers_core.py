@@ -944,12 +944,12 @@ import DocsToKG.ContentDownload.pipeline as pipeline_module
 import DocsToKG.ContentDownload.pipeline as providers_module
 import DocsToKG.ContentDownload.pipeline as resolvers
 from DocsToKG.ContentDownload import cli as downloader
-from DocsToKG.ContentDownload.core import Classification, classify_payload
 from DocsToKG.ContentDownload.cli import (
     WorkArtifact,
     ensure_dir,
     load_resolver_config,
 )
+from DocsToKG.ContentDownload.core import Classification, classify_payload
 from DocsToKG.ContentDownload.pipeline import (
     ApiResolverBase,
     ArxivResolver,
@@ -1549,7 +1549,10 @@ def test_classify_payload_detects_pdf_and_html():
     html = b"<html><body>Hello</body></html>"
     pdf = b"%PDF-sample"
     assert classify_payload(html, "text/html", "https://example.com") is Classification.HTML
-    assert classify_payload(pdf, "application/pdf", "https://example.com/doc.pdf") is Classification.PDF
+    assert (
+        classify_payload(pdf, "application/pdf", "https://example.com/doc.pdf")
+        is Classification.PDF
+    )
 
 
 def test_classify_payload_octet_stream_requires_sniff() -> None:

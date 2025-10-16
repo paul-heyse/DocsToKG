@@ -129,6 +129,10 @@
 <h3><code class="docutils literal notranslate"><span class="pre">_check_compression_ratio()</span></code><a class="headerlink" href="#check-compression-ratio" title="Link to this heading"></a></h3>
 <p>Ensure compressed archives do not expand beyond the permitted ratio.</p>
 </section>
+<section id="enforce-uncompressed-ceiling">
+<h3><code class="docutils literal notranslate"><span class="pre">_enforce_uncompressed_ceiling()</span></code><a class="headerlink" href="#enforce-uncompressed-ceiling" title="Link to this heading"></a></h3>
+<p>Ensure uncompressed payload stays within configured limits.</p>
+</section>
 <section id="extract-zip-safe-zip-path-destination">
 <h3><code class="docutils literal notranslate"><span class="pre">extract_zip_safe(zip_path,</span> <span class="pre">destination)</span></code><a class="headerlink" href="#extract-zip-safe-zip-path-destination" title="Link to this heading"></a></h3>
 <p>Extract a ZIP archive while preventing traversal and compression bombs.</p>
@@ -172,6 +176,10 @@
 <section id="is-retryable-status-status-code">
 <h3><code class="docutils literal notranslate"><span class="pre">_is_retryable_status(status_code)</span></code><a class="headerlink" href="#is-retryable-status-status-code" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
+</section>
+<section id="is-retryable-error-exc">
+<h3><code class="docutils literal notranslate"><span class="pre">is_retryable_error(exc)</span></code><a class="headerlink" href="#is-retryable-error-exc" title="Link to this heading"></a></h3>
+<p>Return <code class="docutils literal notranslate"><span class="pre">True</span></code> when <code class="docutils literal notranslate"><span class="pre">exc</span></code> represents a retryable network failure.</p>
 </section>
 <section id="extract-correlation-id-logger">
 <h3><code class="docutils literal notranslate"><span class="pre">_extract_correlation_id(logger)</span></code><a class="headerlink" href="#extract-correlation-id-logger" title="Link to this heading"></a></h3>
@@ -322,10 +330,6 @@ None</p>
 </section>
 <section id="stream-once">
 <h3><code class="docutils literal notranslate"><span class="pre">_stream_once()</span></code><a class="headerlink" href="#stream-once" title="Link to this heading"></a></h3>
-<p><em>No documentation available.</em></p>
-</section>
-<section id="should-retry-exc">
-<h3><code class="docutils literal notranslate"><span class="pre">_should_retry(exc)</span></code><a class="headerlink" href="#should-retry-exc" title="Link to this heading"></a></h3>
 <p><em>No documentation available.</em></p>
 </section>
 <section id="retry-after-hint-exc">

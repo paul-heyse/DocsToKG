@@ -135,9 +135,8 @@ Raises:
 from __future__ import annotations
 
 import contextlib
-import hashlib
-import math
 import logging
+import math
 import random
 import threading
 import time
@@ -359,6 +358,7 @@ def _enforce_content_policy(
                         content_length=content_length,
                     )
 
+
 def request_with_retries(
     session: requests.Session,
     method: str,
@@ -428,7 +428,9 @@ def request_with_retries(
         if callable(fallback_method):
             return fallback_method(url, **call_kwargs)
         # pragma: no cover - defensive fall-back
-        raise AttributeError(f"Session object of type {type(session)!r} lacks usable HTTP callables.")
+        raise AttributeError(
+            f"Session object of type {type(session)!r} lacks usable HTTP callables."
+        )
 
     last_exception: Optional[Exception] = None
 

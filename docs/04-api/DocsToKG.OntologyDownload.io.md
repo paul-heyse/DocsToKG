@@ -52,6 +52,10 @@ Validate archive member paths to prevent traversal attacks.
 
 Ensure compressed archives do not expand beyond the permitted ratio.
 
+### `_enforce_uncompressed_ceiling()`
+
+Ensure uncompressed payload stays within configured limits.
+
 ### `extract_zip_safe(zip_path, destination)`
 
 Extract a ZIP archive while preventing traversal and compression bombs.
@@ -95,6 +99,10 @@ Emit debug-level memory usage snapshots when enabled.
 ### `_is_retryable_status(status_code)`
 
 *No documentation available.*
+
+### `is_retryable_error(exc)`
+
+Return ``True`` when ``exc`` represents a retryable network failure.
 
 ### `_extract_correlation_id(logger)`
 
@@ -257,10 +265,6 @@ None
 *No documentation available.*
 
 ### `_stream_once()`
-
-*No documentation available.*
-
-### `_should_retry(exc)`
 
 *No documentation available.*
 

@@ -101,6 +101,7 @@
 
 from __future__ import annotations
 
+import atexit
 import base64
 import binascii
 import hashlib
@@ -772,7 +773,6 @@ class HybridSearchService:
             self._observability.logger.exception("dense-strategy-persist-failed")
         self._executor.shutdown(wait=False)
 
-
     def search(self, request: HybridSearchRequest) -> HybridSearchResponse:
         """Execute a hybrid retrieval round trip for ``request``.
 
@@ -811,7 +811,9 @@ class HybridSearchService:
                 adapter_stats.resources if adapter_stats is not None else store_resources
             )
             device_hint = (
-                adapter_stats.device if adapter_stats is not None else getattr(dense_store, "device", 0)
+                adapter_stats.device
+                if adapter_stats is not None
+                else getattr(dense_store, "device", 0)
             )
             fp16_hint = (
                 bool(adapter_stats.fp16_enabled)
@@ -989,9 +991,7 @@ class HybridSearchService:
             paged_results = self._slice_from_cursor(
                 shaped, request.cursor, request.page_size, cursor_fingerprint
             )
-            next_cursor = self._build_cursor(
-                paged_results, request.page_size, cursor_fingerprint
-            )
+            next_cursor = self._build_cursor(paged_results, request.page_size, cursor_fingerprint)
             page_results = paged_results[: request.page_size]
             self._observability.logger.info(
                 "hybrid-search",
@@ -1124,9 +1124,7 @@ class HybridSearchService:
                 if result.vector_id != vector_id:
                     continue
                 score_match = (
-                    True
-                    if score is None or math.isnan(score)
-                    else abs(result.score - score) < 1e-6
+                    True if score is None or math.isnan(score) else abs(result.score - score) < 1e-6
                 )
                 rank_match = True if rank is None else result.fused_rank == rank
                 if score_match and rank_match:
@@ -1188,7 +1186,11 @@ class HybridSearchService:
                 }
             },
         )
-        return {"namespaces": summary, "elapsed_ms": elapsed_ms, "aggregate": after_snapshot.get("aggregate", {})}
+        return {
+            "namespaces": summary,
+            "elapsed_ms": elapsed_ms,
+            "aggregate": after_snapshot.get("aggregate", {}),
+        }
 
     def _execute_bm25(
         self,
@@ -1300,27 +1302,13 @@ class HybridSearchService:
             adapter_stats = store.adapter_stats  # type: ignore[attr-defined]
         except AttributeError:
             adapter_stats = None
-        store_resources = getattr(store, "get_gpu_resources", lambda: None)()
-        resources_hint = (
-            adapter_stats.resources if adapter_stats is not None else store_resources
-        )
-        device_hint = (
-            adapter_stats.device if adapter_stats is not None else getattr(store, "device", 0)
-        )
-        fp16_hint = (
-            bool(adapter_stats.fp16_enabled)
-            if adapter_stats is not None
-            else bool(getattr(getattr(store, "config", object()), "flat_use_fp16", False))
-        )
 
         score_floor = float(getattr(config.retrieval, "dense_score_floor", 0.0))
         use_score_floor = score_floor > 0.0
         use_range = bool(getattr(request, "recall_first", False) and use_score_floor)
         if use_range:
             hits = list(store.range_search(queries[0], score_floor, limit=None))
-            self._observability.metrics.observe(
-                "faiss_search_batch_size", 1.0, channel="dense"
-            )
+            self._observability.metrics.observe("faiss_search_batch_size", 1.0, channel="dense")
             filtered, payloads = self._filter_dense_hits(hits, filters, score_floor)
             observed = (len(filtered) / max(1, len(hits))) if hits else 0.0
             blended_pass = strategy.observe_pass_rate(signature, observed)
@@ -1627,9 +1615,11 @@ class HybridSearchAPI:
                         "bm25": result.diagnostics.bm25_score,
                         "splade": result.diagnostics.splade_score,
                         "dense": result.diagnostics.dense_score,
-                        "fusion_weights": dict(result.diagnostics.fusion_weights)
-                        if result.diagnostics.fusion_weights is not None
-                        else None,
+                        "fusion_weights": (
+                            dict(result.diagnostics.fusion_weights)
+                            if result.diagnostics.fusion_weights is not None
+                            else None
+                        ),
                     },
                 }
                 for result in response.results
@@ -2474,7 +2464,9 @@ class HybridSearchValidator:
                 perturb_hits += 1
 
             if resources is not None:
-                fp16_enabled = bool(adapter_stats.fp16_enabled) if adapter_stats is not None else False
+                fp16_enabled = (
+                    bool(adapter_stats.fp16_enabled) if adapter_stats is not None else False
+                )
                 _scores, indices_block = cosine_topk_blockwise(
                     query_vec,
                     vector_matrix,

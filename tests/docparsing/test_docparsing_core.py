@@ -828,7 +828,9 @@ def test_ensure_uuid_deterministic_generation() -> None:
     assert embedding.ensure_uuid(rows) is True
     generated = rows[0]["uuid"]
     assert uuid.UUID(generated).version == 5
-    assert generated == compute_chunk_uuid("teamA/report.doctags", 128, "Chunk content for reproducible UUID.")
+    assert generated == compute_chunk_uuid(
+        "teamA/report.doctags", 128, "Chunk content for reproducible UUID."
+    )
 
     replica_rows = [
         {

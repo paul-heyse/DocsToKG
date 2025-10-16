@@ -406,6 +406,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "compute-chunk-uuid",
+#       "name": "compute_chunk_uuid",
+#       "anchor": "function-compute-chunk-uuid",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "compute-content-hash",
 #       "name": "compute_content_hash",
 #       "anchor": "function-compute-content-hash",
@@ -594,8 +600,8 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import importlib
 import hashlib
+import importlib
 import json
 import logging
 import os
@@ -859,7 +865,9 @@ def _coerce_str_tuple(value: object, _base_dir: Optional[Path] = None) -> Tuple[
     if not text:
         return ()
     # Support JSON-style arrays for convenience
-    if (text.startswith("[") and text.endswith("]")) or (text.startswith("(") and text.endswith(")")):
+    if (text.startswith("[") and text.endswith("]")) or (
+        text.startswith("(") and text.endswith(")")
+    ):
         try:
             parsed = json.loads(text)
             if isinstance(parsed, (list, tuple, set)):
@@ -901,7 +909,9 @@ def load_config_mapping(path: Path) -> Dict[str, Any]:
     else:
         data = json.loads(raw)
     if not isinstance(data, dict):
-        raise ValueError(f"Stage configuration file {path} must contain an object; received {type(data).__name__}.")
+        raise ValueError(
+            f"Stage configuration file {path} must contain an object; received {type(data).__name__}."
+        )
     return data
 
 
@@ -2258,16 +2268,16 @@ def compute_chunk_uuid(
     selected_algorithm = resolve_hash_algorithm(algorithm)
     hasher = hashlib.new(selected_algorithm)
     hasher.update(safe_doc_id.encode("utf-8"))
-    hasher.update(b"\x1f")
+    hasher.update(bytes((0x1F,)))
     hasher.update(str(safe_offset).encode("utf-8"))
-    hasher.update(b"\x1f")
+    hasher.update(bytes((0x1F,)))
     hasher.update(normalised_text.encode("utf-8"))
     digest = hasher.digest()
     if len(digest) < 16:
         digest = (digest * ((16 // len(digest)) + 1))[:16]
     raw = bytearray(digest[:16])
-    raw[6] = (raw[6] & 0x0F) | 0x50  # version 5 (0101xxxx)
-    raw[8] = (raw[8] & 0x3F) | 0x80  # variant 10xxxxxx
+    raw[6] = (raw[6] & 0x0F) | 0x50  # set UUID version bits to 5
+    raw[8] = (raw[8] & 0x3F) | 0x80  # set UUID variant bits to RFC 4122
     return str(uuid.UUID(bytes=bytes(raw)))
 
 

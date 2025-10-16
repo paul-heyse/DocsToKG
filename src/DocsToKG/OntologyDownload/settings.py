@@ -142,6 +142,12 @@ class DownloadConfiguration(BaseModel):
         description="Token bucket style rate limit expressed as <number>/<unit>",
     )
     max_download_size_gb: float = Field(default=5.0, gt=0, le=100.0)
+    max_uncompressed_size_gb: float = Field(
+        default=10.0,
+        gt=0,
+        le=200.0,
+        description="Maximum allowed uncompressed archive size in gigabytes",
+    )
     concurrent_downloads: int = Field(default=1, ge=1, le=10)
     concurrent_plans: int = Field(default=8, ge=1, le=32)
     validate_media_type: bool = Field(default=True)
@@ -209,6 +215,16 @@ class DownloadConfiguration(BaseModel):
         if parsed is None:
             raise ValueError(f"Invalid rate limit format: {self.per_host_rate_limit}")
         return parsed
+
+    def max_download_bytes(self) -> int:
+        """Return the maximum allowed download payload size in bytes."""
+
+        return int(self.max_download_size_gb * (1024**3))
+
+    def max_uncompressed_bytes(self) -> int:
+        """Return the maximum allowed uncompressed archive size in bytes."""
+
+        return int(self.max_uncompressed_size_gb * (1024**3))
 
     def parse_service_rate_limit(self, service: str) -> Optional[float]:
         """Return service-specific rate limits expressed as requests per second."""
@@ -416,6 +432,9 @@ class EnvironmentOverrides(BaseSettings):
     shared_rate_limit_dir: Optional[Path] = Field(
         default=None, alias="ONTOFETCH_SHARED_RATE_LIMIT_DIR"
     )
+    max_uncompressed_size_gb: Optional[float] = Field(
+        default=None, alias="ONTOFETCH_MAX_UNCOMPRESSED_SIZE_GB"
+    )
 
     model_config = SettingsConfigDict(env_prefix="ONTOFETCH_", case_sensitive=False, extra="ignore")
 
@@ -470,6 +489,13 @@ def _apply_env_overrides(defaults: DefaultsConfig) -> None:
         logger.info(
             "Config overridden: shared_rate_limit_dir=%s",
             env.shared_rate_limit_dir,
+            extra={"stage": "config"},
+        )
+    if env.max_uncompressed_size_gb is not None:
+        defaults.http.max_uncompressed_size_gb = env.max_uncompressed_size_gb
+        logger.info(
+            "Config overridden: max_uncompressed_size_gb=%s",
+            env.max_uncompressed_size_gb,
             extra={"stage": "config"},
         )
 

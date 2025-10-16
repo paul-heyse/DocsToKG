@@ -57,4 +57,3 @@ class UserConfigError(RuntimeError):
 
 # Backwards compatibility alias used throughout the package.
 ConfigError = UserConfigError
-

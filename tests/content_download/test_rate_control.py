@@ -1,4 +1,3 @@
-from typing import Any, Iterable
 
 import pytest
 
@@ -43,7 +42,9 @@ def test_respect_domain_limit_enforces_bucket_and_interval(monkeypatch):
         domain_min_interval_s={"example.com": 1.0},
         domain_token_buckets={"example.com": {"rate_per_second": 1.0, "capacity": 1.0}},
     )
-    pipeline = ResolverPipeline([], config, lambda *args, **kwargs: None, _DummyLogger(), ResolverMetrics(), run_id="test")
+    pipeline = ResolverPipeline(
+        [], config, lambda *args, **kwargs: None, _DummyLogger(), ResolverMetrics(), run_id="test"
+    )
 
     waited_first = pipeline._respect_domain_limit("https://example.com/first")
     assert waited_first == 0.0

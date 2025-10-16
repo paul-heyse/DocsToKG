@@ -37,8 +37,8 @@ from DocsToKG.ContentDownload.core import (
     Classification,
     ReasonCode,
     atomic_write_text,
+    normalize_url,
 )
-from DocsToKG.ContentDownload.core import normalize_url
 
 MANIFEST_SCHEMA_VERSION = 2
 SQLITE_SCHEMA_VERSION = 2
@@ -245,9 +245,7 @@ class JsonlSink:
                 "reason": (
                     record.reason.value
                     if isinstance(record.reason, ReasonCode)
-                    else record.reason
-                    if record.reason is not None
-                    else None
+                    else record.reason if record.reason is not None else None
                 ),
                 "reason_detail": getattr(record, "reason_detail", None),
                 "metadata": record.metadata,
@@ -372,6 +370,7 @@ class RotatingJsonlSink(JsonlSink):
             self._file.write(line)
             self._file.flush()
 
+
 class CsvSink:
     """Lightweight sink that mirrors attempt records into a CSV for spreadsheet review."""
 
@@ -432,9 +431,7 @@ class CsvSink:
             "reason": (
                 record.reason.value
                 if isinstance(record.reason, ReasonCode)
-                else record.reason
-                if record.reason is not None
-                else None
+                else record.reason if record.reason is not None else None
             ),
             "reason_detail": getattr(record, "reason_detail", None) or "",
             "sha256": record.sha256,
@@ -790,9 +787,7 @@ class SqliteSink:
                     (
                         record.reason.value
                         if isinstance(record.reason, ReasonCode)
-                        else record.reason
-                        if record.reason is not None
-                        else None
+                        else record.reason if record.reason is not None else None
                     ),
                     getattr(record, "reason_detail", None),
                     metadata_json,

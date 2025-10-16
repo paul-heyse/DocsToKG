@@ -71,6 +71,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "legacy-chunk-uuid",
+#       "name": "_legacy_chunk_uuid",
+#       "anchor": "function-legacy-chunk-uuid",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "ensure-chunk-schema",
 #       "name": "ensure_chunk_schema",
 #       "anchor": "function-ensure-chunk-schema",
@@ -273,25 +279,26 @@ import unicodedata
 import uuid
 from collections import Counter
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, fields
 from pathlib import Path
 from types import SimpleNamespace
-from dataclasses import dataclass, fields
 from typing import Any, Callable, ClassVar, Dict, Iterator, List, Optional, Sequence, Tuple
 
 # Third-party imports
 from tqdm import tqdm
 
 from DocsToKG.DocParsing.core import (
+    DEFAULT_TOKENIZER,
     UUID_NAMESPACE,
     Batcher,
     BM25Stats,
-    StageConfigBase,
+    CLIOption,
     QwenCfg,
     SpladeCfg,
-    CLIOption,
-    build_subcommand,
+    StageConfigBase,
     acquire_lock,
     atomic_write,
+    build_subcommand,
     compute_chunk_uuid,
     compute_content_hash,
     compute_stable_shard,
@@ -312,7 +319,6 @@ from DocsToKG.DocParsing.core import (
     manifest_log_skip,
     manifest_log_success,
     prepare_data_root,
-    DEFAULT_TOKENIZER,
     resolve_pipeline_path,
     should_skip_output,
 )
@@ -500,10 +506,42 @@ DEFAULT_VECTORS_DIR = data_vectors(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "embeddings"
 SPLADE_SPARSITY_WARN_THRESHOLD_PCT = 1.0
 
+EMBED_PROFILE_PRESETS: Dict[str, Dict[str, Any]] = {
+    "cpu-small": {
+        "batch_size_splade": 8,
+        "batch_size_qwen": 16,
+        "files_parallel": 1,
+        "offline": True,
+    },
+    "gpu-default": {
+        "batch_size_splade": 32,
+        "batch_size_qwen": 64,
+        "files_parallel": 1,
+        "offline": False,
+    },
+    "gpu-max": {
+        "batch_size_splade": 64,
+        "batch_size_qwen": 128,
+        "files_parallel": 4,
+        "tp": 2,
+        "offline": False,
+    },
+}
+
+
 EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     CLIOption(
         ("--config",),
         {"type": Path, "default": None, "help": "Path to stage config file (JSON/YAML/TOML)."},
+    ),
+    CLIOption(
+        ("--profile",),
+        {
+            "type": str,
+            "default": None,
+            "choices": sorted(EMBED_PROFILE_PRESETS),
+            "help": "Preset for batch sizes and parallelism (cpu-small, gpu-default, gpu-max).",
+        },
     ),
     CLIOption(
         ("--log-level",),
@@ -514,14 +552,25 @@ EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
             "help": "Logging verbosity for console output (default: %(default)s).",
         },
     ),
-    CLIOption(("--no-cache",), {"action": "store_true", "help": "Disable Qwen LLM caching between batches (debug)."}),
+    CLIOption(
+        ("--no-cache",),
+        {"action": "store_true", "help": "Disable Qwen LLM caching between batches (debug)."},
+    ),
     CLIOption(
         ("--shard-count",),
-        {"type": int, "default": 1, "help": "Total number of shards for distributed runs (default: %(default)s)."},
+        {
+            "type": int,
+            "default": 1,
+            "help": "Total number of shards for distributed runs (default: %(default)s).",
+        },
     ),
     CLIOption(
         ("--shard-index",),
-        {"type": int, "default": 0, "help": "Zero-based shard index to process (default: %(default)s)."},
+        {
+            "type": int,
+            "default": 0,
+            "help": "Zero-based shard index to process (default: %(default)s).",
+        },
     ),
     CLIOption(("--chunks-dir",), {"type": Path, "default": DEFAULT_CHUNKS_DIR}),
     CLIOption(("--out-dir",), {"type": Path, "default": DEFAULT_VECTORS_DIR}),
@@ -608,7 +657,11 @@ EMBED_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     ),
     CLIOption(
         ("--files-parallel",),
-        {"type": int, "default": 1, "help": "Process up to N chunk files concurrently during embedding (default: 1 for serial runs)."},
+        {
+            "type": int,
+            "default": 1,
+            "help": "Process up to N chunk files concurrently during embedding (default: 1 for serial runs).",
+        },
     ),
     CLIOption(
         ("--validate-only",),
@@ -764,9 +817,7 @@ class EmbedCfg(StageConfigBase):
                 self.splade_model_dir, None
             )
         if self.qwen_model_dir is not None:
-            self.qwen_model_dir = StageConfigBase._coerce_optional_path(
-                self.qwen_model_dir, None
-            )
+            self.qwen_model_dir = StageConfigBase._coerce_optional_path(self.qwen_model_dir, None)
         if self.config is not None:
             self.config = StageConfigBase._coerce_optional_path(self.config, None)
         self.log_level = str(self.log_level).upper()
@@ -779,6 +830,7 @@ class EmbedCfg(StageConfigBase):
         self.resume = bool(self.resume)
         self.force = bool(self.force)
         self.no_cache = bool(self.no_cache)
+
 
 def _ensure_splade_dependencies() -> None:
     """Backward-compatible shim that delegates to core.ensure_splade_dependencies."""
@@ -1526,7 +1578,9 @@ def create_vector_writer(path: Path, fmt: str) -> JsonlVectorWriter:
     if fmt_normalized == "jsonl":
         return JsonlVectorWriter(path)
     if fmt_normalized == "parquet":
-        raise NotImplementedError("Parquet vector output is not yet implemented; use --format jsonl.")
+        raise NotImplementedError(
+            "Parquet vector output is not yet implemented; use --format jsonl."
+        )
     raise ValueError(f"Unsupported vector format: {fmt}")
 
 
@@ -1570,7 +1624,9 @@ def process_chunk_file_vectors(
     nnz_all: List[int] = []
     norms_all: List[float] = []
 
-    with create_vector_writer(resolved_out_path, str(getattr(args, "vector_format", "jsonl"))) as writer:
+    with create_vector_writer(
+        resolved_out_path, str(getattr(args, "vector_format", "jsonl"))
+    ) as writer:
         for rows in iter_rows_in_batches(chunk_file, batch_size):
             if not rows:
                 continue
@@ -1913,13 +1969,27 @@ def main(args: argparse.Namespace | None = None) -> int:
     else:
         namespace = parser.parse_args(args)
 
-    cfg = EmbedCfg.from_args(namespace)
+    profile = getattr(namespace, "profile", None)
+    defaults = EMBED_PROFILE_PRESETS.get(profile or "", {})
+    cfg = EmbedCfg.from_args(namespace, defaults=defaults)
     config_snapshot = cfg.to_manifest()
+    if profile:
+        config_snapshot.setdefault("profile", profile)
     for field_def in fields(EmbedCfg):
         setattr(namespace, field_def.name, getattr(cfg, field_def.name))
 
     log_level = cfg.log_level
     logger = get_logger(__name__, level=str(log_level))
+    if profile and defaults:
+        logger.info(
+            "Applying profile",
+            extra={
+                "extra_fields": {
+                    "profile": profile,
+                    **{key: defaults[key] for key in sorted(defaults)},
+                }
+            },
+        )
     args = namespace
     offline_mode = bool(cfg.offline)
 
@@ -1945,7 +2015,9 @@ def main(args: argparse.Namespace | None = None) -> int:
             "Vector format not implemented",
             vector_format=vector_format,
         )
-        raise NotImplementedError("Parquet vector output is not yet implemented; use --format jsonl.")
+        raise NotImplementedError(
+            "Parquet vector output is not yet implemented; use --format jsonl."
+        )
     cfg.vector_format = vector_format
     args.vector_format = vector_format
 
@@ -2034,6 +2106,8 @@ def main(args: argparse.Namespace | None = None) -> int:
         resolver=data_vectors,
     ).resolve()
 
+    requested_parallel = max(1, int(cfg.files_parallel or 1))
+
     config_snapshot.update(
         {
             "data_root": str(resolved_root),
@@ -2107,25 +2181,24 @@ def main(args: argparse.Namespace | None = None) -> int:
 
     args.out_dir = out_dir
 
-    requested_parallel = max(1, int(cfg.files_parallel or 1))
-
     logger.info(
         "Embedding configuration",
         extra={
-        "extra_fields": {
-            "data_root": str(resolved_root),
-            "chunks_dir": str(chunks_dir),
-            "embeddings_dir": str(out_dir),
-            "splade_model_dir": str(splade_model_dir),
-            "qwen_model_dir": str(qwen_model_dir),
-            "offline": offline_mode,
-            "requested_files_parallel": requested_parallel,
-            "shard_count": shard_count,
-            "shard_index": shard_index,
-            "vector_format": vector_format,
-            "qwen_cache_enabled": not bool(cfg.no_cache),
-            "sparsity_warn_threshold_pct": float(cfg.sparsity_warn_threshold_pct),
-            "sparsity_report_top_n": int(cfg.sparsity_report_top_n),
+            "extra_fields": {
+                "data_root": str(resolved_root),
+                "chunks_dir": str(chunks_dir),
+                "embeddings_dir": str(out_dir),
+                "splade_model_dir": str(splade_model_dir),
+                "qwen_model_dir": str(qwen_model_dir),
+                "offline": offline_mode,
+                "requested_files_parallel": requested_parallel,
+                "shard_count": shard_count,
+                "shard_index": shard_index,
+                "vector_format": vector_format,
+                "qwen_cache_enabled": not bool(cfg.no_cache),
+                "sparsity_warn_threshold_pct": float(cfg.sparsity_warn_threshold_pct),
+                "sparsity_report_top_n": int(cfg.sparsity_report_top_n),
+                "profile": profile,
             }
         },
     )

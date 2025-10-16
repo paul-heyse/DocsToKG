@@ -47,6 +47,12 @@
 #       "kind": "function"
 #     },
 #     {
+#       "id": "extract-chunk-start",
+#       "name": "_extract_chunk_start",
+#       "anchor": "function-extract-chunk-start",
+#       "kind": "function"
+#     },
+#     {
 #       "id": "rec",
 #       "name": "Rec",
 #       "anchor": "class-rec",
@@ -149,7 +155,7 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable, ClassVar, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Sequence, Tuple
 
 # Third-party imports
 from docling_core.transforms.chunker.base import BaseChunk
@@ -177,31 +183,32 @@ __all__ = (
 )
 
 from DocsToKG.DocParsing.core import (
-    DEFAULT_SERIALIZER_PROVIDER,
-    DEFAULT_TOKENIZER,
-    StageConfigBase,
     DEFAULT_CAPTION_MARKERS,
     DEFAULT_HEADING_MARKERS,
-    CLIOption,
-    build_subcommand,
+    DEFAULT_SERIALIZER_PROVIDER,
+    DEFAULT_TOKENIZER,
     ChunkResult,
     ChunkTask,
     ChunkWorkerConfig,
+    CLIOption,
+    StageConfigBase,
     acquire_lock,
     atomic_write,
+    build_subcommand,
     compute_chunk_uuid,
     compute_content_hash,
     compute_relative_doc_id,
     compute_stable_shard,
     data_chunks,
     data_doctags,
-    detect_data_root,
     dedupe_preserve_order,
     derive_doc_id_and_chunks_path,
+    detect_data_root,
     ensure_model_environment,
     get_logger,
     iter_doctags,
     load_manifest_index,
+    load_structural_marker_config,
     log_event,
     manifest_log_failure,
     manifest_log_skip,
@@ -210,7 +217,6 @@ from DocsToKG.DocParsing.core import (
     resolve_pipeline_path,
     set_spawn_or_warn,
     should_skip_output,
-    load_structural_marker_config,
 )
 from DocsToKG.DocParsing.doctags import (
     add_data_root_option,
@@ -400,10 +406,43 @@ class ChunkerCfg(StageConfigBase):
         self.serializer_provider = str(self.serializer_provider)
 
     from_sources = from_args
+
+
+CHUNK_PROFILE_PRESETS: Dict[str, Dict[str, Any]] = {
+    "cpu-small": {
+        "workers": 1,
+        "min_tokens": 128,
+        "max_tokens": 256,
+        "soft_barrier_margin": 24,
+    },
+    "gpu-default": {
+        "workers": 1,
+        "min_tokens": 256,
+        "max_tokens": 512,
+        "soft_barrier_margin": SOFT_BARRIER_MARGIN,
+    },
+    "gpu-max": {
+        "workers": max(1, (os.cpu_count() or 16) - 2),
+        "min_tokens": 256,
+        "max_tokens": 768,
+        "soft_barrier_margin": max(32, SOFT_BARRIER_MARGIN * 2),
+    },
+}
+
+
 CHUNK_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     CLIOption(
         ("--config",),
         {"type": Path, "default": None, "help": "Path to stage config file (JSON/YAML/TOML)."},
+    ),
+    CLIOption(
+        ("--profile",),
+        {
+            "type": str,
+            "default": None,
+            "choices": sorted(CHUNK_PROFILE_PRESETS),
+            "help": "Preset for workers/token windows (cpu-small, gpu-default, gpu-max).",
+        },
     ),
     CLIOption(("--in-dir",), {"type": Path, "default": DEFAULT_IN_DIR}),
     CLIOption(("--out-dir",), {"type": Path, "default": DEFAULT_OUT_DIR}),
@@ -420,11 +459,19 @@ CHUNK_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     ),
     CLIOption(
         ("--shard-count",),
-        {"type": int, "default": 1, "help": "Total number of shards for distributed runs (default: %(default)s)."},
+        {
+            "type": int,
+            "default": 1,
+            "help": "Total number of shards for distributed runs (default: %(default)s).",
+        },
     ),
     CLIOption(
         ("--shard-index",),
-        {"type": int, "default": 0, "help": "Zero-based shard index to process (default: %(default)s)."},
+        {
+            "type": int,
+            "default": 0,
+            "help": "Zero-based shard index to process (default: %(default)s).",
+        },
     ),
     CLIOption(
         ("--tokenizer-model",),
@@ -439,7 +486,11 @@ CHUNK_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     ),
     CLIOption(
         ("--soft-barrier-margin",),
-        {"type": int, "default": SOFT_BARRIER_MARGIN, "help": "Token margin applied when respecting structural boundaries (default: 64)."},
+        {
+            "type": int,
+            "default": SOFT_BARRIER_MARGIN,
+            "help": "Token margin applied when respecting structural boundaries (default: 64).",
+        },
     ),
     CLIOption(
         ("--structural-markers",),
@@ -469,11 +520,18 @@ CHUNK_CLI_OPTIONS: Tuple[CLIOption, ...] = (
     ),
     CLIOption(
         ("--workers",),
-        {"type": int, "default": 1, "help": "Number of worker processes for chunking (default: 1)."},
+        {
+            "type": int,
+            "default": 1,
+            "help": "Number of worker processes for chunking (default: 1).",
+        },
     ),
     CLIOption(
         ("--validate-only",),
-        {"action": "store_true", "help": "Validate chunk files and exit without producing new outputs."},
+        {
+            "action": "store_true",
+            "help": "Validate chunk files and exit without producing new outputs.",
+        },
     ),
 )
 
@@ -589,9 +647,7 @@ def summarize_image_metadata(
             cloned: Dict[str, Any] = {}
             for key, value in entry.items():
                 if isinstance(value, list):
-                    cloned[key] = [
-                        dict(item) if isinstance(item, dict) else item for item in value
-                    ]
+                    cloned[key] = [dict(item) if isinstance(item, dict) else item for item in value]
                 elif isinstance(value, dict):
                     cloned[key] = dict(value)
                 else:
@@ -1217,13 +1273,27 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
     else:
         namespace = parser.parse_args(args)
 
-    cfg = ChunkerCfg.from_args(namespace)
+    profile = getattr(namespace, "profile", None)
+    defaults = CHUNK_PROFILE_PRESETS.get(profile or "", {})
+    cfg = ChunkerCfg.from_args(namespace, defaults=defaults)
     config_snapshot = cfg.to_manifest()
+    if profile:
+        config_snapshot.setdefault("profile", profile)
     for field_def in fields(ChunkerCfg):
         setattr(namespace, field_def.name, getattr(cfg, field_def.name))
 
     log_level = getattr(namespace, "log_level", "INFO")
     logger = get_logger(__name__, level=str(log_level))
+    if profile and defaults:
+        logger.info(
+            "Applying profile",
+            extra={
+                "extra_fields": {
+                    "profile": profile,
+                    **{key: defaults[key] for key in sorted(defaults)},
+                }
+            },
+        )
     set_spawn_or_warn(logger)
     args = namespace
 
@@ -1377,9 +1447,7 @@ def main(args: argparse.Namespace | SimpleNamespace | Sequence[str] | None = Non
         selected_files = [
             path
             for path in files
-            if compute_stable_shard(
-                compute_relative_doc_id(path, in_dir), args.shard_count
-            )
+            if compute_stable_shard(compute_relative_doc_id(path, in_dir), args.shard_count)
             == args.shard_index
         ]
         logger.info(

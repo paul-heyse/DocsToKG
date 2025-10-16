@@ -302,18 +302,18 @@ import argparse
 import json
 import logging
 import math
+import os
 import random
 import re
 import threading
 import time as _time
-import os
 import warnings
 import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 from pathlib import Path
-from threading import Lock, BoundedSemaphore
+from threading import BoundedSemaphore, Lock
 from types import MappingProxyType
 from typing import (
     TYPE_CHECKING,
@@ -342,10 +342,10 @@ from DocsToKG.ContentDownload.core import (
     Classification,
     ReasonCode,
     dedupe,
-    parse_size,
     normalize_doi,
     normalize_pmcid,
     normalize_url,
+    parse_size,
     strip_prefix,
 )
 from DocsToKG.ContentDownload.networking import (
@@ -508,7 +508,9 @@ def _normalise_domain_content_rules(data: Mapping[str, Any]) -> Dict[str, Dict[s
         if "max_bytes" in raw_spec and raw_spec["max_bytes"] is not None:
             raw_limit = raw_spec["max_bytes"]
             try:
-                limit_value = parse_size(raw_limit) if isinstance(raw_limit, str) else int(raw_limit)
+                limit_value = (
+                    parse_size(raw_limit) if isinstance(raw_limit, str) else int(raw_limit)
+                )
             except (TypeError, ValueError) as exc:
                 raise ValueError(
                     (
@@ -1272,11 +1274,7 @@ class ResolverMetrics:
             if reason_code is None and outcome.classification not in PDF_LIKE:
                 reason_code = ReasonCode.from_wire(classification_key)
             if reason_code:
-                key = (
-                    reason_code.value
-                    if isinstance(reason_code, ReasonCode)
-                    else str(reason_code)
-                )
+                key = reason_code.value if isinstance(reason_code, ReasonCode) else str(reason_code)
                 self.error_reasons[resolver_name][key] += 1
 
     def record_skip(self, resolver_name: str, reason: str) -> None:

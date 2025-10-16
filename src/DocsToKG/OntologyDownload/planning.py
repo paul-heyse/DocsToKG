@@ -11,7 +11,7 @@ import tempfile
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple
@@ -28,6 +28,7 @@ except ImportError:  # pragma: no cover - non-windows
     msvcrt = None  # type: ignore[assignment]
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import requests
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
@@ -45,8 +46,6 @@ from .io import (
     download_stream,
     extract_archive_safe,
     generate_correlation_id,
-    get_bucket,
-    retry_with_backoff,
     sanitize_filename,
     validate_url_security,
 )
@@ -61,7 +60,6 @@ from .resolvers import (
     OBOResolver,
     OLSResolver,
     OntobeeResolver,
-    Resolver,
     ResolverCandidate,
     SKOSResolver,
     XBRLResolver,
@@ -75,7 +73,6 @@ from .settings import (
     DefaultsConfig,
     DownloadConfiguration,
     ResolvedConfig,
-    UserConfigError,
     _coerce_sequence,
     ensure_python_version,
 )
@@ -1652,7 +1649,10 @@ def fetch_one(
                     extraction_dir = destination.parent / f"{destination.stem}_extracted"
                     try:
                         extracted_paths = extract_archive_safe(
-                            destination, extraction_dir, logger=adapter
+                            destination,
+                            extraction_dir,
+                            logger=adapter,
+                            max_uncompressed_bytes=active_config.defaults.http.max_uncompressed_bytes(),
                         )
                         artifacts.extend(str(path) for path in extracted_paths)
                     except ConfigError as exc:

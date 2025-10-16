@@ -282,10 +282,10 @@
 from __future__ import annotations
 
 import argparse
-import logging
 import hashlib as _hashlib
 import importlib.util
 import json
+import logging
 import os
 import re
 import shutil
@@ -316,6 +316,7 @@ from .io import (
     sanitize_filename,
     validate_url_security,
 )
+from .logging_utils import setup_logging
 from .planning import (
     MANIFEST_JSON_SCHEMA,
     MANIFEST_SCHEMA_VERSION,
@@ -337,7 +338,6 @@ from .planning import (
     plan_one,
     validate_manifest_dict,
 )
-from .logging_utils import setup_logging
 from .settings import (
     CACHE_DIR,
     CONFIG_DIR,
@@ -1134,6 +1134,7 @@ EXAMPLE_SOURCES_YAML = """# Example configuration for ontology downloader\ndefau
     backoff_factor: 0.5
     per_host_rate_limit: "4/second"
     max_download_size_gb: 5
+    max_uncompressed_size_gb: 10
     validate_media_type: true
   validation:
     skip_reasoning_if_size_mb: 500
@@ -1565,9 +1566,7 @@ def _specs_from_lock_payload(
         indexed = {entry.get("id"): entry for entry in entries if isinstance(entry, dict)}
         missing = sorted(requested - set(indexed))
         if missing:
-            raise ConfigError(
-                f"Lock file does not contain entries for: {', '.join(missing)}"
-            )
+            raise ConfigError(f"Lock file does not contain entries for: {', '.join(missing)}")
         selected = [indexed[oid] for oid in requested_ids]
     else:
         selected = [entry for entry in entries if isinstance(entry, dict)]

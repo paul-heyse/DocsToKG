@@ -125,8 +125,8 @@ from typing import Callable, Dict, Iterator, List, Mapping, Optional, Sequence
 import numpy as np
 
 from .config import DenseIndexConfig
-from .opensearch_simulator import OpenSearchSimulator
 from .interfaces import DenseVectorStore
+from .opensearch_simulator import OpenSearchSimulator
 from .pipeline import Observability
 from .types import ChunkPayload, vector_uuid_to_faiss_int
 
@@ -576,7 +576,9 @@ class FaissVectorStore(DenseVectorStore):
                 try:
                     distances, indices = self._search_matrix(matrix, 1)
                 except Exception:
-                    logger.debug("ingest dedupe check failed; proceeding without filter", exc_info=True)
+                    logger.debug(
+                        "ingest dedupe check failed; proceeding without filter", exc_info=True
+                    )
                 else:
                     keep_mask = []
                     for idx, score in zip(indices.ravel(), distances.ravel()):
@@ -800,9 +802,7 @@ class FaissVectorStore(DenseVectorStore):
                     scored = scored[: int(limit)]
                 for score, vector_id in scored:
                     results.append(FaissSearchResult(vector_id=vector_id, score=float(score)))
-                self._observability.metrics.observe(
-                    "faiss_range_results", float(len(results))
-                )
+                self._observability.metrics.observe("faiss_range_results", float(len(results)))
             return results
         finally:
             self._release_pinned_buffers()

@@ -953,6 +953,21 @@ def test_extract_zip_rejects_symlink(tmp_path):
         download.extract_zip_safe(archive, tmp_path / "out")
 
 
+def test_extract_zip_enforces_uncompressed_limit(tmp_path):
+    archive = tmp_path / "limited.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr("file.txt", b"a" * (2 * 1024 * 1024))
+
+    with pytest.raises(ConfigError) as exc_info:
+        download.extract_zip_safe(
+            archive,
+            tmp_path / "limit_out",
+            max_uncompressed_bytes=1 * 1024 * 1024,
+        )
+
+    assert "exceeding configured ceiling" in str(exc_info.value)
+
+
 # --- Helper Functions ---
 
 
@@ -996,6 +1011,21 @@ def test_extract_tar_rejects_absolute(tmp_path):
 
     with pytest.raises(ConfigError):
         download.extract_tar_safe(archive, tmp_path / "out")
+
+
+def test_extract_tar_enforces_uncompressed_limit(tmp_path):
+    archive = tmp_path / "limited.tar.gz"
+    info = tarfile.TarInfo("huge.bin")
+    data = b"b" * (3 * 1024 * 1024)
+    info.size = len(data)
+    _make_tarfile(archive, [(info, data)])
+
+    with pytest.raises(ConfigError):
+        download.extract_tar_safe(
+            archive,
+            tmp_path / "tar_limit",
+            max_uncompressed_bytes=1 * 1024 * 1024,
+        )
 
 
 def test_extract_tar_rejects_symlink(tmp_path):

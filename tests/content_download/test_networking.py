@@ -596,8 +596,6 @@ import pytest
 import requests
 
 from DocsToKG.ContentDownload import cli as downloader
-from DocsToKG.ContentDownload.core import Classification, ReasonCode
-from DocsToKG.ContentDownload.core import classify_payload
 from DocsToKG.ContentDownload.cli import (
     DEFAULT_MIN_PDF_BYTES,
     DEFAULT_SNIFF_BYTES,
@@ -607,6 +605,16 @@ from DocsToKG.ContentDownload.cli import (
     _build_download_outcome,
     download_candidate,
     process_one_work,
+)
+from DocsToKG.ContentDownload.core import (
+    Classification,
+    ReasonCode,
+    classify_payload,
+    dedupe,
+    normalize_doi,
+    normalize_pmcid,
+    normalize_url,
+    strip_prefix,
 )
 from DocsToKG.ContentDownload.networking import (
     CachedResult,
@@ -627,13 +635,6 @@ from DocsToKG.ContentDownload.pipeline import (
     WaybackResolver,
 )
 from DocsToKG.ContentDownload.telemetry import JsonlSink, SqliteSink, load_manifest_url_index
-from DocsToKG.ContentDownload.core import (
-    dedupe,
-    normalize_doi,
-    normalize_pmcid,
-    normalize_url,
-    strip_prefix,
-)
 
 # --- test_conditional_requests.py ---
 
@@ -3054,7 +3055,9 @@ def test_manifest_and_attempts_single_success(tmp_path: Path) -> None:
         resolver_toggles={"stub": True},
         enable_head_precheck=False,
     )
-    pipeline = ResolverPipeline([StubResolver()], config, fake_download, logger, metrics, run_id="test-run")
+    pipeline = ResolverPipeline(
+        [StubResolver()], config, fake_download, logger, metrics, run_id="test-run"
+    )
 
     options = DownloadOptions(
         dry_run=False,
@@ -3165,7 +3168,9 @@ def test_domain_bytes_budget_skips_over_limit(tmp_path: Path) -> None:
         enable_global_url_dedup=False,
         domain_bytes_budget={"resolver.example": 5},
     )
-    pipeline = ResolverPipeline([StubResolver()], config, fake_download, logger, metrics, run_id="test-run")
+    pipeline = ResolverPipeline(
+        [StubResolver()], config, fake_download, logger, metrics, run_id="test-run"
+    )
 
     options = DownloadOptions(
         dry_run=False,
@@ -3253,7 +3258,9 @@ def test_retry_after_updates_breakers(tmp_path: Path) -> None:
             }
         },
     )
-    pipeline = ResolverPipeline([StubResolver()], config, lambda *args, **kwargs: None, logger, metrics, run_id="test-run")
+    pipeline = ResolverPipeline(
+        [StubResolver()], config, lambda *args, **kwargs: None, logger, metrics, run_id="test-run"
+    )
 
     outcome = DownloadOutcome(
         classification=Classification.HTTP_ERROR,

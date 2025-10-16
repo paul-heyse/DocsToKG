@@ -92,9 +92,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
-import shutil
 from typing import Dict, List, Optional
 
 import pytest
@@ -940,9 +940,7 @@ def test_fetch_records_expected_checksum_and_index(
     assert first_entry["size"] == len(payload)
 
 
-def test_fetch_mirrors_cas_when_enabled(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_fetch_mirrors_cas_when_enabled(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     payload = b"ontology"
     digest = hashlib.sha256(payload).hexdigest()
 
@@ -995,7 +993,9 @@ def test_fetch_mirrors_cas_when_enabled(
             return path
 
         def mirror_cas_artifact(self, algorithm: str, checksum: str, source: Path) -> Path:
-            cas_path = cas_dir / f"by-{algorithm.lower()}" / checksum[:2] / f"{checksum}{source.suffix}"
+            cas_path = (
+                cas_dir / f"by-{algorithm.lower()}" / checksum[:2] / f"{checksum}{source.suffix}"
+            )
             cas_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, cas_path)
             return cas_path
@@ -1037,7 +1037,9 @@ def test_fetch_mirrors_cas_when_enabled(
             RESOLVERS.pop("direct", None)
 
     manifest_data = json.loads(results[0].manifest_path.read_text())
-    cas_artifacts = [path for path in manifest_data["artifacts"] if path.endswith(".owl") and "by-" in path]
+    cas_artifacts = [
+        path for path in manifest_data["artifacts"] if path.endswith(".owl") and "by-" in path
+    ]
     assert cas_artifacts, "expected CAS artifact entry"
 
     index_path = ontology_dir / spec.id / "index.json"

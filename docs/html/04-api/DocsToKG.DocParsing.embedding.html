@@ -161,14 +161,16 @@ Absolute path derived from <code class="docutils literal notranslate"><span clas
 </section>
 <section id="ensure-uuid-rows">
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_uuid(rows)</span></code><a class="headerlink" href="#ensure-uuid-rows" title="Link to this heading"></a></h3>
-<p>Populate missing chunk UUIDs in-place using deterministic UUIDv5 derivation.</p>
+<p>Validate or assign deterministic chunk UUIDs based on content offsets.</p>
 <p>Args:
-rows: Chunk dictionaries that should include a <code class="docutils literal notranslate"><span class="pre">uuid</span></code> key.</p>
+rows: Chunk dictionaries to normalise. Each row may include <code class="docutils literal notranslate"><span class="pre">start_offset</span></code>
+(preferred); when absent the legacy UUID derivation is applied.</p>
 <p>Returns:
-True when at least one UUID was newly assigned; otherwise False. UUIDs are
-derived from a namespace, doc ID, source chunk indices, and the first 16 hex
-characters of the chunk text SHA-1 digest. If deterministic generation fails,
-a UUID4 is assigned as a fallback.</p>
+<code class="docutils literal notranslate"><span class="pre">True</span></code> when at least one UUID was added or corrected; otherwise <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
+</section>
+<section id="legacy-chunk-uuid-doc-id-source-chunk-idxs-text-value">
+<h3><code class="docutils literal notranslate"><span class="pre">_legacy_chunk_uuid(doc_id,</span> <span class="pre">source_chunk_idxs,</span> <span class="pre">text_value)</span></code><a class="headerlink" href="#legacy-chunk-uuid-doc-id-source-chunk-idxs-text-value" title="Link to this heading"></a></h3>
+<p>Derive the historical UUID used before deterministic start offsets.</p>
 </section>
 <section id="ensure-chunk-schema-rows-source">
 <h3><code class="docutils literal notranslate"><span class="pre">ensure_chunk_schema(rows,</span> <span class="pre">source)</span></code><a class="headerlink" href="#ensure-chunk-schema-rows-source" title="Link to this heading"></a></h3>

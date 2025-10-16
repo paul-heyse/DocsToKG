@@ -693,6 +693,18 @@ default: Fallback algorithm name to use when no override is present.</p>
 <p>Returns:
 Hash algorithm identifier resolved from <code class="docutils literal notranslate"><span class="pre">DOCSTOKG_HASH_ALG</span></code> or <code class="docutils literal notranslate"><span class="pre">default</span></code>.</p>
 </section>
+<section id="compute-chunk-uuid-doc-id-start-offset-text">
+<h3><code class="docutils literal notranslate"><span class="pre">compute_chunk_uuid(doc_id,</span> <span class="pre">start_offset,</span> <span class="pre">text)</span></code><a class="headerlink" href="#compute-chunk-uuid-doc-id-start-offset-text" title="Link to this heading"></a></h3>
+<p>Derive a deterministic UUID for a chunk using doc ID, offset, and text content.</p>
+<p>Args:
+doc_id: Identifier for the source document (used as a namespace component).
+start_offset: Character offset of the chunk text within the document.
+text: Chunk text used for content-based stability.
+algorithm: Hash algorithm name; defaults to <code class="docutils literal notranslate"><span class="pre">sha1</span></code> but honours
+:envvar:<code class="docutils literal notranslate"><span class="pre">DOCSTOKG_HASH_ALG</span></code> overrides.</p>
+<p>Returns:
+UUID string derived from the hash digest while enforcing RFC4122 metadata bits.</p>
+</section>
 <section id="compute-content-hash-path-algorithm">
 <h3><code class="docutils literal notranslate"><span class="pre">compute_content_hash(path,</span> <span class="pre">algorithm)</span></code><a class="headerlink" href="#compute-content-hash-path-algorithm" title="Link to this heading"></a></h3>
 <p>Compute a content hash for <code class="docutils literal notranslate"><span class="pre">path</span></code> using the requested algorithm.</p>

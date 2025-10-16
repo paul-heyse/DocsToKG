@@ -241,8 +241,7 @@ import requests
 
 from DocsToKG.ContentDownload import cli as downloader
 from DocsToKG.ContentDownload import pipeline as resolvers
-from DocsToKG.ContentDownload.core import Classification
-from DocsToKG.ContentDownload.core import WorkArtifact
+from DocsToKG.ContentDownload.core import Classification, WorkArtifact
 from DocsToKG.ContentDownload.pipeline import (
     AttemptRecord,
     DownloadOutcome,
@@ -1177,8 +1176,8 @@ def test_real_network_download(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     metrics = ResolverMetrics()
     logger = MemoryLogger([])
 
-    from DocsToKG.ContentDownload.networking import create_session
     from DocsToKG.ContentDownload.cli import download_candidate
+    from DocsToKG.ContentDownload.networking import create_session
 
     session = create_session({"User-Agent": "DocsToKG-Test/1.0"})
     try:

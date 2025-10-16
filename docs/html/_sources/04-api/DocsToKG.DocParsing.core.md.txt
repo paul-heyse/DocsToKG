@@ -591,6 +591,20 @@ default: Fallback algorithm name to use when no override is present.
 Returns:
 Hash algorithm identifier resolved from ``DOCSTOKG_HASH_ALG`` or ``default``.
 
+### `compute_chunk_uuid(doc_id, start_offset, text)`
+
+Derive a deterministic UUID for a chunk using doc ID, offset, and text content.
+
+Args:
+doc_id: Identifier for the source document (used as a namespace component).
+start_offset: Character offset of the chunk text within the document.
+text: Chunk text used for content-based stability.
+algorithm: Hash algorithm name; defaults to ``sha1`` but honours
+:envvar:`DOCSTOKG_HASH_ALG` overrides.
+
+Returns:
+UUID string derived from the hash digest while enforcing RFC4122 metadata bits.
+
 ### `compute_content_hash(path, algorithm)`
 
 Compute a content hash for ``path`` using the requested algorithm.

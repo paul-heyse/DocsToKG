@@ -5,9 +5,11 @@ from urllib.parse import parse_qsl, urlencode, urlsplit
 
 import pytest
 
-hypothesis = pytest.importorskip("hypothesis")
-from hypothesis import given
-from hypothesis import strategies as st
+try:
+    from hypothesis import given
+    from hypothesis import strategies as st
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    pytest.skip("hypothesis not installed", allow_module_level=True)
 
 from DocsToKG.ContentDownload.core import (
     DEFAULT_TAIL_CHECK_BYTES,
@@ -43,8 +45,13 @@ def test_dedupe_preserves_first_occurrence():
 
 
 def test_classify_payload_pdf_and_html():
-    assert classify_payload(b"%PDF-1.4", "application/pdf", "https://example.com") is Classification.PDF
-    assert classify_payload(b"<html><body>", "text/html", "https://example.com") is Classification.HTML
+    assert (
+        classify_payload(b"%PDF-1.4", "application/pdf", "https://example.com")
+        is Classification.PDF
+    )
+    assert (
+        classify_payload(b"<html><body>", "text/html", "https://example.com") is Classification.HTML
+    )
     assert (
         classify_payload(b"", "application/octet-stream", "https://example.com/unknown")
         is Classification.UNKNOWN
@@ -114,7 +121,9 @@ def _url_components(draw):
                     st.text(alphabet=letters_digits, min_size=1, max_size=6).filter(
                         lambda key: not key.lower().startswith("utm_")
                     ),
-                    st.text(alphabet=letters_digits, min_size=1, max_size=6).map(lambda key: "utm_" + key),
+                    st.text(alphabet=letters_digits, min_size=1, max_size=6).map(
+                        lambda key: "utm_" + key
+                    ),
                 ),
                 st.text(alphabet=letters_digits + "-_", min_size=0, max_size=6),
             ),
@@ -197,9 +206,9 @@ def test_classify_payload_detects_pdf_header(leading, trailer):
 
 
 @given(
-    st.text(alphabet=string.ascii_letters + string.digits + " \n\r\t", min_size=0, max_size=512).map(
-        lambda text: text.encode("ascii")
-    ),
+    st.text(
+        alphabet=string.ascii_letters + string.digits + " \n\r\t", min_size=0, max_size=512
+    ).map(lambda text: text.encode("ascii")),
     st.binary(min_size=0, max_size=512),
 )
 def test_classify_payload_detects_pdf_marker_within_window(prefix, suffix):
@@ -209,12 +218,12 @@ def test_classify_payload_detects_pdf_marker_within_window(prefix, suffix):
 
 
 @given(
-    st.text(alphabet=string.ascii_letters + string.digits + " \n\r\t", min_size=0, max_size=128).map(
-        lambda text: text.encode("ascii")
-    ),
-    st.text(alphabet=string.ascii_letters + string.digits + " \n\r\t", min_size=0, max_size=128).map(
-        lambda text: text.encode("ascii")
-    ),
+    st.text(
+        alphabet=string.ascii_letters + string.digits + " \n\r\t", min_size=0, max_size=128
+    ).map(lambda text: text.encode("ascii")),
+    st.text(
+        alphabet=string.ascii_letters + string.digits + " \n\r\t", min_size=0, max_size=128
+    ).map(lambda text: text.encode("ascii")),
 )
 def test_has_pdf_eof_detects_marker(prefix: bytes, suffix: bytes):
     with tempfile.TemporaryDirectory() as tmpdir:

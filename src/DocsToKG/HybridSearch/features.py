@@ -10,6 +10,7 @@ DeprecationWarning) so teams can smoke-test outstanding imports.
 
 from __future__ import annotations
 
+import importlib
 import os
 import warnings
 
@@ -30,6 +31,10 @@ warnings.warn(
     stacklevel=2,
 )
 
-from .devtools.features import *  # noqa: F401,F403
-
-__all__ = [name for name in globals().keys() if not name.startswith("_")]
+_devtools_features = importlib.import_module(".devtools.features", package=__package__)
+__all__ = getattr(
+    _devtools_features,
+    "__all__",
+    [name for name in dir(_devtools_features) if not name.startswith("_")],
+)
+globals().update({name: getattr(_devtools_features, name) for name in __all__})

@@ -45,13 +45,16 @@
 
 from __future__ import annotations
 
-import pytest
 from typing import Dict
 from unittest.mock import Mock, patch
 
-hypothesis = pytest.importorskip("hypothesis")
-from hypothesis import given
-from hypothesis import strategies as st
+import pytest
+
+try:
+    from hypothesis import given
+    from hypothesis import strategies as st
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    pytest.skip("hypothesis not installed", allow_module_level=True)
 
 from DocsToKG.ContentDownload.networking import (
     CircuitBreaker,

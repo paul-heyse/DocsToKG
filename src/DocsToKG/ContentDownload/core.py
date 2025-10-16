@@ -10,7 +10,6 @@ simplifying imports for both the CLI and resolver pipeline.
 
 from __future__ import annotations
 
-import hashlib
 import os
 import re
 import uuid

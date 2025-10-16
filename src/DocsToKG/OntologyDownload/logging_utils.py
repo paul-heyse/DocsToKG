@@ -106,4 +106,3 @@ def setup_logging(
 
     logger.propagate = True
     return logger
-

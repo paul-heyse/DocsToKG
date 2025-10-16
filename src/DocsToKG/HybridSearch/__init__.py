@@ -48,8 +48,6 @@ Usage:
 
 from __future__ import annotations
 
-import sys
-
 # --- Globals ---
 
 __all__ = (
@@ -75,5 +73,11 @@ __all__ = (
 from .pipeline import Observability
 from .router import FaissRouter
 from .service import HybridSearchAPI, HybridSearchService, HybridSearchValidator
-from .store import AdapterStats, FaissVectorStore, ManagedFaissAdapter, restore_state, serialize_state
+from .store import (
+    AdapterStats,
+    FaissVectorStore,
+    ManagedFaissAdapter,
+    restore_state,
+    serialize_state,
+)
 from .types import ChunkPayload, HybridSearchRequest, HybridSearchResponse, HybridSearchResult

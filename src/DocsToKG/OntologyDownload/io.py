@@ -18,8 +18,8 @@ import time
 import unicodedata
 import uuid
 import zipfile
-from dataclasses import dataclass
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path, PurePosixPath
@@ -35,6 +35,7 @@ from .settings import DownloadConfiguration
 
 _DNS_CACHE: Dict[str, Tuple[float, List[Tuple]]] = {}
 _DNS_CACHE_TTL = 120.0
+_DEFAULT_MAX_UNCOMPRESSED_BYTES = DownloadConfiguration().max_uncompressed_bytes()
 
 
 def sanitize_filename(filename: str) -> str:
@@ -335,8 +336,43 @@ def _check_compression_ratio(
         )
 
 
+def _enforce_uncompressed_ceiling(
+    *,
+    total_uncompressed: int,
+    limit_bytes: Optional[int],
+    archive: Path,
+    logger: Optional[logging.Logger],
+    archive_type: str,
+) -> None:
+    """Ensure uncompressed payload stays within configured limits."""
+
+    if limit_bytes is None or limit_bytes <= 0:
+        return
+    if total_uncompressed <= limit_bytes:
+        return
+    if logger:
+        logger.error(
+            "archive uncompressed size exceeds limit",
+            extra={
+                "stage": "extract",
+                "archive": str(archive),
+                "uncompressed_bytes": total_uncompressed,
+                "limit_bytes": limit_bytes,
+                "archive_type": archive_type,
+            },
+        )
+    raise ConfigError(
+        f"{archive_type} archive {archive} expands to {total_uncompressed} bytes, "
+        f"exceeding configured ceiling of {limit_bytes} bytes"
+    )
+
+
 def extract_zip_safe(
-    zip_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None
+    zip_path: Path,
+    destination: Path,
+    *,
+    logger: Optional[logging.Logger] = None,
+    max_uncompressed_bytes: Optional[int] = _DEFAULT_MAX_UNCOMPRESSED_BYTES,
 ) -> List[Path]:
     """Extract a ZIP archive while preventing traversal and compression bombs."""
 
@@ -369,6 +405,13 @@ def extract_zip_safe(
             logger=logger,
             archive_type="ZIP",
         )
+        _enforce_uncompressed_ceiling(
+            total_uncompressed=total_uncompressed,
+            limit_bytes=max_uncompressed_bytes,
+            archive=zip_path,
+            logger=logger,
+            archive_type="ZIP",
+        )
         for member, member_path in safe_members:
             target_path = destination / member_path
             if member.is_dir():
@@ -387,7 +430,11 @@ def extract_zip_safe(
 
 
 def extract_tar_safe(
-    tar_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None
+    tar_path: Path,
+    destination: Path,
+    *,
+    logger: Optional[logging.Logger] = None,
+    max_uncompressed_bytes: Optional[int] = _DEFAULT_MAX_UNCOMPRESSED_BYTES,
 ) -> List[Path]:
     """Safely extract tar archives (tar, tar.gz, tar.xz) with traversal and compression checks."""
 
@@ -423,6 +470,13 @@ def extract_tar_safe(
                 logger=logger,
                 archive_type="TAR",
             )
+            _enforce_uncompressed_ceiling(
+                total_uncompressed=total_uncompressed,
+                limit_bytes=max_uncompressed_bytes,
+                archive=tar_path,
+                logger=logger,
+                archive_type="TAR",
+            )
             for member, member_path in safe_members:
                 if member.isdir():
                     (destination / member_path).mkdir(parents=True, exist_ok=True)
@@ -449,15 +503,29 @@ _TAR_SUFFIXES = (".tar", ".tar.gz", ".tgz", ".tar.xz", ".txz", ".tar.bz2", ".tbz
 
 
 def extract_archive_safe(
-    archive_path: Path, destination: Path, *, logger: Optional[logging.Logger] = None
+    archive_path: Path,
+    destination: Path,
+    *,
+    logger: Optional[logging.Logger] = None,
+    max_uncompressed_bytes: Optional[int] = _DEFAULT_MAX_UNCOMPRESSED_BYTES,
 ) -> List[Path]:
     """Extract archives by dispatching to the appropriate safe handler."""
 
     lower_name = archive_path.name.lower()
     if lower_name.endswith(".zip"):
-        return extract_zip_safe(archive_path, destination, logger=logger)
+        return extract_zip_safe(
+            archive_path,
+            destination,
+            logger=logger,
+            max_uncompressed_bytes=max_uncompressed_bytes,
+        )
     if any(lower_name.endswith(suffix) for suffix in _TAR_SUFFIXES):
-        return extract_tar_safe(archive_path, destination, logger=logger)
+        return extract_tar_safe(
+            archive_path,
+            destination,
+            logger=logger,
+            max_uncompressed_bytes=max_uncompressed_bytes,
+        )
     raise ConfigError(f"Unsupported archive format: {archive_path}")
 
 
@@ -777,7 +845,6 @@ def reset() -> None:
     SESSION_POOL.clear()
 
 
-
 T = TypeVar("T")
 
 
@@ -906,6 +973,29 @@ def _is_retryable_status(status_code: Optional[int]) -> bool:
     if status_code >= 500:
         return True
     return status_code in _RETRYABLE_HTTP_STATUSES
+
+
+def is_retryable_error(exc: BaseException) -> bool:
+    """Return ``True`` when ``exc`` represents a retryable network failure."""
+
+    if isinstance(exc, DownloadFailure):
+        return exc.retryable
+    if isinstance(
+        exc,
+        (
+            requests.ConnectionError,
+            requests.Timeout,
+            requests.exceptions.SSLError,
+        ),
+    ):
+        return True
+    if isinstance(exc, requests.HTTPError):
+        response = getattr(exc, "response", None)
+        status = getattr(response, "status_code", None)
+        return _is_retryable_status(status)
+    if isinstance(exc, requests.RequestException):
+        return True
+    return False
 
 
 _RDF_FORMAT_LABELS = {
@@ -1046,7 +1136,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
         content_length = int(content_length_header) if content_length_header else None
 
         if content_length:
-            max_bytes = self.http_config.max_download_size_gb * (1024**3)
+            max_bytes = self.http_config.max_download_bytes()
             if content_length > max_bytes:
                 self.logger.error(
                     "file exceeds size limit (HEAD check)",
@@ -1215,9 +1305,9 @@ class StreamingDownloader(pooch.HTTPDownloader):
                 ) as response:
                     if response.status_code == 304 and Path(self.destination).exists():
                         self.status = "cached"
-                        self.response_etag = response.headers.get("ETag") or self.previous_manifest.get(
-                            "etag"
-                        )
+                        self.response_etag = response.headers.get(
+                            "ETag"
+                        ) or self.previous_manifest.get("etag")
                         self.response_last_modified = response.headers.get(
                             "Last-Modified"
                         ) or self.previous_manifest.get("last_modified")
@@ -1284,7 +1374,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                     self.response_content_length = parsed_length
                     if parsed_length is not None:
                         total_bytes = parsed_length
-                    max_bytes = self.http_config.max_download_size_gb * (1024**3)
+                    max_bytes = self.http_config.max_download_bytes()
                     if total_bytes is not None and total_bytes > max_bytes:
                         self.logger.error(
                             "file exceeds size limit",
@@ -1333,16 +1423,13 @@ class StreamingDownloader(pooch.HTTPDownloader):
                                         if next_progress > 1:
                                             next_progress = None
                                             break
-                                if bytes_downloaded > self.http_config.max_download_size_gb * (
-                                    1024**3
-                                ):
+                                if bytes_downloaded > self.http_config.max_download_bytes():
                                     self.logger.error(
                                         "download exceeded size limit",
                                         extra={
                                             "stage": "download",
                                             "size": bytes_downloaded,
-                                            "limit": self.http_config.max_download_size_gb
-                                            * (1024**3),
+                                            "limit": self.http_config.max_download_bytes(),
                                         },
                                     )
                                     raise PolicyError(
@@ -1361,18 +1448,6 @@ class StreamingDownloader(pooch.HTTPDownloader):
                         raise OntologyDownloadError(f"Failed to write download: {exc}") from exc
 
                     return "success"
-
-            def _should_retry(exc: BaseException) -> bool:
-                if isinstance(
-                    exc,
-                    (requests.ConnectionError, requests.Timeout, requests.exceptions.SSLError),
-                ):
-                    return True
-                if isinstance(exc, requests.HTTPError):
-                    response = getattr(exc, "response", None)
-                    status = getattr(response, "status_code", None)
-                    return _is_retryable_status(status)
-                return False
 
             def _retry_after_hint(exc: BaseException) -> Optional[float]:
                 delay = getattr(exc, "_retry_after_delay", None)
@@ -1396,7 +1471,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
 
             result_state = retry_with_backoff(
                 _stream_once,
-                retryable=_should_retry,
+                retryable=is_retryable_error,
                 max_attempts=max(1, self.http_config.max_retries),
                 backoff_base=self.http_config.backoff_factor,
                 jitter=self.http_config.backoff_factor,
@@ -1463,9 +1538,7 @@ def download_stream(
 
     start_time = time.monotonic()
     log_memory_usage(logger, stage="download", event="before")
-    polite_headers = http_config.polite_http_headers(
-        correlation_id=_extract_correlation_id(logger)
-    )
+    polite_headers = http_config.polite_http_headers(correlation_id=_extract_correlation_id(logger))
     merged_headers: Dict[str, str] = dict(polite_headers)
     merged_headers.update({str(k): str(v) for k, v in headers.items()})
 
@@ -1695,6 +1768,7 @@ __all__ = [
     "get_bucket",
     "apply_retry_after",
     "reset",
+    "is_retryable_error",
     "retry_with_backoff",
     "DownloadResult",
     "DownloadFailure",
