@@ -42,7 +42,7 @@ credentials (if required) can be stored in `~/.data/ontology-fetcher/configs/ols
 | `normalize_to` | list of strings | Formats to produce in the normalization step (e.g., `ttl`, `obographs`). |
 | `prefer_source` | list of strings | Resolver preference order for ad-hoc downloads. |
 | `http` | mapping | HTTP behaviour (`max_retries`, `timeout_sec`, `download_timeout_sec`, `backoff_factor`, `per_host_rate_limit`, `max_download_size_gb`, `concurrent_downloads`). |
-| `validation` | mapping | Validation timeouts and limits (`parser_timeout_sec`, `max_memory_mb`, `skip_reasoning_if_size_mb`). |
+| `validation` | mapping | Validation timeouts and limits (`parser_timeout_sec`, `max_memory_mb`, `skip_reasoning_if_size_mb`, `streaming_normalization_threshold_mb`, `max_concurrent_validators`). |
 | `logging` | mapping | Structured logging configuration (`level`, `max_log_size_mb`, `retention_days`). |
 | `continue_on_error` | bool | Continue batch processing after an error (default `true`). |
 | `concurrent_downloads` | int | Future parallelism control (currently informational). |
@@ -72,6 +72,8 @@ defaults:
     parser_timeout_sec: 60
     max_memory_mb: 2048
     skip_reasoning_if_size_mb: 500
+    streaming_normalization_threshold_mb: 200
+    max_concurrent_validators: 2
   logging:
     level: "INFO"
     max_log_size_mb: 100

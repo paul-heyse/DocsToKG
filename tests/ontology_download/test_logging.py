@@ -10,7 +10,7 @@ Key Scenarios:
 - Writes JSON log entries with contextual attributes for observability
 
 Dependencies:
-- DocsToKG.OntologyDownload.logging_config: Logging utilities under test
+- DocsToKG.OntologyDownload: Logging utilities under test
 
 Usage:
     pytest tests/ontology_download/test_logging.py

@@ -16,6 +16,14 @@ __all__ = [
     "matches_filters",
 ]
 
+__all__ = [
+    "ChunkRegistry",
+    "OpenSearchIndexTemplate",
+    "OpenSearchSchemaManager",
+    "OpenSearchSimulator",
+    "matches_filters",
+]
+
 @dataclass(slots=True)
 class OpenSearchIndexTemplate:
     """Representation of an OpenSearch index template body.

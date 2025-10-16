@@ -23,3 +23,24 @@ This guide summarises the key operational updates introduced by the
 - ``--resume-from``: skips works already logged in an existing manifest JSONL.
 - ``--extract-html-text``: extracts plaintext from HTML fallbacks (requires
   ``trafilatura``).
+
+## 5. Ontology Downloader API Migration (``harden-ontology-downloader-core``)
+
+- Replace imports that referenced ``DocsToKG.OntologyDownload.core`` (and other legacy
+  module aliases such as ``.config``, ``.validators``, ``.download``) with
+  ``from DocsToKG.OntologyDownload import ...`` using the exported names listed in
+  ``DocsToKG.OntologyDownload.__all__``. Direct module consumers should import
+  ``DocsToKG.OntologyDownload.ontology_download`` or ``.cli`` explicitly.
+- Audit repositories with ``rg "DocsToKG.OntologyDownload" --glob '*.py'`` and
+  replace matches in-place. Imports like ``from DocsToKG.OntologyDownload.core
+  import plan_all`` become ``from DocsToKG.OntologyDownload import plan_all``.
+- Remove ``__all__`` shims or manual alias dictionaries that mirrored the
+  deleted module map; the package facade now exposes the complete surface area.
+- Update custom tooling that parsed rate limit strings, directory sizes, or version
+  timestamps to call the shared helpers ``parse_rate_limit_to_rps``, ``_directory_size``,
+  ``parse_iso_datetime``, and ``parse_version_timestamp`` from the core module.
+- Configurations that relied on planning to warn (but proceed) for disallowed hosts now
+  receive a ``ConfigError`` during planning; adjust allowlists before upgrading.
+- When bumping manifests, reuse ``_migrate_manifest_inplace`` to upgrade payloads
+  in place. The helper preserves schema version ``1.0`` today and provides the
+  hook for future ``1.x`` → ``2.0`` migrations without rewriting consumer code.

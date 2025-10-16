@@ -208,11 +208,14 @@ def test_iter_doctags(tmp_path: Path) -> None:
 def test_iter_chunks(tmp_path: Path) -> None:
     chunks_dir = _common.data_chunks()
     good = chunks_dir / "doc.chunks.jsonl"
+    nested = chunks_dir / "teamA" / "doc.chunks.jsonl"
     other = chunks_dir / "doc.jsonl"
     good.write_text("{}\n", encoding="utf-8")
+    nested.parent.mkdir(parents=True, exist_ok=True)
+    nested.write_text("{}\n", encoding="utf-8")
     other.write_text("{}\n", encoding="utf-8")
     results = list(_common.iter_chunks(chunks_dir))
-    assert results == [good.resolve()]
+    assert results == sorted({good.resolve(), nested.resolve()})
 
 
 def test_jsonl_load_and_save(tmp_path: Path) -> None:
@@ -444,6 +447,23 @@ def test_compute_relative_doc_id_handles_subdirectories(tmp_path: Path) -> None:
     assert compute_relative_doc_id(nested, root) == "teamA/report.doctags"
 
 
+def test_derive_doc_id_and_output_path(tmp_path: Path) -> None:
+    from DocsToKG.DocParsing import EmbeddingV2 as embedding
+
+    chunks_root = tmp_path / "chunks"
+    chunk_file = chunks_root / "teamA" / "report.chunks.jsonl"
+    chunk_file.parent.mkdir(parents=True, exist_ok=True)
+    chunk_file.write_text("{}\n", encoding="utf-8")
+    vectors_root = tmp_path / "vectors"
+
+    doc_id, out_path = embedding._derive_doc_id_and_output_path(
+        chunk_file, chunks_root, vectors_root
+    )
+
+    assert doc_id == "teamA/report.doctags"
+    assert out_path == vectors_root / "teamA" / "report.vectors.jsonl"
+
+
 def test_chunk_row_fields_unique() -> None:
     fields = schemas.ChunkRow.model_fields
     for name in ("has_image_captions", "has_image_classification", "num_images"):
@@ -523,6 +543,24 @@ def test_pdf_model_path_resolution_precedence(monkeypatch: pytest.MonkeyPatch, t
     monkeypatch.setenv("HF_HOME", str(hf_home))
     expected = (hf_home / "granite-docling-258M").resolve()
     assert pipelines.resolve_pdf_model_path(None) == str(expected)
+
+
+def test_pdf_model_path_cli_normalization(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from DocsToKG.DocParsing import pipelines
+
+    monkeypatch.delenv("DOCLING_PDF_MODEL", raising=False)
+    monkeypatch.delenv("DOCSTOKG_MODEL_ROOT", raising=False)
+    monkeypatch.delenv("HF_HOME", raising=False)
+
+    local_dir = tmp_path / "models" / "granite"
+    local_dir.mkdir(parents=True)
+    assert pipelines.resolve_pdf_model_path(str(local_dir)) == str(local_dir.resolve())
+
+    tilde_path = str(Path("~") / "granite-model")
+    assert pipelines.resolve_pdf_model_path(tilde_path) == str(Path(tilde_path).expanduser().resolve())
+
+    repo_id = "ibm-granite/granite-docling-258M"
+    assert pipelines.resolve_pdf_model_path(repo_id) == repo_id
 
 
 def test_pdf_pipeline_mirrors_output_paths(

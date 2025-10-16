@@ -1,14 +1,43 @@
 # 1. Module: validators
 
-This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.validators``.
-
-Ontology validation pipeline.
+The standalone module ``DocsToKG.OntologyDownload.validators`` has been retired. The
+validation pipeline now lives in ``DocsToKG.OntologyDownload.ontology_download`` and
+is exposed through the consolidated ``DocsToKG.OntologyDownload`` facade.
 
 This module implements the post-download workflow that verifies ontologies,
 normalizes output, and collects structured telemetry for DocsToKG. Validators
 support streaming normalization for large ontologies, deterministic hashing for
 manifest fingerprints, and optional dependency fallbacks for tools such as
 rdflib, Pronto, Owlready2, ROBOT, and Arelle.
+
+### Plugin registration example
+
+To add bespoke validation steps, publish an entry point under
+``docstokg.ontofetch.validator``. A minimal plugin might look like:
+
+```python
+import json
+
+from DocsToKG.OntologyDownload import ValidationResult
+
+
+def validate_custom(request, logger):
+    report = request.validation_dir / "custom.json"
+    report.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"ok": True, "validator": request.name}
+    report.write_text(json.dumps(payload))
+    return ValidationResult(ok=True, details=payload, output_files=[str(report)])
+```
+
+Declare the plugin in ``pyproject.toml``:
+
+```toml
+[project.entry-points."docstokg.ontofetch.validator"]
+custom = "my_package.validators:validate_custom"
+```
+
+After installation the validator participates in ``run_validators`` alongside
+the built-in adapters.
 
 ## 1. Functions
 

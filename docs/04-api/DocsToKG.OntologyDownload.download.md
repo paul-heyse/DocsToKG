@@ -1,8 +1,10 @@
-# 1. Module: download
+# 1. Module: download (legacy alias)
 
-This reference documents the DocsToKG module ``DocsToKG.OntologyDownload.download``.
+The legacy module ``DocsToKG.OntologyDownload.download`` has been removed. Importers
+should reference ``DocsToKG.OntologyDownload.ontology_download`` or the public
+``DocsToKG.OntologyDownload`` facade instead.
 
-Ontology download utilities.
+Ontology download utilities now live in ``DocsToKG.OntologyDownload.ontology_download``.
 
 This module exposes the hardened download primitives used by the refactored
 pipeline. Features include per-host and per-service rate limiting, polite

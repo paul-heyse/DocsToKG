@@ -39,7 +39,7 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 
 # Third-party imports
 from tqdm import tqdm
@@ -51,6 +51,7 @@ from DocsToKG.DocParsing._common import (
     data_chunks,
     data_vectors,
     detect_data_root,
+    expand_path,
     get_logger,
     iter_chunks,
     jsonl_load,
@@ -58,6 +59,8 @@ from DocsToKG.DocParsing._common import (
     load_manifest_index,
     manifest_append,
     resolve_hash_algorithm,
+    resolve_hf_home,
+    resolve_model_root,
 )
 from DocsToKG.DocParsing.pipelines import (
     add_data_root_option,
@@ -112,50 +115,8 @@ def _qwen_cache_key(cfg: QwenCfg) -> Tuple[str, str, int, float, str | None]:
         quant,
     )
 
+
 # ---- Cache / model path resolution ----
-
-
-def _expand_path(path: str | Path) -> Path:
-    """Return ``path`` expanded to an absolute :class:`Path`.
-
-    Args:
-        path: Candidate filesystem path supplied as string or :class:`Path`.
-
-    Returns:
-        Absolute path with user home and environment variables resolved.
-    """
-
-    return Path(path).expanduser().resolve()
-
-
-def _resolve_hf_home() -> Path:
-    """Determine the HuggingFace cache directory respecting ``HF_HOME``.
-
-    Args:
-        None
-
-    Returns:
-        Absolute path to the HuggingFace cache directory.
-    """
-
-    env = os.getenv("HF_HOME")
-    if env:
-        return _expand_path(env)
-    return Path.home().expanduser() / ".cache" / "huggingface"
-
-
-def _resolve_model_root(hf_home: Path) -> Path:
-    """Resolve DocsToKG model root with ``DOCSTOKG_MODEL_ROOT`` override.
-
-    Args:
-        hf_home: Base HuggingFace cache directory.
-
-    Returns:
-        Absolute path representing the DocsToKG model root.
-    """
-
-    env = os.getenv("DOCSTOKG_MODEL_ROOT")
-    return _expand_path(env) if env else hf_home
 
 
 def _resolve_qwen_dir(model_root: Path) -> Path:
@@ -169,7 +130,7 @@ def _resolve_qwen_dir(model_root: Path) -> Path:
     """
 
     env = os.getenv("DOCSTOKG_QWEN_DIR")
-    return _expand_path(env) if env else model_root / "Qwen" / "Qwen3-Embedding-4B"
+    return expand_path(env) if env else model_root / "Qwen" / "Qwen3-Embedding-4B"
 
 
 def _resolve_splade_dir(model_root: Path) -> Path:
@@ -183,13 +144,45 @@ def _resolve_splade_dir(model_root: Path) -> Path:
     """
 
     env = os.getenv("DOCSTOKG_SPLADE_DIR")
-    return _expand_path(env) if env else model_root / "naver" / "splade-v3"
+    return expand_path(env) if env else model_root / "naver" / "splade-v3"
 
 
-HF_HOME = _resolve_hf_home()
-MODEL_ROOT = _resolve_model_root(HF_HOME)
-QWEN_DIR = _expand_path(_resolve_qwen_dir(MODEL_ROOT))
-SPLADE_DIR = _expand_path(_resolve_splade_dir(MODEL_ROOT))
+HF_HOME = resolve_hf_home()
+MODEL_ROOT = resolve_model_root(HF_HOME)
+QWEN_DIR = expand_path(_resolve_qwen_dir(MODEL_ROOT))
+SPLADE_DIR = expand_path(_resolve_splade_dir(MODEL_ROOT))
+
+
+def _derive_doc_id_and_output_path(
+    chunk_file: Path, chunks_root: Path, vectors_root: Path
+) -> tuple[str, Path]:
+    """Return manifest doc_id and vector output path for a chunk artifact."""
+
+    relative = chunk_file.relative_to(chunks_root)
+    base = relative
+    if base.suffix == ".jsonl":
+        base = base.with_suffix("")
+    if base.suffix == ".chunks":
+        base = base.with_suffix("")
+    doc_id = base.with_suffix(".doctags").as_posix()
+    vector_relative = base.with_suffix(".vectors.jsonl")
+    return doc_id, vectors_root / vector_relative
+
+
+def _derive_doc_id_and_output_path(
+    chunk_file: Path, chunks_root: Path, vectors_root: Path
+) -> tuple[str, Path]:
+    """Return manifest doc_id and vector output path for a chunk artifact."""
+
+    relative = chunk_file.relative_to(chunks_root)
+    base = relative
+    if base.suffix == ".jsonl":
+        base = base.with_suffix("")
+    if base.suffix == ".chunks":
+        base = base.with_suffix("")
+    doc_id = base.with_suffix(".doctags").as_posix()
+    vector_relative = base.with_suffix(".vectors.jsonl")
+    return doc_id, vectors_root / vector_relative
 
 
 def _expand_optional(path: Optional[Path]) -> Optional[Path]:
@@ -805,8 +798,34 @@ def process_pass_a(files: Sequence[Path], logger) -> BM25Stats:
     return stats
 
 
+def iter_rows_in_batches(path: Path, batch_size: int) -> Iterator[List[dict]]:
+    """Iterate over JSONL rows in batches to reduce memory usage.
+
+    Args:
+        path: Path to JSONL file to read.
+        batch_size: Number of rows to yield per batch.
+
+    Yields:
+        Lists of row dictionaries, each containing up to batch_size items.
+    """
+    buf: List[dict] = []
+    with path.open("r", encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            buf.append(row)
+            if len(buf) >= batch_size:
+                yield buf
+                buf = []
+    if buf:
+        yield buf
+
+
 def process_chunk_file_vectors(
     chunk_file: Path,
+    out_path: Path,
     stats: BM25Stats,
     args: argparse.Namespace,
     validator: SPLADEValidator,
@@ -828,57 +847,72 @@ def process_chunk_file_vectors(
         ValueError: Propagated if vector dimensions or norms fail validation.
     """
 
-    rows = jsonl_load(chunk_file)
-    if not rows:
-        logger.warning("Chunk file empty", extra={"extra_fields": {"chunk_file": str(chunk_file)}})
-        return 0, [], []
-    ensure_chunk_schema(rows, chunk_file)
+    # Determine batch size for streaming
+    batch_size = max(args.batch_size_qwen, args.batch_size_splade)
 
-    uuids: List[str] = []
-    texts: List[str] = []
-    for row in rows:
-        uuid_value = row.get("uuid")
-        if not uuid_value:
-            raise ValueError(f"Chunk row missing UUID in {chunk_file}")
-        uuids.append(uuid_value)
-        texts.append(str(row.get("text", "")))
-    splade_results: List[Tuple[Sequence[str], Sequence[float]]] = []
-    for batch in Batcher(texts, args.batch_size_splade):
-        tokens_batch, weights_batch = splade_encode(
-            args.splade_cfg, list(batch), batch_size=args.batch_size_splade
-        )
-        splade_results.extend(zip(tokens_batch, weights_batch))
-    qwen_results = qwen_embed(args.qwen_cfg, texts, batch_size=args.batch_size_qwen)
+    total_count = 0
+    nnz_all: List[int] = []
+    norms_all: List[float] = []
 
-    out_path = args.out_dir / f"{chunk_file.stem.replace('.chunks', '')}.vectors.jsonl"
-    count, nnz, norms = write_vectors(
-        out_path,
-        uuids,
-        texts,
-        splade_results,
-        qwen_results,
-        stats,
-        args,
-        rows=rows,
-        validator=validator,
-        logger=logger,
-    )
+    with atomic_write(out_path) as handle:
+        for rows in iter_rows_in_batches(chunk_file, batch_size):
+            if not rows:
+                continue
+            ensure_chunk_schema(rows, chunk_file)
+
+            uuids: List[str] = []
+            texts: List[str] = []
+            for row in rows:
+                uuid_value = row.get("uuid")
+                if not uuid_value:
+                    raise ValueError(f"Chunk row missing UUID in {chunk_file}")
+                uuids.append(uuid_value)
+                texts.append(str(row.get("text", "")))
+
+            # SPLADE encoding for this batch
+            splade_results: List[Tuple[Sequence[str], Sequence[float]]] = []
+            for batch in Batcher(texts, args.batch_size_splade):
+                tokens_batch, weights_batch = splade_encode(
+                    args.splade_cfg, list(batch), batch_size=args.batch_size_splade
+                )
+                splade_results.extend(zip(tokens_batch, weights_batch))
+
+            # Qwen embedding for this batch
+            qwen_results = qwen_embed(args.qwen_cfg, texts, batch_size=args.batch_size_qwen)
+
+            # Write vectors for this batch immediately
+            count, nnz, norms = write_vectors(
+                handle,
+                uuids,
+                texts,
+                splade_results,
+                qwen_results,
+                stats,
+                args,
+                rows=rows,
+                validator=validator,
+                logger=logger,
+            )
+
+            total_count += count
+            nnz_all.extend(nnz)
+            norms_all.extend(norms)
 
     logger.info(
         "Embeddings written",
         extra={
             "extra_fields": {
-                "chunk_file": str(chunk_file.name),
-                "vectors_file": out_path.name,
-                "rows": count,
+                "chunk_file": str(chunk_file),
+                "vectors_file": str(out_path),
+                "rows": total_count,
             }
         },
     )
-    return count, nnz, norms
+    return total_count, nnz_all, norms_all
 
 
 def write_vectors(
-    path: Path,
+    path_or_handle,
     uuids: Sequence[str],
     texts: Sequence[str],
     splade_results: Sequence[Tuple[Sequence[str], Sequence[float]]],
@@ -893,7 +927,7 @@ def write_vectors(
     """Write validated vector rows to disk with schema enforcement.
 
     Args:
-        path: Destination JSONL path for vector rows.
+        path_or_handle: Destination JSONL path or file handle for vector rows.
         uuids: Sequence of chunk UUIDs aligned with the other inputs.
         texts: Chunk text bodies.
         splade_results: SPLADE token and weight pairs per chunk.
@@ -920,100 +954,114 @@ def write_vectors(
     splade_nnz: List[int] = []
     qwen_norms: List[float] = []
 
-    path.parent.mkdir(parents=True, exist_ok=True)
+    # Handle both file handle and path inputs
+    if hasattr(path_or_handle, "write"):
+        # It's a file handle
+        handle = path_or_handle
+        close_handle = False
+    else:
+        # It's a path, create directory and atomic write context
+        path_or_handle.parent.mkdir(parents=True, exist_ok=True)
+        atomic_context = atomic_write(path_or_handle)
+        handle = atomic_context.__enter__()
+        close_handle = True
 
-    with atomic_write(path) as handle:
-        for uuid_value, text, splade_pair, qwen_vector, row in zip(
-            uuids, texts, splade_results, qwen_results, rows
-        ):
-            tokens_list = list(splade_pair[0])
-            weight_list = [float(w) for w in splade_pair[1]]
-            validator.validate(uuid_value, tokens_list, weight_list)
-            nnz = sum(1 for weight in weight_list if weight > 0)
-            splade_nnz.append(nnz)
+    for uuid_value, text, splade_pair, qwen_vector, row in zip(
+        uuids, texts, splade_results, qwen_results, rows
+    ):
+        tokens_list = list(splade_pair[0])
+        weight_list = [float(w) for w in splade_pair[1]]
+        validator.validate(uuid_value, tokens_list, weight_list)
+        nnz = sum(1 for weight in weight_list if weight > 0)
+        splade_nnz.append(nnz)
 
-            if len(qwen_vector) != 2560:
-                message = (
-                    f"Qwen dimension mismatch for UUID={uuid_value}: expected 2560, "
-                    f"got {len(qwen_vector)}"
-                )
-                doc_id = row.get("doc_id", "unknown")
-                manifest_append(
-                    stage="embeddings",
-                    doc_id=doc_id,
-                    status="failure",
-                    error=message,
-                    schema_version="embeddings/1.0.0",
-                )
-                raise ValueError(message)
+        if len(qwen_vector) != 2560:
+            message = (
+                f"Qwen dimension mismatch for UUID={uuid_value}: expected 2560, "
+                f"got {len(qwen_vector)}"
+            )
+            doc_id = row.get("doc_id", "unknown")
+            manifest_append(
+                stage="embeddings",
+                doc_id=doc_id,
+                status="failure",
+                error=message,
+                schema_version="embeddings/1.0.0",
+            )
+            raise ValueError(message)
 
-            norm = math.sqrt(sum(float(x) * float(x) for x in qwen_vector))
-            if norm <= 0:
-                doc_id = row.get("doc_id", "unknown")
-                message = f"Invalid Qwen vector (zero norm) for UUID={uuid_value}"
-                logger.error(message)
-                manifest_append(
-                    stage="embeddings",
-                    doc_id=doc_id,
-                    status="failure",
-                    error=message,
-                    schema_version="embeddings/1.0.0",
-                )
-                raise ValueError(message)
-            if abs(norm - 1.0) > 0.01:
-                logger.warning("Qwen norm for UUID=%s: %.4f (expected ~1.0)", uuid_value, norm)
-            qwen_norms.append(norm)
+        norm = math.sqrt(sum(float(x) * float(x) for x in qwen_vector))
+        if norm <= 0:
+            doc_id = row.get("doc_id", "unknown")
+            message = f"Invalid Qwen vector (zero norm) for UUID={uuid_value}"
+            logger.error(message)
+            manifest_append(
+                stage="embeddings",
+                doc_id=doc_id,
+                status="failure",
+                error=message,
+                schema_version="embeddings/1.0.0",
+            )
+            raise ValueError(message)
 
-            terms, weights = bm25_vector(text, stats, k1=bm25_k1, b=bm25_b)
+        if abs(norm - 1.0) > 0.01:
+            logger.warning("Qwen norm for UUID=%s: %.4f (expected ~1.0)", uuid_value, norm)
+        qwen_norms.append(norm)
 
-            try:
-                vector_row = VectorRow(
-                    UUID=uuid_value,
-                    BM25=BM25Vector(
-                        terms=terms,
-                        weights=weights,
-                        k1=bm25_k1,
-                        b=bm25_b,
-                        avgdl=stats.avgdl,
-                        N=stats.N,
-                    ),
-                    SPLADEv3=SPLADEVector(tokens=tokens_list, weights=weight_list),
-                    Qwen3_4B=DenseVector(
-                        model_id="Qwen/Qwen3-Embedding-4B",
-                        vector=[float(x) for x in qwen_vector],
-                        dimension=2560,
-                    ),
-                    model_metadata={
-                        "splade": {"batch_size": args.batch_size_splade},
-                        "qwen": {
-                            "dtype": args.qwen_dtype,
-                            "batch_size": args.batch_size_qwen,
-                        },
+        terms, weights = bm25_vector(text, stats, k1=bm25_k1, b=bm25_b)
+
+        try:
+            vector_row = VectorRow(
+                UUID=uuid_value,
+                BM25=BM25Vector(
+                    terms=terms,
+                    weights=weights,
+                    k1=bm25_k1,
+                    b=bm25_b,
+                    avgdl=stats.avgdl,
+                    N=stats.N,
+                ),
+                SPLADEv3=SPLADEVector(tokens=tokens_list, weights=weight_list),
+                Qwen3_4B=DenseVector(
+                    model_id="Qwen/Qwen3-Embedding-4B",
+                    vector=[float(x) for x in qwen_vector],
+                    dimension=2560,
+                ),
+                model_metadata={
+                    "splade": {"batch_size": args.batch_size_splade},
+                    "qwen": {
+                        "dtype": args.qwen_dtype,
+                        "batch_size": args.batch_size_qwen,
                     },
-                )
-            except Exception as exc:
-                doc_id = row.get("doc_id", "unknown")
-                logger.error(
-                    "Vector row validation failed",
-                    extra={
-                        "extra_fields": {
-                            "uuid": uuid_value,
-                            "doc_id": doc_id,
-                            "error": str(exc),
-                        }
-                    },
-                )
-                manifest_append(
-                    stage="embeddings",
-                    doc_id=doc_id,
-                    status="failure",
-                    error=str(exc),
-                    schema_version="embeddings/1.0.0",
-                )
-                raise
+                },
+            )
+        except Exception as exc:
+            doc_id = row.get("doc_id", "unknown")
+            logger.error(
+                "Vector row validation failed",
+                extra={
+                    "extra_fields": {
+                        "uuid": uuid_value,
+                        "doc_id": doc_id,
+                        "error": str(exc),
+                    }
+                },
+            )
+            manifest_append(
+                stage="embeddings",
+                doc_id=doc_id,
+                status="failure",
+                error=str(exc),
+                schema_version="embeddings/1.0.0",
+            )
+            raise
 
-            payload = vector_row.model_dump(by_alias=True)
-            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        payload = vector_row.model_dump(by_alias=True)
+        handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+    # Clean up atomic write context if we created it
+    if close_handle:
+        atomic_context.__exit__(None, None, None)
 
     return len(uuids), splade_nnz, qwen_norms
 
@@ -1139,10 +1187,10 @@ def main(args: argparse.Namespace | None = None) -> int:
         args = parser.parse_args(args)
     offline_mode = bool(getattr(args, "offline", False))
 
-    hf_home = _resolve_hf_home()
-    model_root = _resolve_model_root(hf_home)
-    default_splade_dir = _expand_path(_resolve_splade_dir(model_root))
-    default_qwen_dir = _expand_path(_resolve_qwen_dir(model_root))
+    hf_home = resolve_hf_home()
+    model_root = resolve_model_root(hf_home)
+    default_splade_dir = expand_path(_resolve_splade_dir(model_root))
+    default_qwen_dir = expand_path(_resolve_qwen_dir(model_root))
     cli_splade = _expand_optional(getattr(args, "splade_model_dir", None))
     cli_qwen = _expand_optional(getattr(args, "qwen_model_dir", None))
     splade_model_dir = cli_splade or default_splade_dir
@@ -1289,10 +1337,12 @@ def main(args: argparse.Namespace | None = None) -> int:
     file_entries = []
     skipped_files = 0
     for chunk_file in files:
-        doc_id = chunk_file.relative_to(chunks_dir).as_posix()
-        out_path = args.out_dir / f"{chunk_file.stem.replace('.chunks', '')}.vectors.jsonl"
+        doc_id, out_path = _derive_doc_id_and_output_path(chunk_file, chunks_dir, args.out_dir)
         input_hash = compute_content_hash(chunk_file)
         entry = manifest_index.get(doc_id)
+        if entry is None:
+            legacy_key = chunk_file.relative_to(chunks_dir).as_posix()
+            entry = manifest_index.get(legacy_key)
         if (
             args.resume
             and not args.force
@@ -1300,7 +1350,15 @@ def main(args: argparse.Namespace | None = None) -> int:
             and entry
             and entry.get("input_hash") == input_hash
         ):
-            logger.info("Skipping %s: output exists and input unchanged", doc_id)
+            logger.info(
+                "Skipping chunk file: output exists and input unchanged",
+                extra={
+                    "extra_fields": {
+                        "doc_id": doc_id,
+                        "output_path": str(out_path),
+                    }
+                },
+            )
             manifest_append(
                 stage=MANIFEST_STAGE,
                 doc_id=doc_id,
@@ -1322,7 +1380,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         start = time.perf_counter()
         try:
             count, nnz, norms = process_chunk_file_vectors(
-                chunk_file, stats, args, validator, logger
+                chunk_file, out_path, stats, args, validator, logger
             )
         except Exception as exc:
             duration = time.perf_counter() - start

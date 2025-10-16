@@ -39,7 +39,7 @@ auditing across the toolchain.
 ### 2. Chunking & Coalescence
 
 * **Entry point**: `python -m DocsToKG.DocParsing.cli chunk`
-* **Output**: `Data/ChunkedDocTagFiles/<doc_id>.chunks.jsonl`
+* **Output**: `Data/ChunkedDocTagFiles/<relative_path>.chunks.jsonl` (mirrors the DocTags hierarchy)
 * **Highlights**:
   - The hybrid chunker honors Docling structural annotations and only merges
     across sections when soft-boundary thresholds permit.
@@ -51,7 +51,7 @@ auditing across the toolchain.
 ### 3. Embedding Generation
 
 * **Entry point**: `python -m DocsToKG.DocParsing.cli embed`
-* **Output**: `Data/Embeddings/<doc_id>.vectors.jsonl`
+* **Output**: `Data/Embeddings/<relative_path>.vectors.jsonl` (mirrors the chunk directory layout)
 * **Highlights**:
   - Streaming two-pass architecture bounds memory usage while collecting BM25
     statistics.

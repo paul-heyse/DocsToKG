@@ -50,8 +50,10 @@ from DocsToKG.DocParsing._common import (
     data_manifests,
     data_pdfs,
     detect_data_root,
+    expand_path,
     find_free_port,
     get_logger,
+    resolve_model_root,
     set_spawn_or_warn,
     load_manifest_index,
     manifest_append,
@@ -70,6 +72,24 @@ _LOGGER = get_logger(__name__)
 # -------- Model path resolution helpers --------
 
 PDF_MODEL_SUBDIR = Path("granite-docling-258M")
+
+
+def _looks_like_filesystem_path(candidate: str) -> bool:
+    """Return ``True`` when ``candidate`` appears to reference a local path."""
+
+    expanded = Path(candidate).expanduser()
+    drive, _ = os.path.splitdrive(candidate)
+    if drive:
+        return True
+    if expanded.is_absolute() or expanded.exists():
+        return True
+    prefixes = ["~", "."]
+    if os.sep not in prefixes:
+        prefixes.append(os.sep)
+    alt = os.altsep
+    if alt and alt not in prefixes:
+        prefixes.append(alt)
+    return any(candidate.startswith(prefix) for prefix in prefixes)
 
 
 def _expand_path(path: str | Path) -> Path:
@@ -100,17 +120,14 @@ def resolve_pdf_model_path(cli_value: str | None = None) -> str:
     """Determine PDF model path using CLI and environment precedence."""
 
     if cli_value:
+        if _looks_like_filesystem_path(cli_value):
+            return str(expand_path(cli_value))
         return cli_value
     env_model = os.getenv("DOCLING_PDF_MODEL")
     if env_model:
-        return str(_expand_path(env_model))
-    model_root_env = os.getenv("DOCSTOKG_MODEL_ROOT")
-    if model_root_env:
-        return str((_expand_path(model_root_env) / PDF_MODEL_SUBDIR).resolve())
-    hf_home_env = os.getenv("HF_HOME")
-    if hf_home_env:
-        return str((_expand_path(hf_home_env) / PDF_MODEL_SUBDIR).resolve())
-    return str((Path.home().expanduser() / ".cache" / "huggingface" / PDF_MODEL_SUBDIR).resolve())
+        return str(expand_path(env_model))
+    model_root = resolve_model_root()
+    return str(expand_path(model_root / PDF_MODEL_SUBDIR))
 
 
 # -------- Paths --------
@@ -141,8 +158,7 @@ def add_data_root_option(parser: argparse.ArgumentParser) -> None:
         type=Path,
         default=None,
         help=(
-            "Override DocsToKG Data directory. Defaults to auto-detection or "
-            "$DOCSTOKG_DATA_ROOT."
+            "Override DocsToKG Data directory. Defaults to auto-detection or $DOCSTOKG_DATA_ROOT."
         ),
     )
 
@@ -390,8 +406,7 @@ def pdf_build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help=(
-            "Override DocsToKG Data directory. Defaults to auto-detection or "
-            "$DOCSTOKG_DATA_ROOT."
+            "Override DocsToKG Data directory. Defaults to auto-detection or $DOCSTOKG_DATA_ROOT."
         ),
     )
     parser.add_argument(
@@ -1513,8 +1528,7 @@ def html_build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help=(
-            "Override DocsToKG Data directory. Defaults to auto-detection or "
-            "$DOCSTOKG_DATA_ROOT."
+            "Override DocsToKG Data directory. Defaults to auto-detection or $DOCSTOKG_DATA_ROOT."
         ),
     )
     parser.add_argument(
