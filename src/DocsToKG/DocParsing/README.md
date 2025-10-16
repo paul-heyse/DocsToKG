@@ -191,11 +191,12 @@ can reason about historical data sets.
 
 ### Deprecations
 
-* The legacy module `DocsToKG.DocParsing.pdf_pipeline` remains temporarily available as a
-  compatibility shim. Importing it now emits a :class:`DeprecationWarning`; migrate to the CLI
-  (`python -m DocsToKG.DocParsing.cli doctags --mode pdf`) or the
-  :mod:`DocsToKG.DocParsing.pipelines` APIs instead. The shim will be removed in an upcoming
-  release once downstream consumers have migrated.
+> **Deprecated**  
+> `DocsToKG.DocParsing.pdf_pipeline` remains temporarily available as a compatibility shim.
+> Importing it now emits a :class:`DeprecationWarning`; migrate to the CLI
+> (`python -m DocsToKG.DocParsing.cli doctags --mode pdf`) or the
+> :mod:`DocsToKG.DocParsing.pipelines` APIs instead. The shim will be removed in an upcoming
+> release once downstream consumers have migrated.
 
 ## Synthetic Benchmarking & Test Utilities
 

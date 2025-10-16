@@ -184,6 +184,11 @@ def test_chunk_and_embed_cli_with_dependency_stubs(
     (tmp_path / "qwen").mkdir()
     (tmp_path / "models").mkdir()
 
+    heading_markers_path = tmp_path / "heading_markers.json"
+    heading_markers_path.write_text(
+        json.dumps({"headings": ["Article ", "Section "]}), encoding="utf-8"
+    )
+
     module = _reload_cli_modules()
     result = module.main(
         [
@@ -192,6 +197,10 @@ def test_chunk_and_embed_cli_with_dependency_stubs(
             str(doc_dir),
             "--out-dir",
             str(data_root / "ChunkedDocTagFiles"),
+            "--soft-barrier-margin",
+            "32",
+            "--heading-markers",
+            str(heading_markers_path),
         ]
     )
     assert result == 0

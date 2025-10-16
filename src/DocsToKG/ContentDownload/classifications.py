@@ -18,6 +18,8 @@ class Classification(StrEnum):
     CACHED = "cached"
     EXISTS = "exists"
     SKIPPED = "skipped"
+    HTML_TOO_LARGE = "html_too_large"
+    PAYLOAD_TOO_LARGE = "payload_too_large"
 
     @classmethod
     def from_wire(cls, value: Union[str, "Classification", None]) -> Optional["Classification"]:

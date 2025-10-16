@@ -129,7 +129,9 @@ default and can be tuned per resolver:
 ```yaml
 enable_head_precheck: true
 resolver_head_precheck:
+  landing_page: false
   wayback: false  # opt-out for resolvers that reject HEAD
+  zenodo: true    # explicitly keep HEAD preflight enabled
 ```
 
 When a HEAD request fails (timeout or 5xx), the pipeline automatically falls
@@ -144,6 +146,8 @@ back to the original ``GET`` attempt to avoid false negatives.
 - ``--resolver-config config.yaml``: load advanced options such as
   ``max_concurrent_resolvers`` and ``resolver_head_precheck`` (see
   ``docs/resolver-configuration.md``).
+- ``--max-bytes <n>``: abort downloads that exceed ``n`` bytes and classify them as
+  ``html_too_large`` / ``payload_too_large``.
 
 ### Resolver Enhancements
 

@@ -97,6 +97,7 @@ from DocsToKG.DocParsing._common import (
     derive_doc_id_and_vectors_path,
     expand_path,
     get_logger,
+    init_hf_env,
     iter_chunks,
     jsonl_load,
     jsonl_save,
@@ -218,8 +219,7 @@ def _resolve_splade_dir(model_root: Path) -> Path:
     return expand_path(env) if env else model_root / "naver" / "splade-v3"
 
 
-HF_HOME = resolve_hf_home()
-MODEL_ROOT = resolve_model_root(HF_HOME)
+HF_HOME, MODEL_ROOT = init_hf_env()
 QWEN_DIR = expand_path(_resolve_qwen_dir(MODEL_ROOT))
 SPLADE_DIR = expand_path(_resolve_splade_dir(MODEL_ROOT))
 
@@ -259,14 +259,6 @@ DEFAULT_CHUNKS_DIR = data_chunks(DEFAULT_DATA_ROOT)
 DEFAULT_VECTORS_DIR = data_vectors(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "embeddings"
 SPLADE_SPARSITY_WARN_THRESHOLD_PCT = 1.0
-
-# Make sure every lib (Transformers / HF Hub / Sentence-Transformers) honors this cache.
-os.environ.setdefault("HF_HOME", str(HF_HOME))
-os.environ.setdefault("HF_HUB_CACHE", str(HF_HOME / "hub"))
-os.environ.setdefault("TRANSFORMERS_CACHE", str(HF_HOME / "transformers"))
-os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", str(MODEL_ROOT))
-os.environ.setdefault("DOCSTOKG_MODEL_ROOT", str(MODEL_ROOT))
-
 
 def _missing_splade_dependency_message() -> str:
     """Return a human-readable installation hint for SPLADE extras."""
@@ -752,7 +744,12 @@ class SPLADEValidator:
         if not self.total_chunks:
             return
         pct = 100 * len(self.zero_nnz_chunks) / self.total_chunks
-        if pct > self.warn_threshold_pct:
+        threshold = getattr(self, "warn_threshold_pct", SPLADE_SPARSITY_WARN_THRESHOLD_PCT)
+        try:
+            threshold = float(threshold)
+        except (TypeError, ValueError):
+            threshold = SPLADE_SPARSITY_WARN_THRESHOLD_PCT
+        if pct > threshold:
             logger.warning(
                 "SPLADE sparsity warning: %s / %s (%.1f%%) chunks have zero non-zero elements.",
                 len(self.zero_nnz_chunks),
@@ -1411,15 +1408,11 @@ def main(args: argparse.Namespace | None = None) -> int:
     qwen_model_dir = cli_qwen or default_qwen_dir
 
     global HF_HOME, MODEL_ROOT, QWEN_DIR, SPLADE_DIR
-    HF_HOME = hf_home
-    MODEL_ROOT = model_root
-    QWEN_DIR = default_qwen_dir
-    SPLADE_DIR = default_splade_dir
-
-    os.environ["HF_HOME"] = str(hf_home)
-    os.environ["HF_HUB_CACHE"] = str(hf_home / "hub")
-    os.environ["TRANSFORMERS_CACHE"] = str(hf_home / "transformers")
-    os.environ["SENTENCE_TRANSFORMERS_HOME"] = str(model_root)
+    HF_HOME, MODEL_ROOT = init_hf_env(hf_home, model_root)
+    QWEN_DIR = expand_path(_resolve_qwen_dir(MODEL_ROOT))
+    SPLADE_DIR = expand_path(_resolve_splade_dir(MODEL_ROOT))
+    default_qwen_dir = QWEN_DIR
+    default_splade_dir = SPLADE_DIR
 
     validate_only = bool(getattr(args, "validate_only", False))
 
