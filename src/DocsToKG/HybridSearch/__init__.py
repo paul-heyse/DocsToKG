@@ -58,6 +58,7 @@ __all__ = (
     "FaissVectorStore",
     "FaissIndexManager",
     "ManagedFaissAdapter",
+    "AdapterStats",
     "FaissRouter",
     "HybridSearchAPI",
     "HybridSearchConfig",
@@ -108,6 +109,7 @@ from .types import (
 )
 from .validation import HybridSearchValidator
 from .vectorstore import (
+    AdapterStats,
     FaissIndexManager,
     FaissVectorStore,
     ManagedFaissAdapter,

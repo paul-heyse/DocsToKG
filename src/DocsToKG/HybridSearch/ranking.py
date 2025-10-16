@@ -158,6 +158,8 @@ class ResultShaper:
         fused_scores: Mapping[str, float],
         request: HybridSearchRequest,
         channel_scores: Mapping[str, Dict[str, float]],
+        *,
+        precomputed_embeddings: Optional[np.ndarray] = None,
     ) -> List[HybridSearchResult]:
         """Shape ranked candidates into final results with highlights and diagnostics.
 
@@ -166,6 +168,8 @@ class ResultShaper:
             fused_scores: Mapping of vector IDs to fused scores.
             request: Original hybrid search request, used for query context.
             channel_scores: Channel-specific score lookups keyed by resolver name.
+            precomputed_embeddings: Optional matrix aligned with ``ordered_chunks`` to
+                skip rebuilding embeddings during shaping.
 
         Returns:
             List[HybridSearchResult]: Finalised results respecting per-document quotas
@@ -174,15 +178,18 @@ class ResultShaper:
         if not ordered_chunks:
             return []
 
-        embeddings = np.ascontiguousarray(
-            np.stack(
-                [
-                    chunk.features.embedding.astype(np.float32, copy=False)
-                    for chunk in ordered_chunks
-                ]
-            ),
-            dtype=np.float32,
-        )
+        if precomputed_embeddings is not None:
+            embeddings = np.ascontiguousarray(precomputed_embeddings, dtype=np.float32)
+        else:
+            embeddings = np.ascontiguousarray(
+                np.stack(
+                    [
+                        chunk.features.embedding.astype(np.float32, copy=False)
+                        for chunk in ordered_chunks
+                    ]
+                ),
+                dtype=np.float32,
+            )
         doc_buckets: Dict[str, int] = defaultdict(int)
         emitted_indices: List[int] = []
         results: List[HybridSearchResult] = []
@@ -272,6 +279,7 @@ def apply_mmr_diversification(
     lambda_param: float,
     top_k: int,
     *,
+    embeddings: Optional[np.ndarray] = None,
     device: int = 0,
     resources: Optional["faiss.StandardGpuResources"] = None,
 ) -> List[FusionCandidate]:
@@ -282,6 +290,7 @@ def apply_mmr_diversification(
         fused_scores: Precomputed fused scores for each candidate vector ID.
         lambda_param: Balancing factor between relevance and diversity (0-1).
         top_k: Maximum number of diversified candidates to retain.
+        embeddings: Optional matrix aligned with ``fused_candidates`` to avoid restacking.
         device: GPU device identifier used for similarity computations.
         resources: Optional FAISS GPU resources; falls back to CPU cosine when ``None``.
 
@@ -297,12 +306,15 @@ def apply_mmr_diversification(
     if not fused_candidates:
         return []
 
-    embeddings = np.stack(
-        [
-            candidate.chunk.features.embedding.astype(np.float32, copy=False)
-            for candidate in fused_candidates
-        ]
-    )
+    if embeddings is None:
+        embeddings = np.stack(
+            [
+                candidate.chunk.features.embedding.astype(np.float32, copy=False)
+                for candidate in fused_candidates
+            ]
+        )
+    else:
+        embeddings = np.ascontiguousarray(embeddings, dtype=np.float32)
     total = embeddings.shape[0]
     if total <= 0:
         return []

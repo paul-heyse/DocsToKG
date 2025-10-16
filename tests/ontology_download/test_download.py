@@ -341,6 +341,7 @@ pytest.importorskip("pydantic_settings")
 import DocsToKG.OntologyDownload.net as download
 import DocsToKG.OntologyDownload.pipeline as pipeline_mod
 from DocsToKG.OntologyDownload import io_safe as io_safe_mod
+from DocsToKG.OntologyDownload import ratelimit
 from DocsToKG.OntologyDownload.config import ConfigError, DefaultsConfig, DownloadConfiguration, ResolvedConfig
 from DocsToKG.OntologyDownload.errors import DownloadFailure, OntologyDownloadError, PolicyError
 from DocsToKG.OntologyDownload.io_safe import sanitize_filename
@@ -427,9 +428,9 @@ def make_session(monkeypatch, responses, head_responses=None):
 def clear_token_buckets():
     """Reset token bucket cache between tests to avoid leakage."""
 
-    download._TOKEN_BUCKETS.clear()
+    ratelimit.reset()
     yield
-    download._TOKEN_BUCKETS.clear()
+    ratelimit.reset()
 
 
 # --- Test Cases ---
@@ -627,7 +628,7 @@ def test_download_stream_rate_limiting(monkeypatch, tmp_path):
         def consume(self):
             consumed.append(True)
 
-    monkeypatch.setattr(download, "_get_bucket", lambda host, config, service=None: StubBucket())
+    monkeypatch.setattr(ratelimit, "get_bucket", lambda **_kwargs: StubBucket())
     destination = tmp_path / "file.owl"
     download.download_stream(
         url="https://example.org/file.owl",
@@ -641,38 +642,80 @@ def test_download_stream_rate_limiting(monkeypatch, tmp_path):
     assert consumed
 
 
+def test_download_stream_sets_known_hash(monkeypatch, tmp_path):
+    recorded = {}
+
+    def fake_retrieve(url, path, fname, known_hash, downloader, progressbar):
+        recorded["known_hash"] = known_hash
+        cache_path = Path(path) / fname
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_bytes(b"payload")
+        return cache_path
+
+    monkeypatch.setattr(download.pooch, "retrieve", fake_retrieve)
+    destination = tmp_path / "file.owl"
+
+    result = download.download_stream(
+        url="https://example.org/file.owl",
+        destination=destination,
+        headers={},
+        previous_manifest=None,
+        http_config=DownloadConfiguration(),
+        cache_dir=tmp_path / "cache",
+        logger=_noop_logger(),
+        expected_hash="sha256:deadbeef",
+    )
+
+    assert recorded["known_hash"] == "sha256:deadbeef"
+    assert destination.exists()
+    assert result.status == "fresh"
+
+
 def test_get_bucket_service_specific_rate():
     config = DownloadConfiguration(rate_limits={"ols": "2/second"})
+    ratelimit.reset()
 
-    bucket = download._get_bucket("ols.example.org", config, "ols")
+    bucket = ratelimit.get_bucket(http_config=config, service="ols", host="ols.example.org")
 
     assert bucket.rate == pytest.approx(2.0)
-    assert download._TOKEN_BUCKETS["ols:ols.example.org"] is bucket
+    assert (
+        ratelimit.get_bucket(http_config=config, service="ols", host="ols.example.org")
+        is bucket
+    )
 
 
 def test_get_bucket_without_service_uses_host_key():
     config = DownloadConfiguration(per_host_rate_limit="4/second")
+    ratelimit.reset()
 
-    bucket = download._get_bucket("example.org", config)
+    bucket = ratelimit.get_bucket(http_config=config, service=None, host="example.org")
 
-    assert download._TOKEN_BUCKETS["example.org"] is bucket
+    assert (
+        ratelimit.get_bucket(http_config=config, service=None, host="example.org")
+        is bucket
+    )
     assert bucket.rate == pytest.approx(config.rate_limit_per_second())
 
 
 def test_get_bucket_falls_back_to_host_limit():
     config = DownloadConfiguration(per_host_rate_limit="6/second")
+    ratelimit.reset()
 
-    bucket = download._get_bucket("obo.org", config, "unknown")
+    bucket = ratelimit.get_bucket(http_config=config, service="unknown", host="obo.org")
 
     assert bucket.rate == pytest.approx(config.rate_limit_per_second())
-    assert download._TOKEN_BUCKETS["unknown:obo.org"].rate == bucket.rate
 
 
 def test_get_bucket_independent_keys_for_services():
     config = DownloadConfiguration(rate_limits={"ols": "2/second", "bioportal": "1/second"})
+    ratelimit.reset()
 
-    ols_bucket = download._get_bucket("api.example.org", config, "ols")
-    bioportal_bucket = download._get_bucket("api.example.org", config, "bioportal")
+    ols_bucket = ratelimit.get_bucket(
+        http_config=config, service="ols", host="api.example.org"
+    )
+    bioportal_bucket = ratelimit.get_bucket(
+        http_config=config, service="bioportal", host="api.example.org"
+    )
 
     assert ols_bucket is not bioportal_bucket
     assert ols_bucket.rate == pytest.approx(2.0)

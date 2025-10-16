@@ -20,7 +20,7 @@ from .config import DenseIndexConfig
 from .types import ChunkPayload
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from .vectorstore import FaissSearchResult
+    from .vectorstore import AdapterStats, FaissSearchResult
 
 
 class LexicalIndex(Protocol):
@@ -161,6 +161,10 @@ class DenseVectorStore(Protocol):
     def gpu_resources(self) -> object | None:
         """Return GPU resources when available, otherwise ``None``."""
 
+    @property
+    def adapter_stats(self) -> "AdapterStats":
+        """Return runtime adapter statistics (device, nprobe, replication state)."""
+
     def add(self, vectors: Sequence[np.ndarray], vector_ids: Sequence[str]) -> None:
         """Insert dense vectors."""
 
@@ -188,6 +192,15 @@ class DenseVectorStore(Protocol):
         self, queries: np.ndarray, top_k: int
     ) -> Sequence[Sequence["FaissSearchResult"]]:
         """Optional alias for batched search."""
+
+    def range_search(
+        self,
+        query: np.ndarray,
+        min_score: float,
+        *,
+        limit: Optional[int] = None,
+    ) -> Sequence["FaissSearchResult"]:
+        """Return all vectors scoring above ``min_score`` for ``query``."""
 
     def serialize(self) -> bytes:
         """Return a serialised representation of the index."""

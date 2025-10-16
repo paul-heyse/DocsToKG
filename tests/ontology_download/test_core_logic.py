@@ -94,7 +94,9 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Optional
+
+import requests
 
 import pytest
 
@@ -107,11 +109,13 @@ from DocsToKG.OntologyDownload import (
     DefaultsConfig,
     DownloadFailure,
     DownloadResult,
+    DownloadConfiguration,
     ResolvedConfig,
     ValidationResult,
 )
 from DocsToKG.OntologyDownload import ontology_download as core
 from DocsToKG.OntologyDownload import resolvers, storage as storage_mod
+from DocsToKG.OntologyDownload import io_safe as io_safe_mod
 from DocsToKG.OntologyDownload.pipeline import ResolverError
 from DocsToKG.OntologyDownload.resolvers import FetchPlan
 
@@ -786,6 +790,153 @@ def test_fetch_one_download_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     assert chain[0]["status"] == "failed"
     assert chain[1]["resolver"] == "lov"
     assert chain[1]["status"] == "success"
+
+
+def test_fetch_records_expected_checksum_and_index(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    payload = b"ontology-data"
+    expected_digest = hashlib.sha256(payload).hexdigest()
+
+    checksum_plan = FetchPlan(
+        url="https://example.org/hp.owl",
+        headers={},
+        filename_hint="hp.owl",
+        version="2024-03-01",
+        license="CC0-1.0",
+        media_type="application/rdf+xml",
+        service="obo",
+        checksum=expected_digest,
+        checksum_algorithm="sha256",
+    )
+
+    class ChecksumResolver:
+        def plan(self, spec, config, logger):
+            return checksum_plan
+
+    monkeypatch.setitem(resolvers.RESOLVERS, "obo", ChecksumResolver())
+
+    defaults = DefaultsConfig(prefer_source=["obo"])
+    config = ResolvedConfig(defaults=defaults, specs=[])
+    spec = core.FetchSpec(id="hp", resolver="obo", extras={}, target_formats=["owl"])
+
+    cache_dir = tmp_path / "cache"
+    ontology_dir = tmp_path / "ontologies"
+    for attr, value in {
+        "CACHE_DIR": cache_dir,
+        "LOCAL_ONTOLOGY_DIR": ontology_dir,
+    }.items():
+        monkeypatch.setattr(storage_mod, attr, value, raising=False)
+        monkeypatch.setattr(pipeline_mod, attr, value, raising=False)
+        monkeypatch.setattr(core, attr, value, raising=False)
+    monkeypatch.setattr(core, "ONTOLOGY_DIR", ontology_dir, raising=False)
+
+    class _StubStorage:
+        def finalize_version(self, ontology_id: str, version: str, base_dir: Path) -> None:
+            pass
+
+        def ensure_local_version(self, ontology_id: str, version: str) -> Path:
+            path = ontology_dir / ontology_id / version
+            path.mkdir(parents=True, exist_ok=True)
+            return path
+
+    stub_storage = _StubStorage()
+    monkeypatch.setattr(storage_mod, "STORAGE", stub_storage, raising=False)
+    monkeypatch.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
+    monkeypatch.setattr(core, "STORAGE", stub_storage, raising=False)
+
+    captured: Dict[str, Optional[str]] = {"expected_hash": None}
+
+    def _fake_download_stream(**kwargs):
+        captured["expected_hash"] = kwargs.get("expected_hash")
+        destination: Path = kwargs["destination"]
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(payload)
+        return DownloadResult(
+            path=destination,
+            status="fresh",
+            sha256=expected_digest,
+            etag="etag",
+            last_modified="today",
+            content_type="application/rdf+xml",
+            content_length=len(payload),
+        )
+
+    monkeypatch.setattr(pipeline_mod, "download_stream", _fake_download_stream, raising=False)
+    monkeypatch.setattr(core, "download_stream", _fake_download_stream, raising=False)
+
+    def _fake_run_validators(requests, logger):
+        return {
+            request.name: ValidationResult(
+                ok=True,
+                details={"normalized_sha256": expected_digest, "normalization_mode": "in-memory"},
+                output_files=[],
+            )
+            for request in requests
+        }
+
+    monkeypatch.setattr(pipeline_mod, "run_validators", _fake_run_validators, raising=False)
+    monkeypatch.setattr(core, "run_validators", _fake_run_validators, raising=False)
+    monkeypatch.setattr(
+        pipeline_mod, "validate_url_security", lambda url, config=None: url, raising=False
+    )
+    monkeypatch.setattr(core, "validate_url_security", lambda url, config=None: url, raising=False)
+
+    results = core.fetch_all([spec], config=config, force=True)
+    assert captured["expected_hash"] == f"sha256:{expected_digest}"
+
+    manifest = json.loads(results[0].manifest_path.read_text())
+    attempt = manifest["resolver_attempts"][0]
+    assert attempt["expected_checksum"] == f"sha256:{expected_digest}"
+
+    index_path = ontology_dir / spec.id / "index.json"
+    index_payload = json.loads(index_path.read_text())
+    assert isinstance(index_payload, list) and index_payload
+    first_entry = index_payload[0]
+    assert first_entry["sha256"] == expected_digest
+    assert first_entry["expected_checksum"] == f"sha256:{expected_digest}"
+    assert first_entry["size"] == len(payload)
+
+
+def test_resolve_expected_checksum_fetches_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    expected_digest = "a" * 64
+    spec = core.FetchSpec(
+        id="hp",
+        resolver="obo",
+        extras={"checksum_url": {"url": "https://example.org/checksums.txt", "algorithm": "sha256"}},
+        target_formats=["owl"],
+    )
+    plan = FetchPlan(
+        url="https://example.org/hp.owl",
+        headers={},
+        filename_hint="hp.owl",
+        version="2024-03-01",
+        license="CC0-1.0",
+        media_type="application/rdf+xml",
+    )
+
+    class DummyResponse:
+        text = f"{expected_digest} hp.owl"
+
+        def raise_for_status(self) -> None:
+            return None
+
+    monkeypatch.setattr(requests, "get", lambda url, timeout: DummyResponse())
+    monkeypatch.setattr(
+        pipeline_mod,
+        "validate_url_security",
+        lambda url, config=None: url,
+        raising=False,
+    )
+
+    checksum = pipeline_mod._resolve_expected_checksum(
+        spec=spec,
+        plan=plan,
+        download_config=DownloadConfiguration(),
+        logger=logging.getLogger("checksum-test"),
+    )
+
+    assert checksum == f"sha256:{expected_digest}"
 
 
 def test_manifest_fingerprint_ignores_target_format_order(

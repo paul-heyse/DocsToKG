@@ -1688,8 +1688,16 @@ def restore_state(
     faiss_index.restore(base64.b64decode(encoded.encode("ascii")), meta=dict(meta))
 
 
-# Backwards compatibility alias for downstream imports.
-FaissIndexManager = FaissVectorStore
+
+def __getattr__(name: str):
+    if name == "FaissIndexManager":
+        warnings.warn(
+            "FaissIndexManager is deprecated; import FaissVectorStore instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return FaissVectorStore
+    raise AttributeError(name)
 
 
 class ManagedFaissAdapter(DenseVectorStore):
@@ -1770,6 +1778,17 @@ class ManagedFaissAdapter(DenseVectorStore):
 
         return self._inner.range_search(query, min_score, limit=limit)
 
+    def set_nprobe(
+        self,
+        nprobe: int,
+        *,
+        clamp_min: int = 1,
+        clamp_max: Optional[int] = None,
+    ) -> int:
+        """Tune ``nprobe`` while clamping to the managed safe range."""
+
+        return self._inner.set_nprobe(nprobe, clamp_min=clamp_min, clamp_max=clamp_max)
+
     def remove(self, vector_ids: Sequence[str]) -> None:
         """Remove vectors corresponding to ``vector_ids`` from the index."""
 
@@ -1809,7 +1828,12 @@ class ManagedFaissAdapter(DenseVectorStore):
     def gpu_resources(self):
         """Return GPU resources backing the managed index."""
 
-        return self._inner.gpu_resources
+        warnings.warn(
+            "ManagedFaissAdapter.gpu_resources is deprecated; use adapter_stats.resources instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self._inner.adapter_stats.resources
 
     @property
     def ntotal(self) -> int:

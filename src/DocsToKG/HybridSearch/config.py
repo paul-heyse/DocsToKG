@@ -120,6 +120,9 @@ class DenseIndexConfig:
         force_64bit_ids: Force FAISS to use 64-bit IDs even when 32-bit would suffice
         interleaved_layout: Enable GPU interleaved layout optimisations when supported
         flat_use_fp16: Use float16 compute for flat indexes when available
+        enable_replication: Allow replication to additional GPUs when configured
+        enable_reserve_memory: Enable GPU memory reservation based on expected_ntotal
+        use_pinned_memory: Use pinned host buffers for large add/search batches
         persist_mode: Persistence policy ("cpu_bytes" default, disable for GPU-only runtime)
         ivf_train_factor: Controls IVF training sample size per nlist shard
 
@@ -150,6 +153,9 @@ class DenseIndexConfig:
     force_64bit_ids: bool = False
     interleaved_layout: bool = True
     flat_use_fp16: bool = False
+    enable_replication: bool = True
+    enable_reserve_memory: bool = True
+    use_pinned_memory: bool = True
     # Persistence: "cpu_bytes" (default, serialize via CPU), or "disabled"
     persist_mode: Literal["cpu_bytes", "disabled"] = "cpu_bytes"
     # Controls training sample size for IVF: min(total, max(1024, nlist * ivf_train_factor))

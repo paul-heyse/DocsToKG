@@ -759,9 +759,17 @@ class HybridSearchValidator:
             np.stack([chunk.features.embedding for chunk in all_chunks], dtype=np.float32)
         )
         vector_ids = [chunk.vector_id for chunk in all_chunks]
-        gpu_resources = self._ingestion.faiss_index.gpu_resources
-        device = self._ingestion.faiss_index.device
-        if gpu_resources is None:
+        try:
+            adapter_stats = self._ingestion.faiss_index.adapter_stats  # type: ignore[attr-defined]
+        except AttributeError:
+            adapter_stats = None
+        resources = (
+            adapter_stats.resources if adapter_stats is not None else getattr(self._ingestion.faiss_index, "gpu_resources", None)
+        )
+        device = (
+            adapter_stats.device if adapter_stats is not None else self._ingestion.faiss_index.device
+        )
+        if resources is None:
             vector_matrix = normalize_rows(vector_matrix)
 
         noise_rng = np.random.default_rng(2024)
@@ -782,13 +790,13 @@ class HybridSearchValidator:
             ):
                 perturb_hits += 1
 
-            if gpu_resources is not None:
+            if resources is not None:
                 _scores, indices_block = cosine_topk_blockwise(
                     query_vec,
                     vector_matrix,
                     k=top_k,
                     device=device,
-                    resources=gpu_resources,
+                    resources=resources,
                 )
                 top_indices = indices_block[0].astype(int, copy=False)
             else:

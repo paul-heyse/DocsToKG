@@ -53,6 +53,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from pathlib import Path
 
@@ -123,6 +124,14 @@ def test_streaming_hash_is_deterministic(tmp_path: Path) -> None:
         pytest.skip("Expected hash value not recorded yet")
 
 
+def test_streaming_header_hash_is_stable() -> None:
+    digest, header_hash = normalize_streaming(_COMPLEX_FIXTURE, return_header_hash=True)
+    digest_again, header_again = normalize_streaming(_COMPLEX_FIXTURE, return_header_hash=True)
+    assert digest == digest_again
+    assert header_hash == header_again
+    assert len(header_hash) == 64
+
+
 def test_streaming_matches_in_memory(tmp_path: Path) -> None:
     in_memory = _run_rdflib(_COMPLEX_FIXTURE, tmp_path / "memory", threshold_mb=4096)
     streaming = _run_rdflib(_COMPLEX_FIXTURE, tmp_path / "stream", threshold_mb=1)
@@ -166,8 +175,15 @@ def test_streaming_flushes_chunks(monkeypatch, tmp_path: Path) -> None:
 
     tracker = _Tracker()
 
+    real_sha256 = hashlib.sha256
+
+    def fake_sha256(*args, **kwargs):
+        if args or kwargs:
+            return real_sha256(*args, **kwargs)
+        return tracker
+
     monkeypatch.setattr(
-        "DocsToKG.OntologyDownload.ontology_download.hashlib.sha256", lambda: tracker
+        "DocsToKG.OntologyDownload.validation_core.hashlib.sha256", fake_sha256
     )
 
     destination = tmp_path / "chunked.ttl"

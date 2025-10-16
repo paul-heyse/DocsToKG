@@ -664,14 +664,16 @@ def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> Valid
             )
             file_size = request.file_path.stat().st_size
             streaming_hash: Optional[str] = None
+            streaming_header_hash: Optional[str] = None
             normalized_sha: Optional[str] = None
             if file_size >= threshold_bytes:
                 normalization_mode = "streaming"
                 try:
-                    streaming_hash = normalize_streaming(
+                    streaming_hash, streaming_header_hash = normalize_streaming(
                         request.file_path,
                         output_path=normalized_ttl,
                         graph=graph,
+                        return_header_hash=True,
                     )
                     normalized_sha = streaming_hash
                 except Exception as exc:  # pylint: disable=broad-except
@@ -701,15 +703,20 @@ def validate_rdflib(request: ValidationRequest, logger: logging.Logger) -> Valid
             output_files.append(str(normalized_ttl))
             if streaming_hash is not None:
                 payload["streaming_nt_sha256"] = streaming_hash
+            if streaming_header_hash is not None:
+                payload["streaming_prefix_sha256"] = streaming_header_hash
         if (
             "ttl" in request.config.defaults.normalize_to
             and payload.get("streaming_nt_sha256") is None
         ):
             try:
-                payload["streaming_nt_sha256"] = normalize_streaming(
+                extra_hash, extra_header = normalize_streaming(
                     request.file_path,
                     graph=graph,
+                    return_header_hash=True,
                 )
+                payload["streaming_nt_sha256"] = extra_hash
+                payload.setdefault("streaming_prefix_sha256", extra_header)
             except Exception as exc:  # pragma: no cover - defensive fallback
                 logger.warning(
                     "failed to compute streaming normalization hash",

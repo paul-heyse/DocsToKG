@@ -279,8 +279,9 @@ def test_streaming_matches_in_memory(tmp_path, config):
     streaming_request = make_request(source, tmp_path / "stream", streaming_config)
     streaming_result = validate_rdflib(streaming_request, _noop_logger())
     assert streaming_result.details["normalization_mode"] == "streaming"
-    stream_hash = normalize_streaming(source)
+    stream_hash, header_hash = normalize_streaming(source, return_header_hash=True)
     assert streaming_result.details.get("streaming_nt_sha256") == stream_hash
+    assert streaming_result.details.get("streaming_prefix_sha256") == header_hash
 
     normalized_file = streaming_request.normalized_dir / "complex.ttl"
     assert normalized_file.exists()
@@ -320,10 +321,13 @@ def test_normalize_streaming_edge_cases(tmp_path, config):
 
     for path, graph in cases.items():
         target = tmp_path / f"{path.stem}.ttl"
-        digest_stream = normalize_streaming(path, output_path=target, graph=graph)
+        digest_stream, header_stream = normalize_streaming(
+            path, output_path=target, graph=graph, return_header_hash=True
+        )
         request = make_request(path, tmp_path / f"{path.stem}-mem", config)
         result = validate_rdflib(request, _noop_logger())
         assert result.details.get("streaming_nt_sha256") == digest_stream
+        assert result.details.get("streaming_prefix_sha256") == header_stream
 
 
 def test_run_validators_respects_concurrency(monkeypatch, tmp_path, config):

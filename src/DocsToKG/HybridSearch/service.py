@@ -190,7 +190,11 @@ class DenseSearchStrategy:
 
 @dataclass(slots=True)
 class ChannelResults:
-    """Results from a single retrieval channel (BM25, SPLADE, or dense)."""
+    """Results from a single retrieval channel (BM25, SPLADE, or dense).
+
+    ``embeddings`` stores an optional matrix aligned with ``candidates`` for
+    downstream GPU deduplication and diversification reuse.
+    """
 
     candidates: List[FusionCandidate]
     scores: Dict[str, float]
@@ -213,15 +217,18 @@ class HybridSearchService:
         >>> # File-backed config manager (JSON/YAML on disk)
         >>> from pathlib import Path  # doctest: +SKIP
         >>> manager = HybridSearchConfigManager(Path("config.json"))  # doctest: +SKIP
+        >>> from DocsToKG.HybridSearch.interfaces import DenseVectorStore  # doctest: +SKIP
         >>> from DocsToKG.HybridSearch.router import FaissRouter  # doctest: +SKIP
         >>> from DocsToKG.HybridSearch.vectorstore import FaissVectorStore, ManagedFaissAdapter  # doctest: +SKIP
         >>> from DocsToKG.HybridSearch.storage import OpenSearchSimulator  # doctest: +SKIP
-        >>> store = ManagedFaissAdapter(FaissVectorStore(dim=16, config=HybridSearchConfig().dense))  # doctest: +SKIP
-        >>> router = FaissRouter(per_namespace=False, default_store=store)  # doctest: +SKIP
+        >>> dense_store: DenseVectorStore = ManagedFaissAdapter(  # doctest: +SKIP
+        ...     FaissVectorStore(dim=16, config=HybridSearchConfig().dense)
+        ... )
+        >>> router = FaissRouter(per_namespace=False, default_store=dense_store)  # doctest: +SKIP
         >>> service = HybridSearchService(  # doctest: +SKIP
         ...     config_manager=manager,
         ...     feature_generator=FeatureGenerator(embedding_dim=16),
-        ...     faiss_index=store,
+        ...     faiss_index=dense_store,
         ...     opensearch=OpenSearchSimulator(),
         ...     registry=ChunkRegistry(),
         ...     faiss_router=router,
@@ -427,7 +434,7 @@ class HybridSearchService:
             shaper = ResultShaper(
                 self._opensearch,
                 config.fusion,
-                device=dense_store.device,
+                device=(dense_stats.device if dense_stats is not None else dense_store.device),
                 resources=(dense_stats.resources if dense_stats is not None else getattr(dense_store, "gpu_resources", None)),
             )
             shaped = shaper.shape(
