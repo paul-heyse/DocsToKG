@@ -394,7 +394,20 @@ class FaissVectorStore:
     def _current_index_ids(self) -> np.ndarray:
         if self._index is None or self._index.ntotal == 0:
             return np.empty(0, dtype=np.int64)
-        return np.asarray(faiss.vector_to_array(self._index.id_map), dtype=np.int64)
+        try:
+            id_map = getattr(self._index, "id_map", None)
+            if id_map is not None:
+                return np.asarray(faiss.vector_to_array(id_map), dtype=np.int64)
+        except Exception:
+            pass
+        try:
+            cpu = self._to_cpu(self._index)
+            id_map_cpu = getattr(cpu, "id_map", None)
+            if id_map_cpu is not None:
+                return np.asarray(faiss.vector_to_array(id_map_cpu), dtype=np.int64)
+        except Exception:
+            logger.debug("Unable to enumerate FAISS id_map; returning empty set", exc_info=True)
+        return np.empty(0, dtype=np.int64)
 
     def _lookup_existing_ids(self, candidate_ids: np.ndarray) -> np.ndarray:
         if candidate_ids.size == 0 or self._index.ntotal == 0:

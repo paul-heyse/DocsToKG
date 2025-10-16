@@ -4,16 +4,16 @@
 #   "purpose": "Utility script for ontofetch benchmark workflows",
 #   "sections": [
 #     {
-#       "id": "public_functions",
-#       "name": "Public Functions",
-#       "anchor": "PF",
-#       "kind": "api"
+#       "id": "benchmark",
+#       "name": "benchmark",
+#       "anchor": "function-benchmark",
+#       "kind": "function"
 #     },
 #     {
-#       "id": "module_entry_points",
-#       "name": "Module Entry Points",
-#       "anchor": "MEP",
-#       "kind": "cli"
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
 #     }
 #   ]
 # }

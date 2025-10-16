@@ -432,10 +432,6 @@ SystemExit: Propagated if ``argparse`` detects invalid options.
 
 Instantiate and cache a Docling HTML converter per worker process.
 
-Returns:
-DocumentConverter configured for HTML input, cached for reuse within
-the worker process.
-
 ### `list_htmls(root)`
 
 Enumerate HTML-like files beneath a directory tree.

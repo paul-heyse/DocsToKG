@@ -5,28 +5,28 @@
 #   "purpose": "Utility script for export attempts csv workflows",
 #   "sections": [
 #     {
-#       "id": "globals",
-#       "name": "Globals",
-#       "anchor": "GLOB",
-#       "kind": "infra"
+#       "id": "iter-attempt-records",
+#       "name": "_iter_attempt_records",
+#       "anchor": "function-iter-attempt-records",
+#       "kind": "function"
 #     },
 #     {
-#       "id": "private_helpers",
-#       "name": "Private Helpers",
-#       "anchor": "PH",
-#       "kind": "internal"
+#       "id": "export-attempts-jsonl-to-csv",
+#       "name": "export_attempts_jsonl_to_csv",
+#       "anchor": "function-export-attempts-jsonl-to-csv",
+#       "kind": "function"
 #     },
 #     {
-#       "id": "public_functions",
-#       "name": "Public Functions",
-#       "anchor": "PF",
-#       "kind": "api"
+#       "id": "parse-args",
+#       "name": "_parse_args",
+#       "anchor": "function-parse-args",
+#       "kind": "function"
 #     },
 #     {
-#       "id": "module_entry_points",
-#       "name": "Module Entry Points",
-#       "anchor": "MEP",
-#       "kind": "cli"
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
 #     }
 #   ]
 # }

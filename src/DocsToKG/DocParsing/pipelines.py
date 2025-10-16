@@ -376,36 +376,11 @@ def _expand_path(path: str | Path) -> Path:
     return Path(path).expanduser().resolve()
 
 
-def resolve_hf_home() -> Path:
-    """Resolve the HuggingFace cache directory respecting ``HF_HOME``.
 
-    Args:
-        None
-
-    Returns:
-        Path: Absolute location of the HuggingFace cache directory.
-    """
-
-    env = os.getenv("HF_HOME")
-    if env:
-        return _expand_path(env)
-    return Path.home().expanduser() / ".cache" / "huggingface"
-
-
-def resolve_model_root() -> Path:
-    """Resolve DocsToKG model root with environment override.
-
-    Args:
-        None
-
-    Returns:
-        Path: Absolute model root directory for DocsToKG artifacts.
-    """
-
-    env = os.getenv("DOCSTOKG_MODEL_ROOT")
-    if env:
-        return _expand_path(env)
-    return resolve_hf_home()
+# Re-export canonical helpers from _common to avoid divergence.
+from DocsToKG.DocParsing._common import resolve_hf_home as _resolve_hf_home_common, resolve_model_root as _resolve_model_root_common
+resolve_hf_home = _resolve_hf_home_common
+resolve_model_root = _resolve_model_root_common
 
 
 def resolve_pdf_model_path(cli_value: str | None = None) -> str:
@@ -1868,8 +1843,40 @@ def html_convert_one(task: HtmlTask) -> HtmlConversionResult:
                 error="empty-document",
             )
 
+        
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        result.document.save_as_doctags(out_path)
+        tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+        # Serialize under a lock to avoid partial writes when workers race
+        try:
+            with acquire_lock(out_path):
+                if out_path.exists() and not task.overwrite:
+                    return HtmlConversionResult(
+                                        doc_id=task.relative_id,
+                                        status="skip",
+                                        duration_s=time.perf_counter() - start,
+                                        input_path=str(task.html_path),
+                                        input_hash=task.input_hash,
+                                        output_path=str(out_path),
+                                    )
+                result.document.save_as_doctags(tmp_path)
+                try:
+                    tmp_path.replace(out_path)
+                finally:
+                    if tmp_path.exists():
+                        try:
+                            tmp_path.unlink()
+                        except Exception:
+                            pass
+        except TimeoutError as exc:
+            return HtmlConversionResult(
+                doc_id=task.relative_id,
+                status="failure",
+                duration_s=time.perf_counter() - start,
+                input_path=str(task.html_path),
+                input_hash=task.input_hash,
+                output_path=str(out_path),
+                error=str(exc),
+            )
         return HtmlConversionResult(
             doc_id=task.relative_id,
             status="success",

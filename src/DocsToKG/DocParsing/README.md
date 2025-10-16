@@ -71,6 +71,8 @@ include:
 | `--workers` | DocTags | Parallel PDF worker count (spawn start method enforced). |
 | `--min-tokens` / `--max-tokens` | Chunker | Token window boundaries for chunk coalescence. |
 | `--tokenizer-model` | Chunker | HuggingFace tokenizer aligning chunk lengths with the dense embedder. |
+| `--validate-only` | Embedder | Validate existing vectors in an output directory and exit. |
+| `--qwen-dim` | Embedder | Expected Qwen output dimension (use with multi-resolution models). |
 | `--batch-size-*` | Embedder | Independent batch sizing for SPLADE and Qwen passes. |
 
 ### Environment Variables
@@ -186,6 +188,10 @@ can reason about historical data sets.
   `Data/Vectors/` directories should rename them to keep manifests and resumable
   processing aligned with the canonical layout.
 
+
+### Deprecations
+
+* The legacy module `DocsToKG.DocParsing.pdf_pipeline` is now **deprecated** and will be removed in a future release. Use the CLI (`python -m DocsToKG.DocParsing.cli --pdf`) or the `DocsToKG.DocParsing.pipelines` APIs instead.
 ## Synthetic Benchmarking & Test Utilities
 
 The test suite ships lightweight fixtures that allow end-to-end validation

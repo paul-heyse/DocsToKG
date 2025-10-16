@@ -33,6 +33,13 @@ import argparse
 
 from DocsToKG.DocParsing import pipelines as _pipelines
 
+import warnings as _warnings
+_warnings.warn(
+    "DocsToKG.DocParsing.pdf_pipeline is deprecated; use `DocsToKG.DocParsing.pipelines` or `python -m DocsToKG.DocParsing.cli --pdf`. This shim will be removed in a future release.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 # --- Re-exported API ---
 
 __all__ = (

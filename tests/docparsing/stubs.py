@@ -26,18 +26,14 @@ from typing import Dict, Iterator, List, Sequence
 __all__ = ["dependency_stubs"]
 
 
-@contextmanager
-# --- Test Cases ---
-
-def dependency_stubs(dense_dim: int = 2560) -> Iterator[None]:
+def dependency_stubs(dense_dim: int = 2560) -> None:
     """Install lightweight optional dependency stubs for integration tests."""
 
-    installed: Dict[str, ModuleType | None] = {}
+    def _install(name: str, module: ModuleType, *, force: bool = False) -> None:
+        """Register a stub module when missing or when forcing replacement."""
 
-    def _install(name: str, module: ModuleType) -> None:
-        """Register a stub module and remember any previous definition."""
-
-        installed[name] = sys.modules.get(name)
+        if not force and name in sys.modules:
+            return
         sys.modules[name] = module
 
     # sentence_transformers stub -------------------------------------------------
@@ -93,7 +89,7 @@ def dependency_stubs(dense_dim: int = 2560) -> Iterator[None]:
 
     sentence_module = ModuleType("sentence_transformers")
     sentence_module.SparseEncoder = _StubSparseEncoder
-    _install("sentence_transformers", sentence_module)
+    _install("sentence_transformers", sentence_module, force=True)
 
     # vllm stub -----------------------------------------------------------------
     class _StubEmbedding:
@@ -121,7 +117,7 @@ def dependency_stubs(dense_dim: int = 2560) -> Iterator[None]:
     vllm_module = ModuleType("vllm")
     vllm_module.LLM = _StubLLM
     vllm_module.PoolingParams = _StubPoolingParams
-    _install("vllm", vllm_module)
+    _install("vllm", vllm_module, force=True)
 
     # tqdm stub ----------------------------------------------------------------
     def _tqdm(iterable=None, **_kwargs):  # type: ignore[override]
@@ -129,7 +125,7 @@ def dependency_stubs(dense_dim: int = 2560) -> Iterator[None]:
 
     tqdm_module = ModuleType("tqdm")
     tqdm_module.tqdm = _tqdm
-    _install("tqdm", tqdm_module)
+    _install("tqdm", tqdm_module, force=True)
 
     # pydantic stub -----------------------------------------------------------
     _FIELD_UNSET = object()
@@ -226,7 +222,7 @@ def dependency_stubs(dense_dim: int = 2560) -> Iterator[None]:
 
     transformers_module = ModuleType("transformers")
     transformers_module.AutoTokenizer = _StubAutoTokenizer
-    _install("transformers", transformers_module)
+    _install("transformers", transformers_module, force=True)
 
     class _StubDocTagsDocument:
         def __init__(self, texts: Sequence[str]) -> None:
@@ -371,27 +367,20 @@ def dependency_stubs(dense_dim: int = 2560) -> Iterator[None]:
     serializer_markdown.MarkdownPictureSerializer = _StubMarkdownPictureSerializer
     serializer_markdown.MarkdownTableSerializer = _StubMarkdownTableSerializer
 
-    _install("docling_core", docling_core)
-    _install("docling_core.transforms", transforms_module)
-    _install("docling_core.transforms.chunker", chunker_module)
-    _install("docling_core.transforms.chunker.base", base_module)
-    _install("docling_core.transforms.chunker.hybrid_chunker", hybrid_module)
-    _install("docling_core.transforms.chunker.hierarchical_chunker", hierarchical_module)
-    _install("docling_core.transforms.chunker.tokenizer", tokenizer_pkg)
-    _install("docling_core.transforms.chunker.tokenizer.huggingface", hf_module)
-    _install("docling_core.transforms.serializer", serializer_pkg)
-    _install("docling_core.transforms.serializer.base", serializer_base)
-    _install("docling_core.transforms.serializer.common", serializer_common)
-    _install("docling_core.transforms.serializer.markdown", serializer_markdown)
-    _install("docling_core.types", types_module)
-    _install("docling_core.types.doc", doc_module)
-    _install("docling_core.types.doc.document", document_module)
-
-    try:
-        yield
-    finally:
-        for name, previous in installed.items():
-            if previous is None:
-                sys.modules.pop(name, None)
-            else:
-                sys.modules[name] = previous
+    _install("docling_core", docling_core, force=True)
+    _install("docling_core.transforms", transforms_module, force=True)
+    _install("docling_core.transforms.chunker", chunker_module, force=True)
+    _install("docling_core.transforms.chunker.base", base_module, force=True)
+    _install("docling_core.transforms.chunker.hybrid_chunker", hybrid_module, force=True)
+    _install("docling_core.transforms.chunker.hierarchical_chunker", hierarchical_module, force=True)
+    _install("docling_core.transforms.chunker.tokenizer", tokenizer_pkg, force=True)
+    _install(
+        "docling_core.transforms.chunker.tokenizer.huggingface", hf_module, force=True
+    )
+    _install("docling_core.transforms.serializer", serializer_pkg, force=True)
+    _install("docling_core.transforms.serializer.base", serializer_base, force=True)
+    _install("docling_core.transforms.serializer.common", serializer_common, force=True)
+    _install("docling_core.transforms.serializer.markdown", serializer_markdown, force=True)
+    _install("docling_core.types", types_module, force=True)
+    _install("docling_core.types.doc", doc_module, force=True)
+    _install("docling_core.types.doc.document", document_module, force=True)

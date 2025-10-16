@@ -4,22 +4,10 @@
 #   "purpose": "Utility script for generate config schema workflows",
 #   "sections": [
 #     {
-#       "id": "globals",
-#       "name": "Globals",
-#       "anchor": "GLOB",
-#       "kind": "infra"
-#     },
-#     {
-#       "id": "public_functions",
-#       "name": "Public Functions",
-#       "anchor": "PF",
-#       "kind": "api"
-#     },
-#     {
-#       "id": "module_entry_points",
-#       "name": "Module Entry Points",
-#       "anchor": "MEP",
-#       "kind": "cli"
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
 #     }
 #   ]
 # }

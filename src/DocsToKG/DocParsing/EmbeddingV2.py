@@ -246,22 +246,6 @@ def _derive_doc_id_and_output_path(
     return doc_id, vectors_root / vector_relative
 
 
-def _derive_doc_id_and_output_path(
-    chunk_file: Path, chunks_root: Path, vectors_root: Path
-) -> tuple[str, Path]:
-    """Return manifest doc_id and vector output path for a chunk artifact."""
-
-    relative = chunk_file.relative_to(chunks_root)
-    base = relative
-    if base.suffix == ".jsonl":
-        base = base.with_suffix("")
-    if base.suffix == ".chunks":
-        base = base.with_suffix("")
-    doc_id = base.with_suffix(".doctags").as_posix()
-    vector_relative = base.with_suffix(".vectors.jsonl")
-    return doc_id, vectors_root / vector_relative
-
-
 def _expand_optional(path: Optional[Path]) -> Optional[Path]:
     """Expand optional :class:`Path` values to absolutes when provided.
 
@@ -795,6 +779,8 @@ class QwenCfg:
     gpu_mem_util: float = 0.60
     batch_size: int = 32
     quantization: str | None = None  # 'awq' if you have an AWQ checkpoint
+    dim: int = 2560  # output embedding dimension (MRL-aware)
+
 
 
 def qwen_embed(
@@ -826,7 +812,7 @@ def qwen_embed(
             download_dir=str(HF_HOME),  # belt & suspenders: keep any aux files in your cache
         )
         _QWEN_LLM_CACHE[cache_key] = llm
-    pool = PoolingParams(normalize=True)
+    pool = PoolingParams(normalize=True, dimensions=int(cfg.dim))
     out: List[List[float]] = []
     for i in range(0, len(texts), effective_batch):
         batch = texts[i : i + effective_batch]
@@ -1080,9 +1066,9 @@ def write_vectors(
         nnz = sum(1 for weight in weight_list if weight > 0)
         splade_nnz.append(nnz)
 
-        if len(qwen_vector) != 2560:
+        if len(qwen_vector) != int(args.qwen_dim):
             message = (
-                f"Qwen dimension mismatch for UUID={uuid_value}: expected 2560, "
+                f"Qwen dimension mismatch for UUID={uuid_value}: expected {int(args.qwen_dim)}, "
                 f"got {len(qwen_vector)}"
             )
             doc_id = row.get("doc_id", "unknown")
@@ -1130,7 +1116,7 @@ def write_vectors(
                 Qwen3_4B=DenseVector(
                     model_id="Qwen/Qwen3-Embedding-4B",
                     vector=[float(x) for x in qwen_vector],
-                    dimension=2560,
+                    dimension=int(args.qwen_dim),
                 ),
                 model_metadata={
                     "splade": {"batch_size": args.batch_size_splade},
@@ -1173,6 +1159,27 @@ def write_vectors(
 
 # --- Main Driver ---
 
+
+def _validate_vectors_in_dir(vectors_dir: Path, logger) -> tuple[int, int]:
+    """Validate all *.vectors.jsonl files under a directory tree.
+
+    Returns:
+        (files_checked, rows_validated)
+    """
+    from DocsToKG.DocParsing.schemas import validate_vector_row
+    files = sorted([p for p in vectors_dir.rglob("*.vectors.jsonl") if p.is_file()])
+    rows = 0
+    for f in files:
+        for batch in iter_rows_in_batches(f, 4096):
+            for row in batch:
+                # Raises on error
+                validate_vector_row(row)
+                rows += 1
+    logger.info(
+        "Validated vector files",
+        extra={"extra_fields": {"files": len(files), "rows": rows, "dir": str(vectors_dir)}},
+    )
+    return len(files), rows
 def build_parser() -> argparse.ArgumentParser:
     """Construct the CLI parser for the embedding pipeline.
 
@@ -1229,12 +1236,14 @@ def build_parser() -> argparse.ArgumentParser:
             "model root/Qwen/Qwen3-Embedding-4B)."
         ),
     )
+    parser.add_argument("--qwen-dim", type=int, default=2560, help="Expected Qwen output dimension (set when using MRL).")
     parser.add_argument("--tp", type=int, default=1)
     add_resume_force_options(
         parser,
         resume_help="Skip chunk files whose vector outputs already exist with matching hash",
         force_help="Force reprocessing even when resume criteria are satisfied",
     )
+    parser.add_argument("--validate-only", action="store_true", help="Validate existing vectors in --out-dir and exit")
     parser.add_argument(
         "--offline",
         action="store_true",
@@ -1382,6 +1391,11 @@ def main(args: argparse.Namespace | None = None) -> int:
     ).resolve()
 
     out_dir.mkdir(parents=True, exist_ok=True)
+    if getattr(args, 'validate_only', False):
+        _f, _r = _validate_vectors_in_dir(out_dir, logger)
+        logger.info('Validation-only mode complete', extra={'extra_fields': {'files': _f, 'rows': _r}})
+        return 0
+
     args.out_dir = out_dir
 
     logger.info(
@@ -1425,6 +1439,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         tp=int(args.tp),
         batch_size=int(args.batch_size_qwen),
         quantization=args.qwen_quant,
+        dim=int(args.qwen_dim),
     )
 
     stats = process_pass_a(files, logger)

@@ -5,22 +5,16 @@
 #   "purpose": "Documentation tooling for build docs workflows",
 #   "sections": [
 #     {
-#       "id": "public_classes",
-#       "name": "Public Classes",
-#       "anchor": "PC",
-#       "kind": "api"
+#       "id": "docsbuilder",
+#       "name": "DocsBuilder",
+#       "anchor": "class-docsbuilder",
+#       "kind": "class"
 #     },
 #     {
-#       "id": "public_functions",
-#       "name": "Public Functions",
-#       "anchor": "PF",
-#       "kind": "api"
-#     },
-#     {
-#       "id": "module_entry_points",
-#       "name": "Module Entry Points",
-#       "anchor": "MEP",
-#       "kind": "cli"
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
 #     }
 #   ]
 # }

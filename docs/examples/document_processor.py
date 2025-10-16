@@ -4,22 +4,64 @@
 #   "purpose": "Example workflow for document processor",
 #   "sections": [
 #     {
-#       "id": "public_classes",
-#       "name": "Public Classes",
-#       "anchor": "PC",
-#       "kind": "api"
+#       "id": "processingconfig",
+#       "name": "ProcessingConfig",
+#       "anchor": "class-processingconfig",
+#       "kind": "class"
 #     },
 #     {
-#       "id": "public_functions",
-#       "name": "Public Functions",
-#       "anchor": "PF",
-#       "kind": "api"
+#       "id": "entity",
+#       "name": "Entity",
+#       "anchor": "class-entity",
+#       "kind": "class"
 #     },
 #     {
-#       "id": "globals",
-#       "name": "Globals",
-#       "anchor": "GLOB",
-#       "kind": "infra"
+#       "id": "processingresult",
+#       "name": "ProcessingResult",
+#       "anchor": "class-processingresult",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "documentprocessor",
+#       "name": "DocumentProcessor",
+#       "anchor": "class-documentprocessor",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "example-usage",
+#       "name": "example_usage",
+#       "anchor": "function-example-usage",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "documentprocessingerror",
+#       "name": "DocumentProcessingError",
+#       "anchor": "class-documentprocessingerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "configurationerror",
+#       "name": "ConfigurationError",
+#       "anchor": "class-configurationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "documentnotfounderror",
+#       "name": "DocumentNotFoundError",
+#       "anchor": "class-documentnotfounderror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "validationerror",
+#       "name": "ValidationError",
+#       "anchor": "class-validationerror",
+#       "kind": "class"
+#     },
+#     {
+#       "id": "modelloaderror",
+#       "name": "ModelLoadError",
+#       "anchor": "class-modelloaderror",
+#       "kind": "class"
 #     }
 #   ]
 # }

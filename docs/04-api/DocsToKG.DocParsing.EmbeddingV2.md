@@ -245,8 +245,7 @@ Generate vectors for a single chunk file and persist them to disk.
 
 Args:
 chunk_file: Chunk JSONL file to process.
-out_path: Destination path for vectors or legacy ``BM25Stats`` when
-using the historical call signature.
+out_path: Destination path for vectors.
 stats: Precomputed BM25 statistics.
 args: Parsed CLI arguments with runtime configuration.
 validator: SPLADE validator for sparsity metrics.

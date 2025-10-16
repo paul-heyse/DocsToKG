@@ -274,7 +274,6 @@ import json
 import os
 import sys
 import uuid
-import warnings
 from http import HTTPStatus
 from pathlib import Path
 from typing import Callable, Dict, List, Mapping, Sequence
@@ -1440,81 +1439,41 @@ def test_gpu_similarity_uses_supplied_device(monkeypatch: pytest.MonkeyPatch) ->
     assert captured.get("resources") is manager.gpu_resources
 
 
-def test_operations_shim_emits_warning_and_reexports() -> None:
+def test_operations_module_is_removed() -> None:
     module_name = "DocsToKG.HybridSearch.operations"
     sys.modules.pop(module_name, None)
 
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always", DeprecationWarning)
-        module = importlib.import_module(module_name)
-
-    assert any(
-        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning for w in caught
-    ), "Importing the shim should emit a deprecation warning"
-    assert module.serialize_state is serialize_state
-    assert module.restore_state is restore_state
-    assert module.verify_pagination is verify_pagination
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module(module_name)
 
 
-def test_results_shim_emits_warning_and_reexports() -> None:
+def test_results_module_is_removed() -> None:
     module_name = "DocsToKG.HybridSearch.results"
     sys.modules.pop(module_name, None)
 
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always", DeprecationWarning)
-        module = importlib.import_module(module_name)
-
-    assert any(
-        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning for w in caught
-    ), "Importing the shim should emit a deprecation warning"
-    assert module.ResultShaper is ResultShaper
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module(module_name)
 
 
-def test_similarity_shim_emits_warning_and_reexports() -> None:
+def test_similarity_module_is_removed() -> None:
     module_name = "DocsToKG.HybridSearch.similarity"
     sys.modules.pop(module_name, None)
 
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always", DeprecationWarning)
-        module = importlib.import_module(module_name)
-
-    assert any(
-        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning for w in caught
-    ), "Importing the shim should emit a deprecation warning"
-    assert module.normalize_rows is normalize_rows
-    assert module.cosine_against_corpus_gpu is cosine_against_corpus_gpu
-    assert module.pairwise_inner_products is pairwise_inner_products
-    assert module.max_inner_product is max_inner_product
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module(module_name)
 
 
-def test_retrieval_shim_emits_warning_and_reexports() -> None:
+def test_retrieval_module_is_removed() -> None:
     module_name = "DocsToKG.HybridSearch.retrieval"
     sys.modules.pop(module_name, None)
 
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always", DeprecationWarning)
-        module = importlib.import_module(module_name)
-
-    assert any(
-        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning for w in caught
-    ), "Importing the shim should emit a deprecation warning"
-    assert module.HybridSearchService is HybridSearchService
-    assert module.HybridSearchAPI is HybridSearchAPI
-    assert module.RequestValidationError is RequestValidationError
-    assert module.ChannelResults is ChannelResults
-    assert module.verify_pagination is verify_pagination
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module(module_name)
 
 
-def test_schema_shim_emits_warning_and_reexports() -> None:
+def test_schema_module_is_removed() -> None:
     module_name = "DocsToKG.HybridSearch.schema"
     sys.modules.pop(module_name, None)
 
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always", DeprecationWarning)
-        module = importlib.import_module(module_name)
-
-    assert any(
-        "deprecated" in str(w.message).lower() and w.category is DeprecationWarning for w in caught
-    ), "Importing the shim should emit a deprecation warning"
-    assert module.OpenSearchSchemaManager is OpenSearchSchemaManager
-    assert module.OpenSearchIndexTemplate is OpenSearchIndexTemplate
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module(module_name)

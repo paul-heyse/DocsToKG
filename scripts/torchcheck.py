@@ -2,20 +2,7 @@
 # {
 #   "module": "scripts.torchcheck",
 #   "purpose": "Utility script for torchcheck workflows",
-#   "sections": [
-#     {
-#       "id": "module_body",
-#       "name": "Module Body",
-#       "anchor": "MB",
-#       "kind": "infra"
-#     },
-#     {
-#       "id": "module_body",
-#       "name": "Module Body",
-#       "anchor": "MB1",
-#       "kind": "infra"
-#     }
-#   ]
+#   "sections": []
 # }
 # === /NAVMAP ===
 

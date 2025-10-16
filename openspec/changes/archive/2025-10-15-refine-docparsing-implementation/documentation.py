@@ -4,16 +4,16 @@
 #   "purpose": "Archived OpenSpec helper module openspec.changes.archive.2025_10_15_refine_docparsing_implementation.documentation",
 #   "sections": [
 #     {
-#       "id": "public_classes",
-#       "name": "Public Classes",
-#       "anchor": "PC",
-#       "kind": "api"
+#       "id": "requirementdoc",
+#       "name": "RequirementDoc",
+#       "anchor": "class-requirementdoc",
+#       "kind": "class"
 #     },
 #     {
-#       "id": "public_functions",
-#       "name": "Public Functions",
-#       "anchor": "PF",
-#       "kind": "api"
+#       "id": "load-requirement-docs",
+#       "name": "load_requirement_docs",
+#       "anchor": "function-load-requirement-docs",
+#       "kind": "function"
 #     }
 #   ]
 # }

@@ -5,22 +5,16 @@
 #   "purpose": "Utility script for calibrate tokenizers workflows",
 #   "sections": [
 #     {
-#       "id": "private_helpers",
-#       "name": "Private Helpers",
-#       "anchor": "PH",
-#       "kind": "internal"
+#       "id": "load-sample-texts",
+#       "name": "_load_sample_texts",
+#       "anchor": "function-load-sample-texts",
+#       "kind": "function"
 #     },
 #     {
-#       "id": "public_functions",
-#       "name": "Public Functions",
-#       "anchor": "PF",
-#       "kind": "api"
-#     },
-#     {
-#       "id": "module_entry_points",
-#       "name": "Module Entry Points",
-#       "anchor": "MEP",
-#       "kind": "cli"
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
 #     }
 #   ]
 # }

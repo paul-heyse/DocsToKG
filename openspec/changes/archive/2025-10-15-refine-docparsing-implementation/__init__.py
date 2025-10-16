@@ -2,14 +2,7 @@
 # {
 #   "module": "openspec.changes.archive.2025_10_15_refine_docparsing_implementation",
 #   "purpose": "Archived OpenSpec helper module openspec.changes.archive.2025_10_15_refine_docparsing_implementation",
-#   "sections": [
-#     {
-#       "id": "globals",
-#       "name": "Globals",
-#       "anchor": "GLOB",
-#       "kind": "infra"
-#     }
-#   ]
+#   "sections": []
 # }
 # === /NAVMAP ===
 

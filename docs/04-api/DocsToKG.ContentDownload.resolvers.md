@@ -92,13 +92,7 @@ Args:
 None
 
 Returns:
-List[Resolver]: Resolver instances ordered according to
-``DEFAULT_RESOLVER_ORDER``.
-
-Examples:
->>> from DocsToKG.ContentDownload import resolvers
->>> [resolver.name for resolver in resolvers.default_resolvers()]  # doctest: +ELLIPSIS
-['openalex', 'unpaywall', ...]
+List[Resolver]: Resolver instances ordered according to ``DEFAULT_RESOLVER_ORDER``.
 
 ### `_callable_accepts_argument(func, name)`
 
@@ -658,7 +652,7 @@ Iterator[ResolverResult]: Stream of candidate download URLs or resolver events.
 
 ### `_emit_attempt(self, record)`
 
-Invoke the configured logger while supporting legacy log-only adapters.
+Invoke the configured logger using the structured attempt contract.
 
 Args:
 record: Attempt payload emitted by the pipeline.

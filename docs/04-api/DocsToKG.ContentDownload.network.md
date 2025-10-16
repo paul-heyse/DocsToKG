@@ -118,14 +118,6 @@ Raises:
 ValueError: If ``max_retries`` or ``backoff_factor`` are invalid or ``url``/``method`` are empty.
 requests.RequestException: If all retry attempts fail due to network errors or the session raises an exception.
 
-### `_looks_like_pdf(headers)`
-
-Return ``True`` when response headers suggest a PDF payload.
-
-### `_head_precheck_via_get(session, url, timeout)`
-
-Fallback GET probe for providers that reject HEAD requests.
-
 ### `head_precheck(session, url, timeout)`
 
 Issue a lightweight request to determine whether ``url`` returns a PDF.
@@ -145,6 +137,14 @@ Returns:
 a PDF. ``False`` when the response clearly corresponds to HTML or an
 error status. Any network exception results in ``True`` to avoid
 blocking legitimate downloads.
+
+### `_looks_like_pdf(headers)`
+
+Return ``True`` when response headers suggest a PDF payload.
+
+### `_head_precheck_via_get(session, url, timeout)`
+
+Fallback GET probe for providers that reject HEAD requests.
 
 ### `build_headers(self)`
 
@@ -175,11 +175,39 @@ TypeError: If ``response`` lacks ``status_code`` or ``headers``.
 
 ### `request_func()`
 
-Invoke :meth:`requests.Session.request` with keyword arguments.
+Invoke :meth:`requests.Session.request` via the pooled session.
+
+Args:
+method: HTTP method name such as ``"GET"``.
+url: Fully qualified URL to request.
+**call_kwargs: Forwarded keyword arguments for ``session.request``.
+
+Returns:
+requests.Response: Response object produced by the session.
 
 ### `request_func()`
 
-Invoke the method-specific session helper when ``request`` is absent.
+Call the method-specific session helper when available.
+
+Args:
+method: HTTP method name (used for diagnostics).
+url: Fully qualified URL to request.
+**call_kwargs: Additional arguments forwarded to the helper.
+
+Returns:
+requests.Response: Response object produced by the method helper.
+
+### `request_func()`
+
+Fallback to the session-level ``request`` implementation.
+
+Args:
+method: HTTP method name such as ``"GET"``.
+url: Fully qualified URL to request.
+**call_kwargs: Keyword arguments forwarded to ``session.request``.
+
+Returns:
+requests.Response: Response object produced by the session.
 
 ## 3. Classes
 

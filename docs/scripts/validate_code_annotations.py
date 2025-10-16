@@ -5,22 +5,16 @@
 #   "purpose": "Documentation tooling for validate code annotations workflows",
 #   "sections": [
 #     {
-#       "id": "public_classes",
-#       "name": "Public Classes",
-#       "anchor": "PC",
-#       "kind": "api"
+#       "id": "codeannotationvalidator",
+#       "name": "CodeAnnotationValidator",
+#       "anchor": "class-codeannotationvalidator",
+#       "kind": "class"
 #     },
 #     {
-#       "id": "public_functions",
-#       "name": "Public Functions",
-#       "anchor": "PF",
-#       "kind": "api"
-#     },
-#     {
-#       "id": "module_entry_points",
-#       "name": "Module Entry Points",
-#       "anchor": "MEP",
-#       "kind": "cli"
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
 #     }
 #   ]
 # }
@@ -44,10 +38,11 @@ Usage:
 
 import argparse
 import ast
+import json
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 # --- Public Classes ---
 
 
@@ -79,6 +74,10 @@ class CodeAnnotationValidator:
         except SyntaxError as e:
             return [{"type": "error", "message": f"Syntax error: {e}", "file": file_name}]
 
+        # Validate NAVMAP (if present) before other checks so ordering issues are surfaced early.
+        lines = content.splitlines()
+        issues.extend(self._validate_navmap(file_path, tree, lines))
+
         # Extract module docstring
         module_docstring = ast.get_docstring(tree)
         if not module_docstring:
@@ -105,6 +104,75 @@ class CodeAnnotationValidator:
         issues.extend(self._check_forbidden_patterns(content, file_name))
 
         return issues
+
+    def _validate_navmap(
+        self, file_path: Path, tree: ast.Module, lines: List[str]
+    ) -> List[Dict]:
+        """Ensure the NAVMAP sections enumerate classes and functions in order."""
+
+        navmap = self._extract_navmap(lines)
+        if navmap is None:
+            return []
+
+        sections = navmap.get("sections", [])
+        expected: List[Tuple[str, str]] = []
+        for node in tree.body:
+            if isinstance(node, ast.ClassDef):
+                expected.append((node.name, "class"))
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                expected.append((node.name, "function"))
+
+        actual: List[Tuple[str, str]] = [
+            (section.get("name", ""), section.get("kind", "")) for section in sections
+        ]
+
+        if expected != actual:
+            return [
+                {
+                    "type": "error",
+                    "message": (
+                        "NAVMAP mismatch: sections must list top-level classes and functions "
+                        "in source order."
+                    ),
+                    "file": str(file_path),
+                    "details": {
+                        "expected": expected,
+                        "actual": actual,
+                    },
+                }
+            ]
+        return []
+
+    def _extract_navmap(self, lines: List[str]) -> Optional[Dict]:
+        """Parse NAVMAP JSON payload from ``lines`` when present."""
+
+        start = None
+        for idx, line in enumerate(lines):
+            if line.strip() == "# === NAVMAP v1 ===":
+                start = idx
+                break
+        if start is None:
+            return None
+
+        end = None
+        for idx in range(start + 1, len(lines)):
+            if lines[idx].strip() == "# === /NAVMAP ===":
+                end = idx
+                break
+        if end is None:
+            return None
+
+        payload_lines = []
+        for line in lines[start + 1 : end]:
+            stripped = line.lstrip("# ").rstrip("\n")
+            payload_lines.append(stripped)
+        payload = "\n".join(payload_lines).strip()
+        if not payload:
+            return None
+        try:
+            return json.loads(payload)
+        except json.JSONDecodeError:
+            return None
 
     def _validate_module_docstring(self, docstring: str, file_name: str) -> List[Dict]:
         """Validate module-level docstring quality."""

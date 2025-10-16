@@ -5,34 +5,112 @@
 #   "purpose": "Utility script for build real hybrid fixture workflows",
 #   "sections": [
 #     {
-#       "id": "globals",
-#       "name": "Globals",
-#       "anchor": "GLOB",
-#       "kind": "infra"
+#       "id": "fixturedocument",
+#       "name": "FixtureDocument",
+#       "anchor": "class-fixturedocument",
+#       "kind": "class"
 #     },
 #     {
-#       "id": "public_classes",
-#       "name": "Public Classes",
-#       "anchor": "PC",
-#       "kind": "api"
+#       "id": "parse-namespaces",
+#       "name": "_parse_namespaces",
+#       "anchor": "function-parse-namespaces",
+#       "kind": "function"
 #     },
 #     {
-#       "id": "private_helpers",
-#       "name": "Private Helpers",
-#       "anchor": "PH",
-#       "kind": "internal"
+#       "id": "parse-args",
+#       "name": "parse_args",
+#       "anchor": "function-parse-args",
+#       "kind": "function"
 #     },
 #     {
-#       "id": "public_functions",
-#       "name": "Public Functions",
-#       "anchor": "PF",
-#       "kind": "api"
+#       "id": "list-candidate-docs",
+#       "name": "list_candidate_docs",
+#       "anchor": "function-list-candidate-docs",
+#       "kind": "function"
 #     },
 #     {
-#       "id": "module_entry_points",
-#       "name": "Module Entry Points",
-#       "anchor": "MEP",
-#       "kind": "cli"
+#       "id": "load-jsonl",
+#       "name": "load_jsonl",
+#       "anchor": "function-load-jsonl",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-jsonl",
+#       "name": "write_jsonl",
+#       "anchor": "function-write-jsonl",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "sha256-digest",
+#       "name": "sha256_digest",
+#       "anchor": "function-sha256-digest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "repo-relative",
+#       "name": "repo_relative",
+#       "anchor": "function-repo-relative",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "clean-chunk-records",
+#       "name": "clean_chunk_records",
+#       "anchor": "function-clean-chunk-records",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "derive-title",
+#       "name": "derive_title",
+#       "anchor": "function-derive-title",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "derive-query",
+#       "name": "derive_query",
+#       "anchor": "function-derive-query",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "build-fixture-document",
+#       "name": "build_fixture_document",
+#       "anchor": "function-build-fixture-document",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-manifest",
+#       "name": "write_manifest",
+#       "anchor": "function-write-manifest",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-queries",
+#       "name": "write_queries",
+#       "anchor": "function-write-queries",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-dataset-jsonl",
+#       "name": "write_dataset_jsonl",
+#       "anchor": "function-write-dataset-jsonl",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "write-readme",
+#       "name": "write_readme",
+#       "anchor": "function-write-readme",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "ensure-output-dir",
+#       "name": "ensure_output_dir",
+#       "anchor": "function-ensure-output-dir",
+#       "kind": "function"
+#     },
+#     {
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
 #     }
 #   ]
 # }

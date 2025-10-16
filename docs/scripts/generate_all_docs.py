@@ -5,28 +5,22 @@
 #   "purpose": "Documentation tooling for generate all docs workflows",
 #   "sections": [
 #     {
-#       "id": "public_classes",
-#       "name": "Public Classes",
-#       "anchor": "PC",
-#       "kind": "api"
+#       "id": "documentationgenerator",
+#       "name": "DocumentationGenerator",
+#       "anchor": "class-documentationgenerator",
+#       "kind": "class"
 #     },
 #     {
-#       "id": "private_helpers",
-#       "name": "Private Helpers",
-#       "anchor": "PH",
-#       "kind": "internal"
+#       "id": "maybe-reexec-inside-venv",
+#       "name": "_maybe_reexec_inside_venv",
+#       "anchor": "function-maybe-reexec-inside-venv",
+#       "kind": "function"
 #     },
 #     {
-#       "id": "public_functions",
-#       "name": "Public Functions",
-#       "anchor": "PF",
-#       "kind": "api"
-#     },
-#     {
-#       "id": "module_entry_points",
-#       "name": "Module Entry Points",
-#       "anchor": "MEP",
-#       "kind": "cli"
+#       "id": "main",
+#       "name": "main",
+#       "anchor": "function-main",
+#       "kind": "function"
 #     }
 #   ]
 # }

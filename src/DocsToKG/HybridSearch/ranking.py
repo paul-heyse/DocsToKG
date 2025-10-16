@@ -175,12 +175,6 @@ class ResultShaper:
             ),
             dtype=np.float32,
         )
-        pairwise: Optional[np.ndarray] = None
-        if self._gpu_resources is not None and len(ordered_chunks) <= 256:
-            pairwise = pairwise_inner_products(
-                embeddings, device=self._gpu_device, resources=self._gpu_resources
-            )
-
         doc_buckets: Dict[str, int] = defaultdict(int)
         emitted_indices: List[int] = []
         results: List[HybridSearchResult] = []
@@ -190,7 +184,7 @@ class ResultShaper:
             if not self._within_doc_limit(chunk.doc_id, doc_buckets):
                 continue
             if emitted_indices and self._is_near_duplicate(
-                embeddings, current_idx, emitted_indices, pairwise
+                embeddings, current_idx, emitted_indices
             ):
                 continue
             highlights = self._build_highlights(chunk, query_tokens)
@@ -227,30 +221,22 @@ class ResultShaper:
         embeddings: np.ndarray,
         current_idx: int,
         emitted_indices: Sequence[int],
-        pairwise: Optional[np.ndarray] = None,
     ) -> bool:
         if not emitted_indices:
             return False
-        if pairwise is not None:
-            return (
-                float(pairwise[current_idx, emitted_indices].max())
-                >= self._fusion_config.cosine_dedupe_threshold
-            )
         resources = self._gpu_resources
-        if resources is None:
-            query = embeddings[current_idx]
-            others = embeddings[list(emitted_indices)]
-            query_norm = np.linalg.norm(query)
-            if query_norm == 0.0:
-                return False
-            other_norms = np.linalg.norm(others, axis=1)
-            other_norms[other_norms == 0.0] = 1.0
-            sims = (others @ query) / (other_norms * query_norm)
-            return float(sims.max()) >= self._fusion_config.cosine_dedupe_threshold
         query = embeddings[current_idx]
         corpus = embeddings[list(emitted_indices)]
-        sims = cosine_batch(query, corpus, device=self._gpu_device, resources=resources)
-        return float(sims[0].max()) >= self._fusion_config.cosine_dedupe_threshold
+        if resources is not None:
+            sims = cosine_batch(query, corpus, device=self._gpu_device, resources=resources)
+            return float(sims[0].max()) >= self._fusion_config.cosine_dedupe_threshold
+        query_norm = np.linalg.norm(query)
+        if query_norm == 0.0:
+            return False
+        other_norms = np.linalg.norm(corpus, axis=1)
+        other_norms[other_norms == 0.0] = 1.0
+        sims = (corpus @ query) / (other_norms * query_norm)
+        return float(sims.max()) >= self._fusion_config.cosine_dedupe_threshold
 
     def _build_highlights(self, chunk: ChunkPayload, query_tokens: Sequence[str]) -> List[str]:
         highlights = self._opensearch.highlight(chunk, query_tokens)
@@ -282,23 +268,20 @@ def apply_mmr_diversification(
         lambda_param: Balancing factor between relevance and diversity (0-1).
         top_k: Maximum number of diversified candidates to retain.
         device: GPU device identifier used for similarity computations.
-        resources: FAISS GPU resources used for pairwise similarity.
+        resources: Optional FAISS GPU resources used for pairwise similarity; falls back to
+            CPU cosine when ``None``.
 
     Returns:
         List[FusionCandidate]: Diversified candidate list ordered by MMR score.
 
     Raises:
         ValueError: If ``lambda_param`` falls outside ``[0, 1]``.
-        RuntimeError: When GPU resources are not available for diversification.
     """
 
     if not 0.0 <= lambda_param <= 1.0:
         raise ValueError("lambda_param must be within [0, 1]")
     if not fused_candidates:
         return []
-    if resources is None:
-        raise RuntimeError("GPU resources are required for MMR diversification")
-
     embeddings = np.stack(
         [
             candidate.chunk.features.embedding.astype(np.float32, copy=False)
@@ -308,7 +291,13 @@ def apply_mmr_diversification(
 
     candidate_indices = list(range(len(fused_candidates)))
     selected_indices: List[int] = []
-    sims_all = pairwise_inner_products(embeddings, device=int(device), resources=resources)
+    if resources is not None:
+        sims_all = pairwise_inner_products(embeddings, device=int(device), resources=resources)
+    else:
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        norms[norms == 0.0] = 1.0
+        normalised = embeddings / norms
+        sims_all = (normalised @ normalised.T).astype(np.float32, copy=False)
 
     while candidate_indices and len(selected_indices) < top_k:
         best_idx: Optional[int] = None

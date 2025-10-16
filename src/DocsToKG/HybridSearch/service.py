@@ -139,8 +139,11 @@ class HybridSearchService:
         _observability: Telemetry facade for metrics and traces.
 
     Examples:
+        >>> # File-backed config manager (JSON/YAML on disk)
+        >>> from pathlib import Path  # doctest: +SKIP
+        >>> manager = HybridSearchConfigManager(Path("config.json"))  # doctest: +SKIP
         >>> service = HybridSearchService(  # doctest: +SKIP
-        ...     config_manager=HybridSearchConfigManager.from_dict({}),
+        ...     config_manager=manager,
         ...     feature_generator=FeatureGenerator(embedding_dim=16),
         ...     faiss_index=FaissVectorStore(dim=16, config=HybridSearchConfig().dense),
         ...     opensearch=OpenSearchSimulator(),
@@ -223,6 +226,7 @@ class HybridSearchService:
                 splade = f_splade.result()
                 dense = f_dense.result()
 
+            fusion_start = time.perf_counter()
             fusion = ReciprocalRankFusion(config.fusion.k0)
             combined_candidates = bm25.candidates + splade.candidates + dense.candidates
             fused_scores = fusion.fuse(combined_candidates)
@@ -258,13 +262,12 @@ class HybridSearchService:
                 request,
                 channel_score_map,
             )
-            elapsed = (time.perf_counter() - total_start) * 1000
-            timings["fusion_ms"] = elapsed
-            timings["total_ms"] = elapsed
+            timings["fusion_ms"] = (time.perf_counter() - fusion_start) * 1000
+            timings["total_ms"] = (time.perf_counter() - total_start) * 1000
             self._observability.metrics.increment("hybrid_search_requests")
             self._observability.metrics.observe("hybrid_search_results", len(shaped))
             self._observability.metrics.observe(
-                "hybrid_search_timings_total_ms", timings["fusion_ms"]
+                "hybrid_search_timings_total_ms", timings["total_ms"]
             )
             paged_results = self._slice_from_cursor(shaped, request.cursor)
             next_cursor = self._build_cursor(paged_results, request.page_size)
@@ -300,13 +303,28 @@ class HybridSearchService:
     ) -> List[HybridSearchResult]:
         if not cursor:
             return list(results)
+        if cursor.startswith("v2|"):
+            try:
+                _version, score_str, vector_id = cursor.split("|", 2)
+                target_score = float(score_str)
+            except (ValueError, TypeError):
+                return list(results)
+            sliced: List[HybridSearchResult] = []
+            skipping = True
+            for result in results:
+                if skipping:
+                    if result.vector_id == vector_id and round(result.score, 6) == round(target_score, 6):
+                        skipping = False
+                    continue
+                sliced.append(result)
+            return list(results) if skipping else sliced
         try:
             vector_id, rank_str = cursor.rsplit(":", 1)
             target_rank = int(rank_str)
         except (ValueError, TypeError):
             return list(results)
 
-        sliced: List[HybridSearchResult] = []
+        sliced = []
         skipping = True
         for result in results:
             if skipping:
@@ -314,15 +332,13 @@ class HybridSearchService:
                     skipping = False
                 continue
             sliced.append(result)
-        if skipping:
-            return list(results)
-        return sliced
+        return list(results) if skipping else sliced
 
     def _build_cursor(self, results: Sequence[HybridSearchResult], page_size: int) -> Optional[str]:
         if len(results) <= page_size:
             return None
         last = results[page_size - 1]
-        return f"{last.vector_id}:{last.fused_rank}"
+        return f"v2|{round(last.score, 6)}|{last.vector_id}"
 
     def _execute_bm25(
         self,
@@ -383,14 +399,11 @@ class HybridSearchService:
         timings: Dict[str, float],
     ) -> ChannelResults:
         start = time.perf_counter()
-        oversampled = int(
-            request.page_size
-            * config.dense.oversample
-            * max(1.0, float(getattr(config.retrieval, "dense_overfetch_factor", 1.5)))
-        )
-        hits = self._faiss.search(
-            query_features.embedding, min(config.retrieval.dense_top_k, oversampled)
-        )
+        # Over-fetch relative to the page size (not dense_top_k) to leave headroom for filtering.
+        overfetch_factor = max(1.0, float(getattr(config.retrieval, "dense_overfetch_factor", 1.5)))
+        overfetch_candidates = int(max(1, request.page_size) * overfetch_factor)
+        k = max(int(config.retrieval.dense_top_k), overfetch_candidates)
+        hits = self._faiss.search(query_features.embedding, k)
         timings["dense_ms"] = (time.perf_counter() - start) * 1000
         filtered, payloads = self._filter_dense_hits(hits, filters)
         self._observability.metrics.increment("search_channel_requests", channel="dense")
