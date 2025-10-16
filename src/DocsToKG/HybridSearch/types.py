@@ -123,6 +123,7 @@ _MASK_63_BITS = (1 << 63) - 1
 
 # --- Public Functions ---
 
+
 def vector_uuid_to_faiss_int(vector_id: str) -> int:
     """Return the FAISS-compatible integer identifier for a vector UUID.
 
@@ -137,6 +138,7 @@ def vector_uuid_to_faiss_int(vector_id: str) -> int:
 
 
 # --- Public Classes ---
+
 
 @dataclass(slots=True)
 class DocumentInput:

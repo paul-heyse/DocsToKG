@@ -33,6 +33,7 @@ import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
+
 # --- Public Classes ---
 
 
@@ -220,6 +221,8 @@ class APIDocGenerator:
 
         print(f"\n🎉 Generated documentation for {len(generated_files)} modules")
         return generated_files
+
+
 # --- Public Functions ---
 # --- Module Entry Points ---
 

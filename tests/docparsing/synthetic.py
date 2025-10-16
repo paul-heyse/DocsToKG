@@ -44,6 +44,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from typing import List, Sequence
+
 # --- Globals ---
 
 __all__ = [
@@ -80,6 +81,8 @@ class SyntheticBenchmarkResult:
         if self.naive_peak_mb == 0:
             return 0.0
         return 1.0 - (self.streaming_peak_mb / self.naive_peak_mb)
+
+
 # --- Test Cases ---
 
 

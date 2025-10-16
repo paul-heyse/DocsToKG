@@ -62,6 +62,7 @@ class _DummyTokenizer:
 )
 # --- Test Cases ---
 
+
 def test_is_structural_boundary_detects_headings(text: str) -> None:
     rec = Rec(text=text, n_tok=1, src_idxs=[], refs=[], pages=[])
     assert is_structural_boundary(rec)
@@ -127,6 +128,7 @@ def test_coalesce_small_runs_soft_barrier_override() -> None:
     tokenizer = _DummyTokenizer()
     body_text = " ".join(["body"] * 35)
     heading_text = "# Section" + " " + " ".join(["item"] * 10)
+
     def _records() -> List[Rec]:
         return [
             Rec(

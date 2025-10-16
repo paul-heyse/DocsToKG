@@ -29,10 +29,11 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Protocol
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.resolvers import AttemptRecord
 
-from DocsToKG.ContentDownload.classifications import Classification, PDF_LIKE
-
+from DocsToKG.ContentDownload.classifications import PDF_LIKE, Classification
 
 MANIFEST_SCHEMA_VERSION = 2
+
+
 @dataclass
 class ManifestEntry:
     """Structured manifest entry describing a resolved artifact.

@@ -41,6 +41,7 @@ import csv
 import json
 from pathlib import Path
 from typing import Iterable, List, Optional
+
 # --- Globals ---
 
 CSV_HEADER: List[str] = [
@@ -76,6 +77,8 @@ def _iter_attempt_records(path: Path) -> Iterable[dict]:
             if data.get("record_type") != "attempt":
                 continue
             yield data
+
+
 # --- Public Functions ---
 
 
@@ -115,6 +118,8 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument("input", type=Path, help="Path to attempts JSONL file")
     parser.add_argument("output", type=Path, help="Path to CSV output file")
     return parser.parse_args(argv)
+
+
 # --- Module Entry Points ---
 
 

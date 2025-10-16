@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional, Union
+from typing import Union
 
 
 class Classification(Enum):

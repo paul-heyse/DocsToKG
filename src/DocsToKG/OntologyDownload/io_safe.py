@@ -88,8 +88,8 @@ import ipaddress
 import logging
 import os
 import re
-import socket
 import shutil
+import socket
 import stat
 import tarfile
 import unicodedata
@@ -97,12 +97,10 @@ import uuid
 import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Dict, List, Optional
-
 from urllib.parse import ParseResult, urlparse, urlunparse
 
 from .config import DownloadConfiguration
-from .errors import OntologyDownloadError, PolicyError
-
+from .errors import ConfigError
 
 __all__ = [
     "sanitize_filename",
@@ -143,15 +141,41 @@ def mask_sensitive_data(payload: Dict[str, object]) -> Dict[str, object]:
     """Return a copy of ``payload`` with common secret fields masked."""
 
     sensitive_keys = {"authorization", "api_key", "apikey", "token", "secret", "password"}
+    token_pattern = re.compile(r"^[A-Za-z0-9+/=_-]{32,}$")
+
+    def _mask_value(value: object, key_hint: Optional[str] = None) -> object:
+        if isinstance(value, dict):
+            return {
+                sub_key: _mask_value(sub_value, sub_key.lower())
+                for sub_key, sub_value in value.items()
+            }
+        if isinstance(value, list):
+            return [_mask_value(item, key_hint) for item in value]
+        if isinstance(value, tuple):
+            return tuple(_mask_value(item, key_hint) for item in value)
+        if isinstance(value, set):
+            return {_mask_value(item, key_hint) for item in value}
+        if isinstance(value, str):
+            lowered = value.lower()
+            if key_hint in sensitive_keys:
+                return "***masked***"
+            if "apikey" in lowered:
+                return "***masked***"
+            if key_hint == "authorization":
+                token = value.strip()
+                if "bearer " in lowered or token_pattern.match(token):
+                    return "***masked***"
+            if "bearer " in lowered:
+                return "***masked***"
+        return value
+
     masked: Dict[str, object] = {}
     for key, value in payload.items():
         lower = key.lower()
         if lower in sensitive_keys:
             masked[key] = "***masked***"
-        elif isinstance(value, str) and "apikey" in value.lower():
-            masked[key] = "***masked***"
         else:
-            masked[key] = value
+            masked[key] = _mask_value(value, lower)
     return masked
 
 
@@ -170,12 +194,12 @@ def _enforce_idn_safety(host: str) -> None:
 
         category = unicodedata.category(char)
         if category in {"Mn", "Me", "Cf"}:
-            raise PolicyError("Internationalized host contains invisible characters")
+            raise ConfigError("Internationalized host contains invisible characters")
 
         try:
             name = unicodedata.name(char)
         except ValueError as exc:
-            raise PolicyError("Internationalized host contains unknown characters") from exc
+            raise ConfigError("Internationalized host contains unknown characters") from exc
 
         for script in ("LATIN", "CYRILLIC", "GREEK"):
             if script in name:
@@ -183,7 +207,7 @@ def _enforce_idn_safety(host: str) -> None:
                 break
 
     if len(scripts) > 1:
-        raise PolicyError("Internationalized host mixes multiple scripts")
+        raise ConfigError("Internationalized host mixes multiple scripts")
 
 
 def _rebuild_netloc(parsed: ParseResult, ascii_host: str) -> str:
@@ -211,11 +235,11 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
     logger = logging.getLogger("DocsToKG.OntologyDownload")
     scheme = parsed.scheme.lower()
     if scheme not in {"http", "https"}:
-        raise PolicyError("Only HTTP(S) URLs are allowed for ontology downloads")
+        raise ConfigError("Only HTTP(S) URLs are allowed for ontology downloads")
 
     host = parsed.hostname
     if not host:
-        raise PolicyError("URL must include hostname")
+        raise ConfigError("URL must include hostname")
 
     try:
         ipaddress.ip_address(host)
@@ -229,7 +253,7 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
         try:
             ascii_host = host.encode("idna").decode("ascii").lower()
         except UnicodeError as exc:
-            raise PolicyError(f"Invalid internationalized hostname: {host}") from exc
+            raise ConfigError(f"Invalid internationalized hostname: {host}") from exc
 
     parsed = parsed._replace(netloc=_rebuild_netloc(parsed, ascii_host))
 
@@ -242,7 +266,7 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
         ):
             allow_private = True
         else:
-            raise PolicyError(f"Host {host} not in allowlist")
+            raise ConfigError(f"Host {host} not in allowlist")
 
     if scheme == "http":
         if allow_private:
@@ -259,14 +283,14 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
             scheme = "https"
 
     if scheme != "https" and not allow_private:
-        raise PolicyError("Only HTTPS URLs are allowed for ontology downloads")
+        raise ConfigError("Only HTTPS URLs are allowed for ontology downloads")
 
     if is_ip:
         address = ipaddress.ip_address(ascii_host)
         if not allow_private and (
             address.is_private or address.is_loopback or address.is_reserved or address.is_multicast
         ):
-            raise PolicyError(f"Refusing to download from private address {host}")
+            raise ConfigError(f"Refusing to download from private address {host}")
         return urlunparse(parsed)
 
     try:
@@ -286,9 +310,7 @@ def validate_url_security(url: str, http_config: Optional[DownloadConfiguration]
             or candidate_ip.is_reserved
             or candidate_ip.is_multicast
         ):
-            raise PolicyError(
-                f"Refusing to download from private address resolved for {host}"
-            )
+            raise ConfigError(f"Refusing to download from private address resolved for {host}")
 
     return urlunparse(parsed)
 
@@ -312,11 +334,11 @@ def _validate_member_path(member_name: str) -> Path:
     normalized = member_name.replace("\\", "/")
     relative = PurePosixPath(normalized)
     if relative.is_absolute():
-        raise PolicyError(f"Unsafe absolute path detected in archive: {member_name}")
+        raise ConfigError(f"Unsafe absolute path detected in archive: {member_name}")
     if not relative.parts:
-        raise PolicyError(f"Empty path detected in archive: {member_name}")
+        raise ConfigError(f"Empty path detected in archive: {member_name}")
     if any(part in {"", ".", ".."} for part in relative.parts):
-        raise PolicyError(f"Unsafe path detected in archive: {member_name}")
+        raise ConfigError(f"Unsafe path detected in archive: {member_name}")
     return Path(*relative.parts)
 
 
@@ -346,7 +368,7 @@ def _check_compression_ratio(
                     "limit": _MAX_COMPRESSION_RATIO,
                 },
             )
-        raise PolicyError(
+        raise ConfigError(
             f"{archive_type} archive {archive} expands to {total_uncompressed} bytes, "
             f"exceeding {_MAX_COMPRESSION_RATIO}:1 compression ratio"
         )
@@ -358,7 +380,7 @@ def extract_zip_safe(
     """Extract a ZIP archive while preventing traversal and compression bombs."""
 
     if not zip_path.exists():
-        raise OntologyDownloadError(f"ZIP archive not found: {zip_path}")
+        raise ConfigError(f"ZIP archive not found: {zip_path}")
     destination.mkdir(parents=True, exist_ok=True)
     extracted: List[Path] = []
     with zipfile.ZipFile(zip_path) as archive:
@@ -369,7 +391,7 @@ def extract_zip_safe(
             member_path = _validate_member_path(member.filename)
             mode = (member.external_attr >> 16) & 0xFFFF
             if stat.S_IFMT(mode) == stat.S_IFLNK:
-                raise PolicyError(f"Unsafe link detected in archive: {member.filename}")
+                raise ConfigError(f"Unsafe link detected in archive: {member.filename}")
             if member.is_dir():
                 safe_members.append((member, member_path))
                 continue
@@ -409,7 +431,7 @@ def extract_tar_safe(
     """Safely extract tar archives (tar, tar.gz, tar.xz) with traversal and compression checks."""
 
     if not tar_path.exists():
-        raise OntologyDownloadError(f"TAR archive not found: {tar_path}")
+        raise ConfigError(f"TAR archive not found: {tar_path}")
     destination.mkdir(parents=True, exist_ok=True)
     extracted: List[Path] = []
     try:
@@ -423,15 +445,13 @@ def extract_tar_safe(
                     safe_members.append((member, member_path))
                     continue
                 if member.islnk() or member.issym():
-                    raise PolicyError(f"Unsafe link detected in archive: {member.name}")
+                    raise ConfigError(f"Unsafe link detected in archive: {member.name}")
                 if member.isdev():
-                    raise PolicyError(
+                    raise ConfigError(
                         f"Unsupported special file detected in archive: {member.name}"
                     )
                 if not member.isfile():
-                    raise PolicyError(
-                        f"Unsupported tar member type encountered: {member.name}"
-                    )
+                    raise ConfigError(f"Unsupported tar member type encountered: {member.name}")
                 total_uncompressed += int(member.size)
                 safe_members.append((member, member_path))
             compressed_size = tar_path.stat().st_size
@@ -450,12 +470,12 @@ def extract_tar_safe(
                 target_path.parent.mkdir(parents=True, exist_ok=True)
                 extracted_file = archive.extractfile(member)
                 if extracted_file is None:
-                    raise OntologyDownloadError(f"Failed to extract member: {member.name}")
+                    raise ConfigError(f"Failed to extract member: {member.name}")
                 with extracted_file as source, target_path.open("wb") as target:
                     shutil.copyfileobj(source, target)
                 extracted.append(target_path)
     except tarfile.TarError as exc:
-        raise OntologyDownloadError(f"Failed to extract tar archive {tar_path}: {exc}") from exc
+        raise ConfigError(f"Failed to extract tar archive {tar_path}: {exc}") from exc
     if logger:
         logger.info(
             "extracted tar archive",
@@ -477,4 +497,4 @@ def extract_archive_safe(
         return extract_zip_safe(archive_path, destination, logger=logger)
     if any(lower_name.endswith(suffix) for suffix in _TAR_SUFFIXES):
         return extract_tar_safe(archive_path, destination, logger=logger)
-    raise OntologyDownloadError(f"Unsupported archive format: {archive_path}")
+    raise ConfigError(f"Unsupported archive format: {archive_path}")

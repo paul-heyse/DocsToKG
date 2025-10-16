@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import gzip
 import hashlib
-import heapq
 import json
 import logging
 import os
@@ -15,11 +14,9 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
-from pathlib import Path, PurePosixPath
-from urllib.parse import urlparse
+from pathlib import Path
 from typing import (
     Any,
-    Callable,
     Dict,
     Iterable,
     Iterator,
@@ -30,6 +27,7 @@ from typing import (
     Sequence,
     Tuple,
 )
+from urllib.parse import urlparse
 
 try:  # pragma: no cover - platform specific availability
     import fcntl  # type: ignore
@@ -41,9 +39,10 @@ try:  # pragma: no cover - platform specific availability
 except ImportError:  # pragma: no cover - non-windows
     msvcrt = None  # type: ignore[assignment]
 
-import requests
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from logging.handlers import RotatingFileHandler
+
+import requests
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
 
@@ -52,20 +51,17 @@ from .config import (
     ConfigError,
     DefaultsConfig,
     ResolvedConfig,
-    ensure_python_version,
     _coerce_sequence,
+    ensure_python_version,
 )
 from .io_safe import (
     extract_archive_safe,
     generate_correlation_id,
     mask_sensitive_data,
     sanitize_filename,
-    sha256_file,
     validate_url_security,
 )
 from .net import (
-    DownloadFailure,
-    DownloadResult,
     RDF_MIME_ALIASES,
     RDF_MIME_FORMAT_LABELS,
     download_stream,
@@ -396,9 +392,7 @@ def _make_fetch_spec(
     if not allow_missing_resolvers:
         missing = [resolver for resolver in prefer_source if resolver not in RESOLVERS]
         if missing:
-            raise ConfigError(
-                "Unknown resolver(s) specified: " + ", ".join(sorted(set(missing)))
-            )
+            raise ConfigError("Unknown resolver(s) specified: " + ", ".join(sorted(set(missing))))
 
     resolver_override = raw_spec.get("resolver")
     if resolver_override:
@@ -544,14 +538,14 @@ class Manifest:
     fingerprint: Optional[str]
     etag: Optional[str]
     last_modified: Optional[str]
-    content_type: Optional[str] = None
-    content_length: Optional[int] = None
-    source_media_type_label: Optional[str] = None
     downloaded_at: str
     target_formats: Sequence[str]
     validation: Dict[str, ValidationResult]
     artifacts: Sequence[str]
     resolver_attempts: Sequence[Dict[str, object]]
+    content_type: Optional[str] = None
+    content_length: Optional[int] = None
+    source_media_type_label: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Return a JSON-serializable dictionary for the manifest.
@@ -900,6 +894,14 @@ def _normalize_timestamp(value: Optional[str]) -> Optional[str]:
     return parsed.isoformat().replace("+00:00", "Z")
 
 
+def _canonical_media_type(value: Optional[str]) -> Optional[str]:
+    """Return a normalized MIME type without parameters."""
+
+    if not value:
+        return None
+    return value.split(";", 1)[0].strip().lower() or None
+
+
 def _populate_plan_metadata(
     planned: PlannedFetch,
     config: ResolvedConfig,
@@ -915,6 +917,12 @@ def _populate_plan_metadata(
         planned.size = planned.plan.content_length
     if planned.plan.content_length is not None:
         metadata.setdefault("content_length", planned.plan.content_length)
+    plan_media_type = _canonical_media_type(planned.plan.media_type)
+    if plan_media_type:
+        metadata.setdefault("content_type", plan_media_type)
+        label = RDF_MIME_FORMAT_LABELS.get(plan_media_type)
+        if label:
+            metadata.setdefault("source_media_type_label", label)
     if planned.plan.last_modified and not planned.last_modified:
         normalized = _normalize_timestamp(planned.plan.last_modified)
         planned.last_modified = normalized
@@ -1018,6 +1026,15 @@ def _populate_plan_metadata(
         planned.last_modified_at = _coerce_datetime(normalized or last_modified_value)
         planned.plan.last_modified = normalized or last_modified_value
         metadata["last_modified"] = planned.plan.last_modified
+
+    content_type_value = headers_map.get("Content-Type") or headers_map.get("content-type")
+    canonical_type = _canonical_media_type(content_type_value)
+    if canonical_type:
+        metadata["content_type"] = canonical_type
+        planned.plan.media_type = canonical_type
+        label = RDF_MIME_FORMAT_LABELS.get(canonical_type)
+        if label:
+            metadata["source_media_type_label"] = label
 
     if planned.size is None:
         content_length_value = headers_map.get("Content-Length") or headers_map.get(
@@ -1565,6 +1582,17 @@ def fetch_one(
                 attempt_record["status"] = "success"
                 resolver_attempts.append(dict(attempt_record))
 
+                content_type = _canonical_media_type(result.content_type) or (
+                    _canonical_media_type(plan.media_type)
+                )
+                content_length = result.content_length or plan.content_length
+                label_key = (
+                    _canonical_media_type(result.content_type)
+                    or media_type
+                    or (_canonical_media_type(plan.media_type))
+                )
+                source_media_label = RDF_MIME_FORMAT_LABELS.get(label_key) if label_key else None
+
                 manifest = Manifest(
                     schema_version=MANIFEST_SCHEMA_VERSION,
                     id=effective_spec.id,
@@ -1579,6 +1607,9 @@ def fetch_one(
                     fingerprint=fingerprint,
                     etag=result.etag,
                     last_modified=result.last_modified,
+                    content_type=content_type,
+                    content_length=content_length,
+                    source_media_type_label=source_media_label,
                     downloaded_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                     target_formats=effective_spec.target_formats,
                     validation=validation_results,

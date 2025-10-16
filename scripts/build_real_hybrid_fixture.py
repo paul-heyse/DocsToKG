@@ -135,6 +135,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Sequence
 
 import numpy as np
+
 # --- Globals ---
 
 DEFAULT_CHUNKS_DIR = Path("Data/ChunkedDocTagFiles")
@@ -151,6 +152,7 @@ DEFAULT_MAX_CHUNKS_PER_DOC = 0
 @dataclass(frozen=True)
 # --- Public Classes ---
 
+
 class FixtureDocument:
     doc_id: str
     title: str
@@ -163,6 +165,8 @@ class FixtureDocument:
     queries: Sequence[Mapping[str, object]]
     metadata: Mapping[str, object]
     chunk_count: int
+
+
 # --- Private Helpers ---
 
 
@@ -171,6 +175,8 @@ def _parse_namespaces(raw: str | None) -> List[str]:
         return []
     parts = [part.strip() for part in raw.split(",")]
     return [part for part in parts if part]
+
+
 # --- Public Functions ---
 
 
@@ -505,6 +511,8 @@ def ensure_output_dir(path: Path, overwrite: bool) -> None:
                         descendant.rmdir()
                 child.rmdir()
     path.mkdir(parents=True, exist_ok=True)
+
+
 # --- Module Entry Points ---
 
 

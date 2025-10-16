@@ -147,10 +147,13 @@ from types import SimpleNamespace
 from typing import Any, Dict, List
 
 import pytest
+
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
 from DocsToKG.ContentDownload import resolvers
 from DocsToKG.ContentDownload.classifications import Classification
 from DocsToKG.ContentDownload.telemetry import MANIFEST_SCHEMA_VERSION
+from tools.manifest_to_index import convert_manifest_to_index
+
 # --- Globals ---
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -164,12 +167,15 @@ AGENTS = REPO_ROOT / "openspec" / "AGENTS.md"
 @pytest.fixture
 # --- Test Fixtures ---
 
+
 def download_modules():
     """Provide downloader/resolver modules guarded by optional dependencies."""
 
     pytest.importorskip("pyalex")
     requests = pytest.importorskip("requests")
     return SimpleNamespace(downloader=downloader, resolvers=resolvers, requests=requests)
+
+
 # --- Test Cases ---
 
 
@@ -1115,7 +1121,9 @@ def test_cli_workers_apply_domain_jitter(download_modules, monkeypatch, tmp_path
             self._last_host_hit = defaultdict(float)
 
     class RecordingPipeline:
-        def __init__(self, *, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **_):
+        def __init__(
+            self, *, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **_
+        ):
             self.config = config
             self.logger = logger
             self.metrics = metrics
@@ -1349,7 +1357,9 @@ def test_cli_attempt_records_cover_all_resolvers(download_modules, monkeypatch, 
     )
 
     class RecordingPipeline:
-        def __init__(self, *, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **_):
+        def __init__(
+            self, *, resolvers=None, config=None, download_func=None, logger=None, metrics=None, **_
+        ):
             self.resolvers = resolvers or []
             self.logger = logger
             self.metrics = metrics

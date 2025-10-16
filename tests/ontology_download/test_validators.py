@@ -174,7 +174,6 @@ import DocsToKG.OntologyDownload.validation_core as validation_core
 from DocsToKG.OntologyDownload.config import DefaultsConfig, ResolvedConfig
 from DocsToKG.OntologyDownload.plugins import load_validator_plugins
 from DocsToKG.OntologyDownload.validation_core import (
-    VALIDATORS,
     ValidationRequest,
     ValidationResult,
     ValidatorSubprocessError,
@@ -232,6 +231,8 @@ def xbrl_package(tmp_path: Path) -> Path:
             "taxonomy/entrypoint.xsd", '<schema xmlns="http://www.w3.org/2001/XMLSchema" />'
         )
     return archive
+
+
 # --- Test Cases ---
 
 
@@ -559,6 +560,8 @@ def test_validate_owlready2_memory_error(monkeypatch, owl_file, tmp_path, config
     assert not result.ok
     payload = json.loads((request.validation_dir / "owlready2_parse.json").read_text())
     assert "memory exceeded" in payload["error"].lower()
+
+
 # --- Helper Functions ---
 
 

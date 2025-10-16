@@ -106,6 +106,8 @@ class SlowResolver:
     ) -> Iterable[ResolverResult]:
         time.sleep(self.delay)
         yield ResolverResult(url=f"https://{self.name}.example/pdf")
+
+
 # --- Helper Functions ---
 
 
@@ -130,6 +132,7 @@ def _make_config(names: List[str], max_workers: int) -> ResolverConfig:
 
 @pytest.mark.benchmark
 # --- Test Cases ---
+
 
 def test_sequential_vs_concurrent_execution() -> None:
     artifact = DummyArtifact("W-bench")

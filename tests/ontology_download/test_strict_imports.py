@@ -10,17 +10,12 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 
 
 def _run_strict_import(module: str) -> subprocess.CompletedProcess[str]:
-    script = (
-        "import os; "
-        "os.environ['ONTOFETCH_STRICT_IMPORTS']='1'; "
-        f"__import__('{module}')"
-    )
+    script = "import os; " "os.environ['ONTOFETCH_STRICT_IMPORTS']='1'; " f"__import__('{module}')"
     return subprocess.run(
         [sys.executable, "-c", script],
         capture_output=True,

@@ -45,6 +45,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import List
+
 # --- Public Classes ---
 
 
@@ -146,6 +147,8 @@ class DocumentationGenerator:
             success = False
 
         return success
+
+
 # --- Private Helpers ---
 
 
@@ -171,6 +174,8 @@ def _maybe_reexec_inside_venv(project_root: Path) -> None:
     script_path = str(Path(__file__).resolve())
     args = [str(candidate), script_path, *sys.argv[1:]]
     os.execvpe(str(candidate), args, env)
+
+
 # --- Public Functions ---
 # --- Module Entry Points ---
 

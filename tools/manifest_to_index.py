@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Generate a manifest index JSON from the DocsToKG download JSONL log."""
+
+from __future__ import annotations
 
 import argparse
 import json
@@ -64,4 +64,3 @@ def main(argv: Optional[list[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

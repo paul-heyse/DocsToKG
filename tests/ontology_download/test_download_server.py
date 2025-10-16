@@ -270,6 +270,7 @@ def http_server():
 @pytest.fixture(autouse=True)
 # --- Helper Functions ---
 
+
 def _reset_token_buckets():
     download._TOKEN_BUCKETS.clear()
     yield
@@ -380,6 +381,8 @@ class _StubLogger:
 
     def debug(self, *args, **kwargs):
         pass
+
+
 # --- Test Cases ---
 
 

@@ -127,6 +127,7 @@ from DocsToKG.DocParsing._common import (
     detect_data_root,
     get_logger,
 )
+
 # --- Globals ---
 
 CommandHandler = Callable[[Sequence[str]], int]
@@ -145,6 +146,7 @@ __all__ = ["main", "run_all", "chunk", "embed", "doctags"]
 
 
 # --- Chunk Command ---
+
 
 def _run_chunk(argv: Sequence[str]) -> int:
     """Execute the Docling chunker subcommand.
@@ -170,6 +172,7 @@ def _run_chunk(argv: Sequence[str]) -> int:
 
 # --- Embed Command ---
 
+
 def _run_embed(argv: Sequence[str]) -> int:
     """Execute the embedding pipeline subcommand.
 
@@ -190,6 +193,7 @@ def _run_embed(argv: Sequence[str]) -> int:
 
 # --- Doctags Command ---
 
+
 def _build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentParser:
     """Create an :mod:`argparse` parser configured for DocTags conversion.
 
@@ -204,8 +208,6 @@ def _build_doctags_parser(prog: str = "docparse doctags") -> argparse.ArgumentPa
   docparse doctags --mode pdf --workers 4
   docparse doctags --mode html --overwrite
 """
-    argv = [] if argv is None else list(argv)
-
     parser = argparse.ArgumentParser(
         prog=prog,
         description="Convert HTML or PDF corpora to DocTags using Docling",
@@ -337,9 +339,7 @@ def _detect_mode(input_dir: Path) -> str:
     if has_html and not has_pdf:
         return "html"
     if has_pdf and has_html:
-        raise ValueError(
-            f"Cannot auto-detect mode in {input_dir}: found both PDF and HTML files"
-        )
+        raise ValueError(f"Cannot auto-detect mode in {input_dir}: found both PDF and HTML files")
     raise ValueError(f"Cannot auto-detect mode in {input_dir}: no PDF or HTML files found")
 
 
@@ -450,6 +450,7 @@ def _run_doctags(argv: Sequence[str]) -> int:
 
 
 # --- All-In-One Command ---
+
 
 def _run_all(argv: Sequence[str]) -> int:
     """Execute DocTags conversion, chunking, and embedding sequentially.
@@ -644,6 +645,7 @@ def _run_all(argv: Sequence[str]) -> int:
 
 
 # --- Dispatcher ---
+
 
 class _Command:
     """Callable wrapper storing handler metadata for subcommands.

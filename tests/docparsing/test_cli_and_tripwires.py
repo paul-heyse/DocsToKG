@@ -147,6 +147,7 @@ GOLDEN_VECTORS = GOLDEN_DIR / "sample.vectors.jsonl"
 
 # --- CLI entry points ---
 
+
 def _reload_cli_modules():
     """Reload CLI modules so newly installed stubs are honoured."""
 
@@ -219,6 +220,7 @@ def test_chunk_and_embed_cli_with_dependency_stubs(
 
 # --- CLI path smoke tests ---
 
+
 def test_scripts_respect_data_root(tmp_path: Path) -> None:
     """Scripts should honor DOCSTOKG_DATA_ROOT when resolving defaults."""
 
@@ -256,6 +258,7 @@ def test_scripts_respect_data_root(tmp_path: Path) -> None:
 
 
 # --- Trip-wire regression checks ---
+
 
 def _load_jsonl(path: Path):
     with path.open("r", encoding="utf-8") as handle:

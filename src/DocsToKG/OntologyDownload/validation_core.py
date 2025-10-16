@@ -16,14 +16,14 @@ import subprocess
 import sys
 import tempfile
 import zipfile
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from itertools import islice
 from pathlib import Path
 from typing import Any, BinaryIO, Callable, Dict, Iterable, Iterator, List, MutableMapping, Optional
 
 from .config import ResolvedConfig
-from .io_safe import extract_archive_safe, sanitize_filename
 from .net import log_memory_usage
 from .optdeps import get_owlready2, get_pronto, get_rdflib
 from .plugins import ensure_validator_plugins

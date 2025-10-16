@@ -254,8 +254,8 @@ from DocsToKG.ContentDownload.resolvers import (
     default_resolvers,
 )
 
-
 # --- test_bounded_concurrency.py ---
+
 
 class RecordingLogger:
     """Collect attempt records emitted by the pipeline during tests."""
@@ -274,6 +274,7 @@ class RecordingLogger:
 
 # --- test_bounded_concurrency.py ---
 
+
 @dataclass
 class DummyArtifact:
     work_id: str
@@ -283,6 +284,7 @@ class DummyArtifact:
 
 
 # --- test_bounded_concurrency.py ---
+
 
 class DelayResolver:
     """Resolver that sleeps before yielding URLs to simulate slow sources."""
@@ -312,6 +314,7 @@ class DelayResolver:
 
 # --- test_bounded_concurrency.py ---
 
+
 class FailingResolver:
     """Resolver that raises an exception to test error isolation."""
 
@@ -327,6 +330,7 @@ class FailingResolver:
 
 # --- test_bounded_concurrency.py ---
 
+
 def _make_artifact(tmp_path) -> DummyArtifact:
     return DummyArtifact(
         work_id="W-test",
@@ -336,6 +340,7 @@ def _make_artifact(tmp_path) -> DummyArtifact:
 
 
 # --- test_bounded_concurrency.py ---
+
 
 def _make_config(names: Iterable[str], **kwargs) -> ResolverConfig:
     names = list(names)
@@ -350,6 +355,7 @@ def _make_config(names: Iterable[str], **kwargs) -> ResolverConfig:
 
 # --- test_bounded_concurrency.py ---
 
+
 def _html_outcome() -> DownloadOutcome:
     return DownloadOutcome(
         classification="html",
@@ -361,6 +367,7 @@ def _html_outcome() -> DownloadOutcome:
 
 
 # --- test_bounded_concurrency.py ---
+
 
 def test_sequential_execution_when_max_concurrent_is_one(tmp_path):
     artifact = _make_artifact(tmp_path)
@@ -387,6 +394,7 @@ def test_sequential_execution_when_max_concurrent_is_one(tmp_path):
 
 
 # --- test_bounded_concurrency.py ---
+
 
 def test_concurrent_execution_with_three_workers(tmp_path):
     artifact = _make_artifact(tmp_path)
@@ -435,6 +443,7 @@ def test_concurrent_execution_with_three_workers(tmp_path):
 
 # --- test_bounded_concurrency.py ---
 
+
 def test_rate_limits_enforced_under_concurrency(tmp_path):
     artifact = _make_artifact(tmp_path)
     resolvers = [
@@ -469,6 +478,7 @@ def test_rate_limits_enforced_under_concurrency(tmp_path):
 
 # --- test_bounded_concurrency.py ---
 
+
 def test_early_stop_cancels_remaining_resolvers(tmp_path):
     artifact = _make_artifact(tmp_path)
     fast = DelayResolver("fast", ["https://fast.example/pdf"], delay=0.0)
@@ -502,6 +512,7 @@ def test_early_stop_cancels_remaining_resolvers(tmp_path):
 
 
 # --- test_bounded_concurrency.py ---
+
 
 def test_resolver_failure_does_not_abort_concurrency(tmp_path):
     artifact = _make_artifact(tmp_path)
@@ -539,12 +550,14 @@ pytest.importorskip("pyalex")
 
 # --- test_parallel_execution.py ---
 
+
 class _NullLogger:
     def log(self, record):  # pragma: no cover - no-op sink
         pass
 
 
 # --- test_parallel_execution.py ---
+
 
 def test_rate_limiting_with_parallel_workers():
     config = ResolverConfig()
@@ -568,6 +581,7 @@ def test_rate_limiting_with_parallel_workers():
 
 # --- test_parallel_execution.py ---
 
+
 class _SlowResolver:
     def __init__(self, name: str, delay: float) -> None:
         self.name = name
@@ -583,6 +597,7 @@ class _SlowResolver:
 
 # --- test_parallel_execution.py ---
 
+
 class _MemoryLogger:
     def __init__(self) -> None:
         self.records = []
@@ -597,6 +612,7 @@ class _MemoryLogger:
 
 # --- test_parallel_execution.py ---
 
+
 class _StubArtifact:
     def __init__(self) -> None:
         self.work_id = "W-concurrency"
@@ -604,6 +620,7 @@ class _StubArtifact:
 
 
 # --- test_parallel_execution.py ---
+
 
 def _download_stub(session, artifact, url, referer, timeout, context=None):
     del session, artifact, url, referer, timeout, context
@@ -616,6 +633,7 @@ def _download_stub(session, artifact, url, referer, timeout, context=None):
 
 
 # --- test_parallel_execution.py ---
+
 
 def test_concurrent_pipeline_reduces_wall_time(monkeypatch):
     monkeypatch.setattr("DocsToKG.ContentDownload.resolvers.random.random", lambda: 0.0)
@@ -674,6 +692,7 @@ pytest.importorskip("pyalex")
 
 # --- test_pipeline_behaviour.py ---
 
+
 class MemoryLogger:
     def __init__(self, records: Optional[List[AttemptRecord]] = None) -> None:
         self.records = records or []
@@ -687,6 +706,7 @@ class MemoryLogger:
 
 
 # --- test_pipeline_behaviour.py ---
+
 
 class StubResolver:
     def __init__(self, name: str, results):
@@ -702,6 +722,7 @@ class StubResolver:
 
 
 # --- test_pipeline_behaviour.py ---
+
 
 def make_artifact(tmp_path: Path) -> downloader.WorkArtifact:
     return downloader.WorkArtifact(
@@ -724,6 +745,7 @@ def make_artifact(tmp_path: Path) -> downloader.WorkArtifact:
 
 # --- test_pipeline_behaviour.py ---
 
+
 def build_outcome(classification: str, path: str | None = None) -> DownloadOutcome:
     return DownloadOutcome(
         classification=classification,
@@ -736,6 +758,7 @@ def build_outcome(classification: str, path: str | None = None) -> DownloadOutco
 
 
 # --- test_pipeline_behaviour.py ---
+
 
 def test_pipeline_respects_custom_order(tmp_path):
     artifact = make_artifact(tmp_path)
@@ -770,6 +793,7 @@ def test_pipeline_respects_custom_order(tmp_path):
 
 
 # --- test_pipeline_behaviour.py ---
+
 
 def test_pipeline_stops_after_max_attempts(tmp_path):
     artifact = make_artifact(tmp_path)
@@ -806,6 +830,7 @@ def test_pipeline_stops_after_max_attempts(tmp_path):
 
 # --- test_pipeline_behaviour.py ---
 
+
 def test_pipeline_deduplicates_urls(tmp_path):
     artifact = make_artifact(tmp_path)
     resolver = StubResolver(
@@ -839,6 +864,7 @@ def test_pipeline_deduplicates_urls(tmp_path):
 
 # --- test_pipeline_behaviour.py ---
 
+
 def test_pipeline_collects_html_paths(tmp_path):
     artifact = make_artifact(tmp_path)
 
@@ -868,6 +894,7 @@ def test_pipeline_collects_html_paths(tmp_path):
 
 
 # --- test_pipeline_behaviour.py ---
+
 
 def test_pipeline_rate_limit_enforced(monkeypatch, tmp_path):
     artifact = make_artifact(tmp_path)
@@ -912,6 +939,7 @@ def test_pipeline_rate_limit_enforced(monkeypatch, tmp_path):
 
 # --- test_pipeline_behaviour.py ---
 
+
 def test_openalex_resolver_executes_first(tmp_path):
     artifact = make_artifact(tmp_path)
     artifact.pdf_urls = ["https://openalex.org/direct.pdf"]
@@ -951,6 +979,7 @@ def test_openalex_resolver_executes_first(tmp_path):
 
 
 # --- test_pipeline_behaviour.py ---
+
 
 def test_openalex_respects_rate_limit(monkeypatch, tmp_path):
     artifact = make_artifact(tmp_path)
@@ -993,6 +1022,7 @@ def test_openalex_respects_rate_limit(monkeypatch, tmp_path):
 
 # --- test_pipeline_behaviour.py ---
 
+
 def test_pipeline_records_failed_urls(tmp_path):
     artifact = make_artifact(tmp_path)
     artifact.pdf_urls = ["https://openalex.org/broken.pdf"]
@@ -1028,6 +1058,7 @@ pytest.importorskip("pyalex")
 
 # --- test_full_pipeline_integration.py ---
 
+
 def _make_artifact(tmp_path: Path) -> WorkArtifact:  # noqa: F811
     return WorkArtifact(
         work_id="W-integration",
@@ -1048,6 +1079,7 @@ def _make_artifact(tmp_path: Path) -> WorkArtifact:  # noqa: F811
 
 
 # --- test_full_pipeline_integration.py ---
+
 
 def test_pipeline_executes_resolvers_in_expected_order(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -1128,6 +1160,7 @@ def test_pipeline_executes_resolvers_in_expected_order(
 
 # --- test_full_pipeline_integration.py ---
 
+
 @pytest.mark.integration
 def test_real_network_download(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     if not os.environ.get("DOCSTOKG_RUN_NETWORK_TESTS"):
@@ -1171,6 +1204,7 @@ responses = pytest.importorskip("responses")
 
 
 # --- test_end_to_end_offline.py ---
+
 
 @responses.activate
 def test_resolver_pipeline_downloads_pdf_end_to_end(tmp_path):
@@ -1232,6 +1266,7 @@ def test_resolver_pipeline_downloads_pdf_end_to_end(tmp_path):
 
 
 # --- test_end_to_end_offline.py ---
+
 
 @responses.activate
 def test_download_candidate_marks_corrupt_without_eof(tmp_path):

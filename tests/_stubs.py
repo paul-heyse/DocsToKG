@@ -26,6 +26,7 @@ from __future__ import annotations
 import sys
 from types import ModuleType, SimpleNamespace
 from typing import Any, Dict
+
 # --- Globals ---
 
 __all__ = ["promote_simple_namespace_modules", "dependency_stubs"]

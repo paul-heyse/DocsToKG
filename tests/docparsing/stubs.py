@@ -18,9 +18,9 @@
 from __future__ import annotations
 
 import sys
-from contextlib import contextmanager
 from types import ModuleType, SimpleNamespace
-from typing import Dict, Iterator, List, Sequence
+from typing import Dict, List, Sequence
+
 # --- Globals ---
 
 __all__ = ["dependency_stubs"]
@@ -372,11 +372,11 @@ def dependency_stubs(dense_dim: int = 2560) -> None:
     _install("docling_core.transforms.chunker", chunker_module, force=True)
     _install("docling_core.transforms.chunker.base", base_module, force=True)
     _install("docling_core.transforms.chunker.hybrid_chunker", hybrid_module, force=True)
-    _install("docling_core.transforms.chunker.hierarchical_chunker", hierarchical_module, force=True)
-    _install("docling_core.transforms.chunker.tokenizer", tokenizer_pkg, force=True)
     _install(
-        "docling_core.transforms.chunker.tokenizer.huggingface", hf_module, force=True
+        "docling_core.transforms.chunker.hierarchical_chunker", hierarchical_module, force=True
     )
+    _install("docling_core.transforms.chunker.tokenizer", tokenizer_pkg, force=True)
+    _install("docling_core.transforms.chunker.tokenizer.huggingface", hf_module, force=True)
     _install("docling_core.transforms.serializer", serializer_pkg, force=True)
     _install("docling_core.transforms.serializer.base", serializer_base, force=True)
     _install("docling_core.transforms.serializer.common", serializer_common, force=True)

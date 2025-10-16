@@ -62,6 +62,8 @@ class _DummyResponse:
 
     def close(self) -> None:  # noqa: D401
         self.closed = True
+
+
 # --- Helper Functions ---
 
 
@@ -75,6 +77,8 @@ def _session_for_response(response: _DummyResponse, *, method: str = "HEAD") -> 
         return response
 
     return session, _request_with_retries
+
+
 # --- Test Cases ---
 
 

@@ -40,6 +40,7 @@ from unittest.mock import Mock
 import pytest
 
 from DocsToKG.DocParsing.EmbeddingV2 import _QWEN_LLM_CACHE, _qwen_cache_key
+
 # --- Test Cases ---
 
 
@@ -218,6 +219,8 @@ def test_qwen_cache_key_uniqueness():
             assert isinstance(key[2], int)  # tp
             assert isinstance(key[3], float)  # gpu_mem_util
             # quantization can be None or string
+
+
 # --- Module Entry Points ---
 
 

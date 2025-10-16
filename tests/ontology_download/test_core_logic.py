@@ -101,6 +101,7 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
+import DocsToKG.OntologyDownload.pipeline as pipeline_mod
 from DocsToKG.OntologyDownload import (
     ConfigError,
     DefaultsConfig,
@@ -108,8 +109,10 @@ from DocsToKG.OntologyDownload import (
     DownloadResult,
     ResolvedConfig,
     ValidationResult,
+    resolvers,
 )
 from DocsToKG.OntologyDownload import ontology_download as core
+from DocsToKG.OntologyDownload import storage as storage_mod
 from DocsToKG.OntologyDownload.resolvers import FetchPlan
 
 
@@ -129,8 +132,14 @@ def stub_requests_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
         def close(self) -> None:
             pass
 
-    monkeypatch.setattr(core.requests, "head", lambda *args, **kwargs: _Response(), raising=False)
-    monkeypatch.setattr(core.requests, "get", lambda *args, **kwargs: _Response(), raising=False)
+    monkeypatch.setattr(
+        pipeline_mod.requests, "head", lambda *args, **kwargs: _Response(), raising=False
+    )
+    monkeypatch.setattr(
+        pipeline_mod.requests, "get", lambda *args, **kwargs: _Response(), raising=False
+    )
+
+
 # --- Helper Functions ---
 
 
@@ -167,7 +176,7 @@ def _run_fetch(
         def plan(self, spec, config, logger):
             return plan
 
-    monkeypatch.setitem(core.RESOLVERS, "obo", Resolver())
+    monkeypatch.setitem(resolvers.RESOLVERS, "obo", Resolver())
 
     defaults = DefaultsConfig(prefer_source=["obo"])
     config = ResolvedConfig(defaults=defaults, specs=[])
@@ -175,8 +184,15 @@ def _run_fetch(
 
     cache_dir = tmp_path / "cache"
     ontology_dir = tmp_path / "ontologies"
-    monkeypatch.setattr(core, "CACHE_DIR", cache_dir)
-    monkeypatch.setattr(core, "ONTOLOGY_DIR", ontology_dir)
+    overrides = {
+        "CACHE_DIR": cache_dir,
+        "LOCAL_ONTOLOGY_DIR": ontology_dir,
+    }
+    for attr, value in overrides.items():
+        monkeypatch.setattr(storage_mod, attr, value, raising=False)
+        monkeypatch.setattr(pipeline_mod, attr, value, raising=False)
+        monkeypatch.setattr(core, attr, value, raising=False)
+    monkeypatch.setattr(core, "ONTOLOGY_DIR", ontology_dir, raising=False)
 
     class _StubStorage:
         def finalize_version(self, ontology_id: str, version: str, base_dir: Path) -> None:
@@ -187,7 +203,10 @@ def _run_fetch(
             path.mkdir(parents=True, exist_ok=True)
             return path
 
-    monkeypatch.setattr(core, "STORAGE", _StubStorage())
+    stub_storage = _StubStorage()
+    monkeypatch.setattr(storage_mod, "STORAGE", stub_storage, raising=False)
+    monkeypatch.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
+    monkeypatch.setattr(core, "STORAGE", stub_storage, raising=False)
 
     def _fake_run_validators(requests, logger):
         results = {}
@@ -202,8 +221,12 @@ def _run_fetch(
             results[request.name] = ValidationResult(ok=True, details=details, output_files=[])
         return results
 
-    monkeypatch.setattr(core, "run_validators", _fake_run_validators)
-    monkeypatch.setattr(core, "validate_url_security", lambda url, config=None: url)
+    monkeypatch.setattr(pipeline_mod, "run_validators", _fake_run_validators, raising=False)
+    monkeypatch.setattr(core, "run_validators", _fake_run_validators, raising=False)
+    monkeypatch.setattr(
+        pipeline_mod, "validate_url_security", lambda url, config=None: url, raising=False
+    )
+    monkeypatch.setattr(core, "validate_url_security", lambda url, config=None: url, raising=False)
 
     def _fake_download_stream(**kwargs):
         destination: Path = kwargs["destination"]
@@ -219,12 +242,15 @@ def _run_fetch(
             last_modified=None,
         )
 
-    monkeypatch.setattr(core, "download_stream", _fake_download_stream)
+    monkeypatch.setattr(pipeline_mod, "download_stream", _fake_download_stream, raising=False)
+    monkeypatch.setattr(core, "download_stream", _fake_download_stream, raising=False)
 
     logger = logging.getLogger("ontology-download-test")
     logger.setLevel(logging.INFO)
     result = core.fetch_one(spec, config=config, force=True, logger=logger)
     return json.loads(result.manifest_path.read_text())
+
+
 # --- Test Cases ---
 
 
@@ -332,9 +358,12 @@ def test_plan_all_honors_concurrent_plan_limit(monkeypatch: pytest.MonkeyPatch) 
             self._futures.append(future)
             return future
 
-    monkeypatch.setattr(core, "ThreadPoolExecutor", DummyExecutor)
-    monkeypatch.setattr(core, "as_completed", fake_as_completed)
-    monkeypatch.setattr(core, "plan_one", fake_plan_one)
+    monkeypatch.setattr(pipeline_mod, "ThreadPoolExecutor", DummyExecutor, raising=False)
+    monkeypatch.setattr(core, "ThreadPoolExecutor", DummyExecutor, raising=False)
+    monkeypatch.setattr(pipeline_mod, "as_completed", fake_as_completed, raising=False)
+    monkeypatch.setattr(core, "as_completed", fake_as_completed, raising=False)
+    monkeypatch.setattr(pipeline_mod, "plan_one", fake_plan_one, raising=False)
+    monkeypatch.setattr(core, "plan_one", fake_plan_one, raising=False)
 
     plans = core.plan_all(specs, config=config)
 

@@ -30,9 +30,10 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from DocsToKG.ContentDownload import download_pyalex_pdfs as downloader
-from DocsToKG.ContentDownload.classifier import classify_payload
 from DocsToKG.ContentDownload.classifications import Classification
+from DocsToKG.ContentDownload.classifier import classify_payload
 from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
+
 # --- Test Cases ---
 
 

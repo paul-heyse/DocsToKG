@@ -87,8 +87,8 @@ from typing import TYPE_CHECKING, Callable, List, Mapping, Optional, Sequence
 import numpy as np
 
 from .config import DenseIndexConfig
-from .observability import Observability
 from .interfaces import DenseVectorStore
+from .observability import Observability
 from .types import vector_uuid_to_faiss_int
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -133,6 +133,7 @@ except Exception:  # pragma: no cover - dependency not present in test rig
 
 
 # --- Public Classes ---
+
 
 @dataclass(slots=True)
 class FaissSearchResult:
@@ -463,9 +464,7 @@ class FaissVectorStore(DenseVectorStore):
             return
         step = max(1, int(batch_size))
         total = len(vector_list)
-        with self._observability.trace(
-            "faiss_add_batch", total=str(total), batch_size=str(step)
-        ):
+        with self._observability.trace("faiss_add_batch", total=str(total), batch_size=str(step)):
             self._observability.metrics.increment("faiss_add_batches", amount=1.0)
             for start in range(0, total, step):
                 end = min(total, start + step)
@@ -673,7 +672,9 @@ class FaissVectorStore(DenseVectorStore):
             return target
         logger.info(
             "faiss-nprobe-update",
-            extra={"event": {"previous": current, "current": target, "index": self._config.index_type}},
+            extra={
+                "event": {"previous": current, "current": target, "index": self._config.index_type}
+            },
         )
         self._config = replace(self._config, nprobe=target)
         with self._observability.trace("faiss_set_nprobe", nprobe=str(target)):
@@ -1005,9 +1006,7 @@ class FaissVectorStore(DenseVectorStore):
                     getattr(self._config, "ivfpq_use_precomputed", True)
                 )
             if hasattr(cfg, "useFloat16LookupTables"):
-                cfg.useFloat16LookupTables = bool(
-                    getattr(self._config, "ivfpq_float16_lut", True)
-                )
+                cfg.useFloat16LookupTables = bool(getattr(self._config, "ivfpq_float16_lut", True))
             if hasattr(cfg, "interleavedLayout"):
                 cfg.interleavedLayout = bool(getattr(self._config, "interleaved_layout", True))
             index = faiss.GpuIndexIVFPQ(
@@ -1179,6 +1178,7 @@ class FaissVectorStore(DenseVectorStore):
 
 
 # --- Public Functions ---
+
 
 def normalize_rows(matrix: np.ndarray) -> np.ndarray:
     """L2-normalise each row of ``matrix`` in-place.
@@ -1408,7 +1408,6 @@ def cosine_topk_blockwise(
             [best_index, np.broadcast_to(block_idx, (N, block_idx.size))], axis=1
         )
         select = np.argpartition(cand_scores, -k, axis=1)[:, -k:]
-        rows = np.arange(N)[:, None]
         best_scores = np.take_along_axis(cand_scores, select, axis=1)
         best_index = np.take_along_axis(cand_index, select, axis=1)
         start = end

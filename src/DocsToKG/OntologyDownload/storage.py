@@ -6,7 +6,7 @@ import os
 import shutil
 import stat
 from pathlib import Path, PurePosixPath
-from typing import List, Optional, Protocol, Tuple
+from typing import List, Protocol, Tuple
 
 try:  # pragma: no cover - optional dependency
     import fsspec  # type: ignore

@@ -59,6 +59,7 @@ pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
 from DocsToKG.OntologyDownload.cli import format_table, format_validation_summary
+
 # --- Test Cases ---
 
 

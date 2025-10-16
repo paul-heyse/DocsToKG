@@ -257,7 +257,7 @@ from collections import deque
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Deque, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Deque, Iterable, List, Optional, Tuple
 
 import requests
 from tqdm import tqdm
@@ -278,7 +278,6 @@ from DocsToKG.DocParsing._common import (
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
-    resolve_hash_algorithm,
     resolve_hf_home,
     resolve_model_root,
     set_spawn_or_warn,
@@ -340,6 +339,7 @@ ARTIFACTS = os.environ.get("DOCLING_ARTIFACTS_PATH", "")
 
 # --- Model Path Utilities ---
 
+
 def _looks_like_filesystem_path(candidate: str) -> bool:
     """Return ``True`` when ``candidate`` appears to reference a local path."""
 
@@ -356,8 +356,6 @@ def _looks_like_filesystem_path(candidate: str) -> bool:
     if alt and alt not in prefixes:
         prefixes.append(alt)
     return any(candidate.startswith(prefix) for prefix in prefixes)
-
-
 
 
 def resolve_pdf_model_path(cli_value: str | None = None) -> str:
@@ -382,6 +380,7 @@ def resolve_pdf_model_path(cli_value: str | None = None) -> str:
 
 
 # --- CLI Helpers ---
+
 
 def add_data_root_option(parser: argparse.ArgumentParser) -> None:
     """Attach the shared ``--data-root`` option to a CLI parser.
@@ -511,6 +510,7 @@ def resolve_pipeline_path(
 
 
 # --- vLLM Lifecycle ---
+
 
 def _dedupe_preserve_order(names: Iterable[str]) -> List[str]:
     """Return a list containing ``names`` without duplicates while preserving order.
@@ -744,6 +744,7 @@ DEFAULT_GPU_MEMORY_UTILIZATION = 0.30
 
 # --- PDF Pipeline ---
 
+
 @dataclass
 class PdfTask:
     """Work item representing a single PDF conversion request.
@@ -787,6 +788,7 @@ class PdfTask:
     inference_model: str
     vlm_prompt: str
     vlm_stop: Tuple[str, ...]
+
 
 @dataclass
 class PdfConversionResult:
@@ -1836,7 +1838,6 @@ def html_convert_one(task: HtmlTask) -> HtmlConversionResult:
                 error="empty-document",
             )
 
-        
         out_path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
         # Serialize under a lock to avoid partial writes when workers race
@@ -1844,13 +1845,13 @@ def html_convert_one(task: HtmlTask) -> HtmlConversionResult:
             with acquire_lock(out_path):
                 if out_path.exists() and not task.overwrite:
                     return HtmlConversionResult(
-                                        doc_id=task.relative_id,
-                                        status="skip",
-                                        duration_s=time.perf_counter() - start,
-                                        input_path=str(task.html_path),
-                                        input_hash=task.input_hash,
-                                        output_path=str(out_path),
-                                    )
+                        doc_id=task.relative_id,
+                        status="skip",
+                        duration_s=time.perf_counter() - start,
+                        input_path=str(task.html_path),
+                        input_hash=task.input_hash,
+                        output_path=str(out_path),
+                    )
                 result.document.save_as_doctags(tmp_path)
                 try:
                     tmp_path.replace(out_path)
@@ -1997,7 +1998,10 @@ def html_main(args: argparse.Namespace | None = None) -> int:
         out_path = (output_dir / rel_path).with_suffix(".doctags")
         input_hash = compute_content_hash(path)
         manifest_entry = manifest_index.get(doc_id)
-        if should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force) and not args.overwrite:
+        if (
+            should_skip_output(out_path, manifest_entry, input_hash, args.resume, args.force)
+            and not args.overwrite
+        ):
             _LOGGER.info(
                 "Skipping HTML document",
                 extra={

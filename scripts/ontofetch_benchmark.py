@@ -30,6 +30,7 @@ from pathlib import Path
 
 from DocsToKG.OntologyDownload import ResolvedConfig
 from DocsToKG.OntologyDownload.cli import _handle_pull
+
 # --- Public Functions ---
 
 
@@ -55,6 +56,8 @@ def benchmark(spec_path: Path, iterations: int) -> None:
     print(f"Runs: {iterations}")
     print(f"Mean: {mean:.2f}s")
     print(f"Median: {median:.2f}s")
+
+
 # --- Module Entry Points ---
 
 

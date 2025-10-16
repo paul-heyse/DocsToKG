@@ -123,6 +123,7 @@ from typing import Any, Dict, List
 import pytest
 
 from tests._stubs import dependency_stubs
+
 # --- Helper Functions ---
 
 
@@ -202,6 +203,8 @@ def _install_minimal_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
         return original_write_text(path_self, data, **kwargs)
 
     monkeypatch.setattr(Path, "write_text", _write_text)
+
+
 # --- Test Cases ---
 
 
@@ -318,7 +321,9 @@ def test_cli_path_overrides_take_precedence(
 
     captured: Dict[str, Path] = {}
 
-    def _capture(chunk_file, out_path, stats, args, validator, logger) -> tuple[int, List[int], List[float]]:
+    def _capture(
+        chunk_file, out_path, stats, args, validator, logger
+    ) -> tuple[int, List[int], List[float]]:
         captured["splade"] = args.splade_cfg.model_dir
         captured["qwen"] = args.qwen_cfg.model_dir
         return 0, [], []

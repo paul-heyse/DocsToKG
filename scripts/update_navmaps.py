@@ -22,7 +22,6 @@ import sys
 from pathlib import Path
 from typing import Iterable, List
 
-
 NAVMAP_START = "# === NAVMAP v1 ==="
 NAVMAP_END = "# === /NAVMAP ==="
 

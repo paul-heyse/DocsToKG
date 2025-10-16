@@ -114,6 +114,8 @@ class _DummyExecutor:
         future = _DummyFuture(fn(arg))
         self.submitted.append(future)
         return future
+
+
 # --- Helper Functions ---
 
 
@@ -151,9 +153,7 @@ def _stub_main_setup(monkeypatch, module, tmp_path, list_return: List) -> Simple
     monkeypatch.setattr(
         module, "ensure_vllm", lambda *_a, **_k: (module.PREFERRED_PORT, None, False)
     )
-    monkeypatch.setattr(
-        module, "start_vllm", lambda *_a, **_k: SimpleNamespace(poll=lambda: None)
-    )
+    monkeypatch.setattr(module, "start_vllm", lambda *_a, **_k: SimpleNamespace(poll=lambda: None))
     monkeypatch.setattr(module, "wait_for_vllm", lambda *_a, **_k: ["stub-model"])
     monkeypatch.setattr(module, "validate_served_models", lambda *_a, **_k: None)
     monkeypatch.setattr(module, "stop_vllm", lambda *_a, **_k: None)
@@ -186,6 +186,8 @@ def _import_pdf_module(monkeypatch):
     monkeypatch.setitem(sys.modules, "tqdm", mock.MagicMock(tqdm=_TqdmStub()))
     module = importlib.import_module("DocsToKG.DocParsing.pipelines")
     return importlib.reload(module)
+
+
 # --- Test Cases ---
 
 

@@ -322,7 +322,9 @@ def _stub_module(name: str, **attrs):
     return module
 
 
-sys.modules.setdefault("requests", _stub_module("requests", get=lambda *args, **kwargs: _RequestsResponse()))
+sys.modules.setdefault(
+    "requests", _stub_module("requests", get=lambda *args, **kwargs: _RequestsResponse())
+)
 
 sys.modules.setdefault("tqdm", _stub_module("tqdm", tqdm=lambda *a, **kw: _DummyTqdm(*a, **kw)))
 
@@ -417,6 +419,7 @@ from DocsToKG.DocParsing.schemas import (  # noqa: E402
 )
 
 # --- _common utility tests ---
+
 
 @pytest.fixture(autouse=True)
 def _reset_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -574,6 +577,7 @@ def test_manifest_append(tmp_path: Path) -> None:
 
 # --- Schema validation tests ---
 
+
 def make_chunk_row(**overrides):
     base = {
         "doc_id": "doc",
@@ -714,6 +718,7 @@ def test_vector_golden_rows_validate(relative: str) -> None:
 
 
 # --- New robustness and configuration tests ---
+
 
 def test_set_spawn_or_warn_warns_on_incompatible_method(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture

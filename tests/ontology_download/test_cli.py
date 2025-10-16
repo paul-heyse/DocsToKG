@@ -137,6 +137,8 @@ def stub_logger():
             pass
 
     return _Logger()
+
+
 # --- Helper Functions ---
 
 
@@ -164,6 +166,8 @@ def _planned_fetch(ontology_id: str, url: str = "https://example.org/doc.owl") -
         last_modified="2024-01-01T00:00:00Z",
         size=128,
     )
+
+
 # --- Test Cases ---
 
 

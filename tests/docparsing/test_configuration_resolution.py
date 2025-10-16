@@ -51,6 +51,7 @@ from DocsToKG.DocParsing.pipelines import (
     resolve_model_root,
     resolve_pdf_model_path,
 )
+
 # --- Test Cases ---
 
 
@@ -191,6 +192,8 @@ def test_path_resolution_edge_cases():
         result = resolve_pdf_model_path(cli_value="")
         assert isinstance(result, str)
         assert len(result) > 0  # Should not be empty
+
+
 # --- Module Entry Points ---
 
 

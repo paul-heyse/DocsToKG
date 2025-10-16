@@ -264,6 +264,7 @@ from .ontology_download import (
     fetch_all,
     get_manifest_schema,
     infer_version_timestamp,
+    list_plugins,
     load_config,
     parse_iso_datetime,
     parse_rate_limit_to_rps,
@@ -276,6 +277,7 @@ from .ontology_download import (
     validate_manifest_dict,
 )
 from .storage import _directory_size
+
 # --- Globals ---
 
 __all__ = (
@@ -396,6 +398,8 @@ def format_validation_summary(results: Dict[str, Dict[str, Any]]) -> str:
                 message = ", ".join(f"{key}={value}" for key, value in details.items())
         formatted.append((name, status, message))
     return format_table(("validator", "status", "details"), formatted)
+
+
 # --- Private Helpers ---
 
 
@@ -529,6 +533,23 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Comma-separated list of additional hosts permitted for this run",
     )
     plan_diff.add_argument("--json", action="store_true", help="Emit plan diff as JSON")
+
+    plugins_cmd = subparsers.add_parser(
+        "plugins",
+        help="List available resolver or validator plugins",
+        description="Show resolver or validator plugins available in this environment.",
+    )
+    plugins_cmd.add_argument(
+        "--kind",
+        choices=("resolver", "validator", "all"),
+        default="resolver",
+        help="Plugin category to display (default: resolver)",
+    )
+    plugins_cmd.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit plugin inventory as JSON",
+    )
 
     show = subparsers.add_parser("show", help="Display ontology metadata")
     show.add_argument("id", help="Ontology identifier")
@@ -908,6 +929,8 @@ def _plan_to_dict(plan: PlannedFetch) -> dict:
     if metadata.get("etag"):
         payload["etag"] = metadata["etag"]
     return payload
+
+
 def _infer_version_timestamp(version: str) -> Optional[datetime]:
     """Attempt to derive a datetime from a version string.
 
@@ -1157,6 +1180,17 @@ def _handle_plan_diff(args, base_config: Optional[ResolvedConfig]) -> Dict[str, 
     diff = _compute_plan_diff(baseline_payload, current_payload)
     diff["baseline"] = str(baseline_path)
     return diff
+
+
+def _handle_plugins(args) -> Dict[str, Dict[str, str]]:
+    """Return plugin inventory for the requested kind."""
+
+    if args.kind == "all":
+        return {
+            "resolver": dict(list_plugins("resolver")),
+            "validator": dict(list_plugins("validator")),
+        }
+    return {args.kind: dict(list_plugins(args.kind))}
 
 
 def _handle_prune(args, logger) -> Dict[str, object]:
@@ -1639,6 +1673,8 @@ def _handle_config_validate(path: Path) -> dict:
         "ontologies": len(config.specs),
         "path": str(path),
     }
+
+
 # --- Module Entry Points ---
 
 

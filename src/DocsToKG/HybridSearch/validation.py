@@ -66,11 +66,10 @@ import faiss  # type: ignore
 
 from .config import HybridSearchConfigManager
 from .features import FeatureGenerator
-from .storage import OpenSearchSimulator
 from .ingest import ChunkIngestionPipeline
 from .observability import Observability
 from .service import HybridSearchService
-from .storage import ChunkRegistry
+from .storage import ChunkRegistry, OpenSearchSimulator
 from .types import (
     ChunkPayload,
     DocumentInput,
@@ -121,6 +120,7 @@ BASIC_SPARSE_RELEVANCE_THRESHOLD = 0.90
 
 
 # --- Public Classes ---
+
 
 class HybridSearchValidator:
     """Execute validation sweeps and persist reports.
@@ -1504,6 +1504,7 @@ class HybridSearchValidator:
 
 # --- Public Functions ---
 
+
 def load_dataset(path: Path) -> List[Mapping[str, object]]:
     """Load a JSONL dataset describing documents and queries.
 
@@ -1628,6 +1629,7 @@ def run_real_vector_ci(output_dir: Path, extra_args: Sequence[str]) -> int:
 
 
 # --- Module Entry Points ---
+
 
 def main(argv: Optional[Sequence[str]] = None) -> None:
     """CLI entrypoint for running hybrid search validation suites.

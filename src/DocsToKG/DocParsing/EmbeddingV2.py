@@ -235,30 +235,28 @@ from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 from tqdm import tqdm
 
 from DocsToKG.DocParsing._common import (
+    UUID_NAMESPACE,
+    Batcher,
     BM25Stats,
     QwenCfg,
     SpladeCfg,
-    UUID_NAMESPACE,
-    Batcher,
     acquire_lock,
     atomic_write,
     compute_content_hash,
     data_chunks,
     data_vectors,
-    detect_data_root,
     derive_doc_id_and_vectors_path,
+    detect_data_root,
     expand_path,
     get_logger,
     init_hf_env,
     iter_chunks,
     jsonl_load,
-    jsonl_save,
     load_manifest_index,
     manifest_append,
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
-    resolve_hash_algorithm,
     resolve_hf_home,
     resolve_model_root,
     should_skip_output,
@@ -271,10 +269,10 @@ from DocsToKG.DocParsing.pipelines import (
 )
 from DocsToKG.DocParsing.schemas import (
     COMPATIBLE_CHUNK_VERSIONS,
+    VECTOR_SCHEMA_VERSION,
     BM25Vector,
     DenseVector,
     SPLADEVector,
-    VECTOR_SCHEMA_VERSION,
     VectorRow,
     validate_schema_version,
 )
@@ -348,6 +346,7 @@ def _qwen_cache_key(cfg: QwenCfg) -> Tuple[str, str, int, float, str | None]:
 
 # --- Cache Utilities ---
 
+
 def _resolve_qwen_dir(model_root: Path) -> Path:
     """Resolve Qwen model directory with ``DOCSTOKG_QWEN_DIR`` override.
 
@@ -416,6 +415,7 @@ DEFAULT_CHUNKS_DIR = data_chunks(DEFAULT_DATA_ROOT)
 DEFAULT_VECTORS_DIR = data_vectors(DEFAULT_DATA_ROOT)
 MANIFEST_STAGE = "embeddings"
 SPLADE_SPARSITY_WARN_THRESHOLD_PCT = 1.0
+
 
 def _missing_splade_dependency_message() -> str:
     """Return a human-readable installation hint for SPLADE extras."""
@@ -547,6 +547,7 @@ def tokens(text: str) -> List[str]:
 
 # --- Public Classes ---
 
+
 class BM25StatsAccumulator:
     """Streaming accumulator for BM25 corpus statistics.
 
@@ -655,6 +656,7 @@ def bm25_vector(
 
 
 # --- SPLADE-v3 (GPU) ---
+
 
 def splade_encode(
     cfg: SpladeCfg, texts: List[str], batch_size: Optional[int] = None
@@ -877,6 +879,7 @@ class SPLADEValidator:
 
 # --- Qwen3 Embeddings ---
 
+
 def qwen_embed(
     cfg: QwenCfg, texts: List[str], batch_size: Optional[int] = None
 ) -> List[List[float]]:
@@ -942,8 +945,10 @@ def process_pass_a(files: Sequence[Path], logger) -> BM25Stats:
         updated = False
         tmp = chunk_file.with_suffix(chunk_file.suffix + ".tmp")
         tmp.parent.mkdir(parents=True, exist_ok=True)
-        with chunk_file.open("r", encoding="utf-8", errors="replace") as src, \
-             tmp.open("w", encoding="utf-8") as dst:
+        with (
+            chunk_file.open("r", encoding="utf-8", errors="replace") as src,
+            tmp.open("w", encoding="utf-8") as dst,
+        ):
             for line_no, line in enumerate(src, start=1):
                 line = line.strip()
                 if not line:
@@ -1294,9 +1299,7 @@ def write_vectors(
 # --- Main Driver ---
 
 
-def _validate_vectors_for_chunks(
-    chunks_dir: Path, vectors_dir: Path, logger
-) -> tuple[int, int]:
+def _validate_vectors_for_chunks(chunks_dir: Path, vectors_dir: Path, logger) -> tuple[int, int]:
     """Validate vectors associated with chunk files without recomputing models.
 
     Returns:
@@ -1335,9 +1338,7 @@ def _validate_vectors_for_chunks(
                 }
             },
         )
-        raise FileNotFoundError(
-            "Vector files not found for documents: " + preview
-        )
+        raise FileNotFoundError("Vector files not found for documents: " + preview)
 
     logger.info(
         "Validated vector files",
@@ -1440,7 +1441,11 @@ def build_parser() -> argparse.ArgumentParser:
         resume_help="Skip chunk files whose vector outputs already exist with matching hash",
         force_help="Force reprocessing even when resume criteria are satisfied",
     )
-    parser.add_argument("--validate-only", action="store_true", help="Validate existing vectors in --out-dir and exit")
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Validate existing vectors in --out-dir and exit",
+    )
     parser.add_argument(
         "--offline",
         action="store_true",
@@ -1647,8 +1652,7 @@ def main(args: argparse.Namespace | None = None) -> int:
         if len(incompatible_chunks) > 5:
             summary += ", ..."
         raise ValueError(
-            "Incompatible chunk schema detected; review chunk files before proceeding: "
-            + summary
+            "Incompatible chunk schema detected; review chunk files before proceeding: " + summary
         )
 
     if args.force:

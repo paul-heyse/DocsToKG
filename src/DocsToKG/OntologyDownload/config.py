@@ -114,27 +114,18 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 try:  # pragma: no cover - dependency check
     import yaml  # type: ignore
 except ModuleNotFoundError as exc:  # pragma: no cover - explicit guidance for users
     raise ImportError(
         "PyYAML is required for configuration parsing. Install it with: pip install pyyaml"
-    ) from exc
-
-try:  # pragma: no cover - optional dependency
-    from jsonschema import Draft202012Validator
-    from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
-except ModuleNotFoundError as exc:  # pragma: no cover - provide actionable guidance
-    raise ImportError(
-        "jsonschema is required for ontology validation. Install it with: pip install jsonschema"
     ) from exc
 
 from pydantic import BaseModel, Field, field_validator
@@ -145,7 +136,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from .errors import UserConfigError
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle guard for type checkers only
-    from .pipeline import ConfigurationError as _ConfigurationError
+    from .errors import PolicyError as _PolicyError
+    from .pipeline import FetchSpec
+
+    PolicyError = _PolicyError
 
 PYTHON_MIN_VERSION = (3, 9)
 
@@ -193,6 +187,7 @@ def __getattr__(name: str):
     if name == "PolicyError":
         from .errors import PolicyError as _PolicyError
 
+        globals()[name] = _PolicyError
         return _PolicyError
     raise AttributeError(name)
 
@@ -585,9 +580,7 @@ def load_raw_yaml(config_path: Path) -> Mapping[str, object]:
         with config_path.open("r", encoding="utf-8") as handle:
             data = yaml.safe_load(handle)
     except yaml.YAMLError as exc:  # pragma: no cover - exercised via tests
-        raise UserConfigError(
-            f"Configuration file '{config_path}' contains invalid YAML"
-        ) from exc
+        raise UserConfigError(f"Configuration file '{config_path}' contains invalid YAML") from exc
 
     if not isinstance(data, Mapping):
         raise UserConfigError("Configuration file must contain a mapping at the root")

@@ -68,6 +68,7 @@ from DocsToKG.OntologyDownload.validation_core import (
     normalize_streaming,
     validate_rdflib,
 )
+
 # --- Globals ---
 
 _COMPLEX_FIXTURE = Path("tests/data/ontology_normalization/complex.ttl")
@@ -101,6 +102,8 @@ def _run_rdflib(path: Path, tmp_path: Path, threshold_mb: int) -> dict[str, obje
     result = validate_rdflib(request, _noop_logger())
     assert result.ok
     return result.details
+
+
 # --- Test Cases ---
 
 

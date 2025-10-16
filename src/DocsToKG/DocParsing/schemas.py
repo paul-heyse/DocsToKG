@@ -99,6 +99,7 @@ Dependencies:
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+
 # --- Globals ---
 
 PYDANTIC_AVAILABLE = True
@@ -245,6 +246,8 @@ except Exception as exc:  # pragma: no cover - exercised via tests with stubs
         """
 
         return dict(kwargs)
+
+
 # --- Private Helpers ---
 
 
@@ -659,6 +662,8 @@ class VectorRow(BaseModel):
             COMPATIBLE_VECTOR_VERSIONS,
             kind="vector",
         )
+
+
 # --- Public Functions ---
 
 

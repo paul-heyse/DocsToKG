@@ -196,10 +196,10 @@ import logging
 import os
 import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
-from functools import lru_cache
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
+from functools import lru_cache
 from pathlib import Path
 from typing import (
     Any,
@@ -211,14 +211,17 @@ from typing import (
     Set,
     Tuple,
 )
-from urllib.parse import unquote, urlsplit
 
 import requests
 from pyalex import Topics, Works
 from pyalex import config as oa_config
 
 from DocsToKG.ContentDownload import resolvers
-from DocsToKG.ContentDownload.classifications import Classification, PDF_LIKE
+from DocsToKG.ContentDownload.classifications import PDF_LIKE, Classification
+from DocsToKG.ContentDownload.classifier import (
+    _infer_suffix,
+    classify_payload,
+)
 from DocsToKG.ContentDownload.network import (
     CachedResult,
     ConditionalRequestHelper,
@@ -227,21 +230,8 @@ from DocsToKG.ContentDownload.network import (
     head_precheck,
     request_with_retries,
 )
-from DocsToKG.ContentDownload.classifier import (
-    classify_payload,
-    _extract_filename_from_disposition,
-    _infer_suffix,
-)
-from DocsToKG.ContentDownload.utils import (
-    dedupe,
-    normalize_doi,
-    normalize_pmcid,
-    normalize_pmid as _normalize_pmid,
-    normalize_arxiv as _normalize_arxiv,
-    strip_prefix,
-    slugify,
-)
 from DocsToKG.ContentDownload.telemetry import (
+    MANIFEST_SCHEMA_VERSION,
     AttemptSink,
     CsvSink,
     JsonlSink,
@@ -249,7 +239,18 @@ from DocsToKG.ContentDownload.telemetry import (
     ManifestEntry,
     ManifestIndexSink,
     MultiSink,
-    MANIFEST_SCHEMA_VERSION,
+)
+from DocsToKG.ContentDownload.utils import (
+    dedupe,
+    normalize_doi,
+    normalize_pmcid,
+    slugify,
+)
+from DocsToKG.ContentDownload.utils import (
+    normalize_arxiv as _normalize_arxiv,
+)
+from DocsToKG.ContentDownload.utils import (
+    normalize_pmid as _normalize_pmid,
 )
 
 ResolverPipeline = resolvers.ResolverPipeline
@@ -301,6 +302,7 @@ LOGGER = logging.getLogger("DocsToKG.ContentDownload")
 
 # --- Pipeline Helpers ---
 
+
 def _utc_timestamp() -> str:
     """Return the current time as an ISO 8601 UTC timestamp.
 
@@ -346,6 +348,7 @@ def _update_tail_buffer(buffer: bytearray, chunk: bytes, *, limit: int = 1024) -
 
 
 # --- Public Functions ---
+
 
 def ensure_dir(path: Path) -> None:
     """Create a directory if it does not already exist.
@@ -579,6 +582,7 @@ def _make_session(
 
 # --- Manifest Utilities ---
 
+
 def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, Any]], Set[str]]:
     """Load manifest JSONL entries indexed by work identifier.
 
@@ -652,6 +656,7 @@ def load_previous_manifest(path: Optional[Path]) -> Tuple[Dict[str, Dict[str, An
 
 
 # --- Download Pipeline ---
+
 
 def build_manifest_entry(
     artifact: WorkArtifact,
@@ -748,6 +753,7 @@ def _collect_location_urls(work: Dict[str, Any]) -> Dict[str, List[str]]:
         "pdf": dedupe(pdf_urls),
         "sources": dedupe(sources),
     }
+
 
 def build_query(args: argparse.Namespace) -> Works:
     """Build a pyalex Works query based on CLI arguments.
@@ -973,8 +979,7 @@ def download_candidate(
                             classification=Classification.HTTP_ERROR,
                             path=None,
                             http_status=response.status_code,
-                            content_type=response.headers.get("Content-Type")
-                            or content_type_hint,
+                            content_type=response.headers.get("Content-Type") or content_type_hint,
                             elapsed_ms=elapsed_ms,
                             error="unexpected-304",
                             sha256=None,
@@ -1009,8 +1014,7 @@ def download_candidate(
                         classification=Classification.CACHED,
                         path=cached.path,
                         http_status=response.status_code,
-                        content_type=response.headers.get("Content-Type")
-                        or content_type_hint,
+                        content_type=response.headers.get("Content-Type") or content_type_hint,
                         elapsed_ms=elapsed_ms,
                         error=None,
                         sha256=cached.sha256,
@@ -1025,8 +1029,7 @@ def download_candidate(
                         classification=Classification.HTTP_ERROR,
                         path=None,
                         http_status=response.status_code,
-                        content_type=response.headers.get("Content-Type")
-                        or content_type_hint,
+                        content_type=response.headers.get("Content-Type") or content_type_hint,
                         elapsed_ms=elapsed_ms,
                         error=None,
                         sha256=None,
@@ -1048,7 +1051,11 @@ def download_candidate(
                         content_length_hint = int(content_length_header.strip())
                     except (TypeError, ValueError):
                         content_length_hint = None
-                if max_bytes and content_length_hint is not None and content_length_hint > max_bytes:
+                if (
+                    max_bytes
+                    and content_length_hint is not None
+                    and content_length_hint > max_bytes
+                ):
                     LOGGER.warning(
                         "Aborting download due to max-bytes limit",
                         extra={
@@ -1108,12 +1115,16 @@ def download_candidate(
                             if detected is not None:
                                 if dry_run:
                                     break
-                                default_suffix = ".html" if detected == Classification.HTML else ".pdf"
+                                default_suffix = (
+                                    ".html" if detected == Classification.HTML else ".pdf"
+                                )
                                 suffix = _infer_suffix(
                                     url, content_type, disposition, detected, default_suffix
                                 )
                                 dest_dir = (
-                                    artifact.html_dir if detected == Classification.HTML else artifact.pdf_dir
+                                    artifact.html_dir
+                                    if detected == Classification.HTML
+                                    else artifact.pdf_dir
                                 )
                                 dest_path = dest_dir / f"{artifact.base_stem}{suffix}"
                                 ensure_dir(dest_path.parent)
@@ -1714,6 +1725,7 @@ def process_one_work(
 
 
 # --- CLI Entry Points ---
+
 
 def main() -> None:
     """Parse CLI arguments, configure resolvers, and execute downloads.

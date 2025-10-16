@@ -35,7 +35,7 @@ from .errors import DownloadFailure, OntologyDownloadError, PolicyError
 from .io_safe import sanitize_filename, sha256_file, validate_url_security
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle guard for type checkers only
-    from .pipeline import validate_manifest_dict as _validate_manifest_dict
+    from .pipeline import validate_manifest_dict
 
 T = TypeVar("T")
 
@@ -204,7 +204,9 @@ class SharedTokenBucket(TokenBucket):
             msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)  # type: ignore[attr-defined]
 
     @staticmethod
-    def _deserialize_state(raw: bytes, *, default_tokens: float, timestamp: float) -> Dict[str, float]:
+    def _deserialize_state(
+        raw: bytes, *, default_tokens: float, timestamp: float
+    ) -> Dict[str, float]:
         try:
             data = json.loads(raw.decode("utf-8") or "{}")
             tokens_value = float(data.get("tokens", default_tokens))
@@ -324,6 +326,7 @@ for canonical, aliases in _RDF_ALIAS_GROUPS.items():
     for alias in aliases:
         RDF_MIME_ALIASES.add(alias)
         RDF_MIME_FORMAT_LABELS[alias] = label
+
 
 class StreamingDownloader(pooch.HTTPDownloader):
     """Custom downloader supporting HEAD validation, conditional requests, resume, and caching.
@@ -610,9 +613,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                             manifest_length = self.previous_manifest.get("content_length")
                             try:
                                 self.response_content_length = (
-                                    int(manifest_length)
-                                    if manifest_length is not None
-                                    else None
+                                    int(manifest_length) if manifest_length is not None else None
                                 )
                             except (TypeError, ValueError):
                                 self.response_content_length = None
@@ -680,7 +681,9 @@ class StreamingDownloader(pooch.HTTPDownloader):
                                                     "stage": "download",
                                                     "status": "in-progress",
                                                     "progress": {
-                                                        "percent": round(min(progress, 1.0) * 100, 1)
+                                                        "percent": round(
+                                                            min(progress, 1.0) * 100, 1
+                                                        )
                                                     },
                                                 },
                                             )
@@ -688,9 +691,8 @@ class StreamingDownloader(pooch.HTTPDownloader):
                                             if next_progress > 1:
                                                 next_progress = None
                                                 break
-                                    if (
-                                        bytes_downloaded
-                                        > self.http_config.max_download_size_gb * (1024**3)
+                                    if bytes_downloaded > self.http_config.max_download_size_gb * (
+                                        1024**3
                                     ):
                                         self.logger.error(
                                             "download exceeded size limit",
@@ -714,9 +716,7 @@ class StreamingDownloader(pooch.HTTPDownloader):
                                 raise OntologyDownloadError(
                                     "No space left on device while writing download"
                                 ) from exc
-                            raise OntologyDownloadError(
-                                f"Failed to write download: {exc}"
-                            ) from exc
+                            raise OntologyDownloadError(f"Failed to write download: {exc}") from exc
                         break
                 except (
                     requests.ConnectionError,
@@ -853,14 +853,11 @@ def download_stream(
         if content_length is None and previous_manifest:
             manifest_length = previous_manifest.get("content_length")
             try:
-                content_length = (
-                    int(manifest_length)
-                    if manifest_length is not None
-                    else None
-                )
+                content_length = int(manifest_length) if manifest_length is not None else None
             except (TypeError, ValueError):
                 content_length = None
         return content_type, content_length
+
     cache_dir.mkdir(parents=True, exist_ok=True)
     safe_name = sanitize_filename(destination.name)
     try:

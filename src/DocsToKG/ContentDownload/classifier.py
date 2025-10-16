@@ -89,7 +89,9 @@ def _infer_suffix(
             return suffix.lower()
 
     ctype = (content_type or "").split(";")[0].strip().lower()
-    if ctype == "application/pdf" or (ctype.endswith("pdf") and classification_text.startswith("pdf")):
+    if ctype == "application/pdf" or (
+        ctype.endswith("pdf") and classification_text.startswith("pdf")
+    ):
         return ".pdf"
     if ctype in {"text/html", "application/xhtml+xml"} or "html" in ctype:
         return ".html"

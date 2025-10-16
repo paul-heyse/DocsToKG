@@ -22,6 +22,7 @@ from .types import ChunkPayload
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from .vectorstore import FaissSearchResult
 
+
 class LexicalIndex(Protocol):
     """Protocol describing the lexical (BM25/SPLADE) index interface.
 
@@ -178,10 +179,14 @@ class DenseVectorStore(Protocol):
     def search(self, query: np.ndarray, top_k: int) -> Sequence["FaissSearchResult"]:
         """Search for nearest neighbours of ``query``."""
 
-    def search_many(self, queries: np.ndarray, top_k: int) -> Sequence[Sequence["FaissSearchResult"]]:
+    def search_many(
+        self, queries: np.ndarray, top_k: int
+    ) -> Sequence[Sequence["FaissSearchResult"]]:
         """Search for nearest neighbours of multiple queries."""
 
-    def search_batch(self, queries: np.ndarray, top_k: int) -> Sequence[Sequence["FaissSearchResult"]]:
+    def search_batch(
+        self, queries: np.ndarray, top_k: int
+    ) -> Sequence[Sequence["FaissSearchResult"]]:
         """Optional alias for batched search."""
 
     def serialize(self) -> bytes:

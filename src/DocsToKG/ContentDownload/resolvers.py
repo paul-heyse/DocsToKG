@@ -294,8 +294,9 @@ from urllib.parse import quote, urljoin, urlparse, urlsplit
 
 import requests as _requests
 
+from DocsToKG.ContentDownload.classifications import PDF_LIKE, Classification
 from DocsToKG.ContentDownload.network import head_precheck, request_with_retries
-from DocsToKG.ContentDownload.classifications import Classification, PDF_LIKE
+from DocsToKG.ContentDownload.telemetry import AttemptSink
 from DocsToKG.ContentDownload.utils import (
     dedupe,
     normalize_doi,
@@ -303,7 +304,6 @@ from DocsToKG.ContentDownload.utils import (
     normalize_url,
     strip_prefix,
 )
-from DocsToKG.ContentDownload.telemetry import AttemptSink
 
 if TYPE_CHECKING:  # pragma: no cover
     from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact
@@ -380,6 +380,7 @@ __all__ = [
 ]
 
 # --- Resolver Configuration ---
+
 
 @dataclass
 class ResolverResult:
@@ -758,15 +759,9 @@ class ResolverMetrics:
     html: Counter = field(default_factory=Counter)
     skips: Counter = field(default_factory=Counter)
     failures: Counter = field(default_factory=Counter)
-    latency_ms: defaultdict[str, List[float]] = field(
-        default_factory=lambda: defaultdict(list)
-    )
-    status_counts: defaultdict[str, Counter] = field(
-        default_factory=lambda: defaultdict(Counter)
-    )
-    error_reasons: defaultdict[str, Counter] = field(
-        default_factory=lambda: defaultdict(Counter)
-    )
+    latency_ms: defaultdict[str, List[float]] = field(default_factory=lambda: defaultdict(list))
+    status_counts: defaultdict[str, Counter] = field(default_factory=lambda: defaultdict(Counter))
+    error_reasons: defaultdict[str, Counter] = field(default_factory=lambda: defaultdict(Counter))
     _lock: Lock = field(default_factory=Lock, repr=False, compare=False)
 
     def record_attempt(self, resolver_name: str, outcome: DownloadOutcome) -> None:
@@ -871,11 +866,14 @@ class ResolverMetrics:
                     "max_ms": ordered[-1],
                 }
 
-            status_summary = {resolver: dict(counter) for resolver, counter in self.status_counts.items() if counter}
+            status_summary = {
+                resolver: dict(counter)
+                for resolver, counter in self.status_counts.items()
+                if counter
+            }
             reason_summary = {
                 resolver: [
-                    {"reason": reason, "count": count}
-                    for reason, count in counter.most_common(5)
+                    {"reason": reason, "count": count} for reason, count in counter.most_common(5)
                 ]
                 for resolver, counter in self.error_reasons.items()
                 if counter
@@ -894,6 +892,7 @@ class ResolverMetrics:
 
 
 # --- Shared Helpers ---
+
 
 def _fetch_semantic_scholar_data(
     session: _requests.Session,
@@ -915,9 +914,7 @@ def _fetch_semantic_scholar_data(
     )
     try:
         if response.status_code != 200:
-            error = _requests.HTTPError(
-                f"Semantic Scholar HTTPError: {response.status_code}"
-            )
+            error = _requests.HTTPError(f"Semantic Scholar HTTPError: {response.status_code}")
             error.response = response
             raise error
         return response.json()
@@ -1172,7 +1169,7 @@ class ApiResolverBase(RegisteredResolver, register=False):
                 ),
             )
         finally:
-            close = getattr(response, 'close', None)
+            close = getattr(response, "close", None)
             if callable(close):
                 close()
 
@@ -1283,6 +1280,7 @@ def default_resolvers() -> List[Resolver]:
 
 
 # --- Resolver implementations ---
+
 
 class ArxivResolver(RegisteredResolver):
     """Resolve arXiv preprints using arXiv identifier lookups.
@@ -2389,10 +2387,11 @@ class PmcResolver(RegisteredResolver):
                             url=_absolute_url(oa_url, href),
                             metadata={"pmcid": pmcid, "source": "oa"},
                         )
-            yield ResolverResult(
-                url=fallback_url,
-                metadata={"pmcid": pmcid, "source": "pdf-fallback"},
-            )
+            if not pdf_links_emitted:
+                yield ResolverResult(
+                    url=fallback_url,
+                    metadata={"pmcid": pmcid, "source": "pdf-fallback"},
+                )
 
 
 class SemanticScholarResolver(RegisteredResolver):

@@ -428,6 +428,8 @@ def clear_token_buckets():
     download._TOKEN_BUCKETS.clear()
     yield
     download._TOKEN_BUCKETS.clear()
+
+
 # --- Test Cases ---
 
 
@@ -860,11 +862,13 @@ def test_extract_zip_rejects_symlink(tmp_path):
     with download.zipfile.ZipFile(archive, "w") as zf:
         info = download.zipfile.ZipInfo("link")
         info.create_system = 3  # POSIX
-        info.external_attr = ((stat.S_IFLNK | 0o777) << 16)
+        info.external_attr = (stat.S_IFLNK | 0o777) << 16
         zf.writestr(info, "target")
 
     with pytest.raises(ConfigError):
         download.extract_zip_safe(archive, tmp_path / "out")
+
+
 # --- Helper Functions ---
 
 

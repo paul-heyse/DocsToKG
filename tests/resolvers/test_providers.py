@@ -164,6 +164,7 @@ responses = pytest.importorskip("responses")
 
 # --- test_figshare_resolver.py ---
 
+
 def load_fixture(name: str):
     fixture_path = DATA_DIR / name
     with fixture_path.open("r", encoding="utf-8") as handle:
@@ -171,6 +172,7 @@ def load_fixture(name: str):
 
 
 # --- test_figshare_resolver.py ---
+
 
 def make_artifact(tmp_path: Path, **overrides):
     base_kwargs = dict(
@@ -194,6 +196,7 @@ def make_artifact(tmp_path: Path, **overrides):
 
 
 # --- test_figshare_resolver.py ---
+
 
 @responses.activate
 def test_figshare_resolver_success(tmp_path):
@@ -222,6 +225,7 @@ def test_figshare_resolver_success(tmp_path):
 
 # --- test_figshare_resolver.py ---
 
+
 @responses.activate
 def test_figshare_resolver_filters_non_pdf_files(tmp_path):
     session = requests.Session()
@@ -246,6 +250,7 @@ def test_figshare_resolver_filters_non_pdf_files(tmp_path):
 
 
 # --- test_figshare_resolver.py ---
+
 
 @responses.activate
 def test_figshare_resolver_multiple_pdfs(tmp_path):
@@ -274,6 +279,7 @@ def test_figshare_resolver_multiple_pdfs(tmp_path):
 
 # --- test_figshare_resolver.py ---
 
+
 @responses.activate
 def test_figshare_resolver_no_matches(tmp_path):
     session = requests.Session()
@@ -292,6 +298,7 @@ def test_figshare_resolver_no_matches(tmp_path):
 
 
 # --- test_figshare_resolver.py ---
+
 
 @responses.activate
 def test_figshare_resolver_http_error(tmp_path):
@@ -319,6 +326,7 @@ def test_figshare_resolver_http_error(tmp_path):
 
 # --- test_figshare_resolver.py ---
 
+
 @responses.activate
 def test_figshare_resolver_json_error(tmp_path):
     session = requests.Session()
@@ -345,6 +353,7 @@ def test_figshare_resolver_json_error(tmp_path):
 
 # --- test_figshare_resolver.py ---
 
+
 @responses.activate
 def test_figshare_resolver_network_error(tmp_path):
     session = requests.Session()
@@ -370,6 +379,7 @@ def test_figshare_resolver_network_error(tmp_path):
 
 # --- test_figshare_resolver.py ---
 
+
 def test_figshare_resolver_disabled_without_doi(tmp_path):
     artifact = make_artifact(tmp_path, doi=None)
     config = ResolverConfig()
@@ -385,6 +395,7 @@ def test_figshare_resolver_disabled_without_doi(tmp_path):
 
 # --- test_zenodo_resolver.py ---
 
+
 def load_fixture(name: str) -> dict:  # noqa: F811
     """Load JSON fixture data from the shared tests/data directory."""
 
@@ -394,6 +405,7 @@ def load_fixture(name: str) -> dict:  # noqa: F811
 
 
 # --- test_zenodo_resolver.py ---
+
 
 def make_artifact(tmp_path: Path, **overrides: object) -> downloader.WorkArtifact:  # noqa: F811
     """Create a WorkArtifact populated with sensible defaults for testing."""
@@ -419,6 +431,7 @@ def make_artifact(tmp_path: Path, **overrides: object) -> downloader.WorkArtifac
 
 
 # --- test_zenodo_resolver.py ---
+
 
 @responses.activate
 def test_zenodo_resolver_success(tmp_path):
@@ -452,6 +465,7 @@ def test_zenodo_resolver_success(tmp_path):
 
 # --- test_zenodo_resolver.py ---
 
+
 @responses.activate
 def test_zenodo_resolver_filters_non_pdf_files(tmp_path):
     session = requests.Session()
@@ -477,6 +491,7 @@ def test_zenodo_resolver_filters_non_pdf_files(tmp_path):
 
 # --- test_zenodo_resolver.py ---
 
+
 @responses.activate
 def test_zenodo_resolver_no_matches(tmp_path):
     session = requests.Session()
@@ -495,6 +510,7 @@ def test_zenodo_resolver_no_matches(tmp_path):
 
 
 # --- test_zenodo_resolver.py ---
+
 
 @responses.activate
 def test_zenodo_resolver_http_error(tmp_path):
@@ -522,6 +538,7 @@ def test_zenodo_resolver_http_error(tmp_path):
 
 # --- test_zenodo_resolver.py ---
 
+
 @responses.activate
 def test_zenodo_resolver_json_error(tmp_path):
     session = requests.Session()
@@ -548,6 +565,7 @@ def test_zenodo_resolver_json_error(tmp_path):
 
 # --- test_zenodo_resolver.py ---
 
+
 @responses.activate
 def test_zenodo_resolver_network_error(tmp_path):
     session = requests.Session()
@@ -572,6 +590,7 @@ def test_zenodo_resolver_network_error(tmp_path):
 
 
 # --- test_zenodo_resolver.py ---
+
 
 def test_zenodo_resolver_disabled_without_doi(tmp_path):
     artifact = make_artifact(tmp_path, doi=None)

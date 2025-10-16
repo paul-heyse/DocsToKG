@@ -52,6 +52,7 @@ from pathlib import Path
 import pytest
 
 from DocsToKG.DocParsing.EmbeddingV2 import iter_rows_in_batches
+
 # --- Test Cases ---
 
 
@@ -197,6 +198,8 @@ def test_iter_rows_in_batches_memory_efficiency():
             total_rows += len(batch)
 
         assert total_rows == num_rows
+
+
 # --- Module Entry Points ---
 
 

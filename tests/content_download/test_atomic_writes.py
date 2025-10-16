@@ -124,6 +124,7 @@ from types import ModuleType, SimpleNamespace
 from typing import Any, Dict, Iterable, List
 
 import pytest
+
 # --- Globals ---
 
 DOWNLOAD_DEPS_AVAILABLE = True
@@ -567,6 +568,7 @@ def configure_embeddings_stubs(monkeypatch):
 
 @pytest.mark.usefixtures("monkeypatch")
 # --- Test Cases ---
+
 
 def test_chunker_failure_leaves_no_partial_files(tmp_path, monkeypatch):
     env = prepare_data_root(tmp_path)

@@ -132,6 +132,8 @@ def _single_work() -> Dict[str, Any]:
         "primary_location": {},
         "locations": [],
     }
+
+
 # --- Test Cases ---
 
 

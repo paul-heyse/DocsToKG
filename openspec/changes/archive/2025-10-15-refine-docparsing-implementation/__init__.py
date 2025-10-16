@@ -29,6 +29,7 @@ DocsToKG DocParsing Refinement Documentation Package.
 """
 
 from .documentation import RequirementDoc, load_requirement_docs
+
 # --- Globals ---
 
 __all__ = ["RequirementDoc", "load_requirement_docs"]

@@ -57,6 +57,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from DocsToKG.DocParsing._common import set_spawn_or_warn
+
 # --- Test Cases ---
 
 
@@ -161,6 +162,8 @@ def test_multiprocessing_import_safety():
         assert True  # If we get here, no exception was raised
     except ImportError as e:
         pytest.fail(f"Multiprocessing import failed: {e}")
+
+
 # --- Module Entry Points ---
 
 

@@ -200,8 +200,8 @@ pytest.importorskip("pydantic_settings")
 
 from pydantic import BaseModel, ValidationError
 
-from DocsToKG.OntologyDownload import resolvers
 from DocsToKG.OntologyDownload import ontology_download as core
+from DocsToKG.OntologyDownload import resolvers
 from DocsToKG.OntologyDownload.config import (
     ConfigError,
     DefaultsConfig,
@@ -216,6 +216,7 @@ from DocsToKG.OntologyDownload.config import (
     validate_config,
 )
 from DocsToKG.OntologyDownload.pipeline import merge_defaults
+
 # --- Test Cases ---
 
 
@@ -554,13 +555,17 @@ def test_fetch_one_download_error(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setitem(resolvers.RESOLVERS, "obo", StubResolver())
     monkeypatch.setattr(
-        core, "download_stream", lambda **_: (_ for _ in ()).throw(ConfigError("boom"))
+        pipeline_mod,
+        "download_stream",
+        lambda **_: (_ for _ in ()).throw(ConfigError("boom")),
     )
 
     with pytest.raises(core.OntologyDownloadError):
         core.fetch_one(
             spec, config=ResolvedConfig.from_defaults(), force=True, logger=_noop_logger()
         )
+
+
 # --- Helper Functions ---
 
 

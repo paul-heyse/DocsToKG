@@ -107,8 +107,13 @@ from .types import (
     vector_uuid_to_faiss_int,
 )
 from .validation import HybridSearchValidator
-from .vectorstore import FaissIndexManager, FaissVectorStore, ManagedFaissAdapter, restore_state, serialize_state
-
+from .vectorstore import (
+    FaissIndexManager,
+    FaissVectorStore,
+    ManagedFaissAdapter,
+    restore_state,
+    serialize_state,
+)
 
 # --- Package Setup ---
 

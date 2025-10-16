@@ -51,6 +51,7 @@ from typing import Iterable, List
 @dataclass(frozen=True)
 # --- Public Classes ---
 
+
 class RequirementDoc:
     """Human-readable description of a DocParsing refinement requirement.
 
@@ -73,6 +74,8 @@ class RequirementDoc:
     summary: str
     spec_reference: str
     scenarios: List[str]
+
+
 # --- Public Functions ---
 
 

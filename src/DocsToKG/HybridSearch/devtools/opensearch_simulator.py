@@ -12,12 +12,9 @@ Raises:
 
 from __future__ import annotations
 
-
 import math
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
-
-import math
 
 from ..config import ChunkingConfig
 from ..interfaces import LexicalIndex

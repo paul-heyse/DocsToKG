@@ -32,6 +32,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+
 # --- Public Classes ---
 
 
@@ -253,6 +254,8 @@ class DocsBuilder:
             success = False
 
         return success
+
+
 # --- Public Functions ---
 # --- Module Entry Points ---
 

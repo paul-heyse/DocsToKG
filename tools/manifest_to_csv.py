@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Produce a manifest.last.csv file from the DocsToKG manifest JSONL log."""
+
+from __future__ import annotations
 
 import argparse
 import csv
@@ -73,4 +73,3 @@ def main(argv: Optional[list[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -62,6 +62,7 @@ TRAINING_SAMPLE_RNG = np.random.default_rng(13)
 
 # --- Public Classes ---
 
+
 class IngestError(RuntimeError):
     """Base exception for ingestion failures.
 
@@ -351,8 +352,7 @@ class ChunkIngestionPipeline:
             )
         if missing:
             raise IngestError(
-                "Missing vector entries for chunk UUIDs: "
-                + ", ".join(sorted(set(missing)))
+                "Missing vector entries for chunk UUIDs: " + ", ".join(sorted(set(missing)))
             )
         return payloads
 

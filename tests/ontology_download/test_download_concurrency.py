@@ -318,6 +318,8 @@ def http_server():
     finally:
         server.shutdown()
         thread.join(timeout=5)
+
+
 # --- Helper Functions ---
 
 
@@ -356,6 +358,8 @@ def _download(
         expected_media_type=expected_media_type,
         service=service,
     )
+
+
 # --- Test Cases ---
 
 

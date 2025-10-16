@@ -297,7 +297,18 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Iterator, List, Mapping, Optional, TextIO, Tuple, TypeVar
+from typing import (
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    TextIO,
+    Tuple,
+    TypeVar,
+)
 
 T = TypeVar("T")
 
@@ -424,7 +435,9 @@ class ChunkResult:
     parse_engine: str
     error: Optional[str] = None
 
+
 # --- Path Resolution ---
+
 
 def expand_path(path: str | Path) -> Path:
     """Return ``path`` expanded to an absolute :class:`Path`.
@@ -486,13 +499,9 @@ def init_hf_env(
         Tuple of ``(hf_home, model_root)`` paths after normalisation.
     """
 
-    resolved_hf = (
-        expand_path(hf_home) if isinstance(hf_home, Path) else resolve_hf_home()
-    )
+    resolved_hf = expand_path(hf_home) if isinstance(hf_home, Path) else resolve_hf_home()
     resolved_model_root = (
-        expand_path(model_root)
-        if isinstance(model_root, Path)
-        else resolve_model_root(resolved_hf)
+        expand_path(model_root) if isinstance(model_root, Path) else resolve_model_root(resolved_hf)
     )
 
     os.environ["HF_HOME"] = str(resolved_hf)
@@ -866,6 +875,7 @@ def manifest_log_failure(
 
 # --- Logging and I/O Utilities ---
 
+
 def get_logger(name: str, level: str = "INFO") -> logging.Logger:
     """Get a structured JSON logger configured for console output.
 
@@ -1000,6 +1010,7 @@ def atomic_write(path: Path) -> Iterator[TextIO]:
 
 # --- Dataset Iterators ---
 
+
 def iter_doctags(directory: Path) -> Iterator[Path]:
     """Yield DocTags files within ``directory`` and subdirectories.
 
@@ -1055,6 +1066,7 @@ def iter_chunks(directory: Path) -> Iterator[Path]:
 
 
 # --- JSONL Helpers ---
+
 
 def jsonl_load(path: Path, skip_invalid: bool = False, max_errors: int = 10) -> List[dict]:
     """Load a JSONL file into memory with optional error tolerance.
@@ -1152,6 +1164,7 @@ def jsonl_save(
 
 # --- Collection Utilities ---
 
+
 class Batcher(Iterable[List[T]]):
     """Yield fixed-size batches from an iterable.
 
@@ -1203,6 +1216,7 @@ class Batcher(Iterable[List[T]]):
 
 
 # --- Manifest Utilities ---
+
 
 def _manifest_filename(stage: str) -> str:
     """Return manifest filename for a given stage."""
@@ -1359,6 +1373,7 @@ def load_manifest_index(stage: str, root: Optional[Path] = None) -> Dict[str, di
 
 
 # --- Concurrency Utilities ---
+
 
 @contextlib.contextmanager
 def acquire_lock(path: Path, timeout: float = 60.0) -> Iterator[bool]:

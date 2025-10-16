@@ -60,6 +60,7 @@ __all__ = (
 
 # --- Public Classes ---
 
+
 class ReciprocalRankFusion:
     """Combine ranked lists using Reciprocal Rank Fusion.
 
@@ -262,9 +263,8 @@ class ResultShaper:
         return [chunk.text[: min(len(chunk.text), 200)]]
 
 
-
-
 # --- Public Functions ---
+
 
 def apply_mmr_diversification(
     fused_candidates: Sequence[FusionCandidate],
@@ -298,7 +298,10 @@ def apply_mmr_diversification(
         return []
 
     embeddings = np.stack(
-        [candidate.chunk.features.embedding.astype(np.float32, copy=False) for candidate in fused_candidates]
+        [
+            candidate.chunk.features.embedding.astype(np.float32, copy=False)
+            for candidate in fused_candidates
+        ]
     )
     total = embeddings.shape[0]
     if total <= 0:

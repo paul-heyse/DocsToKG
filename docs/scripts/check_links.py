@@ -331,6 +331,8 @@ class LinkChecker:
             f.write(report)
 
         print(f"📋 Report saved to: {output_path}")
+
+
 # --- Public Functions ---
 # --- Module Entry Points ---
 

@@ -82,7 +82,6 @@ import re
 from typing import List, Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-
 # --- Globals ---
 
 __all__ = (
@@ -98,6 +97,7 @@ __all__ = (
 
 
 # --- Public Functions ---
+
 
 def normalize_doi(doi: Optional[str]) -> Optional[str]:
     """Normalize DOI identifiers by stripping common prefixes and whitespace.

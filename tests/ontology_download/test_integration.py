@@ -80,8 +80,10 @@ import pytest
 pytest.importorskip("pydantic")
 pytest.importorskip("pydantic_settings")
 
+import DocsToKG.OntologyDownload.pipeline as pipeline_mod
 from DocsToKG.OntologyDownload import DefaultsConfig, ResolvedConfig, resolvers
 from DocsToKG.OntologyDownload import ontology_download as core
+from DocsToKG.OntologyDownload import storage as storage_mod
 
 
 @pytest.fixture()
@@ -92,9 +94,16 @@ def patched_dirs(monkeypatch, tmp_path):
     ontologies = tmp_path / "ontologies"
     for directory in (cache, configs, logs, ontologies):
         directory.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(core, "CACHE_DIR", cache, raising=False)
-    monkeypatch.setattr(core, "CONFIG_DIR", configs, raising=False)
-    monkeypatch.setattr(core, "LOG_DIR", logs, raising=False)
+    overrides = {
+        "CACHE_DIR": cache,
+        "CONFIG_DIR": configs,
+        "LOG_DIR": logs,
+        "LOCAL_ONTOLOGY_DIR": ontologies,
+    }
+    for attr, value in overrides.items():
+        monkeypatch.setattr(storage_mod, attr, value, raising=False)
+        monkeypatch.setattr(pipeline_mod, attr, value, raising=False)
+        monkeypatch.setattr(core, attr, value, raising=False)
     monkeypatch.setattr(core, "ONTOLOGY_DIR", ontologies, raising=False)
 
     class _StubStorage:
@@ -111,7 +120,10 @@ def patched_dirs(monkeypatch, tmp_path):
         ) -> None:  # pragma: no cover - not used
             pass
 
-    monkeypatch.setattr(core, "STORAGE", _StubStorage(), raising=False)
+    stub_storage = _StubStorage()
+    monkeypatch.setattr(storage_mod, "STORAGE", stub_storage, raising=False)
+    monkeypatch.setattr(pipeline_mod, "STORAGE", stub_storage, raising=False)
+    monkeypatch.setattr(core, "STORAGE", stub_storage, raising=False)
     return ontologies
 
 
@@ -152,7 +164,10 @@ def stubbed_validators(monkeypatch):
             )
         return results
 
-    monkeypatch.setattr(core, "run_validators", _runner)
+    monkeypatch.setattr(pipeline_mod, "run_validators", _runner, raising=False)
+    monkeypatch.setattr(core, "run_validators", _runner, raising=False)
+
+
 # --- Test Cases ---
 
 
@@ -183,7 +198,10 @@ def test_fetch_all_writes_manifests(monkeypatch, patched_dirs, stubbed_validator
             last_modified="yesterday",
         )
 
-    monkeypatch.setattr(core, "download_stream", _download_with_fixture)
+    monkeypatch.setattr(
+        pipeline_mod, "download_stream", _download_with_fixture, raising=False
+    )
+    monkeypatch.setattr(core, "download_stream", _download_with_fixture, raising=False)
 
     results = core.fetch_all(
         [
@@ -222,7 +240,8 @@ def test_force_download_bypasses_manifest(monkeypatch, patched_dirs, stubbed_val
             last_modified=None,
         )
 
-    monkeypatch.setattr(core, "download_stream", _download)
+    monkeypatch.setattr(pipeline_mod, "download_stream", _download, raising=False)
+    monkeypatch.setattr(core, "download_stream", _download, raising=False)
     spec = core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"])
     monkeypatch.setitem(resolvers.RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
     manifest_path = patched_dirs / "pato" / "2024-01-01" / "manifest.json"
@@ -246,7 +265,8 @@ def test_multi_version_storage(monkeypatch, patched_dirs, stubbed_validators):
             last_modified=None,
         )
 
-    monkeypatch.setattr(core, "download_stream", _download)
+    monkeypatch.setattr(pipeline_mod, "download_stream", _download, raising=False)
+    monkeypatch.setattr(core, "download_stream", _download, raising=False)
     spec = core.FetchSpec(id="pato", resolver="obo", extras={}, target_formats=["owl"])
     config = ResolvedConfig(defaults=DefaultsConfig(), specs=[])
     core.fetch_one(spec, config=config, force=True)
@@ -269,7 +289,8 @@ def test_fetch_all_logs_progress(monkeypatch, patched_dirs, stubbed_validators, 
             last_modified=None,
         )
 
-    monkeypatch.setattr(core, "download_stream", _download)
+    monkeypatch.setattr(pipeline_mod, "download_stream", _download, raising=False)
+    monkeypatch.setattr(core, "download_stream", _download, raising=False)
     monkeypatch.setitem(resolvers.RESOLVERS, "obo", _StubResolver(fixture, "2024-01-01"))
     config = ResolvedConfig(defaults=DefaultsConfig(), specs=[])
     caplog.set_level(logging.INFO)

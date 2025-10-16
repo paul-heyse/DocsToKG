@@ -77,6 +77,7 @@ __all__ = [
 
 # --- Public API ---
 
+
 class CaptionPlusAnnotationPictureSerializer(MarkdownPictureSerializer):
     """Serialize picture items with captions and rich annotation metadata.
 

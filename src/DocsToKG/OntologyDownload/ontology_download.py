@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import hashlib as _hashlib
+from collections import OrderedDict
+from importlib import metadata as importlib_metadata
+from typing import Dict
 
 from .config import (
     ConfigError,
@@ -24,14 +27,12 @@ from .io_safe import (
     generate_correlation_id,
     mask_sensitive_data,
     sanitize_filename,
-    sha256_file,
     validate_url_security,
 )
 from .net import (
+    RDF_MIME_ALIASES,
     DownloadFailure,
     DownloadResult,
-    RDF_MIME_ALIASES,
-    RDF_MIME_FORMAT_LABELS,
     download_stream,
     retry_with_backoff,
 )
@@ -42,12 +43,10 @@ from .pipeline import (
     ConfigurationError,
     FetchResult,
     FetchSpec,
-    Manifest,
     OntologyDownloadError,
     PlannedFetch,
     ResolverCandidate,
-    ResolverError,
-    ValidationError,
+    _build_destination,
     fetch_all,
     fetch_one,
     get_manifest_schema,
@@ -60,10 +59,10 @@ from .pipeline import (
     plan_one,
     setup_logging,
     validate_manifest_dict,
-    _build_destination,
 )
-from .storage import CACHE_DIR, CONFIG_DIR, LOG_DIR, LOCAL_ONTOLOGY_DIR, STORAGE
+from .storage import CACHE_DIR, CONFIG_DIR, LOCAL_ONTOLOGY_DIR, LOG_DIR, STORAGE
 from .validation_core import (
+    VALIDATORS,
     ValidationRequest,
     ValidationResult,
     ValidationTimeout,
@@ -75,10 +74,19 @@ from .validation_core import (
     validate_pronto,
     validate_rdflib,
     validate_robot,
+)
+from .validation_core import (
     main as validation_main,
 )
 
 hashlib = _hashlib
+
+try:  # pragma: no cover - metadata may be unavailable during development
+    _PACKAGE_VERSION = importlib_metadata.version("DocsToKG")
+except importlib_metadata.PackageNotFoundError:  # pragma: no cover - local source tree
+    _PACKAGE_VERSION = "0.0.0"
+
+__version__ = _PACKAGE_VERSION
 
 DefaultsConfiguration = DefaultsConfig
 LoggingConfig = LoggingConfiguration
@@ -157,5 +165,44 @@ __all__ = [
     "get_owlready2",
     "get_manifest_schema",
     "mask_sensitive_data",
+    "list_plugins",
+    "about",
+    "__version__",
     "hashlib",
 ]
+def _describe_plugin(obj: object) -> str:
+    module = getattr(obj, "__module__", obj.__class__.__module__)
+    name = getattr(obj, "__qualname__", obj.__class__.__name__)
+    return f"{module}.{name}"
+
+
+def list_plugins(kind: str) -> Dict[str, str]:
+    """Return a deterministic mapping of registered plugins for ``kind``.
+
+    Args:
+        kind: Plugin category (``"resolver"`` or ``"validator"``).
+
+    Returns:
+        Mapping of plugin names to import-qualified identifiers.
+    """
+
+    if kind == "resolver":
+        items = {name: _describe_plugin(resolver) for name, resolver in RESOLVERS.items()}
+    elif kind == "validator":
+        items = {name: _describe_plugin(handler) for name, handler in VALIDATORS.items()}
+    else:
+        raise ValueError(f"Unknown plugin kind: {kind}")
+    return OrderedDict(sorted(items.items()))
+
+
+def about() -> Dict[str, object]:
+    """Return metadata describing the ontology download subsystem."""
+
+    return {
+        "package_version": _PACKAGE_VERSION,
+        "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
+        "plugins": {
+            "resolver": list_plugins("resolver"),
+            "validator": list_plugins("validator"),
+        },
+    }

@@ -61,12 +61,12 @@ from __future__ import annotations
 
 import math
 import time
-
-import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from http import HTTPStatus
 from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Sequence
+
+import numpy as np
 
 from .config import HybridSearchConfig, HybridSearchConfigManager
 from .features import FeatureGenerator
@@ -100,6 +100,7 @@ __all__ = (
 
 
 # --- Public Classes ---
+
 
 class RequestValidationError(ValueError):
     """Raised when the caller submits an invalid search request.
@@ -260,7 +261,13 @@ class HybridSearchService:
             fusion_start = time.perf_counter()
             if request.diversification and config.fusion.enable_mmr:
                 pool_size = int(
-                    max(1, min(getattr(config.fusion, "mmr_pool_size", len(unique_candidates)), len(unique_candidates)))
+                    max(
+                        1,
+                        min(
+                            getattr(config.fusion, "mmr_pool_size", len(unique_candidates)),
+                            len(unique_candidates),
+                        ),
+                    )
                 )
                 pool = list(unique_candidates[:pool_size])
                 desired = min(request.page_size, len(pool))
@@ -273,7 +280,9 @@ class HybridSearchService:
                     resources=dense_store.gpu_resources,
                 )
                 selected_ids = {candidate.chunk.vector_id for candidate in selected}
-                pool_remaining = [candidate for candidate in pool if candidate.chunk.vector_id not in selected_ids]
+                pool_remaining = [
+                    candidate for candidate in pool if candidate.chunk.vector_id not in selected_ids
+                ]
                 tail = list(unique_candidates[pool_size:])
                 diversified = [*selected, *pool_remaining, *tail]
             else:
@@ -349,7 +358,10 @@ class HybridSearchService:
                 skipping = True
                 for result in results:
                     if skipping:
-                        if result.vector_id == vector_id and abs(result.score - target_score) < 1e-6:
+                        if (
+                            result.vector_id == vector_id
+                            and abs(result.score - target_score) < 1e-6
+                        ):
                             skipping = False
                         continue
                     sliced.append(result)
@@ -384,9 +396,8 @@ class HybridSearchService:
         timings: Dict[str, float],
     ) -> ChannelResults:
         start = time.perf_counter()
-        use_true_bm25 = (
-            getattr(config.retrieval, "bm25_scoring", "compat") == "true"
-            and hasattr(self._opensearch, "search_bm25_true")
+        use_true_bm25 = getattr(config.retrieval, "bm25_scoring", "compat") == "true" and hasattr(
+            self._opensearch, "search_bm25_true"
         )
         if use_true_bm25:
             hits, _ = getattr(self._opensearch, "search_bm25_true")(
@@ -687,6 +698,7 @@ class PaginationCheckResult:
 
 
 # --- Public Functions ---
+
 
 def build_stats_snapshot(
     faiss_index: DenseVectorStore,

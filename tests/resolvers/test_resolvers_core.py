@@ -994,6 +994,7 @@ pytest.importorskip("requests")
 
 # --- test_resolver_caching.py ---
 
+
 @pytest.fixture(autouse=True)
 def clear_cache_between_tests():
     yield
@@ -1154,6 +1155,7 @@ def test_landing_page_helpers_extract_expected_urls() -> None:
 
 # --- test_resolver_caching.py ---
 
+
 def test_resolvers_use_shared_retry_helper(monkeypatch):
     calls: list[str] = []
 
@@ -1214,6 +1216,7 @@ def test_resolvers_use_shared_retry_helper(monkeypatch):
         "https://api.semanticscholar.org/graph/v1/paper/DOI:10.1234/test",
     ]
 
+
 # --- test_resolver_config.py ---
 
 pytest.importorskip("requests")
@@ -1224,6 +1227,7 @@ pytest.importorskip("pyalex")
 
 
 # --- test_resolver_config.py ---
+
 
 def test_legacy_resolver_rate_limits_rejected(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
@@ -1248,6 +1252,7 @@ def test_legacy_resolver_rate_limits_rejected(tmp_path: Path) -> None:
 
 
 # --- test_resolver_config.py ---
+
 
 def test_user_agent_includes_mailto(tmp_path: Path) -> None:
     args = Namespace(
@@ -1442,6 +1447,7 @@ pytest.importorskip("pyalex")
 
 # --- test_resolver_pipeline.py ---
 
+
 class DummySession:
     def __init__(self, responses):
         self._responses = responses
@@ -1459,6 +1465,7 @@ class DummySession:
 
 # --- test_resolver_pipeline.py ---
 
+
 class DummyResponse:
     def __init__(self, status_code=200, json_data=None, text="", headers=None):
         self.status_code = status_code
@@ -1473,6 +1480,7 @@ class DummyResponse:
 
 
 # --- test_resolver_pipeline.py ---
+
 
 class ListLogger:
     def __init__(self):
@@ -1495,6 +1503,7 @@ class ListLogger:
 
 # --- test_resolver_pipeline.py ---
 
+
 class StubResolver:
     def __init__(self, name, urls):
         self.name = name
@@ -1512,6 +1521,7 @@ class StubResolver:
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def build_artifact(tmp_path: Path) -> WorkArtifact:
     return WorkArtifact(
@@ -1533,6 +1543,7 @@ def build_artifact(tmp_path: Path) -> WorkArtifact:
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_classify_payload_detects_pdf_and_html():
     html = b"<html><body>Hello</body></html>"
@@ -1556,6 +1567,7 @@ def test_classify_payload_octet_stream_with_pdf_signature() -> None:
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_pipeline_stops_on_first_success(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -1594,6 +1606,7 @@ def test_pipeline_stops_on_first_success(tmp_path):
 
 # --- test_resolver_pipeline.py ---
 
+
 def test_pipeline_records_resolver_exception(tmp_path):
     artifact = build_artifact(tmp_path)
 
@@ -1627,6 +1640,7 @@ def test_pipeline_records_resolver_exception(tmp_path):
 
 # --- test_resolver_pipeline.py ---
 
+
 def test_unpaywall_resolver_extracts_candidates(tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = UnpaywallResolver()
@@ -1651,6 +1665,7 @@ def test_unpaywall_resolver_extracts_candidates(tmp_path):
 
 # --- test_resolver_pipeline.py ---
 
+
 def test_landing_page_resolver_meta_parsing(tmp_path, monkeypatch):
     pytest.importorskip("bs4")
     artifact = build_artifact(tmp_path)
@@ -1665,6 +1680,7 @@ def test_landing_page_resolver_meta_parsing(tmp_path, monkeypatch):
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_head_precheck_allows_redirect(monkeypatch, tmp_path):
     resolver = StubResolver("stub", ["https://example.org/file.pdf"])
@@ -1701,6 +1717,7 @@ def test_head_precheck_allows_redirect(monkeypatch, tmp_path):
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_cli_integration_happy_path(monkeypatch, tmp_path):
     from DocsToKG.ContentDownload import download_pyalex_pdfs as module
@@ -1821,6 +1838,7 @@ def test_cli_integration_happy_path(monkeypatch, tmp_path):
 
 # --- test_resolver_pipeline.py ---
 
+
 class DummyHeadResponse:
     def __init__(self, status_code: int = 200, headers: Optional[Dict[str, str]] = None):
         self.status_code = status_code
@@ -1831,6 +1849,7 @@ class DummyHeadResponse:
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_head_precheck_skips_html(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
@@ -1863,6 +1882,7 @@ def test_head_precheck_skips_html(monkeypatch, tmp_path):
 
 # --- test_resolver_pipeline.py ---
 
+
 def test_head_precheck_skips_zero_length(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
@@ -1892,6 +1912,7 @@ def test_head_precheck_skips_zero_length(monkeypatch, tmp_path):
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_head_precheck_skips_error_status(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
@@ -1923,6 +1944,7 @@ def test_head_precheck_skips_error_status(monkeypatch, tmp_path):
 
 # --- test_resolver_pipeline.py ---
 
+
 def test_head_precheck_allows_pdf(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
@@ -1951,6 +1973,7 @@ def test_head_precheck_allows_pdf(monkeypatch, tmp_path):
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_head_precheck_allows_redirect_to_pdf(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
@@ -1984,6 +2007,7 @@ def test_head_precheck_allows_redirect_to_pdf(monkeypatch, tmp_path):
 
 # --- test_resolver_pipeline.py ---
 
+
 def test_head_precheck_failure_allows_download(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
@@ -2012,6 +2036,7 @@ def test_head_precheck_failure_allows_download(monkeypatch, tmp_path):
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_head_precheck_respects_global_disable(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
@@ -2047,6 +2072,7 @@ def test_head_precheck_respects_global_disable(monkeypatch, tmp_path):
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_head_precheck_resolver_override(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
@@ -2089,6 +2115,7 @@ def test_head_precheck_resolver_override(monkeypatch, tmp_path):
 
 # --- test_resolver_pipeline.py ---
 
+
 def test_callable_accepts_argument_handles_noncallable():
     from DocsToKG.ContentDownload.resolvers import _callable_accepts_argument
 
@@ -2098,6 +2125,7 @@ def test_callable_accepts_argument_handles_noncallable():
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_pipeline_logs_missing_resolver(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -2115,6 +2143,7 @@ def test_pipeline_logs_missing_resolver(tmp_path):
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_pipeline_skips_disabled_resolver(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -2139,6 +2168,7 @@ def test_pipeline_skips_disabled_resolver(tmp_path):
 
 # --- test_resolver_pipeline.py ---
 
+
 def test_pipeline_skips_not_applicable_resolver(tmp_path):
     artifact = build_artifact(tmp_path)
 
@@ -2162,6 +2192,7 @@ def test_pipeline_skips_not_applicable_resolver(tmp_path):
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_collect_resolver_results_handles_exception(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -2190,6 +2221,7 @@ def test_collect_resolver_results_handles_exception(tmp_path):
 
 # --- test_resolver_pipeline.py ---
 
+
 def test_pipeline_records_event_and_skip_reason(tmp_path):
     artifact = build_artifact(tmp_path)
     event_result = ResolverResult(url=None, event="info", event_reason="rate-limit")
@@ -2206,6 +2238,7 @@ def test_pipeline_records_event_and_skip_reason(tmp_path):
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_pipeline_skips_duplicate_urls(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -2227,6 +2260,7 @@ def test_pipeline_skips_duplicate_urls(tmp_path):
 
 # --- test_resolver_pipeline.py ---
 
+
 def test_pipeline_head_precheck_failure_skips_attempt(monkeypatch, tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
@@ -2247,6 +2281,7 @@ def test_pipeline_head_precheck_failure_skips_attempt(monkeypatch, tmp_path):
 
 # --- test_resolver_pipeline.py ---
 
+
 def test_pipeline_event_without_reason(tmp_path):
     artifact = build_artifact(tmp_path)
     event_result = ResolverResult(url=None, event="info", event_reason=None)
@@ -2263,6 +2298,7 @@ def test_pipeline_event_without_reason(tmp_path):
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_pipeline_downloads_with_context_argument(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -2285,6 +2321,7 @@ def test_pipeline_downloads_with_context_argument(tmp_path):
 
 # --- test_resolver_pipeline.py ---
 
+
 def test_pipeline_respects_max_attempts(tmp_path):
     artifact = build_artifact(tmp_path)
     resolver = StubResolver("stub", [ResolverResult(url="https://example.org/pdf")])
@@ -2304,6 +2341,7 @@ def test_pipeline_respects_max_attempts(tmp_path):
 
 # --- test_resolver_pipeline.py ---
 
+
 def test_pipeline_jitter_sleep_no_delay():
     config = ResolverConfig()
     config.sleep_jitter = 0.0
@@ -2316,6 +2354,7 @@ def test_pipeline_jitter_sleep_no_delay():
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_pipeline_concurrent_skips_missing_resolver(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -2339,6 +2378,7 @@ def test_pipeline_concurrent_skips_missing_resolver(tmp_path):
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_pipeline_ignores_empty_url(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -2365,6 +2405,7 @@ def test_pipeline_ignores_empty_url(tmp_path):
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_pipeline_concurrent_execution(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -2396,6 +2437,7 @@ def test_pipeline_concurrent_execution(tmp_path):
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_pipeline_global_deduplication_skips_repeat_urls(tmp_path):
     artifact = build_artifact(tmp_path)
@@ -2446,6 +2488,7 @@ def test_pipeline_global_deduplication_skips_repeat_urls(tmp_path):
 
 
 # --- test_resolver_pipeline.py ---
+
 
 def test_pipeline_domain_rate_limiting_enforces_interval(monkeypatch, tmp_path):
     class FakeClock:
@@ -2535,6 +2578,7 @@ def test_pipeline_domain_rate_limiting_enforces_interval(monkeypatch, tmp_path):
 
 # --- new jitter test ---
 
+
 def test_domain_limit_includes_jitter_component(monkeypatch, tmp_path: Path) -> None:
     class FakeClock:
         def __init__(self) -> None:
@@ -2582,6 +2626,7 @@ pytest.importorskip("bs4")
 
 # --- test_resolver_providers_additional.py ---
 
+
 class _StubResponse:
     def __init__(
         self,
@@ -2606,6 +2651,7 @@ class _StubResponse:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def _artifact(tmp_path: Any, **overrides: Any) -> WorkArtifact:
     base_kwargs: Dict[str, Any] = dict(
         work_id="W1",
@@ -2629,6 +2675,7 @@ def _artifact(tmp_path: Any, **overrides: Any) -> WorkArtifact:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_arxiv_resolver_skips_missing_identifier(tmp_path) -> None:
     resolver = ArxivResolver()
     artifact = _artifact(tmp_path, arxiv_id=None)
@@ -2640,6 +2687,7 @@ def test_arxiv_resolver_skips_missing_identifier(tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_arxiv_resolver_strips_prefix(tmp_path) -> None:
     resolver = ArxivResolver()
@@ -2653,6 +2701,7 @@ def test_arxiv_resolver_strips_prefix(tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_openalex_resolver_skip(tmp_path) -> None:
     resolver = OpenAlexResolver()
     artifact = _artifact(tmp_path, pdf_urls=[], open_access_url=None)
@@ -2664,6 +2713,7 @@ def test_openalex_resolver_skip(tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_openalex_resolver_dedupes(tmp_path) -> None:
     resolver = OpenAlexResolver()
@@ -2680,6 +2730,7 @@ def test_openalex_resolver_dedupes(tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_landing_page_resolver_meta_pattern(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2703,6 +2754,7 @@ def test_landing_page_resolver_meta_pattern(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_landing_page_resolver_link_pattern(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2728,6 +2780,7 @@ def test_landing_page_resolver_link_pattern(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_landing_page_resolver_anchor_pattern(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     artifact.landing_urls = ["https://example.org/article"]
@@ -2752,6 +2805,7 @@ def test_landing_page_resolver_anchor_pattern(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_landing_page_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     artifact.landing_urls = ["https://example.org/article"]
@@ -2769,6 +2823,7 @@ def test_landing_page_resolver_http_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 @pytest.mark.parametrize(
     "exception,reason",
@@ -2796,6 +2851,7 @@ def test_landing_page_resolver_request_errors(monkeypatch, tmp_path, exception, 
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_core_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -2814,6 +2870,7 @@ def test_core_resolver_http_error(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_core_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -2830,6 +2887,7 @@ def test_core_resolver_json_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_core_resolver_emits_results(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2861,6 +2919,7 @@ def test_core_resolver_emits_results(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 @pytest.mark.parametrize(
     "exception,reason",
     [
@@ -2886,6 +2945,7 @@ def test_core_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> 
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_core_resolver_skips_when_no_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
     config = ResolverConfig()
@@ -2898,6 +2958,7 @@ def test_core_resolver_skips_when_no_doi(tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_core_resolver_is_enabled_requires_key(tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -2907,6 +2968,7 @@ def test_core_resolver_is_enabled_requires_key(tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_core_resolver_ignores_non_dict_hits(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2927,6 +2989,7 @@ def test_core_resolver_ignores_non_dict_hits(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_crossref_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -2943,6 +3006,7 @@ def test_crossref_resolver_http_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_crossref_resolver_success(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -2972,6 +3036,7 @@ def test_crossref_resolver_success(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_crossref_resolver_link_not_list(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -2990,6 +3055,7 @@ def test_crossref_resolver_link_not_list(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_crossref_resolver_skip_without_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
     config = ResolverConfig()
@@ -3003,6 +3069,7 @@ def test_crossref_resolver_skip_without_doi(tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_crossref_resolver_is_enabled(tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3013,6 +3080,7 @@ def test_crossref_resolver_is_enabled(tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_crossref_resolver_session_success(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -3055,6 +3123,7 @@ def test_crossref_resolver_session_success(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_crossref_resolver_cached_request_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3070,6 +3139,7 @@ def test_crossref_resolver_cached_request_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 @pytest.mark.parametrize(
     "exception,reason",
@@ -3099,6 +3169,7 @@ def test_crossref_resolver_session_errors(monkeypatch, tmp_path, exception, reas
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_crossref_resolver_session_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3120,6 +3191,7 @@ def test_crossref_resolver_session_http_error(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_crossref_resolver_session_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3140,6 +3212,7 @@ def test_crossref_resolver_session_json_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_crossref_resolver_uses_central_retry_logic(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -3198,6 +3271,7 @@ def test_crossref_resolver_uses_central_retry_logic(monkeypatch, tmp_path) -> No
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_doaj_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3213,6 +3287,7 @@ def test_doaj_resolver_http_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_doaj_resolver_emits_candidate(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -3244,6 +3319,7 @@ def test_doaj_resolver_emits_candidate(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_doaj_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3259,6 +3335,7 @@ def test_doaj_resolver_json_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 @pytest.mark.parametrize(
     "exception,reason",
@@ -3284,6 +3361,7 @@ def test_doaj_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> 
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_doaj_resolver_includes_api_key(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3308,6 +3386,7 @@ def test_doaj_resolver_includes_api_key(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_doaj_resolver_skip_no_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
     config = ResolverConfig()
@@ -3318,6 +3397,7 @@ def test_doaj_resolver_skip_no_doi(tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_europe_pmc_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -3335,6 +3415,7 @@ def test_europe_pmc_resolver_http_error(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_europe_pmc_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3350,6 +3431,7 @@ def test_europe_pmc_resolver_json_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_europe_pmc_resolver_emits_pdf(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -3382,6 +3464,7 @@ def test_europe_pmc_resolver_emits_pdf(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 @pytest.mark.parametrize(
     "exception",
     [requests.Timeout("slow"), requests.ConnectionError("down"), requests.RequestException("boom")],
@@ -3401,6 +3484,7 @@ def test_europe_pmc_resolver_error_paths(monkeypatch, tmp_path, exception) -> No
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_hal_resolver_emits_urls(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -3432,6 +3516,7 @@ def test_hal_resolver_emits_urls(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_hal_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3447,6 +3532,7 @@ def test_hal_resolver_json_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 @pytest.mark.parametrize(
     "exception,reason",
@@ -3472,6 +3558,7 @@ def test_hal_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> N
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_hal_resolver_is_enabled(tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3483,6 +3570,7 @@ def test_hal_resolver_is_enabled(tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_hal_resolver_skip_no_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
     config = ResolverConfig()
@@ -3493,6 +3581,7 @@ def test_hal_resolver_skip_no_doi(tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_openaire_resolver_emits_pdf(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -3527,6 +3616,7 @@ def test_openaire_resolver_emits_pdf(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_openaire_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3542,6 +3632,7 @@ def test_openaire_resolver_json_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_openaire_resolver_fallback_json_load(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -3577,6 +3668,7 @@ def test_openaire_resolver_fallback_json_load(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 @pytest.mark.parametrize(
     "exception,reason",
     [
@@ -3600,6 +3692,7 @@ def test_openaire_resolver_error_paths(monkeypatch, tmp_path, exception, reason)
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_osf_resolver_emits_urls(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -3631,6 +3724,7 @@ def test_osf_resolver_emits_urls(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_osf_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3646,6 +3740,7 @@ def test_osf_resolver_json_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 @pytest.mark.parametrize(
     "exception,reason",
@@ -3671,6 +3766,7 @@ def test_osf_resolver_error_paths(monkeypatch, tmp_path, exception, reason) -> N
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_osf_resolver_skip_no_doi(tmp_path) -> None:
     artifact = _artifact(tmp_path, doi=None)
     config = ResolverConfig()
@@ -3681,6 +3777,7 @@ def test_osf_resolver_skip_no_doi(tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_unpaywall_resolver_cached_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -3704,6 +3801,7 @@ def test_unpaywall_resolver_cached_http_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_unpaywall_resolver_cached_success(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -3737,6 +3835,7 @@ def test_unpaywall_resolver_cached_success(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 @pytest.mark.parametrize(
     "exception,reason",
     [
@@ -3760,6 +3859,7 @@ def test_unpaywall_resolver_session_errors(monkeypatch, tmp_path, exception, rea
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_unpaywall_resolver_session_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3775,6 +3875,7 @@ def test_unpaywall_resolver_session_json_error(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_unpaywall_resolver_is_enabled(tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3788,6 +3889,7 @@ def test_unpaywall_resolver_is_enabled(tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_unpaywall_resolver_session_success(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -3810,6 +3912,7 @@ def test_unpaywall_resolver_session_success(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_semantic_scholar_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3831,6 +3934,7 @@ def test_semantic_scholar_resolver_http_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 @pytest.mark.parametrize(
     "exception,reason",
@@ -3859,6 +3963,7 @@ def test_semantic_scholar_resolver_errors(monkeypatch, tmp_path, exception, reas
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_semantic_scholar_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -3877,6 +3982,7 @@ def test_semantic_scholar_resolver_json_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_semantic_scholar_resolver_no_open_access(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -3897,6 +4003,7 @@ def test_semantic_scholar_resolver_no_open_access(monkeypatch, tmp_path) -> None
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_pmc_resolver_no_identifiers(tmp_path) -> None:
     resolver = PmcResolver()
     artifact = _artifact(tmp_path, pmcid=None, pmid=None, doi=None)
@@ -3908,6 +4015,7 @@ def test_pmc_resolver_no_identifiers(tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_pmc_resolver_timeout_fallback(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -3925,6 +4033,7 @@ def test_pmc_resolver_timeout_fallback(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 @pytest.mark.parametrize(
     "exception,reason",
@@ -3949,6 +4058,7 @@ def test_pmc_resolver_other_errors(monkeypatch, tmp_path, exception, reason) -> 
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_pmc_resolver_success(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path, pmcid="PMC123456")
     config = ResolverConfig()
@@ -3967,6 +4077,7 @@ def test_pmc_resolver_success(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_pmc_lookup_pmcids_success(monkeypatch, tmp_path) -> None:
     resolver = PmcResolver()
@@ -3992,6 +4103,7 @@ def test_pmc_lookup_pmcids_success(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_pmc_lookup_pmcids_handles_json_error(monkeypatch, tmp_path) -> None:
     resolver = PmcResolver()
     config = ResolverConfig()
@@ -4007,6 +4119,7 @@ def test_pmc_lookup_pmcids_handles_json_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_wayback_resolver_handles_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -4024,6 +4137,7 @@ def test_wayback_resolver_handles_http_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_wayback_resolver_returns_archive(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -4053,6 +4167,7 @@ def test_wayback_resolver_returns_archive(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_wayback_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     artifact.failed_pdf_urls = ["https://example.org/pdf"]
@@ -4069,6 +4184,7 @@ def test_wayback_resolver_json_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 @pytest.mark.parametrize(
     "exception,reason",
@@ -4095,6 +4211,7 @@ def test_wayback_resolver_error_paths(monkeypatch, tmp_path, exception, reason) 
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_wayback_resolver_no_snapshot(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     artifact.failed_pdf_urls = ["https://example.org/pdf"]
@@ -4114,6 +4231,7 @@ def test_wayback_resolver_no_snapshot(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_zenodo_resolver_no_doi(tmp_path) -> None:
     resolver = ZenodoResolver()
     artifact = _artifact(tmp_path, doi=None)
@@ -4125,6 +4243,7 @@ def test_zenodo_resolver_no_doi(tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 @pytest.mark.parametrize(
     "exception,reason",
@@ -4149,6 +4268,7 @@ def test_zenodo_resolver_errors(monkeypatch, tmp_path, exception, reason) -> Non
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_zenodo_resolver_http_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -4165,6 +4285,7 @@ def test_zenodo_resolver_http_error(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_zenodo_resolver_json_error(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
     config = ResolverConfig()
@@ -4180,6 +4301,7 @@ def test_zenodo_resolver_json_error(monkeypatch, tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_zenodo_resolver_emits_urls(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -4219,6 +4341,7 @@ def test_zenodo_resolver_emits_urls(monkeypatch, tmp_path) -> None:
 
 # --- test_resolver_providers_additional.py ---
 
+
 def test_zenodo_resolver_is_enabled(tmp_path) -> None:
     artifact = _artifact(tmp_path)
     resolver = ZenodoResolver()
@@ -4229,6 +4352,7 @@ def test_zenodo_resolver_is_enabled(tmp_path) -> None:
 
 
 # --- test_resolver_providers_additional.py ---
+
 
 def test_zenodo_resolver_malformed_hits(monkeypatch, tmp_path) -> None:
     artifact = _artifact(tmp_path)
@@ -4242,6 +4366,7 @@ def test_zenodo_resolver_malformed_hits(monkeypatch, tmp_path) -> None:
     results = list(ZenodoResolver().iter_urls(Mock(), config, artifact))
 
     assert results == []
+
 
 # --- test_resolvers_unit.py ---
 
@@ -4257,6 +4382,7 @@ responses = pytest.importorskip("responses")
 
 
 # --- test_resolvers_unit.py ---
+
 
 def make_artifact(tmp_path: Path, **overrides: object) -> downloader.WorkArtifact:
     base_kwargs = dict(
@@ -4281,6 +4407,7 @@ def make_artifact(tmp_path: Path, **overrides: object) -> downloader.WorkArtifac
 
 # --- test_resolvers_unit.py ---
 
+
 def build_config(**overrides: object) -> ResolverConfig:
     config = ResolverConfig()
     for key, value in overrides.items():
@@ -4289,6 +4416,7 @@ def build_config(**overrides: object) -> ResolverConfig:
 
 
 # --- test_resolvers_unit.py ---
+
 
 @responses.activate
 def test_unpaywall_resolver_success(tmp_path):
@@ -4315,6 +4443,7 @@ def test_unpaywall_resolver_success(tmp_path):
 
 # --- test_resolvers_unit.py ---
 
+
 @responses.activate
 def test_unpaywall_resolver_http_error(tmp_path):
     session = requests.Session()
@@ -4331,6 +4460,7 @@ def test_unpaywall_resolver_http_error(tmp_path):
 
 
 # --- test_resolvers_unit.py ---
+
 
 @responses.activate
 def test_crossref_resolver_includes_mailto(tmp_path):
@@ -4360,6 +4490,7 @@ def test_crossref_resolver_includes_mailto(tmp_path):
 
 # --- test_resolvers_unit.py ---
 
+
 @responses.activate
 def test_crossref_resolver_handles_json_error(tmp_path):
     session = requests.Session()
@@ -4377,6 +4508,7 @@ def test_crossref_resolver_handles_json_error(tmp_path):
 
 
 # --- test_resolvers_unit.py ---
+
 
 @responses.activate
 def test_landing_page_resolver_patterns(tmp_path):
@@ -4408,6 +4540,7 @@ def test_landing_page_resolver_patterns(tmp_path):
 
 # --- test_resolvers_unit.py ---
 
+
 @responses.activate
 def test_landing_page_resolver_http_error(tmp_path):  # noqa: F811
     pytest.importorskip("bs4")
@@ -4420,6 +4553,7 @@ def test_landing_page_resolver_http_error(tmp_path):  # noqa: F811
 
 
 # --- test_resolvers_unit.py ---
+
 
 @responses.activate
 def test_pmc_resolver_uses_id_converter(tmp_path):
@@ -4455,6 +4589,7 @@ def test_pmc_resolver_uses_id_converter(tmp_path):
 
 # --- test_resolvers_unit.py ---
 
+
 @responses.activate
 def test_pmc_resolver_handles_request_error(tmp_path):
     session = requests.Session()
@@ -4470,6 +4605,7 @@ def test_pmc_resolver_handles_request_error(tmp_path):
 
 
 # --- test_resolvers_unit.py ---
+
 
 @responses.activate
 def test_europe_pmc_resolver_filters_pdf(tmp_path):
@@ -4501,6 +4637,7 @@ def test_europe_pmc_resolver_filters_pdf(tmp_path):
 
 # --- test_resolvers_unit.py ---
 
+
 @responses.activate
 def test_europe_pmc_resolver_http_error(tmp_path):  # noqa: F811
     session = requests.Session()
@@ -4516,6 +4653,7 @@ def test_europe_pmc_resolver_http_error(tmp_path):  # noqa: F811
 
 
 # --- test_resolvers_unit.py ---
+
 
 @responses.activate
 def test_openaire_resolver_collects_pdf_candidates(tmp_path):
@@ -4553,6 +4691,7 @@ def test_openaire_resolver_collects_pdf_candidates(tmp_path):
 
 # --- test_resolvers_unit.py ---
 
+
 @responses.activate
 def test_hal_resolver_uses_file_fields(tmp_path):
     session = requests.Session()
@@ -4586,6 +4725,7 @@ def test_hal_resolver_uses_file_fields(tmp_path):
 
 # --- test_resolvers_unit.py ---
 
+
 @responses.activate
 def test_osf_resolver_merges_download_links(tmp_path):
     session = requests.Session()
@@ -4613,6 +4753,7 @@ def test_osf_resolver_merges_download_links(tmp_path):
 
 # --- test_resolvers_unit.py ---
 
+
 @responses.activate
 def test_core_resolver_success(tmp_path):
     session = requests.Session()
@@ -4635,6 +4776,7 @@ def test_core_resolver_success(tmp_path):
 
 # --- test_resolvers_unit.py ---
 
+
 @responses.activate
 def test_core_resolver_handles_failure(tmp_path):
     session = requests.Session()
@@ -4650,6 +4792,7 @@ def test_core_resolver_handles_failure(tmp_path):
 
 
 # --- test_resolvers_unit.py ---
+
 
 @responses.activate
 def test_doaj_resolver_filters_pdf(tmp_path):
@@ -4679,6 +4822,7 @@ def test_doaj_resolver_filters_pdf(tmp_path):
 
 # --- test_resolvers_unit.py ---
 
+
 @responses.activate
 def test_doaj_resolver_handles_error(tmp_path):
     session = requests.Session()
@@ -4694,6 +4838,7 @@ def test_doaj_resolver_handles_error(tmp_path):
 
 
 # --- test_resolvers_unit.py ---
+
 
 @responses.activate
 def test_semantic_scholar_resolver_handles_error(tmp_path):
@@ -4714,6 +4859,7 @@ def test_semantic_scholar_resolver_handles_error(tmp_path):
 
 # --- test_resolvers_unit.py ---
 
+
 @responses.activate
 def test_semantic_scholar_resolver_success(tmp_path):
     session = requests.Session()
@@ -4730,6 +4876,7 @@ def test_semantic_scholar_resolver_success(tmp_path):
 
 
 # --- test_resolvers_unit.py ---
+
 
 @responses.activate
 def test_wayback_resolver_success(tmp_path):
@@ -4755,6 +4902,7 @@ def test_wayback_resolver_success(tmp_path):
 
 
 # --- test_resolvers_unit.py ---
+
 
 @responses.activate
 def test_wayback_resolver_handles_missing_snapshot(tmp_path):

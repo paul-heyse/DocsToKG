@@ -43,6 +43,7 @@ import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
 # --- Public Classes ---
 
 
@@ -106,9 +107,7 @@ class CodeAnnotationValidator:
 
         return issues
 
-    def _validate_navmap(
-        self, file_path: Path, tree: ast.Module, lines: List[str]
-    ) -> List[Dict]:
+    def _validate_navmap(self, file_path: Path, tree: ast.Module, lines: List[str]) -> List[Dict]:
         """Ensure the NAVMAP sections enumerate classes and functions in order."""
 
         navmap = self._extract_navmap(lines)
@@ -518,6 +517,8 @@ class CodeAnnotationValidator:
 
         print(f"\n📊 Summary: {total_issues} total issues")
         print("Run this script regularly to maintain code annotation quality")
+
+
 # --- Public Functions ---
 # --- Module Entry Points ---
 

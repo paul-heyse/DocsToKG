@@ -14,9 +14,8 @@ from __future__ import annotations
 
 from typing import Dict, Iterator, List, Mapping, Optional, Sequence
 
-from .types import ChunkPayload, vector_uuid_to_faiss_int
-
 from .devtools.opensearch_simulator import OpenSearchSimulator
+from .types import ChunkPayload, vector_uuid_to_faiss_int
 
 __all__ = ("ChunkRegistry", "OpenSearchSimulator", "matches_filters")
 
@@ -112,7 +111,7 @@ class ChunkRegistry:
         """
         return list(self._chunks.values())
 
-    def iter_all(self) -> typing.Iterator[ChunkPayload]:
+    def iter_all(self) -> Iterator[ChunkPayload]:
         """Yield chunk payloads without materialising the full list."""
 
         return iter(self._chunks.values())

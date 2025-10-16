@@ -29,6 +29,7 @@ from tests.docparsing.synthetic import (
     generate_synthetic_vectors,
     simulate_embedding_benchmark,
 )
+
 # --- Test Cases ---
 
 

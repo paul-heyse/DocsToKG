@@ -161,7 +161,6 @@ from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTok
 from docling_core.types.doc.document import DoclingDocument, DocTagsDocument
 from transformers import AutoTokenizer
 
-
 # --- Globals ---
 
 __all__ = (
@@ -196,7 +195,6 @@ from DocsToKG.DocParsing._common import (
     manifest_log_failure,
     manifest_log_skip,
     manifest_log_success,
-    resolve_hash_algorithm,
     should_skip_output,
 )
 from DocsToKG.DocParsing.pipelines import (
@@ -281,9 +279,7 @@ def _load_structural_marker_config(path: Path) -> Tuple[List[str], List[str]]:
         headings = _ensure_str_list(data.get("headings"), "headings")
         captions = _ensure_str_list(data.get("captions"), "captions")
     else:
-        raise ValueError(
-            f"Unsupported heading markers format in {path}: expected list or mapping."
-        )
+        raise ValueError(f"Unsupported heading markers format in {path}: expected list or mapping.")
 
     return headings, captions
 
@@ -325,6 +321,7 @@ def _validate_chunk_files(files: Sequence[Path], logger) -> tuple[int, int]:
     print(f"Validated {total_rows} rows across {total_files} chunk files.")
     return total_files, total_rows
 
+
 # --- Defaults ---
 
 DEFAULT_DATA_ROOT = detect_data_root()
@@ -337,6 +334,7 @@ _LOGGER = get_logger(__name__)
 
 
 # --- Public Functions ---
+
 
 def read_utf8(p: Path) -> str:
     """Load text from disk using UTF-8 with replacement for invalid bytes.
@@ -390,7 +388,9 @@ def extract_refs_and_pages(chunk: BaseChunk) -> Tuple[List[str], List[int]]:
     return refs, sorted(pages)
 
 
-def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, int, Optional[float]]:
+def summarize_image_metadata(
+    chunk: BaseChunk, text: str
+) -> Tuple[bool, bool, int, Optional[float]]:
     """Infer image annotation flags, counts, and confidences from chunk metadata and text."""
 
     has_caption = False
@@ -420,7 +420,9 @@ def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, i
             has_caption = has_caption or bool(flags.get("has_image_captions"))
             has_classification = has_classification or bool(flags.get("has_image_classification"))
             _maybe_add_conf(flags.get("image_confidence"))
-        annotations = getattr(picture, "annotations", []) or getattr(doc_item, "annotations", []) or []
+        annotations = (
+            getattr(picture, "annotations", []) or getattr(doc_item, "annotations", []) or []
+        )
         for ann in annotations:
             _maybe_add_conf(getattr(ann, "confidence", None))
             _maybe_add_conf(getattr(ann, "score", None))
@@ -444,7 +446,9 @@ def summarize_image_metadata(chunk: BaseChunk, text: str) -> Tuple[bool, bool, i
 
     if num_images == 0:
         num_images = (
-            text.count("<!-- image -->") + text.count("Figure caption:") + text.count("Picture description:")
+            text.count("<!-- image -->")
+            + text.count("Figure caption:")
+            + text.count("Picture description:")
         )
     if num_images == 0 and (has_caption or has_classification):
         num_images = 1
@@ -507,7 +511,11 @@ def _chunk_worker_initializer(cfg: ChunkWorkerConfig) -> None:
 def _process_chunk_task(task: ChunkTask) -> ChunkResult:
     """Chunk a single DocTags file inside a worker process."""
 
-    if _CHUNK_WORKER_CONFIG is None or _CHUNK_WORKER_TOKENIZER is None or _CHUNK_WORKER_CHUNKER is None:
+    if (
+        _CHUNK_WORKER_CONFIG is None
+        or _CHUNK_WORKER_TOKENIZER is None
+        or _CHUNK_WORKER_CHUNKER is None
+    ):
         raise RuntimeError("Chunk worker not initialised")
 
     cfg = _CHUNK_WORKER_CONFIG
@@ -525,8 +533,8 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
             text = chunker.contextualize(ch)
             n_tok = tokenizer.count_tokens(text=text)
             refs, pages = extract_refs_and_pages(ch)
-            has_caption, has_classification, num_images, image_confidence = summarize_image_metadata(
-                ch, text
+            has_caption, has_classification, num_images, image_confidence = (
+                summarize_image_metadata(ch, text)
             )
             recs.append(
                 Rec(
@@ -610,6 +618,8 @@ def _process_chunk_task(task: ChunkTask) -> ChunkResult:
             parse_engine=task.parse_engine,
             error=str(exc),
         )
+
+
 def merge_rec(
     a: Rec,
     b: Rec,
@@ -650,6 +660,7 @@ def merge_rec(
 
 # --- Topic-aware boundary detection ---
 
+
 def is_structural_boundary(
     rec: Rec,
     heading_markers: Optional[Sequence[str]] = None,
@@ -683,6 +694,7 @@ def is_structural_boundary(
 
 
 # --- Smart coalescence of SMALL-RUNS (< min_tokens) ---
+
 
 def coalesce_small_runs(
     records: List[Rec],
@@ -719,7 +731,9 @@ def coalesce_small_runs(
     out: List[Rec] = []
     i, N = 0, len(records)
     margin = max(0, soft_barrier_margin)
-    heading_prefixes = tuple(heading_markers) if heading_markers is not None else DEFAULT_HEADING_MARKERS
+    heading_prefixes = (
+        tuple(heading_markers) if heading_markers is not None else DEFAULT_HEADING_MARKERS
+    )
     caption_prefixes = (
         tuple(caption_markers) if caption_markers is not None else DEFAULT_CAPTION_MARKERS
     )
@@ -900,6 +914,7 @@ def coalesce_small_runs(
 
 # --- Main ---
 
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct an argument parser for the chunking pipeline.
 
@@ -1042,13 +1057,9 @@ def main(args: argparse.Namespace | None = None) -> int:
         custom_heading_markers = extra_headings
         custom_caption_markers = extra_captions
         if extra_headings:
-            heading_markers = _dedupe_preserve_order(
-                (*heading_markers, *tuple(extra_headings))
-            )
+            heading_markers = _dedupe_preserve_order((*heading_markers, *tuple(extra_headings)))
         if extra_captions:
-            caption_markers = _dedupe_preserve_order(
-                (*caption_markers, *tuple(extra_captions))
-            )
+            caption_markers = _dedupe_preserve_order((*caption_markers, *tuple(extra_captions)))
         args.structural_markers = markers_path
 
     logger.info(

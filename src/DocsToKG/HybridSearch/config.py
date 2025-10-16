@@ -73,6 +73,7 @@ __all__ = (
 
 # --- Public Classes ---
 
+
 @dataclass(frozen=True)
 class ChunkingConfig:
     """Configuration for document chunking operations.

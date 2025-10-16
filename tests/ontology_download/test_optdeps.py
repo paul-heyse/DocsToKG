@@ -89,6 +89,7 @@ from DocsToKG.OntologyDownload import optdeps
 @pytest.fixture(autouse=True)
 # --- Helper Functions ---
 
+
 def _reset_caches() -> None:
     """Ensure module caches are reset before each test."""
 
@@ -120,6 +121,8 @@ def _failing_import(module_name: str):
         return importlib.import_module(name)
 
     return _import
+
+
 # --- Test Cases ---
 
 

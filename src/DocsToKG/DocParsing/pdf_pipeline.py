@@ -80,6 +80,7 @@ list_pdfs = _pipelines.list_pdfs
 
 # --- Legacy CLI Entry Points ---
 
+
 def parse_args(argv: object | None = None):
     """Return parsed CLI arguments for the legacy PDF pipeline.
 
@@ -115,9 +116,7 @@ def main(args: object | None = None) -> int:
         namespace.vlm_stop = []
     overrides = {
         "pdf_convert_one": globals().get("convert_one", _pipelines.pdf_convert_one),
-        "ProcessPoolExecutor": globals().get(
-            "ProcessPoolExecutor", _pipelines.ProcessPoolExecutor
-        ),
+        "ProcessPoolExecutor": globals().get("ProcessPoolExecutor", _pipelines.ProcessPoolExecutor),
         "as_completed": globals().get("as_completed", _pipelines.as_completed),
         "tqdm": globals().get("tqdm", _pipelines.tqdm),
     }

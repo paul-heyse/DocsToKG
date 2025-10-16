@@ -33,6 +33,7 @@ from pathlib import Path
 import pytest
 
 from DocsToKG.DocParsing._common import compute_relative_doc_id
+
 # --- Test Cases ---
 
 
@@ -135,6 +136,8 @@ def test_relative_doc_id_edge_cases():
 
         rel_id = compute_relative_doc_id(special_file, root_dir)
         assert rel_id == "file with spaces & symbols.pdf"
+
+
 # --- Module Entry Points ---
 
 

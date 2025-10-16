@@ -32,6 +32,7 @@ from typing import List
 from transformers import AutoTokenizer
 
 from DocsToKG.DocParsing._common import get_logger, iter_doctags
+
 # --- Private Helpers ---
 
 
@@ -44,6 +45,8 @@ def _load_sample_texts(doctags_dir: Path, sample_size: int) -> List[str]:
             break
         texts.append(path.read_text(encoding="utf-8", errors="replace")[:5000])
     return texts
+
+
 # --- Public Functions ---
 # --- Module Entry Points ---
 

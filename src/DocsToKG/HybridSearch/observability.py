@@ -83,6 +83,7 @@ __all__ = (
 
 # --- Public Classes ---
 
+
 @dataclass
 class CounterSample:
     """Sample from a counter metric with labels and value.
@@ -191,9 +192,9 @@ class MetricsCollector:
         self._counters: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], float] = (
             defaultdict(float)
         )
-        self._histograms: MutableMapping[
-            Tuple[str, Tuple[Tuple[str, str], ...]], Deque[float]
-        ] = defaultdict(_deque_factory)
+        self._histograms: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], Deque[float]] = (
+            defaultdict(_deque_factory)
+        )
         self._gauges: MutableMapping[Tuple[str, Tuple[Tuple[str, str], ...]], float] = {}
 
     def increment(self, name: str, amount: float = 1.0, **labels: str) -> None:

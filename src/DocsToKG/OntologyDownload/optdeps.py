@@ -115,7 +115,9 @@ class _StubGraph:
         self._triples = triples
         return self
 
-    def serialize(self, destination: Optional[Any] = None, format: Optional[str] = None, **_kwargs: object):
+    def serialize(
+        self, destination: Optional[Any] = None, format: Optional[str] = None, **_kwargs: object
+    ):
         """Serialise parsed triples to the supplied destination."""
 
         if destination is None:

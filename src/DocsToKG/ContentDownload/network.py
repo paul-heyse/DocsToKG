@@ -134,6 +134,7 @@ LOGGER = logging.getLogger("DocsToKG.ContentDownload.network")
 
 # --- Public Functions ---
 
+
 def create_session(
     headers: Optional[Mapping[str, str]] = None,
     *,
@@ -286,9 +287,7 @@ def request_with_retries(
         retry_statuses = set(retry_statuses)
 
     if not hasattr(session, "request") or not callable(getattr(session, "request")):
-        raise AttributeError(
-            f"Session object of type {type(session)!r} lacks callable 'request'."
-        )
+        raise AttributeError(f"Session object of type {type(session)!r} lacks callable 'request'.")
 
     def request_func(
         *,
@@ -453,6 +452,7 @@ def head_precheck(
 
 # --- Private Helpers ---
 
+
 def _looks_like_pdf(headers: Mapping[str, str]) -> bool:
     """Return ``True`` when response headers suggest a PDF payload."""
 
@@ -502,6 +502,7 @@ def _head_precheck_via_get(
 
 
 # --- Public Classes ---
+
 
 @dataclass
 class CachedResult:
@@ -706,8 +707,7 @@ class ConditionalRequestHelper:
                 digest = hasher.hexdigest()
                 if digest != self.prior_sha256:
                     raise ValueError(
-                        "Cached SHA256 mismatch: "
-                        f"expected {self.prior_sha256}, got {digest}"
+                        "Cached SHA256 mismatch: " f"expected {self.prior_sha256}, got {digest}"
                     )
 
             return CachedResult(

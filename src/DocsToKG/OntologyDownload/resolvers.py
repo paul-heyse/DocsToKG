@@ -123,6 +123,7 @@ from .errors import ResolverError, UserConfigError
 from .net import TokenBucket, retry_with_backoff, validate_url_security
 from .optdeps import get_pystow
 from .plugins import ensure_resolver_plugins
+
 # --- Globals ---
 
 OlsClient = _OlsClient
@@ -181,6 +182,8 @@ def normalize_license_to_spdx(value: Optional[str]) -> Optional[str]:
     if "apache" in lower and "2" in lower:
         return "Apache-2.0"
     return cleaned
+
+
 # --- Private Helpers ---
 
 
@@ -201,6 +204,7 @@ def _get_service_bucket(service: str, config: ResolvedConfig) -> TokenBucket:
 
 @dataclass(slots=True)
 # --- Public Classes ---
+
 
 class FetchPlan:
     """Concrete plan output from a resolver.

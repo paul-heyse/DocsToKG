@@ -83,19 +83,20 @@ import pytest
 pytest.importorskip("requests")
 pytest.importorskip("pyalex")
 
+from DocsToKG.ContentDownload.resolvers import AttemptRecord  # noqa: E402
 from DocsToKG.ContentDownload.telemetry import (  # noqa: E402
+    MANIFEST_SCHEMA_VERSION,
     CsvSink,
     JsonlSink,
     LastAttemptCsvSink,
     ManifestEntry,
     ManifestIndexSink,
     MultiSink,
-    MANIFEST_SCHEMA_VERSION,
 )
-from DocsToKG.ContentDownload.resolvers import AttemptRecord  # noqa: E402
 from scripts.export_attempts_csv import export_attempts_jsonl_to_csv  # noqa: E402
 from tools.manifest_to_csv import convert_manifest_to_csv  # noqa: E402
 from tools.manifest_to_index import convert_manifest_to_index  # noqa: E402
+
 # --- Test Cases ---
 
 
@@ -209,6 +210,7 @@ def test_multi_sink_close_closes_files(tmp_path: Path) -> None:
     assert jsonl_sink._file.closed  # type: ignore[attr-defined]
     assert csv_sink._file.closed  # type: ignore[attr-defined]
 
+
 def test_jsonl_sink_writes_valid_records(tmp_path: Path) -> None:
     log_path = tmp_path / "attempts.jsonl"
     logger = JsonlSink(log_path)
@@ -302,6 +304,8 @@ def test_export_attempts_csv(tmp_path: Path) -> None:
     assert row["status"] == "http_error"
     assert row["dry_run"] == "True"
     assert row["metadata"] == json.dumps({"status": 404}, sort_keys=True)
+
+
 # --- Helper Functions ---
 
 

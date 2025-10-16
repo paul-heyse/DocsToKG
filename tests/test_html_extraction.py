@@ -50,6 +50,7 @@ pytest.importorskip("pyalex")
 
 from DocsToKG.ContentDownload.classifications import Classification
 from DocsToKG.ContentDownload.download_pyalex_pdfs import WorkArtifact, download_candidate
+
 # --- Globals ---
 
 requests = pytest.importorskip("requests")
@@ -64,6 +65,7 @@ class _FakeTrafilatura:
 
 @responses.activate
 # --- Test Cases ---
+
 
 def test_html_extraction_creates_text_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     artifact = WorkArtifact(
